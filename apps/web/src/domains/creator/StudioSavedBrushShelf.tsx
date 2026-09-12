@@ -1,6 +1,7 @@
 import { Check, Pin, SlidersHorizontal } from "lucide-react";
 
 import { selectQuickBrushes, type StudioSavedBrush } from "./brush/studio-brush-library";
+import { StudioMaterialBrushThumbnail } from "./brush/StudioMaterialBrushThumbnail";
 
 import type { MouseEventHandler } from "react";
 
@@ -76,7 +77,9 @@ export function StudioSavedBrushShelf({
                   <Check size={10} strokeWidth={3} />
                 </span>
               ) : null}
-              <span className="grid h-4 w-10 place-items-center overflow-hidden rounded-md border border-line bg-[linear-gradient(90deg,#f8fafc_0_50%,#242936_50%_100%)]" aria-hidden>
+              {brush.enginePrograms?.material ? (
+                <StudioMaterialBrushThumbnail brush={brush} className="h-4 w-10 rounded-md border border-line" />
+              ) : <span className="grid h-4 w-10 place-items-center overflow-hidden rounded-md border border-line bg-[linear-gradient(90deg,#f8fafc_0_50%,#242936_50%_100%)]" aria-hidden>
                 <span
                   className="block w-9 rounded-full"
                   style={{
@@ -85,7 +88,7 @@ export function StudioSavedBrushShelf({
                     opacity: brush.brushOpacity,
                   }}
                 />
-              </span>
+              </span>}
               <span className="w-full truncate text-[0.66rem] font-semibold">{brush.name}</span>
             </button>
           );

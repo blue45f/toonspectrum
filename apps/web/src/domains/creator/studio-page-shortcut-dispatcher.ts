@@ -37,6 +37,7 @@ import {
 import { resolveStudioViewShortcut, stepStudioViewZoom } from "./studio-view-controls";
 
 import type { NormalizedStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
 import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type { BubbleVariant } from "./studio-assets";
 import type { CropRect } from "./studio-crop";
@@ -138,7 +139,7 @@ export interface StudioShortcutHandlerContext {
   readonly dodgeBurnActive: boolean;
   readonly dodgeBurnDragRef: { current: object | null };
   readonly drawingShortcutStateRef: {
-    readonly current: { tool: Tool; drawMode: DrawMode; strokeWidth: number; brushOpacity: number };
+    readonly current: { tool: Tool; drawMode: DrawMode; strokeWidth: number; brushOpacity: number; brushEnginePrograms?: StudioBrushEngineProgramSet | null };
   };
   readonly duplicateSelected: () => void;
   readonly editing: { readonly id: string } | null;
@@ -953,14 +954,14 @@ export function buildStudioShortcutHandler(
           announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
         } else if (drawingShortcut.type === "adjust-width") {
           const currentDrawing = drawingShortcutStateRef.current;
-          const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta);
+          const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta, currentDrawing.brushEnginePrograms);
           if (nextWidth === currentDrawing.strokeWidth) return;
           currentDrawing.strokeWidth = nextWidth;
           setStrokeWidth(nextWidth);
           if (!e.repeat) announceDrawingShortcut(`브러시 크기 ${nextWidth}px`);
         } else if (drawingShortcut.type === "adjust-opacity") {
           const currentDrawing = drawingShortcutStateRef.current;
-          const nextOpacity = adjustStudioBrushOpacity(currentDrawing.brushOpacity, drawingShortcut.delta);
+          const nextOpacity = adjustStudioBrushOpacity(currentDrawing.brushOpacity, drawingShortcut.delta, currentDrawing.brushEnginePrograms);
           if (nextOpacity === currentDrawing.brushOpacity) return;
           currentDrawing.brushOpacity = nextOpacity;
           setBrushOpacity(nextOpacity);

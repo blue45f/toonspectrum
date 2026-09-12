@@ -6,6 +6,11 @@
  * already connected oil and watercolor program switches.
  */
 
+import {
+  normalizeBrushStudioV6MaterialConfig,
+  type BrushStudioV6MaterialConfig,
+} from "../brush-lab/brush-studio-v6-material-engine";
+
 import type { StudioOilRibbonCarrierOptions } from "./studio-oil-ribbon-carrier";
 
 export const STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION = 1 as const;
@@ -49,6 +54,7 @@ export type StudioBrushCompositionProgramSet = Readonly<
 
 export interface StudioBrushEngineProgramSet {
   readonly version: typeof STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION;
+  readonly material?: BrushStudioV6MaterialConfig;
   readonly oil?: StudioBrushOilProgramSet;
   readonly watercolor?: StudioBrushWatercolorProgramSet;
   readonly composition?: StudioBrushCompositionProgramSet;
@@ -208,8 +214,10 @@ export function normalizeStudioBrushEngineProgramSet(
     ? frozenComposition(source.composition as StudioBrushCompositionProgramSet)
     : undefined;
 
+  const material = normalizeBrushStudioV6MaterialConfig(source.material);
   return Object.freeze({
     version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+    ...(material ? { material } : {}),
     ...(oil ? { oil } : {}),
     ...(watercolor ? { watercolor } : {}),
     ...(composition ? { composition } : {}),
@@ -220,13 +228,14 @@ export function studioBrushEngineProgramSetMatchesBrush(
   brush: string,
   set: StudioBrushEngineProgramSet | null | undefined,
 ): boolean {
-  if (set?.watercolor || set?.composition) return false;
+  if (set?.material || set?.watercolor || set?.composition) return false;
   if (!set?.oil) return true;
   const baseline = studioOilProgramSetForBrush(brush);
   return STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => set.oil![key] === baseline[key]);
 }
 
 function buildStudioBrushEngineProgramSet(input: {
+  readonly material?: BrushStudioV6MaterialConfig;
   readonly oil?: StudioBrushOilProgramSet;
   readonly watercolor?: StudioBrushWatercolorProgramSet;
   readonly composition?: StudioBrushCompositionProgramSet;
@@ -234,9 +243,11 @@ function buildStudioBrushEngineProgramSet(input: {
   const watercolor = input.watercolor ? frozenWatercolor(input.watercolor) : undefined;
   const composition = input.composition ? frozenComposition(input.composition) : undefined;
   const oil = input.oil ? Object.freeze({ ...input.oil }) : undefined;
-  if (!oil && !watercolor && !composition) return null;
+  const material = input.material;
+  if (!oil && !watercolor && !composition && !material) return null;
   return Object.freeze({
     version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+    ...(material ? { material } : {}),
     ...(oil ? { oil } : {}),
     ...(watercolor ? { watercolor } : {}),
     ...(composition ? { composition } : {}),
@@ -266,6 +277,7 @@ export function studioBrushEngineProgramSetWithOil(
   oil: StudioBrushOilProgramSet,
 ): StudioBrushEngineProgramSet {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     oil,
     watercolor: current?.watercolor,
     composition: current?.composition,
@@ -276,6 +288,7 @@ export function studioBrushEngineProgramSetWithoutOil(
   current: StudioBrushEngineProgramSet | null | undefined,
 ): StudioBrushEngineProgramSet | null {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     watercolor: current?.watercolor,
     composition: current?.composition,
   });
@@ -286,6 +299,7 @@ export function studioBrushEngineProgramSetWithWatercolor(
   watercolor: StudioBrushWatercolorProgramSet,
 ): StudioBrushEngineProgramSet {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     oil: current?.oil,
     watercolor,
     composition: current?.composition,
@@ -296,6 +310,7 @@ export function studioBrushEngineProgramSetWithoutWatercolor(
   current: StudioBrushEngineProgramSet | null | undefined,
 ): StudioBrushEngineProgramSet | null {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     oil: current?.oil,
     composition: current?.composition,
   });
@@ -306,6 +321,7 @@ export function studioBrushEngineProgramSetWithComposition(
   composition: StudioBrushCompositionProgramSet,
 ): StudioBrushEngineProgramSet {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     oil: current?.oil,
     watercolor: current?.watercolor,
     composition,
@@ -316,7 +332,14 @@ export function studioBrushEngineProgramSetWithoutComposition(
   current: StudioBrushEngineProgramSet | null | undefined,
 ): StudioBrushEngineProgramSet | null {
   return buildStudioBrushEngineProgramSet({
+    material: current?.material,
     oil: current?.oil,
     watercolor: current?.watercolor,
   });
+}
+
+export function studioBrushEngineProgramSetFromMaterial(
+  material: BrushStudioV6MaterialConfig,
+): StudioBrushEngineProgramSet {
+  return buildStudioBrushEngineProgramSet({ material })!;
 }

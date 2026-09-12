@@ -76,6 +76,8 @@ jobs:
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
       - name: Strict lint
         run: pnpm run lint:strict
       - name: Typecheck application, API and realtime worker
@@ -92,6 +94,8 @@ jobs:
             apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts \
             packages/core/src/search-normalization.test.ts \
             packages/core/src/server/home.cpu-cache.test.ts
+      - name: Material brush execution and saved recipe regressions
+        run: pnpm run test:studio-material-brush
       - name: Non-3D Studio editing and export regressions
         run: |
           set -euo pipefail

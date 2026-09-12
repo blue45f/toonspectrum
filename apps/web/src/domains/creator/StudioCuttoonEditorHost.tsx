@@ -1,3 +1,5 @@
+import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
+import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
@@ -89,7 +91,6 @@ import { StudioBg3dRecoveryAccessGate } from "./bg3d/studio-bg3d-recovery-access
 import { isStudioBrushAliasId, isStudioBrushEraserAliasId } from "./brush/studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
-  studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
 } from "./brush/studio-brush-dynamics";
@@ -111,13 +112,14 @@ import {
   studioCoreBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "./brush/studio-brush-selection";
+import { studioBrushCatalogSelectionSnapshot, studioBrushSlotSelectionSnapshot } from "./brush/studio-brush-selection-snapshot";
 import {
   assignStudioBrushSlot,
   rememberStudioBrushSlot,
   studioBrushSlotAt,
   type StudioBrushSlot,
 } from "./brush/studio-brush-slots";
-import { resolveStudioStampBrushKind, resolveStudioStampBrushStyle } from "./brush/studio-brush-stamp-engine";
+import { resolveStudioStampBrushStyle } from "./brush/studio-brush-stamp-engine";
 import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
 import { useStudioBrushQuickSlots } from "./brush/useStudioBrushQuickSlots";
 import {
@@ -352,7 +354,6 @@ import { executeStudioCompanionToolCommand } from "./studio-companion-tool-comma
 import { lintStudioContinuity, type StudioContinuityIssue, type StudioStoryBeat } from "./studio-continuity";
 import {
   commitPendingStrokeBatchForAdmission,
-  studioLiveInkLaneSelectsGpu,
 } from "./live/studio-live-ink-lane-admission";
 import { useStudioCollaborationWiring } from "./live/studio-collaboration-wiring";
 import { studioDrawElementToCrdtStroke } from "./live/studio-crdt-draw-bridge";
@@ -431,7 +432,7 @@ import {
   requireStudioDrawingPointerTransport,
 } from "./brush/studio-drawing-pointer-transport";
 import { createStudioDrawingShortcutNoticeStore } from "./brush/studio-drawing-shortcut-notice-store";
-import { adjustStudioBrushWidth } from "./brush/studio-drawing-shortcuts";
+import { adjustStudioBrushWidthFromWheel } from "./brush/studio-drawing-shortcuts";
 import { isStudioPasteScopeCurrent, resolveStudioEditAvailability } from "./studio-edit-controls";
 import {
   isStudioCuttoonSourceFormat,
@@ -777,7 +778,6 @@ import {
 import {
   BRUSH_DELETE_UNDO_MS,
   STUDIO_SERVER_AUTOSAVE_IDLE_MS,
-  defaultStampTuningForBrushId,
   filterSfxPresets,
   hasStudioBg3dServerPersistedTarget,
   isStudioBg3dRecoveryScopeLocallyCurrent,
@@ -5363,7 +5363,13 @@ export function StudioCuttoonEditor({
     };
   }, [initialToolOperationMemory]);
 
+  useStudioMaterialBrushRequest(location.search, applySavedBrush, announceDrawingShortcut);
+
   function applySavedBrush(saved: StudioSavedBrush) {
+    // A saved paint→paint selection is explicit too. SQLite hydration can finish before
+    // React renders the state updates below, so publish the selected snapshot immediately.
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = saved;
     brushBaselineController.select({ kind: "saved", brush: saved });
     activatePrimaryCanvasTool(
       "draw",
@@ -5430,13 +5436,20 @@ export function StudioCuttoonEditor({
       brushOpacity,
       color,
     }, { operation: selection.operation });
+    const snapshot = studioBrushCatalogSelectionSnapshot(currentBrushSnapshot, selection, applied);
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = snapshot;
     brushBaselineController.select({ kind: "catalog", selection });
     activatePrimaryCanvasTool(
       "draw",
       selection.operation === "erase" ? "eraser" : "pen",
       true,
     );
+    toolOperationMemoryRef.current = rememberStudioToolOperationSnapshot(
+      toolOperationMemoryRef.current, selection.operation, snapshot,
+    );
     prepareStudioSymmetryForBrush(applied.brushId);
+    setBrushEnginePrograms(snapshot.enginePrograms ?? null);
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
     setActiveCatalogBrush({
@@ -5445,15 +5458,11 @@ export function StudioCuttoonEditor({
       sourcePresetId: extendedSource ? selection.catalogId : undefined,
       sourcePresetName: extendedSource ? selection.catalogName : undefined,
     });
-    setStampTuning(defaultStampTuningForBrushId(applied.brushId));
+    setStampTuning(snapshot.stampTuning);
     setStrokeWidth(applied.strokeWidth);
     setBrushOpacity(applied.brushOpacity);
     if (applied.color !== color) setColor(applied.color);
-    if (selection.brushDynamics) {
-      setBrushDynamics(normalizeStudioBrushDynamicsSettings(selection.brushDynamics));
-    } else {
-      setBrushDynamics(normalizeStudioBrushDynamicsSettings());
-    }
+    setBrushDynamics(snapshot.brushDynamics);
     commitProDrawPrefsMutation(
       (latest) => rememberRecentBrushId(latest, selection.catalogId)
     );
@@ -5469,6 +5478,7 @@ export function StudioCuttoonEditor({
         ...(selection.brushDynamics
           ? { brushDynamics: normalizeStudioBrushDynamicsSettings(selection.brushDynamics) }
           : {}),
+        enginePrograms: snapshot.enginePrograms,
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
       }),
@@ -5770,22 +5780,15 @@ export function StudioCuttoonEditor({
   }, [brush, brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: StudioBrushSlot) {
+    const snapshot = studioBrushSlotSelectionSnapshot(currentBrushSnapshot, slot);
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = snapshot;
     brushBaselineController.selectCatalog(slot.sourcePresetId ?? slot.brushId);
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
-    if (preset) {
-      setBrush(preset.id);
-      setStampTuning(defaultStampTuningForBrushId(preset.id));
-      const dynamics = slot.brushDynamics
-        ? normalizeStudioBrushDynamicsSettings(slot.brushDynamics)
-        : studioBrushDynamicsSettingsForBrushId(preset.id);
-      // Non-dynamics presets reset to neutral defaults. Keeping the previous brush's snapshot
-      // alive here leaked its presetId/depositPipeline into currentBrushSnapshot, polluting
-      // saved brushes, slots and tool memory with stale dynamics.
-      setBrushDynamics(dynamics ?? normalizeStudioBrushDynamicsSettings());
-    } else {
-      setBrush(slot.brushId);
-      setStampTuning(defaultStampTuningForBrushId(slot.brushId));
-    }
+    setBrush(snapshot.brushId);
+    setStampTuning(snapshot.stampTuning);
+    setBrushDynamics(snapshot.brushDynamics);
+    setBrushEnginePrograms(snapshot.enginePrograms ?? null);
     setActiveCatalogBrush({
       id: slot.sourcePresetId ?? slot.brushId,
       name: slot.sourcePresetName
@@ -5801,6 +5804,9 @@ export function StudioCuttoonEditor({
       resolveStudioBrushPresetDrawMode(slot.brushId),
       true,
     );
+    toolOperationMemoryRef.current = rememberStudioToolOperationSnapshot(
+      toolOperationMemoryRef.current, resolveStudioBrushPresetOperation(slot.brushId), snapshot,
+    );
     prepareStudioSymmetryForBrush(slot.brushId);
   }
 
@@ -5812,8 +5818,8 @@ export function StudioCuttoonEditor({
     if (preset) applyBuiltInBrushPreset(preset);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(settings));
   }
-  const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
-  drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
+  const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity, brushEnginePrograms });
+  drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity, brushEnginePrograms };
   const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
@@ -8363,12 +8369,6 @@ export function StudioCuttoonEditor({
         cause instanceof Error ? cause.message : "권위 샘플 전송에 실패했습니다.",
       );
     }
-  }
-
-  function studioHokusaiLiveStrokeSelected(element: DrawEl): boolean {
-    return element.mode === "pen"
-      && (element.kind ?? "freehand") === "freehand"
-      && Boolean(studioHokusaiProductLivePreset(element.brush ?? "pen", element.brushCatalogId));
   }
 
   function beginStudioHokusaiLiveStroke(element: DrawEl): boolean {
@@ -12343,8 +12343,7 @@ export function StudioCuttoonEditor({
       }
       if (wheelMode === "brush-size") {
         e.preventDefault();
-        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
-        setStrokeWidth((w) => adjustStudioBrushWidth(w, dir * (e.shiftKey ? 5 : 1)));
+        setStrokeWidth((w) => adjustStudioBrushWidthFromWheel(w, e, prefs.reverseWheel, currentBrushSnapshotRef.current?.enginePrograms));
         return;
       }
       if (wheelMode === "pan") {
@@ -23207,54 +23206,15 @@ const puppetWarpArmed =
         return false;
       };
 
-      // Compatibility boundaries are decided from the brush/document contract, not from runtime
-      // failure. These booleans are mutually exclusive before a provider is touched.
-      const livingInkSelected = studioLivingInkSupportsElement(
-        next,
+      const selectedMedia = selectStudioLiveStrokeMedia(next, {
         livingInkPhysicalModeEnabled,
-      );
-      const hokusaiSelected = !livingInkSelected && studioHokusaiLiveStrokeSelected(next);
-      const stampKind = resolveStudioStampBrushKind(next.brush);
-      const stampSelected = !livingInkSelected
-        && !hokusaiSelected
-        && Boolean(stampKind)
-        && isDirectLiveStampDraftEl(next);
-      const wetMediaSelected = !livingInkSelected
-        && !hokusaiSelected
-        && !stampSelected
-        && !pixelDirect
-        && studioLiveWetInkOverlaySupportsElement(next);
-      const retainedMediaSelected = !livingInkSelected
-        && !hokusaiSelected
-        && !stampSelected
-        && !wetMediaSelected
-        && !pixelDirect
-        && (next.mode !== "eraser" || liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes)
-        && studioLiveRetainedMediaOverlaySupportsElement(next);
-      const dynamicSelected = !livingInkSelected
-        && !hokusaiSelected
-        && !stampSelected
-        && !wetMediaSelected
-        && !retainedMediaSelected
-        && !pixelDirect
-        && studioLiveDynamicBrushOverlaySupportsElement(next);
-      const genericDirectSelected = !livingInkSelected
-        && !hokusaiSelected
-        && !stampSelected
-        && !wetMediaSelected
-        && !retainedMediaSelected
-        && !dynamicSelected
-        && !pixelDirect
-        && isDirectLiveDraftEl(next);
-      const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({
-        element: next,
+        retainedHasSettledStrokes: liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes,
         explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND,
         hardwareReady: webGpuBackendRef.current === "webgpu"
           && webGpuCanvasHandleRef.current?.isBackendAvailable() === true,
         rolloutPrefersGpu: STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
           && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
       });
-      const canvas2dSelected = genericDirectSelected && !gpuSelected;
 
       if (pendingGpuAuthorityBlocksNewSurface) {
         return rejectSelectedSurface(
@@ -23263,23 +23223,23 @@ const puppetWarpArmed =
         );
       }
 
-      const livingInkAdmitted = livingInkSelected
+      const livingInkAdmitted = (selectedMedia.kind === "living-ink")
         && beginStudioLivingInkStroke(next, pointerSample);
-      if (livingInkSelected && !livingInkAdmitted) {
+      if ((selectedMedia.kind === "living-ink") && !livingInkAdmitted) {
         return rejectSelectedSurface("Living Ink", "준비 상태와 표면 연결을 확인해 주세요.");
       }
 
-      const hokusaiPinned = hokusaiSelected
+      const hokusaiPinned = (selectedMedia.kind === "hokusai")
         && beginStudioHokusaiLiveStroke(next);
-      if (hokusaiSelected && !hokusaiPinned) {
+      if ((selectedMedia.kind === "hokusai") && !hokusaiPinned) {
         return rejectSelectedSurface("Hokusai WASM", "선택한 자연매체 프리셋의 Worker가 준비되지 않았습니다.");
       }
 
-      const stampDirect = Boolean(stampSelected
-        && stampKind
+      const stampDirect = Boolean((selectedMedia.kind === "stamp")
+        && selectedMedia.stampKind
         && liveStampOverlayRendererRef.current.begin(
           resolveStudioStampBrushStyle(
-            stampKind,
+            selectedMedia.stampKind,
             {
               color: next.stroke,
               size: Math.max(1, next.strokeWidth),
@@ -23292,13 +23252,13 @@ const puppetWarpArmed =
           next.points[1] ?? strokeOrigin.y,
           next.pressures?.[0] ?? 0.5
         ));
-      if (stampSelected && !stampDirect) {
+      if ((selectedMedia.kind === "stamp") && !stampDirect) {
         return rejectSelectedSurface("스탬프", "선택한 스탬프 표면을 시작하지 못했습니다.");
       }
 
       // The WebGPU lane is either admitted as the selected provider or rejected. It never hands
       // the same stroke to Canvas2D/Konva after initialization, audit, or journal failure.
-      const gpuStartEligible = gpuSelected
+      const gpuStartEligible = (selectedMedia.kind === "webgpu")
         && webGpuBackendRef.current === "webgpu"
         && webGpuCanvasHandleRef.current?.isBackendAvailable() === true
         && gpuLiveStrokePlannerRef.current !== null;
@@ -23307,8 +23267,8 @@ const puppetWarpArmed =
         : null;
       const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null;
       const liveInkBackendDecision = decideStudioLiveInkBackend({
-        preference: gpuSelected ? "webgpu" : "canvas2d",
-        selectionEnabled: gpuSelected ? STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED : true,
+        preference: (selectedMedia.kind === "webgpu") ? "webgpu" : "canvas2d",
+        selectionEnabled: (selectedMedia.kind === "webgpu") ? STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED : true,
         resolvedBackend: webGpuBackendRef.current,
         // Missing preparation is an unavailable WebGPU selection, never permission for Canvas2D.
         direct: overlayCandidate && gpuStartPlan !== null,
@@ -23319,10 +23279,10 @@ const puppetWarpArmed =
         symmetryType: next.symmetry?.type ?? "none",
         preparedStroke: gpuStartPlan?.preparation,
       });
-      const gpuPin = gpuSelected
+      const gpuPin = (selectedMedia.kind === "webgpu")
         && liveInkBackendDecision.status === "ready"
         && liveInkBackendDecision.backend === "webgpu";
-      if (gpuSelected && liveInkBackendDecision.status !== "ready") {
+      if ((selectedMedia.kind === "webgpu") && liveInkBackendDecision.status !== "ready") {
         return rejectSelectedSurface(
           "WebGPU 라이브 잉크",
           `선택 거부 사유: ${liveInkBackendDecision.reason}`,
@@ -23348,7 +23308,7 @@ const puppetWarpArmed =
         && next.mode !== "eraser"
         && !next.fill
         && (next.symmetry?.type ?? "none") === "none";
-      if (canvas2dSelected
+      if ((selectedMedia.kind === "canvas2d")
         && liveInkBackendDecision.status === "ready"
         && liveInkBackendDecision.backend === "canvas2d"
         && liveInkOverlayEligible
@@ -23366,29 +23326,29 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      if (canvas2dSelected && liveInkOverlayEligible && !liveInkOverlayStarted) {
+      if ((selectedMedia.kind === "canvas2d") && liveInkOverlayEligible && !liveInkOverlayStarted) {
         return rejectSelectedSurface("Canvas2D 라이브 잉크", "명시적으로 선택한 2D 표면을 시작하지 못했습니다.");
       }
 
-      const wetInkOverlayStarted = wetMediaSelected
+      const wetInkOverlayStarted = (selectedMedia.kind === "wet")
         && liveWetInkOverlayRendererRef.current.isNativeSurfaceReady
         && liveWetInkOverlayRendererRef.current.begin(next, {
           pageEpoch: currentPageId,
           hidden: next.hidden === true,
         }).status === "started";
-      if (wetMediaSelected && !wetInkOverlayStarted) {
+      if ((selectedMedia.kind === "wet") && !wetInkOverlayStarted) {
         return rejectSelectedSurface("습식 매체", "선택한 습식 표면을 시작하지 못했습니다.");
       }
 
-      const retainedMediaDirect = retainedMediaSelected
+      const retainedMediaDirect = (selectedMedia.kind === "retained")
         && liveRetainedMediaOverlayRendererRef.current.begin(next).status === "started";
-      if (retainedMediaSelected && !retainedMediaDirect) {
+      if ((selectedMedia.kind === "retained") && !retainedMediaDirect) {
         return rejectSelectedSurface("리테인드 매체", "선택한 매체 표면을 시작하지 못했습니다.");
       }
 
-      const dynamicBrushDirect = dynamicSelected
+      const dynamicBrushDirect = (selectedMedia.kind === "dynamic")
         && liveDynamicBrushOverlayRendererRef.current.begin(next).status === "started";
-      if (dynamicSelected && !dynamicBrushDirect) {
+      if ((selectedMedia.kind === "dynamic") && !dynamicBrushDirect) {
         return rejectSelectedSurface("동적 브러시", "선택한 동적 표면을 시작하지 못했습니다.");
       }
       const strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({
@@ -27862,13 +27822,14 @@ function clearSelectionForEdit() {
       commitStudioBrushSlotsMutation(
         (prev) => assignStudioBrushSlot(prev, index, {
           brushId: brush,
-          ...(activeCatalogBrush.sourcePresetId
+          ...(activeCatalogBrush.sourcePresetId || brushEnginePrograms?.material
             ? {
                 sourcePresetId: activeCatalogBrush.sourcePresetId,
                 sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
               }
             : {}),
           brushDynamics,
+          enginePrograms: brushEnginePrograms,
           strokeWidth,
           brushOpacity,
         }),
@@ -27998,6 +27959,7 @@ function clearSelectionForEdit() {
         undoAvailable: brushBaselineController.restoreState.undoAvailable,
       },
       brushOpacity,
+      materialBrush: Boolean(brushEnginePrograms?.material),
       brushSlots: brushSlotsState.slots,
       canvasFlipH,
       color,
@@ -28060,6 +28022,7 @@ function clearSelectionForEdit() {
       brushBaselineController.restoreState.sourceName,
       brushBaselineController.restoreState.undoAvailable,
       brushOpacity,
+      brushEnginePrograms,
       brushSlotsState.slots,
       canvasFlipH,
       canvasOnlyMode,

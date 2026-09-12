@@ -176,6 +176,7 @@ test("core retains all executing main checks without a bypass", () => {
     "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
     "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
   for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {

@@ -71,6 +71,7 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
+import { StudioMaterialBrushThumbnail } from "./StudioMaterialBrushThumbnail";
 
 import type {
   BrushLifecycleStage,
@@ -108,6 +109,9 @@ function previewSize(strokeWidth: number): number {
 }
 
 function SavedBrushStrokePreview({ brush }: { brush: StudioSavedBrush }) {
+  if (brush.enginePrograms?.material) {
+    return <StudioMaterialBrushThumbnail brush={brush} className="h-9 w-24 shrink-0 rounded-md border border-line" />;
+  }
   const sourceDescriptor = studioBrushPackDescriptorById(brush.sourcePresetId);
   const catalogItem = studioCoreBrushCatalogItemById(
     brush.sourcePresetId ?? brush.brushId
