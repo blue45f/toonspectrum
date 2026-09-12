@@ -76,6 +76,8 @@ jobs:
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
       - name: Strict lint
         run: pnpm run lint:strict
       - name: Typecheck application, API and realtime worker
