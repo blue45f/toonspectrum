@@ -93,7 +93,7 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('data-studio-layer-selection-state="current"');
     expect(html).toContain('data-studio-layer-selection-marker="current"');
     expect(html).toContain(
-      'aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"'
+      'aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Shift+ArrowUp Shift+ArrowDown Shift+Home Shift+End Shift+Space Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"'
     );
     expect(html).toContain('data-studio-shortcut-boundary="true"');
     expect(html).toContain("레이어 3");

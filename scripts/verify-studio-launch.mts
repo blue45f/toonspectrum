@@ -1541,7 +1541,8 @@ async function main() {
     ignoreListingErrors: true,
   });
   const port = await findFreePort();
-  const url = `http://127.0.0.1:${port}/studio`;
+  // /studio is the project home; canvas/history/workspace gates belong to the editor route.
+  const url = `http://127.0.0.1:${port}/studio/canvas`;
 
   const server: ChildProcess = spawnVitePreview({ port, runner: "pnpm-exec" });
 

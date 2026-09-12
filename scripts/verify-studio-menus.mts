@@ -122,7 +122,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "지우개",
       "채우기",
       "스마트 도형",
-      "현재 스트로크 교정…",
+      "방금 그린 선 다듬기…",
       "브러시 프리셋 목록…",
       "브러시 스튜디오…",
       "자연 매체 · 안료…",
@@ -193,7 +193,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "명령 · 속성 통합 검색",
       "CSP · Photoshop 용어 찾기",
       "현재 도구 도움말",
-      "사용법 · 기능 튜토리얼",
+      "도움말 홈 · 단계별 가이드",
       "단축키 · 기본 조작",
       "기기 · 브라우저 진단…",
       "복구 가이드…",
@@ -361,6 +361,8 @@ const MENU_DRIVEN_POPOVERS: {
   /** Prefer unique headers so menubar labels are not false positives. */
   expectVisible: string[];
   expectDialogName?: string;
+  /** Require the loaded feature body in addition to its surrounding popover chrome. */
+  expectSelector?: string;
 }[] = [
   {
     groupId: "window",
@@ -370,7 +372,8 @@ const MENU_DRIVEN_POPOVERS: {
   {
     groupId: "brush",
     item: "배경 · 톤",
-    expectVisible: ["배경 편집"],
+    expectVisible: ["2D 배경 도구"],
+    expectSelector: '[data-studio-background-panel="true"] [role="tablist"][aria-label="배경 편집 탭"]',
   },
   {
     groupId: "brush",
@@ -778,6 +781,9 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
       if (entry.expectDialogName) {
         const dialog = page.getByRole("dialog", { name: entry.expectDialogName });
         await dialog.waitFor({ state: "visible", timeout: 5000 });
+      }
+      if (entry.expectSelector) {
+        await page.locator(entry.expectSelector).waitFor({ state: "visible", timeout: 5000 });
       }
 
       let matched = 0;

@@ -41,10 +41,16 @@ test("core aggregation rejects skipped dependencies and verify requires core suc
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
+// Protect file identities, so adding coverage cannot break the contract or hide a removal.
+function executingVitestTargets(block) {
+  return new Set(block.replace(/\\\r?\n/g, " ").split(/\r?\n/)
+    .filter((line) => /^\s*(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
+    .flatMap((line) => line.split(/\s+#/, 1)[0].trim().split(/\s+/))
+    .filter((word) => /^(?:apps|packages)\/[\w./-]+$/.test(word)));
+}
+
 test("all current main product and API CPU regressions remain mandatory", () => {
-  // Protect file identities, not an obsolete exact count that rejects additions
-  // or lets a removed regression be replaced by an unrelated test.
-  const tests = new Set(job("static").match(/(?:apps|packages)\/[^\s]+\.test\.[a-z]+/g) ?? []);
+  const tests = executingVitestTargets(job("static"));
   const required = [
     "apps/api/src/config/catalog-initialization.test.ts",
     "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
@@ -93,6 +99,25 @@ test("production visual audit uses the Vitest runner for its policy suite", () =
 
 test("required core executes the production audit policy suite before merge", () => {
   assert.ok(job("static").includes("      - name: Studio 3D production audit policy regressions\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+});
+
+test("non-3D Studio editing and export regressions execute in the required static job", () => {
+  const name = "      - name: Non-3D Studio editing and export regressions\n";
+  const step = job("static").split(/(?=^ {6}- name:)/m).find((block) => block.startsWith(name));
+  assert.ok(step, "missing non-3D Studio regression step");
+  assert.doesNotMatch(step, /^ {8}if:/m, "non-3D Studio regressions must not be conditionally skipped");
+  const targets = executingVitestTargets(step);
+  for (const path of [
+    "apps/web/src/domains/creator/layer",
+    "apps/web/src/domains/creator/export",
+    "apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx",
+    "apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx",
+    "apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx",
+    "apps/web/src/domains/creator/studio-selection",
+    "apps/web/src/domains/creator/studio-color-range",
+    "apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts",
+    "apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts",
+  ]) assert.ok(targets.has(path), `missing non-3D Studio regression: ${path}`);
 });
 
 // Manual validation must not cancel push validation; retries keep prior evidence.

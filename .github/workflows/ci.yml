@@ -78,6 +78,19 @@ jobs:
             apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts \
             packages/core/src/search-normalization.test.ts \
             packages/core/src/server/home.cpu-cache.test.ts
+      - name: Non-3D Studio editing and export regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/layer \
+            apps/web/src/domains/creator/export \
+            apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx \
+            apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx \
+            apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx \
+            apps/web/src/domains/creator/studio-selection \
+            apps/web/src/domains/creator/studio-color-range \
+            apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts \
+            apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts
       - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
