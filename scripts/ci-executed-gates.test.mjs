@@ -16,6 +16,18 @@ function job(name) {
 // This is a minimum protected set, not an exact total. Additional coverage is
 // welcome; deleting or moving a protected suite requires an explicit review.
 const requiredRegressions = Object.freeze([
+  "apps/web/src/domains/creator/studio-workspace-route.test.ts",
+  "apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts",
+  "apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx",
+  "apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts",
+  "apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx",
+  "apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx",
+  "apps/web/src/domains/creator/studio-batch-rename.test.ts",
+  "apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx",
+  "apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts",
+  "apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx",
   "apps/api/src/config/catalog-initialization.test.ts",
   "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
   "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",
@@ -55,9 +67,46 @@ const requiredRegressions = Object.freeze([
 
 // Read the explicit file arguments of the Vitest commands used by this workflow.
 // Comments and echo text do not count as execution; keep packages/ and .tsx paths.
+// Lex only comments, quotes, escapes and continuations in our explicit static
+// commands. This is not a general Bash evaluator or a YAML execution proof.
+function normalizeShellSource(block) {
+  let result = "";
+  let quote = null;
+  let wordStart = true;
+  for (let index = 0; index < block.length; index += 1) {
+    const char = block[index];
+    const next = block[index + 1];
+    if (quote === null && char === "#" && wordStart) {
+      while (index < block.length && block[index] !== "\n") index += 1;
+      result += "\n";
+      wordStart = true;
+      continue;
+    }
+    if (quote !== "'" && char === "\\" && next !== undefined) {
+      if (next === "\n" || (next === "\r" && block[index + 2] === "\n")) {
+        index += next === "\r" ? 2 : 1;
+        continue;
+      }
+      if (quote === null || /[$`"\\]/.test(next)) {
+        result += char + next;
+        index += 1;
+        wordStart = false;
+        continue;
+      }
+    }
+    if (quote === null && (char === "'" || char === '"')) {
+      quote = char;
+    } else if (quote === char) {
+      quote = null;
+    }
+    result += char;
+    wordStart = quote === null && /[\s|&;()<>]/.test(char);
+  }
+  return result;
+}
+
 function executedRegressions(block) {
-  return block
-    .replace(/\\\r?\n/g, " ")
+  return normalizeShellSource(block)
     .split(/\r?\n/)
     .filter((line) => /^\s*(?:-\s*)?(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
     .flatMap((line) => line.trim().split(/\s+/))
@@ -85,6 +134,7 @@ test("core retains all executing main checks without a bypass", () => {
     "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
     "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
   for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {
@@ -167,3 +217,28 @@ test("isolates event concurrency and retry artifact names", () => {
   assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
   assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
 });
+
+// Shell comments end at the physical newline, even when the comment ends in a
+// backslash. Keep these fixtures dependency-free for the Node-only preflight.
+test("commented mandatory arguments are rejected for every protected suite", () => {
+  for (const path of requiredRegressions) {
+    const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
+    const decoy = `${missing}\n      - run: pnpm exec vitest run apps/web/src/extra.test.ts \\\n          # ${path}\n`;
+    assert.throws(() => assertRequiredRegressions(decoy), /missing mandatory regression/, path);
+  }
+});
+
+const shellCommentFixtures = [
+  ["continued comment argument", "pnpm exec vitest run apps/kept.test.ts \\\n  # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["inline comment", "pnpm exec vitest run apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["comment backslash cannot consume the next command", "pnpm exec vitest run apps/first.test.ts # ignored \\\npnpm exec vitest run packages/second.test.ts\n", ["apps/first.test.ts", "packages/second.test.ts"]],
+  ["standalone comment continuation cannot enable a bare path", "pnpm exec vitest run apps/kept.test.ts \\\n  # ignored \\\n  packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["quoted hashes are not comments", "pnpm exec vitest run --testNamePattern '#literal' \"apps/kept.test.ts\" # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["escaped hashes are not comments", "pnpm exec vitest run --testNamePattern \\#literal apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["valid continued and quoted arguments remain visible", "pnpm exec vitest run \\\n  'apps/kept.test.ts' \\\n  \"packages/kept.test.tsx\"\n", ["apps/kept.test.ts", "packages/kept.test.tsx"]],
+];
+for (const [name, command, expected] of shellCommentFixtures) {
+  test(`regression arguments respect shell syntax: ${name}`, () => {
+    assert.deepEqual(executedRegressions(command), expected);
+  });
+}
