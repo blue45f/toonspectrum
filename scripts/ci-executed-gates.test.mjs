@@ -90,6 +90,14 @@ const requiredRegressions = Object.freeze([
   "apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts",
   "apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts",
   "apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts",
+  "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts",
+  "apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts",
+  "apps/web/src/app/studio-cross-origin-isolation.test.ts",
   "scripts/verify-studio-3d-console.test.ts",
   "scripts/verify-studio-menus.test.ts",
 ]);
@@ -134,13 +142,18 @@ function normalizeShellSource(block) {
   return result;
 }
 
-function executedRegressions(block) {
+function executedVitestTargets(block) {
   return normalizeShellSource(block)
     .split(/\r?\n/)
     .filter((line) => /^\s*(?:-\s*)?(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
     .flatMap((line) => line.trim().split(/\s+/))
     .map((word) => word.replace(/^["']|["']$/g, ""))
-    .filter((word) => /^(?:apps|packages|scripts)\/[\w./-]+\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(word));
+    .filter((word) => /^(?:apps|packages|scripts)\/[\w./-]+$/.test(word));
+}
+
+function executedRegressions(block) {
+  return executedVitestTargets(block)
+    .filter((word) => /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(word));
 }
 
 function assertRequiredRegressions(block) {
@@ -163,6 +176,7 @@ test("core retains all executing main checks without a bypass", () => {
     "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
     "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
   for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {
@@ -237,6 +251,41 @@ test("production visual audit uses the Vitest runner for its policy suite", () =
 
 test("required core executes the production audit policy suite before merge", () => {
   assert.ok(job("static").includes("      - name: Studio 3D production audit policy regressions\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+});
+
+const requiredNon3DTargets = Object.freeze([
+  "apps/web/src/domains/creator/layer",
+  "apps/web/src/domains/creator/export",
+  "apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx",
+  "apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx",
+  "apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx",
+  "apps/web/src/domains/creator/studio-selection",
+  "apps/web/src/domains/creator/studio-color-range",
+  "apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts",
+  "apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts",
+]);
+
+function assertNon3DRegressions(block) {
+  const name = "      - name: Non-3D Studio editing and export regressions\n";
+  const step = block.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith(name));
+  assert.ok(step, "missing non-3D Studio regression step");
+  assert.doesNotMatch(step, /^ {8}if:/m, "non-3D Studio regressions must not be conditionally skipped");
+  const targets = new Set(executedVitestTargets(step));
+  for (const path of requiredNon3DTargets) {
+    assert.ok(targets.has(path), `missing non-3D Studio regression: ${path}`);
+  }
+}
+
+test("non-3D Studio editing and export regressions execute in the required static job", () => {
+  assertNon3DRegressions(job("static"));
+});
+
+test("non-3D directory and file targets cannot be replaced with commented coverage", () => {
+  for (const path of requiredNon3DTargets) {
+    const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
+    const decoy = `${missing}\n      # pnpm exec vitest run ${path}\n`;
+    assert.throws(() => assertNon3DRegressions(decoy), /missing non-3D Studio regression/, path);
+  }
 });
 
 // Manual validation must not cancel push validation; retries keep prior evidence.

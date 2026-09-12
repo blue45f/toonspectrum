@@ -14,7 +14,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { roundExportSize } from "../vrm/studio-vrm-poser-helpers";
-import { encodeStudioVrmCapturePngBlob, captureStudioVrmRgba } from "../vrm/studio-vrm-raster-capture";
+import { encodeStudioVrmCapturePngBlob, captureStudioVrmRgbaCooperatively } from "../vrm/studio-vrm-raster-capture";
 
 import { acquireCharacterExportSession, CHARACTER_EXPORT_EDGES, characterExportSize } from "./character-shaper-export";
 import { boundCharacterSemanticCaptureSize, exportCharacterSemanticPsd } from "./character-shaper-semantic-psd";
@@ -226,12 +226,20 @@ export function CharacterShaperOutputDock({
         let blob: Blob;
         let receipt: DockNotice;
         if (kind === "png") {
-          const rgba = captureStudioVrmRgba(capture.gl as never, capture.scene as never, exportCamera,
-            size, transparent ? { alpha: 0 } : { color: insertBackgroundColor, alpha: 1 });
+          const rgba = await captureStudioVrmRgbaCooperatively(capture.gl as never, capture.scene as never, exportCamera,
+            size, transparent ? { alpha: 0 } : { color: insertBackgroundColor, alpha: 1 }, {
+              signal: session.signal,
+              assertCurrent: session.assertCurrent,
+              onProgress: ({ completedTiles, totalTiles }) => {
+                if (aliveRef.current) setProgress(`PNG 이미지 만드는 중 · ${Math.round(completedTiles / totalTiles * 100)}%`);
+              },
+            });
+          session.assertCurrent();
           // PNG owns immutable pixels now; restore helpers during worker encoding.
           releaseHelpers?.();
           releaseHelpers = undefined;
           helperLeaseRef.current = null;
+          if (aliveRef.current) setProgress("PNG 파일 압축 중");
           blob = await encodeStudioVrmCapturePngBlob(rgba, size, { signal: session.signal });
           receipt = { tone: "good", text: `PNG를 저장했습니다 · ${size.width}×${size.height}${transparent ? " · 투명 배경" : ""}` };
         } else {
@@ -239,6 +247,12 @@ export function CharacterShaperOutputDock({
             capture: { gl: capture.gl as never, scene: capture.scene as never, camera: exportCamera },
             vrm: h.vrm, width: size.width, height: size.height, title: modelName,
             signal: session.signal, assertCurrent: session.assertCurrent,
+            onCaptured: () => {
+              releaseHelpers?.();
+              releaseHelpers = undefined;
+              helperLeaseRef.current = null;
+              if (aliveRef.current) setProgress("PSD 파일 만드는 중");
+            },
           });
           blob = result.blob;
           const skipped = result.receipt.skipped;

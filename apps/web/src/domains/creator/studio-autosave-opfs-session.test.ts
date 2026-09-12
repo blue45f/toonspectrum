@@ -7,6 +7,7 @@ import {
   type StudioAutosaveStorage,
 } from "./studio-autosave";
 import {
+  StudioAutosaveDocumentBusyError,
   StudioAutosaveDurabilityError,
   StudioAutosaveOpfsSession,
   reopenStudioAutosaveDocumentSessionForLeadership,
@@ -400,6 +401,164 @@ describe("StudioAutosaveOpfsSession", () => {
 });
 
 describe("Studio autosave OPFS authority reconciliation", () => {
+  it.each([true, false])("rejects an initially stale snapshot before any write (OPFS available: %s)", async (hasSession) => {
+    const key = "autosave-stale-entry";
+    const previous = serializeStudioAutosave(payload("2026-07-30T02:00:00.000Z", "previous"));
+    const storage = memoryStorage({ [key]: previous });
+    const sqlite = memorySqliteStore();
+    const sqliteWrite = vi.spyOn(sqlite, "write");
+    const target = session(new FakeAutosaveJournal(), key);
+    const opfsWrite = vi.spyOn(target, "write");
+    const degraded = vi.fn();
+
+    await expect(persistStudioAutosaveWithOpfsPrimary({
+      session: hasSession ? target : null,
+      sqlite,
+      storage,
+      key,
+      payload: payload("2026-07-30T03:00:00.000Z", "stale"),
+      isCurrent: () => false,
+      onDurableAuthorityDegraded: degraded,
+    })).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(opfsWrite).not.toHaveBeenCalled();
+    expect(sqliteWrite).not.toHaveBeenCalled();
+    expect(storage.getItem(key)).toBe(previous);
+    expect(degraded).not.toHaveBeenCalled();
+  });
+
+  it.each(["commit", "fail"] as const)(
+    "preserves newer SQLite ink when an older OPFS write becomes stale before it can %s",
+    async (opfsOutcome) => {
+      const key = `autosave-stale-opfs-${opfsOutcome}`;
+      const old = payload("2026-07-30T03:00:00.000Z", "old");
+      const newer = payload("2026-07-30T04:00:00.000Z", "newer-emergency");
+      const serializedNewer = serializeStudioAutosave(newer);
+      const storage = memoryStorage({
+        [key]: serializedNewer,
+        [studioLifecycleAutosaveSidecarKey(key)]: serializedNewer,
+      });
+      const sqlite = memorySqliteStore();
+      const gate = Promise.withResolvers<void>();
+      const journal = new FakeAutosaveJournal();
+      journal.appendGate = gate.promise;
+      const append = vi.spyOn(journal, "appendCheckpoint");
+      const target = session(journal, key);
+      const opfsWrite = vi.spyOn(target, "write");
+      const degraded = vi.fn();
+      let current = true;
+      const pending = persistStudioAutosaveWithOpfsPrimary({
+        session: target,
+        sqlite,
+        storage,
+        key,
+        payload: old,
+        isCurrent: () => current,
+        onDurableAuthorityDegraded: degraded,
+      }).then(
+        (receipt) => ({ receipt, error: null }),
+        (error: unknown) => ({ receipt: null, error }),
+      );
+      await vi.waitFor(() => expect(append).toHaveBeenCalledOnce());
+
+      current = false;
+      await sqlite.write(key, newer, { mode: "emergency" });
+      const sqliteWrite = vi.spyOn(sqlite, "write");
+      if (opfsOutcome === "commit") gate.resolve();
+      else gate.reject(new Error("old OPFS checkpoint failed"));
+      const outcome = await pending;
+
+      if (opfsOutcome === "commit") {
+        expect(outcome.error).toBeNull();
+        expect(outcome.receipt).toBe(await opfsWrite.mock.results[0]!.value);
+        expect(await target.readLatest()).toMatchObject({ state: "snapshot", payload: old });
+      } else {
+        expect(outcome.receipt).toBeNull();
+        expect(outcome.error).toMatchObject({ name: "AbortError" });
+      }
+      expect(sqliteWrite).not.toHaveBeenCalled();
+      expect(await sqlite.read(key)).toMatchObject({ state: "snapshot", payload: newer });
+      expect(storage.getItem(key)).toBe(serializedNewer);
+      expect(storage.getItem(studioLifecycleAutosaveSidecarKey(key))).toBe(serializedNewer);
+      expect(degraded).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves the busy-document failure when the snapshot becomes stale during OPFS admission", async () => {
+    const key = "autosave-stale-busy";
+    const target = session(new FakeAutosaveJournal(), key);
+    const gate = Promise.withResolvers<never>();
+    vi.spyOn(target, "write").mockReturnValue(gate.promise);
+    const sqlite = memorySqliteStore();
+    const sqliteWrite = vi.spyOn(sqlite, "write");
+    const degraded = vi.fn();
+    let current = true;
+    const pending = persistStudioAutosaveWithOpfsPrimary({
+      session: target,
+      sqlite,
+      storage: memoryStorage(),
+      key,
+      payload: payload("2026-07-30T03:00:00.000Z"),
+      isCurrent: () => current,
+      onDurableAuthorityDegraded: degraded,
+    }).catch((cause: unknown) => cause);
+
+    current = false;
+    const busy = new StudioAutosaveDocumentBusyError();
+    gate.reject(busy);
+
+    expect(await pending).toBe(busy);
+    expect(sqliteWrite).not.toHaveBeenCalled();
+    expect(degraded).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("retains compatibility recovery when a snapshot becomes stale during SQLite completion (OPFS available: %s)", async (hasSession) => {
+    const key = "autosave-stale-sqlite-completion";
+    const newer = serializeStudioAutosave(payload("2026-07-30T04:00:00.000Z", "newer"));
+    const storage = memoryStorage({ [key]: newer });
+    const sqlite = memorySqliteStore();
+    const gate = Promise.withResolvers<void>();
+    const originalWrite = sqlite.write.bind(sqlite);
+    const sqliteWrite = vi.spyOn(sqlite, "write").mockImplementation(async (writeKey, next) => {
+      await originalWrite(writeKey, next);
+      await gate.promise;
+    });
+    let current = true;
+    const pending = persistStudioAutosaveWithOpfsPrimary({
+      session: hasSession ? session(new FakeAutosaveJournal(), key) : null,
+      sqlite,
+      storage,
+      key,
+      payload: payload("2026-07-30T03:00:00.000Z", "old"),
+      isCurrent: () => current,
+    });
+    await vi.waitFor(() => expect(sqliteWrite).toHaveBeenCalledOnce());
+
+    current = false;
+    gate.resolve();
+
+    expect(await pending).toMatchObject({
+      authority: hasSession ? "opfs-journal" : "sqlite-fallback",
+      savedAt: "2026-07-30T03:00:00.000Z",
+    });
+    expect(storage.getItem(key)).toBe(newer);
+  });
+
+  it("keeps the default OPFS mirror and compatibility cleanup when no snapshot fence is supplied", async () => {
+    const key = "autosave-default-mirror";
+    const target = session(new FakeAutosaveJournal(), key);
+    const sqlite = memorySqliteStore();
+    const storage = memoryStorage({ [key]: "legacy", [studioLifecycleAutosaveSidecarKey(key)]: "legacy-sidecar" });
+    const next = payload("2026-07-30T03:00:00.000Z", "normal");
+
+    await expect(persistStudioAutosaveWithOpfsPrimary({
+      session: target, sqlite, storage, key, payload: next,
+    })).resolves.toMatchObject({ authority: "opfs-journal", savedAt: next.savedAt });
+
+    expect(await sqlite.read(key)).toMatchObject({ state: "snapshot", payload: next });
+    expect(storage.values.size).toBe(0);
+  });
+
   it("commits OPFS without writing browser storage and discards stale compatibility data", async () => {
     const key = "autosave-primary";
     const storage = memoryStorage({

@@ -83,6 +83,7 @@ export function planStudioPointerReleaseEndpoint(
   const pressure = pointer.pointerType === "pen"
     ? resolveStudioBrushReleasePressure({
         brushId: stroke.brush,
+        rawMaterialPressure: stroke.mode === "pen" && Boolean(stroke.brushEnginePrograms?.material),
         pointerType: "pen",
         rawPressure: pointer.pressure,
         lastContactPressure: lastPressure,

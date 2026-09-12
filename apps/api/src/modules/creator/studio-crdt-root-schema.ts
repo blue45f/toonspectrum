@@ -1,3 +1,4 @@
+import { hasValidStudioBrushEngineProgramExtension, STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION } from "../../../../web/src/shared/lib/studio-brush-material-program-contract";
 import * as Y from "yjs";
 
 import {
@@ -100,7 +101,8 @@ const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 4;
 const STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION = 5;
 function strokePayloadSupportsContinuation(version: unknown): boolean {
   return version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
-    || version === STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION;
+    || version === STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    || version === STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION;
 }
 const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
 const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
@@ -2557,6 +2559,7 @@ function hasValidStudioFilterMaskSurfaceReferences(
 }
 
 export interface StudioCrdtStrokePaintContractInput {
+  brushEnginePrograms?: unknown;
   payloadVersion: unknown;
   paintModel: unknown;
   kind?: unknown;
@@ -2651,6 +2654,7 @@ function rendererSignificantR8GrainAdmission(
 export function hasValidStudioCrdtStrokePaintContract(
   input: StudioCrdtStrokePaintContractInput
 ): boolean {
+  if (!hasValidStudioBrushEngineProgramExtension(input.payloadVersion, input.brushEnginePrograms)) return false;
   if (
     input.payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION
     && input.payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
@@ -2664,6 +2668,7 @@ export function hasValidStudioCrdtStrokePaintContract(
   if (
     brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
     && input.payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    && input.payloadVersion !== STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION
   ) return false;
   const r8GrainAdmission = rendererSignificantR8GrainAdmission(input.brushDynamics);
   if (
@@ -2762,6 +2767,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     && !Array.isArray(brushDynamicsValue)
     ? brushDynamicsValue as Record<string, unknown>
     : undefined;
+  if (!hasValidStudioBrushEngineProgramExtension(payloadVersion, extensions?.brushEnginePrograms)) return false;
   const hasMaterialPressureModel = extensions !== undefined
     && Object.prototype.hasOwnProperty.call(extensions, "materialPressureModel");
   const hasMaterialMinimumDiameterRatio = extensions !== undefined
@@ -2771,6 +2777,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   if (
     brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
     && payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    && payloadVersion !== STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION
   ) return false;
   const hasSegmentedCausalDeposit =
     STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES.has(brushDynamics?.depositPipeline);
@@ -2814,6 +2821,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   if (
     paintModel !== undefined
     && !hasValidStudioCrdtStrokePaintContract({
+      brushEnginePrograms: extensions?.brushEnginePrograms,
       payloadVersion,
       paintModel,
       kind: record.get("kind"),

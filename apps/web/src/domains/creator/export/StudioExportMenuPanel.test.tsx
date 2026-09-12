@@ -7,6 +7,7 @@ import {
   readStudioExportResolutionDpi,
   resetStudioExportResolutionDpi,
 } from "../render/studio-raster-resolution-metadata";
+import { StudioMaterialBrushSvgBudgetError } from "../brush/studio-material-brush-runtime";
 import { STUDIO_Z } from "../studio-z-index";
 
 import { resetStudioExportGeometryDraft } from "./studio-export-geometry-draft";
@@ -67,6 +68,18 @@ afterEach(() => {
 });
 
 describe("StudioExportMenuPanel commercial chrome", () => {
+  it("shows a material SVG budget rejection and permits retry without downloading a partial document", async () => {
+    const error = new StudioMaterialBrushSvgBudgetError(64 * 1024 * 1024);
+    const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<StudioExportMenuPanel {...baseProps} pageCount={1} pageLabels={["1"]}
+      capturePagesForPreset={vi.fn(async () => [])} exportCurrentPageToSvg={async () => { throw error; }} />);
+    const button = screen.getByRole("button", { name: "SVG (벡터, 현재 페이지)" });
+    fireEvent.click(button);
+    expect(await screen.findByText(error.message)).toBeTruthy();
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it("ships a fixed, body-safe panel shell (not menubar-clipped absolute)", () => {
     const html = renderToStaticMarkup(
       <StudioExportMenuPanel

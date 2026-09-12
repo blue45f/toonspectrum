@@ -326,7 +326,7 @@ function CharacterShaperShelfContent({
             ))}
           </div>}
         <p className="px-3 pb-3 text-[0.62rem] leading-relaxed text-fg-3">
-          카드에 잠시 머물면 실제 3D 화면에서 후보를 안전하게 시험합니다. 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.
+          카드의 모양 도해는 실제 모델 이미지와 다릅니다. 잠시 머물면 3D 화면에서 후보를 시험할 수 있고, 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.
         </p>
       </div>
     </div>

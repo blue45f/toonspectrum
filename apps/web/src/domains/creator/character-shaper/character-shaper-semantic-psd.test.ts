@@ -1,6 +1,6 @@
 import { initializeCanvas, readPsd } from "ag-psd";
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CHARACTER_SEMANTIC_MASK_ORDER,
@@ -37,8 +37,8 @@ initializeCanvas(
   }),
 );
 
-const WIDTH = 2;
-const HEIGHT = 2;
+const WIDTH = 4;
+const HEIGHT = 1;
 const PIXELS = WIDTH * HEIGHT;
 
 type MToonLike = THREE.MeshStandardMaterial & {
@@ -590,6 +590,49 @@ describe("character shaper semantic capture — passes", () => {
     expect(`#${scene.materials.face.shadeColorFactor.getHexString()}`).toBe("#c89878");
     expect(Object.values(scene.meshes).every((node) => node.visible)).toBe(true);
   });
+
+  it("restores every scene scope before onCaptured and keeps authority through asynchronous assembly", async () => {
+    const scene = buildCharacterScene();
+    const original = observe(scene.capture.scene);
+    const calls: string[] = [];
+    const assembled = buildCharacterSemanticPsd([pass("beauty", BEAUTY.slice())], [], { title: "test" });
+    let finish!: (result: typeof assembled) => void;
+    const pending = exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test",
+      onCaptured: () => { expect(observe(scene.capture.scene)).toEqual(original); calls.push("captured"); },
+      assertCurrent: () => { calls.push("authority"); },
+    }, {
+      ...fakeRenderer().dependencies,
+      assemblePsd: async (_passes, _skipped, options) => {
+        expect(calls.at(-2)).toBe("captured");
+        expect(options.ownership).toBe("copy");
+        calls.push("assembly");
+        return new Promise((resolve) => { finish = resolve; });
+      },
+    });
+    await vi.waitFor(() => expect(calls).toContain("assembly"));
+    finish(assembled);
+    await expect(pending).resolves.toBe(assembled);
+    expect(calls.at(-1)).toBe("authority");
+  });
+
+  it("does not start assembly after onCaptured cancels and does not publish an assembly after authority changes", async () => {
+    const scene = buildCharacterScene();
+    const abort = new AbortController();
+    const assemblePsd = vi.fn();
+    await expect(exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test", signal: abort.signal, onCaptured: () => abort.abort(),
+    }, { ...fakeRenderer().dependencies, assemblePsd })).rejects.toMatchObject({ name: "AbortError" });
+    expect(assemblePsd).not.toHaveBeenCalled();
+
+    let changed = false;
+    await expect(exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test", assertCurrent: () => { if (changed) throw new Error("stale"); },
+    }, { ...fakeRenderer().dependencies, assemblePsd: async (passes, skipped, options) => {
+      changed = true;
+      return buildCharacterSemanticPsd(passes, skipped, options);
+    } })).rejects.toThrow("stale");
+  });
 });
 
 describe("character shaper semantic PSD", () => {
@@ -716,7 +759,7 @@ describe("character shaper semantic PSD", () => {
     expect(() => buildCharacterSemanticPsd(
       [
         pass("flat", FLAT.slice()),
-        { id: "mask-skin", width: 4, height: 1, rgba: new Uint8ClampedArray(16).fill(255) },
+        { id: "mask-skin", width: 4, height: 2, rgba: new Uint8ClampedArray(32).fill(255) },
       ],
       [],
       { title: "크기 불일치" },
@@ -730,7 +773,7 @@ describe("character shaper semantic PSD — end to end", () => {
 
     const { blob, receipt } = await exportCharacterSemanticPsd(
       { ...baseInput(scene), title: "캐릭터 셰이퍼" },
-      fakeRenderer().dependencies,
+      { ...fakeRenderer().dependencies, assemblePsd: async (passes, skipped, options) => buildCharacterSemanticPsd(passes, skipped, options) },
     );
 
     expect(blob.size).toBeGreaterThan(0);

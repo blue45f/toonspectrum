@@ -33,6 +33,7 @@ import {
   STUDIO_PIXEL_PENCIL_RENDER_MODE,
 } from "../studio-pixel-pencil";
 
+import { normalizeStudioMaterialPointerPressure } from "./studio-brush-velocity-pressure";
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
 import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
@@ -241,7 +242,9 @@ const resolvedStrokeWidth = drawMode === "pixel"
         simulateVelocity: false,
       })
     : null;
-  const resolvedPressure = hybridPressure?.pressure ?? resolveBrushPressureSample({
+  const resolvedPressure = drawMode === "pen" && brushEnginePrograms?.material
+    ? normalizeStudioMaterialPointerPressure(pointer.pointerType, pointer.pressure)
+    : hybridPressure?.pressure ?? resolveBrushPressureSample({
       pointerType: pointer.pointerType,
       rawPressure: profiledPointerPressure,
       distance: 0,

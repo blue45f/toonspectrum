@@ -16,11 +16,11 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import {
-  BRUSH_OPACITY_RANGE,
-  BRUSH_STROKE_WIDTH_RANGE,
   normalizeStudioBrushSourcePresetMetadata,
+  studioBrushSnapshotRanges,
   type StudioBrushSourcePresetMetadata,
 } from "./studio-brush-library";
+import { normalizeStudioBrushEngineProgramSet, type StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 export const STUDIO_BRUSH_SLOT_COUNT = 6;
 export const STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY = "toonspectrum-studio-brush-slots:v1";
@@ -34,6 +34,8 @@ export interface StudioBrushSlot extends StudioBrushSourcePresetMetadata {
   brushOpacity: number;
   /** 팩 프리셋의 압력·산포·팁을 포함한 전체 동역학. v1 슬롯은 이 필드가 없다. */
   brushDynamics?: NormalizedStudioBrushDynamicsSettings;
+  /** An explicit program snapshot, including material; omitted on legacy slots. */
+  enginePrograms?: StudioBrushEngineProgramSet | null;
 }
 
 export interface StudioBrushSlotsState {
@@ -45,14 +47,14 @@ export interface StudioBrushSlotsStorage {
   setItem(key: string, value: string): void;
 }
 
-function clampWidth(n: number): number {
-  if (!Number.isFinite(n)) return BRUSH_STROKE_WIDTH_RANGE[0];
-  return Math.min(BRUSH_STROKE_WIDTH_RANGE[1], Math.max(BRUSH_STROKE_WIDTH_RANGE[0], Math.round(n)));
+function clampWidth(n: number, range: readonly [number, number]): number {
+  if (!Number.isFinite(n)) return range[0];
+  return Math.min(range[1], Math.max(range[0], Math.round(n)));
 }
 
-function clampOpacity(n: number): number {
-  if (!Number.isFinite(n)) return BRUSH_OPACITY_RANGE[1];
-  return Math.min(BRUSH_OPACITY_RANGE[1], Math.max(BRUSH_OPACITY_RANGE[0], Math.round(n * 100) / 100));
+function clampOpacity(n: number, range: readonly [number, number]): number {
+  if (!Number.isFinite(n)) return range[1];
+  return Math.min(range[1], Math.max(range[0], Math.round(n * 100) / 100));
 }
 
 function knownBrushId(id: string): boolean {
@@ -71,12 +73,15 @@ export function normalizeStudioBrushSlot(value: unknown): StudioBrushSlot | null
   const brushDynamics = record.brushDynamics === undefined || record.brushDynamics === null
     ? undefined
     : normalizeStudioBrushDynamicsSettings(record.brushDynamics);
+  const enginePrograms = normalizeStudioBrushEngineProgramSet(record.enginePrograms);
+  const ranges = studioBrushSnapshotRanges(enginePrograms);
   return {
     ...sourcePresetMetadata,
     brushId: record.brushId,
-    strokeWidth: clampWidth(Number(record.strokeWidth)),
-    brushOpacity: clampOpacity(Number(record.brushOpacity)),
+    strokeWidth: clampWidth(Number(record.strokeWidth), ranges.strokeWidth),
+    brushOpacity: clampOpacity(Number(record.brushOpacity), ranges.opacity),
     ...(brushDynamics ? { brushDynamics } : {}),
+    ...(record.enginePrograms !== undefined ? { enginePrograms } : {}),
   };
 }
 
@@ -113,7 +118,8 @@ function studioBrushSlotsEqual(left: StudioBrushSlot, right: StudioBrushSlot): b
     && left.brushOpacity === right.brushOpacity
     && left.sourcePresetId === right.sourcePresetId
     && left.sourcePresetName === right.sourcePresetName
-    && dynamicsEqual;
+    && dynamicsEqual
+    && JSON.stringify(left.enginePrograms) === JSON.stringify(right.enginePrograms);
 }
 
 export function saveStudioBrushSlotsState(
