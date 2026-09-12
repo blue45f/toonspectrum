@@ -1,0 +1,138 @@
+name: Assemble residual recovery candidate
+on:
+  push:
+    branches: [ops/residual-merge-reconcile-20260913]
+    paths: [.github/workflows/residual-merge-candidate.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Build reviewed three-way candidate without updating any branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, concurrent.futures, hashlib, json, os, pathlib, re, subprocess, urllib.request
+          main = '9d6d51dacb91fd40d06b23d166b7979ce98a2995'
+          head = '0f8a1f2900c9e918f90be02b78986b03bf40de64'
+          base = '29aa82c1214fe9dbeba6712fcb9fc523528ef8f2'
+          root = pathlib.Path('artifacts/candidate'); root.mkdir(parents=True)
+          api = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          def request(path, payload=None):
+              body = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(api + path, data=body, headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json', 'Content-Type':'application/json'})
+              with urllib.request.urlopen(req, timeout=60) as response: return json.load(response)
+          def check_tips():
+              assert request('branches/main')['commit']['sha'] == main, 'Main moved; reassess before proceeding'
+              pr = request('pulls/1339')
+              assert pr['state'] == 'open' and pr['head']['sha'] == head
+              assert pr['head']['ref'] == 'fix/residual-worktree-integration-20260912'
+          check_tips()
+          assert request('compare/'+main+'...'+head+'?per_page=1')['merge_base_commit']['sha'] == base
+          tree_shas = {}; trees = {}
+          def tree(ref):
+              if ref not in trees:
+                  sha = request('git/commits/'+ref)['tree']['sha']; tree_shas[ref] = sha
+                  result = request('git/trees/'+sha+'?recursive=1'); assert not result.get('truncated')
+                  trees[ref] = {e['path']:{k:e[k] for k in ('sha','mode','type')} for e in result['tree'] if e['type'] != 'tree'}
+              return trees[ref]
+          mt, ht, bt = tree(main), tree(head), tree(base)
+          changed = sorted(p for p in set(bt)|set(ht) if bt.get(p) != ht.get(p))
+          assert len(changed) == 57
+          def blob(sha):
+              data = request('git/blobs/'+sha); assert data['encoding'] == 'base64'
+              content = base64.b64decode(data['content'])
+              assert hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest() == sha
+              return content
+          needed = {mapping[p]['sha'] for p in changed for mapping in (mt,ht,bt) if p in mapping}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+              values = dict(zip(needed,pool.map(blob,needed)))
+          def text(mapping,path): return values[mapping[path]['sha']].decode()
+          resolved = {}; conflicts = []
+          for path in changed:
+              assert path in ht and ht[path]['type'] == 'blob', 'Unexpected removal or submodule'
+              if mt.get(path) == ht[path]: continue
+              if mt.get(path) == bt.get(path):
+                  resolved[path] = text(ht,path); continue
+              assert all(path in t and t[path]['type'] == 'blob' for t in (mt,ht,bt))
+              for label,mapping in [('main',mt),('base',bt),('head',ht)]:
+                  target = root/label/path; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(values[mapping[path]['sha']])
+              result = subprocess.run(['git','merge-file','-p','-L','main','-L','base','-L','recovery',str(root/'main'/path),str(root/'base'/path),str(root/'head'/path)],capture_output=True)
+              if result.returncode: conflicts.append(path)
+              resolved[path] = result.stdout.decode()
+          assert set(conflicts) == {'.github/workflows/ci.yml','scripts/ci-executed-gates.test.mjs'}
+          ci = '.github/workflows/ci.yml'
+          pattern = r'<<<<<<< main\n(.*?)=======\n(.*?)>>>>>>> recovery\n'
+          chunks = list(re.finditer(pattern,resolved[ci],re.S))
+          assert len(chunks) == 1 and not chunks[0][1]
+          assert 'Recovered worktree regressions' in chunks[0][2]
+          resolved[ci] = re.sub(pattern,lambda match:match[2],resolved[ci],flags=re.S)
+          path = 'scripts/ci-executed-gates.test.mjs'
+          main_gate, head_gate = text(mt,path), text(ht,path)
+          protected = r'const requiredRegressions = Object.freeze\(\[\n(.*?)\n\]\);'
+          current = re.search(protected,main_gate,re.S); recovered = re.search(protected,head_gate,re.S)
+          assert current and recovered
+          additional = [line for line in recovered[1].splitlines() if line not in current[1].splitlines()]
+          assert len(additional) == 10 and len(set(additional)) == 10
+          resolved[path] = main_gate[:current.end(1)]+'\n'+'\n'.join(additional)+main_gate[current.end(1):]
+          marker = 'test("removal and inline comments cannot replace mandatory execution"'
+          assert marker in head_gate and marker not in main_gate
+          resolved[path] += '\n'+head_gate[head_gate.index(marker):]
+          # Synchronize the deliberately lazy runtime's cold module import, not an arbitrary
+          # wall-clock deadline. Pixel and real-draw capture-fence assertions remain unchanged.
+          test_path = 'apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx'
+          test = resolved[test_path]
+          needle = '    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state)'
+          assert test.count(needle) == 8
+          test = test.replace(needle, '    await act(async () => { await vi.dynamicImportSettled(); });\n'+needle)
+          resolved[test_path] = test
+          for path,content in resolved.items():
+              assert not re.search(r'^(<<<<<<<|=======|>>>>>>>)',content,re.M), path
+              target = root/'resolved'/path; target.parent.mkdir(parents=True,exist_ok=True); target.write_text(content)
+          # Run dependency-free CI wiring tests before publishing even a dangling candidate.
+          for path in ['scripts/ci-core-gate.mjs','.github/workflows/studio-3d-production-visual-audit.yml']:
+              target = root/'resolved'/path; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(blob(mt[path]['sha']))
+          subprocess.run(['node','--test','scripts/ci-executed-gates.test.mjs'],cwd=root/'resolved',check=True)
+          entries = []
+          for path,content in resolved.items():
+              raw = content.encode()
+              if path in mt and values.get(mt[path]['sha']) == raw: continue
+              sha = hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+              entry = {'path':path,'mode':ht[path]['mode'],'type':'blob'}
+              if sha == ht[path]['sha']: entry['sha'] = sha
+              else: entry['content'] = content
+              entries.append(entry)
+          # Save exact ancillary branch evidence for a separate reviewed cleanup decision.
+          audits = []
+          for branch in ['fix/creator-work-500-core-import-20260912','ops/clear-obsolete-api-ci-20260912','work/api-merge-audit-20260913']:
+              tip = request('branches/'+branch)['commit']['sha']; comparison = request('compare/'+main+'...'+tip+'?per_page=1')
+              old, feature = tree(comparison['merge_base_commit']['sha']),tree(tip)
+              delta = sorted(p for p in set(old)|set(feature) if old.get(p) != feature.get(p))
+              differing = [p for p in delta if mt.get(p) != feature.get(p)]
+              for path in differing:
+                  for label,mapping in [('side',feature),('main',mt),('base',old)]:
+                      if path in mapping:
+                          target = root/'ancillary'/branch/label/path; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(blob(mapping[path]['sha']))
+              audits.append({'branch':branch,'head':tip,'different':differing})
+          check_tips()
+          new_tree = request('git/trees',{'base_tree':tree_shas[main],'tree':entries})['sha']
+          commit = request('git/commits',{'message':'merge: reconcile recovered Studio work with current production fixes\n\nPreserve all main CI gates and add ten recovery suites. Resolve only reviewed CI conflicts. Await lazy imports deterministically in capture-fence tests; keep draw/pixel assertions and bundle ratchets unchanged.','tree':new_tree,'parents':[head,main]})
+          report = {'main':main,'head':head,'base':base,'candidate':commit['sha'],'tree':new_tree,'changed_files':[e['path'] for e in entries],'ancillary':audits,'branch_refs_updated':False}
+          (root/'candidate.json').write_text(json.dumps(report,indent=2)); print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: residual-recovery-candidate
+          path: artifacts/candidate
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
