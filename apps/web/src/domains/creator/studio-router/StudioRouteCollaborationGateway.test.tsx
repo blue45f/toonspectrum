@@ -33,7 +33,7 @@ describe("Studio collaboration route gateways", () => {
   // Review is now an actual production surface, not an asset-guidance placeholder. Exercise the
   // shipped surface and its scope-preserving editor exit instead of widening the placeholder API.
   it.each([
-    ["/studio/review", "draft", "/studio"],
+    ["/studio/review", "draft", "/studio/canvas"],
     ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas"],
     ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas"],
   ])("opens the review workspace rather than a dead end at %s", async (pathname, scopeKey, editorHref) => {
