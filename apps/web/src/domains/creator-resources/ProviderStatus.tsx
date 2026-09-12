@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { useInRouterContext } from "react-router-dom";
+
+import { ReferenceQueryExplanation } from "./ReferenceQueryExplanation";
 
 import type { ProviderAvailability } from "@/shared/lib/creator-resource-workflow";
 import type { ResourceProvider } from "@/shared/lib/creator-resources";
@@ -8,6 +11,7 @@ import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/infrastructure/api";
 
 export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
+  const inRouter = useInRouterContext();
   const [entries, setEntries] = useState<ProviderAvailability[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -33,5 +37,6 @@ export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
           : <p className="text-fg-2">설정 상태 확인 중…</p>}
     </div>
     <p className="text-xs text-fg-2">인증키 설정 여부만 표시합니다. 실제 연결 성공·이용권한·잔여 쿼터를 보증하지 않습니다.</p>
+    {provider === "met" && inRouter && <ReferenceQueryExplanation />}
   </section>;
 }

@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Header, HttpException, Inject, Module, Query, Req } from "@nestjs/common";
+import { localizeReferenceProviderQuery } from "@toonspectrum/core/reference-query-language";
 
 import { createResourceEngine, ResourceBusyError, ResourceInputError } from "./resource-engine";
 
@@ -19,7 +20,7 @@ export class CreatorResourcesController {
   @Header("Cache-Control", "private, no-store")
   async search(@Query() query: Record<string, unknown>, @Req() req: Request) {
     try {
-      return await this.engine.search(query, req.ip ?? req.socket.remoteAddress ?? "anonymous");
+      return await this.engine.search(localizeReferenceProviderQuery(query), req.ip ?? req.socket.remoteAddress ?? "anonymous");
     } catch (error) {
       if (error instanceof ResourceInputError) throw new BadRequestException(error.message);
       if (error instanceof ResourceBusyError) throw new HttpException(error.message, 429);

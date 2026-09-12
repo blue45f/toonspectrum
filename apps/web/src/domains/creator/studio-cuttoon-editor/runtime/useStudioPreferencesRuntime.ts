@@ -19,6 +19,7 @@ import {
   type StudioEffectId,
 } from "../../studio-effect-favorites";
 import { acquireProductStudioUiPreferencesRepository } from "../../studio-legacy-editor-runtime-helpers";
+import { applyStudioLaunchDensity, readStudioLaunchDensity } from "../../studio-launch-mode";
 
 import type { StudioUiDensityMode } from "../../studio-ui-density";
 import type { StudioUiBooleanPreferenceKey } from "../../studio-ui-preferences-sqlite";
@@ -37,10 +38,15 @@ export function useStudioPreferencesRuntime({
   applyMirroredSettings,
   closeRightPanelForFocusMode,
 }: UseStudioPreferencesRuntimeOptions) {
+  // Capture an explicit launch hint once. Merge it into loaded preferences instead of
+  // persisting defaults before hydration, which would lose unrelated user settings.
+  const [launchDensity] = useState(() => readStudioLaunchDensity(typeof window === "undefined" ? "" : window.location.search));
   const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(
-    () => defaultStudioAppSettings().general.densityMode,
+    () => applyStudioLaunchDensity(defaultStudioAppSettings(), launchDensity).general.densityMode,
   );
-  const [appSettings, setAppSettings] = useState<StudioAppSettings>(defaultStudioAppSettings);
+  const [appSettings, setAppSettings] = useState<StudioAppSettings>(
+    () => applyStudioLaunchDensity(defaultStudioAppSettings(), launchDensity),
+  );
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [appSettingsInitialTab, setAppSettingsInitialTab] =
     useState<StudioAppSettingsTab>("general");
@@ -72,6 +78,10 @@ export function useStudioPreferencesRuntime({
   effectFavoriteStateRef.current = effectFavoriteState;
 
   useEffect(() => {
+    if (launchDensity === "focus") closeRightPanelForFocusModeRef.current();
+  }, [launchDensity]);
+
+  useEffect(() => {
     let cancelled = false;
     const settingsRevisionAtStart = appSettingsUserRevisionRef.current;
     const favoritesRevisionAtStart = effectFavoriteUserRevisionRef.current;
@@ -87,7 +97,9 @@ export function useStudioPreferencesRuntime({
         let degraded = false;
         if (settingsResult.status === "fulfilled") {
           if (appSettingsUserRevisionRef.current === settingsRevisionAtStart) {
-            const hydrated = settingsResult.value;
+            const hydrated = applyStudioLaunchDensity(settingsResult.value, launchDensity);
+            // A launch URL is a session override, not a claim that preferences were saved.
+            if (hydrated !== settingsResult.value) degraded = true;
             appSettingsRef.current = hydrated;
             setAppSettings(hydrated);
             setUiDensityMode(hydrated.general.densityMode);
@@ -144,7 +156,7 @@ export function useStudioPreferencesRuntime({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [launchDensity]);
 
   const persistAppSettings = useCallback((next: StudioAppSettings): void => {
     const revision = ++appSettingsUserRevisionRef.current;
@@ -180,6 +192,7 @@ export function useStudioPreferencesRuntime({
     const next = current.general.densityMode === mode
       ? current
       : { ...current, general: { ...current.general, densityMode: mode } };
+    appSettingsRef.current = next;
     if (next !== current) setAppSettings(next);
     persistAppSettings(next);
   }, [persistAppSettings]);

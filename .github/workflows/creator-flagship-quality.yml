@@ -1,0 +1,65 @@
+name: Creator flagship quality
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/domains/marketing/**'
+      - 'apps/web/src/domains/creator-resources/**'
+      - 'apps/web/src/domains/creator/studio-launch-mode.ts'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
+      - 'apps/api/src/modules/creator-resources/**'
+      - 'packages/core/**'
+      - 'tests/creator-flagship-contracts.test.ts'
+      - 'tools/verify-creator-flagship.mjs'
+      - 'e2e/creator-flagship.spec.ts'
+      - '.github/workflows/creator-flagship-quality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: creator-flagship-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flagship:
+    name: Flagship build and browser regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.16.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deterministic language, storage and mode contracts
+        run: node tools/verify-creator-flagship.mjs
+      - name: React and navigation regressions
+        run: >-
+          pnpm exec vitest run
+          tests/creator-flagship-contracts.test.ts
+          apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
+          apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
+          apps/web/src/domains/marketing/creator-home-navigation.test.ts
+      - name: Full application typecheck
+        run: pnpm run typecheck
+      - name: Production bundle and CSP
+        run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Actual application browser regression
+        env:
+          PLAYWRIGHT_CHANNEL: ''
+        run: pnpm exec playwright test e2e/creator-flagship.spec.ts --project=chromium
+      - name: Preserve browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-flagship-browser-evidence
+          path: test-results/
+          if-no-files-found: warn
+
+# This gate runs real checks and does not replace or relax any existing protected check.
+# Production reachability remains a separate release condition; READY is not HTTP success.
