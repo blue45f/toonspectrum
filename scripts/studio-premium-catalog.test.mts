@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseStudioCc0Catalog, filterStudioCc0Assets, studioCc0AssetUrl } from '../apps/web/src/domains/creator/studio-cc0-asset-delivery.ts';
-import { curateStudioCc0Selection, studioCc0StyleLabel } from '../apps/web/src/domains/creator/studio-cc0-curation.ts';
+
+import { filterStudioCc0Assets, parseStudioCc0Catalog, studioCc0AssetUrl } from '../apps/web/src/domains/creator/studio-cc0-asset-delivery';
+import { curateStudioCc0Selection, studioCc0StyleLabel } from '../apps/web/src/domains/creator/studio-cc0-curation';
 
 function image(kind = 'background', changes: Record<string, unknown> = {}) {
   return { id: 'polyhaven-background-test', name: '골목 거리 · Alley', kind,

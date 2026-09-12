@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+
 import { DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES, validateStudioBg3dGlb } from '../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation';
 
 if (!process.argv[2]) throw new Error('Usage: studio-premium-model-admission.mts STAGE');
@@ -23,7 +24,7 @@ for (const asset of manifest.assets) {
     profile: 'mobile', budgets: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
     digest: async input => createHash('sha256').update(input).digest('hex'),
   });
-  results.push({ id: asset.id, sha256, ok: admission.ok, code: admission.code, metrics: admission.metrics });
+  results.push({ id: asset.id, sha256, ok: admission.ok, code: admission.code, metrics: admission.ok ? admission.metrics : null });
   if (admission.ok) asset.technicalChecks.push('production-GLB-admission-mobile-profile');
   console.log(asset.id, admission.ok ? 'ADMITTED' : 'QUARANTINED', admission.code);
 }
