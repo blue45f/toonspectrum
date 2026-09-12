@@ -27,6 +27,7 @@ on:
       - "scripts/verify-creator-home-navigation.mjs"
       - "scripts/verify-creator-continuity.mjs"
       - "scripts/creator-film-automation.test.mjs"
+      - "scripts/creator-home-checkout-policy.test.mjs"
       - ".github/workflows/creator-home-quality.yml"
   pull_request:
     branches: [main]
@@ -53,6 +54,7 @@ on:
       - "scripts/verify-creator-home-navigation.mjs"
       - "scripts/verify-creator-continuity.mjs"
       - "scripts/creator-film-automation.test.mjs"
+      - "scripts/creator-home-checkout-policy.test.mjs"
       - ".github/workflows/creator-home-quality.yml"
 
 permissions:
@@ -83,10 +85,13 @@ jobs:
             apps/api/data
             apps/web
             automation/n8n
+            crates
+            docs/third-party
             media/brand-film
             packages
             patches
             scripts
+            third_party
 
       - name: Detect changed verification scope
         id: scope
@@ -315,6 +320,7 @@ jobs:
               scripts/verify-creator-home-navigation.mjs|\
               scripts/verify-creator-continuity.mjs|\
               scripts/creator-film-automation.test.mjs|\
+              scripts/creator-home-checkout-policy.test.mjs|\
               media/brand-film/src/*|\
               media/brand-film/render.mjs)
                 files+=("$file")
@@ -359,6 +365,7 @@ jobs:
           scripts/verify-creator-film-upgrades.mjs
           scripts/verify-creator-home-navigation.mjs
           scripts/verify-creator-continuity.mjs
+          scripts/creator-home-checkout-policy.test.mjs
           scripts/creator-film-automation.test.mjs
           media/brand-film/src
           media/brand-film/render.mjs
@@ -371,6 +378,7 @@ jobs:
           apps/web/src/shared/components/pwa-install-nudge.test.tsx
           apps/web/src/shared/lib/creator-continuity.test.ts
           apps/web/src/shared/lib/pwa-install-store.test.ts
+          scripts/creator-home-checkout-policy.test.mjs
 
       - name: Verify film automation contract
         if: steps.scope.outputs.film == 'true'
