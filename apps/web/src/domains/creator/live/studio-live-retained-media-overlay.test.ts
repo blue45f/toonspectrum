@@ -41,6 +41,8 @@ function mockCanvas(width = 256, height = 128) {
   let drawImageCalls = 0;
   const paintColors: string[] = [];
   const transforms: number[][] = [];
+  const translations: number[][] = [];
+  const rotations: number[] = [];
   const context = {
     canvas: { width, height },
     globalAlpha: 1,
@@ -56,8 +58,8 @@ function mockCanvas(width = 256, height = 128) {
     closePath() {},
     moveTo() {},
     lineTo() {},
-    translate() {},
-    rotate() {},
+    translate(...values: number[]) { translations.push(values); },
+    rotate(value: number) { rotations.push(value); },
     ellipse() {},
     roundRect() {},
     fillRect() { fillCalls += 1; },
@@ -94,6 +96,8 @@ function mockCanvas(width = 256, height = 128) {
     context,
     paintColors,
     transforms,
+    translations,
+    rotations,
     stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls, drawImageCalls }),
   };
 }
@@ -173,8 +177,10 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     const { renderer, active } = attachedRenderer();
     expect(studioLiveRetainedMediaOverlaySupportsElement(element)).toBe(true);
     expect(renderer.begin(element)).toEqual({ status: "started", kind: "material" });
-    expect(active.transforms).toContainEqual([1, 0, 0, 1, 0, 0]);
-    expect(active.transforms).toContainEqual([-1, 0, 0, 1, 200, 0]);
+    expect(active.translations).toContainEqual([20, 30]);
+    expect(active.translations).toContainEqual([180, 30]);
+    expect(active.rotations).toContain(Math.PI / 4);
+    expect(active.rotations).toContain(Math.PI * 3 / 4);
     expect(active.stats().fillCalls).toBeGreaterThan(0);
     expect(renderer.end(element)).toEqual({ status: "settled" });
   });

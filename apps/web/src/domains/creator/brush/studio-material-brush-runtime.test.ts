@@ -94,12 +94,22 @@ describe("saved material brush rendering", () => {
     const symmetry = { type: "vertical" as const, centerX: 100, centerY: 0 };
     const marks = planStudioMaterialBrush(source);
     const svg = studioMaterialBrushMarksToSvg(marks, symmetry);
-    expect(svg).toContain('matrix(-1 0 0 1 200 0)');
-    expect(svg.match(/rotate\(45\)/gu)).toHaveLength(2);
+    expect(svg).toContain('translate(20 30) rotate(45)');
+    expect(svg).toContain('translate(180 30) rotate(135)');
     const baseBounds = studioMaterialBrushBounds(source)!;
     const mirroredBounds = studioMaterialBrushBounds({ ...source, symmetry })!;
     expect(mirroredBounds.x).toBeCloseTo(baseBounds.x, 8);
     expect(mirroredBounds.x + mirroredBounds.width).toBeCloseTo(200 - baseBounds.x, 8);
+  });
+
+  it("keeps symmetry paint order identical across append boundaries", () => {
+    const marks = planStudioMaterialBrush(stroke("kaleido-swarm"));
+    const symmetry = { type: "radial" as const, radialCount: 4, centerX: 80, centerY: 50 };
+    const complete = studioMaterialBrushMarksToSvg(marks, symmetry);
+    const appended = studioMaterialBrushMarksToSvg(marks.slice(0, 17), symmetry)
+      + studioMaterialBrushMarksToSvg(marks.slice(17, 129), symmetry)
+      + studioMaterialBrushMarksToSvg(marks.slice(129), symmetry);
+    expect(appended).toBe(complete);
   });
 
   it("retains particle and wet fringe extents outside the nominal nib crop", () => {

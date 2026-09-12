@@ -221,6 +221,7 @@ export function createBrushStudioV6MaterialStroke(
   const laneX = new Float64Array(laneCount);
   const laneY = new Float64Array(laneCount);
   const reservoir = new Float64Array(laneCount);
+  const wetEdges = new Float64Array(4);
   let previous: BrushStudioV6MaterialPoint | null = null;
   let remaining = step;
   let pathLength = 0;
@@ -228,6 +229,7 @@ export function createBrushStudioV6MaterialStroke(
   let dabIndex = 0;
   let clippedDabs = 0;
   let initializedBristles = false;
+  let initializedWetEdges = false;
 
   function deposit(point: BrushStudioV6MaterialPoint, direction: number, marks: BrushStudioV6MaterialMark[], densityMultiplier = 1): void {
     const index = dabIndex++;
@@ -363,7 +365,27 @@ export function createBrushStudioV6MaterialStroke(
       const tooth = sampleBrushStudioV6PaperContact(program.slots.surface, Math.floor(point.x / 2) * 2, Math.floor(point.y / 2) * 2, seed);
       const resist = physics.has("physics-dry-contact") ? unit((tooth - t.surfaceTooth * 0.5) * 3) : 1;
       emit("wet", point.x, point.y, radius, radius * (chisel ? 0.38 : 1), angle, alpha * (0.55 + tooth * t.granulation * 0.5) * resist, t.granulation * tooth * 0.35);
-      if (t.edgeDarkening > 0) emit("wet", point.x, point.y, radius * spread, radius * spread, angle, alpha * t.edgeDarkening * 0.6, 0, 0, "ring");
+      if (t.edgeDarkening > 0) {
+        const normalX = -Math.sin(direction);
+        const normalY = Math.cos(direction);
+        const edgeRadius = radius * spread * (0.96 + tooth * 0.06);
+        const thickness = Math.max(0.18, radius * (0.025 + t.granulation * 0.025));
+        for (let side = 0; side < 2; side++) {
+          const sign = side === 0 ? -1 : 1;
+          const x = point.x + normalX * edgeRadius * sign;
+          const y = point.y + normalY * edgeRadius * sign;
+          const previousX = initializedWetEdges ? wetEdges[side * 2]! : x;
+          const previousY = initializedWetEdges ? wetEdges[side * 2 + 1]! : y;
+          const dx = x - previousX;
+          const dy = y - previousY;
+          // Deposit on the two moving wet boundaries, not an entire ring around
+          // every dab, which leaves regular dark crossbars inside the wash.
+          emit("wet", (x + previousX) * 0.5, (y + previousY) * 0.5, Math.hypot(dx, dy) * 0.5 + thickness, thickness, Math.atan2(dy, dx), alpha * t.edgeDarkening * (0.65 + tooth * 0.35), 0, 0, "capsule");
+          wetEdges[side * 2] = x;
+          wetEdges[side * 2 + 1] = y;
+        }
+        initializedWetEdges = true;
+      }
       if (program.slots.pigment === "pigment-inkwash-density") emit("wet", point.x, point.y, radius * 0.6, radius * 0.6, angle, alpha, 0);
       return;
     }
@@ -405,7 +427,7 @@ export function createBrushStudioV6MaterialStroke(
       emittedMarks += marks.length;
       return marks;
     },
-    reset(): void { previous = null; remaining = step; pathLength = 0; emittedMarks = 0; dabIndex = 0; clippedDabs = 0; initializedBristles = false; },
+    reset(): void { previous = null; remaining = step; pathLength = 0; emittedMarks = 0; dabIndex = 0; clippedDabs = 0; initializedBristles = false; initializedWetEdges = false; },
     statistics: () => ({ pathLength, emittedMarks, resampledDabs: dabIndex, clippedDabs }),
   };
 }

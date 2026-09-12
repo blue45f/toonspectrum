@@ -38,7 +38,7 @@ describe("portable V6 material contacts", () => {
   });
 
   it("produces the same straight stroke at sparse and coalesced input rates", () => {
-    for (const id of ["clean-ink", "velvet-graphite", "oil-hair-mixer", "dendritic-copper", "holographic-stitch"]) {
+    for (const id of ["clean-ink", "velvet-graphite", "oil-hair-mixer", "mineral-bloom", "dendritic-copper", "holographic-stitch"]) {
       const sparse = paint(id, line(12));
       const dense = paint(id, line(180));
       expect(sparse.length, id).toBe(dense.length);
@@ -86,6 +86,19 @@ describe("portable V6 material contacts", () => {
     expect(swarm.some((mark) => mark.kind === "particle")).toBe(true);
     expect(swarm.some((mark) => mark.kind === "pattern")).toBe(true);
     expect(brushStudioV6MaterialActiveTuningKeys(createBrushStudioV6Program("dendritic-copper")).has("reactionRate")).toBe(true);
+  });
+
+  it("deposits wet edge pigment on longitudinal boundaries without ring crossbars", () => {
+    const marks = paint("mineral-bloom", line(30));
+    expect(marks.some((mark) => mark.shape === "ring")).toBe(false);
+    const edges = marks.filter((mark) => mark.shape === "capsule");
+    expect(edges.length).toBeGreaterThan(20);
+    expect(edges.every((mark) => Math.abs(mark.y - 30) > 10)).toBe(true);
+    const program = createBrushStudioV6Program("mineral-bloom");
+    const stroke = createBrushStudioV6MaterialStroke(program);
+    const first = line(10).flatMap((point) => stroke.push(point));
+    stroke.reset();
+    expect(line(10).flatMap((point) => stroke.push(point))).toEqual(first);
   });
 
   it("anchors halftone centers to document coordinates and confines them to contacts", () => {

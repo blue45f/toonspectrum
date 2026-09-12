@@ -97,6 +97,18 @@ export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Progr
   const batch = read(committedCanvas);
   const liveCommitted = difference(settled, batch);
   if (liveCommitted.maximumChannelError !== 0) failures.push(`${program.id}: incremental/committed contacts differ`);
+  let symmetryNewPixels = 0;
+  if (symmetry) {
+    const original = document.createElement("canvas");
+    original.width = WIDTH;
+    original.height = HEIGHT;
+    renderStudioMaterialBrushMarks(original.getContext("2d")!, marks);
+    const originalPixels = read(original);
+    for (let index = 3; index < batch.length; index += 4) {
+      if (originalPixels[index] === 0 && batch[index]! > 2) symmetryNewPixels++;
+    }
+    if (symmetryNewPixels < 50) failures.push(`${program.id}: symmetry did not create distinct reflected/rotated geometry`);
+  }
   const exported = exportPageToSvg({ width: WIDTH, height: HEIGHT, bg: "transparent", elements: [element] });
   if (!exported.svg.includes('data-brush-engine="material-contact-v1"')) failures.push(`${program.id}: document SVG bypassed material engine`);
   if (exported.skipped.length > 0) failures.push(`${program.id}: document SVG skipped content`);
@@ -108,7 +120,7 @@ export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Progr
   // Browser SVG and Canvas antialias paths differ; preserve the measured error instead of claiming equality.
   if (svgPixels.meanChannelError > 0.01 || svgPixels.relativeAlphaError > 0.04) failures.push(`${program.id}: SVG paint/alpha differs materially from committed contacts`);
   overlay.attach(null);
-  return { failures, symmetry: symmetry ?? null, markCount: marks.length, appendSamplesMs, liveSettled, liveCommitted, svgPixels,
+  return { failures, symmetry: symmetry ?? null, symmetryNewPixels, markCount: marks.length, appendSamplesMs, liveSettled, liveCommitted, svgPixels,
     savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
 }
 

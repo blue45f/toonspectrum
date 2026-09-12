@@ -111,19 +111,36 @@ export function planStudioMaterialBrush(element: StudioMaterialBrushElement): re
   return new StudioMaterialBrushPlanner().append(element).marks;
 }
 
-/** Transform the completed contact, including scatter and nib axis, as one affine copy. */
-export function renderStudioMaterialBrushMarks(context: CanvasRenderingContext2D, marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): void {
-  for (const transform of studioBrushSymmetryTransforms(symmetry)) {
-    context.save();
-    context.transform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f);
-    renderBrushStudioV6MaterialMarks(context, marks);
-    context.restore();
+/** Contact-major order is invariant to pointer batching, including overlaps between copies. */
+function* materialSymmetryBatches(marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): Generator<readonly StudioMaterialBrushMark[]> {
+  const transforms = studioBrushSymmetryTransforms(symmetry);
+  if (transforms.length === 1) { yield marks; return; }
+  let batch: StudioMaterialBrushMark[] = [];
+  for (const mark of marks) for (const [index, transform] of transforms.entries()) {
+    if (index === 0) batch.push(mark);
+    else {
+      const cos = Math.cos(mark.angle);
+      const sin = Math.sin(mark.angle);
+      batch.push({ ...mark,
+        x: transform.a * mark.x + transform.c * mark.y + transform.e,
+        y: transform.b * mark.x + transform.d * mark.y + transform.f,
+        angle: Math.atan2(transform.b * cos + transform.d * sin, transform.a * cos + transform.c * sin),
+      });
+    }
+    if (batch.length === 1024) { yield batch; batch = []; }
   }
+  if (batch.length) yield batch;
+}
+
+/** All local primitives are reflection symmetric; transforming their axis is exact. */
+export function renderStudioMaterialBrushMarks(context: CanvasRenderingContext2D, marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): void {
+  for (const batch of materialSymmetryBatches(marks, symmetry)) renderBrushStudioV6MaterialMarks(context, batch);
 }
 
 export function studioMaterialBrushMarksToSvg(marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): string {
-  const markup = brushStudioV6MaterialMarksToSvg(marks);
-  return studioBrushSymmetryTransforms(symmetry).map(({ a, b, c, d, e, f }) => `<g transform="matrix(${a} ${b} ${c} ${d} ${e} ${f})">${markup}</g>`).join("");
+  const parts: string[] = [];
+  for (const batch of materialSymmetryBatches(marks, symmetry)) parts.push(brushStudioV6MaterialMarksToSvg(batch));
+  return parts.join("");
 }
 
 /** Exact primitive bounds for raster-copy crops; particles and wet spread exceed nib width. */

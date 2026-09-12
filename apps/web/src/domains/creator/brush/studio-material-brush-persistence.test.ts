@@ -43,11 +43,11 @@ describe("saved material brush preservation", () => {
     const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("wax-resist"));
     const element = { id: "material-stroke", type: "draw", mode: "pen", brush: "brush", points: [10, 20, 30, 40],
       stroke: saved.color, strokeWidth: saved.strokeWidth, brushEnginePrograms: saved.enginePrograms };
-    const project = { version: 2, title: "Material", pagesList: [{ id: "page", elements: [element], bg: "#fff", bgGrad: null, canvasH: 900 }] };
+    const project = { version: 2 as const, title: "Material", pagesList: [{ id: "page", elements: [element], bg: "#fff", bgGrad: null, canvasH: 900 }] };
     const reopened = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(project)));
     expect(reopened.pagesList[0]!.elements[0]).toEqual(element);
     const recovered = parseStudioAutosave(serializeStudioAutosave({ ...project, savedAt: "2026-09-12T00:00:00.000Z" }));
-    expect(recovered?.pagesList[0]!.elements[0]).toEqual(element);
+    expect(recovered?.pagesList?.[0]?.elements[0]).toEqual(element);
   });
 
   it("keeps paint material independent of eraser settings through tool memory reload", () => {
