@@ -189,8 +189,9 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     rows: [
       part(
         "Raster/Vector/Text/Balloon/3D/Adjustment/Material",
-        "이미지(래스터) 추가만 메뉴에 있다. 나머지 레이어 종류 생성은 우패널 전용이다.",
+        "이미지와 비파괴 보정 레이어를 추가한다. 다른 레이어 종류는 해당 도구에서 만든다.",
         "layer/image",
+        "layer/adjustment",
       ),
       gap("Group/Folder"),
       part("Mask/Clipping", "클리핑 토글과 마스크 편집면 진입만. 마스크 생성·적용·반전은 인스펙터 전용이다.", "layer/clipping-mask", "layer/mask"),

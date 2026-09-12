@@ -1,3 +1,6 @@
+import { CANVAS_W } from "../studio-assets";
+import { buildStudioLiveAdjustmentRenderTree, isStudioLiveAdjustment, type StudioLiveAdjustmentRenderTree } from "../studio-live-adjustment";
+import { StudioLiveAdjustmentGroup } from "./StudioLiveAdjustmentGroup";
 import { Fragment, Suspense, useLayoutEffect, type ReactNode } from "react";
 import { Group, Shape } from "react-konva/lib/ReactKonvaCore";
 
@@ -581,7 +584,7 @@ export function StudioCanvasViewportDocumentLayer({
                       ref={setRef}
                       x={0}
                       y={0}
-                      globalCompositeOperation={el.mode === "eraser" ? "destination-out" : undefined}
+                      globalCompositeOperation={el.mode === "eraser" ? (opts.compositeOverride as GlobalCompositeOperation | undefined) ?? "destination-out" : undefined}
                       draggable={draggable}
                       dragBoundFunc={snapBoundFunc}
                       onMouseDown={onSelect}
@@ -834,7 +837,7 @@ export function StudioCanvasViewportDocumentLayer({
                       .map((pel, pIdx) => renderEl(pel, pIdx, { asMask: true }))}
                   </Group>
                 ) : null;
-                const mainEls = canvasRenderElements.map((el, idx) => {
+                const renderDocumentElement = (el: El, idx: number, compositeOverride?: string) => {
                   if (isEffectivelyHidden(el, groups) || localHiddenElementIds.has(el.id)) return null; // 숨긴 레이어/그룹 + "나만 숨기기"는 렌더·내보내기에서 제외
                   // A verified raster frame and these vector fallbacks switch in one React commit.
                   // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
@@ -936,8 +939,25 @@ export function StudioCanvasViewportDocumentLayer({
                       </ClipMaskGroup>
                     );
                   }
-                  return renderWithOwnMask();
-                });
+                  return renderWithOwnMask({ compositeOverride });
+                };
+                const renderAdjustmentTree = (node: StudioLiveAdjustmentRenderTree, neutralizeComposite = false): ReactNode => {
+                  if (node.kind === "content") return renderDocumentElement(node.element, node.index, neutralizeComposite ? "source-over" : undefined);
+                  const children = node.children.map((child) => renderAdjustmentTree(child, node.kind === "adjustment" && node.isolatedSource));
+                  if (node.kind === "group") return <Fragment key={node.id}>{children}</Fragment>;
+                  return <StudioLiveAdjustmentGroup key={node.id} element={node.element}
+                    composite={neutralizeComposite ? "source-over" : node.composite}
+                    width={CANVAS_W} height={activePage.canvasH} sourceIds={node.children.map((child) => child.id)}
+                    cacheKey={JSON.stringify([node, timelinePlayhead, timelinePreviewFrame,
+                      [...studioLiveGesturePreviewRenderPlan.previewSequenceByElementId], groups])}>
+                    {children}
+                  </StudioLiveAdjustmentGroup>;
+                };
+                const mainEls = canvasRenderElements.some(isStudioLiveAdjustment)
+                  ? buildStudioLiveAdjustmentRenderTree(canvasRenderElements, (element) =>
+                    !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id))
+                    .map((node) => renderAdjustmentTree(node))
+                  : canvasRenderElements.map((element, index) => renderDocumentElement(element, index));
                 return (
                   <>
                     {masterUnderlay}

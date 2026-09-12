@@ -1,4 +1,5 @@
 import {
+  STUDIO_DRAFT_CANVAS_PATHNAME,
   parseStudioWorkspaceRoute,
   type StudioWorkspaceLocationInput,
   type StudioWorkspaceRouteErrorCode,
@@ -39,7 +40,7 @@ function scopeFromWorkspace(
       },
     };
   }
-  return { valid: true, scope: { key: "draft", label: "새 프로젝트", editorHref: "/studio" } };
+  return { valid: true, scope: { key: "draft", label: "새 프로젝트", editorHref: STUDIO_DRAFT_CANVAS_PATHNAME } };
 }
 
 /** Reuse the editor's opaque-ID validator; never fall back to draft on bad scope. */
@@ -60,7 +61,7 @@ export function resolveStudioProductionScope({
     return { valid: false, errorCode: "invalid-path" };
   }
   const pathResult = scopeFromWorkspace({
-    pathname: pathScoped ? `/${segments.slice(1, 4).join("/")}/canvas` : "/studio",
+    pathname: pathScoped ? `/${segments.slice(1, 4).join("/")}/canvas` : STUDIO_DRAFT_CANVAS_PATHNAME,
     search: params,
   });
   if (!pathResult.valid) return pathResult;
@@ -68,7 +69,7 @@ export function resolveStudioProductionScope({
   if (explicit === undefined) return pathResult;
   let scoped: StudioProductionScopeResult;
   if (explicit === "draft") {
-    scoped = scopeFromWorkspace({ pathname: "/studio" });
+    scoped = scopeFromWorkspace({ pathname: STUDIO_DRAFT_CANVAS_PATHNAME });
   } else {
     const separator = explicit.indexOf(":");
     const kind = explicit.slice(0, separator);

@@ -213,6 +213,7 @@ describe("studio work asset wire contract", () => {
       "lineCleanup",
       "screentoneRemoval",
       "smartFilters",
+      "adjustmentLayer",
     ]);
     expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toEqual(expect.arrayContaining([
       "blurFx",

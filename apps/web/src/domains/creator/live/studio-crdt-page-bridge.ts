@@ -705,6 +705,7 @@ export function reconcileStudioCrdtSceneGraphPages<
     } as TPage & { shared3dStage?: StudioShared3dStagePersistedState };
     // An absent synchronized preset field is authoritative too, including remote removal.
     if (!Object.hasOwn(record.payload.props, "layerComps")) delete materialized.layerComps;
+    if (!Object.hasOwn(record.payload.props, "colorProof")) delete materialized.colorProof;
     // Shared Stage state deliberately lives outside the bounded page envelope. A retained
     // inactive sidecar is authoritative too: it must remove a stale local connection instead of
     // allowing the source snapshot's optional property to survive the spread above.

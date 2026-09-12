@@ -629,9 +629,11 @@ function StudioSmartFilterControls({
 export function StudioSmartFiltersPanel({
   stack,
   onChange,
+  maxEntries,
 }: {
   stack: StudioAdjustmentStack | undefined;
   onChange: (next: StudioAdjustmentStack) => void;
+  maxEntries?: number;
 }): React.ReactElement {
   const searchId = useId();
   const [query, setQuery] = useState("");
@@ -644,7 +646,8 @@ export function StudioSmartFiltersPanel({
   }
 
   function addEngine(engine: StudioAdjustmentEngineId) {
-    if (!STUDIO_ADJUSTMENT_ENGINE_IDS.includes(engine)) return;
+    if (!STUDIO_ADJUSTMENT_ENGINE_IDS.includes(engine)
+      || (maxEntries !== undefined && current.entries.length >= maxEntries)) return;
     patch(appendStudioAdjustmentEntry(current, {
       engine,
       params: studioAdjustmentDefaultParams(engine),
@@ -665,11 +668,11 @@ export function StudioSmartFiltersPanel({
           <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">필터 관리</p>
           <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
             원본은 유지됩니다. 필터를 검색해 추가하고 각 항목의 값을 언제든 다시 조절하세요.
-            모든 계산은 브라우저의 로컬 Worker에서 우선 실행됩니다.
+            적용 순서와 불투명도도 원본을 바꾸지 않고 조절할 수 있습니다.
           </p>
         </div>
         <span className="shrink-0 rounded-lg border border-line bg-card px-2 py-1 text-[0.6rem] tabular-nums text-fg-3">
-          {current.entries.length}개
+          {current.entries.length}{maxEntries === undefined ? "개" : ` / ${maxEntries}개`}
         </span>
       </div>
 
@@ -726,6 +729,7 @@ export function StudioSmartFiltersPanel({
                     >
                       <button
                         type="button"
+                        disabled={maxEntries !== undefined && current.entries.length >= maxEntries}
                         onClick={() => addEngine(entry.engine as StudioAdjustmentEngineId)}
                         className={cn(
                           "inline-flex min-h-10 items-center gap-1 rounded-lg border border-line/70 bg-canvas/50 px-2.5 text-[0.62rem] font-bold text-fg-2 pointer-coarse:min-h-11",
