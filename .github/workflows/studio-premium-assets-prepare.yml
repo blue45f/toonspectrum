@@ -1,9 +1,8 @@
-name: Studio premium asset preparation
+name: Publish reviewed premium assets
 on:
   push:
     branches: [codex/studio-premium-assets-20260913]
     paths:
-      - .github/workflows/studio-premium-assets-prepare.yml
       - data/studio-assets/premium-20260913-decisions.json
 permissions:
   contents: write
@@ -11,10 +10,10 @@ concurrency:
   group: studio-premium-assets-20260913
   cancel-in-progress: false
 jobs:
-  prepare:
+  publish:
     if: github.ref == 'refs/heads/codex/studio-premium-assets-20260913'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,84 +22,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install isolated asset tooling
-        run: |
-          python -m pip install Pillow==11.3.0 numpy==2.2.6
-          mkdir -p /tmp/toon-asset-tools
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          fs.writeFileSync('/tmp/toon-asset-tools/package.json', JSON.stringify({private:true,dependencies:{three:pkg.dependencies.three,playwright:pkg.devDependencies.playwright,tsx:pkg.devDependencies.tsx}}));
-          JS
-          npm install --prefix /tmp/toon-asset-tools --ignore-scripts --no-audit --no-fund
-          /tmp/toon-asset-tools/node_modules/.bin/playwright install --with-deps chromium
-      - name: Integrate image kinds and run regression tests
+      - name: Require completed technical evidence
         run: |
           set -euo pipefail
-          node scripts/integrate-studio-premium-assets.mjs
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('scripts/studio-premium-assets-20260913.py')
-          text = p.read_text()
-          before = '    from acquire_studio_pbr_assets import Fetcher\n'
-          after = before + '    Image.MAX_IMAGE_PIXELS = MAX_SOURCE_PIXELS\n'
-          if after not in text:
-              assert text.count(before) == 1
-              p.write_text(text.replace(before, after))
-          PY
+          test -f artifacts/studio-premium-20260913/manifest.json
+          test -f artifacts/studio-premium-20260913/mobile-admission-report.json
+          test -f artifacts/studio-premium-20260913/rendered-prop-candidates.json
+          test -f artifacts/studio-premium-20260913/derivative-packaging-report.json
           node --experimental-strip-types --test scripts/studio-premium-catalog.test.mts
-          python -m unittest discover -s scripts/tests -p test_studio_premium_assets.py -v
-          node --check scripts/render-studio-premium-props.mjs
-      - name: Acquire and verify bounded candidates
+      - name: Publish SHA-bound visual decisions and preserve previous catalog
         run: |
           set -euo pipefail
           STAGE=artifacts/studio-premium-20260913
-          if [ ! -f "$STAGE/manifest.json" ]; then
-            python scripts/acquire_studio_pbr_assets.py --output "$STAGE" --exclude-manifest apps/web/public/assets/studio/cc0-20260906/manifest.json --profile expansion --max-download-mib 1024
-            node scripts/render_studio_asset_delivery.mjs "$STAGE" /tmp/toon-asset-tools
+          if [ ! -f "$STAGE/publication-report.json" ]; then
+            node scripts/publish-studio-asset-expansion.mjs "$STAGE" data/studio-assets/premium-20260913-decisions.json
           fi
-          if [ ! -f "$STAGE/mobile-admission-report.json" ]; then
-            /tmp/toon-asset-tools/node_modules/.bin/tsx scripts/studio-premium-model-admission.mts "$STAGE"
-          fi
-          if [ ! -f "$STAGE/rendered-prop-candidates.json" ]; then
-            node scripts/render-studio-premium-props.mjs "$STAGE" /tmp/toon-asset-tools
-          fi
-          python scripts/studio-premium-assets-20260913.py "$STAGE"
-          python scripts/finalize-studio-premium-derivatives.py "$STAGE"
-          python scripts/studio-premium-assets-20260913.py "$STAGE"
-      - name: Publish only explicitly reviewed candidates
-        if: hashFiles('data/studio-assets/premium-20260913-decisions.json') != ''
-        run: |
-          set -euo pipefail
-          if [ ! -f artifacts/studio-premium-20260913/publication-report.json ]; then
-            node scripts/publish-studio-asset-expansion.mjs artifacts/studio-premium-20260913 data/studio-assets/premium-20260913-decisions.json
-          fi
-          node --experimental-strip-types --test scripts/studio-premium-catalog.test.mts
-      - name: Record branch-only assets and review evidence
+          node scripts/finalize-studio-premium-release.mjs
+      - name: Commit publication and remove temporary preparation payloads
         run: |
           set -euo pipefail
           git config user.name 'ToonStudio asset preparation'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f artifacts/studio-premium-20260913/*.json
-          git add -f artifacts/studio-premium-20260913/assets artifacts/studio-premium-20260913/previews artifacts/studio-premium-20260913/review
-          git add apps/web/public/assets/studio/cc0-20260906 apps/web/src/domains/creator/studio-cc0-asset-delivery.ts apps/web/src/domains/creator/studio-cc0-curation.ts apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx scripts/studio-premium-assets-20260913.py
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'feat(studio): add source-bound CC0 assets and 2D catalog integration'
+          git add -A apps/web/public/assets/studio/cc0-20260906 .github/workflows/studio-premium-assets-prepare.yml docs/reports/studio-premium-assets-20260913.md
+          git add -u artifacts/studio-premium-20260913
+          git add -f artifacts/studio-premium-20260913/*.json artifacts/studio-premium-20260913/review
+          git commit -m 'feat(studio): publish visually selected high-resolution CC0 assets'
           git fetch origin codex/studio-premium-assets-20260913 --depth=100
           git rebase FETCH_HEAD
           git push origin HEAD:refs/heads/codex/studio-premium-assets-20260913
-      - name: Upload bounded review evidence and recovery files
+      - name: Preserve publication evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: studio-premium-assets-review-${{ github.run_id }}
+          name: studio-premium-publication-${{ github.run_id }}
           path: |
             artifacts/studio-premium-20260913/*.json
-            artifacts/studio-premium-20260913/assets/
-            artifacts/studio-premium-20260913/previews/
             artifacts/studio-premium-20260913/review/
-          retention-days: 3
-          if-no-files-found: warn
+          retention-days: 7
+          if-no-files-found: error
