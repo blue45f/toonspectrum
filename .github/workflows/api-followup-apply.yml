@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   group: api-followup-apply
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   apply:
     runs-on: ubuntu-24.04
