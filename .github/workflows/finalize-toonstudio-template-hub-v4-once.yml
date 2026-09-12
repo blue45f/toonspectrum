@@ -102,7 +102,6 @@ jobs:
             audio: workspaceList("audio", "motion", "review"),
             localization: workspaceList("localization", "review"),
           });'''
-          block = "\n".join(line[10:] if line.startswith("          ") else line for line in block.splitlines())
           source = source[:start] + block + source[end:]
           source = source.replace(
               "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = KIND_WORKSPACES[input.kind];",
@@ -134,15 +133,6 @@ jobs:
               raise SystemExit(f"unexpected danger replacement count: {total}")
           PY
 
-          grep -q 'const workspaceList' \
-            apps/web/src/domains/creator/studio-project-document-store.ts
-          if grep -R 'variant: "danger"' \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx; then
-            echo "Unsupported danger variant remains" >&2
-            exit 1
-          fi
-
           rm -f \
             apps/web/src/domains/creator/studio-project-template-catalog.ts \
             apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
@@ -154,6 +144,92 @@ jobs:
             .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml \
             .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml \
             .github/workflows/verify-toonstudio-project-lifecycle.yml
+
+      - name: Associate governance option labels and descriptions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          file = Path("apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.tsx")
+          source = file.read_text()
+          old_import = 'import { useEffect, useMemo, useState } from "react";'
+          new_import = 'import { useEffect, useId, useMemo, useState } from "react";'
+          if source.count(old_import) != 1:
+              raise SystemExit("Unexpected governance React import")
+          source = source.replace(old_import, new_import, 1)
+          start = source.index("function CheckOption({")
+          end = source.index("\n/**", start)
+          option = '''function CheckOption({
+            checked,
+            disabled,
+            label,
+            description,
+            onChange,
+          }: {
+            readonly checked: boolean;
+            readonly disabled?: boolean;
+            readonly label: string;
+            readonly description: string;
+            readonly onChange: (checked: boolean) => void;
+          }) {
+            const inputId = useId();
+            const descriptionId = `${inputId}-description`;
+
+            return (
+              <label
+                htmlFor={inputId}
+                aria-label={label}
+                className={cn(
+                  "flex min-h-14 items-start gap-3 rounded-xl border border-line bg-panel px-3 py-3 text-sm",
+                  disabled && "opacity-55",
+                )}
+              >
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  aria-describedby={descriptionId}
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={(event) => onChange(event.target.checked)}
+                  className="mt-0.5 size-4 accent-[var(--accent)]"
+                />
+                <span>
+                  <b className="block text-xs text-fg">{label}</b>
+                  <span id={descriptionId} className="mt-1 block text-[0.68rem] leading-5 text-fg-3">{description}</span>
+                </span>
+              </label>
+            );
+          }
+          '''
+          file.write_text(source[:start] + option + source[end:])
+
+          tests = Path("apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx")
+          tests.write_text(tests.read_text() + '''
+          describe("governance option accessibility", () => {
+            it.each([
+              { locale: "ko" as const, name: "구매한 계정 연결됨", description: "구매 내역과 사용 좌석을 확인합니다." },
+              { locale: "en" as const, name: "Purchased account connected", description: "Verify purchase history and licensed seats." },
+            ])("associates the $locale label and description with its checkbox", ({ locale, name, description }) => {
+              render(<StudioAssetGovernancePanel projectId="project-labels" locale={locale} />);
+
+              const checkbox = screen.getByRole("checkbox", { name });
+              const label = checkbox.closest("label");
+              const descriptionId = checkbox.getAttribute("aria-describedby");
+              expect(checkbox.id).not.toBe("");
+              expect(label?.htmlFor).toBe(checkbox.id);
+              expect(label?.getAttribute("aria-label")).toBe(name);
+              expect(descriptionId).toBeTruthy();
+              expect(document.getElementById(descriptionId ?? "")?.textContent).toBe(description);
+
+              const ids = screen.getAllByRole("checkbox").map((input) => input.id);
+              expect(ids.every(Boolean)).toBe(true);
+              expect(new Set(ids).size).toBe(ids.length);
+            });
+          });
+          ''')
+          PY
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -169,50 +245,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Normalize and lint product sources
+      - name: Normalize and strictly lint every integrated TypeScript source
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec eslint --fix \
-            apps/web/src/app/routes/groups/creator-route-pages.ts \
-            apps/web/src/app/routes/groups/creator.routes.tsx \
-            apps/web/src/domains/creator/studio-route-registry.ts \
-            apps/web/src/domains/creator/studio-project-creation.ts \
-            apps/web/src/domains/creator/studio-project-creation.test.ts \
-            apps/web/src/domains/creator/studio-project-document-store.ts \
-            apps/web/src/domains/creator/studio-project-document-store.test.ts \
-            apps/web/src/domains/creator/studio-project-library-store.ts \
-            apps/web/src/domains/creator/studio-project-library-store.test.ts \
-            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
-          pnpm exec eslint --max-warnings=0 \
-            apps/web/src/app/routes/groups/creator-route-pages.ts \
-            apps/web/src/app/routes/groups/creator.routes.tsx \
-            apps/web/src/domains/creator/studio-route-registry.ts \
-            apps/web/src/domains/creator/studio-project-creation.ts \
-            apps/web/src/domains/creator/studio-project-document-store.ts \
-            apps/web/src/domains/creator/studio-project-library-store.ts \
-            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          changed = subprocess.check_output([
+              "git", "diff", "--name-only", "--diff-filter=ACMR", "-z", "HEAD",
+          ]).decode().split("\0")
+          untracked = subprocess.check_output([
+              "git", "ls-files", "--others", "--exclude-standard", "-z",
+          ]).decode().split("\0")
+          files = sorted({
+              path for path in changed + untracked
+              if path.endswith((".ts", ".tsx")) and Path(path).is_file()
+          })
+          if not files:
+              raise SystemExit("No integrated TypeScript sources found")
+          print(f"Strictly linting {len(files)} integrated TypeScript sources", flush=True)
+          for fix in (True, False):
+              args = ["pnpm", "exec", "eslint", "--max-warnings=0", "--no-warn-ignored"]
+              if fix:
+                  args.append("--fix")
+              subprocess.run(args + ["--"] + files, check=True)
+          PY
           git diff --check
 
       - name: Typecheck
         run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
 
-      - name: Run lifecycle and route tests
+      - name: Run lifecycle, route and governance regression tests
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/studio-project-creation.test.ts
@@ -221,6 +286,7 @@ jobs:
           apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
           apps/web/src/app/routes/groups/app-routes.test.tsx
           apps/web/src/domains/creator/studio-route-registry.test.ts
           --pool=forks --maxWorkers=2
@@ -230,8 +296,10 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/verify-toonstudio-feature-reachability.mjs
-          if pnpm run | grep -q 'verify:studio-session-complete'; then
+          if node -e 'process.exit(Object.hasOwn(require("./package.json").scripts, "verify:studio-session-complete") ? 0 : 1)'; then
             pnpm run verify:studio-session-complete
+          else
+            echo "No verify:studio-session-complete script is defined; feature reachability was verified explicitly."
           fi
 
       - name: Build production bundle
@@ -254,3 +322,5 @@ jobs:
           git diff --cached --check
           git commit -m "feat(studio): add project and document lifecycle"
           git push origin HEAD:${FEATURE_BRANCH}
+          echo "Validated integrated commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Validated against main: $MERGED_MAIN_SHA" >> "$GITHUB_STEP_SUMMARY"
