@@ -11,16 +11,20 @@ const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const workflow = parseYaml(readFileSync(new URL("../.github/workflows/creator-home-quality.yml", import.meta.url), "utf8"));
 const steps = workflow.jobs["creator-home"].steps;
 const checkout = steps.find((step) => step.uses?.startsWith("actions/checkout@"));
-const includedDirectories = checkout.with["sparse-checkout"].trim().split(/\s+/u);
 
 function expectAvailableInCheckout(path) {
   const relativePath = relative(repositoryRoot, path).replaceAll("\\", "/");
   expect(existsSync(path), `${relativePath} must be a shipped source input`).toBe(true);
-  expect(includedDirectories.some((directory) => relativePath.startsWith(`${directory}/`)),
-    `${relativePath} must be present before the production build`).toBe(true);
 }
 
 describe("creator homepage production checkout", () => {
+  it("checks out the complete production source tree before bundling the whole app", () => {
+    expect(checkout.with["sparse-checkout"]).toBeUndefined();
+    expect(checkout.with.filter).toBeUndefined();
+    expect(checkout.with["persist-credentials"]).toBe(false);
+    expect(checkout.with["fetch-depth"]).toBe(1);
+  });
+
   it("includes the checked-in WASM bindings used by browser engine imports", () => {
     for (const sourcePath of [
       "packages/studio-engine-vello/src/render.ts",
@@ -35,6 +39,16 @@ describe("creator homepage production checkout", () => {
         expectAvailableInCheckout(artifact);
         expectAvailableInCheckout(artifact.replace(/\.js$/u, "_bg.wasm"));
       }
+    }
+  });
+
+  it("includes the shared deployment protocol imported by the application", () => {
+    const sourcePath = resolve(repositoryRoot, "apps/web/src/domains/creator/studio-realtime-provider-cloudflare-adapter.ts");
+    const source = readFileSync(sourcePath, "utf8");
+    const imports = [...source.matchAll(/from\s+["']([^"']*deploy\/[^"']+)["']/gu)];
+    expect(imports.length).toBeGreaterThan(0);
+    for (const [, specifier] of imports) {
+      expectAvailableInCheckout(resolve(dirname(sourcePath), `${specifier}.ts`));
     }
   });
 

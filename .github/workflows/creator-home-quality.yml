@@ -82,24 +82,12 @@ jobs:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Checkout focused source tree
+      # This job bundles the whole application, including shared engines and protocols.
+      - name: Checkout production source tree
         uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 1
-          filter: blob:none
-          sparse-checkout: |
-            .github/workflows
-            apps/api/data
-            apps/web
-            automation/n8n
-            crates
-            docs/third-party
-            media/brand-film
-            packages
-            patches
-            scripts
-            third_party
 
       - name: Detect changed verification scope
         id: scope
