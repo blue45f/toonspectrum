@@ -4,6 +4,7 @@ import { resolveStudioBg3dOrthographicZoom } from "./studio-bg3d-camera-framing"
 import {
   isStudioBg3dCameraNearClip,
   isStudioBg3dCameraUpVectorValid,
+  resolveStudioBg3dCameraDistanceLimits,
   resolveStudioBg3dCameraNearClip,
   resolveStudioBg3dCameraUpVector,
 } from "./studio-bg3d-camera-orientation";
@@ -11,7 +12,37 @@ import { waitForStudioBg3dCapturePhase } from "./studio-bg3d-capture-adapter";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
-type OrbitLike = { target?: THREE.Vector3; update?: () => void } | null;
+type OrbitLike = {
+  target?: THREE.Vector3;
+  minDistance?: number;
+  maxDistance?: number;
+  enableDamping?: boolean;
+  autoRotate?: boolean;
+  update?: () => void;
+} | null;
+
+/** Keep the orbit target beyond the near plane, including small-scene fit cameras. */
+export function resolveStudioBg3dMinimumOrbitDistance(nearClip: unknown): number {
+  return resolveStudioBg3dCameraNearClip(nearClip) * 1.01;
+}
+
+/** Drain the previous gesture synchronously, then apply an explicit camera command without drift. */
+function withoutStudioBg3dOrbitMomentum(controls: OrbitLike, apply: () => boolean): boolean {
+  if (!controls || (controls.enableDamping !== true && controls.autoRotate !== true)) return apply();
+  const damping = controls.enableDamping;
+  const autoRotate = controls.autoRotate;
+  controls.enableDamping = false;
+  controls.autoRotate = false;
+  try {
+    // OrbitControls.update() clears accumulated rotation/pan when damping is disabled. This uses
+    // the public API and runs before apply(), so the drained pose never replaces the requested one.
+    controls.update?.();
+    return apply();
+  } finally {
+    controls.enableDamping = damping;
+    controls.autoRotate = autoRotate;
+  }
+}
 
 export interface BgViewportApi {
   /** Applies a projection-aware zoom command and reports whether a complete view was published. */
@@ -121,10 +152,34 @@ function validStudioBg3dCameraView(
 /** Reads the precise rendered world AABB. Empty, detached, and non-finite geometry fails closed. */
 export function readStudioBg3dObjectWorldBounds(
   object: THREE.Object3D | null | undefined,
+  options?: { readonly visibleOnly?: boolean },
 ): StudioBg3dWorldBounds | null {
   if (!object?.isObject3D) return null;
   object.updateWorldMatrix(true, true);
-  const bounds = new THREE.Box3().setFromObject(object, true);
+  const bounds = new THREE.Box3();
+  if (options?.visibleOnly) {
+    // Box3.setFromObject includes invisible descendants. A hidden wall or alternate model can
+    // otherwise make a visible selection tiny. Visit visible geometry without changing the scene.
+    const vertex = new THREE.Vector3();
+    const instanceBounds = new THREE.Box3();
+    object.traverseVisible((node) => {
+      if (!("geometry" in node) || !(node.geometry instanceof THREE.BufferGeometry)) return;
+      if (node instanceof THREE.InstancedMesh) {
+        if (node.boundingBox === null) node.computeBoundingBox();
+        if (node.boundingBox) bounds.union(instanceBounds.copy(node.boundingBox).applyMatrix4(node.matrixWorld));
+        return;
+      }
+      const positions = node.geometry.getAttribute("position");
+      if (!positions) return;
+      for (let index = 0; index < positions.count; index += 1) {
+        if (node instanceof THREE.Mesh) node.getVertexPosition(index, vertex);
+        else vertex.fromBufferAttribute(positions, index);
+        bounds.expandByPoint(vertex.applyMatrix4(node.matrixWorld));
+      }
+    });
+  } else {
+    bounds.setFromObject(object, true);
+  }
   if (bounds.isEmpty() || !finiteWorldVector(bounds.min) || !finiteWorldVector(bounds.max)) {
     return null;
   }
@@ -195,24 +250,63 @@ export function applyStudioBg3dProjectionAwareZoom(
       distanceFactor,
     });
     if (zoom === null) return false;
-    camera.zoom = zoom;
-    camera.updateProjectionMatrix();
-    camera.updateMatrixWorld();
-    controls?.update?.();
-    return true;
+    const position = camera.position.clone();
+    const target = controls?.target?.clone();
+    return withoutStudioBg3dOrbitMomentum(controls, () => {
+      camera.position.copy(position);
+      if (target) controls?.target?.copy(target);
+      camera.zoom = zoom;
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+      controls?.update?.();
+      return true;
+    });
   }
 
-  const target = controls?.target ?? new THREE.Vector3(...fallbackTarget);
+  if (!isStudioBg3dCameraNearClip(camera.near)) return false;
+  const target = controls?.target?.clone() ?? new THREE.Vector3(...fallbackTarget);
   if (!finiteWorldVector(target)) return false;
   const offset = camera.position.clone().sub(target);
   const distance = offset.length();
   if (!Number.isFinite(distance) || distance < 1e-6) return false;
-  const nextDistance = THREE.MathUtils.clamp(distance * distanceFactor, 2, 60);
+  const limits = resolveStudioBg3dCameraDistanceLimits(
+    camera.position.toArray(), target.toArray(),
+  );
+  const minDistance = resolveStudioBg3dMinimumOrbitDistance(camera.near);
+  const nextDistance = THREE.MathUtils.clamp(distance * distanceFactor, minDistance, limits.maxOrbitDistance);
   offset.setLength(nextDistance);
-  camera.position.copy(target).add(offset);
-  camera.updateMatrixWorld();
-  controls?.update?.();
-  return finiteWorldVector(camera.position);
+  const nextPosition = target.clone().add(offset);
+  if (!finiteWorldVector(nextPosition)) return false;
+  return withoutStudioBg3dOrbitMomentum(controls, () => {
+    camera.position.copy(nextPosition);
+    camera.far = resolveStudioBg3dCameraDistanceLimits(nextPosition.toArray(), target.toArray()).farClip;
+    camera.updateProjectionMatrix();
+    if (controls) {
+      controls.target?.copy(target);
+      controls.minDistance = minDistance;
+      controls.maxDistance = Math.max(limits.maxOrbitDistance, nextDistance);
+    }
+    camera.updateMatrixWorld();
+    controls?.update?.();
+    return finiteWorldVector(camera.position);
+  });
+}
+
+/** Normalized lens offsets must preserve the viewport aspect that setViewOffset overwrites. */
+export function applyStudioBg3dLensShiftToThreeCamera(
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+  lensShift: StudioBg3dCameraSettings["lensShift"],
+): void {
+  if (!lensShift || (lensShift[0] === 0 && lensShift[1] === 0)) {
+    if (camera.view !== null) camera.clearViewOffset();
+    return;
+  }
+  const fullHeight = 1_000;
+  const fullWidth = fullHeight * (camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1);
+  camera.setViewOffset(
+    fullWidth, fullHeight, lensShift[0] * fullWidth, lensShift[1] * fullHeight,
+    fullWidth, fullHeight,
+  );
 }
 
 /** Applies every persisted composition field without replacing Three's live camera identity. */
@@ -226,28 +320,30 @@ export function applyStudioBg3dViewToThreeCamera(
     : camera instanceof THREE.PerspectiveCamera;
   if (!projectionMatches || !validStudioBg3dCameraView(camera, view)) return false;
 
-  if (camera instanceof THREE.PerspectiveCamera) camera.fov = view.fovDegrees;
-  camera.zoom = view.zoom ?? 1;
-  camera.near = resolveStudioBg3dCameraNearClip(view.nearClip);
-  if (view.lensShift) {
-    const [shiftX, shiftY] = view.lensShift;
-    if (shiftX === 0 && shiftY === 0) camera.clearViewOffset();
-    else camera.setViewOffset(1_000, 1_000, shiftX * 1_000, shiftY * 1_000, 1_000, 1_000);
-  } else if (camera.view !== null) {
-    camera.clearViewOffset();
-  }
-  camera.updateProjectionMatrix();
-  camera.position.set(view.position[0], view.position[1], view.position[2]);
-  const up = resolveStudioBg3dCameraUpVector(view);
-  camera.up.set(up[0], up[1], up[2]);
-  if (controls?.target) {
-    controls.target.set(view.target[0], view.target[1], view.target[2]);
-    controls.update?.();
-  } else {
-    camera.lookAt(view.target[0], view.target[1], view.target[2]);
-  }
-  camera.updateMatrixWorld();
-  return true;
+  return withoutStudioBg3dOrbitMomentum(controls, () => {
+    if (camera instanceof THREE.PerspectiveCamera) camera.fov = view.fovDegrees;
+    camera.zoom = view.zoom ?? 1;
+    camera.near = resolveStudioBg3dCameraNearClip(view.nearClip);
+    const limits = resolveStudioBg3dCameraDistanceLimits(view.position, view.target);
+    camera.far = limits.farClip;
+    applyStudioBg3dLensShiftToThreeCamera(camera, view.lensShift);
+    camera.updateProjectionMatrix();
+    camera.position.set(view.position[0], view.position[1], view.position[2]);
+    const up = resolveStudioBg3dCameraUpVector(view);
+    camera.up.set(up[0], up[1], up[2]);
+    if (controls?.target) {
+      // controls.update() enforces the previous scene's limits synchronously, before React can
+      // publish the new props. Expand them first so a fit/undo cannot silently move the camera.
+      controls.minDistance = resolveStudioBg3dMinimumOrbitDistance(camera.near);
+      controls.maxDistance = limits.maxOrbitDistance;
+      controls.target.set(view.target[0], view.target[1], view.target[2]);
+      controls.update?.();
+    } else {
+      camera.lookAt(view.target[0], view.target[1], view.target[2]);
+    }
+    camera.updateMatrixWorld();
+    return true;
+  });
 }
 
 export interface ApplyStudioBg3dViewportAfterTransitionInput {

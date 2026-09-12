@@ -127,6 +127,40 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts \
             apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
           pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
+      - name: Studio 3D camera, composition and character export regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-application.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-framing.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-selection.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-engine-remount-safety.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-surface-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.lens.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dCompositionOverlay.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts \
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-raster-capture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
+            scripts/verify-studio-3d-console.test.ts
+      - name: Production menu entry point regressions
+        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 
   serial:
     needs: preflight

@@ -14,6 +14,7 @@
  * Expects production build in dist/ (vite preview).
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 import { chromium, type Locator, type Page } from "playwright";
 
@@ -46,7 +47,7 @@ interface CatalogueGroup {
  * whichever title now owns them — folding two tables into one must never drop a row,
  * so `buildPresentedMenus()` re-reports any group the presentation does not place.
  */
-const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
+export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
   {
     id: "file",
     caption: "파일",
@@ -122,7 +123,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "지우개",
       "채우기",
       "스마트 도형",
-      "현재 스트로크 교정…",
+      "방금 그린 선 다듬기…",
       "브러시 프리셋 목록…",
       "브러시 스튜디오…",
       "자연 매체 · 안료…",
@@ -193,7 +194,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "명령 · 속성 통합 검색",
       "CSP · Photoshop 용어 찾기",
       "현재 도구 도움말",
-      "사용법 · 기능 튜토리얼",
+      "도움말 홈 · 단계별 가이드",
       "단축키 · 기본 조작",
       "기기 · 브라우저 진단…",
       "복구 가이드…",
@@ -355,12 +356,14 @@ const RAIL_TOOLS = [
  * title through the presentation, so a row that moves under a composite title (AI now
  * opens from 도구) keeps working without editing this table.
  */
-const MENU_DRIVEN_POPOVERS: {
+export const MENU_DRIVEN_POPOVERS: {
   groupId: string;
   item: string;
   /** Prefer unique headers so menubar labels are not false positives. */
   expectVisible: string[];
   expectDialogName?: string;
+  /** A shared word such as “배경” must belong to the loaded editor, not surrounding chrome. */
+  contentSelector?: string;
 }[] = [
   {
     groupId: "window",
@@ -370,7 +373,8 @@ const MENU_DRIVEN_POPOVERS: {
   {
     groupId: "brush",
     item: "배경 · 톤",
-    expectVisible: ["배경 편집"],
+    expectVisible: ["배경"],
+    contentSelector: '[data-studio-background-panel="true"]',
   },
   {
     groupId: "brush",
@@ -519,7 +523,7 @@ async function hasVisibleSectionCaption(menu: Locator, caption: string): Promise
   return false;
 }
 
-async function hasVisibleText(page: Page, text: string): Promise<boolean> {
+async function hasVisibleText(page: Page | Locator, text: string): Promise<boolean> {
   const matches = page.getByText(text);
   const count = await matches.count();
   for (let index = 0; index < count; index += 1) {
@@ -780,9 +784,13 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
         await dialog.waitFor({ state: "visible", timeout: 5000 });
       }
 
+      const content = entry.contentSelector ? page.locator(entry.contentSelector) : page;
+      if (entry.contentSelector) {
+        await page.locator(entry.contentSelector).waitFor({ state: "visible", timeout: 5000 });
+      }
       let matched = 0;
       for (const text of entry.expectVisible) {
-        if (await hasVisibleText(page, text)) matched += 1;
+        if (await hasVisibleText(content, text)) matched += 1;
       }
       if (matched === 0) {
         failures.push(
@@ -986,4 +994,6 @@ async function main() {
   process.exit(exitCode);
 }
 
-void main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void main();
+}

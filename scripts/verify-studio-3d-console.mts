@@ -58,6 +58,11 @@ const EXPECTED_R3F_VERSION = "9.6.1";
 const EXPECTED_THREE_VERSION = "0.184.0";
 const R3F_CONTEXT_LOSS_DIAGNOSTIC = "THREE.WebGLRenderer: Context Lost.";
 const SHARED_POSE_CATALOG_API_PATH = "/api/creator/assets/catalog";
+export function classifyStudio3dPngEncoderWorker(url: string): "vrm" | "bg3d" | null {
+  if (url.includes("studio-vrm-png.worker")) return "vrm";
+  if (url.includes("studio-bg3d-shot-png.worker")) return "bg3d";
+  return null;
+}
 const KTX2_SMOKE_MODEL_NAME = "studio-ktx2-runtime-smoke.glb";
 const KTX2_SMOKE_MODEL_LABEL = "studio-ktx2-runtime-smoke";
 const BABYLON_DIAGNOSTIC_BUTTON_TEST_ID =
@@ -975,6 +980,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const babylonRuntimeResponses: string[] = [];
   const sharedPoseRequests: string[] = [];
   const pngEncoderWorkers: string[] = [];
+  const vrmPngEncoderWorkers: string[] = [];
   const glbValidationWorkers: string[] = [];
   const ktx2TranscoderWorkers: string[] = [];
   const localDatabaseWorkers: string[] = [];
@@ -1010,7 +1016,9 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   page.on("pageerror", (error) => issues.push(`pageerror: ${String(error)}`));
   page.on("worker", (worker) => {
     const url = worker.url();
-    if (url.includes("studio-bg3d-shot-png.worker")) pngEncoderWorkers.push(url);
+    const pngEncoder = classifyStudio3dPngEncoderWorker(url);
+    if (pngEncoder === "bg3d") pngEncoderWorkers.push(url);
+    if (pngEncoder === "vrm") vrmPngEncoderWorkers.push(url);
     if (url.includes("studio-bg3d-glb-validation.worker")) glbValidationWorkers.push(url);
     if (url.includes("studio-local-database.worker")) localDatabaseWorkers.push(url);
     if (url.startsWith("blob:")) ktx2TranscoderWorkers.push(url);
@@ -1055,7 +1063,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   await page.waitForTimeout(500);
   assertCondition(
     babylonSpecialistRequests.length === 0,
-    `opening /studio eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
+    `opening /studio/canvas eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
   );
 
   const characterMenu = await openThreeDMenu(page);
@@ -1145,8 +1153,8 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   await insertCharacterButton.click({ timeout: 30_000 });
   await waitForCanvasDialogTeardown(characterDialog, page);
   assertCondition(
-    pngEncoderWorkers.length > 0,
-    "VRM insertion did not start the shared off-main PNG encoder",
+    vrmPngEncoderWorkers.length > 0,
+    "VRM insertion did not start the dedicated off-main PNG encoder",
   );
 
   const liveLossMenu = await openThreeDMenu(page);
@@ -3236,7 +3244,8 @@ async function main(): Promise<void> {
 
   const port = await findFreePort();
   const rootUrl = `http://127.0.0.1:${port}/`;
-  const studioUrl = `${rootUrl}studio`;
+  // /studio is the project home; the production editor now lives at its scoped route.
+  const studioUrl = `${rootUrl}studio/canvas`;
   const server: ChildProcess = spawn(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
     ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
@@ -3273,7 +3282,12 @@ async function main(): Promise<void> {
         );
       },
     );
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    browser = await chromium.launch({
+      headless: true,
+      // Use the pinned full Chromium; the old headless shell selects software ANGLE on macOS.
+      channel: "chromium",
+      args: ["--no-sandbox"],
+    });
     // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
     // locale so a developer machine or CI runner whose default locale is English does not turn a
     // healthy 3D runtime check into a menu-locator failure before either editor is opened.

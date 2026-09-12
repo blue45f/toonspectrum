@@ -10,7 +10,9 @@ import {
   isStudioBg3dCameraNearClip,
   isStudioBg3dCameraUpVectorValid,
   resolveStudioBg3dCameraNearClip,
+  resolveStudioBg3dCameraUpVector,
 } from "./studio-bg3d-camera-orientation";
+import { resolveStudioBg3dCaptureFrame } from "./studio-bg3d-capture-frame-geometry";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
@@ -31,9 +33,11 @@ export interface FitStudioBg3dCameraToBoundsInput {
   readonly bounds: StudioBg3dCameraFramingBounds;
   /** CSS-pixel viewport width / height. */
   readonly viewportAspect: number;
+  /** Fit inside the actual exported safe frame when the document requests a fixed output ratio. */
+  readonly exportAspectRatio?: number | null;
   /** Required only for an orthographic camera. Values are measured before camera.zoom. */
   readonly orthographicFrustumAtZoomOne?: StudioBg3dOrthographicFrustumAtZoomOne;
-  /** Multiplicative subject margin. One means the bounding sphere may touch the limiting edge. */
+  /** Multiplicative subject margin. One means the projected bounds may touch the limiting edge. */
   readonly padding?: number;
   /** Degenerate point-like bounds frame as a subject with at least this world-space radius. */
   readonly minimumRadius?: number;
@@ -88,6 +92,7 @@ function finiteVec3InWorld(value: unknown): value is StudioBg3dCameraFramingVec3
 
 function readBounds(bounds: StudioBg3dCameraFramingBounds): {
   readonly center: StudioBg3dCameraFramingVec3;
+  readonly halfSize: StudioBg3dCameraFramingVec3;
   readonly radius: number;
 } | null {
   if (
@@ -102,27 +107,73 @@ function readBounds(bounds: StudioBg3dCameraFramingBounds): {
     (bounds.min[1] + bounds.max[1]) / 2,
     (bounds.min[2] + bounds.max[2]) / 2,
   ];
-  const radius = Math.hypot(
+  const halfSize: StudioBg3dCameraFramingVec3 = [
     (bounds.max[0] - bounds.min[0]) / 2,
     (bounds.max[1] - bounds.min[1]) / 2,
     (bounds.max[2] - bounds.min[2]) / 2,
-  );
+  ];
+  const radius = Math.hypot(...halfSize);
   if (!Number.isFinite(radius)) return null;
-  return { center, radius };
+  return { center, halfSize, radius };
+}
+
+function dot(left: StudioBg3dCameraFramingVec3, right: StudioBg3dCameraFramingVec3): number {
+  return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
+
+function cross(
+  left: StudioBg3dCameraFramingVec3,
+  right: StudioBg3dCameraFramingVec3,
+): StudioBg3dCameraFramingVec3 {
+  return [
+    left[1] * right[2] - left[2] * right[1],
+    left[2] * right[0] - left[0] * right[2],
+    left[0] * right[1] - left[1] * right[0],
+  ];
+}
+
+/** The same orthonormal basis as lookAt, including a persisted Dutch roll. */
+function projectBoundsCorners(
+  camera: StudioBg3dCameraSettings,
+  backward: StudioBg3dCameraFramingVec3,
+  bounds: NonNullable<ReturnType<typeof readBounds>>,
+  padding: number,
+  minimumRadius: number,
+): readonly StudioBg3dCameraFramingVec3[] {
+  const rightVector = cross(resolveStudioBg3dCameraUpVector(camera), backward);
+  const rightLength = Math.hypot(...rightVector);
+  const right: StudioBg3dCameraFramingVec3 = [
+    rightVector[0] / rightLength, rightVector[1] / rightLength, rightVector[2] / rightLength,
+  ];
+  const up = cross(backward, right);
+  const scale = padding * Math.max(1, minimumRadius / Math.max(bounds.radius, MIN_DIRECTION_LENGTH));
+  const halfSize = bounds.radius < MIN_DIRECTION_LENGTH
+    ? [minimumRadius * padding / Math.sqrt(3), minimumRadius * padding / Math.sqrt(3), minimumRadius * padding / Math.sqrt(3)]
+    : bounds.halfSize.map((value) => value * scale);
+  const corners: StudioBg3dCameraFramingVec3[] = [];
+  for (const x of [-halfSize[0], halfSize[0]]) {
+    for (const y of [-halfSize[1], halfSize[1]]) {
+      for (const z of [-halfSize[2], halfSize[2]]) {
+        const corner: StudioBg3dCameraFramingVec3 = [x, y, z];
+        corners.push([dot(corner, right), dot(corner, up), dot(corner, backward)]);
+      }
+    }
+  }
+  return corners;
 }
 
 function readLensMargins(
   lensShift: StudioBg3dCameraSettings["lensShift"],
+  frame: { readonly scaleX: number; readonly scaleY: number },
 ): { readonly horizontal: number; readonly vertical: number } | null {
-  if (lensShift === undefined) return { horizontal: 1, vertical: 1 };
   if (
-    !Array.isArray(lensShift) || lensShift.length !== 2 ||
-    !finiteInRange(lensShift[0], -2, 2) || !finiteInRange(lensShift[1], -2, 2)
+    lensShift !== undefined && (!Array.isArray(lensShift) || lensShift.length !== 2 ||
+    !finiteInRange(lensShift[0], -2, 2) || !finiteInRange(lensShift[1], -2, 2))
   ) return null;
   // setViewOffset shifts the optical centre by two NDC units per normalized shift unit. A target
   // centred on camera.target has no symmetric fit region once either shift reaches half a frame.
-  const horizontal = 1 - Math.abs(lensShift[0]) * 2;
-  const vertical = 1 - Math.abs(lensShift[1]) * 2;
+  const horizontal = 1 / frame.scaleX - Math.abs(lensShift?.[0] ?? 0) * 2;
+  const vertical = 1 / frame.scaleY - Math.abs(lensShift?.[1] ?? 0) * 2;
   return horizontal > MIN_LENS_MARGIN && vertical > MIN_LENS_MARGIN
     ? { horizontal, vertical }
     : null;
@@ -212,8 +263,9 @@ export function resolveStudioBg3dOrthographicZoom(
 
 /**
  * Fits one world-space AABB without changing view direction, projection, FOV, or lens shift.
- * A bounding sphere is used deliberately: it is conservative for an AABB but remains correct for
- * any persisted camera roll/up-vector orientation.
+ * Fits all eight corners in the camera's actual image plane. A sphere fit wastes most of a portrait
+ * frame around a tall subject, or a landscape frame around a wide room. Corner projection retains
+ * that useful screen space while accounting for each corner's depth, camera roll and lens shift.
  */
 export function fitStudioBg3dCameraToBounds(
   input: FitStudioBg3dCameraToBoundsInput,
@@ -238,7 +290,12 @@ export function fitStudioBg3dCameraToBounds(
 
   const bounds = readBounds(input.bounds);
   const direction = readDirection(camera.position, camera.target);
-  const lensMargins = readLensMargins(camera.lensShift);
+  const captureFrame = resolveStudioBg3dCaptureFrame({
+    viewportWidth: input.viewportAspect * 1_000,
+    viewportHeight: 1_000,
+    aspectRatio: input.exportAspectRatio,
+  });
+  const lensMargins = captureFrame ? readLensMargins(camera.lensShift, captureFrame) : null;
   const zoomBounds = readZoomBounds(input.minZoom, input.maxZoom);
   const padding = input.padding ?? 1.15;
   const minimumRadius = input.minimumRadius ?? DEFAULT_MINIMUM_RADIUS;
@@ -253,23 +310,20 @@ export function fitStudioBg3dCameraToBounds(
     minDistance > maxDistance
   ) return null;
 
-  const paddedRadius = Math.max(bounds.radius, minimumRadius) * padding;
-  if (!Number.isFinite(paddedRadius) || paddedRadius <= 0) return null;
-  const nearSafeDistance = resolveStudioBg3dCameraNearClip(camera.nearClip) + paddedRadius;
+  const corners = projectBoundsCorners(camera, direction.unit, bounds, padding, minimumRadius);
+  const nearSafeDistance = resolveStudioBg3dCameraNearClip(camera.nearClip)
+    + Math.max(...corners.map((corner) => corner[2]));
   if (!Number.isFinite(nearSafeDistance) || nearSafeDistance > maxDistance) return null;
   const projection = camera.projection === "orthographic" ? "orthographic" : "perspective";
   const currentZoom = camera.zoom ?? 1;
 
   if (projection === "perspective") {
     const verticalTangent = Math.tan((camera.fovDegrees * Math.PI) / 360) / currentZoom;
-    const limitingTangent = Math.min(
-      verticalTangent * lensMargins.vertical,
-      verticalTangent * input.viewportAspect * lensMargins.horizontal,
-    );
-    const limitingHalfAngle = Math.atan(limitingTangent);
-    const sine = Math.sin(limitingHalfAngle);
-    if (!Number.isFinite(sine) || sine <= 0) return null;
-    const requiredDistance = Math.max(paddedRadius / sine, nearSafeDistance);
+    const horizontalTangent = verticalTangent * input.viewportAspect * lensMargins.horizontal;
+    const usableVerticalTangent = verticalTangent * lensMargins.vertical;
+    const requiredDistance = Math.max(nearSafeDistance, ...corners.map(([x, y, z]) => (
+      z + Math.max(Math.abs(x) / horizontalTangent, Math.abs(y) / usableVerticalTangent)
+    )));
     if (!Number.isFinite(requiredDistance) || requiredDistance > maxDistance) return null;
     const distance = Math.max(minDistance, requiredDistance);
     const position = positionedAlongDirection(bounds.center, direction.unit, distance);
@@ -284,9 +338,11 @@ export function fitStudioBg3dCameraToBounds(
     !finiteInRange(frustum.width, MIN_DIRECTION_LENGTH, MAX_ORTHOGRAPHIC_FRUSTUM_SPAN) ||
     !finiteInRange(frustum.height, MIN_DIRECTION_LENGTH, MAX_ORTHOGRAPHIC_FRUSTUM_SPAN)
   ) return null;
+  const horizontalSpan = Math.max(...corners.map((corner) => Math.abs(corner[0]))) * 2;
+  const verticalSpan = Math.max(...corners.map((corner) => Math.abs(corner[1]))) * 2;
   const requiredZoom = Math.min(
-    (frustum.width * lensMargins.horizontal) / (paddedRadius * 2),
-    (frustum.height * lensMargins.vertical) / (paddedRadius * 2),
+    horizontalSpan > 0 ? (frustum.width * lensMargins.horizontal) / horizontalSpan : zoomBounds.maxZoom,
+    verticalSpan > 0 ? (frustum.height * lensMargins.vertical) / verticalSpan : zoomBounds.maxZoom,
   );
   // Zooming farther out than the supported minimum is the only bounded case that cannot fit.
   if (!Number.isFinite(requiredZoom) || requiredZoom < zoomBounds.minZoom) return null;
