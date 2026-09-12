@@ -1,0 +1,132 @@
+name: Health recovery candidate verification v2
+on:
+  push:
+    branches: [ops/toonstudio-db-recovery-inspect-20260913]
+    paths: [.github/workflows/toonstudio-health-repair-verify-v2.yml]
+permissions:
+  contents: read
+concurrency:
+  group: health-recovery-candidate-v2
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: toonspectrum_health_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d toonspectrum_health_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 9e6494f233257e57cc61750249abdc539538436f
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Generate reviewed candidate from immutable recovery source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 9e6494f233257e57cc61750249abdc539538436f
+          mkdir -p artifacts/health-candidate
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import YAML from 'yaml';
+          const response=await fetch('https://raw.githubusercontent.com/blue45f/toonspectrum/af6f66c3928c044c3893cd943244f2301349558d/.github/workflows/toonstudio-health-repair-candidate.yml');
+          if(!response.ok) throw new Error('Cannot read pinned candidate');
+          const workflow=YAML.parse(await response.text());
+          const script=workflow.jobs.verify.steps.find(s=>s.name==='Prepare exact-source candidate without moving any Git reference').run;
+          const python=script.split("python3 - <<'PY'\n")[1].split('\nPY\n')[0];
+          writeFileSync('/tmp/recovery-prepare.py',python);
+          const save=workflow.jobs.verify.steps.find(s=>s.name==='Save candidate bytes and unreferenced Git blobs for reviewed CAS application').run;
+          writeFileSync('/tmp/recovery-save.sh',save);
+          NODE
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          script=Path('/tmp/recovery-prepare.py').read_text()
+          old="assert not re.search(r'\\b(?:DROP|DELETE|TRUNCATE|UPDATE)\\b', ddl, re.I)"
+          assert script.count(old)==1
+          script=script.replace(old,"assert not re.search(r'(?:^|;)\\s*(?:DROP\\s|DELETE\\s+FROM|TRUNCATE\\s|UPDATE\\s)', ddl, re.I)")
+          old="replacement = '\\n'.join(line[10:] if line.startswith('          ') else line for line in replacement.splitlines())"
+          assert script.count(old)==1
+          script=script.replace(old,'# YAML already removes the enclosing run-block indentation.')
+          old="bootstrap = '\\n'.join(line[10:] if line.startswith('          ') else line for line in bootstrap.splitlines()).rstrip()+'\\n'"
+          assert script.count(old)==1
+          script=script.replace(old,"bootstrap = bootstrap.rstrip()+'\\n'")
+          old='it.each([[], [{ relation: null }]])("fails closed for missing catalog evidence", async (rows) => {'
+          assert script.count(old)==1
+          script=script.replace(old,'it.each([{ rows: [] }, { rows: [{ relation: null }] }])("fails closed for missing catalog evidence", async ({ rows }) => {')
+          # ON DELETE CASCADE is a foreign-key declaration, not a data-deletion statement.
+          script=script.replace('/\\\\b(?:DROP|DELETE|TRUNCATE)\\\\b/iu','/(?:^|;)\\\\s*(?:DROP\\\\s|DELETE\\\\s+FROM|TRUNCATE\\\\s)/iu')
+          exec(compile(script,'recovery-prepare.py','exec'),{})
+          path=Path('scripts/run-production-database-migrations.test.mjs')
+          text=path.read_text()
+          assert text.count('expect(manifest).toHaveLength(44);')==1
+          text=text.replace('expect(manifest).toHaveLength(44);','expect(manifest).toHaveLength(45);\n  expect(manifest[43].id).toBe("0044_creator_work_entitlement_authorization");')
+          anchor='expect(manifest.at(-1).id).toBe(\n    "0044_creator_work_entitlement_authorization",'
+          assert text.count(anchor)==1
+          text=text.replace(anchor,'expect(manifest.at(-1).id).toBe(\n    "0045_studio_ai_comic_director_schema",')
+          text=text.replace('expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(44);','expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(45);')
+          path.write_text(text)
+          files=json.loads(Path('artifacts/health-candidate/files.json').read_text())
+          files.append(str(path))
+          Path('artifacts/health-candidate/files.json').write_text(json.dumps(files,indent=2))
+          PY
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          import YAML from 'yaml';
+          const workflow=YAML.parse(readFileSync('.github/workflows/health-recovery-diagnostics.yml','utf8'));
+          assert.equal(workflow.jobs.verify.services.postgres.image,'postgres:17');
+          assert.equal(workflow.jobs.verify.env.STUDIO_LIVE_POSTGRES_RUNTIME_ROLE,'toonspectrum_health_runtime');
+          assert.equal(workflow.jobs['production-inspect'].environment,'production-database');
+          assert.equal(workflow.jobs.verify.steps.filter(s=>s.name==='Bootstrap disposable local PostgreSQL with canonical migrations').length,1);
+          NODE
+          git diff --check
+      - name: Bootstrap disposable local database through the canonical migration runner
+        env:
+          MIGRATION_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          BOOTSTRAP_RUNTIME_DATABASE_PASSWORD: isolated_runtime_ci_only
+        run: |
+          set -euo pipefail
+          node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback --runtime-database-role toonspectrum_health_runtime --release-sha "$(git rev-parse HEAD)" --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE 2>&1 | tee artifacts/health-candidate/bootstrap.log
+      - name: Run health, real PostgreSQL and migration contract regressions
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: toonspectrum_health_runtime
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run apps/api/src/modules/health scripts/run-production-database-migrations.test.mjs scripts/validate-production-database-url.test.mjs scripts/verify-production-database-capabilities.test.mjs scripts/comic-director-database-contract.test.mjs apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.test.ts --reporter=default --reporter=json --outputFile=artifacts/health-candidate/vitest.json 2>&1 | tee artifacts/health-candidate/tests.log
+          pnpm exec eslint apps/api/src/modules/health/health-readiness-diagnostic.ts apps/api/src/modules/health/health-readiness-diagnostic.test.ts apps/api/src/modules/health/health.controller.ts --max-warnings 0
+          pnpm --filter @webtoon-nest/api build 2>&1 | tee artifacts/health-candidate/build.log
+      - name: Preserve exact candidate bytes and unreferenced blobs without moving refs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if test -s artifacts/health-candidate/files.json; then bash /tmp/recovery-save.sh; fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: health-schema-candidate-v2-${{ github.run_id }}
+          path: artifacts/health-candidate
+          retention-days: 3
+          if-no-files-found: error
