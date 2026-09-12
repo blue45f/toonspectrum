@@ -6,6 +6,9 @@ on:
     paths:
       - 'apps/web/src/app/App*.tsx'
       - 'apps/web/src/app/browser-compat-dismissal*'
+      - 'apps/web/src/domains/account/LibraryBackupImport*'
+      - 'apps/web/src/domains/account/library-backup*'
+      - 'apps/web/src/domains/account/SettingsPage.tsx'
       - 'apps/web/src/app/routes/route-titles.ts'
       - 'apps/web/src/app/routes/app-route-title-ownership*'
       - 'apps/web/src/domains/legal/Site*'
@@ -21,6 +24,7 @@ on:
       - 'apps/web/src/shared/components/site-public-routes*'
       - 'apps/web/src/shared/lib/decode-path-segment*'
       - 'e2e/non-studio-experience.spec.ts'
+      - 'e2e/non-studio-controls.spec.ts'
       - 'playwright.non-studio.config.ts'
       - '.github/workflows/non-studio-experience-quality.yml'
   workflow_dispatch:
@@ -54,6 +58,8 @@ jobs:
         run: >-
           pnpm exec vitest run
           apps/web/src/app/browser-compat-dismissal.test.ts
+          apps/web/src/domains/account/library-backup.test.ts
+          apps/web/src/domains/account/LibraryBackupImport.test.tsx
           apps/web/src/shared/lib/decode-path-segment.test.ts
           apps/web/src/shared/components/public-site-destinations.test.ts
           apps/web/src/shared/components/public-site-journey.test.tsx

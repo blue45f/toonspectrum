@@ -2,11 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["non-studio-experience.spec.ts", "learn.spec.ts", "learn-resilience.spec.ts", "learn-guided-lessons.spec.ts"],
+  testMatch: ["non-studio-experience.spec.ts", "non-studio-controls.spec.ts", "learn.spec.ts", "learn-resilience.spec.ts", "learn-guided-lessons.spec.ts"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
+  workers: 2,
   timeout: 90_000,
   expect: { timeout: 15_000 },
   reporter: [["list"], ["json", { outputFile: "test-results/non-studio-results.json" }]],

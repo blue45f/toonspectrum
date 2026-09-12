@@ -10,15 +10,13 @@ const routes = [...new Set([...readdirSync(routeDirectory)
   .filter((name) => name.endsWith(".routes.tsx"))
   .flatMap((name) => [...readFileSync(resolve(routeDirectory, name), "utf8").matchAll(/path:\s*["']([^"']+)["']/gu)].map((match) => match[1]))
   .filter((path) => path.startsWith("/") && !/[:*]/u.test(path) && !EXCLUDED.test(path)),
-  // Learn is registered lazily as /learn/*; enumerate its public static views too.
   "/learn", "/learn/glossary", "/learn/records", "/learn/studio",
 ])].sort();
 
-// Production bundle, actual router and actual UI. Anonymous state is intentional.
-// Public APIs are deterministic outage fixtures, not claims of live backend success.
+// Actual production UI; anonymous API outage fixtures are not live-backend success.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-lang", "ko");
+    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
   });
   await page.route("**/api/**", async (route) => {
@@ -90,11 +88,19 @@ test("footer is keyboard-discoverable without waiting for scrolling or the old t
 test("literal percent names and malformed shared URLs cannot crash the app shell", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const [path, label] of [["/author/100%25", "100%"], ["/pencafe/ink%2525", "ink%25"], ["/author/%E0%A4%A", "%E0%A4%A"]]) {
+  for (const [path, label] of [["/author/100%25", "100%"], ["/pencafe/ink%2525", "ink%25"]]) {
     await page.goto(path);
     await expect(page.locator("h1").first()).toContainText(label);
     await expect(page).toHaveTitle(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   }
+  // Vite preview returns an empty HTTP 404 before malformed encoding reaches the app.
+  // Test the client router separately after a valid document has loaded.
+  await page.evaluate(() => {
+    history.pushState({}, "", "/author/%E0%A4%A");
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.locator("h1").first()).toContainText("%E0%A4%A");
+  await expect(page).toHaveTitle(/%E0%A4%A/u);
   expect(errors).toEqual([]);
 });
 
