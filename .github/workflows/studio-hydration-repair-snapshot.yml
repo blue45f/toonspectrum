@@ -1,0 +1,27 @@
+name: Studio hydration repair snapshot
+on:
+  push:
+    branches: [fix/studio-hydration-ci-completion-20260912]
+    paths: [.github/workflows/studio-hydration-repair-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Archive tracked repair sources without credentials or user data
+        run: |
+          mkdir -p "$RUNNER_TEMP/hydration-source"
+          git rev-parse HEAD > "$RUNNER_TEMP/hydration-source/commit.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/hydration-source/tree.txt"
+          git archive --format=tar HEAD apps/web/src apps/api/src packages scripts .github package.json pnpm-lock.yaml pnpm-workspace.yaml eslint.config.mjs tsconfig.json tsconfig.toonstudio-core.json tsconfig.toonstudio-ui.json vitest.config.ts vite.config.ts | gzip > "$RUNNER_TEMP/hydration-source/source.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-hydration-repair-source
+          path: ${{ runner.temp }}/hydration-source
+          retention-days: 2
+          if-no-files-found: error
