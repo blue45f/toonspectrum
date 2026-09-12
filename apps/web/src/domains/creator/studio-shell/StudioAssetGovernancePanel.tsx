@@ -133,25 +133,31 @@ function CheckOption({
   readonly onChange: (checked: boolean) => void;
 }) {
   const inputId = useId();
+  const descriptionId = `${inputId}-description`;
 
   return (
-    <div className={cn(
-      "flex min-h-14 items-start gap-3 rounded-xl border border-line bg-panel px-3 py-3 text-sm",
-      disabled && "opacity-55",
-    )}>
+    <label
+      htmlFor={inputId}
+      aria-label={label}
+      className={cn(
+        "flex min-h-14 items-start gap-3 rounded-xl border border-line bg-panel px-3 py-3 text-sm",
+        disabled && "opacity-55",
+      )}
+    >
       <input
         id={inputId}
         type="checkbox"
+        aria-describedby={descriptionId}
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className="mt-0.5 size-4 accent-[var(--accent)]"
       />
-      <label htmlFor={inputId} aria-label={label} className={disabled ? "cursor-not-allowed" : "cursor-pointer"}>
+      <span>
         <b className="block text-xs text-fg">{label}</b>
-        <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">{description}</span>
-      </label>
-    </div>
+        <span id={descriptionId} className="mt-1 block text-[0.68rem] leading-5 text-fg-3">{description}</span>
+      </span>
+    </label>
   );
 }
 
