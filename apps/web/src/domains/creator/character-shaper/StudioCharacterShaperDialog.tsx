@@ -23,6 +23,7 @@ import {
   pushCharacterShaperKeyLayer,
   reduceCharacterShaperUiState,
 } from "./character-shaper-ui-model";
+import { CharacterShaperCameraControls } from "./CharacterShaperCameraControls";
 import { CharacterShaperInspector } from "./CharacterShaperInspector";
 import { CharacterShaperMobileSheet } from "./CharacterShaperMobileSheet";
 import { CharacterShaperOutputDock } from "./CharacterShaperOutputDock";
@@ -404,8 +405,9 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     </p>
   ) : null;
 
-  const renderViewport = (className?: string) => (
-    <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, className)}>
+  const renderViewport = (className?: string) => {
+    const viewport = (
+    <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, layout === "mobile" ? "flex-1" : className)}>
       <StudioVrmPoserViewport h={h} presentation="shaper" />
       <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} />
       {paintActive ? (
@@ -456,7 +458,14 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         </aside>
       ) : null}
     </div>
-  );
+    );
+    return layout === "mobile" ? (
+      <div className={cn("flex min-h-0 min-w-0 flex-col bg-card", className)}>
+        <CharacterShaperCameraControls h={h} compact />
+        {viewport}
+      </div>
+    ) : viewport;
+  };
 
   const dock = (
     <CharacterShaperOutputDock
@@ -595,7 +604,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
       }}
     >
-      <div className="relative mx-auto grid h-full max-h-full min-h-0 w-full max-w-[1600px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
+      <div data-character-shaper-surface="true" className="relative mx-auto grid h-full max-h-full min-h-0 w-full max-w-[1600px] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
         {summaryBar}
         {middle}
         {dock}

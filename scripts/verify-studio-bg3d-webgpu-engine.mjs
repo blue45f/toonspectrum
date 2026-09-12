@@ -17,7 +17,7 @@
  *   2 = explicit structured environment skip because WebGPU is unavailable here
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,6 +36,18 @@ const HARNESS_ENTRY = "/scripts/studio-bg3d-webgpu-engine-browser.ts";
 const RESULT_TIMEOUT_MS = 180_000;
 const CHANNEL_TOLERANCE = 4;
 const DEPTH_TOLERANCE = 0.001;
+const GPU_LANE = "swiftshader-determinism";
+const BROWSER_LAUNCH = {
+  headless: true,
+  // Name the launched binary explicitly; Playwright's default headless shell is a different file.
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || chromium.executablePath(),
+  args: [
+    "--no-sandbox",
+    "--enable-unsafe-webgpu",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+  ],
+};
 /**
  * A software adapter rasterizes edges slightly differently from the WebGL2 path, so a handful of
  * silhouette pixels legitimately differ. The gate is on the share of the frame, not on zero.
@@ -121,6 +133,27 @@ function writeJson(fileName, value) {
   writeFileSync(join(SCRATCH, fileName), `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function validateGpuEvidence(result, failures, label = "primary") {
+  const evidence = result.executionEvidence;
+  if (evidence?.lane !== GPU_LANE || !evidence?.secureContext
+    || !evidence?.origin || evidence.origin === "null") {
+    failures.push(`${label}: missing secure-origin evidence for ${GPU_LANE}`);
+  }
+  const gpu = evidence?.webgpu;
+  if (gpu?.source !== "renderer.backend.device.adapterInfo"
+    || gpu.isWebGPUBackend !== true || gpu.devicePresent !== true
+    || gpu.vendor?.toLowerCase() !== "google"
+    || gpu.architecture?.toLowerCase() !== "swiftshader"
+    || gpu.isFallbackAdapter === false) {
+    failures.push(`${label}: actual WebGPU device did not prove SwiftShader: ${JSON.stringify(gpu)}`);
+  }
+  const gl = evidence?.webgl;
+  if (gl?.source !== "renderer.getContext().WEBGL_debug_renderer_info"
+    || gl.debugRendererInfoAvailable !== true || !/swiftshader/iu.test(gl.renderer ?? "")) {
+    failures.push(`${label}: actual WebGL context did not prove SwiftShader: ${JSON.stringify(gl)}`);
+  }
+}
+
 function validateParity(label, section, failures) {
   const channels = section?.raster?.comparedChannels ?? 0;
   const samples = section?.depth?.comparedSamples ?? 0;
@@ -167,6 +200,7 @@ function validateParity(label, section, failures) {
 
 function validateSuccess(result, diagnostics) { // NOSONAR javascript:S3776
   const failures = [];
+  validateGpuEvidence(result, failures);
   if (result.backend !== "real-chromium-three-webgpu") {
     failures.push(`unexpected backend: ${result.backend}`);
   }
@@ -408,12 +442,18 @@ async function main() { // NOSONAR javascript:S3776
     // frontend directory migration.
     root: REPO_ROOT,
     publicDir: WEB_PUBLIC,
+    // Worktrees can share a node_modules symlink with an active dev server. Their independent
+    // optimizeDeps runs must not replace the dependency chunks this verification page is loading.
+    cacheDir: join(SCRATCH, "vite-cache"),
     configFile: false,
     envFile: false,
     appType: "custom",
     logLevel: "error",
     resolve: { alias: [...WEB_VITE_ALIASES] },
-    server: { host: "127.0.0.1", port, strictPort: true },
+    server: {
+      host: "127.0.0.1", port, strictPort: true,
+      fs: { allow: [REPO_ROOT, SCRATCH, realpathSync(join(REPO_ROOT, "node_modules"))] },
+    },
     // Pre-bundle what the VRM probe reaches through a dynamic import. Discovering these mid-run
     // makes Vite re-optimize and invalidate the module graph the page is already executing, which
     // surfaces as "Failed to fetch dynamically imported module" rather than as a real defect.
@@ -422,6 +462,7 @@ async function main() { // NOSONAR javascript:S3776
         "@pixiv/three-vrm",
         "@pixiv/three-vrm/nodes",
         "three/examples/jsm/loaders/GLTFLoader.js",
+        "three/examples/jsm/loaders/KTX2Loader.js",
       ],
     },
     plugins: [{
@@ -450,16 +491,7 @@ async function main() { // NOSONAR javascript:S3776
 
   let browser = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox",
-        // Software WebGPU is enough to prove the contract; a discrete GPU is not required.
-        "--enable-unsafe-webgpu",
-        "--use-angle=swiftshader",
-      ],
-    });
+    browser = await chromium.launch(BROWSER_LAUNCH);
     const { result, diagnostics } = await readHarnessResult(browser, port, { probeVrm: true });
     invariant(result && typeof result === "object", "browser returned no structured result");
     writeJson("browser-result.json", result);
@@ -472,7 +504,10 @@ async function main() { // NOSONAR javascript:S3776
       const summary = {
         status: "unsupported",
         reason: result.reason,
-        message: "WebGPU is unavailable in this environment; the engine policy stays on WebGL2.",
+        message: "WebGPU is unavailable in this environment; no renderer parity claim was made.",
+        browserVersion: browser.version(),
+        browserLaunch: BROWSER_LAUNCH,
+        executionEvidence: result.executionEvidence,
         evidenceDirectory: SCRATCH,
       };
       writeJson("summary.json", summary);
@@ -496,6 +531,7 @@ async function main() { // NOSONAR javascript:S3776
         status: run.result?.status,
         classifiedId: classified?.id ?? null,
         gpuTrust: classified?.gpuTrust ?? null,
+        executionEvidence: run.result?.executionEvidence ?? null,
         pageErrors: run.diagnostics.pageErrors,
         requestFailures: run.diagnostics.requestFailures,
       };
@@ -503,6 +539,7 @@ async function main() { // NOSONAR javascript:S3776
       if (run.result?.status !== "ok") {
         failures.push(`${host.id}: harness did not complete (${run.result?.status})`);
       }
+      validateGpuEvidence(run.result ?? {}, failures, host.id);
       if (classified?.id !== host.expectedId) {
         failures.push(
           `${host.id}: live user agent classified as ${classified?.id} instead of ${host.expectedId}`,
@@ -518,6 +555,8 @@ async function main() { // NOSONAR javascript:S3776
       status: failures.length === 0 ? "ok" : "failed",
       backend: result.backend,
       browserVersion: browser.version(),
+      browserLaunch: BROWSER_LAUNCH,
+      executionEvidence: result.executionEvidence,
       probe: result.probe,
       captureParity: {
         opaque: { raster: result.opaque.raster, depth: result.opaque.depth },
@@ -530,9 +569,9 @@ async function main() { // NOSONAR javascript:S3776
       webglOnlyFeatures: result.webglOnlyFeatures,
       ktx2: result.ktx2,
       vrmMToon: result.vrmMToon,
-      // Reported, not asserted — see the harness. `first` well above `medianAfterFirst` is the
-      // shape that says pipeline cost is one-time and per-capture allocation needs no cache.
+      // These are software diagnostics, not hardware benchmark or engine-adoption evidence.
       captureCost: result.captureCost,
+      captureCostInterpretation: "software-diagnostics-only",
       inAppRuns,
       failures,
       evidenceDirectory: SCRATCH,
@@ -551,6 +590,7 @@ main().catch((error) => {
     status: "error",
     message: error instanceof Error ? error.message : String(error),
     stack: error instanceof Error ? (error.stack ?? null) : null,
+    browserLaunch: BROWSER_LAUNCH,
     evidenceDirectory: SCRATCH,
   };
   mkdirSync(SCRATCH, { recursive: true });

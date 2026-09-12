@@ -1,15 +1,28 @@
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
+import { resolveStudioBg3dCaptureFrame } from "./studio-bg3d-capture-frame-geometry";
 
 export interface StudioBg3dCompositionOverlayProps {
   readonly mode: StudioBg3dCompositionGuideMode;
   readonly className?: string;
+  readonly viewportSize?: { readonly width: number; readonly height: number } | null;
 }
 
 export function StudioBg3dCompositionOverlay({
   mode,
   className,
+  viewportSize,
 }: StudioBg3dCompositionOverlayProps) {
   if (mode === "none") return null;
+  const frame = mode === "verticalWebtoon" && viewportSize
+    ? resolveStudioBg3dCaptureFrame({
+      viewportWidth: viewportSize.width, viewportHeight: viewportSize.height, aspectRatio: 9 / 16,
+    })
+    : null;
+  if (mode === "verticalWebtoon" && !frame) return null;
+  const frameX = frame && viewportSize ? frame.x / viewportSize.width * 1_000 : 0;
+  const frameY = frame && viewportSize ? frame.y / viewportSize.height * 1_000 : 0;
+  const frameWidth = frame && viewportSize ? frame.width / viewportSize.width * 1_000 : 1_000;
+  const frameHeight = frame && viewportSize ? frame.height / viewportSize.height * 1_000 : 1_000;
 
   return (
     <div
@@ -43,23 +56,23 @@ export function StudioBg3dCompositionOverlay({
           <g>
             {/* Mobile cut safe box (9:16 aspect centered) */}
             <rect
-              x="218.75"
-              y="0"
-              width="562.5"
-              height="1000"
+              data-testid="bg3d-vertical-webtoon-frame"
+              x={frameX}
+              y={frameY}
+              width={frameWidth}
+              height={frameHeight}
               fill="none"
               stroke="currentColor"
               className="text-accent/60"
               strokeWidth="2"
             />
             {/* Safe zone top/bottom markers */}
-            <line x1="218.75" y1="120" x2="781.25" y2="120" stroke="currentColor" className="text-accent/30" strokeDasharray="4,4" strokeWidth="1" />
-            <line x1="218.75" y1="880" x2="781.25" y2="880" stroke="currentColor" className="text-accent/30" strokeDasharray="4,4" strokeWidth="1" />
+            <line x1={frameX} y1={frameY + frameHeight * 0.12} x2={frameX + frameWidth} y2={frameY + frameHeight * 0.12} stroke="currentColor" className="text-accent/30" strokeDasharray="4,4" strokeWidth="1" />
+            <line x1={frameX} y1={frameY + frameHeight * 0.88} x2={frameX + frameWidth} y2={frameY + frameHeight * 0.88} stroke="currentColor" className="text-accent/30" strokeDasharray="4,4" strokeWidth="1" />
             {/* Dimmed outer region */}
-            <rect x="0" y="0" width="218.75" height="1000" fill="black" opacity="0.22" />
-            <rect x="781.25" y="0" width="218.75" height="1000" fill="black" opacity="0.22" />
+            <path d={`M 0 0 H 1000 V 1000 H 0 Z M ${frameX} ${frameY} V ${frameY + frameHeight} H ${frameX + frameWidth} V ${frameY} Z`} fill="black" fillRule="evenodd" opacity="0.22" />
             {/* Vertical midline */}
-            <line x1="500" y1="0" x2="500" y2="1000" stroke="currentColor" className="text-accent/35" strokeDasharray="3,3" strokeWidth="0.8" />
+            <line x1="500" y1={frameY} x2="500" y2={frameY + frameHeight} stroke="currentColor" className="text-accent/35" strokeDasharray="3,3" strokeWidth="0.8" />
           </g>
         )}
 

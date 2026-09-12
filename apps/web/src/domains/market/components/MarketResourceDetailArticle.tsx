@@ -730,7 +730,7 @@ export function MarketResourceDetailArticle({
           ) : null}
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:self-start">
           <div className="flex flex-col gap-2 rounded-xl border border-line bg-card p-4">
             <CreatorMarketplaceCloudLibraryAction record={record} />
             {isCreatorMarketplaceInstallReceiptKind(record.kind) ? (

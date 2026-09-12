@@ -10,6 +10,7 @@ import {
   STUDIO_VRM_SKINNED_GARMENT_VERTEX_BUDGET,
   type StudioVrmGarmentSkinBone,
 } from "./studio-vrm-skinned-garment";
+import { buildGarmentParts, FALLBACK_WARDROBE_METRICS } from "./studio-vrm-wardrobe";
 
 import type { GarmentPart, GarmentShape } from "./studio-vrm-wardrobe";
 
@@ -887,5 +888,70 @@ describe("garment assembly preserves smooth authored normals", () => {
       expect(first.distanceTo(last)).toBeLessThan(1e-6);
     }
     disposeStudioVrmSkinnedGarment(built.surface);
+  });
+});
+
+describe("anatomical shoulder and short-sleeve deformation", () => {
+  it("a short sleeve stays on the upper arm when only the elbow bends", () => {
+    const rig = armRig();
+    const parts = buildGarmentParts("tshirt", {
+      ...FALLBACK_WARDROBE_METRICS,
+      upperArm: { left: { len: 1, axis: [1, 0, 0] }, right: { len: 1, axis: [-1, 0, 0] } },
+    });
+    const part = parts.find((candidate) => candidate.bone === "leftUpperArm")!;
+    const material = new THREE.MeshStandardMaterial();
+    const built = buildStudioVrmSkinnedGarment({
+      name: "short-sleeve-regression", root: rig.root, parts: [part], materials: [material], resolveBone: rig.resolveBone,
+    });
+    if (!built.surface) throw new Error(built.receipt.unavailableReason ?? "short sleeve unavailable");
+    const mesh = built.surface.mesh;
+    rig.root.add(mesh);
+    const positions = mesh.geometry.getAttribute("position");
+    const before = Array.from({ length: positions.count }, (_, index) => (
+      mesh.applyBoneTransform(index, new THREE.Vector3().fromBufferAttribute(positions, index)).clone()
+    ));
+    rig.lower.rotation.z = Math.PI / 2;
+    rig.root.updateMatrixWorld(true);
+    mesh.skeleton.update();
+    for (let index = 0; index < positions.count; index += 1) {
+      const after = mesh.applyBoneTransform(index, new THREE.Vector3().fromBufferAttribute(positions, index));
+      expect(after.distanceTo(before[index]!), `short sleeve vertex ${index}`).toBeLessThan(1e-6);
+    }
+    disposeStudioVrmSkinnedGarment(built.surface);
+    material.dispose();
+  });
+
+  it("the outer shoulder seam follows its arm while the inner seam stays on the torso", () => {
+    const rig = upperBodyRig();
+    const part: GarmentPart = {
+      bone: "spine", skinMode: "shoulder-yoke", shoulderBone: "leftUpperArm",
+      shape: { kind: "lathe", profile: [{ radius: 0.05, y: 0 }, { radius: 0.05, y: 0.2 }], segments: 12 },
+      offset: [0.28, 0.8, 0], align: [1, 0, 0], squash: [0.5, 1, 0.7],
+    };
+    const material = new THREE.MeshStandardMaterial();
+    const built = buildStudioVrmSkinnedGarment({
+      name: "shoulder-seam-regression", root: rig.root, parts: [part], materials: [material], resolveBone: rig.resolveBone,
+    });
+    if (!built.surface) throw new Error(built.receipt.unavailableReason ?? "shoulder unavailable");
+    const mesh = built.surface.mesh;
+    rig.root.add(mesh);
+    const positions = mesh.geometry.getAttribute("position");
+    const innerBefore = mesh.applyBoneTransform(0, new THREE.Vector3().fromBufferAttribute(positions, 0));
+    // Quarter-turn sample lies off the arm's rotation axis, so a motion assertion is meaningful.
+    const outerIndex = 7;
+    const outerBefore = mesh.applyBoneTransform(outerIndex, new THREE.Vector3().fromBufferAttribute(positions, outerIndex));
+    const upper = rig.nodes.get("leftUpperArm")!;
+    const inverseBefore = upper.matrixWorld.clone().invert();
+    upper.rotation.z = -Math.PI / 2;
+    rig.root.updateMatrixWorld(true);
+    mesh.skeleton.update();
+    const innerAfter = mesh.applyBoneTransform(0, new THREE.Vector3().fromBufferAttribute(positions, 0));
+    const outerAfter = mesh.applyBoneTransform(outerIndex, new THREE.Vector3().fromBufferAttribute(positions, outerIndex));
+    const expectedOuter = outerBefore.clone().applyMatrix4(inverseBefore).applyMatrix4(upper.matrixWorld);
+    expect(innerAfter.distanceTo(innerBefore)).toBeLessThan(1e-6);
+    expect(outerAfter.distanceTo(expectedOuter)).toBeLessThan(1e-6);
+    expect(outerAfter.distanceTo(outerBefore)).toBeGreaterThan(0.01);
+    disposeStudioVrmSkinnedGarment(built.surface);
+    material.dispose();
   });
 });

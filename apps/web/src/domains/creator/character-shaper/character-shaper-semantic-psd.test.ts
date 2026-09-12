@@ -309,6 +309,59 @@ describe("character shaper semantic capture — passes", () => {
     expect(renderer.observations.every((observation) => observation.muted.length === 0)).toBe(true);
   });
 
+  it.each([
+    { reuse: "meshes", outcome: "success" },
+    { reuse: "meshes", outcome: "render failure" },
+    { reuse: "meshes", outcome: "cancel" },
+    { reuse: "slots", outcome: "success" },
+    { reuse: "slots", outcome: "render failure" },
+    { reuse: "slots", outcome: "cancel" },
+  ] as const)("restores shared material flags across $reuse after $outcome", async ({ reuse, outcome }) => {
+    const scene = buildMergedHeadScene();
+    if (reuse === "meshes") {
+      const secondHead = scene.head.clone();
+      secondHead.name = "N00_000_00_HeadMesh_Second";
+      scene.vrm.scene.add(secondHead);
+    } else {
+      scene.head.material = [scene.faceMaterial, scene.faceMaterial, scene.eyeMaterial, scene.eyeMaterial];
+    }
+    // A restore must preserve intentionally disabled flags, not simply enable every material.
+    scene.eyeMaterial.depthWrite = false;
+    const hidden = mesh("Hair_Hidden", mtoon("Hair", "#123456", "#102030"));
+    hidden.visible = false;
+    scene.vrm.scene.add(hidden);
+    const before = observe(scene.capture.scene);
+    const controller = new AbortController();
+    const renderer = fakeRenderer((observation, call) => {
+      if (call === 2) {
+        // The eye mask is the first pass that temporarily mutes shared face slots.
+        expect(observation.muted).toEqual([scene.faceMaterial.name]);
+        expect(scene.faceMaterial.depthWrite).toBe(false);
+        if (outcome === "render failure") throw new Error("mask render failed");
+        if (outcome === "cancel") controller.abort();
+      }
+      if (call === 3) expect(observation.muted).toEqual([scene.eyeMaterial.name]);
+      return null;
+    });
+    const pending = captureCharacterSemanticPasses({
+      capture: scene.capture, vrm: scene.vrm, width: WIDTH, height: HEIGHT, signal: controller.signal,
+    }, renderer.dependencies);
+    if (outcome === "success") {
+      const result = await pending;
+      expect(result.passes.map((entry) => entry.id)).toEqual(expect.arrayContaining(["mask-eyes", "mask-face"]));
+    } else if (outcome === "render failure") {
+      await expect(pending).rejects.toThrow("mask render failed");
+    } else {
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    }
+    expect(observe(scene.capture.scene)).toEqual(before);
+    expect(scene.faceMaterial.colorWrite).toBe(true);
+    expect(scene.faceMaterial.depthWrite).toBe(true);
+    expect(scene.eyeMaterial.colorWrite).toBe(true);
+    expect(scene.eyeMaterial.depthWrite).toBe(false);
+    if (outcome !== "success") expect(renderer.observations).toHaveLength(3);
+  });
+
   it("restores every material factor after the flat pass", async () => {
     const scene = buildCharacterScene();
     const before = Object.entries(scene.materials).map(([key, material]) =>
@@ -378,12 +431,61 @@ describe("character shaper semantic capture — passes", () => {
     );
 
     const byId = new Map(passes.map((entry) => [entry.id, entry]));
-    // pixel 0 is 60 darker in beauty → shadow; pixel 1 is 95 brighter → highlight.
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(0, 4)]).toEqual([60, 60, 60, 60]);
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(4, 8)]).toEqual([0, 0, 0, 0]);
-    expect([...(byId.get("highlight")?.rgba ?? []).slice(4, 8)]).toEqual([95, 95, 95, 95]);
+    const shadow = byId.get("shadow")!.rgba;
+    const highlight = byId.get("highlight")!.rgba;
+    const flat = byId.get("flat")!.rgba;
+    // Apply the actual PSD blend modes independently. Difference pixels alone cannot reproduce
+    // the beauty pass; normalized Multiply and Screen layers should match within RGBA8 rounding.
+    for (let index = 0; index < flat.length; index += 4) {
+      if (flat[index + 3] !== 255 || BEAUTY[index + 3] !== 255) continue;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const source = flat[index + channel];
+        const shadowAlpha = shadow[index + 3] / 255;
+        const dark = source * (1 - shadowAlpha + shadowAlpha * shadow[index + channel] / 255);
+        const highlightAlpha = highlight[index + 3] / 255;
+        const composite = dark + (255 - dark) * highlight[index + channel] / 255 * highlightAlpha;
+        expect(Math.abs(Math.round(composite) - BEAUTY[index + channel])).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(shadow[3]).toBe(255);
+    expect(shadow[7]).toBe(0);
+    expect(highlight[7]).toBe(255);
     expect(byId.get("line")).toBeDefined();
     expect(byId.get("beauty")?.rgba).toEqual(BEAUTY);
+  });
+
+  it("keeps the interior of dark hair or clothes transparent in the line layer", async () => {
+    const size = 9;
+    const raster = new Uint8ClampedArray(size * size * 4);
+    for (let y = 1; y < size - 1; y += 1) {
+      for (let x = 1; x < size - 1; x += 1) {
+        raster.set([12, 12, 12, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer(() => raster.slice()).dependencies,
+    );
+    const line = passes.find((pass) => pass.id === "line")!.rgba;
+    expect(line[(4 * size + 4) * 4 + 3]).toBe(0);
+    expect(line[(4 * size + 1) * 4 + 3]).toBeGreaterThan(0);
+  });
+
+  it("does not duplicate a toon shadow boundary into the line layer", async () => {
+    const size = 9;
+    const flat = new Uint8ClampedArray(size * size * 4).fill(255);
+    const beauty = flat.slice();
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < 4; x += 1) {
+        beauty.set([80, 80, 80, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer((_observation, call) => (call === 0 ? beauty : flat).slice()).dependencies,
+    );
+    expect(passes.some((pass) => pass.id === "shadow")).toBe(true);
+    expect(passes.some((pass) => pass.id === "line")).toBe(false);
   });
 
   it("names the passes a model cannot produce instead of faking them", async () => {
@@ -453,6 +555,22 @@ describe("character shaper semantic capture — passes", () => {
     expect(`#${scene.materials.face.color.getHexString()}`).toBe("#f0c8a8");
     expect(`#${scene.materials.face.shadeColorFactor.getHexString()}`).toBe("#c89878");
     expect(scene.materials.face.shadingShiftFactor).toBe(-0.25);
+  });
+
+  it("rejects a stale editing authority before the next pass and restores temporary shading", async () => {
+    const scene = buildCharacterScene();
+    const before = observe(scene.capture.scene);
+    const renderer = fakeRenderer();
+    let checks = 0;
+    await expect(captureCharacterSemanticPasses({
+      ...baseInput(scene),
+      assertCurrent: () => {
+        checks += 1;
+        if (checks > 1) throw new Error("캐릭터가 바뀌었습니다");
+      },
+    }, renderer.dependencies)).rejects.toThrow("캐릭터가 바뀌었습니다");
+    expect(renderer.observations).toHaveLength(1);
+    expect(observe(scene.capture.scene)).toEqual(before);
   });
 
   it("aborts between passes and leaves the scene untouched", async () => {

@@ -299,7 +299,7 @@ export function SearchExplorer({
   return (
     <section className="grid gap-6 lg:grid-cols-[16rem_1fr]">
       <aside className="hidden lg:block">
-        <div className="sticky top-20 rounded-2xl border border-line bg-panel/40 p-4">
+        <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-4">
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-line pb-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
               <SlidersHorizontal size={15} />

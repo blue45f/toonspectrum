@@ -52,6 +52,7 @@ function CharacterShaperShelfContent({
   const favorites = useCharacterShaperFavorites();
   const [collection, setCollection] = useState<CharacterShelfCollection>("all");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [showExperimentalGarments, setShowExperimentalGarments] = useState(false);
   const [draft, setDraft] = useState(query);
   const [syncedQuery, setSyncedQuery] = useState(query);
   const [composing, setComposing] = useState(false);
@@ -83,13 +84,17 @@ function CharacterShaperShelfContent({
     }, window);
   }, [draft, composing]);
 
-  const slotEntries = useMemo(() => listShelfEntries(binding.catalog.entries, slot), [binding.catalog.entries, slot]);
+  const allSlotEntries = useMemo(() => listShelfEntries(binding.catalog.entries, slot), [binding.catalog.entries, slot]);
+  const selection = characterSlotSelection(binding.recipe, slot);
+  const selectedSet = new Set(selection);
+  const hasExperimentalGarments = allSlotEntries.some((entry) => entry.apply.kind === "wardrobe");
+  // Existing saved choices remain inspectable; unreviewed generated clothes require an opt-in.
+  const slotEntries = allSlotEntries.filter((entry) => entry.apply.kind !== "wardrobe"
+    || showExperimentalGarments || selectedSet.has(entry.id));
   const meta = binding.catalog.slots.find((candidate) => candidate.id === slot);
   const slotLabel = meta?.label ?? slot;
   const tags = useMemo(() => collectShelfTags(slotEntries), [slotEntries]);
   const favoriteSet = useMemo(() => new Set(favorites.ids), [favorites.ids]);
-  const selection = characterSlotSelection(binding.recipe, slot);
-  const selectedSet = new Set(selection);
   const availability = new Map(slotEntries.map((entry) => [entry.id, binding.evaluate(entry)]));
   const statuses = new Map([...availability].map(([id, result]) => [id, result.status]));
   const counts = countCharacterAvailability(slotEntries.map((entry) => entry.id), statuses);
@@ -100,7 +105,7 @@ function CharacterShaperShelfContent({
   const filtering = query.trim().length > 0 || tag !== null || collection !== "all" || onlyAvailable;
   const multi = isCharacterMultiSlot(slot);
   const equipped = multi ? slotEntries.filter((entry) => selectedSet.has(entry.id)) : [];
-  const featured = slotEntries.filter((entry) => entry.featured);
+  const featured = slotEntries.filter((entry) => entry.featured && entry.apply.kind !== "wardrobe");
   const lockReason = binding.busyReason ?? (binding.compareActive ? "처음 상태 비교를 마친 뒤에 적용해 주세요." : null);
   const focusedIndex = focusedId ? visible.findIndex((entry) => entry.id === focusedId) : -1;
   const rovingIndex = focusedIndex >= 0 ? focusedIndex : Math.max(0, visible.findIndex((entry) => selectedSet.has(entry.id)));
@@ -204,6 +209,14 @@ function CharacterShaperShelfContent({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
         <div className="px-3 pb-2">
+        {hasExperimentalGarments ? (
+          <div className="mt-2 rounded-xl border border-line bg-card p-2">
+            <p className="text-[0.68rem] leading-relaxed text-fg-3">원본 의상을 기본으로 사용합니다. 실험 의상은 체형과 포즈에 따라 연결부나 관통 문제가 남아 있습니다.</p>
+            <button type="button" aria-pressed={showExperimentalGarments}
+              onClick={() => { clearAuditionTimer(); activeAuditionRef.current = null; binding.cancelPreview?.(); setShowExperimentalGarments((value) => !value); }}
+              className={cn(studioSegmentChipClass(showExperimentalGarments), "mt-1 min-h-11 w-full")}>실험 의상 표시</button>
+          </div>
+        ) : null}
         <div role="group" aria-label="프리셋 모아보기" className="mt-2 grid grid-cols-3 gap-1">
           {COLLECTIONS.map((item) => <button key={item.id} type="button" aria-pressed={collection === item.id}
             onClick={() => setCollection(item.id)} className={cn(studioSegmentChipClass(collection === item.id), "min-h-11 min-w-0 px-1")}>
@@ -291,6 +304,7 @@ function CharacterShaperShelfContent({
           : <div ref={gridRef} role="group" aria-label={`${slotLabel} 프리셋`} data-character-shaper-grid="true" className="grid grid-cols-2 items-start gap-2 p-3">
             {visible.map((entry, index) => (
               <div key={entry.id} className="min-w-0">
+                {entry.apply.kind === "wardrobe" ? <p className="mb-1 text-[0.62rem] font-semibold text-warn">실험 의상 · 원고 적용 전 형태 확인</p> : null}
                 <CharacterSlotCard entry={entry} availability={presentAvailability(entry)} selected={isCharacterEntrySelected(binding.recipe, entry)}
                   previewed={binding.previewEntryId === entry.id}
                   tabIndex={index === rovingIndex ? 0 : -1} onCommit={commitEntry} onHover={onHoverEntry}
