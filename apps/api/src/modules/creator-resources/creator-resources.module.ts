@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Get, Header, HttpException, Inject, Module, Query, Req } from "@nestjs/common";
-import { localizeReferenceProviderQuery } from "@toonspectrum/core/reference-query-language";
+import { localizeReferenceProviderQuery } from "../../../../../packages/core/src/reference-query-language";
 
 import { createResourceEngine, ResourceBusyError, ResourceInputError } from "./resource-engine";
 
