@@ -28,7 +28,7 @@ function sourceIndex(routeId: string): number {
 }
 
 describe("unified Brush Editor route contract", () => {
-  it("owns canonical create/edit routes in the registry and retains legacy aliases", () => {
+  it("owns canonical create/edit routes in the registry and retains route aliases", () => {
     expect(auditStudioRouteRegistry()).toEqual([]);
     expect(studioRoutePath("asset-brush-new")).toBe(CANONICAL_BRUSH_EDITOR_ROUTE);
     expect(studioRoutePath("asset-brush-edit")).toBe(CANONICAL_BRUSH_EDIT_ROUTE);
@@ -59,7 +59,7 @@ describe("unified Brush Editor route contract", () => {
     }
   });
 
-  it("redirects unscoped legacy routes through the registry while retaining scoped continuity", () => {
+  it("redirects unscoped aliases through the registry while retaining scoped continuity", () => {
     const publicLegacyStart = sourceIndex("creator-brush-lab");
     const studioLegacyStart = sourceIndex("creator-studio-brush-lab");
     const scopedWorkStart = sourceIndex("creator-studio-work-brush-lab");
@@ -75,9 +75,11 @@ describe("unified Brush Editor route contract", () => {
     expect(SOURCE.slice(scopedRemixStart)).toContain("<StudioBrushLabPage />");
   });
 
-  it("renders the V6 integration bridge and keeps all V5 quality designs discoverable", () => {
+  it("renders the V6 bridge and the consolidated product catalogue", () => {
     expect(PAGE_SOURCE).toContain("<StudioBrushIntegratedWorkbench");
-    expect(PAGE_SOURCE).toContain("<StudioBrushLegacyCataloguePanel");
+    expect(PAGE_SOURCE).toContain("<StudioBrushProductCataloguePanel");
     expect(PAGE_SOURCE).toContain("brushId?: string");
+    expect(PAGE_SOURCE).not.toContain("StudioBrushLegacyCataloguePanel");
+    expect(PAGE_SOURCE).not.toContain("StudioBrushV5RuntimeWorkbench");
   });
 });
