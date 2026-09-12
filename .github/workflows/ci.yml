@@ -1,26 +1,31 @@
 name: CI
 
+# Keep all main merge gates, with serial performance checks added. The broad
+# repository QA workflow remains diagnostic; a green core is not a full-suite claim.
 on:
   workflow_dispatch:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+  merge_group:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  CI: "1"
+  NODE_OPTIONS: --max-old-space-size=8192
+
 jobs:
-  core:
-    name: core
+  static:
+    name: Core static and product checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
@@ -30,8 +35,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Install locked workspace
-        run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify that required checks cannot silently pass
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
       - name: Repository contracts
         run: |
           set -euo pipefail
@@ -45,7 +51,7 @@ jobs:
           set -euo pipefail
           pnpm run typecheck
           pnpm run typecheck:cloudflare-realtime
-      - name: Brush product, rendering and BG3D regressions
+      - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
           pnpm exec vitest run \
@@ -66,18 +72,83 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts \
             apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
           pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
-      - name: Build deployable release
+
+  serial:
+    name: Core serial performance regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Run serial performance checks
         run: |
           set -euo pipefail
-          pnpm --filter @webtoon-nest/api build
-          pnpm run build
-          pnpm run check:studio-bundle
+          mkdir -p artifacts/core
+          git rev-parse HEAD > artifacts/core/commit.txt
+          pnpm run test:perf 2>&1 | tee artifacts/core/serial.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: core-serial-attempt-${{ github.run_attempt }}
+          path: artifacts/core
+          retention-days: 7
+          if-no-files-found: error
+
+  build:
+    name: Core production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Build API and web without relaxing the bundle ratchet
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/core
+          git rev-parse HEAD > artifacts/core/commit.txt
+          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: core-build-attempt-${{ github.run_attempt }}
+          path: artifacts/core
+          retention-days: 7
+          if-no-files-found: error
+
+  core:
+    name: core
+    if: ${{ always() }}
+    needs: [static, serial, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Require actual success from every mandatory check
+        env:
+          CORE_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-core-gate.mjs
 
   verify:
     name: verify
     needs: core
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
       - name: Require deployable core
