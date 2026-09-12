@@ -40,6 +40,22 @@ jobs:
         run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
+      - name: Studio home and production route regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-workspace-route.test.ts \
+            apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts \
+            apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
+            apps/web/src/domains/creator/studio-batch-rename.test.ts \
+            apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
+            apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
+            apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
       - name: Repository contracts
         run: |
           set -euo pipefail
