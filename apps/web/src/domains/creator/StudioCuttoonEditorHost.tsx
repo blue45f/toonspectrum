@@ -7403,6 +7403,7 @@ export function StudioCuttoonEditor({
             storage: globalThis.localStorage,
             key: autosaveKey,
             payload,
+            isCurrent: canPublishSnapshot,
             onDurableAuthorityDegraded: reportStudioSaveAuthorityDegraded,
           });
           if (
@@ -7425,6 +7426,7 @@ export function StudioCuttoonEditor({
           noteStudioSaveSucceeded(receipt.authority);
         })
         .catch((cause: unknown) => {
+          if (!canPublishSnapshot()) return;
           if (studioAutosaveDocumentBusy(cause)) {
             busyRetry.schedule();
             return;
@@ -26369,7 +26371,7 @@ function clearSelectionForEdit() {
               ? applyLeadership(acquiredSqlite, autosaveDocumentLeaseRef.current)
               : acquiredSqlite;
             if (!sqlite) throw new Error("SQLite autosave authority is unavailable");
-            await sqlite.write(autosaveKey, emergency.payload);
+            await sqlite.write(autosaveKey, emergency.payload, { mode: "emergency" });
             return "sqlite-fallback" as const;
           }));
         }
