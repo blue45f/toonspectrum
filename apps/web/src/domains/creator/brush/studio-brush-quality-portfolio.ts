@@ -14,46 +14,64 @@ export const STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS: readonly string[] =
 
 export const STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS = Object.freeze({
   total: STUDIO_BRUSH_QUALITY_PORTFOLIO.length,
-  paint: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter((entry) => entry.medium !== "eraser").length,
-  erase: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter((entry) => entry.medium === "eraser").length,
-  essential: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter((entry) => entry.tier === "essential").length,
-  specialist: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter((entry) => entry.tier === "specialist").length,
+  paint: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+    (entry) => entry.medium !== "eraser",
+  ).length,
+  erase: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+    (entry) => entry.medium === "eraser",
+  ).length,
+  essential: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+    (entry) => entry.tier === "essential",
+  ).length,
+  specialist: STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+    (entry) => entry.tier === "specialist",
+  ).length,
 });
 
 export const STUDIO_BRUSH_QUALITY_PORTFOLIO_CORE_IDS: readonly string[] =
   Object.freeze(
-    STUDIO_BRUSH_QUALITY_PORTFOLIO
-      .filter((entry) => entry.source === "core")
-      .map((entry) => entry.id),
+    STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+      (entry) => entry.source === "core",
+    ).map((entry) => entry.id),
   );
 
 export const STUDIO_BRUSH_QUALITY_PORTFOLIO_PRO_IDS: readonly string[] =
   Object.freeze(
-    STUDIO_BRUSH_QUALITY_PORTFOLIO
-      .filter((entry) => entry.source === "pro")
-      .map((entry) => entry.id),
+    STUDIO_BRUSH_QUALITY_PORTFOLIO.filter(
+      (entry) => entry.source === "pro",
+    ).map((entry) => entry.id),
   );
 
 const PORTFOLIO_BY_ID: ReadonlyMap<string, StudioBrushQualityPortfolioEntry> =
   new Map(STUDIO_BRUSH_QUALITY_PORTFOLIO.map((entry) => [entry.id, entry]));
 
-const aliasPairs: readonly (readonly [string, string])[] =
+const absorbedPairs: readonly (readonly [string, string])[] =
   STUDIO_BRUSH_QUALITY_PORTFOLIO.flatMap((entry) =>
-    entry.absorbedIds.map((aliasId) => [aliasId, entry.id] as const)
+    entry.absorbedIds.map((absorbedId) => [absorbedId, entry.id] as const),
   );
 
-const duplicateAliasIds = aliasPairs
-  .map(([aliasId]) => aliasId)
-  .filter((aliasId, index, all) => all.indexOf(aliasId) !== index);
+const duplicateAbsorbedIds = absorbedPairs
+  .map(([absorbedId]) => absorbedId)
+  .filter(
+    (absorbedId, index, all) => all.indexOf(absorbedId) !== index,
+  );
 
-if (duplicateAliasIds.length > 0) {
+if (duplicateAbsorbedIds.length > 0) {
   throw new Error(
-    `Studio brush quality portfolio has duplicate aliases: ${[...new Set(duplicateAliasIds)].join(", ")}`,
+    `Studio brush product portfolio has duplicate excluded ids: ${[
+      ...new Set(duplicateAbsorbedIds),
+    ].join(", ")}`,
   );
 }
 
-export const STUDIO_BRUSH_QUALITY_ALIAS_TO_REPRESENTATIVE:
-Readonly<Record<string, string>> = Object.freeze(Object.fromEntries(aliasPairs));
+/**
+ * Audit-only ownership for brush ids intentionally excluded from the product catalogue.
+ *
+ * This is not a migration resolver and product code must not use it to expose hidden variants.
+ */
+export const STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER: Readonly<
+  Record<string, string>
+> = Object.freeze(Object.fromEntries(absorbedPairs));
 
 export function studioBrushQualityPortfolioEntryById(
   id: unknown,
@@ -65,13 +83,7 @@ export function isStudioBrushQualityPortfolioId(id: unknown): id is string {
   return typeof id === "string" && PORTFOLIO_BY_ID.has(id);
 }
 
-export function resolveStudioBrushQualityRepresentativeId(id: unknown): string | null {
-  if (typeof id !== "string") return null;
-  if (PORTFOLIO_BY_ID.has(id)) return id;
-  return STUDIO_BRUSH_QUALITY_ALIAS_TO_REPRESENTATIVE[id] ?? null;
-}
-
-export function listStudioBrushQualityAliasesForRepresentative(
+export function listStudioBrushQualityAbsorbedIdsForRepresentative(
   id: unknown,
 ): readonly string[] {
   return studioBrushQualityPortfolioEntryById(id)?.absorbedIds ?? [];
@@ -83,15 +95,17 @@ export function studioBrushQualityFingerprintDistance(
 ): number {
   const a = STUDIO_BRUSH_TEXTURE_PROFILES[left].axes;
   const b = STUDIO_BRUSH_TEXTURE_PROFILES[right].axes;
-  return Math.hypot(
-    a.edgeSoftness - b.edgeSoftness,
-    a.grain - b.grain,
-    a.wetness - b.wetness,
-    a.bristle - b.bristle,
-    a.particleScatter - b.particleScatter,
-    a.opacityBuildUp - b.opacityBuildUp,
-    a.anisotropy - b.anisotropy,
-  ) / Math.sqrt(7);
+  return (
+    Math.hypot(
+      a.edgeSoftness - b.edgeSoftness,
+      a.grain - b.grain,
+      a.wetness - b.wetness,
+      a.bristle - b.bristle,
+      a.particleScatter - b.particleScatter,
+      a.opacityBuildUp - b.opacityBuildUp,
+      a.anisotropy - b.anisotropy,
+    ) / Math.sqrt(7)
+  );
 }
 
 export const STUDIO_BRUSH_FULLSCREEN_LONG_STROKE_EXPERIMENT = Object.freeze({
