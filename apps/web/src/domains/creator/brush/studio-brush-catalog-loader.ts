@@ -33,9 +33,10 @@ export async function loadStudioFullBrushCatalogItems(): Promise<
 }
 
 /**
- * LISTING lane: the quarantine-filtered inventory (see `studio-brush-quarantine.ts`). Injecting
- * this into a quick shelf / picker keeps quarantined favorites and MRU ids from re-surfacing as
- * affordances while `loadStudioBrushCatalogItemById` below stays unfiltered for resolution.
+ * LISTING lane: the curated quality portfolio in its explicit product order. Quick shelves and
+ * pickers expose only those distinct entries; both quarantined and other excluded registry ids
+ * remain hidden even when favorited. `loadStudioBrushCatalogItemById` stays unfiltered so saved
+ * documents retain their original brush identities.
  */
 export async function loadStudioListedBrushCatalogItems(): Promise<
   readonly StudioBrushCatalogItem[]

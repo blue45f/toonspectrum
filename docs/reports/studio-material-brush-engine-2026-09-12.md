@@ -42,7 +42,8 @@ repository bridge, saved-brush application and pixel-analysis contract. This com
 the required core static CI job. Existing native-media, SVG, raster-edit and catalogue gates
 remain enabled. The typed live-media dispatcher selects one compatible renderer before provider
 startup, preserving material priority, eraser ownership and explicit GPU rejection. Its nine
-behavior cases are included in the material suite (13 files, 107 tests). Extracting this policy
+behavior cases are included in the material suite (15 files, 119 tests), alongside renderer
+ownership and curated catalogue compatibility checks. Extracting this policy
 also brings the editor host below its existing size ceiling without increasing the limit.
 
 `pnpm verify:studio-brush-v6-quality` produces `report.json`, an HTML review and recipe PNGs.
