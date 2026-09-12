@@ -49,6 +49,8 @@ export interface StudioVrmCooperativeCaptureOptions {
   /** The caller owns the frozen scene and must reject a changed model/pose/appearance. */
   readonly assertCurrent?: () => void;
   readonly onProgress?: (progress: StudioVrmCaptureProgress) => void;
+  /** Synchronous per-tile scene scope. Return its undo; roll back internally if setup throws. */
+  readonly prepareTile?: () => (() => void);
 }
 
 export interface StudioVrmRasterCaptureDependencies {
@@ -166,6 +168,7 @@ function* captureStudioVrmRgbaTiles(
   dimensions: StudioVrmRasterCaptureDimensions,
   background: StudioVrmRasterCaptureBackground = {},
   cooperative = false,
+  prepareTile?: () => (() => void),
 ): Generator<StudioVrmCaptureProgress, Uint8ClampedArray | undefined, void> {
   const { width, height } = assertDimensions(dimensions);
   const clearAlpha = typeof background.alpha === "number" && Number.isFinite(background.alpha)
@@ -234,7 +237,9 @@ function* captureStudioVrmRgbaTiles(
         const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
         const previousClearAlpha = renderer.getClearAlpha();
         const previousSceneBackground = scene.background;
+        let restoreTile: (() => void) | undefined;
         try {
+          restoreTile = prepareTile?.();
           const w = Math.min(tileWidth, width - left);
           const h = Math.min(tileHeight, height - top);
           sceneTarget.setSize(w, h);
@@ -276,17 +281,21 @@ function* captureStudioVrmRgbaTiles(
             output.set(pixels.subarray(sourceOffset, sourceOffset + w * 4), ((top + row) * width + left) * 4);
           }
         } finally {
-          for (const [material, factor] of screenOutlineFactors) {
-            material.outlineWidthFactor = factor;
-            material.uniformsNeedUpdate = true;
+          try {
+            for (const [material, factor] of screenOutlineFactors) {
+              material.outlineWidthFactor = factor;
+              material.uniformsNeedUpdate = true;
+            }
+            if (originalProjection && originalProjectionInverse) {
+              camera.projectionMatrix.copy(originalProjection);
+              camera.projectionMatrixInverse.copy(originalProjectionInverse);
+            }
+            renderer.setRenderTarget(previousRenderTarget, previousActiveCubeFace, previousActiveMipmapLevel);
+            renderer.setClearColor(previousClearColor, previousClearAlpha);
+            scene.background = previousSceneBackground;
+          } finally {
+            restoreTile?.();
           }
-          if (originalProjection && originalProjectionInverse) {
-            camera.projectionMatrix.copy(originalProjection);
-            camera.projectionMatrixInverse.copy(originalProjectionInverse);
-          }
-          renderer.setRenderTarget(previousRenderTarget, previousActiveCubeFace, previousActiveMipmapLevel);
-          renderer.setClearColor(previousClearColor, previousClearAlpha);
-          scene.background = previousSceneBackground;
         }
         completedTiles += 1;
         yield { completedTiles, totalTiles };
@@ -340,7 +349,8 @@ function yieldStudioVrmCapture(signal: AbortSignal | undefined): Promise<void> {
  * actual tasks between tiles let input, progress and cancellation run. No asynchronous GPU
  * job survives cancellation. Temporary camera/material/renderer state is restored before
  * every yield. The caller must hold the scene capture lease until this promise settles.
- * Do not use across semantic material scopes that are only restored after this promise.
+ * Semantic material changes must use prepareTile, which is undone before progress and every
+ * yield. Never keep a temporary material scope open across this promise.
  */
 export async function captureStudioVrmRgbaCooperatively(
   renderer: THREE.WebGLRenderer,
@@ -360,7 +370,7 @@ export async function captureStudioVrmRgbaCooperatively(
   };
   assertCurrent();
   await yieldStudioVrmCapture(options.signal);
-  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background, true);
+  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background, true, options.prepareTile);
   try {
     for (;;) {
       assertCurrent();

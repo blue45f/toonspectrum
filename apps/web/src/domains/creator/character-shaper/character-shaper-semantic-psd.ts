@@ -25,20 +25,23 @@
 import { classifyMeshName } from "../vrm/studio-vrm-costume";
 import { collectStudioVrmCostumeMeshes } from "../vrm/studio-vrm-costume-runtime";
 import { isStudioVrmMtoonMaterial } from "../vrm/studio-vrm-mtoon-brand";
-import { captureStudioVrmRgba } from "../vrm/studio-vrm-raster-capture";
+import { captureStudioVrmRgba, captureStudioVrmRgbaCooperatively } from "../vrm/studio-vrm-raster-capture";
 
 import {
-  CHARACTER_INK_HEX,
-  alphaOnly,
-  deriveCharacterShadingLayers,
-  isEmptyPass,
-  sobelEdgeAlpha,
-} from "./character-shaper-image-math";
+  alphaOnlyCooperatively,
+  deriveCharacterShadingLayersCooperatively,
+  sobelEdgeAlphaCooperatively,
+  yieldCharacterRasterWork,
+} from "./character-shaper-cooperative-raster";
+import { CHARACTER_INK_HEX, isEmptyPass } from "./character-shaper-image-math";
+import { isolateCharacterMask } from "./character-shaper-mask-scope";
 
 import { CHARACTER_SEMANTIC_MASK_LABELS, CHARACTER_SEMANTIC_MASK_ORDER } from "./character-shaper-psd-assembly";
 import { assembleCharacterPsdInWorker } from "./character-shaper-psd-worker-client";
 import { validateCharacterPsdPasses } from "./character-shaper-psd-worker-protocol";
 
+import type { CharacterMaskTarget } from "./character-shaper-mask-scope";
+import type { StudioVrmCooperativeCaptureOptions } from "../vrm/studio-vrm-raster-capture";
 import type { BuildCharacterSemanticPsdOptions, CharacterSemanticMaskId, CharacterSemanticPsdResult,
   CharacterSemanticSkip } from "./character-shaper-psd-assembly";
 
@@ -68,6 +71,13 @@ export interface CharacterSemanticCaptureState {
 /** Material → paint-only texture. `null` (or an empty map) means nothing has been painted. */
 export type CharacterPaintTextureProvider = () => Map<THREE.Material, THREE.Texture> | null;
 
+export interface CharacterSemanticCaptureProgress {
+  readonly pass: CharacterSemanticPassId | "shading";
+  readonly phase: "render" | "derive";
+  readonly completed: number;
+  readonly total: number;
+}
+
 export interface CaptureCharacterSemanticPassesInput {
   readonly capture: CharacterSemanticCaptureState;
   readonly vrm: VRM;
@@ -76,6 +86,8 @@ export interface CaptureCharacterSemanticPassesInput {
   readonly signal?: AbortSignal;
   /** Reject a stale model or editing authority before every rendered pass. */
   readonly assertCurrent?: () => void;
+  /** Emitted only when all temporary scene mutations have been restored. */
+  readonly onProgress?: (progress: CharacterSemanticCaptureProgress) => void;
   /** Procedural wardrobe mounts; their meshes join 상의/하의/신발 masks. */
   readonly garmentRoots?: readonly THREE.Object3D[];
   /** Procedural prop mounts; their meshes join the 액세서리 mask. */
@@ -95,7 +107,7 @@ export interface ExportCharacterSemanticPsdInput
   readonly timeoutMs?: number;
 }
 
-/** Seam for tests: the product path renders through `captureStudioVrmRgba`. */
+/** The product uses cooperative tiles. The synchronous dependency is an explicit test seam. */
 export interface CharacterSemanticCaptureDependencies {
   readonly captureRgba: (
     renderer: THREE.WebGLRenderer,
@@ -103,6 +115,13 @@ export interface CharacterSemanticCaptureDependencies {
     camera: THREE.Camera,
     dimensions: { readonly width: number; readonly height: number },
   ) => Uint8ClampedArray;
+  readonly captureRgbaCooperatively?: (
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+    dimensions: { readonly width: number; readonly height: number },
+    options: StudioVrmCooperativeCaptureOptions,
+  ) => Promise<Uint8ClampedArray>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -203,18 +222,6 @@ export function boundCharacterSemanticCaptureSize(
   };
 }
 
-/**
- * Yield the main thread between passes. Fourteen 2048² renders back to back would freeze the
- * viewport with no chance to paint progress, and the abort check has to happen somewhere.
- */
-async function betweenPasses(signal: AbortSignal | undefined): Promise<void> {
-  if (signal?.aborted) throw abortError();
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  });
-  if (signal?.aborted) throw abortError();
-}
-
 /* -------------------------------------------------------------------------- */
 /* Scene classification                                                        */
 /* -------------------------------------------------------------------------- */
@@ -286,12 +293,6 @@ function maskSlotsFromMaterials(mesh: THREE.Mesh): Map<number, CharacterSemantic
   });
   // 슬롯이 전부 같은 마스크를 가리키면 쪼갤 이유가 없다 — 메시 단위 분류가 그대로 맞다.
   return seen.size > 1 ? slots : null;
-}
-
-/** 마스크 하나가 붙잡는 대상. `slots`가 있으면 그 메시의 해당 재질 슬롯만 이 마스크의 것이다. */
-interface CharacterMaskTarget {
-  readonly mesh: THREE.Mesh;
-  readonly slots: ReadonlySet<number> | null;
 }
 
 interface CharacterMeshIndex {
@@ -433,62 +434,6 @@ function withRestore<T>(restore: () => void, run: () => T): T {
   }
 }
 
-/**
- * Hide everything outside `targets`; the returned closure puts every flag back as it was.
- *
- * 슬롯만 남기는 대상은 메시를 켜 둔 채 나머지 재질의 색 기록만 끈다 — 재질을 갈아 끼우면
- * 셰이더가 다시 컴파일되고 복원이 어긋날 수 있는데, `colorWrite`는 둘 다 일으키지 않는다.
- */
-function isolateVisibility(
-  meshes: readonly THREE.Mesh[],
-  targets: readonly CharacterMaskTarget[],
-): () => void {
-  const kept = new Map<THREE.Mesh, ReadonlySet<number> | null>();
-  for (const target of targets) {
-    // 같은 메시를 통째로 요구한 대상이 하나라도 있으면 그쪽이 이긴다.
-    if (kept.get(target.mesh) === null) continue;
-    if (target.slots === null) {
-      kept.set(target.mesh, null);
-      continue;
-    }
-    const merged = new Set(kept.get(target.mesh) ?? []);
-    for (const slot of target.slots) merged.add(slot);
-    kept.set(target.mesh, merged);
-  }
-
-  const previousVisible = meshes.map((mesh) => mesh.visible);
-  const muted = new Map<THREE.Material, { colorWrite: boolean; depthWrite: boolean }>();
-  for (const mesh of meshes) {
-    if (!kept.has(mesh)) {
-      mesh.visible = false;
-      continue;
-    }
-    const slots = kept.get(mesh) ?? null;
-    if (slots === null || !Array.isArray(mesh.material)) continue;
-    mesh.material.forEach((material, slot) => {
-      if (!material || slots.has(slot)) return;
-      // Meshes and material slots can share the same instance. Snapshot before its first
-      // mutation only; a second snapshot would save our temporary false flags as the original.
-      if (!muted.has(material)) {
-        muted.set(material, { colorWrite: material.colorWrite, depthWrite: material.depthWrite });
-      }
-      material.colorWrite = false;
-      // 깊이까지 꺼야 숨긴 슬롯이 남긴 슬롯을 가리지 않는다 — 메시 통째로 끌 때와 같은 결과다.
-      material.depthWrite = false;
-    });
-  }
-
-  return () => {
-    meshes.forEach((mesh, index) => {
-      mesh.visible = previousVisible[index];
-    });
-    for (const [material, flags] of muted) {
-      material.colorWrite = flags.colorWrite;
-      material.depthWrite = flags.depthWrite;
-    }
-  };
-}
-
 interface PaintRestore {
   readonly material: PaintableMaterial;
   readonly map: THREE.Texture | null | undefined;
@@ -553,6 +498,8 @@ function bindPaintTextures(
 const DEFAULT_DEPENDENCIES: CharacterSemanticCaptureDependencies = {
   captureRgba: (renderer, scene, camera, dimensions) =>
     captureStudioVrmRgba(renderer, scene, camera, dimensions, { alpha: 0 }),
+  captureRgbaCooperatively: (renderer, scene, camera, dimensions, options) =>
+    captureStudioVrmRgbaCooperatively(renderer, scene, camera, dimensions, { alpha: 0 }, options),
 };
 
 /**
@@ -572,36 +519,60 @@ export async function captureCharacterSemanticPasses(
     if (isEmptyPass(rgba)) skipped.push({ pass: id, reason: emptyReason });
     else passes.push({ id, width, height, rgba });
   };
-  const render = () => {
+  const assertCurrent = () => {
     if (signal?.aborted) throw abortError();
     input.assertCurrent?.();
-    return dependencies.captureRgba(capture.gl, capture.scene, capture.camera, dimensions);
+  };
+  const progress = (pass: CharacterSemanticCaptureProgress["pass"], phase: "render" | "derive", completed: number, total: number) => {
+    input.onProgress?.({ pass, phase, completed, total });
+    if (signal?.aborted) throw abortError();
+  };
+  const rasterOptions = (pass: CharacterSemanticCaptureProgress["pass"]) => ({
+    signal, assertCurrent: input.assertCurrent,
+    onProgress: (completed: number, total: number) => progress(pass, "derive", completed, total),
+  });
+  const render = async (pass: CharacterSemanticPassId, prepareTile?: () => (() => void)) => {
+    assertCurrent();
+    progress(pass, "render", 0, 1);
+    const rgba = dependencies.captureRgbaCooperatively
+      ? await dependencies.captureRgbaCooperatively(capture.gl, capture.scene, capture.camera, dimensions, {
+        signal, assertCurrent: input.assertCurrent, prepareTile,
+        onProgress: ({ completedTiles, totalTiles }) => progress(pass, "render", completedTiles, totalTiles),
+      })
+      : withRestore(prepareTile?.() ?? (() => undefined), () =>
+        dependencies.captureRgba(capture.gl, capture.scene, capture.camera, dimensions));
+    assertCurrent();
+    return rgba;
   };
 
   if (signal?.aborted) throw abortError();
   const index = indexCharacterMeshes(vrm, input.garmentRoots ?? [], input.propRoots ?? []);
 
-  const beauty = render();
+  const beauty = await render("beauty");
   record("beauty", beauty, "모델이 화면에 보이지 않아 미리보기 패스를 만들지 못했습니다.");
 
-  await betweenPasses(signal);
-  const shading = neutralizeCharacterShading(index.meshes);
-  const flat = withRestore(shading.restore, render);
+  await yieldCharacterRasterWork({ signal, assertCurrent: input.assertCurrent });
+  let shadingCount = 0;
+  const flat = await render("flat", () => {
+    const shading = neutralizeCharacterShading(index.meshes);
+    shadingCount = shading.count;
+    return shading.restore;
+  });
   record("flat", flat, "모델이 화면에 보이지 않아 밑색 패스를 만들지 못했습니다.");
 
-  const shadingReason = shading.count === 0
+  const shadingReason = shadingCount === 0
     ? "MToon(툰) 재질이 없어 음영과 하이라이트를 분리하지 못했습니다."
     : "빛과 그림자 차이가 없어 레이어를 만들지 않았습니다.";
-  const shadingLayers = deriveCharacterShadingLayers(flat, beauty);
+  const shadingLayers = await deriveCharacterShadingLayersCooperatively(flat, beauty, rasterOptions("shading"));
   record("shadow", shadingLayers.shadow, shadingReason);
   record("highlight", shadingLayers.highlight, shadingReason);
   record(
     "line",
-    sobelEdgeAlpha(flat, width, height, { inkColor: CHARACTER_INK_HEX }),
+    await sobelEdgeAlphaCooperatively(flat, width, height, { inkColor: CHARACTER_INK_HEX }, rasterOptions("line")),
     "외곽선으로 뽑을 만한 경계가 없습니다.",
   );
 
-  await betweenPasses(signal);
+  await yieldCharacterRasterWork({ signal, assertCurrent: input.assertCurrent });
   const paint = input.paintTextureProvider ? input.paintTextureProvider() : null;
   if (!input.paintTextureProvider) {
     skipped.push({
@@ -617,16 +588,24 @@ export async function captureCharacterSemanticPasses(
     // The drawing layer must carry the strokes, not the strokes with the light rig baked in. Bind
     // the paint textures first so neutralising shading picks up the white base the binding just
     // set; the restores then run in reverse order.
-    const bound = bindPaintTextures(index.meshes, paint);
-    const paintShading = neutralizeCharacterShading(index.meshes);
-    const painted = withRestore(() => {
-      paintShading.restore();
-      bound.restore();
-    }, render);
+    let paintedCount = 0;
+    const painted = await render("surface-paint", () => {
+      const bound = bindPaintTextures(index.meshes, paint);
+      paintedCount = bound.painted;
+      try {
+        const paintShading = neutralizeCharacterShading(index.meshes);
+        return () => {
+          try { paintShading.restore(); } finally { bound.restore(); }
+        };
+      } catch (error) {
+        bound.restore();
+        throw error;
+      }
+    });
     record(
       "surface-paint",
       painted,
-      bound.painted === 0
+      paintedCount === 0
         ? "표면 드로잉 텍스처가 현재 모델의 재질과 연결되지 않았습니다."
         : "칠한 획이 현재 시점에서 보이지 않습니다.",
     );
@@ -638,15 +617,16 @@ export async function captureCharacterSemanticPasses(
       skipped.push({ pass: mask, reason: MASK_NOT_FOUND_REASONS[mask] });
       continue;
     }
-    await betweenPasses(signal);
-    const isolated = withRestore(isolateVisibility(index.meshes, keep), render);
+    await yieldCharacterRasterWork({ signal, assertCurrent: input.assertCurrent });
+    const isolated = await render(mask, () => isolateCharacterMask(index.meshes, keep));
     record(
       mask,
-      alphaOnly(isolated),
+      await alphaOnlyCooperatively(isolated, rasterOptions(mask)),
       `${CHARACTER_SEMANTIC_MASK_LABELS[mask]} 영역이 현재 시점에서 보이지 않습니다.`,
     );
   }
 
+  assertCurrent();
   return { passes, skipped };
 }
 
