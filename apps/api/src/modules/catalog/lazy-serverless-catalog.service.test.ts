@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LazyServerlessCatalogService } from "./lazy-serverless-catalog.service";
+
 const base = vi.hoisted(() => ({ initialize: vi.fn(), destroy: vi.fn() }));
 vi.mock("./catalog.service", () => ({
   CatalogService: class {
@@ -7,8 +9,6 @@ vi.mock("./catalog.service", () => ({
     onModuleDestroy() { base.destroy(); }
   },
 }));
-
-import { LazyServerlessCatalogService } from "./lazy-serverless-catalog.service";
 
 beforeEach(() => {
   vi.stubEnv("WEBDEX_CATALOG_FORCE_DB", "0");
