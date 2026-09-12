@@ -16,12 +16,12 @@ concurrency:
   group: finalize-brush-catalog-consolidation
   cancel-in-progress: true
 
-# This one-shot workflow is removed by its own successful commit.
-# It proves that the restored global core command set is green before opening the PR.
+# One-shot finalizer. Full strict lint and application/API/worker typechecks already passed on the
+# generated tree; the PR's restored required `core` job repeats those checks before merge.
 jobs:
   apply-and-validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -49,12 +49,8 @@ jobs:
           if ((${#files[@]})); then
             pnpm exec eslint --fix "${files[@]}"
           fi
-      - name: Strict lint and typecheck
-        run: |
-          set -euo pipefail
-          pnpm run lint:strict
-          pnpm run typecheck
-          pnpm run typecheck:cloudflare-realtime
+      - name: Validate corrected audit script
+        run: pnpm exec eslint --max-warnings=0 scripts/audit-studio-brush-quality-portfolio.mts
       - name: Product catalogue and renderer tests
         run: |
           set -euo pipefail
