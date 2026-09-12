@@ -1,0 +1,42 @@
+name: Residual review source audit
+on:
+  push:
+    branches: [ops/residual-merge-reconcile-20260913]
+    paths: [.github/workflows/residual-review-source-audit.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact current source contracts without changing repository refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64,concurrent.futures,json,os,pathlib,urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          head='6264457d8febd1023e63f787291af6a790444c43'
+          def read(path):
+              req=urllib.request.Request(api+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
+          data=read('git/trees/'+read('git/commits/'+head)['tree']['sha']+'?recursive=1');assert not data.get('truncated')
+          names={'studio-adjustment-layer-plan.ts','studio-adjustment-layer-plan.test.ts','studio-adjustment-layer-runtime.test.ts','studio-raster-presentation-cache.ts','studio-raster-presentation-cache.test.ts','studio-raster-image-presentation.ts','studio-stage-document-view.ts','studio-stage-document-view.test.ts','StudioCanvasViewportTypes.ts','StudioSmartFiltersPanel.test.tsx','StudioHomePage.tsx','StudioHomePage.test.tsx','creator.routes.tsx','studio-work-asset-admission.test.ts','studio-work-asset-render-projection.ts','studio-work-asset-references.ts'}
+          entries=[e for e in data['tree'] if e['type']=='blob' and (pathlib.PurePosixPath(e['path']).name in names or (e['path'].startswith('apps/web/src/domains/creator/canvas/StudioCanvasViewport') and e['path'].endswith('.tsx')))]
+          assert len(entries)<100
+          root=pathlib.Path('artifacts/review-source');root.mkdir(parents=True)
+          def fetch(entry):
+              blob=read('git/blobs/'+entry['sha']);assert blob['encoding']=='base64'
+              path=root/entry['path'];path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(base64.b64decode(blob['content']))
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:list(pool.map(fetch,entries))
+          (root/'source-manifest.json').write_text(json.dumps({'head':head,'entries':entries},indent=2))
+          print('\n'.join(e['path'] for e in entries))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: residual-review-source-contracts
+          path: artifacts/review-source
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
