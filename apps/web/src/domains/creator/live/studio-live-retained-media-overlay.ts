@@ -10,6 +10,7 @@ import {
   mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
 } from "../brush/studio-brush-alias-profile";
+import { resolveStudioBrushRuntimeProgramSet } from "../brush/studio-brush-composition-runtime";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
 import { studioOilFamilyPlanFields } from "../brush/studio-fluid-paint-reference";
@@ -735,6 +736,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (target === this.activeContext && unchanged) return true;
 
       const brush = element.brush ?? "oil";
+      const runtimeEnginePrograms = resolveStudioBrushRuntimeProgramSet(
+        brush,
+        element.brushEnginePrograms,
+      );
       const planInput = {
         points: flatPoints,
         pressures: element.pressures,
@@ -769,7 +774,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       const programs = studioOilRibbonProgramsForBrush(
         brush,
         fxBrushSeedFromKey(element.id),
-        element.brushEnginePrograms?.oil,
+        runtimeEnginePrograms?.oil,
       );
       // The dab bed is already prefix-stable across a pointer move (`FxOilDabPlanner`); the
       // carrier was rebuilding its smoothed geometry, its stations and every bristle run on top

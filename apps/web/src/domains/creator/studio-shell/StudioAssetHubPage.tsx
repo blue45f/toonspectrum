@@ -1,4 +1,4 @@
-import { Boxes, Library, Palette, Search, Store } from "lucide-react";
+import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -10,9 +10,14 @@ import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
+import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
 import { StudioAssetsPage } from "./StudioFrontDoorPages";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
-import { ASSET_HUB_VIEWS, resolveStudioAssetHubView, type AssetHubView } from "./studio-asset-hub-view";
+import {
+  ASSET_HUB_VIEWS,
+  resolveStudioAssetHubView,
+  type AssetHubView,
+} from "./studio-asset-hub-view";
 
 type Locale = "ko" | "en";
 
@@ -21,6 +26,7 @@ const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
   library: { ko: "내 에셋", en: "My assets" },
   market: { ko: "마켓에서 찾기", en: "Browse market" },
+  safety: { ko: "사용 권리·안전", en: "Rights & safety" },
   seller: { ko: "판매자 센터", en: "Seller center" },
 };
 
@@ -29,6 +35,7 @@ const VIEW_ICONS = {
   "series-kit": Palette,
   library: Library,
   market: Search,
+  safety: ShieldCheck,
   seller: Store,
 } as const;
 
@@ -36,7 +43,6 @@ const VIEW_ICONS = {
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
-
 
 /** Build a canonical link while preserving the optional project context. */
 function assetHubHref(view: AssetHubView, projectId: string | null): string {
@@ -48,20 +54,33 @@ function assetHubHref(view: AssetHubView, projectId: string | null): string {
   return serialized ? `/studio/assets?${serialized}` : "/studio/assets";
 }
 
-function MissingProjectSeriesKit({ locale }: { readonly locale: Locale }) {
+function MissingProjectView({
+  locale,
+  view,
+}: {
+  readonly locale: Locale;
+  readonly view: "safety" | "series-kit";
+}) {
+  const seriesKit = view === "series-kit";
   return (
     <Container size="wide" className="py-8 sm:py-12">
       <section className="rounded-3xl border border-line bg-card p-6 text-center shadow-sm sm:p-10">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-          <Palette size={21} aria-hidden="true" />
+          {seriesKit ? <Palette size={21} aria-hidden="true" /> : <ShieldCheck size={21} aria-hidden="true" />}
         </span>
         <h2 className="mt-4 text-xl font-black text-fg">
-          {locale === "ko" ? "프로젝트에서 Series Kit를 열어 주세요" : "Open Series Kit from a project"}
+          {seriesKit
+            ? (locale === "ko" ? "프로젝트에서 Series Kit를 열어 주세요" : "Open Series Kit from a project")
+            : (locale === "ko" ? "확인할 프로젝트를 먼저 선택해 주세요" : "Choose a project to check")}
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-          {locale === "ko"
-            ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 에셋의 Series Kit를 열면 됩니다."
-            : "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit."}
+          {seriesKit
+            ? (locale === "ko"
+              ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 에셋의 Series Kit를 열면 됩니다."
+              : "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit.")
+            : (locale === "ko"
+              ? "사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다."
+              : "Usage purpose, purchases, team seats, fonts, AI provenance and extension permissions differ per project. Choose a project from My work to review them together.")}
         </p>
         <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
           {locale === "ko" ? "내 작업으로" : "Go to My work"}
@@ -83,7 +102,7 @@ export function StudioAssetHubPage() {
   const currentLabel = useMemo(() => VIEW_LABELS[view][locale], [locale, view]);
   const visibleViews = projectId
     ? ASSET_HUB_VIEWS
-    : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit");
+    : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit" && candidate !== "safety");
 
   return (
     <div data-studio-asset-hub={view}>
@@ -140,9 +159,15 @@ export function StudioAssetHubPage() {
           <StudioSeriesKitPanel projectId={projectId} locale={locale} />
         </Container>
       ) : null}
-      {view === "series-kit" && !projectId ? <MissingProjectSeriesKit locale={locale} /> : null}
+      {view === "series-kit" && !projectId ? <MissingProjectView locale={locale} view="series-kit" /> : null}
       {view === "library" ? <MarketLibraryPage /> : null}
       {view === "market" ? <MarketBrowsePage /> : null}
+      {view === "safety" && projectId ? (
+        <Container size="wide" className="py-7 sm:py-10">
+          <StudioAssetGovernancePanel projectId={projectId} locale={locale} />
+        </Container>
+      ) : null}
+      {view === "safety" && !projectId ? <MissingProjectView locale={locale} view="safety" /> : null}
       {view === "seller" ? <MarketManagePage /> : null}
     </div>
   );

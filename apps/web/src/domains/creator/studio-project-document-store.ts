@@ -87,19 +87,23 @@ const DOCUMENT_WORKSPACE_SET = new Set<string>(STUDIO_DOCUMENT_WORKSPACES);
 const DOCUMENT_STATUS_SET = new Set<string>(["active", "archived", "trashed"]);
 const MAX_DOCUMENTS_PER_PROJECT = 10_000;
 
+const workspaceList = (
+  ...workspaces: StudioDocumentWorkspace[]
+): readonly StudioDocumentWorkspace[] => Object.freeze(workspaces);
+
 const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, readonly StudioDocumentWorkspace[]>> = Object.freeze({
-  webtoon: Object.freeze(["comic", "draw", "image", "localization", "review"]),
-  illustration: Object.freeze(["draw", "image", "review"]),
-  image: Object.freeze(["image", "draw", "review"]),
-  design: Object.freeze(["design", "image", "slides", "review"]),
-  slides: Object.freeze(["slides", "design", "review"]),
-  storyboard: Object.freeze(["storyboard", "draw", "motion", "review"]),
-  whiteboard: Object.freeze(["whiteboard", "design", "review"]),
-  "three-d": Object.freeze(["3d", "image", "review"]),
-  animation: Object.freeze(["animation", "motion", "audio", "review"]),
-  motion: Object.freeze(["motion", "audio", "review"]),
-  audio: Object.freeze(["audio", "motion", "review"]),
-  localization: Object.freeze(["localization", "review"]),
+  webtoon: workspaceList("comic", "draw", "image", "localization", "review"),
+  illustration: workspaceList("draw", "image", "review"),
+  image: workspaceList("image", "draw", "review"),
+  design: workspaceList("design", "image", "slides", "review"),
+  slides: workspaceList("slides", "design", "review"),
+  storyboard: workspaceList("storyboard", "draw", "motion", "review"),
+  whiteboard: workspaceList("whiteboard", "design", "review"),
+  "three-d": workspaceList("3d", "image", "review"),
+  animation: workspaceList("animation", "motion", "audio", "review"),
+  motion: workspaceList("motion", "audio", "review"),
+  audio: workspaceList("audio", "motion", "review"),
+  localization: workspaceList("localization", "review"),
 });
 
 const PROJECT_DEFAULT_DOCUMENT: Readonly<Record<StudioProjectKind, StudioDocumentKind>> = Object.freeze({

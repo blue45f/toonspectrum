@@ -124,6 +124,7 @@ import {
 import {
   resolveStudioCapturedBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushRuntimeProgramSet } from "./studio-brush-composition-runtime";
 import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   resolveStudioBrushRuntimeContract,
@@ -386,6 +387,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const activeDraft = resolvedRenderPurpose === "drawing-draft";
   const durableDocumentRender = resolvedRenderPurpose === "document";
   const kind = el.kind ?? "freehand";
+  const runtimeEnginePrograms = resolveStudioBrushRuntimeProgramSet(
+    el.brush,
+    el.brushEnginePrograms,
+  );
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   // 실제 fillPattern props를 쓰는 도형만 타일을 요청한다. 따라서 exact transform draft는
   // 문서 렌더의 resolved tile을 재사용하고, legacy/freehand의 stale pattern 필드는 어떤
@@ -1807,7 +1812,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
               ? planStudioWetWashLivePipeline(`${el.id}#${index}`, {
                   brushId: brush,
-                  enginePrograms: el.brushEnginePrograms,
+                  enginePrograms: runtimeEnginePrograms,
                   input: watercolorInput,
                   carrierSeed: watercolorSeed,
                 })
@@ -1838,7 +1843,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               resolveStudioBrushEngineLaneWatercolorMaterial(brush);
             // 커스텀 프로그램 세트 오버라이드가 레인 핀보다 우선한다(단일 권위:
             // applyStudioBrushAliasWatercolorMaterial과 같은 순서).
-            const watercolorOverride = el.brushEnginePrograms?.watercolor ?? null;
+            const watercolorOverride = runtimeEnginePrograms?.watercolor ?? null;
             const resolvedWetEdgeBloomProgramId =
               watercolorOverride?.wetEdgeBloomProgramId
               ?? laneWatercolorMaterial?.wetEdgeBloomProgramId;
@@ -1861,7 +1866,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 plannedDabs,
                 watercolorSeed,
                 "live",
-                el.brushEnginePrograms,
+                runtimeEnginePrograms,
               );
               dabs =
                 requestStudioLivingInkSettledBakeDabs(
@@ -1880,7 +1885,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 plannedDabs,
                 watercolorSeed,
                 activeDraft ? "live" : "settled",
-                el.brushEnginePrograms,
+                runtimeEnginePrograms,
               );
             }
             const wetRibbonPlan = liveWetWashPlan
@@ -2654,7 +2659,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const oilPrograms = studioOilRibbonProgramsForBrush(
               brush,
               fxBrushSeedFromKey(el.id),
-              el.brushEnginePrograms?.oil,
+              runtimeEnginePrograms?.oil,
             );
             const carrier = oilDraftPlannersRetained
               ? planStudioOilRibbonCarrierIncremental(el.id, index, dabs, oilPrograms)

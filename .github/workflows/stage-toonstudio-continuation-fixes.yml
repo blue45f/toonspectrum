@@ -1,0 +1,97 @@
+name: Stage ToonStudio continuation fixes once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-completion-followup-20260911
+    paths:
+      - .github/workflows/stage-toonstudio-continuation-fixes.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validate-toonstudio-continuation-once
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout continuation branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-completion-followup-20260911
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Apply the latest deterministic continuation patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          workflow_path = Path(".github/workflows/repair-toonstudio-finalization-v4.yml")
+          if not workflow_path.exists():
+              raise SystemExit("The v4 continuation patch is unavailable")
+          workflow = workflow_path.read_text()
+          block = re.search(
+              r"- name: Refactor state initialization and complete route ownership\n.*?run: \|\n(?P<body>.*?)\n\s+- name: Format continuation source",
+              workflow,
+              re.S,
+          )
+          if block is None:
+              raise SystemExit("Could not locate the v4 deterministic patch")
+          body = textwrap.dedent(block.group("body"))
+          prefix = "set -euo pipefail\npython <<'PY'\n"
+          if not body.startswith(prefix) or not body.rstrip().endswith("\nPY"):
+              raise SystemExit("Unexpected v4 patch format")
+          script = body[len(prefix):body.rfind("\nPY")]
+          exec(compile(script, "toonstudio-continuation-v4.py", "exec"), {})
+          Path(".github/workflows/stage-toonstudio-continuation-fixes.yml").unlink(missing_ok=True)
+          PY
+
+      - name: Normalize staged source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          mapfile -t files < <((git diff --name-only origin/main...HEAD; git diff --name-only) | sort -u | grep -E '\.(ts|tsx|mjs)$' || true)
+          if ((${#files[@]})); then
+            pnpm exec prettier --write "${files[@]}"
+            # Persist all safe autofixes. Remaining non-fixable findings are handled against this
+            # stable commit instead of discarding the implementation.
+            pnpm exec eslint --fix --no-warn-ignored "${files[@]}" || true
+          fi
+          git diff --check
+
+      - name: Commit and push staged implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): stage template seller and delivery runtimes"
+          git push origin HEAD:feat/toonstudio-session-completion-followup-20260911

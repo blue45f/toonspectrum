@@ -100,9 +100,14 @@ export function createStudioProjectWithInitialDocument(
         target,
       });
 
-    markStudioProjectOpened(storage, project.id, document.id, { at: createdAt, target });
+    const openedProject = markStudioProjectOpened(
+      storage,
+      project.id,
+      document.id,
+      { at: createdAt, target },
+    );
     return Object.freeze({
-      project,
+      project: openedProject,
       document,
       href: studioProjectDocumentHref(document),
     });

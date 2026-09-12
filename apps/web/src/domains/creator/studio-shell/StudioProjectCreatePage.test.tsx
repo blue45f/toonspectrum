@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { readStudioProjectDocuments } from "../studio-project-document-store";
 import { readStudioProjectLibrary } from "../studio-project-library-store";
-import { StudioNewIntegratedPage } from "./StudioNewIntegratedPage";
+import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 
 function LocationProbe() {
   const location = useLocation();
@@ -22,11 +22,11 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe("StudioNewIntegratedPage", () => {
+describe("StudioProjectCreatePage", () => {
   it("creates a project and its initial document, then opens the canonical document route", async () => {
     render(
       <MemoryRouter initialEntries={["/studio/new"]}>
-        <StudioNewIntegratedPage />
+        <StudioProjectCreatePage />
         <LocationProbe />
       </MemoryRouter>,
     );
@@ -60,7 +60,7 @@ describe("StudioNewIntegratedPage", () => {
   it("switches project type and prepares the matching template choices", () => {
     render(
       <MemoryRouter>
-        <StudioNewIntegratedPage />
+        <StudioProjectCreatePage />
       </MemoryRouter>,
     );
 

@@ -19,6 +19,11 @@ import {
   type StudioBrushCompositionSlotId,
   type StudioBrushEngineProgramSet,
 } from "./studio-brush-engine-program-set";
+import {
+  constrainStudioBrushCompositionToRuntime,
+  isStudioBrushCompositionRuntimeSelectable,
+  planStudioBrushCompositionRuntime,
+} from "./studio-brush-composition-runtime";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -80,17 +85,33 @@ export function StudioBrushCompositionComposer({
     composition: programSet?.composition ?? baseline,
   });
   const customized = Boolean(programSet?.composition);
+  const runtimePlan = planStudioBrushCompositionRuntime(family, plan.composition);
+  const recipes = STUDIO_BRUSH_COMPOSITION_RECIPES
+    .filter((recipe) => recipe.families.includes(family))
+    .map((recipe) => ({
+      recipe,
+      available: STUDIO_BRUSH_COMPOSITION_SLOT_IDS.some((slot) => {
+        const nodeId = recipe.composition[slot];
+        return Boolean(nodeId && isStudioBrushCompositionRuntimeSelectable(family, slot, nodeId));
+      }),
+    }));
 
   function applyComposition(composition: CompleteStudioBrushComposition) {
+    const constrained = constrainStudioBrushCompositionToRuntime({
+      family,
+      current: plan.composition,
+      requested: composition,
+    });
     onChange(compileStudioBrushCompositionProgramSet({
       brushId,
       family,
       current: programSet,
-      composition,
+      composition: constrained,
     }));
   }
 
   function updateSlot(slot: StudioBrushCompositionSlotId, value: string) {
+    if (!isStudioBrushCompositionRuntimeSelectable(family, slot, value)) return;
     applyComposition(Object.freeze({ ...plan.composition, [slot]: value }));
   }
 
@@ -137,16 +158,20 @@ export function StudioBrushCompositionComposer({
           </span>
         </div>
         <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {STUDIO_BRUSH_COMPOSITION_RECIPES.map((recipe) => (
+          {recipes.map(({ recipe, available }) => (
             <button
               key={recipe.id}
               type="button"
-              onClick={() => applyComposition(recipe.composition)}
-              className="min-h-16 rounded-xl border border-line bg-card px-2.5 py-2 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+              disabled={!available}
+              onClick={() => {
+                if (available) applyComposition(recipe.composition);
+              }}
+              className="min-h-16 rounded-xl border border-line bg-card px-2.5 py-2 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-card"
             >
               <span className="block text-[0.68rem] font-bold text-fg">{recipe.name}</span>
               <span className="mt-0.5 block text-[0.58rem] leading-relaxed text-fg-3">
                 {recipe.description}
+                {!available ? " · 현재 출력 미연결" : ""}
               </span>
             </button>
           ))}
@@ -163,7 +188,7 @@ export function StudioBrushCompositionComposer({
         <div className="rounded-xl border border-line bg-bg-2/55 px-2.5 py-2">
           <span className="block text-[0.58rem] font-semibold text-fg-3">즉시 적용 가능</span>
           <strong className="mt-0.5 block text-xs tabular-nums text-fg">
-            {plan.integrationCounts.connected}/{STUDIO_BRUSH_COMPOSITION_SLOT_IDS.length}
+            {runtimePlan.connectedSelections.length}/{STUDIO_BRUSH_COMPOSITION_SLOT_IDS.length}
           </strong>
         </div>
         <div className="rounded-xl border border-line bg-bg-2/55 px-2.5 py-2">
@@ -188,6 +213,9 @@ export function StudioBrushCompositionComposer({
                 const selectedId = plan.composition[slot];
                 const options = listStudioBrushCompositionNodesForSlot(slot);
                 const selected = options.find((entry) => entry.id === selectedId) ?? null;
+                const runtimeSelectable = selected
+                  ? isStudioBrushCompositionRuntimeSelectable(family, slot, selected.id)
+                  : false;
                 return (
                   <label key={slot} className="rounded-lg border border-line bg-card/70 p-2">
                     <span className="flex items-center justify-between gap-2">
@@ -203,7 +231,9 @@ export function StudioBrushCompositionComposer({
                               ? "bg-warn/10 text-warn"
                               : "bg-accent-soft text-accent",
                         )}>
-                          {INTEGRATION_LABELS[selected.integration]}
+                          {runtimeSelectable
+                            ? "바로 적용"
+                            : `${INTEGRATION_LABELS[selected.integration]} · 출력 미연결`}
                         </span>
                       ) : null}
                     </span>
@@ -213,11 +243,18 @@ export function StudioBrushCompositionComposer({
                       onChange={(event: ChangeEvent<HTMLSelectElement>) => updateSlot(slot, event.currentTarget.value)}
                       className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-bg px-2 text-[0.66rem] font-semibold text-fg outline-none focus:border-accent"
                     >
-                      {options.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label} · {INTEGRATION_LABELS[option.integration]}
-                        </option>
-                      ))}
+                      {options.map((option) => {
+                        const available = isStudioBrushCompositionRuntimeSelectable(
+                          family,
+                          slot,
+                          option.id,
+                        );
+                        return (
+                          <option key={option.id} value={option.id} disabled={!available}>
+                            {option.label} · {available ? "바로 적용" : "현재 출력 미연결"}
+                          </option>
+                        );
+                      })}
                     </select>
                     {selected ? (
                       <span className="mt-1 block text-[0.56rem] leading-relaxed text-fg-3">
@@ -231,6 +268,16 @@ export function StudioBrushCompositionComposer({
           </section>
         ))}
       </div>
+
+      {runtimePlan.unavailableSelections.length > 0 ? (
+        <p
+          className="mt-3 rounded-lg border border-line bg-bg-2/45 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-3"
+          data-studio-brush-runtime-unavailable="true"
+        >
+          현재 렌더러가 직접 소비하지 않는 {runtimePlan.unavailableSelections.length}개 슬롯은
+          읽기 전용입니다. 선택 가능한 항목만 실제 획·정착·내보내기에 반영됩니다.
+        </p>
+      ) : null}
 
       {plan.issues.length > 0 ? (
         <ul className="mt-3 space-y-1.5" aria-label="브러시 엔진 조합 진단">

@@ -197,7 +197,6 @@ function ProjectCard({
           {editing ? (
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
-                autoFocus
                 value={editTitle}
                 maxLength={120}
                 onChange={(event) => onEditTitle(event.target.value)}
@@ -258,7 +257,7 @@ function ProjectCard({
                     ) : (
                       <>
                         <button type="button" onClick={onRestore} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
-                          {locale === "ko" ? "복원" : "Restore"}
+                          {locale === "ko" ? "내 작업으로 복원" : "Restore to My work"}
                         </button>
                         <button type="button" onClick={onConfirmDelete} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-danger hover:bg-danger-soft/20">
                           {locale === "ko" ? "완전히 삭제" : "Delete permanently"}
@@ -288,7 +287,7 @@ function ProjectCard({
               : "Permanently delete this project and its list entry? This cannot be undone."}
           </p>
           <div className="mt-3 flex gap-2">
-            <button type="button" onClick={onDelete} className={buttonClass({ variant: "danger", size: "sm" })}>
+            <button type="button" onClick={onDelete} className={buttonClass({ variant: "outline", size: "sm", className: "border-danger/50 text-danger hover:border-danger hover:bg-danger-soft/25 hover:text-danger" })}>
               {locale === "ko" ? "완전히 삭제" : "Delete permanently"}
             </button>
             <button type="button" onClick={onCancelDelete} className={buttonClass({ variant: "quiet", size: "sm" })}>

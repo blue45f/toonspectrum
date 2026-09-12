@@ -39,18 +39,18 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(screen.getByText("충돌 없이 저장 가능한 엔진 조합입니다.")).toBeTruthy();
   });
 
-  it("persists a distinctive pattern selection instead of reducing it to a scalar", () => {
+  it("keeps catalogue-only pattern providers read-only in the product composer", () => {
     const onChange = vi.fn();
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
     );
     openExpertGraph();
-    fireEvent.change(screen.getByLabelText("패턴·문양 선택"), {
-      target: { value: "kaleido-symmetry" },
-    });
-    const next = onChange.mock.calls[0]![0];
-    expect(next?.composition?.pattern).toBe("kaleido-symmetry");
-    expect(next?.composition?.carrier).toBe("webgpu-causal-ink");
+    const select = screen.getByLabelText("패턴·문양 선택") as HTMLSelectElement;
+    const kaleido = Array.from(select.options).find((option) => option.value === "kaleido-symmetry");
+    expect(kaleido?.disabled).toBe(true);
+    fireEvent.change(select, { target: { value: "kaleido-symmetry" } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(/읽기 전용입니다/u)).toBeTruthy();
   });
 
   it("compiles the living-chroma recipe into the connected watercolor program", () => {

@@ -15,7 +15,6 @@ import { cn } from "@/shared/lib/utils";
 import {
   markStudioProjectDocumentOpened,
   studioProjectDocumentHref,
-  studioDocumentWorkspaces,
   type StudioDocumentKind,
   type StudioDocumentStatus,
   type StudioDocumentWorkspace,
@@ -179,7 +178,7 @@ function DocumentRow({
                 <RotateCcw size={15} aria-hidden="true" />
                 {locale === "ko" ? "복원" : "Restore"}
               </button>
-              <button type="button" onClick={onDelete} className={buttonClass({ variant: "danger", size: "sm" })}>
+              <button type="button" onClick={onDelete} className={buttonClass({ variant: "outline", size: "sm", className: "border-danger/50 text-danger hover:border-danger hover:bg-danger-soft/25 hover:text-danger" })}>
                 {locale === "ko" ? "완전히 삭제" : "Delete permanently"}
               </button>
             </>
@@ -382,7 +381,7 @@ export function StudioProjectDocumentsPanel({
                 <div className="flex gap-2">
                   <button type="button" onClick={() => {
                     if (documents.removePermanently(document.id)) setConfirmDeleteId(null);
-                  }} className={buttonClass({ variant: "danger", size: "sm" })}>
+                  }} className={buttonClass({ variant: "outline", size: "sm", className: "border-danger/50 text-danger hover:border-danger hover:bg-danger-soft/25 hover:text-danger" })}>
                     {locale === "ko" ? "삭제" : "Delete"}
                   </button>
                   <button type="button" onClick={() => setConfirmDeleteId(null)} className={buttonClass({ variant: "quiet", size: "sm" })}>
