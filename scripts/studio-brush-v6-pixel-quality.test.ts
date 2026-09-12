@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { brushV6InkDistance, brushV6InkField, brushV6InkStatistics } from "./studio-brush-v6-pixel-quality";
+import { brushV6InkDistance, brushV6InkField, brushV6InkStatistics, brushV6RelativeInkError } from "./studio-brush-v6-pixel-quality";
 
 describe("V6 material pixel comparison", () => {
   it("does not count a different paper texture as a painted brush", () => {
@@ -24,5 +24,15 @@ describe("V6 material pixel comparison", () => {
     expect(brushV6InkStatistics(brushV6InkField(painted, paper)).paintedPixels).toBe(2);
     expect(() => brushV6InkField(painted, paper.slice(1))).toThrow("matching RGBA");
     expect(() => brushV6InkDistance(new Float32Array(1), new Float32Array(2))).toThrow("matching dimensions");
+  });
+
+  it("rejects a blank, shifted, or changed replay even when total pigment mass matches", () => {
+    const paper = [255, 255, 255, 255], original = [255, 155, 155, 255];
+    expect(brushV6RelativeInkError(paper, original, original)).toBe(0);
+    expect(brushV6RelativeInkError(paper, original, [254, 155, 155, 254])).toBe(0.01);
+    expect(brushV6RelativeInkError(paper, original, paper)).toBe(1);
+    expect(brushV6RelativeInkError(paper, original, [155, 255, 255, 155])).toBe(2);
+    expect(brushV6RelativeInkError(paper, original, [255, 55, 255, 255])).toBe(1);
+    expect(() => brushV6RelativeInkError(paper, original, [])).toThrow("matching dimensions");
   });
 });

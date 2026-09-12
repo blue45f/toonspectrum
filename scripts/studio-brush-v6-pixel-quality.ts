@@ -37,3 +37,20 @@ export function brushV6InkStatistics(field: Float32Array): { paintedPixels: numb
   }
   return { paintedPixels, inkMass };
 }
+
+/** Spatial channel error relative to original pigment mass; equal total mass cannot hide a shift. */
+export function brushV6RelativeInkError(
+  paper: ArrayLike<number>,
+  original: ArrayLike<number>,
+  reopened: ArrayLike<number>,
+): number {
+  if (paper.length !== original.length || original.length !== reopened.length) {
+    throw new Error("brush replay buffers must have matching dimensions");
+  }
+  let inkMass = 0, difference = 0;
+  for (let index = 0; index < original.length; index += 1) {
+    inkMass += Math.abs(original[index]! - paper[index]!);
+    difference += Math.abs(original[index]! - reopened[index]!);
+  }
+  return difference / Math.max(1, inkMass);
+}

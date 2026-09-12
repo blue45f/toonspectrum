@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 
 import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mjs";
+import { brushV6RelativeInkError } from "./studio-brush-v6-pixel-quality";
 
 import type { Browser, BrowserContext, Page } from "playwright";
 
@@ -89,6 +90,14 @@ function changedPixels(first: Buffer, second: Buffer): number {
   return count;
 }
 
+function relativeInkDifference(paper: Buffer, original: Buffer, reopened: Buffer): number {
+  const backdrop = decodePng(paper), first = decodePng(original), second = decodePng(reopened);
+  assert.equal(first.width, second.width);
+  assert.equal(first.height, second.height);
+  assert.equal(first.channels, second.channels);
+  return brushV6RelativeInkError(backdrop.getRawImage().data, first.getRawImage().data, second.getRawImage().data);
+}
+
 try {
   await stage("browser-startup", async () => {
     browser = await chromium.launch({ channel: "chromium", headless: process.platform !== "darwin", timeout: 15_000 });
@@ -133,6 +142,13 @@ try {
     evidence.libraryAfterNavigation = await probeLibrary(new URL(page.url()).searchParams.get("materialBrush")!);
     await page.getByRole("toolbar", { name: /그리기 옵션/u }).waitFor({ state: "visible" });
     await page.getByRole("toolbar", { name: /그리기 옵션/u }).getByText("54px", { exact: true }).first().waitFor({ state: "visible" });
+    await page.locator('canvas[data-studio-live-retained-active="true"]').waitFor({ state: "visible" });
+    await page.locator('canvas[data-studio-live-retained-settled="true"]').waitFor({ state: "visible" });
+    await page.waitForFunction(() => {
+      const active = document.querySelector<HTMLCanvasElement>('canvas[data-studio-live-retained-active="true"]');
+      const settled = document.querySelector<HTMLCanvasElement>('canvas[data-studio-live-retained-settled="true"]');
+      return active && settled && active.width > 1 && active.height > 1 && settled.width > 1 && settled.height > 1;
+    });
     evidence.toolbar = await page.getByRole("toolbar", { name: /그리기 옵션/u }).innerText();
     await page.screenshot({ path: join(output, "02-applied-canvas.png") });
   });
@@ -152,6 +168,8 @@ try {
     await client.detach();
     await page.mouse.move(5, 5);
     committedRegion = await page.screenshot({ clip: strokeRegion });
+    writeFileSync(join(output, "blank-ink-region.png"), blankRegion);
+    writeFileSync(join(output, "committed-ink-region.png"), committedRegion);
     evidence.committedInkPixels = changedPixels(blankRegion, committedRegion);
     assert.ok(Number(evidence.committedInkPixels) > 200, "Native material input left no visible ink");
     await page.screenshot({ path: join(output, "03-committed-stroke.png") });
@@ -179,14 +197,23 @@ try {
     await page.mouse.move(5, 5);
     let restored: Buffer | undefined;
     let restoredDifference = Number.POSITIVE_INFINITY;
+    let restoredRelativeInkError = Number.POSITIVE_INFINITY;
     for (let attempt = 0; attempt < 24; attempt += 1) {
+      const recovery = page.getByRole("button", { name: "복구하기", exact: true });
+      if (await recovery.isVisible()) {
+        evidence.usedRecoveryAction = true;
+        await recovery.click();
+      }
       restored = await page.screenshot({ clip: strokeRegion });
       restoredDifference = changedPixels(committedRegion!, restored);
-      if (restoredDifference <= Number(evidence.committedInkPixels) * 0.03) break;
+      restoredRelativeInkError = relativeInkDifference(blankRegion!, committedRegion!, restored);
+      // Scaled native and reopened Canvas edges may antialias differently; compare actual ink mass.
+      if (restoredRelativeInkError <= 0.03) break;
       await page.waitForTimeout(300);
     }
     evidence.reopenedDifferencePixels = restoredDifference;
-    assert.ok(restoredDifference <= Number(evidence.committedInkPixels) * 0.03, "Durable material data exists but the reopened canvas did not restore its visible ink");
+    evidence.reopenedRelativeInkError = restoredRelativeInkError;
+    assert.ok(restoredRelativeInkError <= 0.03, "Durable material data exists but the reopened canvas did not restore its visible ink");
     writeFileSync(join(output, "reopened-ink-region.png"), restored!);
     await page.screenshot({ path: join(output, "04-reopened-stroke.png") });
   });
