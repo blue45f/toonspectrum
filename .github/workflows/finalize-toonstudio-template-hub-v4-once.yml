@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: finalize-toonstudio-pr-1326
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   integrate-validate-commit:
@@ -74,6 +74,75 @@ jobs:
 
           python scripts/maintenance/finalize-toonstudio-pr-1326.py
 
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          document_store = Path(
+              "apps/web/src/domains/creator/studio-project-document-store.ts"
+          )
+          source = document_store.read_text()
+          start = source.index("const KIND_WORKSPACES")
+          end = source.index("\n\nconst PROJECT_DEFAULT_DOCUMENT", start)
+          block = '''const workspaceList = (
+            ...workspaces: StudioDocumentWorkspace[]
+          ): readonly StudioDocumentWorkspace[] => Object.freeze(workspaces);
+
+          const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, readonly StudioDocumentWorkspace[]>> = Object.freeze({
+            webtoon: workspaceList("comic", "draw", "image", "localization", "review"),
+            illustration: workspaceList("draw", "image", "review"),
+            image: workspaceList("image", "draw", "review"),
+            design: workspaceList("design", "image", "slides", "review"),
+            slides: workspaceList("slides", "design", "review"),
+            storyboard: workspaceList("storyboard", "draw", "motion", "review"),
+            whiteboard: workspaceList("whiteboard", "design", "review"),
+            "three-d": workspaceList("3d", "image", "review"),
+            animation: workspaceList("animation", "motion", "audio", "review"),
+            motion: workspaceList("motion", "audio", "review"),
+            audio: workspaceList("audio", "motion", "review"),
+            localization: workspaceList("localization", "review"),
+          });'''
+          block = "\n".join(line[10:] if line.startswith("          ") else line for line in block.splitlines())
+          source = source[:start] + block + source[end:]
+          source = source.replace(
+              "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = KIND_WORKSPACES[input.kind];",
+              "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];",
+          )
+          document_store.write_text(source)
+
+          replacement = (
+              'buttonClass({ variant: "outline", size: "sm", '
+              'className: "border-danger/50 text-danger hover:border-danger '
+              'hover:bg-danger-soft/25 hover:text-danger" })'
+          )
+          targets = (
+              Path("apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"),
+              Path("apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"),
+          )
+          total = 0
+          pattern = re.compile(
+              r'buttonClass\(\{\s*variant:\s*"danger",\s*size:\s*"sm"\s*\}\)'
+          )
+          for path in targets:
+              text = path.read_text()
+              text, count = pattern.subn(replacement, text)
+              total += count
+              if 'variant: "danger"' in text:
+                  raise SystemExit(f"{path}: unsupported danger variant remains")
+              path.write_text(text)
+          if total != 3:
+              raise SystemExit(f"expected three danger replacements, found {total}")
+          PY
+
+          grep -q 'const workspaceList' \
+            apps/web/src/domains/creator/studio-project-document-store.ts
+          if grep -R 'variant: "danger"' \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx; then
+            echo "Unsupported danger variant remains" >&2
+            exit 1
+          fi
+
           rm -f \
             apps/web/src/domains/creator/studio-project-template-catalog.ts \
             apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
@@ -100,7 +169,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Normalize product sources
+      - name: Normalize and lint product sources
         shell: bash
         run: |
           set -euo pipefail
@@ -122,6 +191,20 @@ jobs:
             apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/app/routes/groups/creator-route-pages.ts \
+            apps/web/src/app/routes/groups/creator.routes.tsx \
+            apps/web/src/domains/creator/studio-route-registry.ts \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-document-store.ts \
+            apps/web/src/domains/creator/studio-project-library-store.ts \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
             apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
             apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
           git diff --check
