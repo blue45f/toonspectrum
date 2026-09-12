@@ -4,6 +4,8 @@ import {
   studioProductionLifecycleKey,
 } from "../studio-production/studio-production-scope";
 import {
+  STUDIO_DRAFT_CANVAS_PATHNAME,
+  STUDIO_HOME_PATHNAME,
   parseStudioWorkspaceRoute,
   studioWorkspaceCanonicalHref,
   studioWorkspaceDocumentIdentity,
@@ -361,7 +363,7 @@ function resolveCanonicalPublish(
     if (params.has("remix")) {
       return invalidResolution(pathname, search, "identity-conflict");
     }
-    const legacyIdentity = parseStudioWorkspaceRoute({ pathname: "/studio", search });
+    const legacyIdentity = parseStudioWorkspaceRoute({ pathname: STUDIO_DRAFT_CANVAS_PATHNAME, search });
     if (!legacyIdentity.valid) {
       return invalidResolution(pathname, search, legacyIdentity);
     }
@@ -515,7 +517,7 @@ function resolveStoryworld(
   if (segments === null) return invalidResolution(pathname, search, "invalid-path");
   let probePathname: string;
   if (segments.length === 2 && segments[1] === "storyworld") {
-    probePathname = "/studio";
+    probePathname = STUDIO_DRAFT_CANVAS_PATHNAME;
   } else if (
     segments.length === 4
     && (segments[1] === "work" || segments[1] === "remix")
@@ -665,7 +667,13 @@ export function resolveStudioRoute({
   const workScopedPlaceholder = resolveWorkScopedPlaceholder(pathname, search);
   if (workScopedPlaceholder !== null) return workScopedPlaceholder;
 
-  const workspaceRoute = parseStudioWorkspaceRoute({ pathname, search });
+  // Keep bare /studio owned by the home page, but preserve legacy editor identities.
+  const params = queryParams(search);
+  const workspacePathname = pathname === STUDIO_HOME_PATHNAME
+    && ["id", "remix", "mode"].some((key) => params.has(key))
+    ? STUDIO_DRAFT_CANVAS_PATHNAME
+    : pathname;
+  const workspaceRoute = parseStudioWorkspaceRoute({ pathname: workspacePathname, search });
   if (!workspaceRoute.valid) return invalidResolution(pathname, search, workspaceRoute);
   if (workspaceRoute.presentation === "publish") {
     const canonicalPathname = publishPathname(workspaceRoute.workId);

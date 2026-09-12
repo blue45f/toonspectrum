@@ -16,6 +16,18 @@ function job(name) {
 // This is a minimum protected set, not an exact total. Additional coverage is
 // welcome; deleting or moving a protected suite requires an explicit review.
 const requiredRegressions = Object.freeze([
+  "apps/web/src/domains/creator/studio-workspace-route.test.ts",
+  "apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts",
+  "apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx",
+  "apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts",
+  "apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx",
+  "apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx",
+  "apps/web/src/domains/creator/studio-batch-rename.test.ts",
+  "apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx",
+  "apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts",
+  "apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx",
   "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
   "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
   "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
