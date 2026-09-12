@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { createStudioBg3dTextureFixture } from "../../../../../../scripts/lib/studio-bg3d-texture-fixture";
+
 import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_PROFILE,
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
@@ -23,6 +25,7 @@ import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import { preflightStudioBg3dBabylonTextures } from "./studio-bg3d-babylon-texture-preflight";
 
 import type { StudioBg3dBabylonSpecialistExecutionContext } from "./studio-bg3d-babylon-specialist-runtime";
 import type {
@@ -781,7 +784,7 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       },
     ))).rejects.toMatchObject({ code: "unsupported-scene-feature" });
 
-    const unbudgetedTexture = createGlb({
+    const invalidTextureView = createGlb({
       asset: { version: "2.0" },
       images: [{ bufferView: 0, mimeType: "image/png" }],
       textures: [{ source: 0 }],
@@ -791,11 +794,36 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
     await expect(execute(context(
       artifactRequest([{ kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE }]),
       {
-        assets: [runtimeAsset(unbudgetedTexture)],
-        document: modelDocument(unbudgetedTexture),
+        assets: [runtimeAsset(invalidTextureView)],
+        document: modelDocument(invalidTextureView),
       },
-    ))).rejects.toMatchObject({ code: "unsupported-scene-feature" });
+    ))).rejects.toMatchObject({ code: "unsafe-glb" });
     expect(render).not.toHaveBeenCalled();
+  });
+
+  it("admits attested embedded PNG bytes and bounds all placed texture instances before import", async () => {
+    const { bytes } = createStudioBg3dTextureFixture();
+    const render = vi.fn(async (_context, plan: StudioBg3dBabylonCapturePlan) => {
+      expect(plan.assets[0]!.bytes).not.toBe(bytes);
+      expect(plan.assets[0]!.bytes).toEqual(bytes);
+      expect(plan.assets[0]!.footprint.textures).toBe(1);
+      expect(plan.assets[0]!.texturePlan.textureBytes).toBe(256);
+      return { rgba: new Uint8Array(16) };
+    });
+    const execute = createStudioBg3dBabylonCaptureExecutor(render);
+    const document = modelDocument(bytes);
+    await execute(context(artifactRequest([{ kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE }]), {
+      document, assets: [runtimeAsset(bytes)],
+    }));
+    expect(render).toHaveBeenCalledOnce();
+    const overBudget = normalizeStudioBg3dSceneDocument({ ...document,
+      nodes: [...document.nodes, { ...document.nodes[0], id: "model-2" }],
+      budgets: { ...document.budgets, textures: { ...document.budgets.textures, maxTotalBytes: 300 } },
+    });
+    await expect(execute(context(artifactRequest([{ kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE }]), {
+      document: overBudget, assets: [runtimeAsset(bytes)],
+    }))).rejects.toMatchObject({ code: "resource-budget-exceeded" });
+    expect(render).toHaveBeenCalledOnce();
   });
 
   it("propagates abort without invoking the renderer", async () => {
@@ -814,6 +842,74 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
 });
 
 describe("Studio Babylon bounded GLB import boundary", () => {
+  it.each(["valid", "generated mips", "different dimensions", "different mips", "unknown binding", "missing texture", "unbound texture"] as const)(
+    "checks decoded textures against their PNG envelope: %s", async (scenario) => {
+      const fixture = triangleImportFixture();
+      const { bytes, root } = createStudioBg3dTextureFixture({ minFilter: scenario === "generated mips" ? 9984 : 9728 });
+      const texturePlan = preflightStudioBg3dBabylonTextures(bytes, root);
+      const texture = disposableResource({
+        _internalMetadata: { gltf: { pointers: [scenario === "unknown binding" ? "/materials/5/baseColorTexture" : "/materials/0/baseColorTexture"] } },
+        isCube: false,
+        getSize: () => ({ width: scenario === "different dimensions" ? 2 : 4, height: 4 }),
+        getInternalTexture: () => ({ depth: 1, generateMipMaps: scenario === "different mips" || scenario === "generated mips", mipLevelCount: 1, is3D: false }),
+      });
+      Object.assign(fixture.material, {
+        _internalMetadata: { gltf: { pointers: ["/materials/0"] } },
+        albedoTexture: scenario === "missing texture" || scenario === "unbound texture" ? null : texture,
+      });
+      const pending = runStudioBg3dBabylonBoundedImport({
+        bytes, texturePlan, budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        name: "texture-envelope.glb", scene: fixture.scene, signal: new AbortController().signal,
+        preflight: preflight({ accessorElements: 6, decodedGeometryBytes: 42, drawCalls: 1, materials: 1,
+          nodes: 1, triangles: 1, textures: 1 }),
+        importMesh: async () => {
+          fixture.attach();
+          if (scenario !== "missing texture") fixture.scene.textures.push(texture as unknown as Scene["textures"][number]);
+          return fixture.imported;
+        },
+      });
+      if (scenario === "valid" || scenario === "generated mips") {
+        const result = await pending;
+        expect(result.receipt).toMatchObject({ textures: 1, textureBytes: scenario === "generated mips" ? 336 : 256, maxTextureDimension: 4 });
+        expect(texture.dispose).not.toHaveBeenCalled();
+      } else {
+        await expect(pending).rejects.toMatchObject({ code: "resource-budget-exceeded" });
+        expect(texture.dispose).toHaveBeenCalledTimes(scenario === "missing texture" ? 0 : 1);
+        expect(fixture.mesh.dispose).toHaveBeenCalledOnce();
+        expect(fixture.material.dispose).toHaveBeenCalledOnce();
+      }
+    },
+  );
+  it("does not require an unused scene's planned material texture", async () => {
+    const [{ NullEngine }, { Scene: BabylonScene }] = await Promise.all([
+      import("@babylonjs/core/Engines/nullEngine"), import("@babylonjs/core/scene"),
+    ]);
+    const { bytes, root } = createStudioBg3dTextureFixture({ mutate(root) {
+      (root.materials as unknown[]).push({ alphaMode: "OPAQUE", pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1] } });
+      const meshes = root.meshes as { primitives: Record<string, unknown>[] }[];
+      meshes.push({ primitives: [{ ...meshes[0]!.primitives[0], material: 1 }] });
+      (root.nodes as unknown[]).push({ mesh: 1 });
+      (root.scenes as unknown[]).push({ nodes: [1] });
+      root.scene = 1;
+    } });
+    const engine = new NullEngine();
+    const scene = new BabylonScene(engine);
+    try {
+      const texturePlan = preflightStudioBg3dBabylonTextures(bytes, root);
+      expect(texturePlan.bindings).toHaveLength(1);
+      const result = await runStudioBg3dBabylonBoundedImport({
+        bytes, texturePlan, budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        name: "unused-material.glb", scene, signal: new AbortController().signal,
+        preflight: await admittedFootprint(bytes),
+      });
+      expect(result.receipt.textures).toBe(0);
+      expect(result.receipt.materials).toBe(1);
+      expect(scene.materials[0]?._internalMetadata.gltf.pointers).toContain("/materials/1");
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  });
   it("measures and admits a real Babylon 9.19 GLB scene delta", async () => {
     const [{ NullEngine }, { Scene: BabylonScene }] = await Promise.all([
       import("@babylonjs/core/Engines/nullEngine"),

@@ -37,6 +37,7 @@ import {
 } from "../apps/web/src/domains/creator/bg3d/studio-bg3d-scene-document";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { runStudioBg3dTextureGpuProof } from "./lib/studio-bg3d-texture-gpu-proof";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -3217,6 +3218,11 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
       switch (shard) {
         case "babylon-artifact-parity":
           await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+          await runStudioBg3dTextureGpuProof(webGpuPage, rootUrl, {
+            three: new URL(`assets/${findProductionAssetFile(THREE_MODULE_FILE_PATTERN, "Three module")}`, rootUrl).href,
+            gltfLoader: new URL(`assets/${findProductionAssetFile(/^GLTFLoader-[A-Za-z0-9_-]+\.js$/u, "GLTFLoader")}`, rootUrl).href,
+            babylon: new URL(`assets/${findBabylonSpecialistEntryFile()}`, rootUrl).href,
+          });
           break;
         case "magic-layer-alignment":
           await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);

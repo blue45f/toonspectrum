@@ -171,6 +171,14 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts \
             apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts \
+            apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts \
+            apps/web/src/app/studio-cross-origin-isolation.test.ts \
             scripts/verify-studio-3d-console.test.ts
       - name: Production menu entry point regressions
         run: pnpm exec vitest run scripts/verify-studio-menus.test.ts

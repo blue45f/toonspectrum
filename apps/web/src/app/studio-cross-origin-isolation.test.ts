@@ -29,6 +29,13 @@ function sessionStorageFixture() {
 }
 
 describe("Studio cross-origin isolation headers", () => {
+  it.each([
+    "/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.ts",
+    "/assets/studio-character-shaper-psd.worker-BOf9Z-eP.js",
+  ])("retains character PSD Worker COEP admission on a service-worker refetch of %s", (url) => {
+    expect(isStudioCrossOriginIsolationWorkerRequest({ url, method: "GET", secFetchDest: "empty" })).toBe(true);
+  });
+
   it("uses the isolated document contract without weakening the public-site popup policy", () => {
     expect(STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS).toEqual({
       "Cross-Origin-Opener-Policy": "same-origin",

@@ -64,6 +64,11 @@ import {
   StudioBg3dBabylonStableIdCaptureError,
   type StudioBg3dBabylonStableIdRenderable,
 } from "./studio-bg3d-babylon-stable-id-capture";
+import {
+  preflightStudioBg3dBabylonTextures,
+  StudioBg3dBabylonTexturePreflightError,
+  type StudioBg3dBabylonTexturePlan,
+} from "./studio-bg3d-babylon-texture-preflight";
 import { resolveStudioBg3dCameraNearClip, resolveStudioBg3dCameraUpVector } from "./studio-bg3d-camera-orientation";
 import { parseStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 
@@ -189,6 +194,7 @@ interface StudioBg3dBabylonCaptureAsset {
   readonly bytes: Uint8Array;
   readonly footprint: GlbBudgetFootprint;
   readonly glbJson: Record<string, unknown>;
+  readonly texturePlan: StudioBg3dBabylonTexturePlan;
 }
 
 export type StudioBg3dBabylonMeshImporter = (
@@ -384,11 +390,6 @@ function assertOfflineCoreGlb(bytes: Uint8Array): Record<string, unknown> {
     // A verified GLB capture must be self-contained. This prevents an imported document from
     // initiating network/blob/file/data fetches from core fields or an extension payload.
     throw captureError("unsafe-glb");
-  }
-  if (recordArray(root.images).length > 0 || recordArray(root.textures).length > 0) {
-    // Texture dimensions and decoded mip allocation are not represented in the current runtime
-    // snapshot. Fail closed until those post-parse metrics are carried across the trust boundary.
-    throw captureError("unsupported-scene-feature");
   }
   return root;
 }
@@ -669,6 +670,17 @@ function assertPreParseBudgets(
   }
   const complexity = document.budgets.complexity;
   const textures = document.budgets.textures;
+  let textureBytes = 0;
+  for (const node of document.nodes) {
+    if (node.kind !== "model") continue;
+    const plan = assetById.get(node.attachmentId)!.texturePlan;
+    textureBytes = safeAdd(textureBytes, plan.textureBytes);
+    if (plan.maxDimension > textures.maxDimension || textureBytes > textures.maxTotalBytes) {
+      throw captureError("resource-budget-exceeded");
+    }
+    if (plan.textureInstances > 0 && node.materialOverride?.opacityMultiplier !== undefined
+      && node.materialOverride.opacityMultiplier !== 1) throw captureError("unsupported-scene-feature");
+  }
   if (
     totals.nodes > complexity.maxNodes ||
     totals.triangles > complexity.maxTriangles ||
@@ -761,12 +773,20 @@ function admitCaptureAssets(
     }
     const ownedBytes = Uint8Array.from(bytes);
     const glbJson = assertOfflineCoreGlb(ownedBytes);
-    const footprint = glbBudgetFootprint(glbJson);
+    let texturePlan: StudioBg3dBabylonTexturePlan;
+    try {
+      texturePlan = preflightStudioBg3dBabylonTextures(ownedBytes, glbJson);
+    } catch (error) {
+      if (error instanceof StudioBg3dBabylonTexturePreflightError) throw captureError(error.code, error);
+      throw error;
+    }
+    const footprint = Object.freeze({ ...glbBudgetFootprint(glbJson), textures: texturePlan.textureInstances });
     admitted.set(asset.attachmentId, Object.freeze({
       attachmentId: asset.attachmentId,
       bytes: ownedBytes,
       footprint,
       glbJson,
+      texturePlan,
     }));
   }
   if (
@@ -1163,6 +1183,7 @@ export interface RunStudioBg3dBabylonBoundedImportInput {
   readonly importMesh?: StudioBg3dBabylonMeshImporter;
   readonly name: string;
   readonly preflight: GlbBudgetFootprint;
+  readonly texturePlan?: StudioBg3dBabylonTexturePlan;
   readonly scene: Scene;
   readonly signal: AbortSignal;
 }
@@ -1643,9 +1664,11 @@ function textureMipReceipt(texture: BaseTexture): {
   const computedMipLevels = internal.generateMipMaps
     ? Math.floor(Math.log2(maxDimension)) + 1
     : 1;
-  const mipLevels = internal.mipLevelCount > 0
+  // Babylon WebGL keeps mipLevelCount at its default 1 even after generateMipmap allocates
+  // the whole chain. Never let that metadata undercount generated GPU texture storage.
+  const mipLevels = Math.max(computedMipLevels, internal.mipLevelCount > 0
     ? safePostParseCount(internal.mipLevelCount)
-    : computedMipLevels;
+    : 1);
   if (mipLevels < 1 || mipLevels > MAX_BABYLON_TEXTURE_MIP_LEVELS) {
     throw captureError("resource-budget-exceeded");
   }
@@ -2023,6 +2046,43 @@ export async function runStudioBg3dBabylonBoundedImport(
       imported,
       input.preflight,
     );
+    // Only require textures for materials the loader actually created. Other glTF scenes may
+    // reference additional materials, but a loaded base-color binding must never become white
+    // silently when decoding loses all (or just one) of the declared images.
+    for (const material of resources.materials) {
+      const pointers = loaderOwnedGltfPointers(material);
+      const bindings = input.texturePlan?.bindings.filter((binding) =>
+        pointers.includes(binding.pointer.split("/").slice(0, 3).join("/")),
+      ) ?? [];
+      for (const binding of bindings) {
+        const albedo = (material as PBRMaterial).albedoTexture;
+        if (!albedo || !resources.textures.has(albedo)
+          || !loaderOwnedGltfPointers(albedo).includes(binding.pointer)) {
+          throw captureError("resource-budget-exceeded");
+        }
+      }
+    }
+    if (resources.textures.size > 0) {
+      const plan = input.texturePlan;
+      if (!plan || receipt.textureBytes > plan.textureBytes) throw captureError("resource-budget-exceeded");
+      const uses = new Map<string, number>();
+      for (const texture of resources.textures) {
+        const pointers = loaderOwnedGltfPointers(texture);
+        const candidates = plan.bindings.filter((binding) => pointers.includes(binding.pointer));
+        if (candidates.length !== 1) throw captureError("resource-budget-exceeded");
+        const binding = candidates[0]!;
+        const size = texture.getSize();
+        const internal = texture.getInternalTexture();
+        const mip = textureMipReceipt(texture);
+        const instances = (uses.get(binding.pointer) ?? 0) + 1;
+        uses.set(binding.pointer, instances);
+        if (size.width !== binding.width || size.height !== binding.height
+          || mip.mipLevels !== binding.mipLevels || instances > binding.maxInstances
+          || texture.isCube || internal?.is3D || (internal?.depth ?? 0) > 1) {
+          throw captureError("resource-budget-exceeded");
+        }
+      }
+    }
     assertStudioBg3dBabylonPostParseReceipt(
       receipt,
       input.preflight,
@@ -2430,6 +2490,7 @@ async function populateScene(
       budgets: plan.document.budgets,
       name: `${asset.attachmentId}.glb`,
       preflight: asset.footprint,
+      texturePlan: asset.texturePlan,
       scene,
       signal: context.signal,
     });

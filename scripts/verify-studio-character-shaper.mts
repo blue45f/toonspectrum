@@ -13,7 +13,7 @@ import { type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readPsd } from "ag-psd";
+import { initializeCanvas, readPsd, type Layer } from "ag-psd";
 import { chromium, type Browser, type Download, type Page } from "playwright";
 
 import {
@@ -253,6 +253,60 @@ async function downloadedPngStats(page: Page, path: string) {
   }, readFileSync(path).toString("base64"));
 }
 
+/** Compare real decoded export pixels, ignoring undefined straight RGB at alpha zero. */
+async function comparePngWithPsdBeauty(page: Page, path: string, rgba: Uint8ClampedArray | Uint8Array, width: number, height: number) {
+  return page.evaluate(async ({ encodedPng, encodedBeauty, width, height }) => {
+    const png = await fetch(`data:image/png;base64,${encodedPng}`);
+    const bitmap = await createImageBitmap(await png.blob());
+    const canvas = new OffscreenCanvas(width, height);
+    try {
+      if (bitmap.width !== width || bitmap.height !== height) throw new Error("PNG and PSD Beauty dimensions differ");
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("2D context unavailable");
+      context.drawImage(bitmap, 0, 0);
+      const pngRgba = context.getImageData(0, 0, width, height).data;
+      const beauty = new Uint8Array(await (await fetch(`data:application/octet-stream;base64,${encodedBeauty}`)).arrayBuffer());
+      if (beauty.byteLength !== pngRgba.byteLength) throw new Error("PSD Beauty pixel storage does not cover the PNG frame");
+      let alphaSum = 0;
+      let maxAlpha = 0;
+      let blackSum = 0;
+      let whiteSum = 0;
+      let maxBlack = 0;
+      let maxWhite = 0;
+      let blackOverFour = 0;
+      let whiteOverFour = 0;
+      for (let offset = 0; offset < beauty.length; offset += 4) {
+        const beautyAlpha = beauty[offset + 3];
+        const pngAlpha = pngRgba[offset + 3];
+        const alphaDelta = Math.abs(beautyAlpha - pngAlpha);
+        alphaSum += alphaDelta;
+        maxAlpha = Math.max(maxAlpha, alphaDelta);
+        for (let channel = 0; channel < 3; channel += 1) {
+          const beautyPremultiplied = beauty[offset + channel] * beautyAlpha / 255;
+          const pngPremultiplied = pngRgba[offset + channel] * pngAlpha / 255;
+          const black = Math.abs(beautyPremultiplied - pngPremultiplied);
+          const white = Math.abs((beautyPremultiplied + 255 - beautyAlpha) - (pngPremultiplied + 255 - pngAlpha));
+          blackSum += black;
+          whiteSum += white;
+          maxBlack = Math.max(maxBlack, black);
+          maxWhite = Math.max(maxWhite, white);
+          if (black > 4) blackOverFour += 1;
+          if (white > 4) whiteOverFour += 1;
+        }
+      }
+      const pixels = width * height;
+      return { width, height, pixels, meanAlpha: alphaSum / pixels, maxAlpha,
+        black: { meanComposite: blackSum / (pixels * 3), maxComposite: maxBlack, overFourShare: blackOverFour / (pixels * 3) },
+        white: { meanComposite: whiteSum / (pixels * 3), maxComposite: maxWhite, overFourShare: whiteOverFour / (pixels * 3) } };
+    } finally {
+      bitmap.close();
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  }, { encodedPng: readFileSync(path).toString("base64"),
+    encodedBeauty: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength).toString("base64"), width, height });
+}
+
 async function openShaper(page: Page, origin: string): Promise<void> {
   await page.goto(`${origin}/studio/character`, { waitUntil: "domcontentloaded", timeout: 180_000 });
   await page.waitForSelector(DIALOG, { timeout: 300_000 });
@@ -272,6 +326,7 @@ async function main(): Promise<void> {
   }
   const browser: Browser = await chromium.launch(launchOptions());
   const evidence: Record<string, unknown> = {
+    status: "running",
     origin, capturedAt: new Date().toISOString(),
     browserVersion: browser.version(), browserLaunch: launchOptions(),
   };
@@ -282,6 +337,11 @@ async function main(): Promise<void> {
       try { localStorage.setItem(q, "1"); localStorage.setItem(m, "1"); } catch { /* ignore */ }
     }, [QUICKSTART_KEY, MOBILE_HINT_KEY]);
     const page = await ctx.newPage();
+    const psdWorkerUrls: string[] = [];
+    evidence.psdWorkerUrls = psdWorkerUrls;
+    page.on("worker", (worker) => {
+      if (worker.url().includes("character-shaper-psd.worker")) psdWorkerUrls.push(worker.url());
+    });
     const consoleErrors: string[] = [];
     evidence.consoleErrors = consoleErrors;
     page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message}`));
@@ -379,8 +439,49 @@ async function main(): Promise<void> {
         + `(transparent ${pngAlpha.transparentShare.toFixed(3)}, opaque ${pngAlpha.opaqueShare.toFixed(3)})`,
     );
 
-    // The advertised 4K option must produce actual decoded 4096px content, at the same aspect.
+    // Cancel through the real DOM handler after rendering has started and before the final tile.
+    // A MutationObserver catches the actual progress paint without adding artificial GPU delays.
     await resolution.selectOption("4096");
+    const cancelledDownloads: string[] = [];
+    const onCancelledDownload = (download: Download) => cancelledDownloads.push(download.suggestedFilename());
+    page.on("download", onCancelledDownload);
+    await page.evaluate(() => {
+      const report = { progress: null as number | null, requested: false, expired: false };
+      Object.assign(window, { __characterCaptureCancellation: report });
+      const observer = new MutationObserver(() => {
+        const status = [...document.querySelectorAll('[data-character-shaper="true"] [role="status"]')]
+          .map((element) => element.textContent ?? "").join(" ");
+        const match = /PNG 이미지 만드는 중 · (\d+)%/u.exec(status);
+        const percentage = match ? Number(match[1]) : 0;
+        if (percentage <= 0 || percentage >= 100) return;
+        const cancel = [...document.querySelectorAll<HTMLButtonElement>('[data-character-shaper="true"] button')]
+          .find((button) => button.textContent?.includes("취소") && !button.disabled);
+        if (!cancel) return;
+        report.progress = percentage;
+        report.requested = true;
+        observer.disconnect();
+        clearTimeout(timeout);
+        cancel.click();
+      });
+      const timeout = setTimeout(() => { observer.disconnect(); report.expired = true; }, 30_000);
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+    await pngButton.click();
+    try {
+      await page.getByRole("status").filter({ hasText: "내보내기를 취소했습니다." }).waitFor({ timeout: 35_000 });
+      const cancellation = await page.evaluate(() => (window as unknown as {
+        __characterCaptureCancellation: { progress: number | null; requested: boolean; expired: boolean };
+      }).__characterCaptureCancellation);
+      invariant(cancellation.requested && !cancellation.expired && cancellation.progress !== null
+        && cancellation.progress > 0 && cancellation.progress < 100, "4K rendering did not expose a cancellable progress paint");
+      invariant(cancelledDownloads.length === 0, "A cancelled raster capture downloaded a file");
+      invariant(await pngButton.isEnabled(), "Raster cancellation did not release the editor capture lock");
+      evidence.pngRenderingCancellation = { ...cancellation, downloads: cancelledDownloads.length, lockReleased: true };
+    } finally {
+      page.off("download", onCancelledDownload);
+    }
+
+    // A complete retry must still produce actual decoded 4096px pixels at the same aspect.
     const png4kDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await pngButton.click();
     const png4kDownload = await Promise.race([
@@ -404,17 +505,75 @@ async function main(): Promise<void> {
     const psdButton = page.getByRole("button", { name: /PSD/ }).first();
     const downloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await psdButton.click();
-    const download: Download = await downloadPromise;
+    const psdFailure = page.getByRole("status").filter({ hasText: "PSD를 내보내지 못했습니다." });
+    const download: Download = await Promise.race([
+      downloadPromise,
+      psdFailure.waitFor({ state: "visible", timeout: 120_000 }).then(async () => {
+        const detail = await psdFailure.textContent();
+        evidence.psdFailure = detail;
+        throw new Error(`PSD export failed: ${detail}`);
+      }),
+    ]);
     const psdPath = join(OUT_DIR, "character-export.psd");
     await download.saveAs(psdPath);
-    const psd = readPsd(readFileSync(psdPath), { skipLayerImageData: true, skipCompositeImageData: true, skipThumbnail: true });
+    initializeCanvas(() => { throw new Error("PSD evidence must decode into raw pixels"); }, (width, height) => ({
+      width, height, colorSpace: "srgb", data: new Uint8ClampedArray(width * height * 4),
+    }));
+    const psd = readPsd(readFileSync(psdPath), { useImageData: true, skipThumbnail: true });
+    invariant(Boolean(psd.imageData), "PSD has no merged image for file previews");
+    const composite = psd.imageData!;
+    let visibleCompositePixels = 0;
+    let transparentCompositePixels = 0;
+    let coloredCompositePixels = 0;
+    for (let offset = 0; offset < composite.data.length; offset += 4) {
+      if (composite.data[offset + 3] === 0) transparentCompositePixels += 1;
+      else {
+        visibleCompositePixels += 1;
+        if (Math.max(composite.data[offset], composite.data[offset + 1], composite.data[offset + 2]) > 20) coloredCompositePixels += 1;
+      }
+    }
+    const compositePixelCount = psd.width * psd.height;
+    evidence.psdComposite = { visiblePixels: visibleCompositePixels, transparentPixels: transparentCompositePixels,
+      coloredPixels: coloredCompositePixels, pixelCount: compositePixelCount };
+    invariant(visibleCompositePixels > compositePixelCount * 0.01 && transparentCompositePixels > compositePixelCount * 0.1
+      && coloredCompositePixels > visibleCompositePixels * 0.1, "PSD merged preview is blank, black, or lost the transparent ground");
     const layerNames: string[] = [];
-    const walk = (children: typeof psd.children) => children?.forEach((c) => { layerNames.push(c.name ?? "?"); walk(c.children); });
+    const rasterLayers: { name: string; visiblePixels: number }[] = [];
+    const beautyLayers: Layer[] = [];
+    const walk = (children: typeof psd.children) => children?.forEach((c) => {
+      layerNames.push(c.name ?? "?");
+      if (c.name === "미리보기 (Beauty)") beautyLayers.push(c);
+      if (c.imageData) {
+        let visiblePixels = 0;
+        for (let index = 3; index < c.imageData.data.length; index += 4) {
+          if (c.imageData.data[index] > 0) visiblePixels += 1;
+        }
+        rasterLayers.push({ name: c.name ?? "?", visiblePixels });
+      }
+      walk(c.children);
+    });
     walk(psd.children);
     evidence.psdLayers = layerNames;
     evidence.psdDimensions = { width: psd.width, height: psd.height };
-    invariant(psd.width === pngAlpha.width && psd.height === pngAlpha.height, "PSD and PNG must preserve the same composition at 2048 px");
+    evidence.psdRasterLayers = rasterLayers;
+    evidence.psdWorkerUrls = psdWorkerUrls;
+    invariant(psd.width === pngAlpha.width && psd.height === pngAlpha.height, "PSD and PNG must preserve the same dimensions at 2048 px");
+    invariant(beautyLayers.length === 1 && beautyLayers[0]!.hidden === true, "PSD must contain one hidden Beauty reference layer");
+    const beautyLayer = beautyLayers[0]!;
+    const beauty = beautyLayer.imageData;
+    if (!beauty || !(beauty.data instanceof Uint8ClampedArray || beauty.data instanceof Uint8Array)) {
+      throw new Error("PSD Beauty layer has no decoded RGBA8 pixels");
+    }
+    invariant(beauty.width === psd.width && beauty.height === psd.height
+      && beautyLayer.left === 0 && beautyLayer.top === 0, "PSD Beauty layer changed its frame dimensions or offset");
+    const composition = await comparePngWithPsdBeauty(page, pngPath, beauty.data, psd.width, psd.height);
+    evidence.psdPngComposition = composition;
+    invariant(composition.meanAlpha <= 0.1 && [composition.black, composition.white].every((background) =>
+      background.meanComposite <= 0.25 && background.overFourShare <= 0.001),
+    `PSD Beauty and 2048 PNG composition differ: ${JSON.stringify(composition)}`);
     invariant(layerNames.length >= 8, `PSD has too few layers: ${layerNames.join(", ")}`);
+    invariant(rasterLayers.length >= 5 && rasterLayers.every((layer) => layer.visiblePixels > 0), "PSD contains missing or empty raster layers");
+    invariant(psdWorkerUrls.length === 1, "PSD export did not execute exactly one dedicated assembly Worker");
     invariant(await pngButton.isEnabled(), "export did not release the editor capture lock");
 
     // Esc 순서 — 서랍이 열려 있으면 Esc는 서랍만 닫는다. 첫 Esc에 작업 전체가 닫히면
@@ -467,9 +626,11 @@ async function main(): Promise<void> {
     evidence.mobileWidths = [390, 320];
     invariant(consoleErrors.length === 0, `character workflow page errors: ${consoleErrors.join("; ")}`);
     evidence.consoleErrors = consoleErrors;
+    evidence.status = "passed";
     writeFileSync(RESULT_PATH, JSON.stringify(evidence, null, 2));
     console.log(`character shaper evidence → ${RESULT_PATH}`);
   } finally {
+    if (evidence.status !== "passed") evidence.status = "failed";
     writeFileSync(RESULT_PATH, JSON.stringify(evidence, null, 2));
     for (const context of browser.contexts()) {
       await context.pages()[0]?.screenshot({ path: join(OUT_DIR, `character-final-${context.pages()[0]?.viewportSize()?.width}.png`) }).catch(() => undefined);
