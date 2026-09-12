@@ -37,8 +37,8 @@ initializeCanvas(
   }),
 );
 
-const WIDTH = 2;
-const HEIGHT = 2;
+const WIDTH = 4;
+const HEIGHT = 1;
 const PIXELS = WIDTH * HEIGHT;
 
 type MToonLike = THREE.MeshStandardMaterial & {
@@ -759,7 +759,7 @@ describe("character shaper semantic PSD", () => {
     expect(() => buildCharacterSemanticPsd(
       [
         pass("flat", FLAT.slice()),
-        { id: "mask-skin", width: 4, height: 1, rgba: new Uint8ClampedArray(16).fill(255) },
+        { id: "mask-skin", width: 4, height: 2, rgba: new Uint8ClampedArray(32).fill(255) },
       ],
       [],
       { title: "크기 불일치" },

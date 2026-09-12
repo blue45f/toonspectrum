@@ -2,6 +2,9 @@ import type { CharacterPsdExportReceipt, CharacterSemanticPass, CharacterSemanti
 import type { CharacterSemanticSkip } from "./character-shaper-psd-assembly";
 
 export const CHARACTER_PSD_WORKER_VERSION = 1;
+// ag-psd's composite RLE scratch allocation truncates width-1 RGB and width-1/2 RGBA.
+// Keep admission independent of an alpha scan and refuse both narrow widths consistently.
+export const CHARACTER_PSD_MIN_WIDTH = 3;
 export const CHARACTER_PSD_MAX_EDGE = 2048;
 export const CHARACTER_PSD_MAX_PASSES = 14;
 /** 14 RGBA8 passes at 2K; assembly temporaries and the PSD writer are additional Worker memory. */
@@ -37,8 +40,8 @@ function object(value: unknown): value is Record<string, unknown> {
 function keys(value: Record<string, unknown>, expected: readonly string[]): boolean {
   return Object.keys(value).length === expected.length && expected.every((key) => Object.hasOwn(value, key));
 }
-function dimension(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= CHARACTER_PSD_MAX_EDGE;
+function dimension(value: unknown, minimum = 1): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum && value <= CHARACTER_PSD_MAX_EDGE;
 }
 function requestId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
@@ -74,6 +77,7 @@ export function validateCharacterPsdPasses(
       || raw.rgba.byteLength !== raw.width * raw.height * 4) {
       throw new TypeError("PSD 렌더 패스 저장소가 올바르지 않습니다.");
     }
+    if (raw.width < CHARACTER_PSD_MIN_WIDTH) throw new RangeError("PSD의 가로 크기는 3픽셀 이상이어야 합니다.");
     if (seen.size === 0) { width = raw.width; height = raw.height; }
     if (raw.width !== width || raw.height !== height) throw new TypeError("렌더 패스 크기가 서로 달라 PSD를 만들 수 없습니다.");
     seen.add(raw.id);
@@ -109,7 +113,7 @@ export function isCharacterPsdWorkerResponse(value: unknown): value is Character
       || value.blob.size < 40 || value.blob.size > CHARACTER_PSD_MAX_OUTPUT_BYTES) return false;
     const receipt = value.receipt;
     return object(receipt) && keys(receipt, ["width", "height", "layerNames", "skipped", "byteLength"])
-      && dimension(receipt.width) && dimension(receipt.height) && receipt.byteLength === value.blob.size
+      && dimension(receipt.width, CHARACTER_PSD_MIN_WIDTH) && dimension(receipt.height) && receipt.byteLength === value.blob.size
       && Array.isArray(receipt.layerNames) && receipt.layerNames.length >= 1 && receipt.layerNames.length <= 32
       && receipt.layerNames.every((name: unknown) => typeof name === "string" && name.length >= 1 && name.length <= 128)
       && validSkipped(receipt.skipped);
@@ -118,7 +122,7 @@ export function isCharacterPsdWorkerResponse(value: unknown): value is Character
 
 /** PSD v1, RGB, 8-bit channels; dimensions must match the admitted capture, not only the receipt. */
 export function isCharacterPsdHeader(bytes: Uint8Array, width: number, height: number): boolean {
-  if (bytes.byteLength < 26) return false;
+  if (!dimension(width, CHARACTER_PSD_MIN_WIDTH) || !dimension(height) || bytes.byteLength < 26) return false;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return view.getUint32(0) === 0x38425053 && view.getUint16(4) === 1
     && bytes.subarray(6, 12).every((byte) => byte === 0)
