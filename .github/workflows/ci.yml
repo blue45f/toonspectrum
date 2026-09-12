@@ -115,7 +115,8 @@ jobs:
             apps/api/src/session-middleware.test.ts \
             apps/api/src/config/security-headers.test.ts \
             apps/api/src/config/cors.test.ts \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
+            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
       - name: Material brush execution and saved recipe regressions
         run: pnpm run test:studio-material-brush
       - name: Non-3D Studio editing and export regressions

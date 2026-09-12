@@ -14,5 +14,6 @@
   "apps/api/src/config/security-headers.test.ts",
   "apps/api/src/config/cors.test.ts",
   "apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts",
-  "apps/api/src/modules/catalog/catalog-search-cache.test.ts"
+  "apps/api/src/modules/catalog/catalog-search-cache.test.ts",
+  "apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts"
 ]

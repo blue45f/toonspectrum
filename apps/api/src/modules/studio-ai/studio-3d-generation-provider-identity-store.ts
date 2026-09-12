@@ -1,12 +1,15 @@
+import { Logger } from "@nestjs/common";
+import { Pool } from "pg";
+
+import {
+  normalizePgConnectionStringForTls,
+  observePgPoolIdleErrors,
+} from "../../db/pg-connection";
+
 export interface Studio3dGenerationProviderIdentityStore {
   put(jobId: string, sealedIdentity: string, updatedAtMs: number): Promise<void>;
   get(jobId: string): Promise<string | undefined>;
   delete(jobId: string): Promise<void>;
-}
-
-interface PostgresSql {
-  unsafe(query: string, parameters?: readonly unknown[]): Promise<readonly Record<string, unknown>[]>;
-  end(options?: { readonly timeout?: number }): Promise<void>;
 }
 
 export class InMemoryStudio3dGenerationProviderIdentityStore
@@ -30,49 +33,52 @@ export class InMemoryStudio3dGenerationProviderIdentityStore
 export class PostgresStudio3dGenerationProviderIdentityStore
   implements Studio3dGenerationProviderIdentityStore
 {
-  readonly #clientPromise: Promise<PostgresSql>;
+  readonly #pool: Pool;
   #bootstrapPromise?: Promise<void>;
+  #closePromise?: Promise<void>;
 
   constructor(connectionString: string) {
     const url = connectionString.trim();
     if (!url) throw new TypeError("DATABASE_URL is required for 3D provider identity storage.");
-    this.#clientPromise = this.#createClient(url);
-  }
-
-  async #createClient(connectionString: string): Promise<PostgresSql> {
-    const moduleName = "postgres";
-    const imported = (await import(moduleName)) as Record<string, unknown>;
-    const factory = (imported.default ?? imported) as (
-      url: string,
-      options: Readonly<Record<string, unknown>>,
-    ) => PostgresSql;
-    if (typeof factory !== "function") throw new TypeError("The postgres driver did not expose a client factory.");
-    return factory(connectionString, {
+    const normalized = normalizePgConnectionStringForTls(url);
+    // Use the declared, statically traceable driver shared by the durable job store.
+    // Pool construction does not connect or execute DDL during unrelated Studio reads.
+    this.#pool = new Pool({
+      connectionString: normalized,
       max: 2,
-      idle_timeout: 20,
-      connect_timeout: 15,
-      prepare: false,
+      idleTimeoutMillis: 20_000,
+      connectionTimeoutMillis: 15_000,
+      allowExitOnIdle: true,
+    });
+    observePgPoolIdleErrors(this.#pool, {
+      connectionString: normalized,
+      logger: new Logger("Studio3dGenerationProviderIdentityStore"),
     });
   }
 
-  async #client(): Promise<PostgresSql> {
-    const client = await this.#clientPromise;
+  async #client(): Promise<Pool> {
+    if (this.#closePromise) throw new Error("3D provider identity storage is closed.");
     if (!this.#bootstrapPromise) {
-      this.#bootstrapPromise = client.unsafe(`
+      this.#bootstrapPromise = this.#pool.query(`
         CREATE TABLE IF NOT EXISTS studio_3d_generation_provider_identities (
           job_id text PRIMARY KEY,
           sealed_identity text NOT NULL,
           updated_at_ms bigint NOT NULL
         )
-      `).then(() => undefined);
+      `).then(() => undefined).catch((error: unknown) => {
+        // A transient database outage must not permanently poison this warm instance.
+        this.#bootstrapPromise = undefined;
+        throw error;
+      });
     }
     await this.#bootstrapPromise;
-    return client;
+    if (this.#closePromise) throw new Error("3D provider identity storage is closed.");
+    return this.#pool;
   }
 
   async put(jobId: string, sealedIdentity: string, updatedAtMs: number): Promise<void> {
     if (!jobId.trim() || !sealedIdentity.trim()) throw new TypeError("3D provider identity record is invalid.");
-    await (await this.#client()).unsafe(
+    await (await this.#client()).query(
       `INSERT INTO studio_3d_generation_provider_identities (job_id, sealed_identity, updated_at_ms)
        VALUES ($1, $2, $3)
        ON CONFLICT (job_id) DO UPDATE SET
@@ -83,7 +89,7 @@ export class PostgresStudio3dGenerationProviderIdentityStore
   }
 
   async get(jobId: string): Promise<string | undefined> {
-    const rows = await (await this.#client()).unsafe(
+    const { rows } = await (await this.#client()).query<{ sealed_identity: unknown }>(
       `SELECT sealed_identity
        FROM studio_3d_generation_provider_identities
        WHERE job_id = $1
@@ -95,13 +101,15 @@ export class PostgresStudio3dGenerationProviderIdentityStore
   }
 
   async delete(jobId: string): Promise<void> {
-    await (await this.#client()).unsafe(
+    await (await this.#client()).query(
       "DELETE FROM studio_3d_generation_provider_identities WHERE job_id = $1",
       [jobId],
     );
   }
 
-  async close(): Promise<void> {
-    await (await this.#clientPromise).end({ timeout: 5 });
+  close(): Promise<void> {
+    // Closing an unused store never bootstraps its table; shutdown is idempotent.
+    if (!this.#closePromise) this.#closePromise = this.#pool.end();
+    return this.#closePromise;
   }
 }
