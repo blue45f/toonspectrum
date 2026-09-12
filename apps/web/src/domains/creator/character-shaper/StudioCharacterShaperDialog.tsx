@@ -23,6 +23,7 @@ import {
   pushCharacterShaperKeyLayer,
   reduceCharacterShaperUiState,
 } from "./character-shaper-ui-model";
+import { CharacterShaperCameraControls } from "./CharacterShaperCameraControls";
 import { CharacterShaperInspector } from "./CharacterShaperInspector";
 import { CharacterShaperMobileSheet } from "./CharacterShaperMobileSheet";
 import { CharacterShaperOutputDock } from "./CharacterShaperOutputDock";
@@ -404,8 +405,9 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     </p>
   ) : null;
 
-  const renderViewport = (className?: string) => (
-    <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, className)}>
+  const renderViewport = (className?: string) => {
+    const viewport = (
+    <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, layout === "mobile" ? "flex-1" : className)}>
       <StudioVrmPoserViewport h={h} presentation="shaper" />
       <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} />
       {paintActive ? (
@@ -456,7 +458,14 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         </aside>
       ) : null}
     </div>
-  );
+    );
+    return layout === "mobile" ? (
+      <div className={cn("flex min-h-0 min-w-0 flex-col bg-card", className)}>
+        <CharacterShaperCameraControls h={h} compact />
+        {viewport}
+      </div>
+    ) : viewport;
+  };
 
   const dock = (
     <CharacterShaperOutputDock

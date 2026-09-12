@@ -137,6 +137,12 @@ jobs:
             apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx \
             apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-raster-capture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
             scripts/verify-studio-3d-console.test.ts
 
   serial:

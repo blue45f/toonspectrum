@@ -202,6 +202,14 @@ async function mobileChromeBounds(page: Page, exportOpen: boolean) {
     if (!exportOpen && !root.querySelector("[data-character-quality-launcher] [data-character-quality-trigger]")) {
       violations.push("mobile quality launcher must be in the sheet header");
     }
+    const cameraBar = root.querySelector<HTMLElement>("[data-character-shaper-camera-bar]");
+    const sceneCanvas = root.querySelector<HTMLCanvasElement>("[data-character-shaper-viewport] canvas");
+    const barBounds = cameraBar?.getBoundingClientRect();
+    const canvasBounds = sceneCanvas?.getBoundingClientRect();
+    if (!barBounds || !canvasBounds) violations.push("mobile camera controls or scene canvas missing");
+    else if (barBounds.bottom > canvasBounds.top + 0.5) {
+      violations.push("camera controls cover the character canvas");
+    }
     const sheet = root.querySelector<HTMLElement>("[data-character-export-sheet]");
     if (exportOpen) {
       if (!sheet) violations.push("export sheet missing");
@@ -214,7 +222,7 @@ async function mobileChromeBounds(page: Page, exportOpen: boolean) {
         if (!help || help.scrollWidth > help.clientWidth + 1) violations.push("export resolution help is clipped");
       }
     }
-    return { width: innerWidth, exportOpen, controls, violations };
+    return { width: innerWidth, exportOpen, controls, cameraBarBottom: barBounds?.bottom, canvasTop: canvasBounds?.top, canvasHeight: canvasBounds?.height, violations };
   }, { dialogSelector: DIALOG, exportOpen });
 }
 
@@ -311,14 +319,25 @@ async function main(): Promise<void> {
 
     const railTop = page.locator(RAIL).filter({ hasText: "상의" }).first();
     await railTop.click();
-    const topCard = page.locator(`${GRID}:not([aria-disabled="true"])`).nth(1);
+    const topCard = page.locator(`${GRID}[data-character-slot-card="top:tshirt"]`);
+    invariant(await topCard.count() === 0, "unreviewed procedural garments must not be offered by default");
+    await page.getByRole("button", { name: "실험 의상 표시", exact: true }).click();
     await topCard.click();
+    evidence.experimentalGarmentOptIn = true;
     await page.waitForTimeout(4_000);
     await page.screenshot({ path: join(OUT_DIR, "character-desktop-top.png") });
     const afterTop = await viewportStats(page);
     evidence.topPeakTileDelta = peakTileDelta(afterHair, afterTop);
     const peak = Math.max(peakTileDelta(before, afterHair), peakTileDelta(afterHair, afterTop));
     invariant(peak > 2, `committing hair and top did not change the rendered frame (peak tile delta ${peak.toFixed(2)})`);
+
+    // Preserve a real experimental garment artifact above, then explicitly restore the native
+    // outfit/hair for publication output. Opt-in geometry is not a curated asset-quality receipt.
+    await page.locator(`${GRID}[data-character-slot-card="top:original"]`).click();
+    await railHair.click();
+    await page.locator(`${GRID}[data-character-slot-card="hair:original"]`).click();
+    await page.waitForTimeout(2_000);
+    evidence.publicationAppearance = "native-model-outfit-and-hair";
 
     const railPose = page.locator(RAIL).filter({ hasText: "포즈" }).first();
     await railPose.click();
@@ -342,7 +361,7 @@ async function main(): Promise<void> {
     await pngButton.click();
     const pngDownload: Download = await Promise.race([
       pngDownloadPromise,
-      page.getByText("PNG를 저장하지 못했습니다.", { exact: true }).waitFor({ state: "visible", timeout: 120_000 })
+      page.getByRole("status").filter({ hasText: "PNG를 저장하지 못했습니다." }).waitFor({ state: "visible", timeout: 120_000 })
         .then(async () => { throw new Error(`PNG export failed: ${await page.locator(DIALOG).innerText()}`); }),
     ]);
     const pngPath = join(OUT_DIR, "character-export.png");
@@ -364,7 +383,11 @@ async function main(): Promise<void> {
     await resolution.selectOption("4096");
     const png4kDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await pngButton.click();
-    const png4kDownload = await png4kDownloadPromise;
+    const png4kDownload = await Promise.race([
+      png4kDownloadPromise,
+      page.getByRole("status").filter({ hasText: "PNG를 저장하지 못했습니다." }).waitFor({ state: "visible", timeout: 120_000 })
+        .then(async () => { throw new Error(`4K PNG export failed: ${await page.locator(DIALOG).innerText()}`); }),
+    ]);
     const png4kPath = join(OUT_DIR, "character-export-4096.png");
     await png4kDownload.saveAs(png4kPath);
     const png4k = await downloadedPngStats(page, png4kPath);

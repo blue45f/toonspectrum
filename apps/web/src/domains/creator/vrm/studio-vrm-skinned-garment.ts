@@ -329,7 +329,12 @@ export function planStudioVrmGarmentSkinInfluences(
     return normalizeInfluences(influences, main);
   }
 
-  const previousWeight = previous && availableBones.has(previous)
+  // The sleeve's proximal ring belongs to the upper arm. Pinning that whole ring to the
+  // clavicle freezes its T-pose silhouette when the arm lowers; the separate yoke owns the
+  // torso-to-arm transition. Anatomical ranges distinguish generated sleeves from generic parts.
+  const upperArmSleeve = part.skinJointRange
+    && (main === "leftUpperArm" || main === "rightUpperArm");
+  const previousWeight = previous && availableBones.has(previous) && !upperArmSleeve
     ? 1 - smoothstep(0.02, 0.28, t)
     : 0;
   const nextWeight = next && availableBones.has(next)

@@ -135,8 +135,13 @@ interface FramingProfileResult {
   readonly failures: readonly string[];
 }
 
-async function compareCompositedFrames(page: Page, left: Buffer, right: Buffer): Promise<number> {
-  return page.evaluate(async ([leftUrl, rightUrl]) => {
+interface FramingFrame {
+  readonly png: Buffer;
+  readonly controls: readonly { x: number; y: number; width: number; height: number }[];
+}
+
+async function compareCompositedFrames(page: Page, left: FramingFrame, right: FramingFrame): Promise<number> {
+  return page.evaluate(async ({ leftUrl, rightUrl, controls }) => {
     const pixels = async (url: string) => {
       const bitmap = await createImageBitmap(await (await fetch(url)).blob());
       const canvas = document.createElement("canvas");
@@ -152,14 +157,29 @@ async function compareCompositedFrames(page: Page, left: Buffer, right: Buffer):
     if (first.width !== second.width || first.height !== second.height) {
       throw new Error("Camera command changed the canvas dimensions during the comparison");
     }
+    // Element screenshots include overlaid DOM controls. Undo correctly enables Redo, whose
+    // large mobile button otherwise looks like a camera regression. Compare only scene pixels.
+    const excluded = new Uint8Array(first.width * first.height);
+    for (const rect of controls) {
+      const x0 = Math.max(0, Math.floor(rect.x * first.width));
+      const x1 = Math.min(first.width, Math.ceil((rect.x + rect.width) * first.width));
+      const y0 = Math.max(0, Math.floor(rect.y * first.height));
+      const y1 = Math.min(first.height, Math.ceil((rect.y + rect.height) * first.height));
+      for (let y = y0; y < y1; y += 1) excluded.fill(1, y * first.width + x0, y * first.width + x1);
+    }
     let delta = 0;
+    let compared = 0;
     for (let index = 0; index < first.data.length; index += 4) {
+      if (excluded[index / 4]) continue;
+      compared += 1;
       delta += Math.abs(first.data[index] - second.data[index]);
       delta += Math.abs(first.data[index + 1] - second.data[index + 1]);
       delta += Math.abs(first.data[index + 2] - second.data[index + 2]);
     }
-    return delta / (first.width * first.height * 3);
-  }, [left, right].map((buffer) => `data:image/png;base64,${buffer.toString("base64")}`));
+    if (compared < first.width * first.height * 0.2) throw new Error("Too little unobscured scene remains for a camera comparison");
+    return delta / (compared * 3);
+  }, { leftUrl: `data:image/png;base64,${left.png.toString("base64")}`,
+    rightUrl: `data:image/png;base64,${right.png.toString("base64")}`, controls: [...left.controls, ...right.controls] });
 }
 
 /** Fresh contexts preserve the original in-app profiles' scene, selection, scroll and tab state. */
@@ -206,11 +226,18 @@ async function verifyFramingProfile(
     await reset.click();
     const viewport = page.getByTestId("studio-bg3d-viewport");
     const canvas = dialog.locator("canvas").first();
-    const capture = async (phase: string): Promise<Buffer> => {
+    const capture = async (phase: string): Promise<FramingFrame> => {
       await viewport.scrollIntoViewIfNeeded();
       await page.mouse.move(0, 0);
       await page.waitForTimeout(1_000);
-      return canvas.screenshot({ path: join(SCRATCH, `${profile.id}-${phase}.png`), type: "png" });
+      const controls = await canvas.evaluate((element) => {
+        const area = element.getBoundingClientRect();
+        return [...document.querySelectorAll('button, [role="tablist"]')].map((control) => control.getBoundingClientRect())
+          .filter((rect) => rect.width > 0 && rect.height > 0 && rect.right > area.left && rect.left < area.right && rect.bottom > area.top && rect.top < area.bottom)
+          .map((rect) => ({ x: (rect.left - area.left - 6) / area.width, y: (rect.top - area.top - 6) / area.height,
+            width: (rect.width + 12) / area.width, height: (rect.height + 12) / area.height }));
+      });
+      return { png: await canvas.screenshot({ path: join(SCRATCH, `${profile.id}-${phase}.png`), type: "png" }), controls };
     };
     const baseline = await capture("before-fit");
     await dialog.getByRole("button", { name: "선택 객체 화면 맞춤", exact: true }).click();
