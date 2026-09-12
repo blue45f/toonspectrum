@@ -111,6 +111,14 @@ describe("Brush Studio V6 quality authority", () => {
     expect(optimized.input.transport).toBe("move-coalesced");
   });
 
+  it("falls back from explicitly selected unavailable input transports", () => {
+    const raw = patchBrushStudioV6Input(createBrushStudioV6Program(), { transport: "raw-coalesced" });
+    const basic = optimizeBrushStudioV6Program(raw, { ...BRUSH_STUDIO_V6_FULL_CAPABILITIES, pointerRawUpdate: false, coalescedEvents: false });
+    expect(basic.input.transport).toBe("move-basic");
+    const withoutSharedMemory = optimizeBrushStudioV6Program(raw, { ...BRUSH_STUDIO_V6_FULL_CAPABILITIES, sharedArrayBuffer: false });
+    expect(withoutSharedMemory.input.transport).toBe("raw-coalesced");
+  });
+
   it("downgrades unverified Mixbox to Spectral during optimization", () => {
     const mixbox = replaceBrushStudioV6Slot(createBrushStudioV6Program(), "pigment", "pigment-mixbox");
     expect(optimizeBrushStudioV6Program(mixbox, BRUSH_STUDIO_V6_FULL_CAPABILITIES).slots.pigment).toBe("pigment-spectral");

@@ -1,3 +1,5 @@
+import { brushStudioV6MaterialMarksToSvg } from "../brush-lab/brush-studio-v6-material-engine";
+import { planStudioMaterialBrush } from "../brush/studio-material-brush-runtime";
 import {
   mapStudioBrushAliasPressure,
   resolveStudioBrushAliasPencilPasses,
@@ -240,6 +242,10 @@ export function serializeFreehand(
   causalCoverageMarks?: readonly StudioDynamicBrushCoverageMark[],
   dynamicMaterialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): string {
+  if (el.brushEnginePrograms?.material && el.mode !== "eraser") {
+    const marks = planStudioMaterialBrush({ ...el, points, stroke, strokeWidth, opacity: strokeOpacity });
+    return `<g data-brush-engine="material-contact-v1">${brushStudioV6MaterialMarksToSvg(marks)}</g>`;
+  }
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
   // Mirrors StudioDrawNode's engine decision exactly (shared captured resolver, no fallback).

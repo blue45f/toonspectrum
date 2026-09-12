@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 
 import {
   StudioLiveRetainedMediaOverlayRenderer,
@@ -38,6 +40,7 @@ function mockCanvas(width = 256, height = 128) {
   let fillCalls = 0;
   let drawImageCalls = 0;
   const paintColors: string[] = [];
+  const transforms: number[][] = [];
   const context = {
     canvas: { width, height },
     globalAlpha: 1,
@@ -53,6 +56,12 @@ function mockCanvas(width = 256, height = 128) {
     closePath() {},
     moveTo() {},
     lineTo() {},
+    translate() {},
+    rotate() {},
+    ellipse() {},
+    roundRect() {},
+    fillRect() { fillCalls += 1; },
+    transform(...values: number[]) { transforms.push(values); },
     arc() {},
     fill() {
       fillCalls += 1;
@@ -84,6 +93,7 @@ function mockCanvas(width = 256, height = 128) {
     canvas,
     context,
     paintColors,
+    transforms,
     stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls, drawImageCalls }),
   };
 }
@@ -153,6 +163,22 @@ describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
 });
 
 describe("StudioLiveRetainedMediaOverlayRenderer", () => {
+  it("owns material symmetry natively and transforms the completed nib contacts", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program("natural-calligraphy"));
+    const element = drawElement("material-mirror", "pencil", [20, 30, 40, 30], {
+      brush: "brush", strokeWidth: brush.strokeWidth, stroke: brush.color,
+      brushEnginePrograms: brush.enginePrograms!,
+      symmetry: { type: "vertical", centerX: 100, centerY: 0 },
+    });
+    const { renderer, active } = attachedRenderer();
+    expect(studioLiveRetainedMediaOverlaySupportsElement(element)).toBe(true);
+    expect(renderer.begin(element)).toEqual({ status: "started", kind: "material" });
+    expect(active.transforms).toContainEqual([1, 0, 0, 1, 0, 0]);
+    expect(active.transforms).toContainEqual([-1, 0, 0, 1, 200, 0]);
+    expect(active.stats().fillCalls).toBeGreaterThan(0);
+    expect(renderer.end(element)).toEqual({ status: "settled" });
+  });
+
   it("distinguishes rejected sources from an unavailable selected surface", () => {
     const detached = new StudioLiveRetainedMediaOverlayRenderer();
     expect(detached.begin(drawElement("detached", "pencil", [12, 20]))).toEqual({

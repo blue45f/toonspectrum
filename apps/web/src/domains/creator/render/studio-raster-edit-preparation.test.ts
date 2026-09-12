@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
+import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
+import { studioMaterialBrushBounds } from "../brush/studio-material-brush-runtime";
 
 import {
   prepareStudioVectorReferenceExport,
@@ -344,6 +347,20 @@ describe("editable raster copy planning", () => {
       unsupportedVisibleCount: 1,
       hasPageBackground: true,
     });
+  });
+
+  it("keeps the complete mirrored particle fringe in raster preparation bounds", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program("kaleido-swarm"));
+    const element: Extract<El, { type: "draw" }> = {
+      id: "material-particle", type: "draw", kind: "freehand", mode: "pen", brush: "brush",
+      points: [100, 100], pressures: [1], stroke: brush.color, strokeWidth: brush.strokeWidth,
+      opacity: 1, brushEnginePrograms: brush.enginePrograms!,
+      symmetry: { type: "vertical", centerX: 160, centerY: 0 },
+    };
+    const expected = studioMaterialBrushBounds(element)!;
+    const summary = summarizeStudioRasterPreparationSources({ width: 320, height: 480, elements: [element] });
+    expect(summary.sourceBounds).toEqual(expected);
+    expect(expected.width).toBeGreaterThan(120 + brush.strokeWidth);
   });
 
   it("censuses freehand, smart shape, frame, text, bubble and linked 3D preview in one z-order", () => {

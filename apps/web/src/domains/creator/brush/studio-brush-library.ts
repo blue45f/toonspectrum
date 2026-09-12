@@ -1038,6 +1038,7 @@ export function brushMatchesSnapshot(
     && brush.tipAngle === snapshot.tipAngle
     && brush.tipRoundness === snapshot.tipRoundness
     && jsonStructureEqual(brush.stampTuning, snapshot.stampTuning)
+    && jsonStructureEqual(brush.enginePrograms ?? null, snapshot.enginePrograms ?? null)
     && studioBrushDynamicsSettingsEqual(brush.brushDynamics, snapshot.brushDynamics);
 }
 
@@ -1071,6 +1072,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     tipRoundness: snapshot.tipRoundness,
     brushDynamics: snapshot.brushDynamics,
     stampTuning: snapshot.stampTuning,
+    enginePrograms: snapshot.enginePrograms,
   };
   return JSON.stringify(payload, null, 2);
 }

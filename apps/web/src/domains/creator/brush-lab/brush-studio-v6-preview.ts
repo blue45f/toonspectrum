@@ -3,6 +3,7 @@ import type {
   BrushStudioV6Program,
   BrushStudioV6TouchPolicy,
 } from "./brush-studio-v6-engine";
+import { createBrushStudioV6MaterialStroke, mapBrushStudioV6Pressure, mapBrushStudioV6Tilt, mixBrushStudioV6MaterialColors, renderBrushStudioV6MaterialMarks, type BrushStudioV6MaterialStroke } from "./brush-studio-v6-material-engine";
 
 export interface BrushStudioV6Telemetry {
   readonly pointerType: string;
@@ -42,10 +43,6 @@ export interface BrushStudioV6PointerLike {
 const PALM_AREA_THRESHOLD = 850;
 const PALM_AXIS_THRESHOLD = 38;
 
-function clamp(value: number, min = 0, max = 1): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function rng(seed: number): () => number {
   let state = seed >>> 0 || 1;
   return () => {
@@ -65,27 +62,10 @@ function rgb(hex: string): [number, number, number] {
   ];
 }
 
-function rgba(hex: string, alpha: number): string {
-  const [red, green, blue] = rgb(hex);
-  return `rgba(${red},${green},${blue},${clamp(alpha)})`;
-}
 
 export function mixPreviewPigments(first: string, second: string, weight: number): string {
-  const firstChannels = rgb(first);
-  const secondChannels = rgb(second);
-  const ratio = clamp(weight);
-  const output = firstChannels.map((channel, index) => {
-    const firstReflectance = Math.pow((channel + 12) / 267, 2.2);
-    const secondReflectance = Math.pow((secondChannels[index]! + 12) / 267, 2.2);
-    const absorption = (1 - firstReflectance) * (1 - ratio) + (1 - secondReflectance) * ratio;
-    const scattering = Math.sqrt(Math.max(0.0001, firstReflectance * secondReflectance));
-    return Math.round(
-      clamp(
-        Math.pow(clamp(1 - absorption * (0.88 + scattering * 0.25)), 1 / 2.2),
-      ) * 255,
-    );
-  });
-  return `rgba(${output[0]},${output[1]},${output[2]},1)`;
+  const [red, green, blue] = rgb(mixBrushStudioV6MaterialColors(first, second, weight));
+  return `rgba(${red},${green},${blue},1)`;
 }
 
 export function resolveBrushStudioV6LiveTransport(
@@ -143,10 +123,9 @@ export function resolveBrushStudioV6PointerIntent(
 }
 
 function fit(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
-  const rect = canvas.getBoundingClientRect();
   const devicePixelRatio = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
-  const width = Math.max(1, Math.round(rect.width * devicePixelRatio));
-  const height = Math.max(1, Math.round(rect.height * devicePixelRatio));
+  const width = Math.max(1, Math.round(canvas.clientWidth * devicePixelRatio));
+  const height = Math.max(1, Math.round(canvas.clientHeight * devicePixelRatio));
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width;
     canvas.height = height;
@@ -201,309 +180,26 @@ function clearPaper(
   context.restore();
 }
 
-type PreviewPoint = readonly [number, number, number];
-
-function pathPoints(width: number, height: number): readonly PreviewPoint[] {
-  const result: PreviewPoint[] = [];
-  for (let index = 0; index <= 100; index += 1) {
-    const progress = index / 100;
-    result.push([
-      width * (0.08 + progress * 0.84),
-      height * (0.52 + Math.sin(progress * Math.PI * 2.15) * 0.25),
-      0.12 + Math.sin(progress * Math.PI) * 0.86,
-    ]);
-  }
-  return result;
-}
-
-function lineStroke(
-  context: CanvasRenderingContext2D,
-  points: readonly PreviewPoint[],
-  program: BrushStudioV6Program,
-): void {
-  context.save();
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  const chisel = program.slots.tip === "tip-chisel-sdf";
-  const dry = program.slots.deposition === "deposit-dry";
-  const neon = program.slots.finish.includes("finish-neon");
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1]!;
-    const point = points[index]!;
-    const pressure = point[2];
-    context.beginPath();
-    context.moveTo(previous[0], previous[1]);
-    context.lineTo(point[0], point[1]);
-    context.lineWidth = program.tuning.size * (0.25 + pressure * 0.75) * (chisel ? 0.72 : 1);
-    context.strokeStyle = rgba(
-      program.tuning.primaryColor,
-      program.tuning.opacity * (dry ? 0.25 + pressure * 0.55 : 0.75),
-    );
-    if (neon) {
-      context.shadowColor = program.tuning.secondaryColor;
-      context.shadowBlur = program.tuning.size * 0.8;
-    }
-    context.stroke();
-  }
-  context.restore();
-}
-
-function grainStroke(
-  context: CanvasRenderingContext2D,
-  points: readonly PreviewPoint[],
-  program: BrushStudioV6Program,
-): void {
-  const random = rng(program.seed ^ 0x43c1);
-  context.save();
-  context.fillStyle = rgba(
-    program.tuning.primaryColor,
-    0.24 + program.tuning.granulation * 0.42,
-  );
-  const count = Math.round(500 + program.tuning.surfaceTooth * 900);
-  for (let index = 0; index < count; index += 1) {
-    const point = points[Math.floor(random() * points.length)]!;
-    const radius = program.tuning.size * (0.05 + random() * 0.15) * point[2];
-    const spread = program.tuning.size * (0.2 + program.tuning.surfaceTooth);
-    context.beginPath();
-    context.ellipse(
-      point[0] + (random() - 0.5) * spread,
-      point[1] + (random() - 0.5) * spread,
-      Math.max(0.4, radius),
-      Math.max(0.25, radius * (0.35 + random() * 0.5)),
-      random() * Math.PI,
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-  }
-  context.restore();
-}
-
-function bristleStroke(
-  context: CanvasRenderingContext2D,
-  points: readonly PreviewPoint[],
-  program: BrushStudioV6Program,
-): void {
-  const random = rng(program.seed ^ 0x717);
-  const lanes = Math.min(34, Math.max(6, Math.round(program.tuning.bristleStrands / 4)));
-  context.save();
-  context.lineCap = "round";
-  for (let lane = 0; lane < lanes; lane += 1) {
-    const offset = (lane / Math.max(1, lanes - 1) - 0.5) * program.tuning.size;
-    context.beginPath();
-    points.forEach((point, index) => {
-      const y = point[1] + offset + Math.sin(index * 0.2 + lane) * program.tuning.size * 0.035;
-      if (index === 0) context.moveTo(point[0], y);
-      else context.lineTo(point[0], y);
-    });
-    context.globalAlpha = 0.2 + random() * 0.55;
-    context.strokeStyle = lane % 4 === 0
-      ? program.tuning.secondaryColor
-      : program.tuning.primaryColor;
-    context.lineWidth = 0.45 + random() * 1.7;
-    context.stroke();
-  }
-  context.restore();
-}
-
-function particleStroke(
-  context: CanvasRenderingContext2D,
-  points: readonly PreviewPoint[],
-  program: BrushStudioV6Program,
-): void {
-  const random = rng(program.seed ^ 0x97f);
-  const count = Math.min(2_200, Math.round(program.tuning.particleCount * 0.7));
-  context.save();
-  for (let index = 0; index < count; index += 1) {
-    const point = points[Math.floor(random() * points.length)]!;
-    const angle = random() * Math.PI * 2;
-    const distance = Math.sqrt(random()) * program.tuning.size * (1 + program.tuning.patternJitter);
-    const radius = 0.35 + random() * Math.max(0.8, program.tuning.size * 0.09);
-    context.fillStyle = rgba(
-      random() > 0.8 ? program.tuning.secondaryColor : program.tuning.primaryColor,
-      0.18 + random() * 0.62,
-    );
-    context.beginPath();
-    context.arc(
-      point[0] + Math.cos(angle) * distance,
-      point[1] + Math.sin(angle) * distance + (
-        program.slots.physics.includes("physics-thin-film")
-          ? random() * program.tuning.gravity * 24
-          : 0
-      ),
-      radius,
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-  }
-  context.restore();
-}
-
-function wetStroke(
-  context: CanvasRenderingContext2D,
-  points: readonly PreviewPoint[],
-  program: BrushStudioV6Program,
-): void {
-  context.save();
-  context.globalCompositeOperation = "multiply";
-  const mixed = mixPreviewPigments(
-    program.tuning.primaryColor,
-    program.tuning.secondaryColor,
-    0.42,
-  );
-  const layers = 7 + Math.round(program.tuning.diffusion * 9);
-  for (let layer = layers; layer >= 0; layer -= 1) {
-    context.beginPath();
-    for (const [index, point] of points.entries()) {
-      const y = point[1] + Math.sin(index * 0.29 + layer) * layer * 0.22;
-      if (index === 0) context.moveTo(point[0], y);
-      else context.lineTo(point[0], y);
-    }
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.lineWidth = program.tuning.size + layer * (1.4 + program.tuning.diffusion * 2.4);
-    context.strokeStyle = layer === 0
-      ? rgba(program.tuning.primaryColor, 0.34)
-      : mixed.replace(",1)", `,${0.018 + program.tuning.wetness * 0.018})`);
-    context.stroke();
-  }
-  if (program.slots.finish.includes("finish-edge-bloom")) {
-    context.beginPath();
-    points.forEach((point, index) => {
-      if (index === 0) context.moveTo(point[0], point[1]);
-      else context.lineTo(point[0], point[1]);
-    });
-    context.lineWidth = program.tuning.size * 1.15;
-    context.strokeStyle = rgba(
-      program.tuning.primaryColor,
-      0.16 + program.tuning.edgeDarkening * 0.34,
-    );
-    context.stroke();
-  }
-  context.restore();
-}
-
-function pattern(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  program: BrushStudioV6Program,
-): void {
-  const id = program.slots.pattern;
-  if (id === "pattern-none") return;
-  const scale = Math.max(5, 13 * program.tuning.patternScale);
-  context.save();
-  context.globalAlpha = 0.22 + program.tuning.patternDensity * 0.45;
-  context.strokeStyle = program.tuning.secondaryColor;
-  context.fillStyle = program.tuning.secondaryColor;
-  context.lineWidth = 1;
-  if (id === "pattern-dot-tone") {
-    for (let y = scale / 2; y < height; y += scale) {
-      for (let x = scale / 2; x < width; x += scale) {
-        context.beginPath();
-        context.arc(x, y, 1.2 + program.tuning.patternDensity * 2.4, 0, Math.PI * 2);
-        context.fill();
-      }
-    }
-  } else if (id === "pattern-cross-hatch" || id === "pattern-weave") {
-    for (let x = -height; x < width + height; x += scale) {
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x + height, height);
-      context.stroke();
-      if (id === "pattern-weave") {
-        context.beginPath();
-        context.moveTo(x + height, 0);
-        context.lineTo(x, height);
-        context.stroke();
-      }
-    }
-  } else if (id === "pattern-brick") {
-    for (let y = 0; y < height; y += scale) {
-      for (let x = (Math.round(y / scale) % 2) * -scale; x < width; x += scale * 2) {
-        context.strokeRect(x, y, scale * 2, scale);
-      }
-    }
-  } else if (id === "pattern-kaleido") {
-    const centerX = width / 2;
-    const centerY = height / 2;
-    for (let index = 0; index < 16; index += 1) {
-      context.save();
-      context.translate(centerX, centerY);
-      context.rotate(index * Math.PI / 8);
-      context.beginPath();
-      context.moveTo(10, 0);
-      context.quadraticCurveTo(width * 0.18, -height * 0.18, width * 0.38, 0);
-      context.stroke();
-      context.restore();
-    }
-  } else {
-    const random = rng(program.seed ^ 0x7e5);
-    for (let index = 0; index < 90 * program.tuning.patternDensity; index += 1) {
-      const x = random() * width;
-      const y = random() * height;
-      context.beginPath();
-      context.ellipse(x, y, scale * 0.35, scale * 0.13, random() * Math.PI, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-  context.restore();
-}
-
 export function renderBrushStudioV6Preview(
   canvas: HTMLCanvasElement,
   program: BrushStudioV6Program,
-  options: { readonly settleProgress?: number } = {},
+  _options: { readonly settleProgress?: number } = {},
 ): void {
-  const settleProgress = clamp(options.settleProgress ?? 1);
   const context = fit(canvas);
   if (!context) return;
+  clearPaper(context, canvas, program);
   const width = canvas.clientWidth || canvas.width;
   const height = canvas.clientHeight || canvas.height;
-  clearPaper(context, canvas, program);
-  pattern(context, width, height, program);
-  const points = pathPoints(width, height);
-  if (
-    program.slots.physics.includes("physics-inkwash")
-    || program.slots.deposition === "deposit-wet"
-  ) {
-    wetStroke(context, points, program);
-  } else if (
-    program.slots.carrier === "carrier-krita-hairy"
-    || program.slots.physics.includes("physics-bristle")
-  ) {
-    bristleStroke(context, points, program);
-  } else if (
-    program.slots.carrier === "carrier-webgpu-particles"
-    || program.slots.deposition === "deposit-particles"
-  ) {
-    particleStroke(context, points, program);
-  } else {
-    lineStroke(context, points, program);
-    if (
-      program.slots.deposition === "deposit-dry"
-      || program.slots.tip === "tip-grain-exemplar"
-    ) {
-      grainStroke(context, points, program);
-    }
-  }
-  if (program.slots.physics.includes("physics-thin-film")) {
-    context.save();
-    context.strokeStyle = rgba(program.tuning.primaryColor, 0.24);
-    context.lineCap = "round";
-    for (let index = 0; index < 9; index += 1) {
-      const point = points[20 + index * 8]!;
-      context.lineWidth = Math.max(1, program.tuning.size * (0.08 + index * 0.006));
-      context.beginPath();
-      context.moveTo(point[0], point[1]);
-      context.lineTo(
-        point[0] + (index % 2 ? 3 : -2),
-        point[1] + (18 + program.tuning.gravity * 52) * settleProgress,
-      );
-      context.stroke();
-    }
-    context.restore();
+  const material = createBrushStudioV6MaterialStroke(program);
+  for (let index = 0; index <= 100; index++) {
+    const progress = index / 100;
+    renderBrushStudioV6MaterialMarks(context, material.push({
+      x: width * (0.08 + progress * 0.84),
+      y: height * (0.52 + Math.sin(progress * Math.PI * 2.15) * 0.25),
+      pressure: mapBrushStudioV6Pressure(0.12 + Math.sin(progress * Math.PI) * 0.86, program.input),
+      tilt: mapBrushStudioV6Tilt(18, program.input),
+      twist: 15,
+    }));
   }
 }
 
@@ -512,11 +208,14 @@ interface LivePoint {
   readonly y: number;
   readonly pressure: number;
   readonly tilt: number;
+  readonly twist: number;
 }
 
 interface LiveStroke {
   readonly intent: "draw" | "water";
   readonly point: LivePoint;
+  readonly material: BrushStudioV6MaterialStroke;
+  readonly program: BrushStudioV6Program;
 }
 
 function eventPoint(
@@ -525,16 +224,14 @@ function eventPoint(
   program: BrushStudioV6Program,
 ): LivePoint {
   const rect = canvas.getBoundingClientRect();
-  const rawPressure = event.pressure > 0 ? event.pressure : event.buttons ? 0.5 : 0;
-  const normalized = clamp(
-    (rawPressure - program.input.pressureOnset)
-    / Math.max(0.05, program.input.pressureSaturation - program.input.pressureOnset),
-  );
+  const rawPressure = event.pointerType === "mouse" && event.buttons ? 0.5 : event.pressure;
+  const tiltDegrees = Math.hypot(event.tiltX || 0, event.tiltY || 0);
   return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-    pressure: Math.pow(normalized, program.input.pressureGamma),
-    tilt: Math.hypot(event.tiltX || 0, event.tiltY || 0) / 90,
+    x: event.clientX - rect.left - canvas.clientLeft,
+    y: event.clientY - rect.top - canvas.clientTop,
+    pressure: mapBrushStudioV6Pressure(rawPressure, program.input),
+    tilt: mapBrushStudioV6Tilt(tiltDegrees, program.input),
+    twist: event.twist || 0,
   };
 }
 
@@ -578,52 +275,11 @@ export function attachBrushStudioV6LivePreview(
   if (context) clearPaper(context, canvas, getProgram());
   canvas.style.touchAction = "none";
 
-  const draw = (
-    from: LivePoint,
-    to: LivePoint,
-    program: BrushStudioV6Program,
-    waterOnly: boolean,
-  ): void => {
+  const draw = (stroke: LiveStroke, to: LivePoint): void => {
     const drawContext = fit(canvas);
     if (!drawContext) return;
-    const size = program.tuning.size
-      * (0.18 + to.pressure * 0.82)
-      * (1 + to.tilt * 0.55);
-    drawContext.save();
-    drawContext.lineCap = "round";
-    drawContext.lineJoin = "round";
-    drawContext.beginPath();
-    drawContext.moveTo(from.x, from.y);
-    drawContext.lineTo(to.x, to.y);
-    drawContext.lineWidth = size;
-    const wet = program.slots.physics.includes("physics-inkwash");
-    const bristle = program.slots.physics.includes("physics-bristle");
-    if (waterOnly) {
-      drawContext.globalCompositeOperation = "destination-out";
-      drawContext.globalAlpha = 0.025 + program.tuning.wetness * 0.04;
-      drawContext.strokeStyle = "#ffffff";
-    } else if (wet) {
-      drawContext.globalCompositeOperation = "multiply";
-      drawContext.globalAlpha = 0.1 + program.tuning.flow * 0.28;
-      drawContext.strokeStyle = program.tuning.primaryColor;
-      drawContext.shadowColor = program.tuning.secondaryColor;
-      drawContext.shadowBlur = size * program.tuning.diffusion * 0.65;
-    } else {
-      drawContext.globalAlpha = program.tuning.opacity * (0.32 + to.pressure * 0.68);
-      drawContext.strokeStyle = program.tuning.primaryColor;
-    }
-    drawContext.stroke();
-    if (bristle && !waterOnly) {
-      drawContext.globalAlpha *= 0.45;
-      for (let index = -3; index <= 3; index += 1) {
-        drawContext.beginPath();
-        drawContext.moveTo(from.x, from.y + index * size * 0.09);
-        drawContext.lineTo(to.x, to.y + index * size * 0.09);
-        drawContext.lineWidth = Math.max(0.5, size * 0.045);
-        drawContext.stroke();
-      }
-    }
-    drawContext.restore();
+    if (stroke.intent === "water") return;
+    renderBrushStudioV6MaterialMarks(drawContext, stroke.material.push(to));
   };
 
   const down = (event: PointerEvent): void => {
@@ -639,10 +295,10 @@ export function attachBrushStudioV6LivePreview(
       return;
     }
     canvas.setPointerCapture(event.pointerId);
-    active.set(event.pointerId, {
-      intent,
-      point: eventPoint(canvas, event, program),
-    });
+    const point = eventPoint(canvas, event, program);
+    const stroke: LiveStroke = { intent, point, program, material: createBrushStudioV6MaterialStroke(program) };
+    active.set(event.pointerId, stroke);
+    draw(stroke, point);
   };
 
   const move = (event: PointerEvent): void => {
@@ -676,8 +332,8 @@ export function attachBrushStudioV6LivePreview(
         : [event];
     let from = stroke.point;
     for (const source of sourceEvents.length > 0 ? sourceEvents : [event]) {
-      const point = eventPoint(canvas, source, program);
-      draw(from, point, program, stroke.intent === "water");
+      const point = eventPoint(canvas, source, stroke.program);
+      draw(stroke, point);
       from = point;
       samples += 1;
     }

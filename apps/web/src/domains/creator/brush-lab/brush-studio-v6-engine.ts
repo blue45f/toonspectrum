@@ -165,7 +165,11 @@ export function detectBrushStudioV6Capabilities(): BrushStudioV6Capabilities {
 export const BRUSH_STUDIO_V6_FULL_CAPABILITIES: BrushStudioV6Capabilities = Object.freeze({ webgpu: true, wasm: true, webgl2: true, sharedArrayBuffer: true, pointerRawUpdate: true, coalescedEvents: true, predictedEvents: true, pressure: true, tilt: true, twist: true, hover: true, maxTextureDimension2D: 16384, memoryBudgetMb: 2048 });
 function active(program: BrushStudioV6Program): readonly BrushStudioV6NodeDescriptor[] { return Object.freeze([program.slots.input, program.slots.motion, program.slots.carrier, program.slots.tip, program.slots.surface, program.slots.deposition, program.slots.pickup, program.slots.pigment, ...program.slots.physics, program.slots.pattern, ...program.slots.finish, program.slots.output].map(nodeFor)); }
 function capability(c: BrushStudioV6Capabilities, id: BrushStudioV6Capability): boolean { return ({ webgpu: c.webgpu, wasm: c.wasm, webgl2: c.webgl2, "shared-array-buffer": c.sharedArrayBuffer, pointerrawupdate: c.pointerRawUpdate, "coalesced-events": c.coalescedEvents, "predicted-events": c.predictedEvents, pressure: c.pressure, tilt: c.tilt, twist: c.twist, hover: c.hover })[id]; }
-function transport(program: BrushStudioV6Program, c: BrushStudioV6Capabilities): Exclude<BrushStudioV6InputTransport, "auto"> { if (program.input.transport !== "auto") return program.input.transport; return c.pointerRawUpdate && c.coalescedEvents && c.sharedArrayBuffer ? "raw-coalesced" : c.coalescedEvents ? "move-coalesced" : "move-basic"; }
+function transport(program: BrushStudioV6Program, c: BrushStudioV6Capabilities): Exclude<BrushStudioV6InputTransport, "auto"> {
+  if (program.input.transport === "move-basic") return "move-basic";
+  if (program.input.transport !== "move-coalesced" && c.pointerRawUpdate && c.coalescedEvents) return "raw-coalesced";
+  return c.coalescedEvents ? "move-coalesced" : "move-basic";
+}
 function issue(id: string, severity: BrushStudioV6IssueSeverity, title: string, detail: string, fix?: string): BrushStudioV6Issue { return Object.freeze({ id, severity, title, detail, ...(fix ? { fix } : {}) }); }
 const PHASES: readonly BrushStudioV6Phase[] = ["hover", "preview", "live", "settle", "commit", "export"];
 function passes(nodes: readonly BrushStudioV6NodeDescriptor[]): readonly BrushStudioV6ExecutionPass[] {

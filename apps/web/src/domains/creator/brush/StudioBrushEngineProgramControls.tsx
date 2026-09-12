@@ -5,6 +5,7 @@ import { ChevronDown, Gauge, Layers, RotateCcw, Sparkles } from "lucide-react";
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import type { StudioBrushRenderFamily } from "../studio-brush";
 import { StudioBrushCompositionComposer } from "./StudioBrushCompositionComposer";
+import { StudioMaterialBrushControls } from "./StudioMaterialBrushControls";
 import {
   STUDIO_BRUSH_OIL_PROGRAM_KEYS,
   STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
@@ -338,6 +339,9 @@ export function StudioBrushEngineProgramControls({
   programSet,
   onChange,
 }: StudioBrushEngineProgramControlsProps) {
+  if (programSet?.material) {
+    return <StudioMaterialBrushControls material={programSet.material} programSet={programSet} onChange={onChange} />;
+  }
   const family = resolveStudioBrushRenderFamily(brushId);
   const guide = ENGINE_FAMILY_GUIDE[family];
   return (

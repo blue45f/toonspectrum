@@ -1,0 +1,160 @@
+import { planStudioMaterialBrush, renderStudioMaterialBrushMarks, StudioMaterialBrushPlanner } from "../apps/web/src/domains/creator/brush/studio-material-brush-runtime";
+import { renderBrushStudioV6MaterialMarks } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-material-engine";
+import { createBrushStudioV6ProductBrush } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-product-bridge";
+import { exportPageToSvg } from "../apps/web/src/domains/creator/export/studio-svg-export";
+import { StudioLiveRetainedMediaOverlayRenderer } from "../apps/web/src/domains/creator/live/studio-live-retained-media-overlay";
+
+import type { BrushStudioV6Program } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-engine";
+import type { DrawEl } from "../apps/web/src/domains/creator/studio-element-model";
+
+const WIDTH = 420;
+const HEIGHT = 180;
+
+function read(canvas: HTMLCanvasElement): Uint8ClampedArray {
+  return canvas.getContext("2d")!.getImageData(0, 0, WIDTH, HEIGHT).data;
+}
+
+function difference(first: Uint8ClampedArray, second: Uint8ClampedArray) {
+  let total = 0;
+  let maximum = 0;
+  let alphaFirst = 0;
+  let alphaSecond = 0;
+  for (let index = 0; index < first.length; index += 1) {
+    const change = Math.abs(first[index]! - second[index]!);
+    maximum = Math.max(maximum, change);
+    total += change;
+    if (index % 4 === 3) { alphaFirst += first[index]!; alphaSecond += second[index]!; }
+  }
+  return { meanChannelError: total / first.length / 255, maximumChannelError: maximum,
+    relativeAlphaError: Math.abs(alphaFirst - alphaSecond) / Math.max(1, alphaFirst), alphaFirst, alphaSecond };
+}
+
+function surface(parent: HTMLElement, label: string): HTMLCanvasElement {
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+  title.textContent = label;
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+  canvas.style.cssText = `width:${WIDTH}px;height:${HEIGHT}px;display:block;background:white;outline:1px solid #cbd5e1`;
+  container.append(title, canvas);
+  parent.append(container);
+  return canvas;
+}
+
+function stroke(program: BrushStudioV6Program): DrawEl {
+  // Serialize the actual saved brush payload, not an invented material-only fixture.
+  const saved = JSON.parse(JSON.stringify(createBrushStudioV6ProductBrush(program))) as ReturnType<typeof createBrushStudioV6ProductBrush>;
+  const points: number[] = [], pressures: number[] = [], tiltXs: number[] = [], tiltYs: number[] = [], twists: number[] = [];
+  for (let index = 0; index <= 60; index += 1) {
+    const t = index / 60;
+    points.push(WIDTH * (0.08 + t * 0.84), HEIGHT * (0.52 + Math.sin(t * Math.PI * 2.15) * 0.25));
+    pressures.push(0.12 + Math.sin(t * Math.PI) * 0.86);
+    tiltXs.push(Math.round(35 * Math.sin(t * Math.PI)));
+    tiltYs.push(15);
+    twists.push(Math.round(t * 120));
+  }
+  return { id: `quality-${program.id}`, type: "draw", kind: "freehand", mode: "pen", brush: saved.brushId,
+    stroke: saved.color, strokeWidth: saved.strokeWidth, opacity: saved.brushOpacity,
+    points, pressures, tiltXs, tiltYs, twists, brushEnginePrograms: saved.enginePrograms ?? undefined };
+}
+
+function prefix(element: DrawEl, count: number): DrawEl {
+  return { ...element, points: element.points.slice(0, count * 2), pressures: element.pressures?.slice(0, count),
+    tiltXs: element.tiltXs?.slice(0, count), tiltYs: element.tiltYs?.slice(0, count), twists: element.twists?.slice(0, count) };
+}
+
+export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Program, parent: HTMLElement, symmetry?: DrawEl["symmetry"]) {
+  const failures: string[] = [];
+  const label = symmetry ? `${symmetry.type} symmetry` : "Main Studio";
+  const activeCanvas = document.createElement("canvas");
+  const settledCanvas = surface(parent, `${label} · native retained live → settled`);
+  const committedCanvas = surface(parent, `${label} · committed Canvas contacts`);
+  const exportCanvas = surface(parent, `${label} · complete SVG export decoded`);
+  const element = { ...stroke(program), ...(symmetry ? { symmetry } : {}) };
+  const overlay = new StudioLiveRetainedMediaOverlayRenderer();
+  overlay.attach({ activeCanvas, settledCanvas });
+  overlay.setSurface({ left: 0, top: 0, width: WIDTH, height: HEIGHT, documentScale: 1, documentWidth: WIDTH, flipX: false });
+  const begin = overlay.begin(prefix(element, 1));
+  if (begin.status !== "started" || begin.kind !== "material") failures.push(`${program.id}: production overlay did not select material`);
+  const appendSamplesMs: number[] = [];
+  for (let count = 2; count <= 61; count += 1) {
+    const start = performance.now();
+    const result = overlay.appendFrom(prefix(element, count));
+    appendSamplesMs.push(performance.now() - start);
+    if (result.status !== "appended" && result.status !== "noop") failures.push(`${program.id}: production append failed`);
+  }
+  const live = read(activeCanvas);
+  const end = overlay.end(element);
+  if (end.status !== "settled") failures.push(`${program.id}: production settle failed`);
+  const settled = read(settledCanvas);
+  const liveSettled = difference(live, settled);
+  if (liveSettled.maximumChannelError !== 0) failures.push(`${program.id}: live/settled native pixels differ`);
+  const context = committedCanvas.getContext("2d")!;
+  context.globalAlpha = 1;
+  const marks = planStudioMaterialBrush(element);
+  renderStudioMaterialBrushMarks(context, marks, element.symmetry);
+  const batch = read(committedCanvas);
+  const liveCommitted = difference(settled, batch);
+  if (liveCommitted.maximumChannelError !== 0) failures.push(`${program.id}: incremental/committed contacts differ`);
+  const exported = exportPageToSvg({ width: WIDTH, height: HEIGHT, bg: "transparent", elements: [element] });
+  if (!exported.svg.includes('data-brush-engine="material-contact-v1"')) failures.push(`${program.id}: document SVG bypassed material engine`);
+  if (exported.skipped.length > 0) failures.push(`${program.id}: document SVG skipped content`);
+  const image = new Image();
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exported.svg)}`;
+  await image.decode();
+  exportCanvas.getContext("2d")!.drawImage(image, 0, 0);
+  const svgPixels = difference(batch, read(exportCanvas));
+  // Browser SVG and Canvas antialias paths differ; preserve the measured error instead of claiming equality.
+  if (svgPixels.meanChannelError > 0.01 || svgPixels.relativeAlphaError > 0.04) failures.push(`${program.id}: SVG paint/alpha differs materially from committed contacts`);
+  overlay.attach(null);
+  return { failures, symmetry: symmetry ?? null, markCount: marks.length, appendSamplesMs, liveSettled, liveCommitted, svgPixels,
+    savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
+}
+
+/** Exercise production incremental planning for a long, densely sampled max-strand stroke. */
+export function verifyBrushV6LongStrokeQuality(program: BrushStudioV6Program) {
+  const maximum = { ...program, tuning: { ...program.tuning, bristleStrands: 128, spacing: 0.01, size: 26 } };
+  const element = stroke(maximum);
+  element.points = [];
+  element.pressures = [];
+  element.tiltXs = [];
+  element.tiltYs = [];
+  element.twists = [];
+  const planner = new StudioMaterialBrushPlanner();
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+  const context = canvas.getContext("2d")!;
+  const samplesMs: number[] = [];
+  let totalMarks = 0;
+  let maximumMarksPerAppend = 0;
+  for (let index = 0; index < 10_000; index += 1) {
+    // A circle avoids wraparound teleports; adjacent samples stay 0.35 document pixels apart.
+    const angle = index * (0.35 / 65);
+    element.points.push(WIDTH / 2 + Math.cos(angle) * 65, HEIGHT / 2 + Math.sin(angle) * 65);
+    element.pressures.push(0.7);
+    element.tiltXs.push(20);
+    element.tiltYs.push(10);
+    element.twists.push(0);
+    const start = performance.now();
+    const result = planner.append(element);
+    renderBrushStudioV6MaterialMarks(context, result.marks);
+    samplesMs.push(performance.now() - start);
+    totalMarks += result.marks.length;
+    maximumMarksPerAppend = Math.max(maximumMarksPerAppend, result.marks.length);
+    // Returned marks are consumed and discarded; retaining every historical array would hide a leak.
+  }
+  const windowMetrics = (start: number, end: number) => {
+    const values = samplesMs.slice(start, end).sort((first, second) => first - second);
+    return { meanMs: values.reduce((sum, value) => sum + value, 0) / values.length,
+      p95Ms: values[Math.floor(values.length * 0.95)]!, maximumMs: values.at(-1)! };
+  };
+  const early = windowMetrics(1000, 2000);
+  const late = windowMetrics(9000, 10000);
+  return { recipe: program.id, sampleCount: 10_000, spacingPx: 0.35, bristleStrands: 128,
+    totalMarks, maximumMarksPerAppend, inputNumericValueCount: element.points.length + 4 * element.pressures.length,
+    retainedOutputMarkArrays: 0, early, late, lateToEarlyMeanRatio: late.meanMs / Math.max(0.001, early.meanMs),
+    totalMs: samplesMs.reduce((sum, value) => sum + value, 0), samplesMs,
+    timingScope: "Production planner append plus Canvas2D submission; excludes physical input and GPU presentation. Counts describe held input/transient output, not heap-byte measurements." };
+}

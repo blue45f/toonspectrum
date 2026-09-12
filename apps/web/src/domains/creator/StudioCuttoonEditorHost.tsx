@@ -1,3 +1,4 @@
+import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
@@ -5362,6 +5363,8 @@ export function StudioCuttoonEditor({
       globalThis.removeEventListener("online", retryWhenOnline);
     };
   }, [initialToolOperationMemory]);
+
+  useStudioMaterialBrushRequest(location.search, applySavedBrush, announceDrawingShortcut);
 
   function applySavedBrush(saved: StudioSavedBrush) {
     brushBaselineController.select({ kind: "saved", brush: saved });
@@ -23209,17 +23212,18 @@ const puppetWarpArmed =
 
       // Compatibility boundaries are decided from the brush/document contract, not from runtime
       // failure. These booleans are mutually exclusive before a provider is touched.
-      const livingInkSelected = studioLivingInkSupportsElement(
+      const materialSelected = next.mode !== "eraser" && Boolean(next.brushEnginePrograms?.material);
+      const livingInkSelected = !materialSelected && studioLivingInkSupportsElement(
         next,
         livingInkPhysicalModeEnabled,
       );
-      const hokusaiSelected = !livingInkSelected && studioHokusaiLiveStrokeSelected(next);
+      const hokusaiSelected = !materialSelected && !livingInkSelected && studioHokusaiLiveStrokeSelected(next);
       const stampKind = resolveStudioStampBrushKind(next.brush);
-      const stampSelected = !livingInkSelected
+      const stampSelected = !materialSelected && !livingInkSelected
         && !hokusaiSelected
         && Boolean(stampKind)
         && isDirectLiveStampDraftEl(next);
-      const wetMediaSelected = !livingInkSelected
+      const wetMediaSelected = !materialSelected && !livingInkSelected
         && !hokusaiSelected
         && !stampSelected
         && !pixelDirect

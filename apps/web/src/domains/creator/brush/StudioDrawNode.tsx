@@ -1,3 +1,4 @@
+import { planStudioMaterialBrush, renderStudioMaterialBrushMarks } from "./studio-material-brush-runtime";
 import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
@@ -511,7 +512,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     : null;
   // Stamp and dynamic-dab renderers own their symmetry fan inside one bounded Shape. Do not build
   // and discard up to 64 complete transformed source-point arrays on every active-draft frame.
-  const symmetricVariations = stampBrushKind || dynamicBrushId
+  const materialOwnsSymmetry = kind === "freehand" && !isEraserOperation && Boolean(runtimeEnginePrograms?.material);
+  const symmetricVariations = materialOwnsSymmetry || stampBrushKind || dynamicBrushId
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
   // 활성 초안의 대칭 카피는 매 프레임 고정 인덱스 순서로 전부 그려지므로, 획 키 캐시가 보는
@@ -841,6 +843,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         }
 
         if (kind === "freehand") {
+          if (runtimeEnginePrograms?.material && !isEraserOperation) {
+            const marks = planStudioMaterialBrush({ ...el, points, brushEnginePrograms: runtimeEnginePrograms });
+            return <Shape key={index} listening={false}
+              sceneFunc={(context) => renderStudioMaterialBrushMarks(context._context, marks, el.symmetry)} />;
+          }
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
           const aliasProfileEnabled =
