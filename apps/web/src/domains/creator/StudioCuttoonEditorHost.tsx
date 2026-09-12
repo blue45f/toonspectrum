@@ -1,5 +1,6 @@
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
 import { useStudioAdjustmentLayerCommands } from "./useStudioAdjustmentLayerCommands";
+import { StudioColorProofProvider } from "./color/StudioColorProofContext";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
 import { useStudioRecentColors } from "./useStudioRecentColors";
@@ -29499,6 +29500,14 @@ function clearSelectionForEdit() {
 
   return (
     <StudioFilterDialogIntentContext value={preloadStudioFilterDialog}>
+      <StudioColorProofProvider page={activePage} color={color} disabled={activePageMutationLocked || masterEditMode}
+        getCurrentPage={() => (pagesHistoryRef.current[pagesHiRef.current] ?? pages).find(page => page.id === currentPageIdRef.current)}
+        capture={() => rasterExportOrchestration.handleCapturePagesForPreset("current")}
+        commitProfile={(source, colorProof) => {
+          const latest = pagesHistoryRef.current[pagesHiRef.current] ?? pages;
+          if (activePageMutationLocked || masterEditMode || currentPageIdRef.current !== source.id || latest.find(page => page.id === source.id) !== source || !markStudioDocumentChanged()) return false;
+          return commitPages(latest.map(page => page === source ? { ...page, colorProof } : page));
+        }}>
       <StudioDccWorkbenchRoute
         dccRouteAccess={hybridDccRouteAccess}
         dccRouteRequested={hybridDccRouteRequested}
@@ -29534,6 +29543,7 @@ function clearSelectionForEdit() {
           </Suspense>
         ) : null}
       </StudioDccWorkbenchRoute>
+      </StudioColorProofProvider>
     </StudioFilterDialogIntentContext>
   );
 }
