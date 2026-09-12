@@ -61,7 +61,9 @@ jobs:
         shell: bash
         run: |
           git fetch origin main
-          mapfile -t files < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.mjs')
+          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
+          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- '*.ts' '*.tsx' '*.mjs' '*.mts' > "$RUNNER_TEMP/changed-files"
+          mapfile -d '' -t files < "$RUNNER_TEMP/changed-files"
           if ((${#files[@]})); then pnpm exec eslint --max-warnings=0 "${files[@]}"; fi
 
   tests:
@@ -89,14 +91,18 @@ jobs:
         shell: bash
         run: |
           git fetch origin main
-          mapfile -t tests < <(git diff --name-only origin/main...HEAD -- 'apps/web/src/domains/creator/*.test.ts')
+          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
+          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- 'apps/web/src/domains/creator/*.test.ts' > "$RUNNER_TEMP/changed-tests"
+          mapfile -d '' -t tests < "$RUNNER_TEMP/changed-tests"
           if ((${#tests[@]})); then pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2; fi
       - name: Run UI and route tests
         if: matrix.shard == 'ui'
         shell: bash
         run: |
           git fetch origin main
-          mapfile -t tests < <(git diff --name-only origin/main...HEAD -- 'apps/web/src/**/*.test.tsx' 'apps/web/src/app/routes/**/*.test.ts')
+          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
+          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- 'apps/web/src/**/*.test.tsx' 'apps/web/src/app/routes/**/*.test.ts' > "$RUNNER_TEMP/changed-tests"
+          mapfile -d '' -t tests < "$RUNNER_TEMP/changed-tests"
           if ((${#tests[@]})); then pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2; fi
 
   build:
