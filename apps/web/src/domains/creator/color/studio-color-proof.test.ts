@@ -32,13 +32,17 @@ describe("RGB ICC product transform and persistence", () => {
     expect(result.outOfGamutPixels).toBe(1); expect(result.visiblePixels).toBe(2);
     expect([...result.gamut.slice(0, 4)]).toEqual([255, 0, 255, 1]);
     expect(result.proof[3]).toBe(1); expect([...result.target.slice(8)]).toEqual([0, 0, 0, 0]);
-    expect(input).toEqual(before); expect(result.target.slice(0, 3)).not.toEqual(input.slice(0, 3));
+    expect(input).toEqual(before);
+    // The clipped target primary is still RGB(255,0,0), but the narrower profile
+    // displays it as sRGB encode(2/3,1/6,1/6), approximately (213,113,113).
+    expect([...result.target.slice(0, 4)]).toEqual([255, 0, 0, 1]);
+    expect([...result.proof.slice(0, 3)]).toEqual([213, 113, 113]);
   });
   it("keeps original profile bytes and identity through actual project JSON and CRDT page carriers", async () => {
     const { document } = await importStudioColorProofProfile(profile(), "source.icc", true);
     const authored = { ...page, colorProof: document };
     const project = { version: 2, pagesList: [authored] };
-    const serialized = serializeStudioProjectFile(project); const decoded = parseStudioProjectFile(serialized);
+    const serialized = serializeStudioProjectFile(project); const decoded = parseStudioProjectFile(JSON.parse(serialized));
     expect(decoded.pagesList[0]!.colorProof).toEqual(document);
     const payload = studioPageToCrdtPage(authored).payload;
     expect(validateStudioCrdtPagePayload(JSON.parse(JSON.stringify(payload))).props.colorProof).toEqual(document);
