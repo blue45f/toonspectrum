@@ -47,7 +47,7 @@ describe("saved material brush preservation", () => {
     const reopened = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(project)));
     expect(reopened.pagesList[0]!.elements[0]).toEqual(element);
     const recovered = parseStudioAutosave(serializeStudioAutosave({ ...project, savedAt: "2026-09-12T00:00:00.000Z" }));
-    expect(recovered?.pagesList?.[0]?.elements[0]).toEqual(element);
+    expect(recovered?.pagesList?.[0]?.elements?.[0]).toEqual(element);
   });
 
   it("keeps paint material independent of eraser settings through tool memory reload", () => {
