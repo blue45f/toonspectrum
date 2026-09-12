@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from PIL import Image
+from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -62,8 +62,20 @@ def package(stage: Path) -> dict:
         manifest['assets'].append(row)
         by_id[identifier] = row
         added.append(identifier)
+    # The grid decodes at most 384px per image; inserting and enlarging use asset.path.
+    for row in manifest['assets']:
+        if row['kind'] == 'model':
+            continue
+        with Image.open(stage / row['path']) as decoded:
+            thumbnail = ImageOps.contain(decoded.convert('RGBA'), (384, 384), Image.Resampling.LANCZOS)
+        relative = str(Path(row['path']).parent / 'thumbnail.webp')
+        thumbnail.save(stage / relative, 'WEBP', quality=86, method=6, exact=True)
+        raw = (stage / relative).read_bytes()
+        row.update(previewPath=relative, previewWidth=thumbnail.width, previewHeight=thumbnail.height,
+                   previewBytes=len(raw), previewSha256=hashlib.sha256(raw).hexdigest())
     write_json(manifest_path, manifest)
-    report = {'addedDerivatives': added, 'independentOriginals': 0, 'resolution': [1536, 1536], 'artisticApproval': False}
+    report = {'addedDerivatives': added, 'independentOriginals': 0, 'resolution': [1536, 1536],
+              'thumbnailMaximumDimension': 384, 'artisticApproval': False}
     write_json(stage / 'derivative-packaging-report.json', report)
     return report
 
