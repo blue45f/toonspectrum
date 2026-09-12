@@ -6,34 +6,48 @@ import {
   auditBrushStudioVersionIntegration,
   brushStudioV6StorageKey,
   resolveBrushStudioRequestedRecipe,
-  resolveLegacyBrushV6RecipeId,
+  resolveProductBrushV6RecipeId,
 } from "./brush-studio-version-integration";
 
-describe("Brush Studio version integration", () => {
-  it("keeps every V5 quality catalogue entry reachable through a real V6 recipe", () => {
-    expect(BRUSH_QUALITY_CATALOG).toHaveLength(72);
+describe("Brush Studio product integration", () => {
+  it("keeps every paint product reachable through a real V6 editing recipe", () => {
+    expect(BRUSH_QUALITY_CATALOG).toHaveLength(48);
     expect(auditBrushStudioVersionIntegration()).toEqual([]);
+
     for (const entry of BRUSH_QUALITY_CATALOG) {
-      expect(BRUSH_STUDIO_V6_RECIPE_IDS).toContain(resolveLegacyBrushV6RecipeId(entry));
+      const recipeId = resolveProductBrushV6RecipeId(entry);
+      if (entry.group === "지우개") {
+        expect(recipeId, entry.id).toBeNull();
+      } else {
+        expect(BRUSH_STUDIO_V6_RECIPE_IDS, entry.id).toContain(recipeId);
+      }
     }
   });
 
-  it("applies only explicit and known recipe handoffs", () => {
+  it("applies only explicit and known product-brush handoffs", () => {
     const requested = resolveBrushStudioRequestedRecipe(
-      "?recipe=chroma-sumi&legacyBrush=living-ink&applyRecipe=1",
+      "?recipe=chroma-sumi&productBrush=ink-wash--sumi-core&applyRecipe=1",
     );
     expect(requested?.recipeId).toBe("chroma-sumi");
-    expect(requested?.legacyBrushId).toBe("living-ink");
+    expect(requested?.productBrushId).toBe("ink-wash--sumi-core");
     expect(requested?.program.schemaVersion).toBe(6);
 
-    expect(resolveBrushStudioRequestedRecipe("?recipe=chroma-sumi")).toBeNull();
-    expect(resolveBrushStudioRequestedRecipe("?recipe=missing&applyRecipe=1")).toBeNull();
-    expect(resolveBrushStudioRequestedRecipe("?recipe=clean-ink&legacyBrush=missing&applyRecipe=1"))
-      .toBeNull();
+    expect(
+      resolveBrushStudioRequestedRecipe("?recipe=chroma-sumi"),
+    ).toBeNull();
+    expect(
+      resolveBrushStudioRequestedRecipe("?recipe=missing&applyRecipe=1"),
+    ).toBeNull();
+    expect(
+      resolveBrushStudioRequestedRecipe(
+        "?recipe=clean-ink&productBrush=missing&applyRecipe=1",
+      ),
+    ).toBeNull();
   });
 
   it("keeps document/remix scopes isolated in V6 persistence", () => {
-    expect(brushStudioV6StorageKey("work:series/한글"))
-      .toBe("toonspectrum.brush-program-v6:work%3Aseries%2F%ED%95%9C%EA%B8%80");
+    expect(brushStudioV6StorageKey("work:series/한글")).toBe(
+      "toonspectrum.brush-program-v6:work%3Aseries%2F%ED%95%9C%EA%B8%80",
+    );
   });
 });

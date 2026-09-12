@@ -37,10 +37,8 @@ on:
 permissions:
   contents: read
 
-# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
-# cancel-in-progress 가 취소할 대상을 갖지 못한다 (ref 로 묶어야 같은 그룹이 된다). 이 게이트는
-# 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
-# ci.yml 은 그대로 SHA 로 묶어 둔다.
+# This non-required evidence suite keeps the latest PR/ref run; ci.yml independently
+# runs the required core validation for each active pull request or main push.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -59,18 +57,23 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Product brush taxonomy, succession and render boundary contracts
+      - name: Consolidated product catalogue and render boundary contracts
         run: |
           set -o pipefail
           mkdir -p /tmp/studio-stability-unit-evidence
           git rev-parse HEAD > /tmp/studio-stability-unit-evidence/commit.txt
           pnpm exec vitest run \
-            apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
             apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts \
             apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
             2>&1 | tee /tmp/studio-stability-unit-evidence/brush-product-contracts.log
+          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts \
+            2>&1 | tee /tmp/studio-stability-unit-evidence/brush-product-audit.log
       - name: Worker recovery, exact median pixels, texture loading and verifier regressions
         run: |
           set -o pipefail

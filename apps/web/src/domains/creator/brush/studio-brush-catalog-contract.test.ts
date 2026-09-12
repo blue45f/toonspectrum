@@ -18,6 +18,7 @@ import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
@@ -83,7 +84,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps all identities behind one searchable quick/full catalogue source", () => {
+  it("keeps the full registry internal and exposes one 48-brush product catalogue", () => {
     const counts = STUDIO_BRUSH_CATALOG_COUNTS;
     expect(counts.core).toBe(BRUSH_PRESETS.length);
     expect(counts.pro).toBe(160);
@@ -93,40 +94,43 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(counts.total);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      counts.total
+      counts.total,
     );
+
+    const productIds = new Set(
+      filterStudioBrushCatalogItems({ category: "all" }).map((item) => item.id),
+    );
+    expect(productIds.size).toBe(48);
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
-      // The eleven STUDIO_BRUSH_MATERIAL_GROUP_LABELS since #771 (c9ef0ff7) — pinned literally so a
-      // renamed or added material shows up here as a deliberate vocabulary change.
       expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
-        /^(펜·잉크|연필·흑연|마커|수채·수묵|유화·아크릴|에어브러시|목탄·파스텔|질감|망점·해칭|빛·효과|지우개)$/u
+        /^(펜·잉크|연필·흑연|마커|수채·수묵|유화·아크릴|에어브러시|목탄·파스텔|질감|망점·해칭|빛·효과|지우개)$/u,
       );
-      // V17.1 quarantined ids stay resolvable above but leave every picker listing/search —
-      // their exposure contract is asserted in the dedicated quarantine block below.
-      if (isStudioBrushQuarantinedPresetId(item.id)) continue;
+      const matches = filterStudioBrushCatalogItems({
+        category: "beginner",
+        query: item.id,
+      });
       expect(
-        filterStudioBrushCatalogItems({
-          // Exact-id search must be global even while the UI still has another category selected.
-          category: "beginner",
-          query: item.id,
-        }).some((candidate) => candidate.id === item.id),
-        `${item.id}: hidden behind category during search`
+        matches.every((candidate) => productIds.has(candidate.id)),
+        `${item.id}: search escaped the product catalogue`,
       ).toBe(true);
+      if (!productIds.has(item.id)) {
+        expect(
+          matches.some((candidate) => candidate.id === item.id),
+          `${item.id}: internal implementation became a product`,
+        ).toBe(false);
+      }
     }
-    expect(studioBrushCatalogKindLabel(
-      STUDIO_ERASER_BRUSH_CATALOG_ITEMS[0]!,
-    )).toBe("지우개");
 
     const quick = listStudioQuickBrushCatalogItems({
-      favoriteIds: ["heart-stamp"],
-      recentIds: ["hair-fiber", "pen"],
+      favoriteIds: ["gpen"],
+      recentIds: ["pencil", "pen"],
       limit: 3,
     });
     expect(quick.map(({ id, quickSource }) => [id, quickSource])).toEqual([
-      ["heart-stamp", "favorite"],
-      ["hair-fiber", "recent"],
+      ["gpen", "favorite"],
+      ["pencil", "recent"],
       ["pen", "recent"],
     ]);
   });
@@ -188,8 +192,8 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     // library and search already refuse to show.
     for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
       const quick = listStudioQuickBrushCatalogItems({
-        favoriteIds: [quarantinedId, "heart-stamp"],
-        recentIds: [quarantinedId, "pen"],
+        favoriteIds: [quarantinedId, "gpen"],
+        recentIds: [quarantinedId, "pencil"],
       });
       expect(
         quick.some((item) => item.id === quarantinedId),
@@ -205,12 +209,12 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     // A quarantined favorite/MRU entry is skipped, never a hole: listed neighbours keep their slots.
     const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
     expect(listStudioQuickBrushCatalogItems({
-      favoriteIds: [quarantinedId, "heart-stamp"],
-      recentIds: [quarantinedId, "hair-fiber", "pen"],
+      favoriteIds: [quarantinedId, "gpen"],
+      recentIds: [quarantinedId, "pencil", "pen"],
       limit: 3,
     }).map(({ id, quickSource }) => [id, quickSource])).toEqual([
-      ["heart-stamp", "favorite"],
-      ["hair-fiber", "recent"],
+      ["gpen", "favorite"],
+      ["pencil", "recent"],
       ["pen", "recent"],
     ]);
 
@@ -218,14 +222,14 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     // preserves SSOT order, so removing quarantined rows must not reorder or reshape anything.
     for (const options of [
       {},
-      { favoriteIds: ["heart-stamp"], recentIds: ["hair-fiber", "pen"] },
-      { favoriteIds: ["heart-stamp"], recentIds: ["hair-fiber", "pen"], limit: 3 },
-      { limit: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length },
+      { favoriteIds: ["gpen"], recentIds: ["pencil", "pen"] },
+      { favoriteIds: ["gpen"], recentIds: ["pencil", "pen"], limit: 3 },
+      { limit: STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length },
     ]) {
       expect(JSON.stringify(listStudioQuickBrushCatalogItems(options))).toBe(
         JSON.stringify(listStudioQuickBrushCatalogItems({
           ...options,
-          catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+          catalogItems: STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
         }))
       );
     }

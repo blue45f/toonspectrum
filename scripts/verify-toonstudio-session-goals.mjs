@@ -3,6 +3,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
+import ts from "typescript";
+
 const root = resolve(process.cwd());
 const failures = [];
 
@@ -11,7 +13,12 @@ function fail(message) {
 }
 
 function requireFile(path) {
-  if (!existsSync(resolve(root, path))) fail(`missing required file: ${path}`);
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute) || !statSync(absolute).isFile()) {
+    fail(`missing required file: ${path}`);
+  } else if (!readFileSync(absolute, "utf8").trim()) {
+    fail(`empty required file: ${path}`);
+  }
 }
 
 function requireText(path, expressions) {
@@ -22,7 +29,10 @@ function requireText(path, expressions) {
   }
   const text = readFileSync(absolute, "utf8");
   for (const expression of expressions) {
-    if (!expression.test(text)) fail(`${path} does not satisfy ${expression}`);
+    const matches = typeof expression === "string"
+      ? text.includes(expression)
+      : expression.test(text);
+    if (!matches) fail(`${path} does not satisfy ${expression}`);
   }
 }
 
@@ -36,6 +46,38 @@ function walk(directory) {
     else result.push(path);
   }
   return result;
+}
+
+// Inspect actual string/JSX content, not comments or the regular expressions
+// which enforce this policy. Unicode escapes are decoded by the TS parser.
+function copyLiterals(text, path) {
+  const tree = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
+  const values = [];
+  function visit(node) {
+    if (ts.isStringLiteralLike(node) || ts.isJsxText(node)
+      || node.kind === ts.SyntaxKind.TemplateHead
+      || node.kind === ts.SyntaxKind.TemplateMiddle
+      || node.kind === ts.SyntaxKind.TemplateTail) {
+      values.push(node.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  return values.join("\n");
+}
+
+const placeholderCopy = /coming soon|준비 중입니다/iu;
+for (const [code, expected] of [
+  ['const guard = /coming soon|준비 중입니다/iu;', false],
+  ['// coming soon\nconst label = "Ready";', false],
+  ['const label = "coming soon";', true],
+  ['const label = "coming\\u0020soon";', true],
+  ['const label = `Feature ${name}: coming soon`;', true],
+  ['const panel = <p>준비 중입니다</p>;', true],
+]) {
+  if (placeholderCopy.test(copyLiterals(code, "fixture.tsx")) !== expected) {
+    fail(`copy scanner regression: ${code}`);
+  }
 }
 
 const domainFiles = [
@@ -118,10 +160,26 @@ requireText("apps/web/src/domains/creator/studio-project-view-destinations.ts", 
   /section === "export"/u,
 ]);
 
-requireText("apps/web/src/app/routes/groups/creator.routes.tsx", [
-  /StudioProjectIntegratedPage/u,
-  /\/studio\/p\/:projectId/u,
+// The public alias is lazy-loaded. Check the complete registry -> route ->
+// integrated runtime chain rather than demanding obsolete inline URL strings.
+requireText("apps/web/src/app/routes/groups/creator-route-pages.ts", [
+  /export const StudioProjectShellPage = lazyRetry\(\s*\(\) => import\("@\/domains\/creator\/studio-shell\/StudioProjectIntegratedPage"\)\.then\(\(module\) => \(\{\s*default: module\.StudioProjectIntegratedPage,/u,
 ]);
+requireText("apps/web/src/app/routes/groups/creator.routes.tsx", [
+  'import { studioRoutePath } from "@/domains/creator/studio-route-registry";',
+  'path: studioRoutePath("project-root"), element: <Navigate to="overview" replace />',
+]);
+requireText("apps/web/src/domains/creator/studio-route-registry.ts", [
+  'route("project-root", "/studio/p/:projectId", "project", "project"',
+]);
+for (const section of ["overview", "story", "production", "assets", "review", "export", "settings"]) {
+  requireText("apps/web/src/app/routes/groups/creator.routes.tsx", [
+    `path: studioRoutePath("project-${section}"), element: <StudioProjectShellPage section="${section}" />`,
+  ]);
+  requireText("apps/web/src/domains/creator/studio-route-registry.ts", [
+    `route("project-${section}", "/studio/p/:projectId/${section}", "project", "project"`,
+  ]);
+}
 
 const testFiles = [
   "apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts",
@@ -145,7 +203,7 @@ const forbiddenCopy = [
   /SQLite\/OPFS 저장됨/gu,
 ];
 for (const absolute of userFacingFiles) {
-  const text = readFileSync(absolute, "utf8");
+  const text = copyLiterals(readFileSync(absolute, "utf8"), absolute);
   for (const expression of forbiddenCopy) {
     expression.lastIndex = 0;
     if (expression.test(text)) {
@@ -162,7 +220,7 @@ for (const absolute of coreFiles) {
   if (/\b(?:TODO|FIXME|NOT_IMPLEMENTED)\b/u.test(text)) {
     fail(`${relative(root, absolute)} contains an unfinished marker`);
   }
-  if (/coming soon|준비 중입니다/iu.test(text)) {
+  if (placeholderCopy.test(copyLiterals(text, absolute))) {
     fail(`${relative(root, absolute)} contains placeholder copy`);
   }
 }

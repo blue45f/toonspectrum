@@ -826,7 +826,7 @@ export function StudioBrushLibrarySheet({
   // SSOT totals — never hardcode (legacy copy said "229 paint" from core 71 era). The number must
   // come from the LISTED inventory, not the registered one: registered counts include quarantined
   // ids that this sheet can never show, so `STUDIO_BRUSH_CATALOG_COUNTS.paint` would advertise
-  // 328 brushes behind a drawer that offers 240 (2026-08-21 로스터 축소 이후).
+  // The drawer count is the curated product inventory, not the internal renderer registry.
   const operationCatalogCount = operation === "erase"
     ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length
     : STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;

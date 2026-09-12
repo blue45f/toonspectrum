@@ -1,17 +1,5 @@
 name: CI
 
-# Emergency merge-unblock policy.
-#
-# GitHub-hosted runners for this repository are saturated by a large backlog of
-# heavyweight test, browser, database, GPU/3D, code-scanning and packaging jobs.
-# A required check that waits indefinitely for a runner blocks every otherwise
-# mergeable change. The owner explicitly authorized relaxing CI/test criteria to
-# complete main integration.
-#
-# Keep the protected check name `core`, but skip the PR/push job without allocating
-# a runner. GitHub reports a deliberately skipped job as a successful required
-# check. Full verification can be restored after the Actions backlog is drained.
-
 on:
   workflow_dispatch:
   pull_request:
@@ -29,7 +17,73 @@ concurrency:
 jobs:
   core:
     name: core
-    if: ${{ false }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - run: echo "core merge gate temporarily relaxed by repository owner"
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked workspace
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Repository contracts
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run verify:csp
+          pnpm run verify:toolchain-coverage
+      - name: Strict lint
+        run: pnpm run lint:strict
+      - name: Typecheck application, API and realtime worker
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm run typecheck:cloudflare-realtime
+      - name: Brush product, rendering and BG3D regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
+            apps/web/src/domains/creator/studio-integration-closure.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
+          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
+      - name: Build deployable release
+        run: |
+          set -euo pipefail
+          pnpm --filter @webtoon-nest/api build
+          pnpm run build
+          pnpm run check:studio-bundle
+
+  verify:
+    name: verify
+    needs: core
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require deployable core
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+        run: |
+          set -euo pipefail
+          test "$CORE_RESULT" = success
+          echo "Required core validation passed."
