@@ -129,7 +129,7 @@ export function ReviewsPage() {
             )}
           </div>
 
-          <aside className="lg:sticky lg:top-20 lg:order-2">
+          <aside className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:order-2">
             <div className="rounded-2xl border border-line bg-card p-5 surface-hl">
               <p className="eyebrow text-accent">MOST REVIEWED</p>
               <h2 className="mt-1.5 text-base font-bold tracking-tight text-fg">가장 많이 리뷰된 작품</h2>

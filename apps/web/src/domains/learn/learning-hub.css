@@ -499,7 +499,7 @@
 .learn-hero-art { position: relative; align-self: stretch; min-height: 440px; min-width: 0; overflow: hidden; margin: 0; }
 .learn-hero-art > img { display: block; height: 100%; width: 100%; position: absolute; inset: 0; object-fit: cover; object-position: 70% center; }
 .learn-hero-art::after { content: ""; position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, oklch(.16 .008 70 / .9)); pointer-events: none; }
-.learn-hero-art figcaption { position: absolute; z-index: 1; bottom: 24px; left: 26px; right: 24px; display: grid; gap: 8px; color: var(--color-fg); }
+.learn-hero-art figcaption { position: absolute; z-index: 1; bottom: 24px; left: 26px; right: 24px; display: grid; gap: 8px; color: oklch(.95 .010 85); }
 .learn-hero-art figcaption span { font-family: var(--font-display); font-size: 10px; letter-spacing: .1em; }
 .learn-hero-art figcaption span:last-child { opacity: .8; font-family: var(--font-sans); font-size: 10px; }
 .learn-hero-art figcaption strong { font-size: 20px; letter-spacing: -.03em; }
@@ -520,7 +520,7 @@
 .learn-process-heading > p { max-width: 240px; margin: 0; font-size: 12px; color: var(--learn-muted); }
 .learn-process-art { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--color-line); border-radius: 14px 14px 0 0; background: var(--color-panel); }
 .learn-process-art > img { display: block; width: 100%; aspect-ratio: 2.6; object-fit: cover; }
-.learn-process-art figcaption { position: absolute; bottom: 10px; left: 12px; padding: 4px 8px; background: oklch(.16 .008 70 / .86); color: var(--color-fg); font-size: 10px; }
+.learn-process-art figcaption { position: absolute; bottom: 10px; left: 12px; padding: 4px 8px; background: oklch(.16 .008 70 / .86); color: oklch(.95 .010 85); font-size: 10px; }
 .learn-process-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--color-line); border-top: 0; border-radius: 0 0 12px 12px; overflow: hidden; }
 .learn-process-steps > button { display: flex; gap: 14px; align-items: center; text-align: left; border: 0; border-radius: 0; padding: 20px; min-height: 90px; transition: background 180ms ease-out; }
 .learn-process-steps > button + button { border-left: 1px solid var(--color-line); }

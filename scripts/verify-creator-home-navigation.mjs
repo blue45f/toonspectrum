@@ -82,7 +82,7 @@ try {
     assert.equal(await page.locator("video").count(), 0);
     assert.deepEqual(mediaRequests, [], "Navigation must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    for (const control of await page.locator(".cf-jump-nav a,.cf-stage-switcher button,.cf-stage-switcher button").all()) {
+    for (const control of await page.locator(".cf-jump-nav a,.cf-stage-switcher button,.cf-study-controls input").all()) {
       const box = await control.boundingBox();
       assert(box && box.height >= 44, "Navigation and workflow controls must keep the 44px touch target");
     }

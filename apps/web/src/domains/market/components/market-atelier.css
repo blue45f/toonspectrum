@@ -1,7 +1,7 @@
 .market-material-preview { min-width: 0; margin: 0; border: 1px solid var(--color-line); border-radius: 1.15rem; background: var(--color-panel); overflow: hidden; }
 .market-material-image { position: relative; overflow: hidden; height: 22rem; }
 .market-material-image img { width: 100%; height: 100%; object-fit: cover; transition: object-position 250ms ease-out; }
-.market-material-label { position: absolute; bottom: 1rem; left: 1rem; background: oklch(.18 .009 68 / .9); color: var(--color-fg); font-family: var(--font-display); font-size: .65rem; letter-spacing: .1em; padding: .5rem .7rem; }
+.market-material-label { position: absolute; bottom: 1rem; left: 1rem; background: oklch(.18 .009 68 / .9); color: oklch(.95 .010 85); font-family: var(--font-display); font-size: .65rem; letter-spacing: .1em; padding: .5rem .7rem; }
 .market-material-preview figcaption { padding: 1rem 1.4rem; }
 .market-material-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
 .market-material-tabs > button { min-height: 44px; display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--color-line); border-radius: .5rem; padding: .4rem .7rem; font-size: .7rem; color: var(--color-fg-2); cursor: pointer; transition: background 180ms ease-out; }

@@ -17,6 +17,8 @@ import {
 } from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
 import { PublicSiteJourney } from "./public-site-journey";
+import { isDiscoverPurposeRoute, isPublicCreativeRoute } from "./site-public-routes";
+import { useSiteHeaderHeight } from "./use-site-header-height";
 
 import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
 import { usePathname } from "@/compat/navigation";
@@ -30,20 +32,6 @@ const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
 );
 
-const DISCOVER_PURPOSE_PREFIXES = [
-  "/discover",
-  "/search",
-  "/explore",
-  "/ranking",
-  "/recommend",
-  "/calendar",
-  "/compare",
-  "/random",
-  "/tags",
-  "/authors",
-  "/author",
-  "/title",
-] as const;
 const STUDIO_ASSET_PREFIXES = [
   "/studio/assets",
   "/studio/brushes",
@@ -116,7 +104,7 @@ function purposeActive(pathname: string, href: string, exact?: boolean): boolean
   if (href === "/studio/assets") return pathMatchesAny(pathname, STUDIO_ASSET_PREFIXES);
   if (href === "/learn") return pathMatchesAny(pathname, STUDIO_LEARN_PREFIXES);
   if (exact || href === "/") return pathname === href;
-  if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
+  if (href === "/discover") return isDiscoverPurposeRoute(pathname);
   if (href === "/ranking") return matchesPrefix(pathname, "/ranking");
   if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
   if (href === "/library") return matchesPrefix(pathname, "/library");
@@ -171,7 +159,9 @@ export function SiteHeader() {
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
   const navigationContext = siteNavigationContextForPath(pathname);
-  const isPublicPage = !matchesPrefix(pathname, "/studio");
+  const isPublicPage = isPublicCreativeRoute(pathname);
+  const headerRef = useRef<HTMLElement>(null);
+  useSiteHeaderHeight(headerRef);
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
   const brandHref = navigationContext === "studio" ? "/studio" : "/";
@@ -208,6 +198,7 @@ export function SiteHeader() {
   return (
     <>
       <header
+        ref={headerRef}
         data-site-chrome="header"
         data-site-product={navigationContext}
         data-public-site={isPublicPage || undefined}

@@ -11,6 +11,7 @@ import { ToonSpectrumMark } from "./visual-marks";
 
 import Link from "@/compat/router-link";
 import { usePathname } from "@/compat/navigation";
+import { isPublicCreativeRoute } from "./site-public-routes";
 
 import "./public-site-shell.css";
 import { spectrumGradient } from "@/shared/lib/genre-color";
@@ -31,7 +32,8 @@ const POLICY_LINKS = [
 
 export function SiteFooter() {
   const pathname = usePathname();
-  const isPublicPage = pathname !== "/studio" && !pathname.startsWith("/studio/");
+  const isPublicPage = isPublicCreativeRoute(pathname);
+  const isStudioPage = pathname === "/studio" || pathname.startsWith("/studio/");
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
   const t = useT();
@@ -85,7 +87,7 @@ export function SiteFooter() {
             </div>
           </div>
         </section>
-        ) : (
+        ) : isStudioPage ? (
         <section className="grid gap-6 rounded-3xl border border-line/70 bg-panel/72 p-6 shadow-lg backdrop-blur-xl md:grid-cols-[1fr_auto] md:items-center md:p-8" aria-labelledby="footer-creative-title">
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
@@ -116,7 +118,7 @@ export function SiteFooter() {
             </Link>
           </div>
         </section>
-        )}
+        ) : null}
 
         <div className="grid gap-8 py-12 sm:grid-cols-2 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-6 lg:py-14">
           <div className="max-w-sm sm:col-span-2 lg:col-span-1">

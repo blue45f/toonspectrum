@@ -9,6 +9,10 @@ on:
       - "apps/web/src/domains/creator-resources/CreatorHomePage.tsx"
       - "apps/web/src/domains/creator-resources/ProductIntentStart.tsx"
       - "apps/web/src/shared/components/site-header*"
+      - "apps/web/src/shared/components/site-public-routes*"
+      - "apps/web/src/shared/components/use-site-header-height*"
+      - "apps/web/src/shared/components/public-site-*"
+      - "apps/web/src/shared/components/public-story-*"
       - "apps/web/src/shared/components/site-footer.tsx"
       - "apps/web/src/shared/components/pwa-install-nudge*"
       - "apps/web/src/shared/lib/creator-continuity*"
@@ -36,6 +40,10 @@ on:
       - "apps/web/src/domains/creator-resources/CreatorHomePage.tsx"
       - "apps/web/src/domains/creator-resources/ProductIntentStart.tsx"
       - "apps/web/src/shared/components/site-header*"
+      - "apps/web/src/shared/components/site-public-routes*"
+      - "apps/web/src/shared/components/use-site-header-height*"
+      - "apps/web/src/shared/components/public-site-*"
+      - "apps/web/src/shared/components/public-story-*"
       - "apps/web/src/shared/components/site-footer.tsx"
       - "apps/web/src/shared/components/pwa-install-nudge*"
       - "apps/web/src/shared/lib/creator-continuity*"
@@ -169,6 +177,10 @@ jobs:
                   ;;
                 apps/web/src/shared/components/site-header*|\
                 apps/web/src/shared/components/site-footer.tsx|\
+                apps/web/src/shared/components/site-public-routes*|\
+                apps/web/src/shared/components/use-site-header-height*|\
+                apps/web/src/shared/components/public-site-*|\
+                apps/web/src/shared/components/public-story-*|\
                 apps/web/src/app/routes/groups/catalog.routes.tsx)
                   install=true
                   unit=true
@@ -308,6 +320,10 @@ jobs:
               apps/web/src/domains/creator-resources/ProductIntentStart.tsx|\
               apps/web/src/shared/components/site-header*|\
               apps/web/src/shared/components/site-footer.tsx|\
+              apps/web/src/shared/components/site-public-routes*|\
+              apps/web/src/shared/components/use-site-header-height*|\
+              apps/web/src/shared/components/public-site-*|\
+              apps/web/src/shared/components/public-story-*|\
               apps/web/src/shared/components/pwa-install-nudge*|\
               apps/web/src/shared/lib/creator-continuity*|\
               apps/web/src/shared/lib/pwa-install-store*|\
@@ -350,6 +366,10 @@ jobs:
           apps/web/src/shared/components/site-header.tsx
           apps/web/src/shared/components/site-header-mobile-nav.tsx
           apps/web/src/shared/components/site-footer.tsx
+          apps/web/src/shared/components/site-public-routes.ts
+          apps/web/src/shared/components/use-site-header-height.ts
+          apps/web/src/shared/components/public-site-journey.tsx
+          apps/web/src/shared/components/public-story-hero.tsx
           apps/web/src/shared/components/pwa-install-nudge.tsx
           apps/web/src/shared/lib/creator-continuity.ts
           apps/web/src/shared/lib/creator-continuity-model.ts
@@ -376,6 +396,8 @@ jobs:
           pnpm exec vitest run
           apps/web/src/domains/marketing
           apps/web/src/shared/components/pwa-install-nudge.test.tsx
+          apps/web/src/shared/components/site-public-routes.test.ts
+          apps/web/src/shared/components/use-site-header-height.test.tsx
           apps/web/src/shared/lib/creator-continuity.test.ts
           apps/web/src/shared/lib/pwa-install-store.test.ts
           scripts/creator-home-checkout-policy.test.mjs

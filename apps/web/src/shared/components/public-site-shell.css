@@ -1,3 +1,7 @@
+:root {
+  --site-header-sticky-offset: calc(var(--site-header-height, 4.25rem) + 0.75rem);
+}
+
 .public-site-journey {
   border-top: 1px solid var(--color-line);
   background: var(--color-panel);
@@ -88,6 +92,15 @@
 }
 
 .public-footer-invitation {
+  /* Artwork always uses a dark stage, independently of the surrounding theme. */
+  --color-panel: oklch(0.185 0.009 68);
+  --color-fg: oklch(0.95 0.01 85);
+  --color-fg-2: oklch(0.8 0.012 78);
+  --color-line: oklch(0.305 0.012 64);
+  --color-line-strong: oklch(0.42 0.013 64);
+  --color-accent: oklch(0.72 0.185 42);
+  --color-accent-2: oklch(0.66 0.2 38);
+  --color-on-accent: oklch(0.2 0.02 60);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -119,7 +132,7 @@
 }
 
 .public-footer-invitation__content { max-width: 590px; word-break: keep-all; }
-.public-support-panel { scroll-margin-top: 140px; }
+.public-support-panel { scroll-margin-top: calc(var(--site-header-sticky-offset, 5rem) + 0.75rem); }
 
 @media (width < 1100px) {
   .public-site-journey__label { display: none; }

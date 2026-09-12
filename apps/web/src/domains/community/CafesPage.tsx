@@ -237,7 +237,7 @@ export function CafesPage() {
         </div>
 
         <aside className="order-1 min-w-0 lg:order-2">
-          <div className="sticky top-20 rounded-2xl border border-line bg-panel/40 p-4">
+          <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-4">
             <h2 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold text-fg">
               <Plus size={14} className="text-accent" />새 카페 만들기
             </h2>

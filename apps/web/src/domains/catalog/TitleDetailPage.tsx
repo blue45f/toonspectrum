@@ -150,7 +150,7 @@ export function TitleDetailPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:self-start">
           <TitlePoster title={title} size="lg" priority />
           <ReadStateSelector titleId={title.id} />
           <CollectionAdd titleId={title.id} />
@@ -321,7 +321,7 @@ export function TitleDetailPage() {
         }
       >
         <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] lg:items-start">
-          <div className="lg:sticky lg:top-20">
+          <div className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)]">
             <ReviewForm titleId={title.id} />
           </div>
           <div className="flex flex-col gap-3">

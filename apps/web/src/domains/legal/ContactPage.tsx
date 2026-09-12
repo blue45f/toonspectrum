@@ -88,7 +88,7 @@ export function ContactPage() {
         </div>
 
         <aside>
-          <div id="contact-inquiry" className="public-support-panel sticky top-32 rounded-2xl border border-line bg-panel/40 p-5">
+          <div id="contact-inquiry" className="public-support-panel sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-5">
             <h2 className="mb-1 text-sm font-semibold text-fg">바로 문의하기</h2>
             <p className="mb-4 text-xs leading-relaxed text-fg-3">
               제목과 내용은 공개 게시판에 표시됩니다. 개인정보와 비공개 제안서 대신, 논의하고 싶은 주제와 협업 개요를 적어 주세요.

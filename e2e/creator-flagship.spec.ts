@@ -13,6 +13,13 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(home).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    const comparison = home.getByRole("slider");
+    // Read native layout dimensions; offscreen CDP quads round a 44px box to 43.999px.
+    const comparisonBounds = await comparison.evaluate((element) => ({ width: element.clientWidth, height: element.clientHeight }));
+    expect(comparisonBounds.height).toBeGreaterThanOrEqual(44);
+    expect(comparisonBounds.width).toBeGreaterThanOrEqual(44);
+    await comparison.click({ position: { x: comparisonBounds.width * 0.25, y: 22 } });
+    expect(Number(await comparison.inputValue())).toBeLessThan(40);
     const modes = home.locator(".cf-stage-switcher button");
     await modes.first().focus();
     await page.keyboard.press("ArrowRight");

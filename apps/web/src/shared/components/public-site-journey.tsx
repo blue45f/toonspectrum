@@ -1,11 +1,12 @@
 import { ArrowUpRight, BookOpen, Compass, Images, Palette, Store } from "lucide-react";
 
 import Link from "@/compat/router-link";
+import { DISCOVER_PURPOSE_PREFIXES } from "./site-public-routes";
 
 import "./public-site-shell.css";
 
 const JOURNEY = [
-  { href: "/discover", ko: "영감 찾기", en: "Discover", icon: Compass, paths: ["/discover", "/search", "/explore", "/ranking", "/recommend", "/research", "/now"] },
+  { href: "/discover", ko: "영감 찾기", en: "Discover", icon: Compass, paths: [...DISCOVER_PURPOSE_PREFIXES, "/research", "/now"] },
   { href: "/learn", ko: "기법 익히기", en: "Learn", icon: BookOpen, paths: ["/learn", "/help"] },
   { href: "/market", ko: "재료 고르기", en: "Resources", icon: Store, paths: ["/market"] },
   { href: "/make", ko: "장면 그리기", en: "Create", icon: Palette, paths: ["/make"] },

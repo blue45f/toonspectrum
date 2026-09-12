@@ -11,6 +11,7 @@ The public site now introduces ToonStudio as a professional workspace for drawin
 - Showcase: three-panel visual storytelling introduction, existing work/series/following feeds, and links back into production.
 - Discover, Community, About, Help, Contact and Support: contextual artwork, webtoon-focused guidance, existing data/forms, and connected next steps.
 - Shared public header/footer: creation journey and webtoon drawing identity. New presentation is guarded away from `/studio`.
+- Public route classification keeps promotional navigation out of account, authentication, personal libraries and unknown routes. Sticky public panels and section links share the measured header height; discovery navigation uses one route classification.
 - Search/social metadata: Korean webtoon drawing positioning; JSON-LD CSP hash updated for the exact data block.
 
 ## Media
@@ -36,6 +37,7 @@ These images are labeled brand concept art. They are not represented as screensh
 - Additional Korean/English visual inspection covered homepage and six support/discovery pages; image comparison, motion pause, reduced-motion, menu Escape/focus, help search, and search query preservation passed.
 - Existing purpose, fragment/history navigation, continuity and film browser scripts passed after aligning their selectors with the current page and preventing the test seed from overwriting saved state on reload.
 - Source and built HTML CSP verification passed.
+- Review follow-up: 53 public-route, measured-header and existing navigation/auth tests passed. The final production bundle passed the 39-view matrix and 7 flagship browser tests again, including a 44px comparison slider and actual pointer input. Dark-overlay captions were checked in both themes. Search/title/market sticky panels kept a 12px gap below the header using fixture-backed frontend content; this is layout evidence, not backend availability evidence.
 
 Screenshots and the matrix report are generated under `artifacts/public-webtoon-experience/`. Run `PUBLIC_WEBTOON_ORIGIN=http://127.0.0.1:5281 node scripts/verify-public-webtoon-experience.mjs` against a production preview to reproduce the matrix.
 
