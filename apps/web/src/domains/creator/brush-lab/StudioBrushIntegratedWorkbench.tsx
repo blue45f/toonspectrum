@@ -11,10 +11,7 @@ import {
 
 const BRUSH_V6_PROGRAM_EVENT = "toonspectrum:brush-v6-program";
 
-/**
- * Connects explicit V5→V6 recipe succession and the existing marketplace publish bridge without
- * pretending that V6 is already the normal canvas pixel authority.
- */
+/** Connects product brushes, V6 editing and marketplace publishing on one Brush Editor route. */
 export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: string }) {
   const location = useLocation();
   const [ready, setReady] = useState(false);
@@ -36,8 +33,8 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
         window.localStorage.setItem(storageKey, JSON.stringify(requested.program));
         setSnapshot(requested.program);
         setGeneration((current) => current + 1);
-        setNotice(requested.legacyBrushId
-          ? `${requested.legacyBrushId}의 V5 설계를 가장 가까운 V6 레시피로 열었습니다. 픽셀 동일 변환이 아니므로 실제 획을 비교한 뒤 저장하세요.`
+        setNotice(requested.productBrushId
+          ? `${requested.productBrushId} 제품 브러시를 V6 편집 레시피로 열었습니다. 실제 획을 확인한 뒤 저장하세요.`
           : `${requested.program.name} V6 레시피를 열었습니다.`);
       } catch {
         setNotice("브라우저 저장소를 사용할 수 없어 이번 세션에서만 V6 레시피를 엽니다.");
@@ -73,9 +70,8 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
       <StudioBrushV6Workbench key={`${scope}:${generation}`} scope={scope} />
       <div className="rounded-2xl border border-line bg-card/45 p-4">
         <p className="text-xs leading-5 text-fg-3">
-          V6 프로그램은 이 제작 화면과 마켓 게시 브리지에 연결됩니다. 일반 캔버스의 기존 브러시
-          snapshot·live/commit 렌더 권위는 아직 별도이므로, 현재 원고에서는 기존 브러시 세부 설정과
-          실제 획 비교를 함께 사용합니다.
+          V6 프로그램은 제품 브러시의 편집 설정과 마켓 게시 브리지에 연결됩니다. 일반
+          캔버스에서는 저장된 프로그램을 공통 live·commit·export 런타임 resolver가 해석합니다.
         </p>
         <div className="mt-3">
           <MarketplaceBrushStudioBridge snapshot={snapshot} visible={snapshot !== null} />

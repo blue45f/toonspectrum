@@ -245,7 +245,7 @@ run_editor() {
     apps/web/src/app/routes/groups/creator.routes.tsx \
     apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx \
     apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx \
-    apps/web/src/domains/creator/brush-lab/StudioBrushLegacyCataloguePanel.tsx \
+    apps/web/src/domains/creator/brush-lab/StudioBrushProductCataloguePanel.tsx \
     apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.ts \
     apps/web/src/domains/creator/canvas/studio-transient-canvas.ts \
     apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts \

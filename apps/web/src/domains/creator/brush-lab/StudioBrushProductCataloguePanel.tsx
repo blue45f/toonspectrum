@@ -1,31 +1,44 @@
-import { ArrowRight, ArchiveRestore, Search } from "lucide-react";
+import { ArrowRight, Library, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import Link from "@/compat/router-link";
 
-import { studioBrushCatalogItemById } from "../brush/studio-brush-catalog";
-import { studioBrushQualityDesignProductId } from "../brush/studio-brush-quality-design-bridge";
 import { BRUSH_QUALITY_CATALOG } from "./brush-studio-v5-quality-catalog";
 import { BRUSH_STUDIO_V6_RECIPES } from "./brush-studio-v6-engine";
-import { resolveLegacyBrushV6RecipeId } from "./brush-studio-version-integration";
+import { resolveProductBrushV6RecipeId } from "./brush-studio-version-integration";
 
-function successionHref(baseHref: string, legacyBrushId: string, recipeId: string): string {
+function editorHref(
+  baseHref: string,
+  productBrushId: string,
+  recipeId: string,
+): string {
   const separator = baseHref.includes("?") ? "&" : "?";
   const params = new URLSearchParams({
     applyRecipe: "1",
-    legacyBrush: legacyBrushId,
+    productBrush: productBrushId,
     recipe: recipeId,
   });
   params.sort();
   return `${baseHref}${separator}${params.toString()}`;
 }
 
-/** Restores discoverability for all 72 V5 quality designs and maps each to a shipped V6 start. */
-export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHref: string }) {
-  const [open, setOpen] = useState(false);
+function pickerHref(productBrushId: string): string {
+  return `/studio/assets/brushes?selected=${encodeURIComponent(productBrushId)}`;
+}
+
+/** Shows the single curated product catalogue shared by the picker and Brush Editor. */
+export function StudioBrushProductCataloguePanel({
+  baseHref,
+}: {
+  readonly baseHref: string;
+}) {
+  const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
   const recipeNames = useMemo(
-    () => new Map(BRUSH_STUDIO_V6_RECIPES.map((recipe) => [recipe.id, recipe.label])),
+    () =>
+      new Map(
+        BRUSH_STUDIO_V6_RECIPES.map((recipe) => [recipe.id, recipe.label]),
+      ),
     [],
   );
   const filtered = useMemo(() => {
@@ -43,13 +56,13 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">
-            <ArchiveRestore size={15} aria-hidden="true" /> V5 SUCCESSION
+            <Library size={15} aria-hidden="true" /> PRODUCT CATALOGUE
           </p>
-          <h2 className="mt-1 text-sm font-black text-fg">V5 품질 브러시 72종 승계 카탈로그</h2>
+          <h2 className="mt-1 text-sm font-black text-fg">제품 브러시 48종</h2>
           <p className="mt-1 max-w-4xl text-xs leading-5 text-fg-3">
-            72종 설계 이름·ID·재질 설명은 이제 일반 브러시 선택 창에서도 검색할 수 있습니다.
-            여기서는 각 설계가 실제 렌더러를 가진 제품 브러시와 어떤 V6 편집 시작점으로 이어지는지
-            함께 확인하며, 픽셀 동일 변환으로 표시하지 않습니다.
+            실제 렌더 결과·손맛·재질이 구분되는 대표만 남겼습니다. 비슷한 구현 변형과 이전
+            설계명은 별도 브러시로 노출하지 않으며, 일반 선택 창과 이 편집기가 같은 목록을
+            사용합니다.
           </p>
         </div>
         <button
@@ -58,15 +71,19 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
           onClick={() => setOpen((current) => !current)}
           className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-fg hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         >
-          {open ? "카탈로그 닫기" : "72종 모두 보기"}
+          {open ? "카탈로그 닫기" : "48종 보기"}
         </button>
       </div>
 
       {open ? (
         <div className="mt-5">
           <label className="relative block max-w-xl">
-            <span className="sr-only">V5 브러시 검색</span>
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden="true" />
+            <span className="sr-only">제품 브러시 검색</span>
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
+              aria-hidden="true"
+            />
             <input
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
@@ -74,45 +91,59 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
               className="min-h-11 w-full rounded-xl border border-line bg-panel pl-10 pr-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             />
           </label>
-          <p className="mt-2 text-xs text-fg-3">{filtered.length} / {BRUSH_QUALITY_CATALOG.length}종</p>
+          <p className="mt-2 text-xs text-fg-3">
+            {filtered.length} / {BRUSH_QUALITY_CATALOG.length}종
+          </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((entry) => {
-              const recipeId = resolveLegacyBrushV6RecipeId(entry);
-              const productCatalogId = studioBrushQualityDesignProductId(entry.id);
-              const productBrush = productCatalogId
-                ? studioBrushCatalogItemById(productCatalogId)
-                : null;
+              const recipeId = resolveProductBrushV6RecipeId(entry);
+              const href = recipeId
+                ? editorHref(baseHref, entry.id, recipeId)
+                : pickerHref(entry.id);
               return (
                 <Link
                   key={entry.id}
-                  href={successionHref(baseHref, entry.id, recipeId)}
-                  data-studio-brush-quality-product-target={productCatalogId ?? undefined}
+                  href={href}
+                  data-studio-brush-product-target={entry.id}
                   className="group rounded-2xl border border-line bg-panel/55 p-3.5 transition-colors hover:border-accent/45 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span>
                       <strong className="block text-sm text-fg">{entry.name}</strong>
-                      <span className="mt-1 block text-[0.68rem] font-semibold text-accent">{entry.group}</span>
+                      <span className="mt-1 block text-[0.68rem] font-semibold text-accent">
+                        {entry.group}
+                      </span>
                     </span>
                     <span className="rounded-full border border-line px-2 py-1 text-[0.62rem] font-bold text-fg-3">
-                      {entry.engine}
+                      {entry.quick ? "기본" : "전문"}
                     </span>
                   </span>
-                  <span className="mt-2 block text-xs leading-5 text-fg-3">{entry.signature}</span>
+                  <span className="mt-2 block text-xs leading-5 text-fg-3">
+                    {entry.signature}
+                  </span>
                   <span className="mt-2 block rounded-lg border border-line bg-card/70 px-2.5 py-1.5 text-[0.68rem] font-semibold text-fg-2">
-                    일반 브러시 · {productBrush?.name ?? productCatalogId ?? "연결 확인 필요"}
+                    {entry.engine}
                   </span>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
-                    {recipeNames.get(recipeId) ?? recipeId}로 편집하기
-                    <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                    {recipeId
+                      ? `${recipeNames.get(recipeId) ?? recipeId}로 편집하기`
+                      : "브러시 선택에서 사용하기"}
+                    <ArrowRight
+                      size={13}
+                      className="transition-transform group-hover:translate-x-1"
+                      aria-hidden="true"
+                    />
                   </span>
                 </Link>
               );
             })}
           </div>
           {filtered.length === 0 ? (
-            <p className="mt-4 rounded-xl border border-line bg-panel/55 px-3 py-5 text-center text-sm text-fg-3" role="status">
-              일치하는 V5 브러시가 없습니다.
+            <p
+              className="mt-4 rounded-xl border border-line bg-panel/55 px-3 py-5 text-center text-sm text-fg-3"
+              role="status"
+            >
+              일치하는 제품 브러시가 없습니다.
             </p>
           ) : null}
         </div>

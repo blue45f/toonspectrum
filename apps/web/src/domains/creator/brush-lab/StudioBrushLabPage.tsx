@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  BookOpen,
   Brush,
   CheckCircle2,
   Gauge,
@@ -12,15 +11,14 @@ import { useParams } from "react-router-dom";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { StudioBrushIntegratedWorkbench } from "./StudioBrushIntegratedWorkbench";
-import { StudioBrushLegacyCataloguePanel } from "./StudioBrushLegacyCataloguePanel";
-import { StudioBrushV5RuntimeWorkbench } from "./StudioBrushV5RuntimeWorkbench";
+import { StudioBrushProductCataloguePanel } from "./StudioBrushProductCataloguePanel";
 
 const STEPS = [
   {
     icon: Sparkles,
     number: "1",
-    title: "시작 느낌 고르기",
-    description: "연필·잉크·수채·유화·입자처럼 결과가 가까운 브러시에서 시작합니다.",
+    title: "대표 브러시 고르기",
+    description: "실제 결과와 손맛이 구분되는 48개 제품 브러시 중에서 시작합니다.",
   },
   {
     icon: Brush,
@@ -37,8 +35,8 @@ const STEPS = [
   {
     icon: CheckCircle2,
     number: "4",
-    title: "저장·게시·원고 비교",
-    description: "V6 프로그램을 저장·게시하고 기존 캔버스 브러시와 실제 획을 비교합니다.",
+    title: "저장·게시·원고 적용",
+    description: "V6 프로그램을 저장·게시하고 공통 렌더 경로에서 결과를 확인합니다.",
   },
 ] as const;
 
@@ -86,7 +84,7 @@ function routeContext(params: {
   };
 }
 
-/** Render the unified Brush Editor landing surface and its available workflows. */
+/** Render the unified Brush Editor and its single consolidated product catalogue. */
 export function StudioBrushLabPage() {
   const params = useParams<{ workId?: string; sourceWorkId?: string; brushId?: string }>();
   const context = routeContext(params);
@@ -100,12 +98,12 @@ export function StudioBrushLabPage() {
               <Brush size={14} aria-hidden /> BRUSH EDITOR
             </p>
             <h1 className="mt-2 text-pretty text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              브러시 프로그램을 만들고, 시험하고, 실제 원고와 비교하세요.
+              브러시 프로그램을 만들고, 시험하고, 원고에 적용하세요.
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-              결과가 가까운 시작점을 고르고 실제 획을 확인한 뒤 필요한 설정만 조절하세요. V5의 72종
-              품질 설계는 아래 승계 카탈로그에서 모두 찾을 수 있고, V6 프로그램은 저장·마켓 게시까지
-              연결됩니다. 일반 캔버스의 기존 브러시 렌더 권위와는 실제 획으로 비교해 적용합니다.
+              비슷한 종류를 늘어놓지 않고 실제 결과가 구분되는 48개 제품 브러시만 사용합니다.
+              같은 목록에서 시작점을 고르고 V6 설정을 조절하면 live·commit·export 경로에
+              동일하게 적용됩니다.
             </p>
             <p className="mt-3 inline-flex rounded-full border border-line bg-panel/60 px-3 py-1 text-xs font-bold text-fg-3">
               {context.contextLabel}
@@ -153,7 +151,7 @@ export function StudioBrushLabPage() {
             <p className="text-xs leading-6 text-fg-3">
               필압·기울기·펜 회전, 종이 접촉, 안료 혼합, 수채·유화·강모·입자 물리,
               결정적 패턴과 출력 품질까지 조절할 수 있습니다. 현재 장치가 지원하지 않는 설정은
-              저장 전에 가장 안전한 대체 방법과 함께 알려 줍니다.
+              저장 전에 안전한 대체 방법과 함께 알려 줍니다.
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[0.65rem] font-semibold text-fg-3">
               {["필압·기울기", "종이·재질", "수채·유화", "듀얼 팁·입자", "패턴·문양", "이 기기에 맞게 최적화", "가져오기·내보내기"].map((label) => (
@@ -166,21 +164,7 @@ export function StudioBrushLabPage() {
 
       <div className="mt-5 space-y-5">
         <StudioBrushIntegratedWorkbench scope={context.scope} />
-        <StudioBrushLegacyCataloguePanel baseHref={context.baseHref} />
-
-        <details className="rounded-3xl border border-line bg-card/35 p-4 sm:p-5">
-          <summary className={`flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-fg-2 ${STUDIO_FOCUS_RING}`}>
-            <BookOpen size={16} className="text-accent" aria-hidden />
-            이전 브러시 런타임 호환성 진단
-          </summary>
-          <p className="mt-2 max-w-4xl text-xs leading-6 text-fg-3">
-            아래 도구는 예전에 만든 브러시의 실제 실행 경로와 결과가 달라 보일 때 사용합니다.
-            V5 설계 카탈로그 승계와 별도로, 런타임·장치 호환 문제를 진단하며 원본 브러시는 변경하지 않습니다.
-          </p>
-          <div className="mt-4 border-t border-line pt-4">
-            <StudioBrushV5RuntimeWorkbench scope={context.scope} />
-          </div>
-        </details>
+        <StudioBrushProductCataloguePanel baseHref={context.baseHref} />
       </div>
     </main>
   );
