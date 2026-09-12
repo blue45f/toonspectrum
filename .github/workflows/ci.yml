@@ -38,6 +38,8 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Verify that required checks cannot silently pass
         run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
+      - name: Studio 3D production audit policy regressions
+        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
       - name: Repository contracts
         run: |
           set -euo pipefail
