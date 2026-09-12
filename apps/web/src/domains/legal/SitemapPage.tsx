@@ -82,7 +82,8 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       en: "Open drawing, animation, 3D and publishing workspaces directly",
     },
     items: [
-      destination("/studio", "빈 캔버스 편집기", "Blank canvas editor", "새 초안을 바로 열어 자유롭게 제작", "Open a draft and start creating immediately"),
+      destination("/studio", "Studio 홈", "Studio home", "새 프로젝트와 최근 작업으로 이동", "Start a project or return to recent work"),
+      destination("/studio/projects", "프로젝트 목록", "Project list", "기존 프로젝트를 찾아 이어서 작업", "Find an existing project and continue your work"),
       destination("/studio/animation", "애니메이션 작업실", "Animation workspace", "프레임과 움직임을 편집", "Edit frames and motion"),
       destination("/studio/brushes", "Studio 브러시", "Studio brushes", "작업 중 브러시를 선택하고 조정", "Choose and tune brushes while editing"),
       destination("/studio/bg3d", "3D 배경", "3D backgrounds", "장면 배경과 카메라 구도 설계", "Build scene backgrounds and camera composition"),
@@ -100,7 +101,7 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/studio/manual", "Studio 사용 설명서", "Studio manual", "도구·작업 흐름·문제 해결 안내", "Learn tools, workflows and troubleshooting"),
       destination("/brush-lab", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
       destination("/music", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
-      destination("/create/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
+      destination("/showcase/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
     ],
   },
   {
@@ -146,7 +147,7 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       en: "Explore and manage published work and creative materials in detail",
     },
     items: [
-      destination("/create/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
+      destination("/showcase/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
       destination("/authors", "작가별 보기", "Browse creators", "작가와 대표 작품 탐색", "Explore creators and representative work"),
       destination("/discover/works", "만화·작법서 탐색", "Comics & craft books", "만화와 창작 참고서를 함께 검색", "Search comics and creative craft books"),
       destination("/market/browse", "에셋 상세 탐색", "Browse assets", "종류·사용권으로 리소스 찾기", "Find resources by type and license"),
