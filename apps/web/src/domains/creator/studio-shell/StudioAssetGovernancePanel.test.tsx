@@ -41,3 +41,25 @@ describe("StudioAssetGovernancePanel", () => {
     });
   });
 });
+
+describe("governance option accessibility", () => {
+  it.each([
+    { locale: "ko" as const, name: "구매한 계정 연결됨", description: "구매 내역과 사용 좌석을 확인합니다." },
+    { locale: "en" as const, name: "Purchased account connected", description: "Verify purchase history and licensed seats." },
+  ])("associates the $locale label and description with its checkbox", ({ locale, name, description }) => {
+    render(<StudioAssetGovernancePanel projectId="project-labels" locale={locale} />);
+
+    const checkbox = screen.getByRole("checkbox", { name });
+    const label = checkbox.closest("label");
+    const descriptionId = checkbox.getAttribute("aria-describedby");
+    expect(checkbox.id).not.toBe("");
+    expect(label?.htmlFor).toBe(checkbox.id);
+    expect(label?.getAttribute("aria-label")).toBe(name);
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId ?? "")?.textContent).toBe(description);
+
+    const ids = screen.getAllByRole("checkbox").map((input) => input.id);
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

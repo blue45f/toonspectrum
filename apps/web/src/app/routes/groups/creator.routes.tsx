@@ -20,6 +20,7 @@ import {
   StudioNewPage,
   StudioProjectShellPage,
   StudioPromoPage,
+  StudioTemplatesPage,
   StudioRouter,
 } from "./creator-route-pages";
 
@@ -28,6 +29,8 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomePage /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },
   { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
+  { id: "creator-studio-recovery", path: studioRoutePath("recovery"), element: <Navigate to="/studio?view=archived" replace /> },
+  { id: "creator-studio-trash", path: studioRoutePath("trash"), element: <Navigate to="/studio?view=trash" replace /> },
   { id: "creator-studio-assets", path: studioRoutePath("assets"), element: <StudioAssetHubPage /> },
   { id: "creator-studio-assets-brushes", path: studioRoutePath("asset-brushes"), element: <Navigate to="/studio/brushes" replace /> },
   { id: "creator-studio-assets-brush-new", path: studioRoutePath("asset-brush-new"), element: <StudioBrushLabPage /> },
@@ -35,7 +38,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-assets-character-new", path: studioRoutePath("asset-character-new"), element: <CharacterShaperLandingPage /> },
   { id: "creator-studio-assets-audio", path: studioRoutePath("asset-audio"), element: <StudioMusicPage /> },
   { id: "creator-studio-assets-3d", path: studioRoutePath("asset-3d"), element: <Navigate to="/studio/bg3d" replace /> },
-  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <Navigate to="/market?view=templates" replace /> },
+  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <StudioTemplatesPage /> },
 
   // Canonical document identities bridge losslessly into the established editor authority.
   { id: "creator-studio-project-document", path: studioRoutePath("project-document"), element: <StudioDocumentWorkspaceRoute /> },

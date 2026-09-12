@@ -60,16 +60,23 @@ export const StudioBrushLabPage = lazyRetry(
   "StudioBrushLabPage",
 );
 export const StudioHomePage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
-    default: module.StudioHomePage,
+  () => import("@/domains/creator/studio-shell/StudioProjectLibraryPage").then((module) => ({
+    default: module.StudioProjectLibraryPage,
   })),
-  "StudioHomePage",
+  "StudioProjectLibraryPage",
 );
 export const StudioNewPage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
-    default: module.StudioNewPage,
+  () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
+    default: module.StudioNewIntegratedPage,
   })),
-  "StudioNewPage",
+  "StudioNewIntegratedPage",
+);
+
+export const StudioTemplatesPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioTemplatesPage").then((module) => ({
+    default: module.StudioTemplatesPage,
+  })),
+  "StudioTemplatesPage",
 );
 export const StudioImportPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioImportIntegratedPage").then((module) => ({
