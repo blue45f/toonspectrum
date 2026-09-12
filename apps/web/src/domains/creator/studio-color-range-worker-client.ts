@@ -2,10 +2,11 @@ import {
   STUDIO_COLOR_RANGE_WORKER_MAX_PIXELS,
   STUDIO_COLOR_RANGE_WORKER_PROTOCOL_VERSION,
   isStudioColorRangeWorkerSelection,
+  assertStudioSelectionBorderWorkerRequest,
   studioColorRangeRequestTransfers,
   type StudioColorRangeWorkerResponseMessage,
   type StudioColorRangeWorkerRunMessage,
-  type StudioColorRangeWorkerRunRequest,
+  type StudioSelectionComputeWorkerRunRequest,
 } from "./studio-color-range-worker-protocol";
 import { executeStudioColorRangeWorkerRequest } from "./studio-color-range-worker-runtime";
 
@@ -47,7 +48,7 @@ export interface StudioColorRangeWorkerClientResult {
 
 export interface StudioColorRangeWorkerSession {
   run(
-    request: StudioColorRangeWorkerRunRequest,
+    request: StudioSelectionComputeWorkerRunRequest,
     options?: StudioColorRangeWorkerRunOptions,
   ): Promise<StudioColorRangeWorkerClientResult>;
   dispose(): void;
@@ -62,7 +63,7 @@ export interface StudioColorRangeWorkerSessionOptions {
 
 interface ActiveTask {
   readonly requestId: number;
-  readonly request: StudioColorRangeWorkerRunRequest;
+  readonly request: StudioSelectionComputeWorkerRunRequest;
   readonly signal?: AbortSignal;
   readonly resolve: (result: StudioColorRangeWorkerClientResult) => void;
   readonly reject: (error: unknown) => void;
@@ -93,12 +94,12 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
-function pixelCountOf(request: StudioColorRangeWorkerRunRequest): number {
+function pixelCountOf(request: StudioSelectionComputeWorkerRunRequest): number {
   return request.width * request.height;
 }
 
 function assertStudioColorRangeWorkerRequest(
-  request: StudioColorRangeWorkerRunRequest,
+  request: StudioSelectionComputeWorkerRunRequest,
 ): void {
   if (!request || typeof request !== "object") {
     throw new TypeError("색상 범위 Worker 요청이 올바르지 않습니다.");
@@ -119,6 +120,10 @@ function assertStudioColorRangeWorkerRequest(
     throw new RangeError(
       `색상 범위 Worker는 최대 ${STUDIO_COLOR_RANGE_WORKER_MAX_PIXELS.toLocaleString("en-US")}픽셀까지 처리합니다.`,
     );
+  }
+  if (request.kind === "selection-border") {
+    assertStudioSelectionBorderWorkerRequest(request);
+    return;
   }
   if (
     !(request.data instanceof Uint8ClampedArray)
@@ -162,8 +167,9 @@ function assertStudioColorRangeWorkerRequest(
 }
 
 function cloneSafeWorkerRequest(
-  request: StudioColorRangeWorkerRunRequest,
-): StudioColorRangeWorkerRunRequest {
+  request: StudioSelectionComputeWorkerRunRequest,
+): StudioSelectionComputeWorkerRunRequest {
+  if (request.kind === "selection-border") return request;
   const data = request.data;
   const hasDedicatedTransferableBuffer =
     data.buffer instanceof ArrayBuffer
@@ -199,7 +205,7 @@ function workerUnavailableError(cause?: unknown): Error {
 }
 
 function runDirect(
-  request: StudioColorRangeWorkerRunRequest,
+  request: StudioSelectionComputeWorkerRunRequest,
   signal: AbortSignal | undefined,
 ): StudioColorRangeWorkerClientResult {
   throwIfAborted(signal);

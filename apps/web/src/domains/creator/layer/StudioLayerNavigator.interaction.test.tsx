@@ -137,6 +137,27 @@ describe("StudioLayerNavigator selection interaction", () => {
     expect(create.getAttribute("title")).toContain("먼저 그룹을 해제");
   });
 
+  it.each([{ readOnly: true }, { groupingDisabled: true }])(
+    "keeps grouping shortcuts inside the same capability gate as the buttons: %o",
+    (capability) => {
+      const onAction = vi.fn();
+      render(
+        <StudioLayerNavigator
+          items={ITEMS} groups={[]} selectedIds={["middle", "front"]}
+          pageKey="guarded-shortcuts" localHiddenIds={new Set()}
+          onToggleLocalHidden={() => {}} onSelectionChange={() => {}}
+          onAction={onAction} {...capability}
+        />,
+      );
+      const target = row(/주인공 대사/);
+      fireEvent.keyDown(target, { key: "g", code: "KeyG", ctrlKey: true });
+      fireEvent.keyDown(target, { key: "G", code: "KeyG", metaKey: true, shiftKey: true });
+      expect(onAction).not.toHaveBeenCalled();
+      fireEvent.keyDown(target, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(row(/인물 선화/));
+    },
+  );
+
   it("selects a whole group from its row and exposes one-click group lock and collapse", () => {
     const initialGroup = createLayerGroup("character", "캐릭터");
     const groupedItems: StudioLayerNavigatorItem[] = [
@@ -331,6 +352,132 @@ describe("StudioLayerNavigator selection interaction", () => {
     expect(back.querySelector('[data-studio-layer-selection-marker="selected"]')).not.toBeNull();
     expect(front.className).toContain("pointer-coarse:min-h-11");
     expect(screen.getByRole("toolbar", { name: "선택 레이어 일괄 작업" }).textContent).toContain("선택 2개");
+  });
+
+  it("extends and shrinks a keyboard range around the original anchor", () => {
+    render(<Harness />);
+    fireEvent.click(row(/주인공 대사/));
+    fireEvent.keyDown(row(/주인공 대사/), { key: "ArrowDown", shiftKey: true });
+    expect(document.activeElement).toBe(row(/인물 선화/));
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/인물 선화/).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(row(/인물 선화/), { key: "End", shiftKey: true });
+    expect(row(/배경 채색/).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(row(/배경 채색/), { key: "ArrowUp", shiftKey: true });
+    expect(row(/배경 채색/).getAttribute("aria-selected")).toBe("false");
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/인물 선화/).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("selects a range with Shift Space after moving focus independently", () => {
+    render(<Harness />);
+    fireEvent.click(row(/주인공 대사/));
+    fireEvent.keyDown(row(/주인공 대사/), { key: "End" });
+    expect(row(/배경 채색/).getAttribute("aria-selected")).toBe("false");
+    fireEvent.keyDown(row(/배경 채색/), { key: " ", shiftKey: true });
+    for (const name of [/주인공 대사/, /인물 선화/, /배경 채색/]) {
+      expect(row(name).getAttribute("aria-selected")).toBe("true");
+    }
+  });
+
+  it("uses typed layer names for focus without changing the selection or editing", () => {
+    render(<Harness />);
+    fireEvent.click(row(/주인공 대사/));
+    fireEvent.keyDown(row(/주인공 대사/), { key: "배" });
+    expect(document.activeElement).toBe(row(/배경 채색/));
+    fireEvent.keyDown(row(/배경 채색/), { key: "경" });
+    expect(document.activeElement).toBe(row(/배경 채색/));
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/배경 채색/).getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("does not consume IME composition as tree navigation", () => {
+    render(<Harness />);
+    const target = row(/주인공 대사/);
+    target.focus();
+    expect(fireEvent.keyDown(target, { key: "배", isComposing: true })).toBe(true);
+    expect(document.activeElement).toBe(target);
+  });
+
+  it("keeps range selection inside filtered rows", () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("레이어 이름·텍스트·그룹 검색"), { target: { value: "선화" } });
+    fireEvent.keyDown(row(/인물 선화/), { key: "End", shiftKey: true });
+    expect(row(/인물 선화/).getAttribute("aria-current")).toBe("true");
+    expect(screen.getByRole("status").textContent).toContain("선택 1");
+  });
+
+  it("limits expanded folder ranges to traversed children and keeps collapsed folders atomic", () => {
+    const initialGroup = createLayerGroup("character-range", "캐릭터 범위");
+    const onSelectionChange = vi.fn();
+    function GroupRangeHarness() {
+      const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+      const [group, setGroup] = useState(initialGroup);
+      return (
+        <StudioLayerNavigator
+          items={[
+            { id: "outside", type: "bubble", label: "대사", zIndex: 3 },
+            { id: "ink", type: "draw", label: "선화", zIndex: 2, groupId: group.id },
+            { id: "color", type: "image", label: "채색", zIndex: 1, groupId: group.id },
+          ]}
+          groups={[group]} selectedIds={selectedIds} pageKey="expanded-range"
+          localHiddenIds={new Set()} onToggleLocalHidden={() => {}}
+          onSelectionChange={(ids) => { onSelectionChange(ids); setSelectedIds(ids); }}
+          onAction={(action) => {
+            if (action.type === "set-group-flag") {
+              setGroup((current) => ({ ...current, [action.flag]: action.value }));
+            }
+          }}
+        />
+      );
+    }
+    render(<GroupRangeHarness />);
+    const folder = row(/캐릭터 범위, 그룹/);
+    fireEvent.click(row(/대사/));
+    fireEvent.keyDown(row(/대사/), { key: "ArrowDown", shiftKey: true });
+    expect(document.activeElement).toBe(folder);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["outside"]);
+    fireEvent.keyDown(folder, { key: "ArrowDown", shiftKey: true });
+    expect(document.activeElement).toBe(row(/선화/));
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["outside", "ink"]);
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("false");
+    fireEvent.keyDown(row(/선화/), { key: "ArrowDown", shiftKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["outside", "ink", "color"]);
+    fireEvent.keyDown(row(/채색/), { key: "ArrowUp", shiftKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["outside", "ink"]);
+
+    // A direct group click retains its existing whole-group selection contract.
+    fireEvent.click(folder);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["ink", "color"]);
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 범위 그룹 접기" }));
+    fireEvent.click(row(/대사/));
+    fireEvent.keyDown(row(/대사/), { key: "ArrowDown", shiftKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["outside", "ink", "color"]);
+    expect(folder.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("selects collapsed folder contents with Select All and keyboard ranges", () => {
+    const onSelectionChange = vi.fn();
+    const group = { ...createLayerGroup("character", "캐릭터"), collapsed: true };
+    render(
+      <StudioLayerNavigator
+        items={[
+          { id: "ink", type: "draw", label: "선화", zIndex: 2, groupId: group.id },
+          { id: "color", type: "image", label: "채색", zIndex: 1, groupId: group.id },
+          { id: "back", type: "image", label: "배경", zIndex: 0 },
+        ]}
+        groups={[group]} selectedIds={[]} pageKey="collapsed"
+        localHiddenIds={new Set()} onToggleLocalHidden={() => {}}
+        onSelectionChange={onSelectionChange} onAction={() => {}}
+      />,
+    );
+    const folder = row(/캐릭터, 그룹/);
+    fireEvent.keyDown(folder, { key: "a", ctrlKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["ink", "color", "back"]);
+    fireEvent.keyDown(folder, { key: "ArrowDown", shiftKey: true });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(["ink", "color", "back"]);
+    expect(document.activeElement).toBe(row(/배경/));
+    expect(folder.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("exposes frame-folder bind when the active layer is a frame with extra selection", () => {
