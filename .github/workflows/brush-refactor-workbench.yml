@@ -1,0 +1,60 @@
+name: Brush material refactor workbench
+
+on:
+  push:
+    branches: [feat/brush-material-reset-core-20260912]
+    paths: [.github/workflows/brush-refactor-workbench.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brush-refactor-workbench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - name: Snapshot tracked source for isolated code review
+        run: |
+          mkdir -p /tmp/brush-refactor-evidence
+          python3 - <<'PY'
+          import pathlib, subprocess, zipfile
+          paths = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          suffixes = {'.ts','.tsx','.js','.jsx','.mjs','.cjs','.mts','.cts','.json','.yaml','.yml','.md','.toml','.wgsl','.glsl','.css','.html'}
+          with zipfile.ZipFile('/tmp/brush-refactor-evidence/source.zip','w',zipfile.ZIP_DEFLATED) as out:
+              for name in paths:
+                  path = pathlib.Path(name)
+                  if path.is_file() and not path.is_symlink() and path.suffix in suffixes and path.stat().st_size < 6000000 and not any(part.startswith('.env') for part in path.parts):
+                      out.write(path, name)
+              out.writestr('REVIEW_BASE_SHA.txt', subprocess.check_output(['git','rev-parse','HEAD']).decode())
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: brush-refactor-source
+          path: /tmp/brush-refactor-evidence/source.zip
+          retention-days: 2
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Baseline brush tests
+        run: |
+          set -o pipefail
+          pnpm exec vitest run apps/web/src/domains/creator/brush/ apps/web/src/domains/creator/brush-lab/ 2>&1 | tee /tmp/brush-refactor-evidence/tests.log
+      - name: Preserve baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: brush-refactor-baseline
+          path: /tmp/brush-refactor-evidence/tests.log
+          retention-days: 7
+          if-no-files-found: warn
