@@ -423,9 +423,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec vite preview --host 127.0.0.1 --port 4173 > /tmp/creator-home-preview.log 2>&1 &
+          pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort > /tmp/creator-home-preview.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" || true' EXIT
+
+          preview_ready=false
+          preview_deadline=$((SECONDS + 60))
+          while (( SECONDS < preview_deadline )); do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "Preview process exited before becoming ready." >&2
+              cat /tmp/creator-home-preview.log
+              exit 1
+            fi
+            preview_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 1 http://127.0.0.1:4173/ || true)"
+            if [[ "$preview_status" == "200" ]]; then
+              preview_ready=true
+              break
+            fi
+            if (( SECONDS < preview_deadline )); then sleep 1; fi
+          done
+          if [[ "$preview_ready" != "true" ]]; then
+            echo "Preview did not return HTTP 200 within 60 seconds." >&2
+            cat /tmp/creator-home-preview.log
+            exit 1
+          fi
 
           if [[ "${{ steps.scope.outputs.purpose }}" == "true" ]]; then
             node scripts/verify-purpose-first-home.mjs

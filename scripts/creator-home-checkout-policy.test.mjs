@@ -11,6 +11,10 @@ const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const workflow = parseYaml(readFileSync(new URL("../.github/workflows/creator-home-quality.yml", import.meta.url), "utf8"));
 const steps = workflow.jobs["creator-home"].steps;
 const checkout = steps.find((step) => step.uses?.startsWith("actions/checkout@"));
+const browserCommands = steps.find((step) => step.name === "Verify selected homepage contracts").run;
+const firstVerifier = browserCommands.indexOf('if [[ "${{ steps.scope.outputs.purpose }}"');
+const readinessCommands = browserCommands.slice(browserCommands.indexOf("preview_ready=false"), firstVerifier)
+  .replaceAll("/tmp/creator-home-preview.log", "/dev/null");
 
 function expectAvailableInCheckout(path) {
   const relativePath = relative(repositoryRoot, path).replaceAll("\\", "/");
@@ -67,4 +71,34 @@ describe("creator homepage production checkout", () => {
     expect(contractIndex).toBeGreaterThan(-1);
     expect(buildIndex).toBeGreaterThan(contractIndex);
   });
+
+  it("waits for HTTP readiness before the first verifier on the fixed preview port", () => {
+    expect(browserCommands).toContain("--port 4173 --strictPort");
+    expect(browserCommands).toContain('trap \'kill "$server_pid" || true\' EXIT');
+    const readinessIndex = browserCommands.indexOf("preview_ready=false");
+    expect(readinessIndex).toBeGreaterThan(-1);
+    expect(firstVerifier).toBeGreaterThan(readinessIndex);
+    expect(readinessCommands).toContain("preview_deadline=$((SECONDS + 60))");
+  });
+
+  it.each([
+    { status: "200", processAlive: true, succeeds: true },
+    { status: "204", processAlive: true, succeeds: false },
+    { status: "000", processAlive: true, succeeds: false },
+    { status: "200", processAlive: false, succeeds: false },
+  ])("gates verifiers on an alive process and HTTP 200: $status / $processAlive", ({ status, processAlive, succeeds }) => {
+    const result = spawnSync("bash", ["-c", [
+      "set -euo pipefail",
+      `server_pid=${processAlive ? "$$" : "99999999"}`,
+      `curl() { printf '${status}'; }`,
+      // Simulate the deadline without slowing down failed-readiness regressions.
+      "sleep() { SECONDS=$((SECONDS + 60)); }",
+      readinessCommands,
+      "printf 'verifier-reached'",
+    ].join("\n")], { encoding: "utf8", timeout: 5_000 });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(succeeds ? 0 : 1);
+    expect(result.stdout.includes("verifier-reached")).toBe(succeeds);
+  });
 });
+import { spawnSync } from "node:child_process";
