@@ -62,7 +62,7 @@ describe("ToonStudio integration closure", () => {
     expect(routePages).toContain('import("@/domains/creator/studio-shell/StudioProjectIntegratedPage")');
     expect(routePages).toContain("default: module.StudioProjectIntegratedPage");
     for (const section of ["overview", "story", "production", "assets", "review", "export", "settings"]) {
-      expect(routes).toContain(`path: "/studio/p/:projectId/${section}"`);
+      expect(routes).toContain(`path: studioRoutePath("project-${section}")`);
       expect(routes).toContain(`StudioProjectShellPage section="${section}"`);
     }
     expect(productIa).toContain('primaryRoute: "/studio"');
@@ -152,19 +152,20 @@ describe("ToonStudio integration closure", () => {
     expect(hosts).toContain("onProjectJson={handleImportProject}");
   });
 
-  it("keeps V5 catalogue recovery and V6 program ownership reachable from one brush route", () => {
+  it("keeps the consolidated product catalogue and V6 program ownership reachable from one brush route", () => {
     const page = source("apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx");
     const workbench = source("apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx");
     const versionBridge = source("apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.ts");
     const routes = source("apps/web/src/app/routes/groups/creator.routes.tsx");
 
     expect(page).toContain("<StudioBrushIntegratedWorkbench");
-    expect(page).toContain("<StudioBrushLegacyCataloguePanel");
+    expect(page).toContain("<StudioBrushProductCataloguePanel");
     expect(workbench).toContain('"toonspectrum:brush-v6-program"');
     expect(workbench).toContain("<MarketplaceBrushStudioBridge");
     expect(versionBridge).toContain("BRUSH_QUALITY_CATALOG");
+    expect(versionBridge).toContain("resolveProductBrushV6RecipeId");
     expect(versionBridge).toContain("BRUSH_STUDIO_V6_RECIPES");
-    expect(routes).toContain('path: "/studio/assets/brushes/new"');
-    expect(routes).toContain('path: "/studio/assets/brushes/:brushId/edit"');
+    expect(routes).toContain('path: studioRoutePath("asset-brush-new")');
+    expect(routes).toContain('path: studioRoutePath("asset-brush-edit")');
   });
 });

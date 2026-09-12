@@ -612,10 +612,10 @@ export const StudioBg3dSharedStagePanel = createLazyComponent(() =>
     default: Panel,
   }))
 );
-export {
-  StudioBg3dViewPanel,
-  type StudioBg3dBabylonDiagnosticBackend,
-  type StudioBg3dBabylonDiagnosticState,
+export { StudioBg3dViewPanel } from "./StudioBg3dViewPanelLazy";
+export type {
+  StudioBg3dBabylonDiagnosticBackend,
+  StudioBg3dBabylonDiagnosticState,
 } from "./StudioBg3dViewPanel";
 export {
   StudioBg3dImmersiveRenderBridge,
