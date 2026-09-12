@@ -6,6 +6,7 @@ import { AppRouter } from "./routes/AppRouter";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
+import { PublicSiteWayfinder } from "@/shared/components/public-site-wayfinder";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { pingVisit } from "@/shared/lib/visits-api";
 import {
@@ -121,6 +122,7 @@ export interface AppShellProps {
   showGlobalOverlays?: boolean;
   trackVisit?: boolean;
   mainClassName?: string;
+  publicExperience?: boolean;
 }
 
 export function AppShell({
@@ -132,6 +134,7 @@ export function AppShell({
   showCommandPalette = true,
   showGlobalOverlays = true,
   trackVisit = true,
+  publicExperience = false,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   useVisitPing(trackVisit);
@@ -152,8 +155,9 @@ export function AppShell({
       ) : null}
       {header}
       <PwaInstallNudge />
-      <main id="main-content" tabIndex={-1} className={mainClassName}>
+      <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={publicExperience || undefined}>
         <AppRouter />
+        {publicExperience ? <PublicSiteWayfinder /> : null}
       </main>
       {footer}
       {showCommandPalette ? <CommandPaletteHost /> : null}

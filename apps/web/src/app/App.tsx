@@ -6,11 +6,13 @@ import { BrowserCompatModal } from "../components/browser-compat-modal";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
+import { dismissBrowserCompat, isBrowserCompatDismissed } from "./browser-compat-dismissal";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
 import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
 
+import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 import { FloatingControls } from "@/shared/components/FloatingControls";
 import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
@@ -86,9 +88,9 @@ function DeskCloudHost() {
   );
 }
 
-function DeferredFooter() {
+function DeferredFooter({ immediate = false }: { immediate?: boolean }) {
   const ready = useDeferredByScroll();
-  if (!ready) return null;
+  if (!ready && !immediate) return null;
   return (
     <Suspense fallback={null}>
       <SiteFooter />
@@ -223,19 +225,20 @@ function AppRuntime() {
   const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
   const isolatedChrome = studioImmersive || adminChrome;
+  const publicExperience = !isStudioRoutePathname(pathname) && !adminChrome;
 
   useKmasEntryMerge(!adminChrome);
 
   useEffect(() => {
     const result = checkBrowserCompatibility();
     setCompatResult(result);
-    const dismissed = sessionStorage.getItem("toonspectrum-compat-dismissed");
+    const dismissed = isBrowserCompatDismissed();
     if (result.recommendUpdate && !dismissed) setShowCompatModal(true);
   }, []);
 
   const handleCloseCompatModal = () => {
     setShowCompatModal(false);
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    dismissBrowserCompat();
   };
 
   return (
@@ -250,7 +253,8 @@ function AppRuntime() {
       <SerifWebFontBridge />
       <AppShell
         header={isolatedChrome ? null : <SiteHeader />}
-        footer={isolatedChrome ? null : <DeferredFooter />}
+        footer={isolatedChrome ? null : <DeferredFooter immediate={publicExperience} />}
+        publicExperience={publicExperience}
         floatingControls={isolatedChrome ? null : <WebFloatingControls />}
         showSkipLink={!studioImmersive}
         showCommandPalette={!adminChrome}
