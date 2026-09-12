@@ -192,22 +192,21 @@ try {
       // only the current active surface's commands, with an explicit fixed cap for this QA stroke.
       globalThis.__studioMaterialCanvasTrace = { fills: [], overflow: false };
       const paths = new WeakMap<CanvasRenderingContext2D, NativeMaterialFillTrace["path"]>();
-      const isActive = (context: CanvasRenderingContext2D) => context.canvas.dataset.studioLiveRetainedActive === "true";
       for (const method of ["roundRect", "ellipse"] as const) {
         const native = CanvasRenderingContext2D.prototype[method];
         CanvasRenderingContext2D.prototype[method] = function (...args: unknown[]) {
-          if (isActive(this)) paths.set(this, { method, args });
+          if (this.canvas.dataset.studioLiveRetainedActive === "true") paths.set(this, { method, args });
           return Reflect.apply(native, this, args);
         };
       }
       const clear = CanvasRenderingContext2D.prototype.clearRect;
       CanvasRenderingContext2D.prototype.clearRect = function (...args: Parameters<typeof clear>) {
-        if (isActive(this)) globalThis.__studioMaterialCanvasTrace = { fills: [], overflow: false };
+        if (this.canvas.dataset.studioLiveRetainedActive === "true") globalThis.__studioMaterialCanvasTrace = { fills: [], overflow: false };
         return Reflect.apply(clear, this, args);
       };
       const fill = CanvasRenderingContext2D.prototype.fill;
       CanvasRenderingContext2D.prototype.fill = function (...args: unknown[]) {
-        if (isActive(this)) {
+        if (this.canvas.dataset.studioLiveRetainedActive === "true") {
           const trace = globalThis.__studioMaterialCanvasTrace;
           if (trace.fills.length >= 100_000) trace.overflow = true;
           else {
