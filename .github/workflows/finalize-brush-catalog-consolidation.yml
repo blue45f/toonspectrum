@@ -1,0 +1,84 @@
+name: Finalize brush catalogue consolidation
+
+on:
+  push:
+    branches: [fix/brush-catalog-consolidation-core-20260912]
+    paths:
+      - 'scripts/maintenance/finalize-brush-catalog-consolidation.py'
+      - '.github/workflows/finalize-brush-catalog-consolidation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-brush-catalog-consolidation
+  cancel-in-progress: true
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/brush-catalog-consolidation-core-20260912
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Apply final consolidation patch
+        run: python scripts/maintenance/finalize-brush-catalog-consolidation.py
+      - name: Install locked workspace
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Format changed source and workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|mts|mjs|js|json|md|yml|yaml)$' || true)
+          if ((${#files[@]})); then
+            pnpm exec prettier --write "${files[@]}"
+          fi
+      - name: Strict lint and typecheck
+        run: |
+          set -euo pipefail
+          pnpm run lint:strict
+          pnpm run typecheck
+          pnpm run typecheck:cloudflare-realtime
+      - name: Product catalogue and renderer tests
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
+            apps/web/src/domains/creator/studio-integration-closure.test.ts
+          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
+      - name: Production build
+        run: |
+          set -euo pipefail
+          pnpm --filter @webtoon-nest/api build
+          pnpm run build
+          pnpm run check:studio-bundle
+      - name: Remove one-shot helpers and publish validated result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm scripts/maintenance/finalize-brush-catalog-consolidation.py
+          git rm .github/workflows/finalize-brush-catalog-consolidation.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor(brush): consolidate product catalogue and restore core CI'
+          git push origin HEAD:fix/brush-catalog-consolidation-core-20260912
