@@ -34,6 +34,32 @@ replace_once(
     '    expect(routes).toContain(\'path: studioRoutePath("asset-brush-edit")\');',
 )
 
+replace_once(
+    "scripts/audit-studio-brush-quality-portfolio.mts",
+    '''import {
+  STUDIO_BRUSH_HAND_FEEL_PROFILES,
+  STUDIO_BRUSH_LIVE_COMMIT_GATES,
+  STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER,
+  STUDIO_BRUSH_QUALITY_ENGINE_PINS,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS,
+  STUDIO_BRUSH_QUALITY_SCORE_WEIGHTS,
+  STUDIO_BRUSH_TEXTURE_PROFILES,
+} from "../apps/web/src/domains/creator/brush/studio-brush-quality-portfolio";''',
+    '''import {
+  STUDIO_BRUSH_HAND_FEEL_PROFILES,
+  STUDIO_BRUSH_LIVE_COMMIT_GATES,
+  STUDIO_BRUSH_QUALITY_ENGINE_PINS,
+  STUDIO_BRUSH_QUALITY_SCORE_WEIGHTS,
+  STUDIO_BRUSH_TEXTURE_PROFILES,
+} from "../apps/web/src/domains/creator/brush/studio-brush-quality-foundation";
+import {
+  STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS,
+} from "../apps/web/src/domains/creator/brush/studio-brush-quality-portfolio";''',
+)
+
 # These workflows were temporary branch-mutating installers/repair jobs. They are not product CI
 # and the permanent ToonStudio integration contract explicitly requires them to be absent.
 TRANSIENT_WORKFLOWS = (
