@@ -558,7 +558,7 @@ test("historical adoption requires structural evidence through 0019", () => {
   expect(sql).not.toContain("creator_marketplace_resource");
 });
 
-test("post-baseline relation classification stays synchronized with the CI fixture reset", () => {
+test("historical adoption and post-baseline relations exactly partition runtime readiness", () => {
   expect(POST_BASELINE_RELATIONS).toEqual([
     "admin_announcements",
     "admin_audit_logs",
@@ -591,15 +591,41 @@ test("post-baseline relation classification stays synchronized with the CI fixtu
     "creator_work_asset_storage_reference",
     "creator_work_catalog_asset_binding",
   ]);
-  const workflow = readFileSync(
-    new URL("../.github/workflows/ci.yml", import.meta.url),
+  const readinessSource = readFileSync(
+    new URL(
+      "../apps/api/src/modules/health/health-readiness.repository.ts",
+      import.meta.url,
+    ),
     "utf8",
   );
-  const fixtureReset =
-    /DROP TABLE IF EXISTS([\s\S]*?)CASCADE;/u.exec(workflow)?.[1] ?? "";
-  for (const relation of POST_BASELINE_RELATIONS) {
-    expect(fixtureReset).toContain(`"${relation}"`);
-  }
+  const readinessDeclaration =
+    /export const REQUIRED_DATABASE_RELATIONS = \[([\s\S]*?)\] as const/u.exec(
+      readinessSource,
+    );
+  expect(readinessDeclaration).not.toBeNull();
+  const requiredRelations = [
+    ...readinessDeclaration[1].matchAll(/"([^"]+)"/gu),
+  ].map((match) => match[1]);
+
+  const historicalSql = buildHistoricalAdoptionVerificationSql();
+  const historicalRequirementArray =
+    /FROM unnest\(ARRAY\[([\s\S]*?)\]::text\[\]\) AS required_relation/u.exec(
+      historicalSql,
+    );
+  expect(historicalRequirementArray).not.toBeNull();
+  const historicalRelations = [
+    ...historicalRequirementArray[1].matchAll(/'([^']+)'/gu),
+  ].map((match) => match[1]);
+
+  expect(historicalRelations).toEqual(
+    requiredRelations.filter(
+      (relation) => !POST_BASELINE_RELATIONS.includes(relation),
+    ),
+  );
+  expect([...historicalRelations, ...POST_BASELINE_RELATIONS].toSorted()).toEqual(
+    requiredRelations.toSorted(),
+  );
+  expect(new Set(requiredRelations).size).toBe(requiredRelations.length);
 });
 
 test("an exact applied checksum is skipped", () => {

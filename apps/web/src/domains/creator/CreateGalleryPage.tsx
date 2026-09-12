@@ -1,13 +1,13 @@
-import { BookOpen, PenLine, Plus, Sparkles, Trophy, UserCheck, X } from "lucide-react";
+import { BookOpen, PenLine, Plus, Sparkles, UserCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { CreateFeaturedSections } from "./CreateFeaturedSections";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
-import { buildStudioHref } from "./creator-studio-links";
+import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
 
 import { Container } from "@/shared/components/section";
-import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { CreativeJourneyLinks } from "@/shared/components/public-creative";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
@@ -39,7 +39,6 @@ const TABS: { value: GalleryTab; label: string }[] = [
 ];
 
 // root-relative 자산은 정적 경로 헬퍼를 거쳐 렌더링합니다.
-const CREATOR_BOARD_HERO = "/assets/create/creator-board-hero.png";
 const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
 
 function isSort(value: string | null): value is WorkSort {
@@ -380,12 +379,12 @@ function ChipButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium transition-all duration-150 active:scale-[0.96]",
+        "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         active
           ? "border-accent bg-accent text-on-accent shadow-md shadow-accent/25"
           : tone === "tab"
-            ? "border-white/20 bg-white/10 text-white/85 backdrop-blur-md hover:bg-white/[0.18]"
-            : "border-white/15 bg-white/[0.07] text-white/72 backdrop-blur-md hover:bg-white/[0.14]"
+            ? "border-line-strong bg-card text-fg-2 hover:bg-raised"
+            : "border-line bg-card text-fg-2 hover:bg-raised"
       )}
     >
       {children}
@@ -415,68 +414,11 @@ export function CreateGalleryPage() {
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
-      <header className="sheen-sweep relative mb-6 overflow-hidden rounded-3xl border border-line bg-panel/45 shadow-lg shadow-black/20 sm:mb-7">
-        <img
-          src={resolveAssetUrl(CREATOR_BOARD_HERO)}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-right"
-          loading="eager"
-          decoding="async"
-        />
-        {/* 좌측이 어두운 일러스트라 좌→우 그라데이션으로 텍스트 가독성(WCAG-AA) 확보 + 하단 보강 */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.12_0.015_245/0.95)] via-[oklch(0.12_0.015_245/0.78)] to-[oklch(0.12_0.015_245/0.25)]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.1_0.015_245/0.85)] via-transparent to-transparent" />
-        <div className="relative flex flex-col justify-between gap-5 p-5 sm:gap-7 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <p className="eyebrow flex items-center gap-1.5 text-accent">
-                <span aria-hidden className="pulse-dot" /> CREATOR BOARD
-              </p>
-              <h1 className="mt-2 text-[1.75rem] font-bold leading-tight tracking-tight sm:text-4xl">
-                <ShimmerTitle as="span">창작 게시판</ShimmerTitle>
-              </h1>
-              <p className="mt-2 max-w-xl text-pretty text-[0.8125rem] leading-relaxed text-white/80 sm:text-sm">
-                직접 그린 컷툰과 업로드한 작품을 자유롭게 공유하는 공간입니다. 연재 시리즈를 만들고,
-                챌린지에 참여하고, 좋아하는 창작자를 팔로우해 보세요.
-              </p>
-            </div>
-            <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
-              <Link
-                href="/create/challenges"
-                className={buttonClass({
-                  variant: "ghost",
-                  className:
-                    "h-11 gap-1.5 border border-white/30 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white",
-                })}
-              >
-                <Trophy size={16} />
-                창작 챌린지
-              </Link>
-              <Link
-                href={buildStudioHref({ mode: "upload" })}
-                className={buttonClass({
-                  variant: "ghost",
-                  className:
-                    "h-11 gap-1.5 border border-white/30 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white",
-                })}
-              >
-                <BookOpen size={16} />
-                이미지 업로드
-              </Link>
-              <Link
-                href="/studio"
-                className={buttonClass({
-                  variant: "solid",
-                  className: "h-11 gap-1.5 shadow-lg shadow-accent/25 sm:col-span-2",
-                })}
-              >
-                <PenLine size={16} />
-                <span className="truncate">스튜디오로 만들기</span>
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-white/15 pt-4">
+      <WebtoonGalleryIntro />
+      <header className="webtoon-gallery-filter mb-7 rounded-2xl border border-line p-5 sm:p-6">
+        <div>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-bold">창작자의 작품을 만나보세요</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
+          <div className="flex flex-col gap-3 border-t border-line pt-4">
             {/* 탭: 전체 작품 / 시리즈 / 팔로잉 — 썸 친화 칩, 360px 에서 깔끔히 줄바꿈 */}
             <div role="tablist" aria-label="보기" className="flex flex-wrap gap-2">
               {TABS.map((option) => (
@@ -513,7 +455,7 @@ export function CreateGalleryPage() {
                     type="button"
                     onClick={() => setParam("tag", null)}
                     aria-label={`#${tag} 태그 필터 해제`}
-                    className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-accent-soft active:scale-[0.96]"
+                    className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent-soft active:scale-[0.96]"
                   >
                     #{tag}
                     <X size={14} aria-hidden />
@@ -528,6 +470,7 @@ export function CreateGalleryPage() {
       {tab === "works" && !tag ? <CreateFeaturedSections /> : null}
 
       {tab === "works" ? <WorksTab sort={sort} tag={tag} /> : tab === "series" ? <SeriesTab sort={sort} /> : <FollowingTab />}
+      <CreativeJourneyLinks />
     </Container>
   );
 }
