@@ -90,4 +90,16 @@ describe("search-client", () => {
     await expect(fetchSearchResponse("sort=relevance&q=abort")).resolves.toMatchObject({ items: [] });
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+  it("keeps saved IDs out of URLs and includes the standard CSRF proof", async () => {
+    const payload = { items: [], typeCount: { webtoon: 0, webnovel: 0 }, topTags: [] };
+    const mockFetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(payload)));
+    globalThis.fetch = mockFetch;
+    await fetchSearchResponse("ids=work-159&page=1&pageSize=24");
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/search");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("x-toonspectrum-csrf")).toBe("1");
+    expect(JSON.parse(String(init?.body))).toEqual({ ids: "work-159", page: "1", pageSize: "24" });
+  });
+
 });

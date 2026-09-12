@@ -33,7 +33,6 @@ deploy/coturn/
 deploy/oci/
 
 # Test-only sources are verified in CI and are not production build inputs.
-# Keep this block last so it also removes tests from preserved source trees.
 **/*.test.*
 **/*.spec.*
 **/__tests__/
@@ -43,3 +42,7 @@ deploy/oci/
 **/specs/
 e2e/
 tests/benchmarks/
+
+# The API build explicitly runs this dependency-free Node contract test before
+# compilation. Preserve that build input; do not drop the runtime import guard.
+!scripts/verify-api-runtime-imports.test.mjs

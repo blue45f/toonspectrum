@@ -26,7 +26,7 @@ import { Segmented } from "./ui/segmented";
 import { Select } from "./ui/select";
 
 import type { SortKey } from "@/shared/lib/search";
-import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/shared/lib/types";
+import type { WorkType, SerialStatus, AgeRating, PlatformId } from "@/shared/lib/types";
 
 import { useT } from "@/shared/lib/i18n";
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
@@ -34,7 +34,7 @@ import { normalizeQuery } from "@/shared/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/infrastructure/search-client";
+import { usePaginatedSearch } from "@/infrastructure/use-paginated-search";
 
 
 type FilterToken = { key: string; label: string; category: string };
@@ -64,13 +64,6 @@ export function SearchExplorer({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [savedOnly, setSavedOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [limit, setLimit] = useState(24);
-  const [results, setResults] = useState<Title[]>([]);
-  const [typeCount, setTypeCount] = useState({ webtoon: 0, webnovel: 0 });
-  const [topTags, setTopTags] = useState<string[]>([]);
-  const [catalog, setCatalog] = useState<SearchCatalogMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const t = useT();
 
@@ -79,6 +72,7 @@ export function SearchExplorer({
   const removeRecentSearch = useApp((s) => s.removeRecentSearch);
   const clearRecentSearches = useApp((s) => s.clearRecentSearches);
   const textSettling = q.trim() !== debouncedQ.trim();
+  const savedIds = useSavedTitleIds();
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ sort });
@@ -96,55 +90,25 @@ export function SearchExplorer({
     }
     if (freeOnly) params.set("freeOnly", "true");
     if (adaptedOnly) params.set("adaptedOnly", "true");
+    if (savedOnly) params.set("ids", [...savedIds].sort().join(","));
     return params.toString();
-  }, [adaptedOnly, ages, debouncedQ, freeOnly, genres, minRating, platforms, sort, status, tags, types, yearRange]);
+  }, [adaptedOnly, ages, debouncedQ, freeOnly, genres, minRating, platforms, sort, status, tags, types, yearRange, savedOnly, savedIds]);
 
+  const search = usePaginatedSearch(query, !textSettling, retryKey);
+  const results = search.items;
+  const loading = search.loading;
+  const error = search.failed ? t("search.explorer.error.description") : null;
+  const typeCount = search.data?.typeCount ?? { webtoon: 0, webnovel: 0 };
+  const topTags = search.data?.topTags ?? [];
+  const catalog = search.data?.catalog ?? null;
   useEffect(() => {
-    if (textSettling) {
-      setLoading(true);
-      return;
-    }
+    if (!loading && normalizeQuery(debouncedQ) && results.length > 0) recordRecentSearch(debouncedQ);
+  }, [debouncedQ, loading, results.length, recordRecentSearch]);
 
-    let alive = true;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetchSearchResponse(query, controller.signal)
-      .then((data) => {
-        if (!alive) return;
-        setResults(data.items);
-        setTypeCount(data.typeCount);
-        setTopTags(data.topTags);
-        setCatalog(data.catalog ?? null);
-        setLimit(24);
-        // 결과가 있는 검색어만 최근 검색어로 기록(오타·빈 검색은 제외). 정규화·중복 제거는 스토어가 담당.
-        if (normalizeQuery(debouncedQ) && data.items.length > 0) recordRecentSearch(debouncedQ);
-      })
-      .catch((error: unknown) => {
-        if (isSearchAbortError(error)) return;
-        if (!alive) return;
-        setError(t("search.explorer.error.description"));
-        setResults([]);
-        setTypeCount({ webtoon: 0, webnovel: 0 });
-        setCatalog(null);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [debouncedQ, query, recordRecentSearch, retryKey, textSettling, t]);
-
-  const savedIds = useSavedTitleIds();
-  const visibleResults = savedOnly ? results.filter((title) => savedIds.has(title.id)) : results;
-  const shown = visibleResults.slice(0, limit);
-  const hasResult = Boolean(visibleResults.length);
-  const resultText = hasResult
-    ? t("search.explorer.resultCount").replace("{count}", compactNumber(visibleResults.length))
+  const shown = results;
+  const hasResult = Boolean(shown.length);
+  const resultText = search.total > 0
+    ? t("search.explorer.resultCount").replace("{count}", compactNumber(search.total))
     : t("search.explorer.noResult");
   const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
   const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
@@ -235,9 +199,6 @@ export function SearchExplorer({
     setMinRating(0);
     setFreeOnly(false);
     setAdaptedOnly(false);
-    if (activeCount > 0) {
-      setLimit(24);
-    }
   };
 
   const removeToken = (token: FilterToken) => {
@@ -674,17 +635,24 @@ export function SearchExplorer({
               </div>
             )}
 
-            {shown.length < visibleResults.length && (
+            {search.moreFailed && (
+              <p role="alert" className="mt-4 text-center text-sm text-bad">
+                {t("search.explorer.error.description")}
+              </p>
+            )}
+            {search.hasMore && (
               <div className="mt-8 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setLimit((current) => current + 24)}
+                  onClick={search.loadMore}
+                  disabled={search.loadingMore}
+                  aria-busy={search.loadingMore}
                   className={buttonClass({ size: "sm", className: "gap-1.5" })}
                 >
-                  {t("search.explorer.loadMore")}
+                  {search.loadingMore ? t("search.explorer.loading") : search.moreFailed ? t("search.explorer.retry") : t("search.explorer.loadMore")}
                   <span className="text-fg-3">
                     (
-                    {compactNumber(visibleResults.length - shown.length)}
+                    {compactNumber(Math.max(0, search.total - shown.length))}
                     {t("search.explorer.unit.itemSuffix")}
                     )
                   </span>

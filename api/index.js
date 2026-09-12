@@ -90,6 +90,6 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const app = await loadServerlessApp()();
+  const app = await loadServerlessApp()(path);
   return app(req, res);
 };

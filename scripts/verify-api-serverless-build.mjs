@@ -138,7 +138,103 @@ function probeNativeArtifact() {
   run().catch((error) => { console.error(error); process.exit(1); });
 }
 
-/** Run after `pnpm --filter @webtoon-nest/api build`; never pulls Vercel environment secrets. */
+
+// Each partition is checked in a separate fresh process, before any full API import.
+function probePartitionArtifact() {
+  const assert = require("node:assert/strict");
+  const fs = require("node:fs");
+  const http = require("node:http");
+  const root = fs.realpathSync(process.argv[1]);
+  const group = process.env.PROBE_PARTITION;
+  const routes = { auth: "/api/auth/session", studio: "/api/studio-music/status", general: "/api/config" };
+  const handler = require(root + "/api/index.js");
+  const originalFetch = globalThis.fetch;
+  let origin;
+  globalThis.fetch = (input, init) => {
+    const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+    assert.equal(url.origin, origin, "Partition probe forbids external HTTP");
+    return originalFetch(input, init);
+  };
+  const server = http.createServer((req, res) => {
+    Promise.resolve(handler(req, res)).catch((error) => { console.error(error); res.statusCode = 500; res.end("boot-failed"); });
+  });
+  async function run() {
+    await new Promise((done) => server.listen(0, "127.0.0.1", done));
+    origin = "http://127.0.0.1:" + server.address().port;
+    const startCpu = process.cpuUsage();
+    const start = performance.now();
+    const response = await fetch(origin + routes[group], { signal: AbortSignal.timeout(20_000), headers: { "x-user-id": "untrusted-user" } });
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    if (group === "auth") {
+      assert.equal(body.authenticated, false);
+      assert.equal(body.user, null);
+      const denied = await fetch(origin + "/api/auth/login", {
+        method: "POST", headers: { "content-type": "application/json", Origin: "https://attacker.invalid" }, body: "{}",
+        signal: AbortSignal.timeout(5_000),
+      });
+      assert.equal(denied.status, 403, "Partitioning must not bypass login CSRF");
+      await denied.text();
+    }
+    if (group === "studio") assert.equal(body.enabled, false);
+    const modules = Object.keys(require.cache);
+    assert(modules.some((file) => file.endsWith(`/runtime/${group}-api.module.js`)));
+    assert(!modules.some((file) => file.endsWith("/src/app.module.js")), "A partition imported the full AppModule");
+    if (group !== "general") {
+      assert(!modules.some((file) => file.endsWith("/catalog/catalog.module.js")), "Auth/Studio imported CatalogModule");
+      assert(!modules.some((file) => file.endsWith("/server/catalog-file.js")), "Auth/Studio imported the catalog file loader");
+    }
+    if (group !== "studio") assert(!modules.some((file) => file.endsWith("/creator/creator.module.js")), "A non-Studio request imported CreatorModule");
+    assert(modules.every((file) => file.startsWith(root + "/")), "A module escaped the Lambda artifact");
+    fs.writeFileSync(process.argv[2], JSON.stringify({ group, status: response.status, elapsedMs: performance.now() - start,
+      cpuMicroseconds: process.cpuUsage(startCpu), modules }, null, 2));
+    await new Promise((done) => server.close(done)); process.exit(0);
+  }
+  run().catch((error) => { console.error(error); process.exit(1); });
+}
+
+function probeOgArtifact() {
+  const assert = require("node:assert/strict");
+  const fs = require("node:fs");
+  const root = fs.realpathSync(process.argv[1]);
+  globalThis.fetch = () => { throw new Error("OG probe forbids HTTP"); };
+  const handler = require(root + "/api/og.js");
+  const response = () => ({ headers: {}, html: "", code: 0,
+    setHeader(key, value) { this.headers[key] = value; }, status(code) { this.code = code; return this; }, send(html) { this.html = html; } });
+  async function run() {
+    const names = fs.readdirSync(root + "/dist/og/titles").filter((name) => /^[a-f0-9]{2}\.json$/.test(name));
+    assert(names.length > 0 && names.length <= 256, "The generated OG shards are missing");
+    const shard = JSON.parse(fs.readFileSync(root + "/dist/og/titles/" + names[0], "utf8"));
+    const title = Object.values(shard)[0];
+    const res = response();
+    await handler({ query: { slug: encodeURIComponent(title.slug) }, headers: { "user-agent": "Googlebot", host: "attacker.invalid" } }, res);
+    assert.equal(res.code, 200); assert.equal(res.headers["Cache-Control"], "public, max-age=300, s-maxage=86400");
+    assert(!res.html.includes("attacker.invalid"));
+    const graphs = [...res.html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
+    const graph = JSON.parse(graphs.at(-1)[1]);
+    assert.equal(graph["@graph"][0].name, title.title);
+    const loadedBeforeMarket = Object.keys(require.cache);
+    assert(!loadedBeforeMarket.some((file) => file.includes("/node_modules/@nestjs/")), "A title OG request booted Nest");
+    assert(!loadedBeforeMarket.some((file) => file.endsWith("/server/catalog-file.js")), "A title OG request loaded the whole catalog");
+    const missing = response();
+    await handler({ query: { slug: "missing-probe-" + Date.now() }, headers: { "user-agent": "Googlebot" } }, missing);
+    assert.equal(missing.headers["Cache-Control"], "no-store");
+    // A valid, unknown release reaches the existing visibility-aware service. With the
+    // deliberately unavailable local DB it may reject as 404/503, never as a missing module/DI.
+    const { readMarketplaceOgResource } = require(root + "/apps/api/dist/apps/api/src/server/marketplace-og.js");
+    let rejected;
+    try { await readMarketplaceOgResource("00000000-0000-4000-8000-000000000001"); }
+    catch (error) { rejected = error; }
+    assert(rejected && typeof rejected.getStatus === "function" && [404, 503].includes(rejected.getStatus()), "OG marketplace context failed before the public service policy");
+    fs.writeFileSync(process.argv[2], JSON.stringify({ shards: names.length, titleStatus: res.code,
+      missingCache: missing.headers["Cache-Control"], marketStatus: rejected.getStatus(), loadedBeforeMarket }, null, 2));
+    process.exit(0);
+  }
+  run().catch((error) => { console.error(error); process.exit(1); });
+}
+
+/** Run after API and web builds; never pulls Vercel environment secrets. */
 export async function verifyApiServerlessBuild() {
   const require = createRequire(resolve(ROOT, "package.json"));
   const vercelRequire = createRequire(require.resolve("vercel/package.json"));
@@ -148,7 +244,7 @@ export async function verifyApiServerlessBuild() {
   await readFile(resolve(ROOT, "apps/api/dist/apps/api/src/serverless.js"));
   await readFile(resolve(ROOT, "apps/api/dist/apps/api/src/studio-live-serverless.js"));
   const output = await mkdtemp(resolve(tmpdir(), "toonspectrum-api-lambda-"));
-  for (const entrypoint of ["api/index.js", "api/studio-live.js"]) {
+  for (const entrypoint of ["api/index.js", "api/studio-live.js", "api/og.js"]) {
     const result = await builder.build({
       files: { [entrypoint]: new FileFsRef({ fsPath: resolve(ROOT, entrypoint) }) },
       entrypoint,
@@ -165,8 +261,8 @@ export async function verifyApiServerlessBuild() {
       meta: { skipDownload: true },
     });
     const files = Object.keys(result.output.files).sort();
-    assert(files.includes("apps/api/dist/packages/core/src/studio-music.js"));
-    const artifactName = entrypoint === "api/index.js" ? "http" : "studio-live";
+    if (entrypoint !== "api/og.js") assert(files.includes("apps/api/dist/packages/core/src/studio-music.js"));
+    const artifactName = entrypoint === "api/index.js" ? "http" : entrypoint === "api/og.js" ? "og" : "studio-live";
     const manifest = {
       builder: "@vercel/node",
       version: vercelRequire("@vercel/node/package.json").version,
@@ -174,12 +270,15 @@ export async function verifyApiServerlessBuild() {
       handler: result.output.handler,
       files,
     };
-    await writeFile(resolve(output, artifactName === "http" ? "manifest.json" : "native-manifest.json"), JSON.stringify(manifest, null, 2));
-    const lambdaRoot = resolve(output, artifactName === "http" ? "lambda" : "native-lambda");
+    await writeFile(resolve(output, artifactName === "http" ? "manifest.json" : artifactName === "og" ? "og-manifest.json" : "native-manifest.json"), JSON.stringify(manifest, null, 2));
+    const lambdaRoot = resolve(output, artifactName === "http" ? "lambda" : artifactName === "og" ? "og-lambda" : "native-lambda");
     await download(result.output.files, lambdaRoot);
     const probes = artifactName === "http"
-      ? [{ name: "http", probe: probeArtifact, environment: {} }]
-      : [
+      ? [
+        { name: "http", probe: probeArtifact, environment: {} },
+        ...["auth", "studio", "general"].map((group) => ({ name: `partition-${group}`, probe: probePartitionArtifact, environment: { PROBE_PARTITION: group } })),
+      ]
+      : artifactName === "og" ? [{ name: "og", probe: probeOgArtifact, environment: {} }] : [
         { name: "native-disabled", probe: probeNativeArtifact, environment: {} },
         {
           name: "native-cluster-unavailable",
@@ -217,7 +316,7 @@ export async function verifyApiServerlessBuild() {
       assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
     }
   }
-  console.log(`Vercel HTTP/native Lambda packaging, 12 isolated API reads and fail-closed gateway probes passed: ${output}`);
+  console.log(`Vercel HTTP/native/OG packaging, isolated API reads, partition/CSRF and fail-closed gateway probes passed: ${output}`);
   return output;
 }
 

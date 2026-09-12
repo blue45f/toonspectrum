@@ -21,7 +21,7 @@
     },
     "api/og.js": {
       "maxDuration": 30,
-      "includeFiles": "dist/index.html"
+      "includeFiles": "{dist/index.html,dist/og/titles/**}"
     }
   },
   "redirects": [

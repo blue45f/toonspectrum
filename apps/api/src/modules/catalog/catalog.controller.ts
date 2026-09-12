@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Headers,
   HttpCode,
@@ -17,6 +18,8 @@ import {
 import { buildAffiliateUrl } from "../../../../web/src/shared/lib/affiliate";
 import { coverImagePolicy } from "../../../../../packages/core/src/server";
 import { getAppConfig } from "../../server/app-config";
+
+import { searchParamsFromBody } from "../../../../../packages/core/src/search-pagination";
 
 import { CatalogService } from "./catalog.service";
 import { resolveAffiliateDestination, resolveCoverFetchUrl } from "./catalog-url-policy";
@@ -40,6 +43,9 @@ interface ReviewLikePostPayload {
 }
 
 interface SearchQuery {
+  page?: string;
+  pageSize?: string;
+  ids?: string;
   sort?: string;
   q?: string;
   types?: string;
@@ -221,6 +227,21 @@ export class CatalogController {
   @Get("/search")
   @Header("Cache-Control", "no-store, max-age=0")
   async getSearch(@Query() query: SearchQuery) {
+    return this.catalogService.getSearchData(query);
+  }
+
+  // Large saved collections are submitted in the body instead of leaking into URLs.
+  // The common session/CSRF boundary still applies; this route has no write side effects.
+  @Post("/search")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store, max-age=0")
+  async postSearch(@Body() body: unknown) {
+    let query: SearchQuery;
+    try {
+      query = Object.fromEntries(searchParamsFromBody(body));
+    } catch (error) {
+      throw new BadRequestException({ error: error instanceof Error ? error.message : "Invalid search query" });
+    }
     return this.catalogService.getSearchData(query);
   }
 
