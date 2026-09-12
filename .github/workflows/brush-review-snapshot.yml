@@ -1,0 +1,28 @@
+name: Brush review source snapshot
+on:
+  push:
+    branches: [feat/brush-material-reset-core-20260912]
+    paths: [.github/workflows/brush-review-snapshot.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Archive tracked source and exact refs only
+        run: |
+          mkdir -p /tmp/brush-review
+          git rev-parse HEAD > /tmp/brush-review/commit.txt
+          git ls-files > /tmp/brush-review/files.txt
+          git archive HEAD apps/web/src apps/api/src packages scripts .github package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json vite.config.ts vitest.config.ts eslint.config.mjs > /tmp/brush-review/source.tar
+      - uses: actions/upload-artifact@v6
+        with:
+          name: brush-review-source
+          path: /tmp/brush-review
+          retention-days: 3
+          if-no-files-found: error
