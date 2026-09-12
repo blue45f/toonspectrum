@@ -396,8 +396,15 @@ describe("shared document requests", () => {
     });
     expect(apiGet).toHaveBeenCalledWith(
       "/creator/works/Shared%2FWORK%2001/team/document",
-      { signal: controller.signal }
+      expect.objectContaining({
+        timeout: 15_000,
+        retry: expect.objectContaining({ limit: 2, methods: ["get"] }),
+      })
     );
+    const requestSignal = apiGet.mock.calls[0]?.[1]?.signal as AbortSignal;
+    expect(requestSignal.aborted).toBe(false);
+    controller.abort();
+    expect(requestSignal.aborted).toBe(true);
   });
 
   it("meta GET은 opaque id를 인코딩한 최소 경로와 AbortSignal을 사용한다", async () => {

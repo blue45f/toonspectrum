@@ -1,3 +1,4 @@
+import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
 import { useStudioRecentColors } from "./useStudioRecentColors";
@@ -1003,6 +1004,7 @@ import {
 import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
+  normalizeStudioReleaseScheduleDeferred,
 } from "./studio-release-schedule-loader";
 import { studioSafeModeQuality } from "./studio-reliability-status-store";
 import { publishStudioRenderBackend } from "./studio-render-backend-beacon";
@@ -7251,6 +7253,18 @@ export function StudioCuttoonEditor({
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
     const scheduledPendingFingerprint = studioPendingStrokeFingerprint(pendingBatch);
     const scheduledAutosaveSession = autosaveOpfsSessionRef.current;
+    const snapshotIsCurrent = createStudioAutosaveSnapshotFence({
+      generation: scheduledGeneration,
+      pendingFingerprint: scheduledPendingFingerprint,
+      session: scheduledAutosaveSession,
+    }, () => ({
+      generation: studioRevisionProjectGenerationRef.current,
+      pendingFingerprint: studioPendingStrokeFingerprint(pendingStrokeCommitsRef.current),
+      session: autosaveOpfsSessionRef.current,
+    }));
+    const canPublishSnapshot = () => editorMountedRef.current
+      && !collaborationAccessRef.current.locked
+      && snapshotIsCurrent();
     const busyRetry = createStudioAutosaveBusyRetry({
       isCurrent: () => editorMountedRef.current
         && !collaborationAccessRef.current.locked
@@ -7269,6 +7283,13 @@ export function StudioCuttoonEditor({
       );
     }
     const timer = setTimeout(() => {
+      if (!canPublishSnapshot()) {
+        // Capture fresh ref-backed history instead of assigning a newer timestamp to old ink.
+        if (editorMountedRef.current && autosaveOpfsSessionRef.current === scheduledAutosaveSession) {
+          setAutosaveRetryNonce((current) => current + 1);
+        }
+        return;
+      }
       if (
         scheduledGeneration <= studioLifecycleDurableGenerationRef.current
         && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
@@ -7298,7 +7319,7 @@ export function StudioCuttoonEditor({
             autosaveDocumentLeaseRef.current,
           );
           if (
-            studioRevisionProjectGenerationRef.current !== scheduledGeneration
+            !canPublishSnapshot()
             || (
               sessionPromise !== null
               && autosaveOpfsSessionRef.current !== sessionPromise
@@ -7322,7 +7343,7 @@ export function StudioCuttoonEditor({
           }
           // 새 편집이 clear 도중 시작됐다면 그 편집의 기존 브라우저 복구 슬롯은 보존한다.
           // 뒤따르는 최신 세대 저장이 직렬 OPFS journal을 다시 채운다.
-          if (studioRevisionProjectGenerationRef.current !== scheduledGeneration) return;
+          if (!canPublishSnapshot()) return;
           globalThis.localStorage.removeItem(autosaveKey);
           globalThis.localStorage.removeItem(
             studioLifecycleAutosaveSidecarKey(autosaveKey)
@@ -7330,6 +7351,7 @@ export function StudioCuttoonEditor({
           if (!workId && !remixId) {
             globalThis.localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
           }
+          if (!canPublishSnapshot()) return;
           studioLifecycleDurableGenerationRef.current = Math.max(
             studioLifecycleDurableGenerationRef.current,
             scheduledGeneration
@@ -7368,6 +7390,7 @@ export function StudioCuttoonEditor({
             sessionPromise ?? Promise.resolve(null),
             sqlitePromise ?? Promise.resolve(null),
           ]);
+          if (!canPublishSnapshot()) return;
           const receipt = await persistStudioAutosaveWithOpfsPrimary({
             session,
             sqlite,
@@ -7386,6 +7409,7 @@ export function StudioCuttoonEditor({
             sessionPromise !== null
             && autosaveOpfsSessionRef.current !== sessionPromise
           ) return;
+          if (!canPublishSnapshot()) return;
           studioLifecycleDurableGenerationRef.current = Math.max(
             studioLifecycleDurableGenerationRef.current,
             scheduledGeneration
@@ -14453,12 +14477,19 @@ const puppetWarpArmed =
   // Source hydration must not refetch when render-local sidecar editing commands change.
   const hydrateSourceSidecarsFromEffect = useEffectEvent(hydrateStudioSidecarSource);
 
+  const [sourceHydrationAttempt, setSourceHydrationAttempt] = useState(0);
+  const [workHydrationError, setWorkHydrationError] = useState<string | null>(null);
+  const retrySourceHydration = useCallback(() => {
+    setSourceHydrationAttempt((attempt) => attempt + 1);
+  }, []);
+
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
     // Route/server hydration establishes a different document authority than a downloaded JSON.
     // Clear before either the empty-draft or remote-document branch can become exportable.
     studioProjectDocumentSessionRef.current = null;
     const targetId = workId || remixId;
+    setWorkHydrationError(null);
     if (!targetId) {
       setSharedDocumentScope(null);
       setLoadedWork(null);
@@ -14476,6 +14507,9 @@ const puppetWarpArmed =
     setLoadedWork(null);
     setError(linked3dCloudSaveRecoveryNoticeRef.current);
     setSharedDocumentNotice(null);
+    // A null session before cookie verification is NOT an anonymous reader. Keep the source
+    // locked until authentication settles instead of probing a private draft via public getWork.
+    if (!studioAuthReady) return;
     let alive = true;
     const controller = new AbortController();
     async function loadStudioWork(): Promise<{
@@ -14513,14 +14547,8 @@ const puppetWarpArmed =
       };
     }
 
-    void Promise.all([
-      loadStudioWork(),
-      loadStudioReleaseScheduleRuntime(),
-    ])
-      .then(async ([
-        { work: w, remixAuthorName, shared, detail },
-        { normalizeStudioReleaseSchedule },
-      ]) => {
+    void loadStudioWork()
+      .then(async ({ work: w, remixAuthorName, shared, detail }) => {
         if (!alive) return;
         if (!isStudioCuttoonSourceFormat(w.format)) {
           setWorkHydrationFailed(true);
@@ -14547,6 +14575,10 @@ const puppetWarpArmed =
           referenceBoard?: unknown;
           publishPack?: unknown;
         };
+        const normalizedReleaseSchedule = remixId
+          ? createEmptyStudioReleaseScheduleSnapshot()
+          : await normalizeStudioReleaseScheduleDeferred(doc?.releaseSchedule);
+        if (!alive || controller.signal.aborted) return;
         const normalizedPublicationAnalytics = remixId
           ? createEmptyStudioPublicationAnalyticsSnapshot()
           : await normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics);
@@ -14664,7 +14696,7 @@ const puppetWarpArmed =
         setReleaseScheduleState(
           remixId
             ? createEmptyStudioReleaseScheduleSnapshot()
-            : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
+            : normalizedReleaseSchedule
         );
         setPublicationAnalyticsState(normalizedPublicationAnalytics);
         const hydratedReferenceBoard = remixId
@@ -14690,7 +14722,9 @@ const puppetWarpArmed =
       .catch((e) => {
         if (!alive || controller.signal.aborted) return;
         setWorkHydrationFailed(true);
-        setError(e instanceof Error ? e.message : "불러오기 실패");
+        const message = e instanceof Error ? e.message : "원고를 불러오지 못했습니다.";
+        setWorkHydrationError(message);
+        setError(message);
       });
     return () => {
       alive = false;
@@ -14722,6 +14756,8 @@ const puppetWarpArmed =
     setWorkHydrated,
     setWorkHydrationFailed,
     setWorkHydrationUnsupportedFormat,
+    sourceHydrationAttempt,
+    studioAuthReady,
     studioProjectDocumentSessionRef,
     studioRevisionProjectGenerationRef,
     workAuthScopeKey,
@@ -29407,6 +29443,8 @@ function clearSelectionForEdit() {
       willImportChoice={willImportChoice}
       workHydrated={workHydrated}
       workHydrationFailed={workHydrationFailed}
+      workHydrationError={workHydrationError}
+      onRetrySourceHydration={retrySourceHydration}
       workHydrationUnsupportedFormat={workHydrationUnsupportedFormat}
       workId={workId}
       workspaceControlSide={workspaceControlSide}

@@ -1,3 +1,4 @@
+import { creatorWorkReadOptions } from "./creator-work-read-options";
 // 창작 게시판(/api/creator) 전용 타입 + ky 헬퍼.
 // 인증은 공유 클라이언트의 HttpOnly 세션 쿠키만 사용하므로 호출부는
 // x-user-id나 브라우저 저장 토큰을 별도로 전달하지 않는다.
@@ -427,7 +428,7 @@ export async function listWorks(
 
 export async function getWork(id: string, signal?: AbortSignal): Promise<WorkDetail> {
   return callOrThrow(
-    () => api.get<WorkDetail>(`${BASE}/works/${encodeURIComponent(id)}`, { signal }),
+    () => api.get<WorkDetail>(`${BASE}/works/${encodeURIComponent(id)}`, creatorWorkReadOptions(signal)),
     "창작물을 불러오지 못했습니다."
   );
 }

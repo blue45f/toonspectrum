@@ -32,3 +32,26 @@ export function preloadStudioReleaseScheduleRuntime(): void {
 export function createEmptyStudioReleaseScheduleSnapshot(): StudioReleaseSchedule {
   return { version: 1, items: [] };
 }
+
+/** Only the exact empty snapshot can avoid the planner; unknown/non-empty data must be validated. */
+export function isEmptyStudioReleaseScheduleSnapshot(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  return keys.length === 2
+    && keys.includes("version")
+    && keys.includes("items")
+    && candidate.version === 1
+    && Array.isArray(candidate.items)
+    && candidate.items.length === 0;
+}
+
+export async function normalizeStudioReleaseScheduleDeferred(
+  value: unknown,
+): Promise<StudioReleaseSchedule> {
+  if (value == null || isEmptyStudioReleaseScheduleSnapshot(value)) {
+    return createEmptyStudioReleaseScheduleSnapshot();
+  }
+  const { normalizeStudioReleaseSchedule } = await loadStudioReleaseScheduleRuntime();
+  return normalizeStudioReleaseSchedule(value);
+}

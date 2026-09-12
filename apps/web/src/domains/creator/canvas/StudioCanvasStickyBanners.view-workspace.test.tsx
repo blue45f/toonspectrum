@@ -107,11 +107,11 @@ describe("StudioCanvasStickyBanners precision View HUD wiring", () => {
 
     expect(hudState.props).toMatchObject({
       magnification: 0.8,
-      minMagnification: 0.08,
       maxMagnification: 2,
       selectionCount: 3,
     });
 
+    expect(hudState.props?.minMagnification).toBeCloseTo(0.08, 12);
     fireEvent.click(screen.getByRole("button", { name: "확대율 100%" }));
     expect(context.setZoom).toHaveBeenCalledWith(2.5);
   });
@@ -124,5 +124,42 @@ describe("StudioCanvasStickyBanners precision View HUD wiring", () => {
     fireEvent.click(screen.getByRole("button", { name: "선택 영역 맞춤" }));
 
     expect(zoomToSelection).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe("manuscript loading recovery", () => {
+  it("keeps the overwrite lock and retries the source without navigating or changing pages", () => {
+    const retry = vi.fn();
+    const context = createContext({
+      viewTool: null,
+      sourceHydrationPending: true,
+      workHydrationFailed: true,
+      workHydrationError: "공동 문서를 불러오지 못했습니다.",
+      workId: "private-draft",
+      onRetrySourceHydration: retry,
+    });
+    render(<>{renderStudioCanvasStickyBanners(context)}</>);
+    expect(screen.getByText("원고를 열지 못했어요")).toBeTruthy();
+    expect(screen.getByText(/빈 캔버스로 덮어쓰지 않도록/u)).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toBe(context.workHydrationError);
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(context.navigate).not.toHaveBeenCalled();
+    expect(context.commitPages).not.toHaveBeenCalled();
+    expect(context.setCurrentPageId).not.toHaveBeenCalled();
+  });
+
+  it("does not expose retry during loading and keeps unsupported formats in their own editor", () => {
+    const retry = vi.fn();
+    const context = createContext({ viewTool: null, sourceHydrationPending: true, onRetrySourceHydration: retry });
+    const { rerender } = render(<>{renderStudioCanvasStickyBanners(context)}</>);
+    expect(screen.queryByRole("button", { name: "다시 불러오기" })).toBeNull();
+    rerender(<>{renderStudioCanvasStickyBanners({
+      ...context, workHydrationFailed: true, workHydrationUnsupportedFormat: true, workId: "work/one",
+    })}</>);
+    fireEvent.click(screen.getByRole("button", { name: "업로드 편집기로 이동" }));
+    expect(context.navigate).toHaveBeenCalledWith("/studio?mode=upload&id=work%2Fone");
+    expect(retry).not.toHaveBeenCalled();
   });
 });
