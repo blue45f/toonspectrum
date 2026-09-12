@@ -1,3 +1,5 @@
+import { normalizedSearchText } from "./search-normalization";
+
 import type { Title, WorkType, SerialStatus, AgeRating, PlatformId } from "./types";
 
 export interface SearchFilters {
@@ -39,12 +41,13 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, "");
 }
 
-// Pre-compiled normalized search scoring function for maximum performance
+// Reuse normalized text while preserving the original ranking and tie-breaks.
 function score(t: Title, nq: string, tokens: string[]): number {
   if (!nq || tokens.length === 0) return 0;
   let s = 0;
-  const title = norm(t.title);
-  const author = norm(t.author + (t.artist ?? ""));
+  const text = normalizedSearchText(t);
+  const title = text.title;
+  const author = text.author;
 
   for (const tok of tokens) {
     if (title === tok) s += 120;
@@ -53,7 +56,7 @@ function score(t: Title, nq: string, tokens: string[]): number {
 
     if (t.altTitles && t.altTitles.length > 0) {
       for (let j = 0; j < t.altTitles.length; j++) {
-        if (norm(t.altTitles[j]).includes(tok)) {
+        if (text.altTitles[j].includes(tok)) {
           s += 45;
           break;
         }
@@ -64,29 +67,29 @@ function score(t: Title, nq: string, tokens: string[]): number {
 
     let tagMatched = false;
     for (let j = 0; j < t.tags.length; j++) {
-      if (norm(t.tags[j]).includes(tok)) {
+      if (text.tags[j].includes(tok)) {
         s += 22;
         tagMatched = true;
         break;
       }
     }
     if (!tagMatched && t.tags.length > 0) {
-      if (t.tags.map(norm).join("").includes(tok)) s += 22;
+      if (text.joinedTags.includes(tok)) s += 22;
     }
 
     let genreMatched = false;
     for (let j = 0; j < t.genres.length; j++) {
-      if (norm(t.genres[j]).includes(tok)) {
+      if (text.genres[j].includes(tok)) {
         s += 18;
         genreMatched = true;
         break;
       }
     }
     if (!genreMatched && t.genres.length > 0) {
-      if (t.genres.map(norm).join("").includes(tok)) s += 18;
+      if (text.joinedGenres.includes(tok)) s += 18;
     }
 
-    if (t.synopsis && norm(t.synopsis).includes(tok)) s += 8;
+    if (t.synopsis && text.synopsis.includes(tok)) s += 8;
   }
 
   // 전체 질의가 제목에 통째로 포함되면 가산
@@ -234,7 +237,7 @@ export function searchTitles(
     }
   }
 
-  return sortTitles(results, sort, q);
+  return q && sort === "relevance" ? results : sortTitles(results, sort, q);
 }
 
 export function sortTitles(list: Title[], sort: SortKey, q = ""): Title[] {

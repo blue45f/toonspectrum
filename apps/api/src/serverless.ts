@@ -14,6 +14,7 @@ import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundary";
 import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
+import { createCatalogInitializationMiddleware } from "./config/catalog-initialization";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import {
@@ -23,7 +24,10 @@ import {
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
 import { BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
+import { CatalogService } from "./modules/catalog/catalog.service";
 import { sessionAuth } from "./session-middleware";
+
+import type { LazyServerlessCatalogService } from "./modules/catalog/lazy-serverless-catalog.service";
 
 // Vercel 서버리스용 — 콜드 컨테이너당 1회 부팅 후 캐시(웜 인스턴스 재사용).
 // 기본 platform-express 어댑터로 생성 → init() → 내부 Express 인스턴스를 핸들러로 반환.
@@ -55,6 +59,8 @@ async function create(): Promise<Express> {
   // 기본 본문 파서(100kb) 대신 직접 등록(main.ts와 동일) — 스튜디오/커뮤니티 첨부가 data-URL
   // 이미지를 JSON으로 보내므로 서버리스에서도 한도를 키운다(미러 누락 시 프로덕션만 413).
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
+  const catalog = app.get<LazyServerlessCatalogService>(CatalogService);
+  catalog.deferInitializationUntilRequest();
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(main.ts와 동일)
   app.use(createApiSecurityHeadersMiddleware(process.env));
   configureCors(app); // Vercel OPTIONS를 Nest가 204로 끝내고 Origin별 허용 헤더를 반환
@@ -66,6 +72,7 @@ async function create(): Promise<Express> {
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.use(createCsrfProtectionMiddleware(process.env));
   configureApiBodyParserBoundary(app, null);
+  app.use(createCatalogInitializationMiddleware(() => catalog.ensureInitialized()));
   app.setGlobalPrefix("api", {
     exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
   });

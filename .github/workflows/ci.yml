@@ -51,6 +51,15 @@ jobs:
           set -euo pipefail
           pnpm run typecheck
           pnpm run typecheck:cloudflare-realtime
+      - name: API CPU budget regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/api/src/config/catalog-initialization.test.ts \
+            apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts \
+            apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts \
+            packages/core/src/search-normalization.test.ts \
+            packages/core/src/server/home.cpu-cache.test.ts
       - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
