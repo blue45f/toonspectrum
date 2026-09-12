@@ -626,21 +626,39 @@ function StudioSmartFilterControls({
   );
 }
 
+/** Used by every mutation, including duplicate and recipe append, not just catalog insertion. */
+export function studioSmartFilterMutationError(
+  next: StudioAdjustmentStack,
+  maxEntries?: number,
+  validateStack?: (next: StudioAdjustmentStack) => string | null,
+): string | null {
+  if (maxEntries !== undefined && next.entries.length > maxEntries) {
+    return `이 레이어에는 필터를 최대 ${maxEntries}개까지 저장할 수 있어요.`;
+  }
+  return validateStack?.(next) ?? null;
+}
+
 export function StudioSmartFiltersPanel({
   stack,
   onChange,
   maxEntries,
+  validateStack,
 }: {
   stack: StudioAdjustmentStack | undefined;
   onChange: (next: StudioAdjustmentStack) => void;
   maxEntries?: number;
+  validateStack?: (next: StudioAdjustmentStack) => string | null;
 }): React.ReactElement {
   const searchId = useId();
   const [query, setQuery] = useState("");
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const current = normalizeStudioAdjustmentStack(stack);
   const visibleCatalog = searchStudioFilterCatalog(query, STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS);
 
   function patch(next: StudioAdjustmentStack) {
+    const error = studioSmartFilterMutationError(next, maxEntries, validateStack);
+    setMutationError(error);
+    if (error) return;
     const receipt = admitStudioAdjustmentStack(next, current);
     onChange(receipt.stack);
   }
@@ -663,6 +681,7 @@ export function StudioSmartFiltersPanel({
 
   return (
     <div className="space-y-3" data-studio-filter-manager="true">
+      {mutationError ? <p role="alert" className="text-sm text-fg-2">{mutationError}</p> : null}
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">필터 관리</p>
@@ -809,6 +828,7 @@ export function StudioSmartFiltersPanel({
                     type="button"
                     aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 복제`}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
+                    disabled={maxEntries !== undefined && current.entries.length >= maxEntries}
                     onClick={() => patch(duplicateStudioEffectEntry(current, entry.id))}
                   >
                     <Copy className="size-3.5" aria-hidden />

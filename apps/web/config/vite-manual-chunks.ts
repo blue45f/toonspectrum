@@ -102,6 +102,10 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-element-model.ts")
       || id.endsWith("/src/domains/creator/render/studio-raster-image-presentation.ts")
       || id.endsWith("/src/domains/creator/brush/studio-brush-engine-program-set.ts")
+      || id.endsWith("/src/domains/creator/contracts/studio-adjustment-engine-ids.ts")
+      || id.endsWith("/src/domains/creator/studio-live-adjustment-status.ts")
+      || id.endsWith("/src/domains/creator/render/studio-raster-presentation-cache.ts")
+      || id.endsWith("/src/domains/creator/color/studio-color-proof-document.ts")
     ) {
       // These lightweight contracts are shared by several Studio lazy entries. Similar-style
       // and story-beat helpers are also synchronously needed by StudioPage, so leaving their

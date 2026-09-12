@@ -94,6 +94,18 @@ describe("PSD live adjustment graph capture", () => {
     expect(psd.imageResources!.xmpMetadata).not.toContain("blob:render-only-mask");
   });
 
+  it.each([true, false])("records the effective clipping command in PSD graph metadata: %s", async (clipBelow) => {
+    const captured = { width: 16, height: 24, getContext: () => ({ getImageData: () => ({ width: 16, height: 24, data: new Uint8ClampedArray(16 * 24 * 4) }) }) } as unknown as HTMLCanvasElement;
+    vi.spyOn(stage, "toCanvas").mockReturnValue(captured);
+    const source = [{ ...graph[1]!, clipBelow, adjustmentLayer: { version: 1 as const, scope: clipBelow ? "composite-below" as const : "clip-previous" as const } }];
+    const result = await exportPagePsd(stage, source, 16, 24, 0.5, { scale: 1 });
+    const psd = readPsd(await result.blob.arrayBuffer(), { useImageData: true, skipCompositeImageData: true });
+    const xml = new DOMParser().parseFromString(psd.imageResources!.xmpMetadata!, "application/xml");
+    const metadata = JSON.parse(xml.getElementsByTagName("tsadjust:manifest")[0]!.textContent!);
+    expect(metadata.adjustments[0].adjustmentLayer.scope).toBe(clipBelow ? "clip-previous" : "composite-below");
+    expect(source[0]!.adjustmentLayer.scope).toBe(clipBelow ? "composite-below" : "clip-previous");
+  });
+
   it("excludes background only when requested and restores visibility and view after readback failure", async () => {
     const originalView = view(stage);
     vi.spyOn(stage, "toCanvas").mockImplementation(() => {

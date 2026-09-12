@@ -1,3 +1,4 @@
+import { studioLiveAdjustmentDescriptorError } from "./contracts/studio-work-asset-contract";
 import type { StudioCrdtJsonValue } from "./live/studio-crdt-scene-schema";
 import { STUDIO_ADJUSTMENT_ENGINE_IDS, studioAdjustmentDefaultParams } from "./studio-adjustment-stack";
 import { describe, expect, it } from "vitest";
@@ -6,8 +7,8 @@ import { validateStudioCrdtSceneElementPayload } from "./live/studio-crdt-scene-
 import { buildStudioProjectArchive, importStudioProjectArchive } from "./studio-project-archive";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "./studio-project-file";
 import { createStudioWorkAssetInitialImageDescriptor } from "./studio-work-asset-admission";
-import { buildStudioLiveAdjustmentRenderTree, createStudioLiveAdjustment, createStudioLiveAdjustmentPlan } from "./studio-live-adjustment";
-import { createStudioAdjustmentLayerRuntimeRecipe, executeStudioAdjustmentLayerRuntime, executeStudioAdjustmentLayerRuntimeSync } from "./studio-adjustment-layer-runtime";
+import { buildStudioLiveAdjustmentRenderTree, createStudioLiveAdjustment, studioLiveAdjustmentRenderRevision } from "./studio-live-adjustment";
+import { createStudioLiveAdjustmentPlan, createStudioAdjustmentLayerRuntimeRecipe, executeStudioAdjustmentLayerRuntime, executeStudioAdjustmentLayerRuntimeSync } from "./studio-adjustment-layer-runtime";
 import { studioDocumentAllowsKonvaHide } from "./render/studio-document-scene-lower";
 import type { El } from "./studio-element-model";
 
@@ -112,5 +113,62 @@ describe("actual cache compositor pixels", () => {
     expect(() => executeStudioAdjustmentLayerRuntimeSync(recipe, { ...source, revision: 2 })).toThrow(/stale/);
     expect(() => executeStudioAdjustmentLayerRuntimeSync(recipe, source, { limits: { maxWorkingBytes: 1 } })).toThrow(/budget/);
     expect([...source.imageData.data]).toEqual([10, 20, 30, 0]);
+  });
+});
+
+
+describe("recovered graph review regressions", () => {
+  it("uses a folded adjustment as the alpha source for a normal clipped layer", () => {
+    const clipped = { ...image("clipped"), clipBelow: true };
+    const tree = buildStudioLiveAdjustmentRenderTree([image("ink"), invert(), clipped], () => true);
+    expect(tree[1]).toMatchObject({ kind: "content", clipBase: { kind: "adjustment", children: [{ id: "ink" }] } });
+    expect(clipped).not.toHaveProperty("clipBase");
+    const withHiddenGap = buildStudioLiveAdjustmentRenderTree([image("ink"), invert(), { ...image("hidden"), hidden: true }, clipped], (element) => !element.hidden);
+    expect(withHiddenGap[1]).not.toHaveProperty("clipBase");
+  });
+  it("includes the content-layer master once in root adjustment scope but not an isolated folder", () => {
+    const tree = buildStudioLiveAdjustmentRenderTree([image("ink"), invert()], () => true, "master");
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ kind: "adjustment", children: [{ kind: "underlay", id: "master" }, { id: "ink" }] });
+    const folder = buildStudioLiveAdjustmentRenderTree([{ ...image("ink"), groupId: "folder" }, { ...invert(), groupId: "folder" }], () => true, "master");
+    expect(folder[0]).toEqual({ kind: "underlay", id: "master" });
+    expect(folder[1]).toMatchObject({ kind: "group", children: [{ children: [{ id: "ink" }] }] });
+  });
+  it("keys immutable revisions without reading multi-megabyte source strings", () => {
+    const source = image("source");
+    Object.defineProperty(source, "src", { get: () => { throw new Error("image payload must not be read for a cache key"); } });
+    const adjustment = invert();
+    const tree = buildStudioLiveAdjustmentRenderTree([source, adjustment], () => true)[0]!;
+    const key = studioLiveAdjustmentRenderRevision(tree);
+    expect(key.length).toBeLessThan(150);
+    expect(studioLiveAdjustmentRenderRevision(buildStudioLiveAdjustmentRenderTree([source, adjustment], () => true)[0]!)).toBe(key);
+    expect(studioLiveAdjustmentRenderRevision(buildStudioLiveAdjustmentRenderTree([source, { ...adjustment, opacity: 0.5 }], () => true)[0]!)).not.toBe(key);
+  });
+  it("blocks an oversized authored graph before immutable asset admission without dropping its filters", () => {
+    const element = invert();
+    expect(studioLiveAdjustmentDescriptorError(element, element.smartFilters)).toBeNull();
+    const large = { version: 1 as const, entries: Array.from({ length: 24 }, (_, index) => ({ id: `filter-${index}`, engine: "exposure" as const, enabled: true, opacity: 0.5, params: { exposure: 1, gamma: 1.2, offset: 0.1 } })) };
+    const snapshot = structuredClone(large);
+    expect(studioLiveAdjustmentDescriptorError(element, large)).toMatch(/한도/);
+    expect(large).toEqual(snapshot);
+    expect(() => createStudioWorkAssetInitialImageDescriptor({ ...element, smartFilters: large })).toThrow();
+  });
+  it("ignores hidden and zero-opacity adjustments when deciding renderer ownership", () => {
+    expect(studioDocumentAllowsKonvaHide([{ ...invert(), hidden: true }], ["owned"])).toBe(true);
+    expect(studioDocumentAllowsKonvaHide([{ ...invert(), opacity: 0 }], ["owned"])).toBe(true);
+    expect(studioDocumentAllowsKonvaHide([invert()], ["owned"])).toBe(false);
+  });
+  it.each(["color-dodge", "color-burn", "difference", "exclusion", "hue", "saturation"] as const)("executes the inspector's %s mode with preserved source pixels", (blendMode) => {
+    const element = { ...invert(), blendMode };
+    const source = { revision: 1, width: 1, height: 1, renderKinds: ["group" as const], imageData: { width: 1, height: 1, data: new Uint8ClampedArray([32, 96, 160, 255]) } };
+    const recipe = createStudioAdjustmentLayerRuntimeRecipe({ plan: createStudioLiveAdjustmentPlan(element, ["ink"], false), source });
+    const result = executeStudioAdjustmentLayerRuntimeSync(recipe, source);
+    expect(result.imageData.data).toHaveLength(4);
+    expect(result.imageData.data[3]).toBe(255);
+    expect([...source.imageData.data]).toEqual([32, 96, 160, 255]);
+    if (blendMode === "color-dodge") expect([...result.imageData.data]).toEqual([255, 255, 255, 255]);
+    if (blendMode === "color-burn") expect([...result.imageData.data]).toEqual([0, 0, 0, 255]);
+    if (blendMode === "difference") expect([...result.imageData.data]).toEqual([191, 63, 65, 255]);
+    if (blendMode === "exclusion") expect([...result.imageData.data]).toEqual([199, 135, 136, 255]);
   });
 });

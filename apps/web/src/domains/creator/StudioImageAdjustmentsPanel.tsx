@@ -1,3 +1,4 @@
+import { studioLiveAdjustmentDescriptorError } from "./contracts/studio-work-asset-contract";
 import { StudioLiveAdjustmentControls } from "./StudioLiveAdjustmentControls";
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
@@ -696,7 +697,8 @@ export function StudioImageAdjustmentsPanel({
   if (selected.adjustmentLayer) return <>
     <StudioLiveAdjustmentControls selected={selected} onPatch={onPatch} />
     <Suspense fallback={<p role="status">{sectionLoading}</p>}>
-      <StudioSmartFiltersPanel stack={selected.smartFilters} maxEntries={24} onChange={(smartFilters) => onPatch({ smartFilters })} />
+      <StudioSmartFiltersPanel stack={selected.smartFilters} maxEntries={24}
+        validateStack={(next) => studioLiveAdjustmentDescriptorError(selected, next)} onChange={(smartFilters) => onPatch({ smartFilters })} />
     </Suspense>
   </>;
   return (

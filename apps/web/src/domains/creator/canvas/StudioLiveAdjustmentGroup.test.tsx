@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStudioLiveAdjustment } from "../studio-live-adjustment";
 import { readStudioLiveAdjustmentStatus } from "../studio-live-adjustment-status";
 import { snapshotStudioMountedRasterImagePresentations, waitForStudioRasterImagePresentations } from "../render/studio-raster-image-presentation";
-import { refreshStudioRasterPresentationCaches } from "../render/studio-raster-presentation-cache";
+import { prepareStudioRasterCapture, refreshStudioRasterPresentationCaches } from "../render/studio-raster-presentation-cache";
 import { StudioLiveAdjustmentGroup } from "./StudioLiveAdjustmentGroup";
 import type Konva from "konva";
 import type { StudioImageDataLike } from "../studio-filters";
@@ -15,16 +15,23 @@ const scene = vi.hoisted(() => {
   const state = {
     source: new Uint8ClampedArray([10, 20, 30, 128]),
     output: new Uint8ClampedArray(),
+    stage: {},
+    density: 1,
     cacheFailure: false,
     draws: 0,
     layer: { on: (_event: string, callback: () => void) => listeners.add(callback), off: (_event: string, callback: () => void) => listeners.delete(callback), batchDraw: vi.fn() },
     draw: () => { state.draws++; for (const callback of listeners) callback(); },
     node: {
-      getLayer: () => state.layer, getParent: () => null, isVisible: () => true,
+      getLayer: () => state.layer, getStage: () => state.stage, getParent: () => null, isVisible: () => true,
       isCached: () => true, clearCache: vi.fn(),
       filters: (next: typeof filters) => { filters = next; },
-      cache: () => { if (state.cacheFailure) throw new Error("cache allocation failed"); state.output = state.source.slice(); },
-      toCanvas: () => { for (const filter of filters) filter({ width: 1, height: 1, data: state.output }); return { width: 1, height: 1 }; },
+      cache: (options: { pixelRatio: number }) => {
+        if (state.cacheFailure) throw new Error("cache allocation failed");
+        state.density = options.pixelRatio;
+        state.output = new Uint8ClampedArray(state.density * state.density * 4);
+        for (let offset = 0; offset < state.output.length; offset += 4) state.output.set(state.source, offset);
+      },
+      toCanvas: () => { for (const filter of filters) filter({ width: state.density, height: state.density, data: state.output }); return { width: 1, height: 1 }; },
     },
   };
   return state;
@@ -134,5 +141,37 @@ describe("live adjustment actual runtime and capture fence", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(snapshotStudioMountedRasterImagePresentations()).toHaveLength(0);
     expect(readStudioLiveAdjustmentStatus("adjustment")).toBeUndefined();
+  });
+});
+
+
+describe("density-aware live adjustment captures", () => {
+  it("recomputes the actual filter at output density and restores preview pixels", async () => {
+    render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
+    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
+    const restore = prepareStudioRasterCapture(scene.stage, 3);
+    expect(scene.density).toBe(3);
+    expect(scene.output).toHaveLength(36);
+    expect([...scene.output.slice(0, 4)]).toEqual([245, 235, 225, 128]);
+    restore();
+    expect(scene.density).toBe(1);
+    expect([...scene.output]).toEqual([245, 235, 225, 128]);
+  });
+  it("blocks an over-budget high-resolution capture and restores the usable preview", async () => {
+    render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
+    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
+    expect(() => prepareStudioRasterCapture(scene.stage, 10000)).toThrow(/출력 배율/);
+    expect(scene.density).toBe(1);
+    expect([...scene.output]).toEqual([245, 235, 225, 128]);
+  });
+  it("does not retain capture owners after the adjustment unmounts", async () => {
+    const view = render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
+    view.unmount();
+    const previous = scene.density;
+    prepareStudioRasterCapture(scene.stage, 2)();
+    expect(scene.density).toBe(previous);
   });
 });

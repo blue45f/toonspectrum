@@ -1,5 +1,5 @@
 import { inflateSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildMatrixTrcIccProfile, SRGB_ICC_BUILD_OPTIONS } from "../render/studio-canvaskit-icc-profile";
 import { calculateStudioCrc32 } from "../studio-crc32";
 import { studioPageToCrdtPage, validateStudioCrdtPagePayload, hasSameStudioCrdtPageMetadata } from "../live/studio-crdt-page-payload";
@@ -92,4 +92,25 @@ describe("ICC PNG output", () => {
     await expect(encodeStudioColorProofPng({ rgba: new Uint8ClampedArray(4), width: 1, height: 1, profileBytes: profile(), signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
     await expect(encodeStudioColorProofPng({ rgba: new Uint8ClampedArray(4), width: 2, height: 1, profileBytes: profile() })).rejects.toThrow("크기");
   });
+});
+
+
+it("cancels the in-flight PNG compression reader instead of completing a discarded export", async () => {
+  const signal = new AbortController();
+  const cancelled = vi.fn();
+  let readableStarted!: () => void;
+  const started = new Promise<void>((resolve) => { readableStarted = resolve; });
+  class PendingCompression {
+    readable = new ReadableStream<Uint8Array>({ pull: () => { readableStarted(); }, cancel: cancelled });
+    writable = new WritableStream<Uint8Array>();
+  }
+  vi.stubGlobal("CompressionStream", PendingCompression);
+  try {
+    const result = encodeStudioColorProofPng({ rgba: new Uint8ClampedArray([1, 2, 3, 255]), width: 1, height: 1, profileBytes: new Uint8Array([1]), signal: signal.signal });
+    const rejected = expect(result).rejects.toMatchObject({ name: "AbortError" });
+    await started;
+    signal.abort();
+    await rejected;
+    expect(cancelled).toHaveBeenCalledWith(signal.signal.reason);
+  } finally { vi.unstubAllGlobals(); }
 });

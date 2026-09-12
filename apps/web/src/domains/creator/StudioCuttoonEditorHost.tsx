@@ -16912,10 +16912,10 @@ const puppetWarpArmed =
    * 두 불변식과 복원 기하는 `studio-stage-document-view.ts` 가 단독으로 소유한다 — 여기서는
    * 현재 문서 크기·표시 배율만 넘긴다.
    */
-  function readStageInDocumentView<T>(stage: Konva.Stage, read: () => T): T {
+  function readStageInDocumentView<T>(stage: Konva.Stage, read: () => T, capturePixelRatio = 1): T {
     return readStudioStageInDocumentView(
       stage,
-      { documentWidth: CANVAS_W, documentHeight: canvasH, effectiveScale: effScale },
+      { documentWidth: CANVAS_W, documentHeight: canvasH, effectiveScale: effScale, capturePixelRatio },
       read
     );
   }
@@ -16965,7 +16965,7 @@ const puppetWarpArmed =
         height: el.height * effScale,
         pixelRatio: 2 / effScale,
       }),
-    }));
+    }), 2);
     const newFrameId = uid();
     // 마지막 캡처 이후 새로 추가된 "draw" 타입 요소 중 캡처 bbox와 겹치는 것만 스트로크로 간주해
     // 소거한다(텍스트/말풍선/스티커 등 다른 새 요소는 건드리지 않는다 — flatten은 펜 스크래치만 소비).
@@ -17019,7 +17019,7 @@ const puppetWarpArmed =
         height: b.h * effScale,
         pixelRatio: 2 / effScale,
       }),
-    }));
+    }), 2);
     if (!markStudioDocumentChanged()) return;
     updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
@@ -19738,7 +19738,7 @@ const puppetWarpArmed =
         height: bounds.h * effScale,
         pixelRatio: 2 / effScale,
       }),
-    }));
+    }), 2);
     const name = globalThis.prompt("틀 이름을 정해주세요", "내 이메레스 틀")?.trim();
     setContextMenu((prev) => ({ ...prev, visible: false }));
     if (!name) return;
@@ -26934,13 +26934,14 @@ function clearSelectionForEdit() {
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
       layerMaskPaintArmed || filterMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
-    postProcessingActive: pageGrade.vignette > 0 || elements.some((element) => element.type === "image" && element.adjustmentLayer),
+    postProcessingActive: pageGrade.vignette > 0 || elements.some((element) => element.type === "image" && element.adjustmentLayer
+      && !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id) && (element.opacity ?? 1) > 0),
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
     editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
     bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, filterMaskPaintArmed, quickMaskArmed, historyBrushArmed,
-    puppetWarpArmed, pageGrade.vignette, elements,
+    puppetWarpArmed, pageGrade.vignette, elements, groups, localHiddenElementIds,
   ]);
   const {
     visibleDocumentRect: studioRasterVisibleDocumentRect,

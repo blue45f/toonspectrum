@@ -1,5 +1,5 @@
 import { CANVAS_W } from "../studio-assets";
-import { buildStudioLiveAdjustmentRenderTree, isStudioLiveAdjustment, type StudioLiveAdjustmentRenderTree } from "../studio-live-adjustment";
+import { buildStudioLiveAdjustmentRenderTree, isStudioLiveAdjustment, studioLiveAdjustmentRenderRevision, studioLiveAdjustmentObjectRevision, type StudioLiveAdjustmentRenderTree } from "../studio-live-adjustment";
 import { StudioLiveAdjustmentGroup } from "./StudioLiveAdjustmentGroup";
 import { Fragment, Suspense, useLayoutEffect, type ReactNode } from "react";
 import { Group, Shape } from "react-konva/lib/ReactKonvaCore";
@@ -837,7 +837,8 @@ export function StudioCanvasViewportDocumentLayer({
                       .map((pel, pIdx) => renderEl(pel, pIdx, { asMask: true }))}
                   </Group>
                 ) : null;
-                const renderDocumentElement = (el: El, idx: number, compositeOverride?: string) => {
+                const renderDocumentElement = (el: El, idx: number, compositeOverride?: string,
+                  asMask = false, clipBase?: StudioLiveAdjustmentRenderTree) => {
                   if (isEffectivelyHidden(el, groups) || localHiddenElementIds.has(el.id)) return null; // 숨긴 레이어/그룹 + "나만 숨기기"는 렌더·내보내기에서 제외
                   // A verified raster frame and these vector fallbacks switch in one React commit.
                   // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
@@ -859,7 +860,7 @@ export function StudioCanvasViewportDocumentLayer({
                   // maskSrc로 자른 ClipMaskGroup"으로 한 번 더 감싼다. opts는 clipBelow 분기
                   // (source-in override)와 평범한 분기(opts={}) 양쪽에서 재사용된다.
                   const renderWithOwnMask = (opts: { compositeOverride?: string } = {}) => {
-                    if (!maskOn) return renderEl(el, idx, opts);
+                    if (!maskOn) return renderEl(el, idx, { ...opts, asMask });
                     // The sandwich content must composite `source-in` against its mask sibling —
                     // ALWAYS, not only when the caller wanted source-in for the element itself.
                     // The plain branch used to pass the content through with `source-over`, which
@@ -867,7 +868,7 @@ export function StudioCanvasViewportDocumentLayer({
                     // measurably changed nothing. The caller's intent (the element's blend mode,
                     // or clipBelow's source-in) moves onto the cached sandwich root instead, where
                     // it applies exactly once to the flattened, already-masked result.
-                    const content = renderEl(el, idx, { ...opts, compositeOverride: "source-in" });
+                    const content = renderEl(el, idx, { ...opts, asMask, compositeOverride: "source-in" });
                     const imgEl = el as ImageEl;
                     const maskSrc = (el as El).maskSrc;
                     // 마스크 노드는 최소 필드만 새로 구성한다(el 스프레드 후 필터 필드를 하나하나
@@ -913,6 +914,13 @@ export function StudioCanvasViewportDocumentLayer({
                       </ClipMaskGroup>
                     );
                   };
+                  if (clipBase) {
+                    return <ClipMaskGroup key={el.id}
+                      cacheKey={`${studioLiveAdjustmentObjectRevision(el)}:${studioLiveAdjustmentRenderRevision(clipBase)}:${adjustmentContextRevision}`}>
+                      {renderAdjustmentTree(clipBase, true, `${el.id}:clip-mask:`)}
+                      {renderWithOwnMask({ compositeOverride: "source-in" })}
+                    </ClipMaskGroup>;
+                  }
                   if (base && !isEffectivelyHidden(base, groups) && !localHiddenElementIds.has(base.id)) {
                     // 알파 정밀 클리핑: 베이스 사본(마스크) + 자식(source-in)을 캐시 그룹에 담아 베이스 알파로만 자른다.
                     const ck = [
@@ -941,26 +949,40 @@ export function StudioCanvasViewportDocumentLayer({
                   }
                   return renderWithOwnMask({ compositeOverride });
                 };
-                const renderAdjustmentTree = (node: StudioLiveAdjustmentRenderTree, neutralizeComposite = false): ReactNode => {
-                  if (node.kind === "content") return renderDocumentElement(node.element, node.index, neutralizeComposite ? "source-over" : undefined);
-                  const children = node.children.map((child) => renderAdjustmentTree(child, node.kind === "adjustment" && node.isolatedSource));
+                const adjustmentContextRevision = [
+                  timelinePlayhead, timelinePreviewFrame,
+                  ...Array.from(studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.entries()).flatMap(([id, sequence]) => [id, sequence]),
+                  ...groups.map(studioLiveAdjustmentObjectRevision),
+                  ...masterRenderEls.map(studioLiveAdjustmentObjectRevision),
+                ].join("|");
+                const renderAdjustmentTree = (node: StudioLiveAdjustmentRenderTree, neutralizeComposite = false, maskPrefix = ""): ReactNode => {
+                  if (node.kind === "underlay") return <Fragment key={node.id}>{masterUnderlay}</Fragment>;
+                  if (node.kind === "content") return renderDocumentElement(node.element, node.index,
+                    neutralizeComposite ? "source-over" : undefined, Boolean(maskPrefix), node.clipBase);
+                  const children = node.children.map((child) => renderAdjustmentTree(child,
+                    node.kind === "adjustment" && node.isolatedSource, maskPrefix));
                   if (node.kind === "group") return <Fragment key={node.id}>{children}</Fragment>;
                   return <StudioLiveAdjustmentGroup key={node.id} element={node.element}
+                    instanceId={maskPrefix ? `${maskPrefix}${node.id}` : undefined}
+                    asMask={Boolean(maskPrefix)}
+                    pixelRatio={Math.max(1, effScale * (globalThis.devicePixelRatio || 1))}
                     composite={neutralizeComposite ? "source-over" : node.composite}
                     width={CANVAS_W} height={activePage.canvasH} sourceIds={node.children.map((child) => child.id)}
-                    cacheKey={JSON.stringify([node, timelinePlayhead, timelinePreviewFrame,
-                      [...studioLiveGesturePreviewRenderPlan.previewSequenceByElementId], groups])}>
+                    cacheKey={`${studioLiveAdjustmentRenderRevision(node)}:${adjustmentContextRevision}`}>
                     {children}
                   </StudioLiveAdjustmentGroup>;
                 };
-                const mainEls = canvasRenderElements.some(isStudioLiveAdjustment)
+                const hasLiveAdjustments = canvasRenderElements.some((element) =>
+                  isStudioLiveAdjustment(element) && !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id));
+                const mainEls = hasLiveAdjustments
                   ? buildStudioLiveAdjustmentRenderTree(canvasRenderElements, (element) =>
-                    !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id))
+                    !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id),
+                    masterUnderlay ? "studio-master-underlay" : undefined)
                     .map((node) => renderAdjustmentTree(node))
                   : canvasRenderElements.map((element, index) => renderDocumentElement(element, index));
                 return (
                   <>
-                    {masterUnderlay}
+                    {!hasLiveAdjustments ? masterUnderlay : null}
                     {mainEls}
                     {!masterEditMode
                       ? studioWorkAssetRenderPlaceholders.map((placeholder) => (

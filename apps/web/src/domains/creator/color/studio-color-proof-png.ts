@@ -10,8 +10,28 @@ async function deflate(bytes: Uint8Array<ArrayBuffer>, signal?: AbortSignal): Pr
   signal?.throwIfAborted();
   if (typeof CompressionStream !== "function") throw new Error("이 브라우저에서 ICC PNG 압축을 지원하지 않습니다.");
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
-  const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
-  signal?.throwIfAborted(); return compressed;
+  const reader = stream.getReader();
+  const abort = () => { void reader.cancel(signal?.reason).catch(() => undefined); };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    signal?.throwIfAborted();
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    for (;;) {
+      const next = await reader.read();
+      signal?.throwIfAborted();
+      if (next.done) break;
+      chunks.push(next.value);
+      length += next.value.byteLength;
+    }
+    const compressed = new Uint8Array(length);
+    let offset = 0;
+    for (const part of chunks) { compressed.set(part, offset); offset += part.byteLength; }
+    return compressed;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    reader.releaseLock();
+  }
 }
 
 /** Encode target-profile samples directly. Passing them through an sRGB Canvas encoder would

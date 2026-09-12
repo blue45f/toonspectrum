@@ -1,3 +1,6 @@
+import { canonicalizeStudioLiveAdjustmentElement } from "./contracts/studio-live-adjustment-contract";
+import { buildStudioAdjustmentLayerCompositorPlan } from "./studio-adjustment-layer-plan";
+import type { StudioLiveAdjustmentElement } from "./studio-live-adjustment";
 import {
   applyGpuFilterChain,
 } from "./render/studio-gpu-filter-apply";
@@ -8,6 +11,7 @@ import {
   type KonvaLike,
 } from "./render/studio-konva-filters";
 import {
+  createEmptyStudioAdjustmentStack,
   studioAdjustmentOperationToFilterFields,
   type StudioAdjustmentFilterOperation,
 } from "./studio-adjustment-stack";
@@ -1031,7 +1035,7 @@ function setSaturation(
 }
 
 function blendChannel(
-  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity">,
+  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity" | "hue" | "saturation">,
   base: number,
   blend: number,
 ): number {
@@ -1065,6 +1069,14 @@ function blendChannel(
       return Math.min(base, blend);
     case "lighten":
       return Math.max(base, blend);
+    case "color-dodge":
+      return base === 0 ? 0 : blend === 255 ? 255 : Math.min(255, base * 255 / (255 - blend));
+    case "color-burn":
+      return base === 255 ? 255 : blend === 0 ? 0 : 255 - Math.min(255, (255 - base) * 255 / blend);
+    case "difference":
+      return Math.abs(base - blend);
+    case "exclusion":
+      return base + blend - 2 * base * blend / 255;
   }
 }
 
@@ -1073,9 +1085,18 @@ function blendRgb(
   base: readonly [number, number, number],
   filtered: readonly [number, number, number],
 ): [number, number, number] {
-  if (mode === "color") {
+  if (mode === "hue") {
     return setLuminance(
       setSaturation(filtered, saturation(base[0], base[1], base[2])),
+      luminance(base[0], base[1], base[2]),
+    );
+  }
+  if (mode === "color") {
+    return setLuminance(filtered, luminance(base[0], base[1], base[2]));
+  }
+  if (mode === "saturation") {
+    return setLuminance(
+      setSaturation(base, saturation(filtered[0], filtered[1], filtered[2])),
       luminance(base[0], base[1], base[2]),
     );
   }
@@ -1423,4 +1444,16 @@ export async function verifyStudioAdjustmentLayerAdapterParity(
     );
   }
   return report;
+}
+
+export function createStudioLiveAdjustmentPlan(element: StudioLiveAdjustmentElement, sourceIds: readonly string[], masked: boolean) {
+  canonicalizeStudioLiveAdjustmentElement(element);
+  return buildStudioAdjustmentLayerCompositorPlan({ version: 1, groups: [], layers: [
+    ...sourceIds.map((id, paintOrder) => ({ id, paintOrder, parentGroupId: null, visible: true,
+      kind: "content" as const, renderKind: "group" as const })),
+    { id: element.id, parentGroupId: null, paintOrder: sourceIds.length, visible: true,
+      kind: "adjustment", scope: "composite-below", opacity: element.opacity ?? 1,
+      blendMode: (element.blendMode === "source-over" || !element.blendMode ? "normal" : element.blendMode) as StudioAdjustmentLayerBlendMode,
+      ...(masked ? { maskId: element.id + ":mask" } : {}), stack: element.smartFilters ?? createEmptyStudioAdjustmentStack() },
+  ] });
 }

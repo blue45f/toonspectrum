@@ -1172,7 +1172,11 @@ function exportAdjustmentGraphPsd(input: {
     sourceLayerOrder: elements.map((element) => element.id),
     adjustments: adjustments.map((element) => ({
       id: element.id,
-      adjustmentLayer: element.adjustmentLayer,
+      adjustmentLayer: {
+        ...element.adjustmentLayer,
+        scope: element.clipBelow === undefined ? element.adjustmentLayer!.scope
+          : element.clipBelow ? "clip-previous" : "composite-below",
+      },
       smartFilters: element.smartFilters,
       opacity: element.opacity ?? 1,
       blendMode: element.blendMode ?? "source-over",

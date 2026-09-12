@@ -1,5 +1,4 @@
-import { canonicalizeStudioLiveAdjustmentElement, StudioLiveAdjustmentMetadataSchema } from "./contracts/studio-live-adjustment-contract";
-import { buildStudioAdjustmentLayerCompositorPlan, type StudioAdjustmentLayerBlendMode } from "./studio-adjustment-layer-plan";
+import { StudioLiveAdjustmentMetadataSchema } from "./contracts/studio-live-adjustment-contract";
 import { createEmptyStudioAdjustmentStack } from "./studio-adjustment-stack";
 
 import type { El, ImageEl } from "./studio-element-model";
@@ -20,12 +19,13 @@ export function createStudioLiveAdjustment(id: string, width: number, height: nu
 }
 
 export type StudioLiveAdjustmentRenderTree =
-  | { kind: "content"; id: string; element: El; index: number }
+  | { kind: "underlay"; id: string }
+  | { kind: "content"; id: string; element: El; index: number; clipBase?: StudioLiveAdjustmentRenderTree }
   | { kind: "group"; id: string; children: StudioLiveAdjustmentRenderTree[] }
-  | { kind: "adjustment"; id: string; element: StudioLiveAdjustmentElement; composite: string; isolatedSource: boolean; children: StudioLiveAdjustmentRenderTree[] };
+  | { kind: "adjustment"; id: string; index: number; element: StudioLiveAdjustmentElement; composite: string; isolatedSource: boolean; children: StudioLiveAdjustmentRenderTree[] };
 
 function treeComposite(node: StudioLiveAdjustmentRenderTree | undefined): string {
-  if (!node || node.kind === "group") return "source-over";
+  if (!node || node.kind === "group" || node.kind === "underlay") return "source-over";
   if (node.kind === "adjustment") return node.composite;
   return node.element.type === "draw" && node.element.mode === "eraser"
     ? "destination-out" : node.element.blendMode ?? "source-over";
@@ -34,20 +34,30 @@ function treeComposite(node: StudioLiveAdjustmentRenderTree | undefined): string
 function foldScope(nodes: StudioLiveAdjustmentRenderTree[]): StudioLiveAdjustmentRenderTree[] {
   const output: StudioLiveAdjustmentRenderTree[] = [];
   for (const node of nodes) {
-    if (node.kind !== "content" || !isStudioLiveAdjustment(node.element)) { output.push(node); continue; }
+    if (node.kind !== "content" || !isStudioLiveAdjustment(node.element)) {
+      const previous = output[output.length - 1];
+      // The placeholder carries no alpha. A normal clipped layer needs the folded composite.
+      output.push(node.kind === "content" && node.element.clipBelow && previous?.kind === "adjustment" && previous.index === node.index - 1
+        ? { ...node, clipBase: previous } : node);
+      continue;
+    }
     const metadata = StudioLiveAdjustmentMetadataSchema.parse(node.element.adjustmentLayer);
     const isolatedSource = (node.element.clipBelow ?? (metadata.scope === "clip-previous"));
-    const children = isolatedSource ? output.splice(-1) : output.splice(0);
+    const children = isolatedSource
+      ? output[output.length - 1]?.kind === "underlay" ? [] : output.splice(-1)
+      : output.splice(0);
     // An empty adjustment has no pixels, but retains a real mount and capture failure fence.
-    output.push({ kind: "adjustment", id: node.id, element: node.element,
+    output.push({ kind: "adjustment", id: node.id, index: node.index, element: node.element,
       composite: isolatedSource ? treeComposite(children[0]) : "source-over", isolatedSource, children });
   }
   return output;
 }
 
 /** Group runs stay in painter order; root adjustments include preceding groups as composite inputs. */
-export function buildStudioLiveAdjustmentRenderTree(elements: readonly El[], visible: (element: El) => boolean): StudioLiveAdjustmentRenderTree[] {
-  const roots: StudioLiveAdjustmentRenderTree[] = [];
+export function buildStudioLiveAdjustmentRenderTree(
+  elements: readonly El[], visible: (element: El) => boolean, underlayId?: string,
+): StudioLiveAdjustmentRenderTree[] {
+  const roots: StudioLiveAdjustmentRenderTree[] = underlayId ? [{ kind: "underlay", id: underlayId }] : [];
   let group: Extract<StudioLiveAdjustmentRenderTree, { kind: "group" }> | undefined;
   elements.forEach((element, index) => {
     if (!visible(element)) return;
@@ -60,14 +70,22 @@ export function buildStudioLiveAdjustmentRenderTree(elements: readonly El[], vis
   return foldScope(roots);
 }
 
-export function createStudioLiveAdjustmentPlan(element: StudioLiveAdjustmentElement, sourceIds: readonly string[], masked: boolean) {
-  canonicalizeStudioLiveAdjustmentElement(element);
-  return buildStudioAdjustmentLayerCompositorPlan({ version: 1, groups: [], layers: [
-    ...sourceIds.map((id, paintOrder) => ({ id, paintOrder, parentGroupId: null, visible: true,
-      kind: "content" as const, renderKind: "group" as const })),
-    { id: element.id, parentGroupId: null, paintOrder: sourceIds.length, visible: true,
-      kind: "adjustment", scope: "composite-below", opacity: element.opacity ?? 1,
-      blendMode: (element.blendMode === "source-over" || !element.blendMode ? "normal" : element.blendMode) as StudioAdjustmentLayerBlendMode,
-      ...(masked ? { maskId: element.id + ":mask" } : {}), stack: element.smartFilters ?? createEmptyStudioAdjustmentStack() },
-  ] });
+
+const liveAdjustmentRevisions = new WeakMap<object, number>();
+let nextLiveAdjustmentRevision = 0;
+export function studioLiveAdjustmentObjectRevision(value: object): number {
+  let revision = liveAdjustmentRevisions.get(value);
+  if (revision === undefined) {
+    revision = ++nextLiveAdjustmentRevision;
+    liveAdjustmentRevisions.set(value, revision);
+  }
+  return revision;
+}
+
+/** Immutable element identities bound cache keys to element count, never image/stroke payload size. */
+export function studioLiveAdjustmentRenderRevision(node: StudioLiveAdjustmentRenderTree): string {
+  if (node.kind === "underlay") return `underlay:${node.id}`;
+  if (node.kind === "content") return `content:${studioLiveAdjustmentObjectRevision(node.element)}:${node.clipBase ? studioLiveAdjustmentRenderRevision(node.clipBase) : ""}`;
+  const own = node.kind === "adjustment" ? studioLiveAdjustmentObjectRevision(node.element) : node.id;
+  return `${node.kind}:${own}[${node.children.map(studioLiveAdjustmentRenderRevision).join(",")}]`;
 }

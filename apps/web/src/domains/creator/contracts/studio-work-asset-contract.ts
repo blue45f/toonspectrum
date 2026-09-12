@@ -756,6 +756,25 @@ export function parseStudioWorkAssetDescriptor(
   return descriptor;
 }
 
+/** Author the same bounded descriptor that collaboration admits; never silently drop a live graph. */
+export function studioLiveAdjustmentDescriptorError(element: object, smartFilters: unknown): string | null {
+  const source = element as Record<string, unknown>;
+  const descriptor: Record<string, unknown> = { id: source.id, type: "image" };
+  for (const key of STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS) {
+    if (source[key] !== undefined) descriptor[key] = source[key];
+  }
+  if (typeof source.name === "string") descriptor.name = source.name;
+  descriptor.smartFilters = smartFilters;
+  try {
+    parseStudioWorkAssetDescriptor({ version: 1, element: descriptor }, {
+      assetId: String(source.id), elementType: "image",
+    });
+    return null;
+  } catch {
+    return "보정 설정이 공동 편집 저장 한도를 넘거나 올바르지 않아 변경하지 않았어요. 필터를 줄이거나 설정을 단순화해 주세요.";
+  }
+}
+
 export function studioWorkAssetReferenceKey(
   reference: Pick<StudioWorkAssetManifest, "assetId" | "elementType">
 ): string {
