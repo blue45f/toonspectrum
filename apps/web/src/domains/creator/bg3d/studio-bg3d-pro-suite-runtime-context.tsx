@@ -72,6 +72,8 @@ export interface StudioBg3dProSuiteRuntimeValue {
   readonly sceneSummary?: StudioBg3dProductionSceneSummary;
   readonly onSetLineArtPreview?: (enabled: boolean) => void;
   readonly onSetTransparentBackground?: (transparent: boolean) => void;
+  /** Composes from the live viewport at command time; null means the edit was accepted. */
+  readonly onComposeLens?: (fovDegrees: number, preserveSubjectSize: boolean) => string | null;
   readonly onApplyCameraView: (camera: StudioBg3dCameraSettings) => void;
   readonly onPreviewCameraView?: (camera: StudioBg3dCameraSettings) => void;
   readonly onFinishCameraViewPreview?: () => void;

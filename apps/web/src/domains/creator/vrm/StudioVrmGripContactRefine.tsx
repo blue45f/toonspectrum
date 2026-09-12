@@ -224,13 +224,14 @@ export function createStudioVrmGripContactPasses(
 
 const NO_LOCKS: readonly string[] = [];
 
-export function StudioVrmGripContactRefine({ vrm, items, metrics, rigRevision, lockedBones = NO_LOCKS, disabled = false }: {
+export function StudioVrmGripContactRefine({ vrm, items, metrics, rigRevision, lockedBones = NO_LOCKS, disabled = false, capturePaused = false }: {
   vrm: VRM;
   items: readonly PropInstance[];
   metrics: VrmPropRigMetrics;
   rigRevision?: number;
   lockedBones?: readonly string[];
   disabled?: boolean;
+  capturePaused?: boolean;
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const passes = useMemo(() => {
@@ -250,6 +251,9 @@ export function StudioVrmGripContactRefine({ vrm, items, metrics, rigRevision, l
       }
     };
   }, [invalidate, passes, vrm]);
-  useFrame(() => { passes.forEach((pass) => pass.run()); }, STUDIO_VRM_GRIP_CONTACT_PRIORITY);
+  useFrame(() => {
+    if (capturePaused) return;
+    passes.forEach((pass) => pass.run());
+  }, STUDIO_VRM_GRIP_CONTACT_PRIORITY);
   return null;
 }

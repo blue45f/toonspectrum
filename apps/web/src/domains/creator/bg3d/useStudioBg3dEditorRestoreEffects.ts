@@ -324,7 +324,8 @@ export function useStudioBg3dEditorRestoreEffects(h) {
   // 이 effect 가 어떤 입력으로 이미 복원을 돌렸는지. renderer 아이덴티티는 일부러 넣지 않는다.
   const restoredSourceRef = useRef(null);
 
-  useEffect(() => {
+  // Mark restoration busy before the newly created/replaced renderer can expose editable UI.
+  useLayoutEffect(() => {
     if (!open || !modelRenderer) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;

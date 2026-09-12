@@ -82,6 +82,7 @@ export function VrmActor({
   webcamActive,
   trackingDataRef,
   idleAnimation,
+  capturePaused = false,
   fingerEdits,
   bodyScale,
   rigRevision,
@@ -105,6 +106,8 @@ export function VrmActor({
   webcamActive: boolean;
   trackingDataRef: React.RefObject<VrmTrackingData | null>;
   idleAnimation: boolean;
+  /** Freeze the displayed pose without resetting webcam smoothing or authored pose state. */
+  capturePaused?: boolean;
   fingerEdits: FingerRotationMap;
   bodyScale: BodyScale;
   rigRevision: number;
@@ -530,6 +533,7 @@ export function VrmActor({
   }, [webcamActive]);
 
   useFrame((state, delta) => {
+    if (capturePaused) return;
     const dVal = delta as number;
     const humanoid = vrm.humanoid;
     const expressionManager = vrm.expressionManager;

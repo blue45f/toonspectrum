@@ -14,9 +14,9 @@ import { useNavigate } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
+import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import {
   FriendlyQuickGuide,
-  PurposeExperienceStage,
 } from "@/shared/components/purpose-experience-stage";
 import { useI18n } from "@/shared/lib/i18n";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -24,8 +24,8 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 const COPY = {
   ko: {
     eyebrow: "DISCOVER",
-    title: "지금 원하는 방식으로 작품을 찾으세요.",
-    body: "제목을 알고 있으면 검색하고, 취향만 있다면 탐색하거나 추천받고, 결정하기 어렵다면 랭킹·랜덤·비교를 이용하세요.",
+    title: "다음 컷의 영감은, 새로운 이야기에서.",
+    body: "마음을 움직이는 연출, 오래 남는 캐릭터, 다음에 읽을 이야기. 작품을 검색하고 취향을 좁혀 발견하세요. 창작에 필요한 자료는 참고자료 작업실로 이어집니다.",
     placeholder: "작품명·작가·태그 검색",
     search: "검색",
     open: "열기",
@@ -52,8 +52,8 @@ const COPY = {
   },
   en: {
     eyebrow: "DISCOVER",
-    title: "Find a story in the way that fits your goal.",
-    body: "Search when you know the title, explore or get recommendations when you only know your taste, and use rankings, random picks or comparison when choosing is hard.",
+    title: "Find the story that sparks your next panel.",
+    body: "Memorable characters, visual storytelling and your next great read. Search for stories or explore by taste, then visit the reference atelier for your own creative work.",
     placeholder: "Search stories, creators or tags",
     search: "Search",
     open: "Open",
@@ -99,14 +99,14 @@ export function DiscoverHubPage() {
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <header className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-5 sm:p-8 lg:p-10">
-        <div aria-hidden="true" className="absolute -right-28 -top-36 size-96 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.17),_transparent_70%)]" />
-        <div className="relative grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
-          <div className="max-w-3xl">
-            <p className="eyebrow flex items-center gap-2 text-accent"><Compass size={14} aria-hidden="true" />{copy.eyebrow}</p>
-            <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
-
+      <PublicStoryHero
+        eyebrow="DISCOVER · STORIES & INSPIRATION"
+        title={copy.title}
+        description={copy.body}
+        image="world"
+        imageAlt={locale === "ko" ? "따뜻한 빛과 도시의 풍경이 펼쳐지는 웹툰 장면 콘셉트 아트" : "Webtoon concept art of a city scene in warm light"}
+        caption={locale === "ko" ? "READ THE SCENE · 웹툰 장면 콘셉트 아트" : "READ THE SCENE · Webtoon concept art"}
+      >
             <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
                 <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
@@ -123,15 +123,8 @@ export function DiscoverHubPage() {
                 {copy.search}
               </button>
             </form>
-          </div>
-
-          <PurposeExperienceStage
-            variant="discover"
-            ariaLabel={copy.visualLabel}
-            steps={copy.visualSteps}
-          />
-        </div>
-      </header>
+        <Link href="/research" className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-accent">{locale === "ko" ? "내 웹툰을 위한 참고자료 찾기" : "Find references for your webtoon"}<ArrowRight size={14} aria-hidden="true" /></Link>
+      </PublicStoryHero>
 
       <FriendlyQuickGuide
         className="mt-5"
@@ -149,7 +142,7 @@ export function DiscoverHubPage() {
               <Link
                 key={href}
                 href={href}
-                className="group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card/75 p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                className="group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card/75 p-4 transition-all motion-safe:hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
               >
                 <span aria-hidden="true" className="absolute -right-7 -top-7 size-20 rounded-full bg-accent/0 blur-2xl transition-colors duration-300 group-hover:bg-accent/15" />
                 <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
