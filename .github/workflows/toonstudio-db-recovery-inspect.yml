@@ -1,0 +1,83 @@
+name: ToonStudio recovery inspection
+
+on:
+  push:
+    branches: [ops/toonstudio-db-recovery-inspect-20260913]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toonstudio-db-recovery-inspection
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: 9d6d51dacb91fd40d06b23d166b7979ce98a2995
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 9d6d51dacb91fd40d06b23d166b7979ce98a2995
+          persist-credentials: false
+      - name: Package immutable public migration source for independent verification
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          mkdir -p recovery-inspection
+          git rev-parse HEAD > recovery-inspection/release-sha.txt
+          tar -czf recovery-inspection/recovery-inputs.tgz scripts apps/api/src/db apps/api/src/modules/health apps/api/package.json package.json .vercelignore
+          sha256sum recovery-inspection/recovery-inputs.tgz > recovery-inspection/SHA256SUMS
+      - uses: actions/upload-artifact@v6
+        with:
+          name: toonstudio-recovery-source-${{ github.run_id }}
+          path: recovery-inspection
+          retention-days: 3
+          if-no-files-found: error
+
+  database-read-only:
+    environment: production-database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 9d6d51dacb91fd40d06b23d166b7979ce98a2995
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Inspect configured production target without exposing credentials or user data
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
+          RUNTIME_DATABASE_ROLE: ${{ vars.PRODUCTION_RUNTIME_DATABASE_ROLE }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { createPsqlEnvironment, validateProductionDatabaseUrl } from './scripts/validate-production-database-url.mjs';
+          const raw = process.env.MIGRATION_DATABASE_URL;
+          if (!raw) throw new Error('production-database environment has no PRODUCTION_DATABASE_DIRECT_URL; no database operation was attempted');
+          const role = process.env.RUNTIME_DATABASE_ROLE;
+          if (!role || !/^[a-z_][a-z0-9_]{0,62}$/.test(role)) throw new Error('production-database environment has no valid PRODUCTION_RUNTIME_DATABASE_ROLE');
+          const contract = validateProductionDatabaseUrl(raw);
+          if (contract.hostname !== 'ep-jolly-smoke-aoixxix3.c-2.ap-southeast-1.aws.neon.tech' || contract.databaseName !== 'neondb') throw new Error('Configured production target differs from the inspected Neon branch; stopped without querying');
+          console.log(JSON.stringify({event:'verified-production-target', release:process.env.RELEASE_SHA, ...contract, runtimeRole:role}));
+          const env = {...createPsqlEnvironment(raw), PGCONNECT_TIMEOUT:'10', PGOPTIONS:'-c default_transaction_read_only=on -c statement_timeout=15000'};
+          const query = `BEGIN READ ONLY;
+          SELECT current_database() AS database_name, current_user AS migration_role;
+          SELECT id, state, provenance, "releaseSha" FROM toonspectrum_ops.deployment_migration ORDER BY id;
+          SELECT count(*) AS migration_lock_count FROM toonspectrum_ops.deployment_migration_lock;
+          SELECT count(*) AS creator_work_count FROM public.creator_work;
+          SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls FROM pg_roles WHERE rolname='${role}';
+          COMMIT;`;
+          const result = spawnSync('psql', ['-X','--no-psqlrc','--set=ON_ERROR_STOP=1','--no-align','--tuples-only','--file=-'], {env,input:query,encoding:'utf8',timeout:60000});
+          if (result.status !== 0 || result.error) throw new Error('Read-only production inspection failed; no mutation was attempted');
+          process.stdout.write(result.stdout);
+          NODE
