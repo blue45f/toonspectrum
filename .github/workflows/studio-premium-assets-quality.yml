@@ -26,24 +26,28 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24.16.0'
+          package-manager-cache: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install isolated verification tools
+      - name: Install isolated verification tools with the repository package manager
         run: |
           set -euo pipefail
           python -m pip install Pillow==11.3.0 numpy==2.2.6
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
           mkdir -p /tmp/toon-asset-tools
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          fs.writeFileSync('/tmp/toon-asset-tools/package.json', JSON.stringify({private:true,dependencies:{three:pkg.dependencies.three,react:pkg.dependencies.react,'react-dom':pkg.dependencies['react-dom'],playwright:pkg.devDependencies.playwright,tsx:pkg.devDependencies.tsx,vitest:pkg.devDependencies.vitest}}));
+          fs.writeFileSync('/tmp/toon-asset-tools/package.json', JSON.stringify({name:'studio-asset-verification',private:true,packageManager:pkg.packageManager,dependencies:{three:pkg.dependencies.three,react:pkg.dependencies.react,'react-dom':pkg.dependencies['react-dom'],playwright:pkg.devDependencies.playwright,tsx:pkg.devDependencies.tsx,vitest:pkg.devDependencies.vitest,vite:pkg.devDependencies.vite}}));
           fs.writeFileSync('/tmp/toon-asset-tools/vitest.config.mts', `import {defineConfig} from 'vitest/config'; export default defineConfig({test:{include:['apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts','apps/web/src/domains/creator/studio-cc0-original-delivery.test.ts','apps/web/src/domains/creator/studio-asset-expansion-20260908.test.ts'],environment:'node'}});`);
           JS
-          npm install --prefix /tmp/toon-asset-tools --ignore-scripts --no-audit --no-fund
+          pnpm --dir /tmp/toon-asset-tools install --ignore-scripts --config.node-linker=hoisted --no-frozen-lockfile
           ln -s /tmp/toon-asset-tools/node_modules node_modules
           /tmp/toon-asset-tools/node_modules/.bin/playwright install --with-deps chromium
       - name: New and legacy regression tests
