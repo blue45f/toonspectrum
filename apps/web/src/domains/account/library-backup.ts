@@ -27,7 +27,12 @@ const backup = z.object({
 /** Validate the full exported format before any local-library state can be replaced. */
 export function parseLibraryBackup(text: string): HydratePayload {
   if (new TextEncoder().encode(text).byteLength > MAX_LIBRARY_BACKUP_BYTES) throw new Error("backup-too-large");
-  const data = backup.parse(JSON.parse(text));
+  // Reject dangerous own keys before a schema library can silently discard them.
+  const parsed: unknown = JSON.parse(text, (property: string, value: unknown) => {
+    if (["__proto__", "constructor", "prototype"].includes(property)) throw new Error("unsafe-backup-key");
+    return value;
+  });
+  const data = backup.parse(parsed);
   if (new Set(data.collections.map((item) => item.id)).size !== data.collections.length) throw new Error("duplicate-collection");
   for (const [id, item] of Object.entries(data.reviews)) {
     if (id !== item.titleId) throw new Error("review-identity-mismatch");

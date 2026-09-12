@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { matchRoutes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { appRoutes } from "../../../app/routes/route-manifest";
+import { appRoutes } from "../../../app/routes/groups/app-routes";
 
 interface ManifestIcon {
   src: string;
@@ -36,9 +37,17 @@ interface WebManifest {
   screenshots?: ManifestScreenshot[];
 }
 
+const appOrigin = "https://www.toonstudio.cloud";
 const manifest = JSON.parse(
   readFileSync(join(process.cwd(), "apps/web/public/manifest.webmanifest"), "utf8")
 ) as WebManifest;
+
+function publicAssetPath(src: string): string {
+  const url = new URL(src, appOrigin);
+  expect(url.origin).toBe(appOrigin);
+  // Cache revisions belong to the URL, not the filesystem filename.
+  return join(process.cwd(), "apps/web/public", url.pathname);
+}
 
 describe("PWA manifest", () => {
   it("pins the app identity with an explicit id matching the scope", () => {
@@ -61,22 +70,30 @@ describe("PWA manifest", () => {
     expect(maskable.map((icon) => icon.sizes).sort()).toEqual(["192x192", "512x512"]);
     for (const icon of maskable) {
       expect(icon.type).toBe("image/png");
-      expect(existsSync(join(process.cwd(), "apps/web/public", icon.src))).toBe(true);
+      expect(new URL(icon.src, appOrigin).searchParams.get("v")).toBe("ink-panel-v1");
+      expect(existsSync(publicAssetPath(icon.src))).toBe(true);
     }
   });
 
-  it("exposes shortcuts that resolve to declared in-scope app routes", () => {
+  it("exposes creator shortcuts that resolve to declared in-scope app routes", () => {
     const shortcuts = manifest.shortcuts ?? [];
-    expect(shortcuts.map((shortcut) => shortcut.url)).toEqual(["/search", "/ranking", "/calendar"]);
+    expect(shortcuts.map((shortcut) => shortcut.url)).toEqual([
+      "/studio", "/studio/comic", "/shaper", "/research",
+    ]);
 
-    const routePaths = appRoutes.map((route) => route.path);
+    // Use the real router, not the legacy navigation-only metadata. Do not
+    // allow a missing destination to pass through the global 404 wildcard.
+    const registeredRoutes = appRoutes.filter((route) => !["*", "/*"].includes(route.path));
     for (const shortcut of shortcuts) {
-      expect(routePaths).toContain(shortcut.url);
+      const url = new URL(shortcut.url, appOrigin);
+      expect(url.origin).toBe(appOrigin);
+      expect(url.pathname.startsWith(manifest.scope)).toBe(true);
+      expect(matchRoutes(registeredRoutes, shortcut.url)).not.toBeNull();
     }
   });
 
-  it("declares store categories for richer install surfaces", () => {
-    expect(manifest.categories).toEqual(["entertainment", "books"]);
+  it("declares creator store categories for richer install surfaces", () => {
+    expect(manifest.categories).toEqual(["productivity", "graphics_design", "entertainment"]);
   });
 
   it("ships wide and narrow install-UI screenshots whose declared sizes match the PNGs", () => {
@@ -87,7 +104,7 @@ describe("PWA manifest", () => {
       expect(shot.type).toBe("image/png");
       expect(shot.label).not.toBe("");
 
-      const file = join(process.cwd(), "apps/web/public", shot.src);
+      const file = publicAssetPath(shot.src);
       expect(existsSync(file)).toBe(true);
 
       // PNG IHDR: width/height live at byte offsets 16/20, big-endian.
@@ -100,11 +117,14 @@ describe("PWA manifest", () => {
     }
   });
 
-  it("serves a raster apple-touch-icon (iOS does not render SVG touch icons)", () => {
+  it("serves a versioned raster apple-touch-icon", () => {
     const html = readFileSync(join(process.cwd(), "apps/web/index.html"), "utf8");
     const href = html.match(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/)?.[1];
-
-    expect(href).toBe("/apple-touch-icon.png");
-    expect(existsSync(join(process.cwd(), "apps/web/public/apple-touch-icon.png"))).toBe(true);
+    expect(href).toBeDefined();
+    const url = new URL(href ?? "", appOrigin);
+    expect(url.origin).toBe(appOrigin);
+    expect(url.pathname).toBe("/apple-touch-icon.png");
+    expect(url.searchParams.get("v")).toBe("ink-panel-v1");
+    expect(existsSync(publicAssetPath(url.href))).toBe(true);
   });
 });
