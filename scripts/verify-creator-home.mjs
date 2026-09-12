@@ -66,7 +66,7 @@ try {
     const brand = locale === "ko" ? "툰스튜디오" : "ToonStudio";
     await page.waitForFunction((name) => document.title.includes(name), brand);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
-    const headlineBounds = await page.locator("#creator-home-title > span").boundingBox();
+    const headlineBounds = await page.locator("#creator-home-title").boundingBox();
     assert(headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1, `Clipped headline: ${name}`);
     assert(await page.locator('.cf-hero .cf-actions a[href="/studio"]').isVisible());
 
@@ -89,7 +89,8 @@ try {
     const footer = page.locator('footer[data-site-chrome="footer"]');
     await footer.waitFor({ state: "visible", timeout: 30000 });
     assert.equal(await footer.getByRole("heading", { name: brand, exact: true }).count(), 1);
-    assert.equal(await footer.locator("nav").first().locator("a").first().getAttribute("href"), "/studio");
+    const creationEntry = footer.locator('.public-footer-invitation a[href="/studio/new"]');
+    await expect(creationEntry).toBeVisible();
     assert.equal(/툰스펙트럼|ToonSpectrum/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Footer overflow: ${name}`);
     await page.evaluate(() => window.scrollTo(0, 0));
