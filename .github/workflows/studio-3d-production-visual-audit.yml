@@ -42,7 +42,7 @@ jobs:
           pnpm exec playwright install --with-deps chromium
 
       - name: Verify audit policy
-        run: node --test scripts/lib/studio-3d-production-audit-policy.test.mjs
+        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
 
       - name: Audit production Studio on desktop, retina and mobile
         id: production-audit
