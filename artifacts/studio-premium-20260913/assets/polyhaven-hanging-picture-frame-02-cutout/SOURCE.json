@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-hanging-picture-frame-02",
+  "sourceModelSha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+  "render": {
+    "sourceId": "polyhaven-hanging-picture-frame-02",
+    "sourceSha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+    "path": "high-resolution-props/polyhaven-hanging-picture-frame-02.png",
+    "visiblePixels": 405074,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 3680
+  },
+  "independentOriginal": false
+}

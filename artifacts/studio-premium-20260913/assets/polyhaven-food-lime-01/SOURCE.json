@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_lime_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1625619600,
+    "name": "Food Lime 01",
+    "categories": [
+      "food",
+      "nature"
+    ],
+    "type": 2,
+    "authors": {
+      "Oliver Harries": "All"
+    },
+    "tags": [
+      "fruit",
+      "fruitbowl",
+      "food",
+      "lemon",
+      "lime",
+      "citrus",
+      "green",
+      "fresh"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 8100,
+    "texel_density": 48393.33830867773,
+    "dimensions": [
+      60.0700993090868,
+      61.33793853223324,
+      75.4411633242853
+    ],
+    "sponsors": [
+      "6265765",
+      "128081732"
+    ],
+    "files_hash": "b16ed297c671e83aed5f55fc1eb82f4b01976547",
+    "description": "Free 8K model of a realistic lime with bumpy, mottled green-yellow peel, subtle blemishes and a glossy, slightly waxy surface.",
+    "category_id": "482e0c49-27e5-54ed-8039-54f7c4560e2d",
+    "category": "Food & Kitchen/Produce/Fruit",
+    "attributes": {
+      "material": [
+        "food"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "83c14cac",
+    "download_count": 20793,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/food_lime_01.png?width=256&height=256&v=83c14cac"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/food_lime_01/food_lime_01_2k.gltf",
+      "bytes": 2696,
+      "sha256": "8e103c2b11cc928fdc87be2d98f6473eb797ef7355aa679834b8e0b594aae94a",
+      "sourceMd5": "09e49a72378e18c85f6b288740a2e7ef"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_lime_01/food_lime_01_nor_gl_2k.jpg",
+      "bytes": 550501,
+      "sha256": "e42266242d063e7451e255a3c516088b4f3612b96fe9b35d1c10082255b41a4f",
+      "sourceMd5": "200d992465a7c778b8a365dd1cc41850"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_lime_01/food_lime_01_diff_2k.jpg",
+      "bytes": 630469,
+      "sha256": "96081f55b5f9500f46edb07d949fb8e8df5a31efc52d709297c5d95055970832",
+      "sourceMd5": "8cab0c363eaedb38bd6aa0adbe1ad0f7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_lime_01/food_lime_01_rough_2k.jpg",
+      "bytes": 325175,
+      "sha256": "fb846972534dc20d3f6e5710abeb0b4bce13badb5c8b2840e1aac015980e29d2",
+      "sourceMd5": "4a257d94bc7364c7a1dbfe80747d3198"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/food_lime_01/food_lime_01.bin",
+      "bytes": 188600,
+      "sha256": "a504f452f8f94c3017e46e03851c4941efed4f5f4020afa3945fdf824d47aa8a",
+      "sourceMd5": "6f5d8d5d07cc03d1a59b29bf3d85e977"
+    }
+  ]
+}

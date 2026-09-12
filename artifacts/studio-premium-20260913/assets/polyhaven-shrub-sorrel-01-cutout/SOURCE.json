@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-shrub-sorrel-01",
+  "sourceModelSha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+  "render": {
+    "sourceId": "polyhaven-shrub-sorrel-01",
+    "sourceSha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+    "path": "high-resolution-props/polyhaven-shrub-sorrel-01.png",
+    "visiblePixels": 25489,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 3319
+  },
+  "independentOriginal": false
+}

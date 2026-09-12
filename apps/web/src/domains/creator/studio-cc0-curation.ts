@@ -85,6 +85,8 @@ function hasDetailedStyle(asset: Pick<StudioCc0Asset, "provider" | "style">): bo
 }
 
 export function studioCc0StyleLabel(asset: Pick<StudioCc0Asset, "kind" | "provider" | "style">): string {
+  if (asset.kind === "background") return "실사 레퍼런스 배경";
+  if (asset.kind === "prop-image") return "투명 2D 소품 · 3D 원본의 렌더";
   if (asset.kind !== "model") return asset.kind === "effect-mask" ? "투명 효과" : "원본 표면 재질";
   return hasDetailedStyle(asset) ? "디테일 PBR" : "스타일라이즈 · 로우폴리";
 }

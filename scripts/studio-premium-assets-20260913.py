@@ -125,6 +125,7 @@ def select_backgrounds(metadata: dict, existing_sources: set[str]) -> list[tuple
 
 def acquire_backgrounds(stage: Path, manifest: dict) -> None:
     from acquire_studio_pbr_assets import Fetcher
+    Image.MAX_IMAGE_PIXELS = MAX_SOURCE_PIXELS
     receipt_path = stage / 'background-acquisition.json'
     if receipt_path.exists():
         return

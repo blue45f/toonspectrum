@@ -1,0 +1,116 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Wooden Picnic Table",
+    "categories": [
+      "furniture",
+      "seating",
+      "table"
+    ],
+    "type": 2,
+    "tags": [
+      "vintage",
+      "old",
+      "worn",
+      "park",
+      "bench",
+      "outdoor",
+      "weathered",
+      "countryside",
+      "outdoor seating"
+    ],
+    "authors": {
+      "Ulan Cabanilla": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 10210,
+    "texel_density": 1156.5982859911464,
+    "dimensions": [
+      2240.9759759902954,
+      3022.329568862915,
+      745.9869086742401
+    ],
+    "date_published": 1715558400,
+    "sponsors": [
+      "26820710"
+    ],
+    "files_hash": "56962f92a441625ad0afd4cc2e1ae405035a86ea",
+    "description": "Free 4K model of a weathered wooden picnic table with attached benches, vintage worn planks, visible nail heads and rustic countryside patina.",
+    "category_id": "c87c74dd-a53f-58b7-a4f0-a2b27042c226",
+    "category": "Furniture/Tables/Outdoor Tables",
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "d0b52d80",
+    "download_count": 29737,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_picnic_table.png?width=256&height=256&v=d0b52d80"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_picnic_table/wooden_picnic_table_2k.gltf",
+      "bytes": 5099,
+      "sha256": "3d8d1b6d0c0efe5303b50e58e2d9d449bd7b6223b7421f2acc75693eb1044333",
+      "sourceMd5": "9421ec959f6447e5edbf2551b5cc6754"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/wooden_picnic_table/wooden_picnic_table.bin",
+      "bytes": 279116,
+      "sha256": "1efd51c292843194fbd709452d56d06c9ddc770f43a013db57ca79bfc2731b01",
+      "sourceMd5": "5d52db76187b9990c328f79612eafe5b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_bottom_diff_2k.jpg",
+      "bytes": 2779459,
+      "sha256": "3f6ab082adbc93d58d0fcb890dbcbbbf1bb9731390bf86f7e06f1149cd8c44d9",
+      "sourceMd5": "1b7f3fc4cd25d3bd3f70fbc3d79abcda"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_top_arm_2k.jpg",
+      "bytes": 3118298,
+      "sha256": "a095db06707a2101ac3fe3ba41b1b78c5bcecd338ee981643f2aa36bf31b0043",
+      "sourceMd5": "2d15a3d29e030399e103b281cd5d3ade"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_bottom_nor_gl_2k.jpg",
+      "bytes": 2513966,
+      "sha256": "2b5f79431ebdfc7a94f54be64c168a975bff4a3f41666ca992450ae58e686026",
+      "sourceMd5": "fefd4371897586469d15c90e61bf2636"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_top_nor_gl_2k.jpg",
+      "bytes": 3037855,
+      "sha256": "9aff708208707c2017c7422f6c0d97b302f9ccccd30fb45bb86bdfa320498425",
+      "sourceMd5": "3b39af73bd852ee53836ea8decb2ab12"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_bottom_arm_2k.jpg",
+      "bytes": 2774038,
+      "sha256": "a7d8573dc60ed977f2069d34460b6784eb4155601b4890b47c4f52c4b1231ffe",
+      "sourceMd5": "1d2d2b4aabb1de0081fa3ab46ca332fb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_picnic_table/wooden_picnic_table_top_diff_2k.jpg",
+      "bytes": 3135590,
+      "sha256": "34440cd1c2618716d3f585ee7e431b57f9ff0adb7b4633b28674a1dfd0dce5bc",
+      "sourceMd5": "95fc5e6a6ebc1c9f6ce36689bf748403"
+    }
+  ]
+}

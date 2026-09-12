@@ -1,0 +1,136 @@
+{
+  "sources": [
+    {
+      "id": "polyhaven-background-wide-street-01",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/wide_street_01.jpg",
+      "bytes": 4827893,
+      "sha256": "6fc798b65a6ba62d45da328e58dd914adafd160084824a031d3af95785c33e7d",
+      "sourceMd5": "edf218167bc9c9a970044657e055b5d1"
+    },
+    {
+      "id": "polyhaven-background-kiara-1-dawn",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/kiara_1_dawn.jpg",
+      "bytes": 5694761,
+      "sha256": "57b73d1e8e36c2d1e41cc2a0f8e790d57c8ce391fdd808601b160e2c53160226",
+      "sourceMd5": "4589b5be73ab249d7b1f259bed5e3379"
+    },
+    {
+      "id": "polyhaven-background-canary-wharf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/canary_wharf.jpg",
+      "bytes": 6175039,
+      "sha256": "62169f131300e52610930edb0d304e3e38a22f3a6b2762c0849ea8824610cf6a",
+      "sourceMd5": "8f657e36b6294be1da2031262dd85506"
+    },
+    {
+      "id": "polyhaven-background-wide-street-02",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/wide_street_02.jpg",
+      "bytes": 8611619,
+      "sha256": "5393414f0c7a2398cbb6a0ec886f3c01fbc537c95981cd5523961ef88106ec48",
+      "sourceMd5": "caea14f2b48251b67e55d1360252f73c"
+    },
+    {
+      "id": "polyhaven-background-urban-courtyard-02",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/urban_courtyard_02.jpg",
+      "bytes": 6207119,
+      "sha256": "c742ed6c488b75d6df0416ccbdebcb83ddf572f4eaff659f043e24899f5cc216",
+      "sourceMd5": "5fc2105fa343121236b114be4ac08e1a"
+    },
+    {
+      "id": "polyhaven-background-winter-evening",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/winter_evening.jpg",
+      "bytes": 2760539,
+      "sha256": "5f90b70e79b46613d923cf10ebf10fc6bc73aed9333dbd6e8a360add8eafbd1f",
+      "sourceMd5": "ba20fbc78f327f0bf022a14e7f9700a8"
+    },
+    {
+      "id": "polyhaven-background-rooftop-night",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rooftop_night.jpg",
+      "bytes": 4720008,
+      "sha256": "a8deb0e6c74a923e776786eb1ee9258b83d8afc7980efbdee3af0f8e833c0f76",
+      "sourceMd5": "e371f1d45d99040cba1ab9bec393715c"
+    },
+    {
+      "id": "polyhaven-background-portland-landing-pad",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/portland_landing_pad.jpg",
+      "bytes": 4046983,
+      "sha256": "6a23aeb5f7e83e46755bde45d5bc974dc1775089ddb1adcbedb2a4b8946cad48",
+      "sourceMd5": "37b01e565f8eb7c981c4436eeb228457"
+    },
+    {
+      "id": "polyhaven-background-rooitou-park",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rooitou_park.jpg",
+      "bytes": 6921351,
+      "sha256": "6cbfeffb50c409c3a2ad6553c2e18eea38171c366893a80fc89f81f75bd1f266",
+      "sourceMd5": "287654bfe32961ec41adb2aee85e01c8"
+    },
+    {
+      "id": "polyhaven-background-autumn-park",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/autumn_park.jpg",
+      "bytes": 8285763,
+      "sha256": "57fab029aa63df91853cac91381fbf300f26c1ceddebf82f194a9af1340b4de3",
+      "sourceMd5": "f88a69f678661c848b66383cae20ae7d"
+    },
+    {
+      "id": "polyhaven-background-the-sky-is-on-fire",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/the_sky_is_on_fire.jpg",
+      "bytes": 3467321,
+      "sha256": "2fe96ef8fd648d8727ac972a7c9a07c61ac7b91b9745fa79986a6d4ec52f4690",
+      "sourceMd5": "178cd92790281f0637d3f3e02ab3bf68"
+    },
+    {
+      "id": "polyhaven-background-shanghai-bund",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/shanghai_bund.jpg",
+      "bytes": 4758520,
+      "sha256": "8976e91394c6594b76f0cac3f7e0b667ff50dd6b035b5b9ada7e1da84478f589",
+      "sourceMd5": "e32d5336319873cdb1e9acecf1e45bc2"
+    },
+    {
+      "id": "polyhaven-background-fireplace",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/fireplace.jpg",
+      "bytes": 4528196,
+      "sha256": "e4eb8633cb6cd9e763d7ed32882567cf83819f960ae1cc0f4bedae6820d7a668",
+      "sourceMd5": "21f42a925bfd34df7cacedb9ce3a3245"
+    },
+    {
+      "id": "polyhaven-background-cayley-interior",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/cayley_interior.jpg",
+      "bytes": 4583075,
+      "sha256": "abf4897f4c2f36226a1ffbb2dbc52e5777e04f2ab18a8b46d05f327b98c879cc",
+      "sourceMd5": "b56ae551991b3cd259cd11f23e4129b5"
+    },
+    {
+      "id": "polyhaven-background-empty-warehouse-01",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/empty_warehouse_01.jpg",
+      "bytes": 4072009,
+      "sha256": "c40091f113f33868fc966b3762749f48d8470da3a4267c09b152dff79e089511",
+      "sourceMd5": "c8bade16362fe4ffcc2f8c176b84daba"
+    },
+    {
+      "id": "polyhaven-background-abandoned-slipway",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/abandoned_slipway.jpg",
+      "bytes": 5160993,
+      "sha256": "1e7b7989b81226e8b13c5afbfe208f7e89db6aea4d7542fa63bdf0a45f574633",
+      "sourceMd5": "f94f23017b84809622c71fd18f849685"
+    }
+  ],
+  "errors": [
+    {
+      "id": "meadow_2",
+      "reason": "No bounded official tonemapped panorama"
+    },
+    {
+      "id": "meadow",
+      "reason": "No bounded official tonemapped panorama"
+    },
+    {
+      "id": "photo_studio_loft_hall",
+      "reason": "No bounded official tonemapped panorama"
+    },
+    {
+      "id": "studio_country_hall",
+      "reason": "No bounded official tonemapped panorama"
+    }
+  ],
+  "downloadedBytes": 87438260,
+  "artisticApproval": false
+}

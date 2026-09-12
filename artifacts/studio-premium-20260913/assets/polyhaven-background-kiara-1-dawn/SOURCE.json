@@ -1,0 +1,82 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/kiara_1_dawn",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 10,
+    "type": 0,
+    "date_published": 1522879200,
+    "name": "Kiara 1 Dawn",
+    "categories": [
+      "outdoor",
+      "skies",
+      "nature",
+      "sunrise-sunset",
+      "partly cloudy",
+      "medium contrast",
+      "natural light"
+    ],
+    "coords": [
+      -28.508926,
+      28.5664
+    ],
+    "date_taken": 1472012400,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "backplates": true,
+    "tags": [
+      "mountain",
+      "valley",
+      "rock",
+      "backplates"
+    ],
+    "files_hash": "526e35c2ff1a82f02f565c4e5f61b05514621763",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "sponsors": [
+      "10485422",
+      "3237733",
+      "32966849"
+    ],
+    "description": "Free 16K unclipped HDRI of a rocky mountain valley at dawn, soft pastel sunrise glow, partly cloudy sky, medium-contrast natural light with cool violet tones.",
+    "category_id": "8bc2e77f-89ff-5514-9fbe-dbb20af3d7a7",
+    "category": "Mountains & Hills/Valleys/Arid & Rocky Valleys",
+    "attributes": {
+      "time_of_day": "sunrise",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "53299e21",
+    "download_count": 450483,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/kiara_1_dawn.png?width=256&height=256&v=53299e21"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/kiara_1_dawn.jpg",
+      "bytes": 5694761,
+      "sha256": "57b73d1e8e36c2d1e41cc2a0f8e790d57c8ce391fdd808601b160e2c53160226",
+      "sourceMd5": "4589b5be73ab249d7b1f259bed5e3379"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

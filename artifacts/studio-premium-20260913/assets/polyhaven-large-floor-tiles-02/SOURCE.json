@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/large_floor_tiles_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "tiles",
+      "flat",
+      "large",
+      "square",
+      "even"
+    ],
+    "date_published": 1559876840,
+    "name": "Large Floor Tiles 02",
+    "categories": [
+      "floor",
+      "man made",
+      "outdoor",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "703a5b54139eb4635dad06b61ff289f6aa760503",
+    "description": "Free 8K texture of large square concrete floor tiles, matte and weathered with recessed grout, subtle surface roughness, dirt, and worn edges.",
+    "category_id": "ce26ba57-ef4b-54d4-a954-9a85bb053b9e",
+    "category": "Brick & Block/Concrete Block & Paver/Interlocking Pavers",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "804dee0c",
+    "download_count": 128328,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/large_floor_tiles_02.png?width=256&height=256&v=804dee0c"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_floor_tiles_02/large_floor_tiles_02_diff_2k.jpg",
+      "bytes": 2409892,
+      "sha256": "a18c67aedef1099f5ad24abd4e65d9a9fcc44e2b9e60aba27ec255f9220708cd",
+      "sourceMd5": "4a11f2c94aeba4ef7eec7a4ec31b857e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_floor_tiles_02/large_floor_tiles_02_rough_2k.jpg",
+      "bytes": 1895686,
+      "sha256": "0838441397c114faecb89c4e1fae56ce8df195748b2128d0eb1a9bb116407731",
+      "sourceMd5": "0e74a78daad5b9a8fd9afed1d5d102cb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_floor_tiles_02/large_floor_tiles_02_nor_gl_2k.jpg",
+      "bytes": 1272020,
+      "sha256": "436117e6fc10a4e76a7d2d31ebb1e56372709068b52875baa9468ae414330ea3",
+      "sourceMd5": "ae6767279425e8719d255c768e30ef33"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_floor_tiles_02/large_floor_tiles_02_ao_2k.jpg",
+      "bytes": 1208024,
+      "sha256": "ceb98043a24a92fcb42b7589560006b52595298d04ac8374db3f089f4d61c779",
+      "sourceMd5": "5ef6a2307e626678f8c3f2597a3b6641"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_floor_tiles_02/large_floor_tiles_02_disp_2k.jpg",
+      "bytes": 643976,
+      "sha256": "faa2e995dacfb2a3f85bb3fca6c6deb80b5c61ccc0df6470c60ee1fa0cb47e72",
+      "sourceMd5": "bc04ced04e287e112aa28f86949e53cd"
+    }
+  ]
+}
