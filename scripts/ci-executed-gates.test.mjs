@@ -48,3 +48,10 @@ test("all sixteen main product regression files remain mandatory", () => {
   assert.ok(tests.some((path) => path.endsWith("studio-brush-catalog-contract.test.ts")));
   assert.ok(tests.some((path) => path.endsWith("StudioBg3dViewPanelLazy.test.tsx")));
 });
+
+// Manual validation must not cancel push validation; retries keep prior evidence.
+test("isolates event concurrency and retry artifact names", () => {
+  assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
+  assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
+});

@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: core-${{ github.event.pull_request.number || github.ref }}
+  group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: core-serial
+          name: core-serial-attempt-${{ github.run_attempt }}
           path: artifacts/core
           retention-days: 7
           if-no-files-found: error
@@ -124,7 +124,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: core-build
+          name: core-build-attempt-${{ github.run_attempt }}
           path: artifacts/core
           retention-days: 7
           if-no-files-found: error
