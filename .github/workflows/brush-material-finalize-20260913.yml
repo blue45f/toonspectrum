@@ -1,0 +1,89 @@
+name: Finalize brush material regression coverage
+on:
+  push:
+    branches: [feat/brush-material-engine-20260913]
+    paths: [.github/workflows/brush-material-finalize-20260913.yml]
+permissions:
+  contents: write
+defaults:
+  run:
+    shell: bash
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - name: Correct bounded historical ranges and exercise real progressive selection
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path('apps/web/src/domains/creator/brush')
+          def replace(text, old, new):
+              assert text.count(old) == 1, (old, text.count(old))
+              return text.replace(old, new)
+          p = base / 'studio-brush-pack-index.test.ts'
+          text = p.read_text()
+          text = replace(text, 'STUDIO_BRUSH_PACK_CATALOG_IDS.slice(87)', 'STUDIO_BRUSH_PACK_CATALOG_IDS.slice(87, 160)')
+          text = replace(text, 'STUDIO_BRUSH_PACK_DESCRIPTORS.slice(87)', 'STUDIO_BRUSH_PACK_DESCRIPTORS.slice(87, 160)')
+          text = replace(text, 'STUDIO_BRUSH_PACK_CATALOG_IDS.slice(-40)', 'STUDIO_BRUSH_PACK_CATALOG_IDS.slice(120, 160)')
+          p.write_text(text)
+          p = base / 'StudioBrushLibrarySheet.test.tsx'
+          text = p.read_text()
+          start = text.index('  it("renders the complete single-batch product catalog')
+          end = text.index('\n  it(', start+5)
+          block = text[start:end]
+          block = replace(block, 'renders the complete single-batch product catalog and materializes a durable selection', 'progressively reveals the complete product catalog and materializes a new durable material selection')
+          block = replace(block, '// Product inventory fits in one batch; large-list behavior is covered with explicit fixtures below.', '// Keep the first render bounded, then exercise keyboard-accessible pagination on real inventory.')
+          block = replace(block, 'expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();', 'expect(exhaustiveCatalogCount).toBeGreaterThan(48);\n    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).not.toBeNull();')
+          block = replace(block, 'expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();', 'expect(container.querySelector("[data-studio-brush-progressive-fallback]")).not.toBeNull();')
+          old = '''    while (container.querySelector('[data-studio-brush-progressive-fallback="true"]')) {
+                fireEvent.click(
+                  container.querySelector('[data-studio-brush-progressive-fallback="true"]')!,
+                );
+              }'''
+          # Preserve a bounded test even when pagination regresses.
+          first = block.index('    while (container.querySelector(')
+          last = block.index('    expect(screen.getByRole("status")', first)
+          block = block[:first] + '''    for (let batch = 0; batch < Math.ceil(exhaustiveCatalogCount / 48); batch++) {
+                const next = container.querySelector('[data-studio-brush-progressive-fallback="true"]');
+                if (!next) break;
+                fireEvent.click(next);
+              }
+              expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
+              expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();
+          ''' + block[last:]
+          block = replace(block, 'name: "잎송이 선택"', 'name: "고사리 깃잎 선택"')
+          block = replace(block, 'catalogId: "leaf-cluster"', 'catalogId: "material-fern-frond"')
+          block = replace(block, 'catalogName: "잎송이"', 'catalogName: "고사리 깃잎"')
+          block = replace(block, 'defaultWidth: 34', 'defaultWidth: 56')
+          block = replace(block, 'defaultOpacity: 0.78', 'defaultOpacity: 0.94')
+          text = text[:start] + block + text[end:]
+          p.write_text(text)
+          p = base / 'studio-material-tip-kernels.ts'
+          p.write_text(replace(p.read_text(), 'They compile to portable R8 fields at selection time.', 'They compile to portable R8 fields at build time; selection reads the baked atlas.'))
+          PY
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Exercise corrected catalogue, icons and real second-page selection
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/brush/studio-brush-pack-index.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-icons.test.ts
+          apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+      - name: Remove all one-off transfer infrastructure and commit verified changes
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/brush-material-engine-20260913
+          git rm .github/workflows/brush-source-audit-20260913.yml .github/workflows/brush-material-apply-20260913.yml .github/workflows/brush-material-finalize-20260913.yml .github/brush-material-payload-1.b64 .github/brush-material-payload-2.b64 .github/brush-material-payload-3.b64 .github/brush-material-repairs.json .github/brush-material-integration.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web/src/domains/creator/brush/
+          git diff --cached --check
+          git commit -m 'test(studio): verify progressive material selection and retain exact historical catalogue ranges'
+          git push origin HEAD:feat/brush-material-engine-20260913

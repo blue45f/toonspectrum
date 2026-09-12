@@ -6,6 +6,7 @@ on:
     paths:
       - apps/web/src/domains/creator/brush/**
       - apps/web/src/domains/creator/studio-dynamic-brush-*.ts
+      - apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay*
       - scripts/generate-studio-material-tip-atlas.mts
       - scripts/studio-material-morphology-browser.ts
       - scripts/verify-studio-material-morphology.mjs
@@ -20,6 +21,10 @@ on:
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: studio-material-morphology-${{ github.event.pull_request.number || github.ref }}
@@ -45,32 +50,33 @@ jobs:
         run: |
           pnpm exec tsx scripts/generate-studio-material-tip-atlas.mts
           git diff --exit-code -- apps/web/src/domains/creator/brush/studio-material-tip-atlas.generated.json
-      - name: Material, catalogue, persistence and existing-engine regressions
-        run: >-
-          pnpm exec vitest run
-          apps/web/src/domains/creator/brush/studio-procedural-tip-rasterizer.test.ts
-          apps/web/src/domains/creator/brush/studio-material-tip-kernels.test.ts
-          apps/web/src/domains/creator/brush/studio-material-morphology-runtime.test.ts
-          apps/web/src/domains/creator/brush/studio-material-brush-runtime.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-pack-id.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-pack-index.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-pack-runtime.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-catalog-lazy-boundary.test.ts
-          apps/web/src/domains/creator/brush/studio-brush-continuity-audit.test.ts
-          apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
-          apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
+      - name: Complete brush-folder and catalogue regressions
+        run: |
+          mkdir -p "$RUNNER_TEMP/studio-material-morphology"
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush \
+            apps/web/src/domains/creator/studio-sketchpad-specialty.test.ts \
+            apps/web/src/domains/creator/studio-competitor-specialty-brush-expansion.test.ts \
+            scripts/studio-brush-long-matrix-quality.test.ts \
+            2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/brush-tests.log"
+      - name: Quiet performance and incremental live streaming regressions
+        run: |
+          pnpm exec vitest run --config vitest.perf.config.ts \
+            apps/web/src/domains/creator/brush \
+            apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay.test.ts \
+            2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/streaming-perf-tests.log"
       - name: Existing material-engine, CRDT, pointer and export regressions
-        run: pnpm run test:studio-material-brush
+        run: |
+          pnpm run test:studio-material-brush 2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/material-tests.log"
+      - name: Audit public catalogue consistency
+        run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Compare all 32 materials in the real Canvas2D renderer at DPR 1, 2 and 3
         env:
           TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
         run: node scripts/verify-studio-material-morphology.mjs
-      - name: Upload real-renderer images, pressure and performance receipts
+      - name: Upload real-renderer images, pressure, performance and test receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
