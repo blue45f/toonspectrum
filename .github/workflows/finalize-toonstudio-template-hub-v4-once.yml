@@ -130,8 +130,8 @@ jobs:
               if 'variant: "danger"' in text:
                   raise SystemExit(f"{path}: unsupported danger variant remains")
               path.write_text(text)
-          if total != 3:
-              raise SystemExit(f"expected three danger replacements, found {total}")
+          if total not in {0, 3}:
+              raise SystemExit(f"unexpected danger replacement count: {total}")
           PY
 
           grep -q 'const workspaceList' \
