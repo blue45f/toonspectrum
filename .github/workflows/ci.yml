@@ -52,6 +52,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Studio 3D production audit policy regressions
+        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
       - name: Repository contracts
         run: |
           set -euo pipefail

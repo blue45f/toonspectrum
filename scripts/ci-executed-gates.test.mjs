@@ -150,6 +150,17 @@ test("duplicate arguments cannot inflate regression coverage", () => {
   assert.throws(() => assertRequiredRegressions(duplicated), /duplicate regression arguments/);
 });
 
+// Preserve the concurrent production-audit runner fix from PR #1337.
+test("production visual audit uses the Vitest runner for its policy suite", () => {
+  const audit = readFileSync(new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url), "utf8");
+  assert.ok(audit.includes("      - name: Verify audit policy\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+  assert.doesNotMatch(audit, /node\s+--test\s+scripts\/lib\/studio-3d-production-audit-policy\.test\.mjs/);
+});
+
+test("required core executes the production audit policy suite before merge", () => {
+  assert.ok(job("static").includes("      - name: Studio 3D production audit policy regressions\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+});
+
 // Manual validation must not cancel push validation; retries keep prior evidence.
 test("isolates event concurrency and retry artifact names", () => {
   assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
