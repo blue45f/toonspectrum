@@ -35,14 +35,14 @@ try {
     await page.goto(`${origin}/#creator-faq-title`, { waitUntil: "domcontentloaded" });
     const faq = page.locator("#creator-faq-title");
     await expect(faq).toBeFocused({ timeout: 30000 });
-    await expect(page.locator(".ch-jump-links a")).toHaveCount(4);
+    await expect(page.locator(".cf-jump-nav a")).toHaveCount(5);
     const position = await faq.boundingBox();
     const header = await page.locator('header').first().boundingBox();
     assert(position && position.y >= (header ? header.y + header.height : 0) - 1, "Fragment heading must not be hidden by the site header");
     assert(position.y < height, "Fragment heading must land inside the viewport");
 
     // The hero film link is still a genuine URL fragment, not a media-play command.
-    await page.locator('.ch-actions a[href="#creator-film"]').click();
+    await page.locator('.cf-film-link[href="#creator-film"]').click();
     await expect(page.locator("#creator-film-title")).toBeFocused();
     await expect(page).toHaveURL(/#creator-film$/);
     await page.goBack();
@@ -52,17 +52,17 @@ try {
     await expect(page.locator("#creator-film-title")).toBeFocused();
 
     // Same-fragment activation should focus the heading even without hashchange.
-    const filmLink = page.locator('.ch-jump-links a[href="#creator-film"]');
+    const filmLink = page.locator('.cf-film-link[href="#creator-film"]');
     await filmLink.focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#creator-film-title")).toBeFocused();
 
-    await page.locator('.ch-jump-links a[href="#creator-process-title"]').click();
+    await page.locator('.cf-jump-nav a[href="#creator-process-title"]').click();
     await expect(page.locator("#creator-process-title")).toBeFocused();
-    const localPicker = page.locator(".ch-process-options button");
+    const localPicker = page.locator(".cf-stage-switcher button");
     await localPicker.nth(1).click();
     await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "comic");
-    await expect(page.locator('.ch-preview-options button[data-creator-stage="comic"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.cf-stage-switcher button[data-creator-stage="comic"]')).toHaveAttribute("aria-pressed", "true");
     await page.keyboard.press("End");
     await expect(localPicker.nth(2)).toBeFocused();
     await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "scene");
@@ -77,14 +77,14 @@ try {
     assert.equal(await page.locator("video").count(), 0);
     assert.deepEqual(mediaRequests, [], "Navigation must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    for (const control of await page.locator(".ch-jump-links a,.ch-process-options button,.ch-preview-options button").all()) {
+    for (const control of await page.locator(".cf-jump-nav a,.cf-stage-switcher button,.cf-stage-switcher button").all()) {
       const box = await control.boundingBox();
       assert(box && box.height >= 44, "Navigation and workflow controls must keep the 44px touch target");
     }
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
     assert.deepEqual(errors, []);
-    results.push({ name, viewport: [width, height], directFragment: true, nativeBackForward: true, sameFragmentFocus: true, synchronizedPickers: true, keyboard: true, noMediaRequests: true, minimumControlHeight: 44 });
+    results.push({ name, viewport: [width, height], directFragment: true, nativeBackForward: true, sameFragmentFocus: true, workflowPicker: true, keyboard: true, noMediaRequests: true, minimumControlHeight: 44 });
     await context.close();
     currentPage = undefined;
   }

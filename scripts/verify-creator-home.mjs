@@ -68,9 +68,9 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
     const headlineBounds = await page.locator("#creator-home-title > span").boundingBox();
     assert(headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1, `Clipped headline: ${name}`);
-    assert(await page.locator('.ch-actions a[href="/studio"]').isVisible());
+    assert(await page.locator('.cf-hero .cf-actions a[href="/studio"]').isVisible());
 
-    const previewOptions = page.locator(".ch-preview-options button");
+    const previewOptions = page.locator(".cf-stage-switcher button");
     await previewOptions.nth(1).click();
     assert.equal(await previewOptions.nth(1).getAttribute("aria-pressed"), "true");
     assert((await page.locator("#creator-stage-description").innerText()).includes(locale === "ko" ? "장면과 장면" : "one scene"));
@@ -78,7 +78,7 @@ try {
     await page.keyboard.press("Enter");
     assert.equal(await previewOptions.nth(2).getAttribute("aria-pressed"), "true");
     await previewOptions.nth(0).click();
-    const faq = page.locator(".ch-faq summary").first();
+    const faq = page.locator(".cf-faq summary").first();
     await faq.click();
     assert.equal(await faq.locator("..").getAttribute("open"), "");
     await faq.click();
@@ -128,7 +128,7 @@ try {
       await page.route("**/brand/toonstudio-intro.mp4", (route) => route.abort());
       await page.getByTestId("creator-film-play").click();
       await page.locator(".ch-film-error").waitFor();
-      assert.equal(await page.locator('.ch-actions a[href="/studio"]').count(), 1);
+      assert.equal(await page.locator('.cf-hero .cf-actions a[href="/studio"]').count(), 1);
       results.push({ check: "mobile-menu-focus-and-film-error", pass: true });
     }
     assert.deepEqual(errors, [], `Uncaught page errors: ${name}`);

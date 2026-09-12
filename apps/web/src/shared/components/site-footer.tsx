@@ -1,4 +1,4 @@
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, PenTool, Sparkles } from "lucide-react";
 
 import {
   SITE_NAVIGATION_GROUPS,
@@ -10,6 +10,9 @@ import {
 import { ToonSpectrumMark } from "./visual-marks";
 
 import Link from "@/compat/router-link";
+import { usePathname } from "@/compat/navigation";
+
+import "./public-site-shell.css";
 import { spectrumGradient } from "@/shared/lib/genre-color";
 import { useI18n, useT } from "@/shared/lib/i18n";
 
@@ -27,6 +30,8 @@ const POLICY_LINKS = [
 ] as const;
 
 export function SiteFooter() {
+  const pathname = usePathname();
+  const isPublicPage = pathname !== "/studio" && !pathname.startsWith("/studio/");
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
   const t = useT();
@@ -48,12 +53,39 @@ export function SiteFooter() {
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러", "드라마"], 90) }}
+        style={{ background: isPublicPage ? "linear-gradient(90deg, transparent, var(--color-accent), transparent)" : spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러", "드라마"], 90) }}
       />
-      <span aria-hidden="true" className="pointer-events-none absolute -right-24 top-10 size-80 rounded-full border border-line/35 opacity-55" />
-      <span aria-hidden="true" className="pointer-events-none absolute -right-8 top-28 size-44 rounded-full border border-accent/20 opacity-60" />
+      {!isPublicPage && <span aria-hidden="true" className="pointer-events-none absolute -right-24 top-10 size-80 rounded-full border border-line/35 opacity-55" />}
+      {!isPublicPage && <span aria-hidden="true" className="pointer-events-none absolute -right-8 top-28 size-44 rounded-full border border-accent/20 opacity-60" />}
 
       <div className="relative mx-auto max-w-[1320px] px-4 pt-10 sm:px-6 sm:pt-14">
+        {isPublicPage ? (
+        <section className="public-footer-invitation" aria-labelledby="footer-creative-title">
+          <img src="/brand/atelier-world.webp" alt="" loading="lazy" decoding="async" width={1536} height={1024} className="public-footer-invitation__art" />
+          <div className="public-footer-invitation__content">
+            <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
+              <PenTool size={14} aria-hidden="true" />
+              YOUR NEXT WEBTOON STARTS HERE
+            </p>
+            <h2 id="footer-creative-title" className="mt-4 text-balance text-3xl font-bold leading-tight tracking-[-0.045em] text-fg sm:text-4xl">
+              {locale === "ko" ? "오래 상상한 장면, 이제 직접 그려보세요." : "That scene you keep imagining. Make it yours."}
+            </h2>
+            <p className="mt-4 max-w-md text-sm leading-7 text-fg-2">
+              {locale === "ko"
+                ? "브러시의 첫 선부터 레이어, 말풍선, 완성한 작품의 내보내기까지. 브라우저에서 열리는 당신의 드로잉 작업실."
+                : "From your first brushstroke to layers, speech balloons and the final export. Your drawing atelier, in the browser."}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href={make.href} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+                {locale === "ko" ? "웹툰 그리기" : "Draw your webtoon"}<ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              <Link href={research.href} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-panel/85 px-4 py-3 text-sm font-semibold text-fg-2 transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+                {siteNavigationText(research.label, locale)}<ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
+        ) : (
         <section className="grid gap-6 rounded-3xl border border-line/70 bg-panel/72 p-6 shadow-lg backdrop-blur-xl md:grid-cols-[1fr_auto] md:items-center md:p-8" aria-labelledby="footer-creative-title">
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
@@ -84,6 +116,7 @@ export function SiteFooter() {
             </Link>
           </div>
         </section>
+        )}
 
         <div className="grid gap-8 py-12 sm:grid-cols-2 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-6 lg:py-14">
           <div className="max-w-sm sm:col-span-2 lg:col-span-1">
@@ -96,11 +129,11 @@ export function SiteFooter() {
                   {siteBrand}
                 </h2>
                 <span className="block font-display text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-fg-3">
-                  Create · Share · Discover
+                  {isPublicPage ? "Draw · Discover · Share" : "Create · Share · Discover"}
                 </span>
               </span>
             </Link>
-            <p className="mt-5 text-sm leading-7 text-fg-2">{t("footer.description.primary")}</p>
+            <p className="mt-5 text-sm leading-7 text-fg-2">{isPublicPage ? (locale === "ko" ? "웹툰과 일러스트를 위한 브라우저 드로잉 도구. 영감을 찾는 순간부터 작품을 그려 나누는 순간까지 연결합니다." : "Browser drawing tools for webtoons and illustration. A connected journey from finding inspiration to creating and sharing your work.") : t("footer.description.primary")}</p>
             <p className="mt-3 text-xs leading-6 text-fg-3">{t("footer.description.secondary")}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {SITE_UTILITY_NAVIGATION.map((item) => {

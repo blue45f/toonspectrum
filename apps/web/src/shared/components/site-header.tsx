@@ -16,6 +16,7 @@ import {
   siteNavigationText,
 } from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
+import { PublicSiteJourney } from "./public-site-journey";
 
 import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
 import { usePathname } from "@/compat/navigation";
@@ -170,6 +171,7 @@ export function SiteHeader() {
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
   const navigationContext = siteNavigationContextForPath(pathname);
+  const isPublicPage = !matchesPrefix(pathname, "/studio");
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
   const brandHref = navigationContext === "studio" ? "/studio" : "/";
@@ -177,7 +179,9 @@ export function SiteHeader() {
   const brandDescription = navigationContext === "studio"
     ? SITE_NAVIGATION_ITEMS.studio.description
     : SITE_NAVIGATION_ITEMS.home.description;
-  const brandTagline = navigationContext === "studio"
+  const brandTagline = isPublicPage
+    ? "Webtoon drawing atelier"
+    : navigationContext === "studio"
     ? (locale === "ko" ? "만들기 · 검토 · 내보내기" : "Create · Review · Publish")
     : "Discover · Read · Share";
   const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
@@ -206,6 +210,7 @@ export function SiteHeader() {
       <header
         data-site-chrome="header"
         data-site-product={navigationContext}
+        data-public-site={isPublicPage || undefined}
         className="sticky top-0 z-50 border-b border-line/70 bg-canvas/80 shadow-sm backdrop-blur-2xl"
       >
         <div className="mx-auto flex h-[4.25rem] max-w-[1320px] items-center gap-2 px-4 sm:px-6">
@@ -323,6 +328,7 @@ export function SiteHeader() {
             </button>
           </div>
         </div>
+        {isPublicPage && <PublicSiteJourney pathname={pathname} locale={locale} />}
       </header>
 
       {shouldRenderMobileNavigation && (

@@ -43,9 +43,28 @@ test("Korean query reaches the real reference screen without losing its original
   await expect(page.locator('aside').filter({ hasText: "medieval armor" })).toBeVisible();
 });
 
-test("simple launch and project entry are explicit", async ({ page }) => {
+test("professional webtoon entry leads with simple mode and projects available", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('.cf-hero a.cf-primary[href="/studio"]')).toBeVisible();
   await expect(page.locator('.cf-hero a[href="/studio?uiMode=simple"]')).toBeVisible();
   await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
   await expect(page.locator('.creator-flagship form')).toHaveCount(1);
+});
+
+
+test("artwork values can be compared by keyboard and reduced motion stops the artwork", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const study = page.locator(".cf-art-study");
+  const comparison = study.getByRole("slider");
+  await comparison.focus();
+  await page.keyboard.press("Home");
+  await expect(comparison).toHaveValue("0");
+  await page.keyboard.press("End");
+  await expect(comparison).toHaveValue("100");
+  await study.locator(".cf-motion-control").click();
+  await expect(study).toHaveAttribute("data-motion", "paused");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(study.locator(".cf-motion-control")).toBeHidden();
+  expect(await study.locator(".cf-study-art img").first().evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
 });

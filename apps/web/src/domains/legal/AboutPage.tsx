@@ -1,182 +1,62 @@
-import {
-  Search,
-  Compass,
-  Trophy,
-  Sparkles,
-  CalendarDays,
-  Star,
-  Network,
-  Library,
-  ArrowRight,
-  MapPin,
-} from "lucide-react";
+import { ArrowRight, BookOpen, Brush, Layers, MessageSquare, ShieldCheck } from "lucide-react";
 
-import { Container } from "@/shared/components/section";
 import Link from "@/compat/router-link";
-
-// 사이트 소개·튜토리얼 페이지(/about) — 처음 온 사람에게 툰스펙트럼이 무엇이고 무엇을 할 수 있는지,
-// 어떻게 쓰는지 한 화면에서 안내한다.
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { PublicStoryHero } from "@/shared/components/public-story-hero";
+import { Container } from "@/shared/components/section";
+import { useI18n } from "@/shared/lib/i18n";
 
 const FEATURES = [
-  {
-    icon: MapPin,
-    title: "어디서 봐",
-    body: "한 작품이 네이버·카카오·리디 등 어디서 연재되는지, 무료·기다무·유료 중 무엇인지 한눈에. 가장 싸게 보는 길을 먼저 보여줍니다.",
-    href: "/search",
-    cta: "작품 찾기",
-  },
-  {
-    icon: Search,
-    title: "통합 검색",
-    body: "18개 플랫폼의 작품을 한 번에 검색합니다. 같은 작품이 여러 곳에 흩어져 있어도 하나로 묶어 보여줍니다.",
-    href: "/search",
-    cta: "검색하기",
-  },
-  {
-    icon: Trophy,
-    title: "투명 통합 랭킹",
-    body: "플랫폼을 가로지르는 8개 축의 순위. 손으로 고르지 않고 공개된 산식으로만 계산합니다.",
-    href: "/ranking",
-    cta: "랭킹 보기",
-  },
-  {
-    icon: Sparkles,
-    title: "맞춤 추천",
-    body: "별점·읽은 작품·취향 태그를 바탕으로 다음에 볼 작품을 제안합니다. 플랫폼을 가리지 않습니다.",
-    href: "/recommend",
-    cta: "추천 받기",
-  },
-  {
-    icon: CalendarDays,
-    title: "연재 캘린더",
-    body: "요일별 연재작을 모아 봅니다. 네이버·카카오 밖의 플랫폼 신작도 빠뜨리지 않습니다.",
-    href: "/calendar",
-    cta: "캘린더 열기",
-  },
-  {
-    icon: Compass,
-    title: "스펙트럼 탐색",
-    body: "18색 장르 스펙트럼으로 기분 따라 작품을 발견합니다. 필터를 좁혀가며 취향의 결을 찾습니다.",
-    href: "/explore",
-    cta: "탐색하기",
-  },
-  {
-    icon: Star,
-    title: "신뢰 리뷰",
-    body: "별점·스포일러 가림·태그가 붙은 독자 리뷰. 평가가 적은 작품은 베이즈 보정으로 과대평가를 막습니다.",
-    href: "/reviews",
-    cta: "리뷰 보기",
-  },
-  {
-    icon: Network,
-    title: "원작·2차 창작",
-    body: "웹소설 원작이 웹툰이 되고 드라마·영화로 이어지는 관계를 그래프로 잇습니다.",
-    href: "/insights",
-    cta: "인사이트 보기",
-  },
-  {
-    icon: Library,
-    title: "내 서재",
-    body: "보고싶다·보는중·완독·하차로 상태를 기록하고, 컬렉션으로 묶어 나만의 서재를 만듭니다.",
-    href: "/library",
-    cta: "내 서재",
-  },
-];
+  { icon: Brush, ko: ["이야기에 맞는 선과 색", "펜으로 선을 잡고 브러시로 채색하세요. 레이어를 나누어 수정하면서 장면의 분위기를 만들어 갑니다."], en: ["Lines and color that tell your story", "Ink with a pen, paint with brushes and refine the atmosphere across separate layers."] },
+  { icon: Layers, ko: ["컷에서 완성 원고까지", "캔버스와 레이어, 말풍선을 함께 다루며 웹툰의 흐름을 구성하세요. 완성한 작업은 내보내기로 이어집니다."], en: ["From panels to a finished page", "Build your webtoon with canvases, layers and speech balloons, then export the finished work."] },
+  { icon: MessageSquare, ko: ["참고하고, 만들고, 나누기", "작품 탐색으로 연출을 살피고, 참고자료와 창작 리소스를 찾아보세요. 갤러리와 커뮤니티에서 다음 이야기를 이어갑니다."], en: ["Reference, create and share", "Study visual storytelling, explore references and creative resources, then continue the conversation in the gallery and community."] },
+] as const;
 
 const STEPS = [
-  { n: "01", title: "검색하거나 둘러보기", body: "작품명을 검색하거나, 랭킹·캘린더·스펙트럼 탐색으로 마음에 드는 작품을 찾습니다." },
-  { n: "02", title: "'어디서 봐' 확인", body: "작품 상세에서 연재 플랫폼과 무료·기다무·유료 여부를 보고, 가장 좋은 길로 바로 이동합니다." },
-  { n: "03", title: "서재에 담고 기록", body: "상태를 표시하고 별점·리뷰를 남기면, 그 기록이 다음 추천을 더 정확하게 만듭니다." },
-];
+  { href: "/research", ko: ["장면의 단서를 모으세요", "구도와 분위기를 참고하고, 출처와 사용 조건을 함께 확인하세요.", "참고자료 둘러보기"], en: ["Gather the clues for your scene", "Explore composition and atmosphere, keeping sources and usage conditions in view.", "Explore references"] },
+  { href: "/make", ko: ["첫 컷을 직접 그리세요", "웹툰·컷툰·일러스트 중 만들고 싶은 작업을 고르고 시작하세요.", "작업 시작하기"], en: ["Draw your first panel", "Choose the webtoon, short comic or illustration you want to make.", "Start creating"] },
+  { href: "/showcase", ko: ["완성한 이야기를 연결하세요", "다른 창작자의 작품을 보고, 내 작품을 나눌 공간을 찾아보세요.", "갤러리 둘러보기"], en: ["Connect your finished story", "Discover other creators and find a place to share your own work.", "Explore the gallery"] },
+] as const;
 
 export function AboutPage() {
-  return (
-    <Container size="prose" className="py-10 sm:py-14">
-      {/* 히어로 */}
-      <header>
-        <p className="eyebrow text-accent">소개 · GETTING STARTED</p>
-        <h1 className="mt-2 text-balance font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight text-fg sm:text-4xl">
-          무엇을, 어디서, 왜 볼지 한 곳에서
-        </h1>
-        <p className="mt-3 text-base leading-relaxed text-fg-2">
-          툰스펙트럼은 작품을 직접 서비스하지 않습니다. 대신 네이버·카카오·리디를 비롯한 국내 웹툰·웹소설
-          플랫폼을 가로질러, <strong className="text-fg">고르는 단계</strong>를 책임지는 통합 인덱스입니다.
-          흩어진 작품을 하나로 묶고, 어디서 가장 좋게 볼 수 있는지 알려주고, 믿을 수 있는 데이터로
-          순위를 매깁니다.
-        </p>
-      </header>
+  const language = useI18n((state) => state.lang);
+  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const ko = locale === "ko";
+  useDocumentTitle(ko ? "ToonStudio 소개 · 웹툰을 그리는 작업실" : "About ToonStudio · A webtoon drawing atelier");
 
-      {/* 기능 카드 */}
-      <section className="mt-10">
-        <h2 className="text-xl font-bold tracking-tight text-fg">무엇을 할 수 있나요</h2>
-        <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
-          {FEATURES.map((f) => (
-            <Link
-              key={f.title}
-              href={f.href}
-              className="group flex flex-col rounded-2xl border border-line bg-card/30 p-5 transition-colors hover:border-line-strong hover:bg-card/50"
-            >
-              <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent">
-                <f.icon size={18} />
-              </span>
-              <h3 className="mt-3 font-bold text-fg">{f.title}</h3>
-              <p className="mt-1.5 flex-1 text-sm leading-relaxed text-fg-2">{f.body}</p>
-              <span className="mt-3 inline-flex items-center gap-1 text-[0.8rem] font-medium text-accent">
-                {f.cta}
-                <ArrowRight size={13} className="transition-transform duration-150 group-hover:translate-x-0.5" />
-              </span>
-            </Link>
-          ))}
+  return (
+    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
+      <PublicStoryHero
+        eyebrow="ABOUT · THE WEBTOON ATELIER"
+        title={ko ? "웹툰을 그리는 전문 작업실." : "A drawing atelier built for webtoons."}
+        description={ko ? "한 컷의 선, 장면의 색, 이야기를 잇는 말풍선. ToonStudio는 브라우저에서 웹툰과 일러스트를 만들고, 다시 열어 다듬고, 완성한 작업을 내보내는 드로잉 도구입니다." : "The line of a panel, the color of a scene, the words that connect them. ToonStudio brings webtoon drawing, illustration, revision and export to your browser."}
+        image="process"
+        imageAlt={ko ? "스케치와 잉크 선, 채색으로 웹툰 장면을 완성하는 과정을 표현한 일러스트" : "Illustration of a webtoon scene developing from sketch through ink to color"}
+        caption={ko ? "SKETCH → INK → COLOR · 웹툰 제작 과정 콘셉트 아트" : "SKETCH → INK → COLOR · Webtoon process concept art"}
+      >
+        <div className="flex flex-wrap gap-3">
+          <Link href="/make" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2">{ko ? "첫 컷 그리기" : "Draw your first panel"}<ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link href="/learn" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><BookOpen size={16} aria-hidden="true" />{ko ? "작업 흐름 알아보기" : "Learn the workflow"}</Link>
+        </div>
+      </PublicStoryHero>
+
+      <section className="py-14 sm:py-20" aria-labelledby="about-drawing-title">
+        <div className="grid gap-6 md:grid-cols-[0.7fr_1.3fr] md:gap-14">
+          <div><p className="eyebrow text-accent">MADE FOR YOUR STORY</p><h2 id="about-drawing-title" className="mt-4 max-w-sm text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl">{ko ? "선과 장면, 이야기에 집중하세요." : "Keep your attention on the story."}</h2></div>
+          <div className="space-y-7">{FEATURES.map(({ icon: Icon, ...feature }) => { const [title, body] = feature[locale]; return <div key={title} className="flex gap-5 border-b border-line pb-7"><Icon size={22} className="mt-1 shrink-0 text-accent" aria-hidden="true" /><div><h3 className="text-lg font-bold text-fg">{title}</h3><p className="mt-2 text-sm leading-7 text-fg-2">{body}</p></div></div>; })}</div>
         </div>
       </section>
 
-      {/* 사용법 3단계 */}
-      <section className="mt-10">
-        <h2 className="text-xl font-bold tracking-tight text-fg">3단계로 시작하기</h2>
-        <ol className="mt-5 flex flex-col gap-3">
-          {STEPS.map((s) => (
-            <li key={s.n} className="flex gap-4 rounded-2xl border border-line bg-card/30 p-5">
-              <span className="numeral text-2xl font-bold text-accent">{s.n}</span>
-              <div className="min-w-0">
-                <h3 className="font-bold text-fg">{s.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-fg-2">{s.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+      <section aria-labelledby="about-journey-title">
+        <p className="eyebrow text-accent">A CONNECTED CREATIVE PRACTICE</p>
+        <h2 id="about-journey-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">{ko ? "영감부터 당신의 첫 작품까지." : "From inspiration to your first work."}</h2>
+        <div className="mt-7 grid gap-x-8 md:grid-cols-3">{STEPS.map((step, index) => { const [title, body, cta] = step[locale]; return <Link key={step.href} href={step.href} className="public-story-route group"><span className="public-story-route__index" aria-hidden="true">0{index + 1}</span><div><h3 className="font-bold text-fg">{title}</h3><p className="mt-3 text-sm leading-7 text-fg-2">{body}</p><span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-accent">{cta}<ArrowRight size={14} aria-hidden="true" /></span></div></Link>; })}</div>
       </section>
 
-      {/* 정직성 약속 */}
-      <section className="mt-10 rounded-2xl border border-line bg-panel/40 p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-fg">데이터에 대한 약속</h2>
-        <p className="mt-2.5 text-sm leading-relaxed text-fg-2">
-          작품 메타데이터와 표지는 여러 플랫폼의 공개 카탈로그에서 수집한 실데이터입니다. 네이버
-          웹툰의 별점은 실수집값이며, 일부 보조 지표(조회·관심수 등)는 추정값(≈)으로 분명히
-          구분해 표기합니다. 가격·조회수를 부풀리지 않고, 순위는 공개된 산식으로만 계산합니다.
-        </p>
-        <Link
-          href="/guide"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
-        >
-          랭킹 산정 방식 자세히 보기 <ArrowRight size={14} />
-        </Link>
+      <section className="mt-12 grid gap-7 border-y border-line bg-panel/45 px-6 py-8 md:grid-cols-2 sm:px-8" aria-label={ko ? "제품의 약속과 데이터 안내" : "Product commitments and data"}>
+        <div><ShieldCheck size={22} className="text-accent" aria-hidden="true" /><h2 className="mt-4 text-lg font-bold text-fg">{ko ? "작업을 지키는 습관까지." : "A practice that protects your work."}</h2><p className="mt-3 text-sm leading-7 text-fg-2">{ko ? "로컬 저장과 문서 복구를 제공하며, 중요한 작업은 파일로도 내보내 보관하세요. 브라우저 데이터 삭제와 기기 변경에 대비하는 방법을 도움말에서 확인할 수 있습니다." : "Use local saving and document recovery, and keep an exported copy of important work. Our help center explains how to prepare for clearing browser data or moving to another device."}</p><Link href="/help" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent">{ko ? "저장·복구 도움말" : "Saving and recovery help"}<ArrowRight size={14} aria-hidden="true" /></Link></div>
+        <div><BookOpen size={22} className="text-accent" aria-hidden="true" /><h2 className="mt-4 text-lg font-bold text-fg">{ko ? "읽는 경험도, 창작의 일부." : "Reading is part of creating."}</h2><p className="mt-3 text-sm leading-7 text-fg-2">{ko ? "ToonSpectrum의 작품 검색, 제공처 비교, 랭킹과 리뷰로 다음 이야기를 발견하세요. 작품 정보의 출처와 갱신 상태, 추정 지표를 구분해 안내합니다. 외부 플랫폼의 유료 본문과 회차 이미지는 제공하지 않습니다." : "Discover your next story through ToonSpectrum search, platform comparisons, rankings and reviews. Sources, update status and estimates are distinguished. Paid chapters and episode images from external platforms are not hosted here."}</p><Link href="/discover" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent">{ko ? "작품 탐색하기" : "Discover stories"}<ArrowRight size={14} aria-hidden="true" /></Link></div>
       </section>
-
-      {/* CTA */}
-      <div className="mt-10 flex flex-wrap gap-3">
-        <Link
-          href="/search"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
-        >
-          지금 작품 찾아보기 <ArrowRight size={15} />
-        </Link>
-        <Link
-          href="/ranking"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
-        >
-          통합 랭킹
-        </Link>
-      </div>
     </Container>
   );
 }
