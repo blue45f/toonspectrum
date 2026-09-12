@@ -21,7 +21,7 @@ describe("deliberate library restore", () => {
     fireEvent.change(input, { target: { files: [file(backup)] } });
     await screen.findByRole("region", { name: "백업 복원 미리보기" });
     expect(restore).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "취소", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(restore).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "백업 가져오기" }));
     fireEvent.change(input, { target: { files: [file(backup)] } });
