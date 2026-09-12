@@ -6,14 +6,18 @@ export const CREATOR_HOME_SECTIONS = [
   { id: "creator-faq-title", headingId: "creator-faq-title", ko: "자주 묻는 질문", en: "Questions" },
 ] as const;
 
+const FLAGSHIP_SECTIONS = [
+  { id: "creator-desk-title", headingId: "creator-desk-title", ko: "한글 자료 검색", en: "Reference search" },
+  { id: "creator-offline-title", headingId: "creator-offline-title", ko: "오프라인 준비", en: "Offline preparation" },
+] as const;
+
 export function creatorSectionFromHash(hash: string) {
   if (!hash.startsWith("#") || hash.length > 128) return undefined;
   try {
     const id = decodeURIComponent(hash.slice(1));
-    return CREATOR_HOME_SECTIONS.find((section) => section.id === id);
-  } catch {
-    return undefined;
-  }
+    return CREATOR_HOME_SECTIONS.find((section) => section.id === id)
+      ?? FLAGSHIP_SECTIONS.find((section) => section.id === id);
+  } catch { return undefined; }
 }
 
 export function creatorWorkflowIndex(key: string, current: number, count: number): number | null {
@@ -29,12 +33,8 @@ export function creatorWorkflowIndex(key: string, current: number, count: number
 }
 
 export type CreatorJumpActivation = {
-  button: number;
-  defaultPrevented: boolean;
-  altKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  shiftKey: boolean;
+  button: number; defaultPrevented: boolean; altKey: boolean;
+  ctrlKey: boolean; metaKey: boolean; shiftKey: boolean;
 };
 
 export function isPlainCreatorJump(event: CreatorJumpActivation): boolean {
@@ -56,18 +56,13 @@ export function focusCreatorSection(hash: string, findTarget: FindCreatorTarget,
 }
 
 export type CreatorNavigationHost = {
-  getHash: () => string;
-  findTarget: FindCreatorTarget;
+  getHash: () => string; findTarget: FindCreatorTarget;
   requestFrame: (callback: () => void) => number;
   cancelFrame: (handle: number) => void;
   subscribe: (callback: () => void) => () => void;
 };
 
-/**
- * A lazy route may mount after the browser's initial fragment scroll. Resolve its
- * known heading after mount and on native hash/back/forward navigation. Do not
- * write history, play media, or leave a delayed focus change after unmount.
- */
+/** Resolve lazy-route headings without selectors, history writes or delayed focus after unmount. */
 export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () => void {
   let frame: number | undefined;
   let revision = 0;
@@ -89,8 +84,7 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
   schedule();
   return () => {
     if (disposed) return;
-    disposed = true;
-    revision += 1;
+    disposed = true; revision += 1;
     if (frame !== undefined) host.cancelFrame(frame);
     unsubscribe();
   };
