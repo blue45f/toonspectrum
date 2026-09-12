@@ -41,58 +41,97 @@ test("core aggregation rejects skipped dependencies and verify requires core suc
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
-test("all current main product and API CPU regressions remain mandatory", () => {
-  // Protect file identities, not an obsolete exact count that rejects additions
-  // or lets a removed regression be replaced by an unrelated test.
-  const tests = new Set(job("static").match(/(?:apps|packages)\/[^\s]+\.test\.[a-z]+/g) ?? []);
-  const required = [
-    "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
-    "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
-    "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
-    "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
-    "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
-    "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
-    "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
-    "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
-    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
-    "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
-    "apps/api/src/config/catalog-initialization.test.ts",
-    "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
-    "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",
-    "packages/core/src/search-normalization.test.ts",
-    "packages/core/src/server/home.cpu-cache.test.ts",
-    "apps/web/src/infrastructure/creator-work-read-options.test.ts",
-    "apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts",
-    "apps/web/src/domains/creator/studio-shared-document-client.test.ts",
-    "apps/web/src/domains/creator/studio-release-schedule-loader.test.ts",
-    "apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts",
-    "apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts",
-    "apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts",
-    "apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts",
-    "apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts",
-    "apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts",
-    "apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts",
-    "apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx",
-    "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx",
-    "apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx",
-    "apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts",
-    "apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts",
-    "apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts",
-    "apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts",
-    "apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts",
-    "apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts",
-    "apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx",
-    "apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts",
-    "apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts",
-    "apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts",
-    "apps/web/src/domains/creator/studio-integration-closure.test.ts",
-    "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx",
-    "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx",
-    "apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts",
-    "apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts",
-    "apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx",
-  ];
-  for (const path of required) assert.ok(tests.has(path), `missing mandatory regression: ${path}`);
+// Pin file identities, not the total count: adding coverage must not fail this gate,
+// while deleting or substituting any existing regression must still be rejected.
+const REQUIRED_REGRESSION_FILES = Object.freeze([
+  "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
+  "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
+  "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
+  "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
+  "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
+  "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
+  "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
+  "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
+  "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
+  "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
+  "apps/api/src/config/catalog-initialization.test.ts",
+  "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
+  "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",
+  "packages/core/src/search-normalization.test.ts",
+  "packages/core/src/server/home.cpu-cache.test.ts",
+  "apps/web/src/infrastructure/creator-work-read-options.test.ts",
+  "apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-shared-document-client.test.ts",
+  "apps/web/src/domains/creator/studio-release-schedule-loader.test.ts",
+  "apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts",
+  "apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts",
+  "apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts",
+  "apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts",
+  "apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts",
+  "apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts",
+  "apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx",
+  "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx",
+  "apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx",
+  "apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts",
+  "apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts",
+  "apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts",
+  "apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts",
+  "apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts",
+  "apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts",
+  "apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx",
+  "apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts",
+  "apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts",
+  "apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts",
+  "apps/web/src/domains/creator/studio-integration-closure.test.ts",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts",
+  "apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx",
+]);
+
+function executedRegressionPaths(block) {
+  // ci.yml uses literal shell commands with backslash continuations. Ignore names,
+  // comments and echo statements rather than counting every filename in the YAML.
+  const lines = block.replace(/\\\r?\n[ \t]*/gu, " ").split(/\r?\n/u);
+  return new Set(lines.flatMap((line) => {
+    if (!/^\s*(?:(?:-\s+)?run:\s*)?pnpm exec vitest run(?:\s|$)/u.test(line)) return [];
+    const command = line.replace(/[ \t]+#.*$/u, "");
+    return command.match(/(?:apps|packages)\/[^\s"'\\]+\.test\.[a-z]+/gu) ?? [];
+  }));
+}
+
+function assertMandatoryRegressions(block) {
+  const executed = executedRegressionPaths(block);
+  for (const path of REQUIRED_REGRESSION_FILES) {
+    assert.ok(executed.has(path), `missing mandatory regression: ${path}`);
+  }
+}
+
+test("all main product, hydration and CPU regressions remain mandatory", () => {
+  assertMandatoryRegressions(job("static"));
+});
+
+test("allows additional regression coverage without changing the baseline", () => {
+  const expanded = `${job("static")}\n          pnpm exec vitest run apps/web/src/additional.test.ts\n`;
+  assertMandatoryRegressions(expanded);
+});
+
+test("rejects removal or equal-count substitution of every mandatory regression", () => {
+  for (const path of REQUIRED_REGRESSION_FILES) {
+    assert.throws(() => assertMandatoryRegressions(job("static").replace(path, "")), /missing mandatory regression/);
+    const substituted = job("static").replace(path, "apps/web/src/unrelated.test.ts");
+    assert.throws(() => assertMandatoryRegressions(substituted), /missing mandatory regression/);
+  }
+});
+
+test("comments, echo statements and duplicate filenames cannot replace execution", () => {
+  const [missing, duplicate] = REQUIRED_REGRESSION_FILES;
+  const commented = `${job("static").replace(missing, duplicate)}\n          # ${missing}\n`;
+  assert.throws(() => assertMandatoryRegressions(commented), /missing mandatory regression/);
+  const echoed = job("static").replaceAll("pnpm exec vitest run", "echo pnpm exec vitest run");
+  assert.throws(() => assertMandatoryRegressions(echoed), /missing mandatory regression/);
 });
 
 test("production visual audit uses the Vitest runner for its policy suite", () => {
