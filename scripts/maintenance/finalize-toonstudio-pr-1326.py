@@ -179,6 +179,33 @@ replace_once(
       {section === "story" && view === "localization" ? (''',
 )
 
+replace_once(
+    "apps/web/src/domains/creator/studio-project-creation.ts",
+    '''    markStudioProjectOpened(storage, project.id, document.id, { at: createdAt, target });
+    return Object.freeze({
+      project,
+      document,''',
+    '''    const openedProject = markStudioProjectOpened(
+      storage,
+      project.id,
+      document.id,
+      { at: createdAt, target },
+    );
+    return Object.freeze({
+      project: openedProject,
+      document,''',
+)
+
+replace_once(
+    "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+    '''                        <button type="button" onClick={onRestore} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
+                          {locale === "ko" ? "복원" : "Restore"}
+                        </button>''',
+    '''                        <button type="button" onClick={onRestore} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
+                          {locale === "ko" ? "내 작업으로 복원" : "Restore to My work"}
+                        </button>''',
+)
+
 remove_once(
     "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
     r"^\s*autoFocus\s*\n",
