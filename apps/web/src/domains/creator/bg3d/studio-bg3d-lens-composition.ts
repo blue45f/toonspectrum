@@ -1,4 +1,5 @@
 import { STUDIO_BG3D_CAMERA_MAX_WORLD_COORDINATE } from "./studio-bg3d-camera-framing";
+import { resolveStudioBg3dMinimumOrbitDistance } from "./studio-bg3d-camera-application";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
@@ -25,8 +26,10 @@ export function composeStudioBg3dLens(
   const distance = Math.hypot(...offset);
   const ratio = Math.tan(camera.fovDegrees * Math.PI / 360) / Math.tan(fovDegrees * Math.PI / 360);
   const nextDistance = distance * ratio;
-  // Match the scene framing coordinate limits; reject rather than silently clamp the composition.
-  if (!Number.isFinite(nextDistance) || distance < 1e-6 || nextDistance < 0.01 || nextDistance > STUDIO_BG3D_CAMERA_MAX_WORLD_COORDINATE) return null;
+  // OrbitControls must be able to apply this exact distance. A near-plane clamp would change
+  // subject size and leave the saved camera different from the live camera.
+  const minDistance = resolveStudioBg3dMinimumOrbitDistance(camera.nearClip);
+  if (!Number.isFinite(nextDistance) || distance < 1e-6 || nextDistance < minDistance || nextDistance > STUDIO_BG3D_CAMERA_MAX_WORLD_COORDINATE) return null;
   const position = offset.map((value, axis) => camera.target[axis] + value * ratio) as [number, number, number];
   if (position.some((value) => Math.abs(value) > STUDIO_BG3D_CAMERA_MAX_WORLD_COORDINATE)) return null;
   return { ...camera, position, fovDegrees };

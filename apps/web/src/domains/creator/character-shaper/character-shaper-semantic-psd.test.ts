@@ -309,6 +309,59 @@ describe("character shaper semantic capture — passes", () => {
     expect(renderer.observations.every((observation) => observation.muted.length === 0)).toBe(true);
   });
 
+  it.each([
+    { reuse: "meshes", outcome: "success" },
+    { reuse: "meshes", outcome: "render failure" },
+    { reuse: "meshes", outcome: "cancel" },
+    { reuse: "slots", outcome: "success" },
+    { reuse: "slots", outcome: "render failure" },
+    { reuse: "slots", outcome: "cancel" },
+  ] as const)("restores shared material flags across $reuse after $outcome", async ({ reuse, outcome }) => {
+    const scene = buildMergedHeadScene();
+    if (reuse === "meshes") {
+      const secondHead = scene.head.clone();
+      secondHead.name = "N00_000_00_HeadMesh_Second";
+      scene.vrm.scene.add(secondHead);
+    } else {
+      scene.head.material = [scene.faceMaterial, scene.faceMaterial, scene.eyeMaterial, scene.eyeMaterial];
+    }
+    // A restore must preserve intentionally disabled flags, not simply enable every material.
+    scene.eyeMaterial.depthWrite = false;
+    const hidden = mesh("Hair_Hidden", mtoon("Hair", "#123456", "#102030"));
+    hidden.visible = false;
+    scene.vrm.scene.add(hidden);
+    const before = observe(scene.capture.scene);
+    const controller = new AbortController();
+    const renderer = fakeRenderer((observation, call) => {
+      if (call === 2) {
+        // The eye mask is the first pass that temporarily mutes shared face slots.
+        expect(observation.muted).toEqual([scene.faceMaterial.name]);
+        expect(scene.faceMaterial.depthWrite).toBe(false);
+        if (outcome === "render failure") throw new Error("mask render failed");
+        if (outcome === "cancel") controller.abort();
+      }
+      if (call === 3) expect(observation.muted).toEqual([scene.eyeMaterial.name]);
+      return null;
+    });
+    const pending = captureCharacterSemanticPasses({
+      capture: scene.capture, vrm: scene.vrm, width: WIDTH, height: HEIGHT, signal: controller.signal,
+    }, renderer.dependencies);
+    if (outcome === "success") {
+      const result = await pending;
+      expect(result.passes.map((entry) => entry.id)).toEqual(expect.arrayContaining(["mask-eyes", "mask-face"]));
+    } else if (outcome === "render failure") {
+      await expect(pending).rejects.toThrow("mask render failed");
+    } else {
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    }
+    expect(observe(scene.capture.scene)).toEqual(before);
+    expect(scene.faceMaterial.colorWrite).toBe(true);
+    expect(scene.faceMaterial.depthWrite).toBe(true);
+    expect(scene.eyeMaterial.colorWrite).toBe(true);
+    expect(scene.eyeMaterial.depthWrite).toBe(false);
+    if (outcome !== "success") expect(renderer.observations).toHaveLength(3);
+  });
+
   it("restores every material factor after the flat pass", async () => {
     const scene = buildCharacterScene();
     const before = Object.entries(scene.materials).map(([key, material]) =>

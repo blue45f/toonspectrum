@@ -509,7 +509,7 @@ function isolateVisibility(
   }
 
   const previousVisible = meshes.map((mesh) => mesh.visible);
-  const muted: { material: THREE.Material; colorWrite: boolean; depthWrite: boolean }[] = [];
+  const muted = new Map<THREE.Material, { colorWrite: boolean; depthWrite: boolean }>();
   for (const mesh of meshes) {
     if (!kept.has(mesh)) {
       mesh.visible = false;
@@ -519,7 +519,11 @@ function isolateVisibility(
     if (slots === null || !Array.isArray(mesh.material)) continue;
     mesh.material.forEach((material, slot) => {
       if (!material || slots.has(slot)) return;
-      muted.push({ material, colorWrite: material.colorWrite, depthWrite: material.depthWrite });
+      // Meshes and material slots can share the same instance. Snapshot before its first
+      // mutation only; a second snapshot would save our temporary false flags as the original.
+      if (!muted.has(material)) {
+        muted.set(material, { colorWrite: material.colorWrite, depthWrite: material.depthWrite });
+      }
       material.colorWrite = false;
       // 깊이까지 꺼야 숨긴 슬롯이 남긴 슬롯을 가리지 않는다 — 메시 통째로 끌 때와 같은 결과다.
       material.depthWrite = false;
@@ -530,9 +534,9 @@ function isolateVisibility(
     meshes.forEach((mesh, index) => {
       mesh.visible = previousVisible[index];
     });
-    for (const entry of muted) {
-      entry.material.colorWrite = entry.colorWrite;
-      entry.material.depthWrite = entry.depthWrite;
+    for (const [material, flags] of muted) {
+      material.colorWrite = flags.colorWrite;
+      material.depthWrite = flags.depthWrite;
     }
   };
 }
