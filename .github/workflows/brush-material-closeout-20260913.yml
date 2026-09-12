@@ -1,0 +1,71 @@
+name: Validate brush material closeout
+on:
+  push:
+    branches: [feat/brush-material-engine-20260913]
+    paths: [.github/workflows/brush-material-closeout-20260913.yml]
+permissions:
+  contents: write
+defaults:
+  run:
+    shell: bash
+jobs:
+  closeout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply only the previously reviewed exact catalogue correction
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, textwrap
+          path = pathlib.Path('.github/workflows/brush-material-finalize-20260913.yml')
+          data = path.read_bytes()
+          digest = hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          assert digest == 'ec3c096576106d540a0af6ce09af5fa301a00843', 'Unexpected catalogue patch source'
+          text = data.decode()
+          start = text.index("          python3 - <<'PY'\n") + len("          python3 - <<'PY'\n")
+          end = text.index('\n          PY', start)
+          exec(compile(textwrap.dedent(text[start:end]), str(path), 'exec'))
+          PY
+          python3 .github/brush-material-fracture.py
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Recompile original material fields
+        run: pnpm exec tsx scripts/generate-studio-material-tip-atlas.mts
+      - name: Verify selection, original field parity, icons and pressure/persistence
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/brush/studio-brush-pack-index.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-icons.test.ts
+          apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          apps/web/src/domains/creator/brush/studio-material-tip-kernels.test.ts
+          apps/web/src/domains/creator/brush/studio-material-morphology-runtime.test.ts
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify actual renderer pixels and all 496 normalized stroke pairs
+        env:
+          TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
+        run: node scripts/verify-studio-material-morphology.mjs
+      - name: Remove all one-off transfer infrastructure and push through existing hooks
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/brush-material-engine-20260913
+          git rm .github/workflows/brush-source-audit-20260913.yml .github/workflows/brush-material-apply-20260913.yml .github/workflows/brush-material-finalize-20260913.yml .github/workflows/brush-material-closeout-20260913.yml .github/brush-material-payload-1.b64 .github/brush-material-payload-2.b64 .github/brush-material-payload-3.b64 .github/brush-material-repairs.json .github/brush-material-integration.py .github/brush-material-fracture.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web/src/domains/creator/brush/ scripts/studio-material-morphology-browser.ts docs/studio/brush-material-morphology-2026-09.md
+          git diff --cached --check
+          git commit -m 'fix(studio): preserve film-fracture identity through overlap and verify progressive selection'
+          git push origin HEAD:feat/brush-material-engine-20260913
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: material-closeout-pixels
+          path: ${{ runner.temp }}/studio-material-morphology
+          retention-days: 7
+          if-no-files-found: warn
