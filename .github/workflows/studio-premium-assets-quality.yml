@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24.16.0'
           package-manager-cache: false
@@ -45,7 +45,7 @@ jobs:
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           fs.writeFileSync('/tmp/toon-asset-tools/package.json', JSON.stringify({name:'studio-asset-verification',private:true,packageManager:pkg.packageManager,dependencies:{three:pkg.dependencies.three,react:pkg.dependencies.react,'react-dom':pkg.dependencies['react-dom'],playwright:pkg.devDependencies.playwright,tsx:pkg.devDependencies.tsx,vitest:pkg.devDependencies.vitest,vite:pkg.devDependencies.vite}}));
-          fs.writeFileSync('/tmp/toon-asset-tools/vitest.config.mts', `import {defineConfig} from 'vitest/config'; export default defineConfig({test:{include:['apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts','apps/web/src/domains/creator/studio-cc0-original-delivery.test.ts','apps/web/src/domains/creator/studio-asset-expansion-20260908.test.ts'],environment:'node'}});`);
+          fs.writeFileSync('/tmp/toon-asset-tools/vitest.config.mts', `import {defineConfig} from 'vitest/config'; export default defineConfig({resolve:{alias:{'@':process.cwd()+'/apps/web/src'}},test:{include:['apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts','apps/web/src/domains/creator/studio-cc0-original-delivery.test.ts','apps/web/src/domains/creator/studio-asset-expansion-20260908.test.ts'],environment:'node'}});`);
           JS
           pnpm --dir /tmp/toon-asset-tools install --ignore-scripts --config.node-linker=hoisted --no-frozen-lockfile
           ln -s /tmp/toon-asset-tools/node_modules node_modules
