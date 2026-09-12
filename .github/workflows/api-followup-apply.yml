@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/work/api-runtime-followup-20260912
           python3 - <<'PY'
-          import hashlib,json,pathlib,subprocess
+          import hashlib,json,pathlib
           root=pathlib.Path.cwd()
           staged={}
           for manifest in sorted(root.glob('.api-followup-edits/[1-4].json')):
@@ -112,6 +112,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          git fetch --no-tags --depth=1 origin 29aa82c1214fe9dbeba6712fcb9fc523528ef8f2
           git diff 29aa82c1214fe9dbeba6712fcb9fc523528ef8f2 HEAD --name-only -- '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.js' | xargs pnpm exec eslint --max-warnings=0 2>&1 | tee artifacts/api-followup/lint.log
       - name: API and web production build
         if: ${{ !cancelled() }}
