@@ -16,8 +16,7 @@ concurrency:
   group: finalize-brush-catalog-consolidation
   cancel-in-progress: true
 
-# One-shot finalizer. Full strict lint and application/API/worker typechecks already passed on the
-# generated tree; the PR's restored required `core` job repeats those checks before merge.
+# One-shot finalizer. The restored PR core repeats global contracts, strict lint and typechecks.
 jobs:
   apply-and-validate:
     runs-on: ubuntu-latest
@@ -46,11 +45,17 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < <(git diff --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|mts|mjs|js)$' || true)
-          if ((${#files[@]})); then
-            pnpm exec eslint --fix "${files[@]}"
-          fi
-      - name: Validate corrected audit script
-        run: pnpm exec eslint --max-warnings=0 scripts/audit-studio-brush-quality-portfolio.mts
+          files+=(apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.tsx)
+          files+=(apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx)
+          pnpm exec eslint --fix "${files[@]}"
+      - name: Validate audit and first-use view boundary
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --max-warnings=0 \
+            scripts/audit-studio-brush-quality-portfolio.mts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx
+          pnpm exec vitest run apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx
       - name: Product catalogue and renderer tests
         run: |
           set -euo pipefail
