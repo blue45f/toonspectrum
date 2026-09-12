@@ -16,12 +16,15 @@ import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { roundExportSize } from "../vrm/studio-vrm-poser-helpers";
 import { encodeStudioVrmCapturePngBlob, captureStudioVrmRgba } from "../vrm/studio-vrm-raster-capture";
 
+import { acquireCharacterExportSession, CHARACTER_EXPORT_EDGES, characterExportSize } from "./character-shaper-export";
 import { boundCharacterSemanticCaptureSize, exportCharacterSemanticPsd } from "./character-shaper-semantic-psd";
 import { pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
 
+import type { CharacterExportEdge, CharacterExportSession } from "./character-shaper-export";
 import type { CharacterShaperDrawerMode, CharacterShaperOutputDockProps } from "./character-shaper-ui-contract";
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 import type { ReactNode } from "react";
+import type { Camera as ThreeCamera } from "three";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -102,6 +105,10 @@ export function CharacterShaperOutputDock({
 }: CharacterShaperOutputDockProps) {
   const sheetId = useId();
   const aliveRef = useRef(true);
+  const hostRef = useRef(h);
+  const exportRef = useRef<CharacterExportSession | null>(null);
+  const helperLeaseRef = useRef<(() => void) | null>(null);
+  const [exportEdge, setExportEdge] = useState<CharacterExportEdge>(2048);
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const [running, setRunning] = useState<ExportKind | null>(null);
@@ -109,9 +116,21 @@ export function CharacterShaperOutputDock({
   const [notice, setNotice] = useState<DockNotice | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  useEffect(() => () => {
-    aliveRef.current = false;
+  useEffect(() => { hostRef.current = h; });
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      exportRef.current?.cancel();
+      helperLeaseRef.current?.();
+      helperLeaseRef.current = null;
+    };
   }, []);
+  useEffect(() => () => {
+    exportRef.current?.cancel();
+    helperLeaseRef.current?.();
+    helperLeaseRef.current = null;
+  }, [h.vrm, h.activeModelId]);
 
   useEffect(() => {
     if (notice === null) return;
@@ -169,107 +188,94 @@ export function CharacterShaperOutputDock({
     return capture;
   };
 
-  const savePng = () => {
+  const runExport = (kind: ExportKind) => {
+    if (exportBlocked || exportRef.current !== null) return;
     const capture = readCapture();
-    if (!capture) {
-      fail("캡처할 3D 장면이 아직 준비되지 않았습니다.");
+    if (!capture) { fail("캡처할 3D 장면이 아직 준비되지 않았습니다."); return; }
+    if (!h.vrm) { fail("내보낼 캐릭터가 없습니다."); return; }
+    let session: CharacterExportSession;
+    try {
+      session = acquireCharacterExportSession(h, () => hostRef.current);
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "캡처를 시작하지 못했습니다.");
       return;
     }
-    setRunning("png");
-    setProgress("PNG로 굽는 중");
+    exportRef.current = session;
+    setRunning(kind);
+    setNotice(null);
+    setProgress(kind === "png" ? "PNG로 굽는 중" : "레이어를 나누는 중 · 밑색 · 음영 · 하이라이트 · 주선");
     void (async () => {
-      const releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: transparent });
+      let releaseHelpers: (() => void) | undefined;
       try {
+        // Let the host commit the capture lock so camera, animation and paint are frozen.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        session.assertCurrent();
+        // Finish the frozen raw-bone pose and cloth solve before taking the first layer.
+        h.vrm.update?.(0);
+        for (const sync of h.wardrobeXpbdCaptureSyncRef?.current?.values() ?? []) {
+          if (!sync().ok) throw new Error("의상 천 물리를 현재 포즈에 맞추지 못했습니다. 다시 시도해 주세요.");
+        }
+        const sourceCamera = capture.camera as ThreeCamera;
+        const exportCamera = sourceCamera.clone?.() ?? sourceCamera;
         const gl = capture.gl as { domElement: HTMLCanvasElement };
-        const size = roundExportSize(gl.domElement);
-        const rgba = captureStudioVrmRgba(
-          capture.gl as never,
-          capture.scene as never,
-          capture.camera as never,
-          size,
-          transparent ? { alpha: 0 } : { color: insertBackgroundColor, alpha: 1 },
-        );
-        const blob = await encodeStudioVrmCapturePngBlob(rgba, size);
-        const saved = downloadBlob(blob, `${safeFileStem(modelName)}-${timestamp()}.png`);
+        const display = roundExportSize(gl.domElement);
+        const requested = characterExportSize(display.width, display.height, exportEdge);
+        const size = kind === "psd" ? boundCharacterSemanticCaptureSize(requested.width, requested.height) : requested;
+        releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: kind === "psd" || transparent });
+        helperLeaseRef.current = releaseHelpers ?? null;
+        let blob: Blob;
+        let receipt: DockNotice;
+        if (kind === "png") {
+          const rgba = captureStudioVrmRgba(capture.gl as never, capture.scene as never, exportCamera,
+            size, transparent ? { alpha: 0 } : { color: insertBackgroundColor, alpha: 1 });
+          // PNG owns immutable pixels now; restore helpers during worker encoding.
+          releaseHelpers?.();
+          releaseHelpers = undefined;
+          helperLeaseRef.current = null;
+          blob = await encodeStudioVrmCapturePngBlob(rgba, size, { signal: session.signal });
+          receipt = { tone: "good", text: `PNG를 저장했습니다 · ${size.width}×${size.height}${transparent ? " · 투명 배경" : ""}` };
+        } else {
+          const result = await exportCharacterSemanticPsd({
+            capture: { gl: capture.gl as never, scene: capture.scene as never, camera: exportCamera },
+            vrm: h.vrm, width: size.width, height: size.height, title: modelName,
+            signal: session.signal, assertCurrent: session.assertCurrent,
+          });
+          blob = result.blob;
+          const skipped = result.receipt.skipped;
+          receipt = {
+            tone: skipped.length > 0 ? "info" : "good",
+            text: `PSD 레이어 ${result.receipt.layerNames.length}개 저장 · ${size.width}×${size.height}${skipped.length > 0 ? ` · 건너뛴 패스 ${skipped.length}개` : ""}`,
+            detail: skipped.length > 0 ? skipped.map((entry) => `${entry.pass}: ${entry.reason}`).join(" · ") : undefined,
+          };
+        }
+        session.assertCurrent();
         if (!aliveRef.current) return;
-        if (!saved) {
+        if (!downloadBlob(blob, `${safeFileStem(modelName)}-${timestamp()}.${kind}`)) {
           fail("이 브라우저에서는 파일을 내려받을 수 없습니다.");
           return;
         }
-        setNotice({
-          tone: "good",
-          text: `PNG를 저장했습니다 · ${size.width}×${size.height}${transparent ? " · 투명 배경" : ""}`,
-        });
+        setNotice(receipt);
       } catch (error) {
-        fail("PNG를 저장하지 못했습니다.", error instanceof Error ? error.message : undefined);
+        if (session.signal.aborted) {
+          if (aliveRef.current) setNotice({ tone: "info", text: "내보내기를 취소했습니다." });
+        } else {
+          fail(kind === "png" ? "PNG를 저장하지 못했습니다." : "PSD를 내보내지 못했습니다.",
+            error instanceof Error ? error.message : undefined);
+        }
       } finally {
-        releaseHelpers();
-        if (aliveRef.current) {
-          setRunning(null);
-          setProgress(null);
+        releaseHelpers?.();
+        if (helperLeaseRef.current === releaseHelpers) helperLeaseRef.current = null;
+        session.release();
+        if (exportRef.current === session) {
+          exportRef.current = null;
+          if (aliveRef.current) { setRunning(null); setProgress(null); }
         }
       }
     })();
   };
 
-  const exportPsd = () => {
-    const capture = readCapture();
-    if (!capture) {
-      fail("캡처할 3D 장면이 아직 준비되지 않았습니다.");
-      return;
-    }
-    if (!h.vrm) {
-      fail("PSD로 나눌 캐릭터가 없습니다.");
-      return;
-    }
-    setRunning("psd");
-    setProgress("레이어를 나누는 중 · 밑색 · 음영 · 하이라이트 · 주선");
-    void (async () => {
-      const releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: true });
-      try {
-        const gl = capture.gl as { domElement: HTMLCanvasElement };
-        const display = roundExportSize(gl.domElement);
-        const size = boundCharacterSemanticCaptureSize(display.width, display.height);
-        const result = await exportCharacterSemanticPsd({
-          capture: {
-            gl: capture.gl as never,
-            scene: capture.scene as never,
-            camera: capture.camera as never,
-          },
-          vrm: h.vrm,
-          width: size.width,
-          height: size.height,
-          title: modelName,
-        });
-        const saved = downloadBlob(result.blob, `${safeFileStem(modelName)}-${timestamp()}.psd`);
-        if (!aliveRef.current) return;
-        if (!saved) {
-          fail("이 브라우저에서는 파일을 내려받을 수 없습니다.");
-          return;
-        }
-        const skipped = result.receipt.skipped;
-        setNotice({
-          tone: skipped.length > 0 ? "info" : "good",
-          text:
-            skipped.length > 0
-              ? `PSD 레이어 ${result.receipt.layerNames.length}개 저장 · 건너뛴 패스 ${skipped.length}개`
-              : `PSD 레이어 ${result.receipt.layerNames.length}개를 저장했습니다`,
-          detail:
-            skipped.length > 0
-              ? skipped.map((entry) => `${entry.pass}: ${entry.reason}`).join(" · ")
-              : undefined,
-        });
-      } catch (error) {
-        fail("PSD를 내보내지 못했습니다.", error instanceof Error ? error.message : undefined);
-      } finally {
-        releaseHelpers();
-        if (aliveRef.current) {
-          setRunning(null);
-          setProgress(null);
-        }
-      }
-    })();
-  };
+  const savePng = () => runExport("png");
+  const exportPsd = () => runExport("psd");
 
   const insert = () => {
     if (exportBlocked) return;
@@ -281,7 +287,7 @@ export function CharacterShaperOutputDock({
       type="button"
       role="switch"
       aria-checked={transparent}
-      disabled={capturing || auditionActive}
+      disabled={capturing || exportBusy || auditionActive}
       title={
         transparent
           ? "투명 배경 · 캔버스와 PNG에 캐릭터만 남습니다"
@@ -309,7 +315,7 @@ export function CharacterShaperOutputDock({
       <input
         type="color"
         value={insertBackgroundColor}
-        disabled={capturing || auditionActive}
+        disabled={capturing || exportBusy || auditionActive}
         aria-label="삽입 배경색"
         className="size-8 cursor-pointer rounded-md border border-line bg-panel p-0.5 disabled:cursor-not-allowed disabled:opacity-45"
         onChange={(event) => h.setInsertBackgroundColor(event.currentTarget.value)}
@@ -345,6 +351,18 @@ export function CharacterShaperOutputDock({
     </button>
   );
 
+  const exportSettings = (
+    <label className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1.5 text-[0.7rem] font-semibold text-fg-2">
+      <span className="shrink-0">파일 긴 변</span>
+      <select aria-label="파일 내보내기 해상도" value={exportEdge} disabled={exportBlocked}
+        onChange={(event) => setExportEdge(Number(event.currentTarget.value) as CharacterExportEdge)}
+        className={cn("min-h-11 shrink-0 rounded-lg border border-line bg-panel px-2 text-fg disabled:opacity-45", STUDIO_FOCUS_RING)}>
+        {CHARACTER_EXPORT_EDGES.map((edge) => <option key={edge} value={edge}>{edge} px</option>)}
+      </select>
+      <span data-character-export-size-help="true" className={cn("min-w-0 text-fg-3", compact && "basis-full")}>비율 유지 · PSD 최대 2048 px</span>
+    </label>
+  );
+
   const statusLine = progress ?? notice?.text ?? (auditionActive
     ? "후보 미리보기 중 · 클릭해 확정하거나 Esc로 취소한 뒤 원고에 적용할 수 있습니다."
     : null);
@@ -352,8 +370,9 @@ export function CharacterShaperOutputDock({
   return (
     <div
       data-character-shaper-dock={compact ? "compact" : "wide"}
-      className="relative flex shrink-0 flex-wrap items-center gap-1.5 border-t border-line bg-panel px-2 py-2"
+      className={cn("relative flex min-w-0 shrink-0 flex-wrap items-center border-t border-line bg-panel px-2 py-2", compact ? "gap-1" : "gap-1.5")}
     >
+      {compact ? null : <div className="w-full">{exportSettings}</div>}
       <div role="group" aria-label="참고 도구" className="flex shrink-0 items-center gap-1">
         {DRAWER_BUTTONS.map((item) => {
           const Icon = item.icon;
@@ -365,6 +384,7 @@ export function CharacterShaperOutputDock({
               aria-pressed={open}
               aria-label={item.label}
               title={item.label}
+              disabled={capturing || exportBusy}
               onClick={() => onOpenDrawer(item.id)}
               className={cn(compact ? ICON_BUTTON : BUTTON, open && ACTIVE_BUTTON)}
             >
@@ -382,7 +402,7 @@ export function CharacterShaperOutputDock({
         aria-pressed={paintActive}
         aria-keyshortcuts="B"
         aria-label="표면 드로잉"
-        disabled={paintBlocked || (!paintActive && !modelReady)}
+        disabled={capturing || exportBusy || paintBlocked || (!paintActive && !modelReady)}
         title={paintBlocked ? paintDisabledReason : "모델 표면에 직접 그립니다 (B)"}
         onClick={onTogglePaint}
         className={cn(compact ? ICON_BUTTON : BUTTON, paintActive && ACTIVE_BUTTON)}
@@ -391,7 +411,7 @@ export function CharacterShaperOutputDock({
         {compact ? null : "표면 드로잉"}
       </button>
 
-      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
+      <div className={cn("ml-auto flex min-w-0 shrink-0 items-center", compact ? "gap-1" : "gap-1.5")}>
         {compact ? null : (
           <>
             {transparentSwitch}
@@ -431,18 +451,22 @@ export function CharacterShaperOutputDock({
       </div>
 
       {statusLine ? (
-        <p
-          role="status"
-          aria-live="polite"
-          title={notice?.detail}
-          className={cn(
-            "w-full min-w-0 truncate text-[0.68rem] font-semibold leading-relaxed",
-            notice?.tone === "bad" ? "text-bad" : notice?.tone === "good" ? "text-good" : "text-fg-3",
-          )}
-        >
-          {statusLine}
-          {notice?.detail ? <span className="ml-1 font-normal text-fg-3">{notice.detail}</span> : null}
-        </p>
+        <div className="absolute inset-x-2 bottom-full z-30 mb-2 flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel/95 px-3 py-2 shadow-lg">
+          {/* Export feedback must not resize the camera between successive PNG/PSD captures. */}
+          <p
+            role="status"
+            aria-live="polite"
+            title={notice?.detail}
+            className={cn(
+              "min-w-0 flex-1 truncate text-[0.68rem] font-semibold leading-relaxed",
+              notice?.tone === "bad" ? "text-bad" : notice?.tone === "good" ? "text-good" : "text-fg-3",
+            )}
+          >
+            {statusLine}
+            {notice?.detail ? <span className="ml-1 font-normal text-fg-3">{notice.detail}</span> : null}
+          </p>
+          {exportBusy ? <button type="button" onClick={() => exportRef.current?.cancel()} className={BUTTON}>내보내기 취소</button> : null}
+        </div>
       ) : null}
 
       {compact && sheetOpen ? (
@@ -451,8 +475,10 @@ export function CharacterShaperOutputDock({
           id={sheetId}
           role="group"
           aria-label="내보내기"
-          className="absolute bottom-full right-2 z-40 mb-1.5 w-[min(20rem,calc(100vw-1rem))] rounded-2xl border border-line bg-panel p-2 shadow-[0_-12px_40px_oklch(0.05_0.01_70/0.45)]"
+          data-character-export-sheet="true"
+          className="absolute inset-x-2 bottom-full z-40 mb-1.5 ml-auto max-w-80 rounded-2xl border border-line bg-panel p-2 shadow-[0_-12px_40px_oklch(0.05_0.01_70/0.45)]"
         >
+          {exportSettings}
           <div className="flex flex-wrap items-center gap-1.5">
             {transparentSwitch}
             {backgroundColorField}

@@ -270,7 +270,7 @@ export function planStudioVrmGarmentSkinInfluences(
   vertexLocalX = 0,
 ): StudioVrmGarmentSkinInfluence[] {
   const main = part.bone as StudioVrmGarmentSkinBone;
-  const range = shapeAxialRange(part.shape);
+  const range = part.skinJointRange ?? shapeAxialRange(part.shape);
   // A matching hem trim may be a torus, which has no axial range in the generic joint-chain
   // planner. Treat that trim as the skirt's bottom edge (t=0) so it follows the exact same
   // lower-body drape weights instead of remaining rigidly attached to the hips.
@@ -280,6 +280,17 @@ export function planStudioVrmGarmentSkinInfluences(
   const previous = PREVIOUS_BONE[main];
   const next = NEXT_BONE[main];
   const influences: StudioVrmGarmentSkinInfluence[] = [];
+
+  if (part.skinMode === "shoulder-yoke" && main === "spine") {
+    const torsoBone = availableBones.has("chest") ? "chest" : main;
+    const arm = part.shoulderBone;
+    if (!arm || !availableBones.has(arm)) return [{ bone: torsoBone, weight: 1 }];
+    const armWeight = smoothstep(0.08, 0.92, t);
+    return normalizeInfluences([
+      { bone: torsoBone, weight: 1 - armWeight },
+      { bone: arm, weight: armWeight },
+    ], torsoBone);
+  }
 
   if (part.skinMode === "lower-body-drape" && main === "hips") {
     const hasLeftLeg = availableBones.has("leftUpperLeg");
@@ -318,7 +329,12 @@ export function planStudioVrmGarmentSkinInfluences(
     return normalizeInfluences(influences, main);
   }
 
-  const previousWeight = previous && availableBones.has(previous)
+  // The sleeve's proximal ring belongs to the upper arm. Pinning that whole ring to the
+  // clavicle freezes its T-pose silhouette when the arm lowers; the separate yoke owns the
+  // torso-to-arm transition. Anatomical ranges distinguish generated sleeves from generic parts.
+  const upperArmSleeve = part.skinJointRange
+    && (main === "leftUpperArm" || main === "rightUpperArm");
+  const previousWeight = previous && availableBones.has(previous) && !upperArmSleeve
     ? 1 - smoothstep(0.02, 0.28, t)
     : 0;
   const nextWeight = next && availableBones.has(next)
@@ -496,6 +512,8 @@ function receiptSignature(input: {
   const parts = input.parts.map((part) => ({
     bone: part.bone,
     skinMode: part.skinMode ?? null,
+    shoulderBone: part.shoulderBone ?? null,
+    skinJointRange: part.skinJointRange?.map((value) => round(value)) ?? null,
     shape: part.shape,
     offset: part.offset.map((value) => round(value)),
     align: part.align?.map((value) => round(value)) ?? null,
@@ -582,10 +600,12 @@ function valuesAreFinite(values: readonly number[]): boolean {
 function partValidationReason(part: GarmentPart): "non-finite-geometry" | "invalid-topology" | null {
   if (!valuesAreFinite(part.offset)
     || (part.align && !valuesAreFinite(part.align))
-    || (part.squash && !valuesAreFinite(part.squash))) {
+    || (part.squash && !valuesAreFinite(part.squash))
+    || (part.skinJointRange && !valuesAreFinite(part.skinJointRange))) {
     return "non-finite-geometry";
   }
   if (part.squash?.some((value) => Math.abs(value) <= GEOMETRY_EPSILON)) return "invalid-topology";
+  if (part.skinJointRange && part.skinJointRange[1] - part.skinJointRange[0] <= GEOMETRY_EPSILON) return "invalid-topology";
 
   switch (part.shape.kind) {
     case "cylinder":
@@ -1142,7 +1162,9 @@ export function buildStudioVrmSkinnedGarment(
     return unavailableBuildResult(receipt);
   }
 
-  const requiredBones = [...new Set(input.parts.map((part) => part.bone as StudioVrmGarmentSkinBone))];
+  const requiredBones = [...new Set(input.parts.flatMap((part) => (
+    part.shoulderBone ? [part.bone, part.shoulderBone] : [part.bone]
+  )))] as StudioVrmGarmentSkinBone[];
   const requiredNodes = new Map(requiredBones.map((bone) => [bone, input.resolveBone(bone)]));
   const missingBones = requiredBones.filter((bone) => !requiredNodes.get(bone));
   if (missingBones.length > 0) {

@@ -3,6 +3,7 @@ import {
   Layers,
   LoaderCircle,
   Save,
+  SquareDashed,
   Sparkles,
   Trash2,
   Wand2,
@@ -15,6 +16,13 @@ import {
   useState,
 } from "react";
 
+import { createStudioColorRangeWorkerSession } from "./studio-color-range-worker-client";
+import {
+  STUDIO_SELECTION_BORDER_MAX_WIDTH_PX,
+  STUDIO_SELECTION_BORDER_PLACEMENTS,
+  studioSelectionBorderRasterSize,
+  type StudioSelectionBorderPlacement,
+} from "./studio-selection-border";
 import {
   PIXEL_SELECTION_SMOOTH_PRESETS,
   canSmoothPixelSelection,
@@ -52,6 +60,7 @@ export type StudioSelectionWorkbenchCommitIntent =
   | "select-opaque"
   | "select-subject"
   | "smooth"
+  | "border"
   | "restore-saved";
 
 export interface StudioSelectionWorkbenchPanelProps {
@@ -60,6 +69,8 @@ export interface StudioSelectionWorkbenchPanelProps {
   readonly imageSource: string | null;
   readonly scopeKey: string;
   readonly aspect?: number;
+  readonly displayWidth?: number;
+  readonly displayHeight?: number;
   readonly flipX?: boolean;
   readonly flipY?: boolean;
   readonly busy?: boolean;
@@ -70,7 +81,7 @@ export interface StudioSelectionWorkbenchPanelProps {
   ) => void;
 }
 
-type SourceJob = "opaque" | "subject" | null;
+type SourceJob = "opaque" | "subject" | "border" | null;
 
 function browserStorage(explicit: StudioSelectionStorage | null | undefined): StudioSelectionStorage | null {
   if (explicit !== undefined) return explicit;
@@ -109,6 +120,8 @@ export function StudioSelectionWorkbenchPanel({
   imageSource,
   scopeKey,
   aspect,
+  displayWidth = 640,
+  displayHeight = displayWidth * (aspect ?? 1),
   flipX,
   flipY,
   busy = false,
@@ -117,6 +130,9 @@ export function StudioSelectionWorkbenchPanel({
 }: StudioSelectionWorkbenchPanelProps) {
   const nameInputId = useId();
   const thresholdInputId = useId();
+  const borderWidthInputId = useId();
+  const [borderWidth, setBorderWidth] = useState(8);
+  const [borderPlacement, setBorderPlacement] = useState<StudioSelectionBorderPlacement>("inside");
   const resolvedStorage = useMemo(() => browserStorage(storage), [storage]);
   const [library, setLibrary] = useState<StudioSavedSelectionLibrary>(() => (
     readStudioSavedSelectionLibrary(resolvedStorage, scopeKey)
@@ -136,7 +152,14 @@ export function StudioSelectionWorkbenchPanel({
     setLibrary(readStudioSavedSelectionLibrary(resolvedStorage, scopeKey));
   }, [resolvedStorage, scopeKey]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    // A delayed result belongs to the exact source, selection and lock state it started with.
+    // Changing tools/selection elsewhere in the editor must never be overwritten by this panel.
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setSourceJob(null);
+    return () => abortRef.current?.abort();
+  }, [selection, operation, imageSource, scopeKey, aspect, displayWidth, displayHeight, flipX, flipY, busy]);
 
   useEffect(() => {
     if (storage !== undefined || typeof window === "undefined") return undefined;
@@ -153,8 +176,50 @@ export function StudioSelectionWorkbenchPanel({
   const sourceDisabled = busy || sourceJob !== null || !imageSource;
   const smoothDisabled = busy || sourceJob !== null || !canSmoothPixelSelection(selection);
   const selectedOperationLabel = operationLabel(operation);
+  const borderGeometryValid = [displayWidth, displayHeight].every((value) => Number.isFinite(value) && value > 0);
+  const borderRaster = borderGeometryValid
+    ? studioSelectionBorderRasterSize(displayWidth, displayHeight)
+    : { width: 1, height: 1, minimumWidthPx: 1 };
+  const effectiveBorderWidth = Math.max(borderRaster.minimumWidthPx, borderWidth);
+  const borderDisabled = busy || sourceJob !== null || !selectionReady || !borderGeometryValid
+    || borderRaster.minimumWidthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX;
 
-  const runSourceSelection = async (kind: Exclude<SourceJob, null>) => {
+  const runBorderSelection = async () => {
+    if (!selection || borderDisabled) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const session = createStudioColorRangeWorkerSession();
+    setSourceJob("border");
+    setStatus("선택 영역의 테두리를 계산하고 있습니다.");
+    try {
+      const result = await session.run({
+        kind: "selection-border",
+        selection,
+        width: borderRaster.width,
+        height: borderRaster.height,
+        widthPx: effectiveBorderWidth,
+        placement: borderPlacement,
+        displayWidth,
+        displayHeight,
+      }, { signal: controller.signal });
+      if (controller.signal.aborted || abortRef.current !== controller) return;
+      onCommitSelection(result.selection, "border");
+      setStatus(result.selection
+        ? `${STUDIO_SELECTION_BORDER_PLACEMENTS.find((item) => item.id === borderPlacement)?.label} 테두리 ${effectiveBorderWidth}px를 선택했습니다. 선택 실행 취소로 복원할 수 있습니다.`
+        : "이미지 안에 남는 테두리 영역이 없습니다. 선택 실행 취소로 복원할 수 있습니다.");
+    } catch (error) {
+      if (!controller.signal.aborted) setStatus(studioSelectionSourceErrorMessage(error));
+    } finally {
+      session.dispose();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setSourceJob(null);
+      }
+    }
+  };
+
+  const runSourceSelection = async (kind: "opaque" | "subject") => {
     if (!imageSource || sourceDisabled) return;
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -172,6 +237,7 @@ export function StudioSelectionWorkbenchPanel({
           flipY,
           signal: controller.signal,
         });
+        if (controller.signal.aborted || abortRef.current !== controller) return;
         onCommitSelection(next, "select-opaque");
         setStatus(next ? `레이어 불투명도를 ${selectedOperationLabel}으로 적용했습니다.` : "선택 영역이 비었습니다.");
       } else {
@@ -185,6 +251,7 @@ export function StudioSelectionWorkbenchPanel({
           threshold: subjectThreshold,
           signal: controller.signal,
         });
+        if (controller.signal.aborted || abortRef.current !== controller) return;
         onCommitSelection(result.selection, "select-subject");
         const transparency = result.sourceTransparencyApplied
           ? "원본 투명도 결합"
@@ -200,8 +267,10 @@ export function StudioSelectionWorkbenchPanel({
         setStatus(studioSelectionSourceErrorMessage(error));
       }
     } finally {
-      if (abortRef.current === controller) abortRef.current = null;
-      setSourceJob((current) => current === kind ? null : current);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setSourceJob(null);
+      }
     }
   };
 
@@ -271,7 +340,7 @@ export function StudioSelectionWorkbenchPanel({
             type="button"
             className={cn(
               "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-medium text-fg-2 transition hover:border-accent/50 hover:text-fg",
-              "disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11",
+              "disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11",
             )}
             disabled={sourceDisabled}
             onClick={() => void runSourceSelection("opaque")}
@@ -286,7 +355,7 @@ export function StudioSelectionWorkbenchPanel({
             type="button"
             className={cn(
               "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent/10 px-2 text-[0.68rem] font-semibold text-fg transition hover:bg-accent/15",
-              "disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11",
+              "disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11",
             )}
             disabled={sourceDisabled}
             onClick={() => void runSourceSelection("subject")}
@@ -322,6 +391,64 @@ export function StudioSelectionWorkbenchPanel({
         ) : null}
       </div>
 
+      <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5" data-studio-selection-border="true">
+        <span className="text-[0.68rem] font-semibold text-fg-2">테두리 선택</span>
+        <p className="text-[0.62rem] leading-relaxed text-fg-3">
+          선택의 안쪽을 비우고 윤곽만 남깁니다. 구멍과 떨어진 영역의 경계에도 적용됩니다.
+        </p>
+        <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="선택 테두리 위치">
+          {STUDIO_SELECTION_BORDER_PLACEMENTS.map((placement) => (
+            <button
+              key={placement.id}
+              type="button"
+              className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 aria-pressed:border-accent/60 aria-pressed:bg-accent/10 disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
+              aria-label={`선택 테두리 ${placement.label}`}
+              aria-pressed={borderPlacement === placement.id}
+              disabled={busy || sourceJob !== null}
+              onClick={() => setBorderPlacement(placement.id)}
+            >
+              {placement.label}
+            </button>
+          ))}
+        </div>
+        <label htmlFor={borderWidthInputId} className="flex items-center justify-between gap-2 text-[0.65rem] text-fg-3">
+          <span>테두리 두께 (px)</span>
+          <input
+            id={borderWidthInputId}
+            type="number"
+            className="w-20 rounded-md border border-line bg-bg px-2 py-1 text-fg tabular-nums disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
+            min={borderRaster.minimumWidthPx}
+            max={STUDIO_SELECTION_BORDER_MAX_WIDTH_PX}
+            step={1}
+            value={effectiveBorderWidth}
+            disabled={busy || sourceJob !== null}
+            onChange={(event) => {
+              const value = event.currentTarget.valueAsNumber;
+              if (Number.isFinite(value)) setBorderWidth(Math.min(STUDIO_SELECTION_BORDER_MAX_WIDTH_PX, Math.max(borderRaster.minimumWidthPx, value)));
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-medium text-fg-2 transition hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
+          disabled={borderDisabled}
+          onClick={() => void runBorderSelection()}
+          aria-label="선택 영역을 테두리로 바꾸기"
+        >
+          {sourceJob === "border"
+            ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+            : <SquareDashed className="size-3.5" aria-hidden="true" />}
+          테두리 선택 적용
+        </button>
+        <p className="text-[0.6rem] leading-relaxed text-fg-3">
+          {!borderGeometryValid
+            ? "이미지의 너비와 높이를 지정한 뒤 테두리를 선택할 수 있습니다."
+            : borderRaster.minimumWidthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
+              ? "이미지가 너무 커서 테두리를 계산할 수 없습니다. 표시 크기를 줄여 주세요."
+              : `현재 크기에서 최소 ${borderRaster.minimumWidthPx}px · 현재 페더 유지${Math.max(displayWidth, displayHeight) > 640 ? " · 미세한 경계는 근사됩니다." : ""}`}
+        </p>
+      </div>
+
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[0.68rem] font-semibold text-fg-2">경계 스무딩</span>
@@ -332,7 +459,7 @@ export function StudioSelectionWorkbenchPanel({
             <button
               key={preset.id}
               type="button"
-              className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 transition hover:border-accent/50 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+              className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 transition hover:border-accent/50 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
               disabled={smoothDisabled}
               onClick={() => applySmoothPreset(preset.id)}
               aria-label={`선택 경계 ${preset.label} 스무딩`}
@@ -372,7 +499,7 @@ export function StudioSelectionWorkbenchPanel({
           />
           <button
             type="button"
-            className="inline-flex min-h-8 items-center gap-1 rounded-md border border-accent/35 bg-accent/10 px-2 text-[0.65rem] font-semibold text-fg transition hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+            className="inline-flex min-h-8 items-center gap-1 rounded-md border border-accent/35 bg-accent/10 px-2 text-[0.65rem] font-semibold text-fg transition hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
             disabled={busy || !selectionReady || name.trim().length === 0}
             onClick={saveCurrentSelection}
             aria-label="현재 픽셀 선택 저장"

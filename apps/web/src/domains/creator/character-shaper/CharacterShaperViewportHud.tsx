@@ -1,7 +1,8 @@
 /**
  * Character Shaper — floating controls over the 3D viewport.
  *
- * Top-left: camera presets · top-right: turntable, lighting tone, transparent background, zoom.
+ * Desktop top-left: camera presets. Mobile camera controls occupy a separate normal-flow bar.
+ * Top-right: turntable, lighting tone, transparent background, zoom.
  * Bottom-left: a status pill (model status / busy reason / hold-to-compare). Every control is a
  * labelled 44px button; the wrapper is pointer-transparent so orbiting the model keeps working.
  */
@@ -9,14 +10,14 @@ import { Eye, EyeOff, LoaderCircle, Maximize2, RotateCw, SunMedium, ZoomIn, Zoom
 
 import { StudioHudPill } from "../studio-chrome-ui";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
-import { STUDIO_VRM_INSPECTION_VIEWS } from "../vrm/studio-vrm-inspection-framing";
 import { CAMERA_PRESETS } from "../vrm/studio-vrm-poser-catalogs";
 
 import {
-  CHARACTER_SHAPER_CAMERA_PRESET_IDS,
   characterLightingToneLabel,
   nextCharacterLightingTone,
 } from "./character-shaper-ui-model";
+
+import { CharacterShaperCameraControls } from "./CharacterShaperCameraControls";
 
 import type { CharacterShaperViewportHudProps } from "./character-shaper-ui-contract";
 import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
@@ -60,9 +61,6 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
   const cameraLocked = Boolean(h.viewportCameraInteractionLocked || h.isCapturing || h.isSharingPose || h.isThumbnailCapturing);
   const lightingTone: string | undefined = typeof h.lightingTone === "string" ? h.lightingTone : undefined;
   const modelReady = status === "ready";
-  const presets = CHARACTER_SHAPER_CAMERA_PRESET_IDS
-    .map((id) => CAMERA_PRESETS.find((preset) => preset.id === id) ?? null)
-    .filter((preset): preset is (typeof CAMERA_PRESETS)[number] => preset !== null);
   const activePresetLabel = CAMERA_PRESETS.find((preset) => preset.id === activeCameraId)?.label ?? "정면";
   const entries: readonly VrmLibraryEntry[] = Array.isArray(h.libraryEntries) ? h.libraryEntries : [];
   const modelName = entries.find((entry) => entry.id === h.activeModelId)?.name ?? null;
@@ -81,60 +79,14 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
       data-character-shaper-hud="true"
       className="pointer-events-none absolute inset-0 z-20"
     >
-      <div
-        role="group"
-        aria-label="카메라 프리셋"
-        className={cn(
-          "pointer-events-auto absolute left-2 top-2 flex max-w-[calc(100%-4rem)] gap-1 overflow-x-auto rounded-2xl border border-line/60 bg-panel/80 p-1 backdrop-blur",
-          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          compact ? "right-16" : "",
-        )}
-      >
-        {presets.map((preset) => {
-          const active = preset.id === activeCameraId;
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              aria-pressed={active}
-              disabled={cameraLocked || !modelReady}
-              title={`카메라: ${preset.label}`}
-              onClick={() => h.setActiveCameraId(preset.id)}
-              className={cn(
-                "min-h-11 shrink-0 rounded-xl px-3 text-[0.72rem] font-semibold transition-colors motion-reduce:transition-none",
-                STUDIO_FOCUS_RING,
-                active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
-                "disabled:cursor-not-allowed disabled:opacity-40",
-              )}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <select
-        aria-label="부위·방향 확대 검사"
-        title="측면·후면과 착장 접점을 확대합니다. 드래그로 자유롭게 회전할 수 있습니다."
-        disabled={cameraLocked || !modelReady}
-        value={STUDIO_VRM_INSPECTION_VIEWS.some((view) => view.id === activeCameraId) ? activeCameraId : ""}
-        onChange={(event) => { if (event.target.value) h.setActiveCameraId(event.target.value); }}
-        className={cn(
-          "pointer-events-auto absolute left-2 top-16 min-h-11 max-w-[calc(100%-5rem)] rounded-xl border border-line/70 bg-panel/90 px-3 text-xs font-semibold text-fg shadow-sm backdrop-blur",
-          "disabled:cursor-not-allowed disabled:opacity-40",
-          STUDIO_FOCUS_RING,
-        )}
-      >
-        <option value="" disabled>부위·방향 확대 검사</option>
-        {STUDIO_VRM_INSPECTION_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
-      </select>
+      {!compact ? <CharacterShaperCameraControls h={h} compact={false} /> : null}
 
       <div
         role="group"
         aria-label="뷰포트 보기 설정"
         className={cn(
-          "pointer-events-auto absolute right-2 top-2 flex flex-col gap-1.5",
-          compact && "top-16",
+          "pointer-events-auto absolute right-2 gap-1.5",
+          compact ? "top-2 grid grid-cols-2" : "top-2 flex flex-col",
         )}
       >
         <button
@@ -186,7 +138,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         >
           {transparent ? <Eye size={17} aria-hidden /> : <EyeOff size={17} aria-hidden />}
         </button>
-        <div className="my-0.5 h-px w-full bg-line/70" aria-hidden />
+        <div className={cn("my-0.5 h-px w-full bg-line/70", compact && "hidden")} aria-hidden />
         <button
           type="button"
           aria-label="확대"
