@@ -1,0 +1,74 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/cayley_interior",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 14,
+    "type": 0,
+    "tags": [
+      "lamp",
+      "table",
+      "window",
+      "glass",
+      "balcony",
+      "view",
+      "log"
+    ],
+    "date_published": 1511996400,
+    "name": "Cayley Interior",
+    "categories": [
+      "indoor",
+      "urban",
+      "sunrise-sunset",
+      "artificial light",
+      "natural light",
+      "high contrast"
+    ],
+    "date_taken": 1460647800,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "3567764"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "22df992763e27c67d789aea034249ef165a97f16",
+    "description": "Free 16K, unclipped HDRI of an interior at sunrise: strong natural backlight through glass doors, warm artificial lamps, high-contrast lighting and a balcony view.",
+    "category_id": "cf1ef789-69a7-51fe-b808-1147443a1173",
+    "category": "Interiors/Residential/Living Rooms & Lounges",
+    "attributes": {
+      "weather": "clear",
+      "light_type": "mixed",
+      "contrast": "high",
+      "environment": "indoor"
+    },
+    "img_version": "b0869513",
+    "download_count": 252160,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/cayley_interior.png?width=256&height=256&v=b0869513"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/cayley_interior.jpg",
+      "bytes": 4583075,
+      "sha256": "abf4897f4c2f36226a1ffbb2dbc52e5777e04f2ab18a8b46d05f327b98c879cc",
+      "sourceMd5": "b56ae551991b3cd259cd11f23e4129b5"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

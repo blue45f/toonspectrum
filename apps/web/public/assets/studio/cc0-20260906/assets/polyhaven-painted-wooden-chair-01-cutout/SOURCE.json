@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-painted-wooden-chair-01",
+  "sourceModelSha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+  "render": {
+    "sourceId": "polyhaven-painted-wooden-chair-01",
+    "sourceSha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+    "path": "high-resolution-props/polyhaven-painted-wooden-chair-01.png",
+    "visiblePixels": 223317,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 724
+  },
+  "independentOriginal": false
+}

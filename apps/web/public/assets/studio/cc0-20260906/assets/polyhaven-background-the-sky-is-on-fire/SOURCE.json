@@ -1,0 +1,87 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/the_sky_is_on_fire",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 9,
+    "type": 0,
+    "date_published": 1508536800,
+    "name": "The Sky Is On Fire",
+    "categories": [
+      "outdoor",
+      "skies",
+      "urban",
+      "sunrise-sunset",
+      "partly cloudy",
+      "medium contrast",
+      "natural light"
+    ],
+    "coords": [
+      -33.903853,
+      18.397963
+    ],
+    "date_taken": 1464882900,
+    "sponsors": [
+      {
+        "url": "http://www.eidyknowles.com/",
+        "name": "Eidy"
+      }
+    ],
+    "backplates": true,
+    "tags": [
+      "twilight",
+      "rail",
+      "promenade",
+      "path",
+      "ocean",
+      "wave",
+      "backplates"
+    ],
+    "files_hash": "9be3cf12e0beb7d272c3c11894cc921d1360220d",
+    "authors": {
+      "Greg Zaal": "All",
+      "Rico Cilliers": "Backplates"
+    },
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K HDRI, unclipped - twilight seaside promenade with a fiery sunset, partly cloudy skies, warm reflections on ocean waves and mid-contrast natural light.",
+    "category_id": "e0324752-e9a3-513a-a958-71262797f6a1",
+    "category": "Coast & Water/Harbours & Piers/Promenades & Seafronts",
+    "attributes": {
+      "time_of_day": "dusk",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "153627cb",
+    "download_count": 601008,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/the_sky_is_on_fire.png?width=256&height=256&v=153627cb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/the_sky_is_on_fire.jpg",
+      "bytes": 3467321,
+      "sha256": "2fe96ef8fd648d8727ac972a7c9a07c61ac7b91b9745fa79986a6d4ec52f4690",
+      "sourceMd5": "178cd92790281f0637d3f3e02ab3bf68"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

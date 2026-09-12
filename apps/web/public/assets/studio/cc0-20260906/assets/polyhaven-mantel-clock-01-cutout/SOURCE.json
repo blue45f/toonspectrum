@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/mantel_clock_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-mantel-clock-01",
+  "sourceModelSha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+  "render": {
+    "sourceId": "polyhaven-mantel-clock-01",
+    "sourceSha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+    "path": "high-resolution-props/polyhaven-mantel-clock-01.png",
+    "visiblePixels": 272370,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 26201
+  },
+  "independentOriginal": false
+}

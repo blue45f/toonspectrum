@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "type": 2,
+    "tags": [
+      "lighting",
+      "brass",
+      "metal",
+      "lamp",
+      "candle",
+      "light",
+      "cultural",
+      "hanging"
+    ],
+    "name": "Brass Diya Lantern",
+    "categories": [
+      "decorative",
+      "lighting"
+    ],
+    "authors": {
+      "Bhargav Kubal": "All"
+    },
+    "date_published": 1639526400,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 12742,
+    "texel_density": 20723.980962316098,
+    "dimensions": [
+      123.00453707575798,
+      123.00454080104828,
+      380.8239474892616
+    ],
+    "files_hash": "c8a70bbd5dd2708135a561576d895436844aaa25",
+    "description": "Free 8K model of a hanging brass diya lantern featuring aged patina, hexagonal glass panels, star-shaped vents, a chain suspension, and a lit oil bowl.",
+    "category_id": "68f93037-d68a-5cb0-b10f-920243f9adbe",
+    "category": "Lighting/Portable/Oil Lamps",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "brass",
+        "glass"
+      ]
+    },
+    "img_version": "48c72cf4",
+    "download_count": 13715,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brass_diya_lantern.png?width=256&height=256&v=48c72cf4"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_diya_lantern/brass_diya_lantern_2k.gltf",
+      "bytes": 10202,
+      "sha256": "326ca7044f4b2104a40cb345fa2beba3ebe7ce8b9811dee632651caae2951ac7",
+      "sourceMd5": "2a288769636bc0833516381e44e1629a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_diya_lantern/brass_diya_lantern_arm_2k.jpg",
+      "bytes": 2472763,
+      "sha256": "ca89f9d346486d3c6e76003d643c2057daa98c6e1a32842bbe7d63f78078df41",
+      "sourceMd5": "3b45cce96958da5eae83d010877075af"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_diya_lantern/brass_diya_lantern_diff_2k.jpg",
+      "bytes": 1699090,
+      "sha256": "1dd20a5ff6119b0350b2137e88919d60d1a39bb5a67d8eed2f44a1abc71fc87f",
+      "sourceMd5": "fdacb3d6b4f88b4ee684e2a73c20cfdc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/brass_diya_lantern/brass_diya_lantern.bin",
+      "bytes": 455708,
+      "sha256": "7060383d23c5ef19eed274ff70ead72001be1c8397c39ba924c35bbeca4795dc",
+      "sourceMd5": "1e09f3575cab311415e85fd76256a067"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_diya_lantern/brass_diya_lantern_nor_gl_2k.jpg",
+      "bytes": 837724,
+      "sha256": "f0ddcbddea35c66e6910101c60afe7468b1842e85e758099d6ac57ea32c4ca06",
+      "sourceMd5": "1f64c4a1fd5b9e763c28ff3a4cb44ab9"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-namaqualand-boulder-02",
+  "sourceModelSha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+  "render": {
+    "sourceId": "polyhaven-namaqualand-boulder-02",
+    "sourceSha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+    "path": "high-resolution-props/polyhaven-namaqualand-boulder-02.png",
+    "visiblePixels": 215059,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 97964
+  },
+  "independentOriginal": false
+}

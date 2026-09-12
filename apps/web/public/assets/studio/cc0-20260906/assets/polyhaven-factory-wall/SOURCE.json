@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/factory_wall",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1550538047,
+    "name": "Factory Wall",
+    "type": 1,
+    "tags": [
+      "wall",
+      "fence",
+      "industrial",
+      "corrugated"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "categories": [
+      "metal",
+      "outdoor",
+      "wall",
+      "clean",
+      "roofing",
+      "man made"
+    ],
+    "files_hash": "14873f590bad05227f15bd2f197fdd730a699b3e",
+    "description": "Free 8K texture: green corrugated metal wall with painted finish, subtle weathering, fine scratches and rivets, soft specular sheen and moderate roughness.",
+    "category_id": "c10ee76b-cb81-546f-bba9-095bf5a18a6d",
+    "category": "Metal/Sheet & Corrugated/Corrugated Iron",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "sponsors": [
+      "4714267",
+      "101447488"
+    ],
+    "img_version": "1315ffc6",
+    "download_count": 107477,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/factory_wall.png?width=256&height=256&v=1315ffc6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/factory_wall/factory_wall_diff_2k.jpg",
+      "bytes": 1140576,
+      "sha256": "243178a7f3fecb28de5d491716bbea0b8caa6ec032c46e99abf3d3043792f0ee",
+      "sourceMd5": "ea55cbd02a08fb09ffaf623bc2da12d0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/factory_wall/factory_wall_rough_2k.jpg",
+      "bytes": 437842,
+      "sha256": "266e5124d36da00b028874a00a97b8ab3ebe4437e706df260792834fe1ef98c9",
+      "sourceMd5": "6d55e6b2e77d567df440e939724d1683"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/factory_wall/factory_wall_nor_gl_2k.jpg",
+      "bytes": 676845,
+      "sha256": "27b5d00ced3f6aa10a781c6659c3e0d3c2d52a22344500bad786a8e4ac69e2a0",
+      "sourceMd5": "59c2a76a1c88d91c36f6166e07bdd7f6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/factory_wall/factory_wall_ao_2k.jpg",
+      "bytes": 1995001,
+      "sha256": "56d110f59a4d559ce05367f99e1b74580d3df28ae6365c98e7393c7ae7219b09",
+      "sourceMd5": "3f1696ce0888ee83ab2f7e90bcb29dba"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/factory_wall/factory_wall_disp_2k.jpg",
+      "bytes": 394235,
+      "sha256": "98489e09ed12ac2454db1440eba563f9f50e74efa469580b51dc24185da25a83",
+      "sourceMd5": "bd826a3d5b41dd164f52564f6a712910"
+    }
+  ]
+}

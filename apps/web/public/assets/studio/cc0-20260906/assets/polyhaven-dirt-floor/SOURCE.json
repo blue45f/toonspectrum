@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dirt_floor",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1673827200,
+    "name": "Dirt Floor",
+    "type": 1,
+    "tags": [
+      "dirt",
+      "ground",
+      "brown",
+      "nature",
+      "uneven",
+      "mud",
+      "debris",
+      "forest",
+      "pathway",
+      "woodland"
+    ],
+    "authors": {
+      "eye-candy.xyz": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2069.9996948242188,
+      2069.9996948242188
+    ],
+    "prepaid": true,
+    "categories": [
+      "outdoor",
+      "natural",
+      "terrain",
+      "collection: verdant_trail"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "sponsors": [
+      "77433244",
+      "128081732"
+    ],
+    "files_hash": "5786a04233bc38e09aea24ac369f43f71a0aa728",
+    "description": "Free 8K texture of uneven brown dirt with compacted, slightly muddy surface, scattered twig and leaf debris, fine granular detail and subtle roughness.",
+    "category_id": "2b016db1-a760-53aa-89ac-54c30f13214a",
+    "category": "Ground & Terrain/Forest Floor/Forest Soil",
+    "collections": [
+      "verdant_trail"
+    ],
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "01ad0711",
+    "download_count": 50860,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/dirt_floor.png?width=256&height=256&v=01ad0711"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirt_floor/dirt_floor_diff_2k.jpg",
+      "bytes": 3944426,
+      "sha256": "1afaf974bc016e5019f48f6590a53e3e3730f48ae2eb5a1717519ad89038f661",
+      "sourceMd5": "dace6e0d469e7b99f0794b941f06bab8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirt_floor/dirt_floor_rough_2k.jpg",
+      "bytes": 1808214,
+      "sha256": "56d3faa1f0624c3e366d057596f50fe3264415a64c967830f61ca139b9a94bfc",
+      "sourceMd5": "c987eada3ef1492be2843f974e2d9a84"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirt_floor/dirt_floor_nor_gl_2k.jpg",
+      "bytes": 4977831,
+      "sha256": "da70ddc5c7d53d905d842ec189afbf7e2a7da84f281e94041346829b65f29786",
+      "sourceMd5": "f47bd35ce5a09771aba4ce85e22d5e36"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirt_floor/dirt_floor_ao_2k.jpg",
+      "bytes": 2781172,
+      "sha256": "3fa4e877751f8f20a255e60df897b85ae3d066d334c6a6cee63e3aa9a7d6b6be",
+      "sourceMd5": "27bdc648d1528d18cd29394859ef67ad"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirt_floor/dirt_floor_disp_2k.jpg",
+      "bytes": 1552069,
+      "sha256": "51ec6654074625a205f29e07e4c928ebfa5a892036303b6eb921c2791cc88403",
+      "sourceMd5": "52f507cdfeb132c6dc7753b276c27401"
+    }
+  ]
+}

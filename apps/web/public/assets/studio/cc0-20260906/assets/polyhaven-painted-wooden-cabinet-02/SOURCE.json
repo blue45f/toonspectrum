@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Painted Wooden Cabinet 02",
+    "categories": [
+      "furniture",
+      "shelves"
+    ],
+    "type": 2,
+    "tags": [
+      "storage",
+      "cabinet",
+      "wood",
+      "vintage",
+      "rustic",
+      "worn",
+      "carpentry",
+      "aged",
+      "bookcase"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "info": null,
+    "date_published": 1710720000,
+    "polycount": 966,
+    "dimensions": [
+      996.9334602355957,
+      729.429692029953,
+      2568.572537857108
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "texel_density": 769.8343893811391,
+    "files_hash": "2f601a35a11252f78512bd915689567fd8782150",
+    "description": "Free 4K model of a painted wooden cabinet: rustic, vintage bookcase with worn blue paint, aged wood, shelves, drawer and lower cupboard.",
+    "category_id": "14debc4f-6ceb-597a-a824-8de173aa95a9",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "28d0e953",
+    "download_count": 4492,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/painted_wooden_cabinet_02.png?width=256&height=256&v=28d0e953"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/painted_wooden_cabinet_02/painted_wooden_cabinet_02_2k.gltf",
+      "bytes": 6085,
+      "sha256": "85dcb90361d7fee4dfc279c91015fffd6f8a0ed607737cb8cd0eab1f3b05bae9",
+      "sourceMd5": "25d558e1b7191d7dce9a1e7177f9f6d2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/painted_wooden_cabinet_02/painted_wooden_cabinet_02.bin",
+      "bytes": 39332,
+      "sha256": "7acab853993b90cafc9c7550a7035397dfeb4bbda7f0dba8759d40a971c755ca",
+      "sourceMd5": "00b400f46d4a95cc51abfb1361b30184"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet_02/painted_wooden_cabinet_02_arm_2k.jpg",
+      "bytes": 1631952,
+      "sha256": "5aee389d79167887af3063c64419b9ad5903d2b08c5fa9cbe7190d193cbbc338",
+      "sourceMd5": "a937b0cbd6d2df249e09593fdce108ec"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet_02/painted_wooden_cabinet_02_nor_gl_2k.jpg",
+      "bytes": 2325419,
+      "sha256": "90b057654befa0bc580f0ed60313d10820c2a794d8b7672dd2324bef4f89702f",
+      "sourceMd5": "f7ac9923a930b9f9e97ff401fc4a9491"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet_02/painted_wooden_cabinet_02_diff_2k.jpg",
+      "bytes": 2174316,
+      "sha256": "78f80c86ace88c2ef810dd3f1665f3c009d7af09dda7e25ec6a2e673e80e4011",
+      "sourceMd5": "bfda93a700b05921e87415f5e1b2f051"
+    }
+  ]
+}
