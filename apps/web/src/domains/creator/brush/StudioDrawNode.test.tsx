@@ -2,6 +2,8 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 
 
 import { exportPageToSvg } from "../export/studio-svg-export";
@@ -707,6 +709,21 @@ describe("StudioDrawNode orchestration", () => {
       { x: 2, y: 3, width: 6, height: 8 },
       { x: 12, y: 3, width: 6, height: 8 },
     ]);
+  });
+
+  it("preserves shape symmetry while a custom material brush is selected", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program());
+    render(<StudioDrawNode el={drawEl({ kind: "rect", points: [2, 3, 8, 11],
+      symmetry: { type: "vertical", centerX: 10, centerY: 0 }, brushEnginePrograms: brush.enginePrograms! })} />);
+    expect(captured("Rect").map(({ props }) => props.x)).toEqual([2, 12]);
+  });
+
+  it("preserves eraser symmetry when a stroke retains custom material metadata", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program());
+    render(<StudioDrawNode el={drawEl({ mode: "eraser", points: [4, 7],
+      symmetry: { type: "vertical", centerX: 10, centerY: 0 }, brushEnginePrograms: brush.enginePrograms! })} />);
+    expect(captured("Circle").map(({ props }) => ({ x: props.x, composite: props.globalCompositeOperation })))
+      .toEqual([{ x: 4, composite: "destination-out" }, { x: 16, composite: "destination-out" }]);
   });
 
   it("routes arrow shapes to the registered Konva Arrow node", () => {

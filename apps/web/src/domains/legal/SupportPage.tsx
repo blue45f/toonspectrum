@@ -2,6 +2,8 @@ import { CheckCircle2, Inbox, MessageSquarePlus, RefreshCw, Send } from "lucide-
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Container } from "@/shared/components/section";
+import { PublicStoryHero } from "@/shared/components/public-story-hero";
+import Link from "@/compat/router-link";
 import {
   INQUIRY_BODY_MAX,
   INQUIRY_CATEGORIES,
@@ -241,26 +243,27 @@ export function SupportPage() {
   };
 
   return (
-    <Container size="prose" className="py-8 sm:py-12 lg:py-16">
+    <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <div className="space-y-8">
-        <header>
-          <p className="eyebrow text-accent">SUPPORT · 문의</p>
-          <h1 ref={headingRef} tabIndex={-1} className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight outline-none sm:text-4xl">
-            무엇을 도와드릴까요?
-          </h1>
-          <p className="mt-4 text-pretty text-base leading-relaxed text-fg-2">
-            제휴·버그·의견·이용 문의를 남겨 주세요. 접수된 문의는 아래 게시판에 공개로 표시되며,
-            운영팀이 확인 후 상태를 업데이트합니다. 전화·이메일 대신 이 게시판으로 문의를 통합했습니다.
-          </p>
-        </header>
+        <PublicStoryHero
+          eyebrow="SUPPORT · BACK TO YOUR STORY"
+          title="작업은 계속될 수 있도록."
+          description="웹툰을 그리다 막힌 순간, 저장·내보내기 문제, 함께 나누고 싶은 제안을 알려주세요. 접수된 문의는 아래 공개 게시판에서 상태를 확인할 수 있습니다."
+          image="process"
+          imageAlt="선화와 채색으로 웹툰을 완성하는 과정을 보여주는 콘셉트 아트"
+          caption="YOUR NEXT PANEL IS WAITING · 웹툰 제작 과정 콘셉트 아트"
+          headingRef={headingRef}
+        >
+          <Link href="/help" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg">도움말에서 해결 방법 찾기</Link>
+        </PublicStoryHero>
 
-        <section className="space-y-4">
+        <section className="mx-auto max-w-3xl space-y-4">
           <div>
             <h2 className="inline-flex items-center gap-1.5 text-lg font-bold text-fg">
               <MessageSquarePlus size={16} className="text-accent" aria-hidden /> 문의 남기기
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-fg-2">
-              카테고리를 고르고 제목과 내용을 작성하세요. 이름·이메일은 선택 사항입니다.
+              카테고리를 고르고 제목과 내용을 작성하세요. 제목·내용·표시 이름은 공개됩니다. 이메일은 선택 사항이며 운영팀만 확인합니다.
             </p>
           </div>
 
@@ -420,7 +423,7 @@ export function SupportPage() {
           )}
         </section>
 
-        <InquiryBoard reloadKey={boardKey} />
+        <div className="mx-auto max-w-3xl"><InquiryBoard reloadKey={boardKey} /></div>
       </div>
     </Container>
   );

@@ -168,10 +168,12 @@ interface StudioBg3dShapesPanelContext {
 
 export interface StudioBg3dShapesPanelProps {
   readonly hidden: boolean;
+  readonly disabled?: boolean;
   readonly context: StudioBg3dShapesPanelContext;
 }
 
 export function StudioBg3dShapesPanel({
+  disabled = false,
   hidden,
   context,
 }: StudioBg3dShapesPanelProps) {
@@ -298,7 +300,9 @@ export function StudioBg3dShapesPanel({
   } = context;
 
   return (
-<section hidden={hidden}>
+<section hidden={hidden} aria-busy={disabled || undefined}>
+                {disabled ? <p role="status" className="mb-3 text-xs text-fg-3">3D 장면을 준비하고 있습니다. 엔진 선택은 보기 탭에서 할 수 있습니다.</p> : null}
+                <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Boxes size={15} className="text-accent" aria-hidden />
                   도형 추가
@@ -1927,6 +1931,7 @@ export function StudioBg3dShapesPanel({
                     <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
                   )}
                 </div>
+                </fieldset>
               </section>
   );
 }

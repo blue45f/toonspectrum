@@ -260,8 +260,9 @@ export const BG3D_VIEWPORT_HINTS = {
   focus: {
     id: "bg3d:camera:focus-selection",
     title: "선택 객체 화면 맞춤",
-    description: "선택한 객체의 실제 지오메트리 경계를 계산해 현재 원근 또는 직교 화면에 여백과 함께 맞춥니다.",
+    description: "선택한 객체들의 보이는 지오메트리를 출력 프레임에 여백과 함께 맞춥니다. 원근·직교 투영과 카메라 기울기도 유지합니다.",
     preview: "camera-zoom",
+    tip: "여러 객체를 함께 선택해 구도를 잡을 수 있습니다. 숨긴 객체는 제외하고, 실행 취소로 이전 구도를 복원합니다.",
   },
   zoomIn: {
     id: "bg3d:camera:zoom-in",

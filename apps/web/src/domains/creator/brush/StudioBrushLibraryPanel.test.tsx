@@ -13,6 +13,7 @@ import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
+  writeBrushJson,
   type BrushLibraryStorage,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
@@ -506,6 +507,26 @@ describe("StudioBrushLibraryPanel", () => {
     });
     expect(screen.getByText("두 번째 펜")).toBeTruthy();
     expect(screen.queryByText("주력 펜")).toBeNull();
+  });
+
+  it.each([
+    ["future engine version", { version: 2 }],
+    ["invalid nested material", { version: 1, material: { version: 99 } }],
+  ])("rejects %s JSON with a visible error before writing to the library", async (_label, enginePrograms) => {
+    const product = await seededRepositoryFactory([])();
+    const put = vi.spyOn(product.repository, "put");
+    render(<StudioBrushLibraryPanel currentSnapshot={snapshot} brushes={[]}
+      onBrushesChange={vi.fn()} onApplyBrush={vi.fn()} onBrushDeleted={vi.fn()}
+      repositoryFactory={async () => product} />);
+    await waitFor(() => expect(screen.getByText(/0개 · 무제한 · 로컬 SQL/u)).toBeTruthy());
+    const payload = { ...JSON.parse(writeBrushJson(saved)), enginePrograms };
+    fireEvent.change(screen.getByLabelText(
+      "브러시 설정 · Photoshop ABR · Clip Studio SUT/SUTG · libmypaint MYB · Krita KPP/번들 가져오기",
+    ), { target: { files: [new File([JSON.stringify(payload)], "unsupported-material.json", { type: "application/json" })] } });
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("브러시 엔진 설정을 그대로 복원할 수 없어 가져오지 않았어요"));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(put).not.toHaveBeenCalled();
+    expect((await product.repository.query()).items).toEqual([]);
   });
 
   it("Krita bundle의 KPP/MYB 3개를 한 putMany로 저장하고 권리·미지원 원장을 표시한다", async () => {

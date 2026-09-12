@@ -13,6 +13,13 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(home).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    const comparison = home.getByRole("slider");
+    // Read native layout dimensions; offscreen CDP quads round a 44px box to 43.999px.
+    const comparisonBounds = await comparison.evaluate((element) => ({ width: element.clientWidth, height: element.clientHeight }));
+    expect(comparisonBounds.height).toBeGreaterThanOrEqual(44);
+    expect(comparisonBounds.width).toBeGreaterThanOrEqual(44);
+    await comparison.click({ position: { x: comparisonBounds.width * 0.25, y: 22 } });
+    expect(Number(await comparison.inputValue())).toBeLessThan(40);
     const modes = home.locator(".cf-stage-switcher button");
     await modes.first().focus();
     await page.keyboard.press("ArrowRight");
@@ -43,9 +50,28 @@ test("Korean query reaches the real reference screen without losing its original
   await expect(page.locator('aside').filter({ hasText: "medieval armor" })).toBeVisible();
 });
 
-test("simple launch and project entry are explicit", async ({ page }) => {
+test("professional webtoon entry leads with simple mode and projects available", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('.cf-hero a.cf-primary[href="/studio"]')).toBeVisible();
   await expect(page.locator('.cf-hero a[href="/studio?uiMode=simple"]')).toBeVisible();
   await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
   await expect(page.locator('.creator-flagship form')).toHaveCount(1);
+});
+
+
+test("artwork values can be compared by keyboard and reduced motion stops the artwork", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const study = page.locator(".cf-art-study");
+  const comparison = study.getByRole("slider");
+  await comparison.focus();
+  await page.keyboard.press("Home");
+  await expect(comparison).toHaveValue("0");
+  await page.keyboard.press("End");
+  await expect(comparison).toHaveValue("100");
+  await study.locator(".cf-motion-control").click();
+  await expect(study).toHaveAttribute("data-motion", "paused");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(study.locator(".cf-motion-control")).toBeHidden();
+  expect(await study.locator(".cf-study-art img").first().evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
 });

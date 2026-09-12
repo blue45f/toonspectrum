@@ -246,8 +246,8 @@
 }
 
 .learn-caption[data-correct="false"] {
-  border-left-color: #b65c46;
-  background: color-mix(in srgb, #b65c46 8%, transparent);
+  border-left-color: var(--color-bad);
+  background: color-mix(in oklch, var(--color-bad) 8%, transparent);
 }
 
 .learn-notes .learn-section-heading {
@@ -412,7 +412,7 @@
 .learn-requirement-list li[data-done="true"] > span {
   border-color: var(--learn-accent);
   background: var(--learn-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .learn-requirement-list li[data-done="true"] strong {

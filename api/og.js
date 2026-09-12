@@ -179,25 +179,20 @@ function handleMarketLanding(res, { host, proto, marketPage }) {
 const MARKET_RESOURCE_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\s\S])/iu;
 
-async function fetchMarketResource(host, proto, marketResourceId) {
+async function fetchMarketResource(_host, _proto, marketResourceId, readers) {
   if (!MARKET_RESOURCE_ID_RE.test(marketResourceId)) return null;
   try {
-    const response = await fetch(
-      proto + "://" + host + "/api/creator/marketplace/resources/" + encodeURIComponent(marketResourceId),
-      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(22000) },
-    );
-    if (response.ok) {
-      const value = await response.json();
-      if (validMarketResource(value)) return value;
-    }
+    const read = readers?.readMarketResource ?? require("../apps/api/dist/apps/api/src/server/marketplace-og").readMarketplaceOgResource;
+    const value = await read(marketResourceId);
+    return validMarketResource(value) ? value : null;
   } catch {
-    /* fall back to the default shell; failures are deliberately not cached */
+    // Existing public visibility policy is fail-closed. Never cache hidden/error metadata.
+    return null;
   }
-  return null;
 }
 
-async function handleMarketResource(res, { host, proto, marketResourceId }) {
-  const resource = await fetchMarketResource(host, proto, marketResourceId);
+async function handleMarketResource(res, { host, proto, marketResourceId, readers }) {
+  const resource = await fetchMarketResource(host, proto, marketResourceId, readers);
   let page = template();
   if (resource) {
     const origin = `${proto}://${host}`;
@@ -269,20 +264,13 @@ async function handleMarketResource(res, { host, proto, marketResourceId }) {
   return res.status(200).send(page);
 }
 
-async function fetchTitle(host, proto, slug) {
+async function fetchTitle(_host, _proto, slug, readers) {
   try {
-    const response = await fetch(
-      proto + "://" + host + "/api/titles/" + encodeURIComponent(slug),
-      {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(22000),
-      },
-    );
-    if (response.ok) return (await response.json())?.title ?? null;
+    const read = readers?.readTitle ?? require("../apps/api/og-title-files.cjs").readTitleMetadata;
+    return await read(slug);
   } catch {
-    /* fall back to default OG */
+    return null;
   }
-  return null;
 }
 
 function buildTitleStructuredData(t, { proto, host, url, fullDesc, img }) {
@@ -332,8 +320,8 @@ function buildTitleStructuredData(t, { proto, host, url, fullDesc, img }) {
   return ld;
 }
 
-async function handleTitleRequest(res, { host, proto, slug }) {
-  const t = await fetchTitle(host, proto, slug);
+async function handleTitleRequest(res, { host, proto, slug, readers }) {
+  const t = await fetchTitle(host, proto, slug, readers);
   let page = template();
   if (t) {
     const titleText = `${t.title} · 툰스펙트럼`;
@@ -365,8 +353,8 @@ async function handleTitleRequest(res, { host, proto, slug }) {
   return res.status(200).send(page);
 }
 
-async function handleRequest(req, res) {
-  // SSRF 방지 — 서버 사이드 fetch와 정규(canonical) URL은 신뢰 가능한 고정 호스트만 사용한다.
+async function handleRequest(req, res, readers) {
+  // 정규(canonical) URL은 신뢰 가능한 고정 호스트만 사용한다. 자기 사이트 HTTP 재호출은 없다.
   // 요청 Host/X-Forwarded-Host 헤더는 공격자가 조작할 수 있어(내부 IP·메타데이터 엔드포인트 등) 신뢰하지 않는다.
   const host = (
     process.env.CANONICAL_HOST || "www.toonstudio.cloud"
@@ -391,9 +379,11 @@ async function handleRequest(req, res) {
     return handleMarketLanding(res, { host, proto, marketPage });
   }
   if (hasMarketResource) {
-    return handleMarketResource(res, { host, proto, marketResourceId });
+    return handleMarketResource(res, { host, proto, marketResourceId, readers });
   }
-  return handleTitleRequest(res, { host, proto, slug });
+  return handleTitleRequest(res, { host, proto, slug, readers });
 }
 
 module.exports = handleRequest;
+// Isolated reader seam: tests can assert rendering/security without a compiled DB service.
+module.exports.createOgHandler = (readers) => (req, res) => handleRequest(req, res, readers);

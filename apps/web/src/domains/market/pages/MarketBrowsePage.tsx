@@ -43,6 +43,8 @@ import {
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
 
+import "../components/market-atelier.css";
+
 const PAGE_SIZE = 12;
 const MARKET_BROWSE_DESCRIPTION =
   "웹툰 템플릿, 2D·3D 에셋, 브러시, 팔레트와 필터를 제작 목적과 사용권으로 찾아보세요.";
@@ -173,11 +175,14 @@ export function MarketBrowsePage() {
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
           <MarketNavHeader />
-          <p className="eyebrow mt-6 text-accent">Find Resources</p>
-          <h1 className="mt-2 text-pretty text-2xl font-bold leading-tight sm:text-3xl">{pageTitle}</h1>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-fg-3 sm:text-sm sm:leading-6">
-            파일 형식보다 지금 하려는 작업을 먼저 선택하세요. 템플릿은 장면을 시작하고, 에셋은 배치하고, 브러시·색·보정은 표현을 완성합니다.
-          </p>
+          <div className="market-browse-masthead">
+            <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>
+              <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{pageTitle}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.</p>
+              <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">저장한 리소스 보기</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">선화·채색 실습으로 연결</Link></div>
+            </div>
+            <img src="/brand/atelier-materials.webp" alt="선과 색, 소품 스케치를 모은 재료 콘셉트 이미지" width={640} height={480} />
+          </div>
 
           <form
             role="search"

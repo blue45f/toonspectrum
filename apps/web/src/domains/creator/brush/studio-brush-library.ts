@@ -60,9 +60,9 @@ export interface StudioBrushSourcePresetMetadata {
 export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
   /** BRUSH_PRESETS[].id (studio-brush.ts). StudioPage의 `brush` state에 대응. */
   brushId: string;
-  /** StudioPage의 `strokeWidth` state에 대응. UI 슬라이더 범위와 동일하게 1~80로 clamp. */
+  /** Studio stroke width. Legacy presets use 1–80px; material programs retain 1–240px. */
   strokeWidth: number;
-  /** StudioPage의 `brushOpacity` state에 대응(0~1). UI 슬라이더 범위와 동일하게 0.05~1로 clamp. */
+  /** Studio opacity. Legacy presets use 0.05–1; material programs retain 0.01–1. */
   brushOpacity: number;
   /** 정규화된 소문자 #rrggbb. StudioPage의 `color` state에 대응. */
   color: string;
@@ -203,6 +203,15 @@ export interface BrushUpdateResult {
 
 export const BRUSH_STROKE_WIDTH_RANGE = [1, 80] as const;
 export const BRUSH_OPACITY_RANGE = [0.05, 1] as const;
+export const MATERIAL_BRUSH_STROKE_WIDTH_RANGE = [1, 240] as const;
+export const MATERIAL_BRUSH_OPACITY_RANGE = [0.01, 1] as const;
+
+export function studioBrushSnapshotRanges(programs?: StudioBrushEngineProgramSet | null) {
+  return {
+    strokeWidth: programs?.material ? MATERIAL_BRUSH_STROKE_WIDTH_RANGE : BRUSH_STROKE_WIDTH_RANGE,
+    opacity: programs?.material ? MATERIAL_BRUSH_OPACITY_RANGE : BRUSH_OPACITY_RANGE,
+  };
+}
 export const BRUSH_PRESSURE_CURVE_RANGE = [0.3, 3] as const;
 export const BRUSH_VELOCITY_SENSITIVITY_RANGE = [0.1, 1] as const;
 export const BRUSH_TIP_ANGLE_RANGE = [-180, 180] as const;
@@ -413,6 +422,14 @@ function jsonStructureEqual(
   return leftKeys.every((key) => jsonStructureEqual(leftRecord[key], rightRecord[key], seen));
 }
 
+/** Older oil payloads may omit switches whose documented default is false. */
+function engineProgramsComparisonValue(raw: unknown, normalized: StudioBrushEngineProgramSet | null): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !normalized?.oil) return raw;
+  const source = raw as Record<string, unknown>;
+  if (!source.oil || typeof source.oil !== "object" || Array.isArray(source.oil)) return raw;
+  return { ...source, oil: { ...normalized.oil, ...source.oil } };
+}
+
 /**
  * Phase-two material fields are additive identity defaults. A v1 saved brush that predates those
  * keys is already semantically normalized and should not be reported to the artist as repaired.
@@ -449,19 +466,24 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   if (runtime.status === "safe-fallback") {
     adjustedFields.push("brushId");
   }
+  const enginePrograms = normalizeStudioBrushEngineProgramSet(o.enginePrograms);
+  if (o.enginePrograms != null && !jsonStructureEqual(engineProgramsComparisonValue(o.enginePrograms, enginePrograms), enginePrograms)) {
+    adjustedFields.push("enginePrograms");
+  }
+  const ranges = studioBrushSnapshotRanges(enginePrograms);
   const strokeWidth = clampedNumberField(
     o,
     "strokeWidth",
-    BRUSH_STROKE_WIDTH_RANGE[0],
-    BRUSH_STROKE_WIDTH_RANGE[1],
+    ranges.strokeWidth[0],
+    ranges.strokeWidth[1],
     DEFAULT_SNAPSHOT.strokeWidth,
     adjustedFields
   );
   const brushOpacity = clampedNumberField(
     o,
     "brushOpacity",
-    BRUSH_OPACITY_RANGE[0],
-    BRUSH_OPACITY_RANGE[1],
+    ranges.opacity[0],
+    ranges.opacity[1],
     DEFAULT_SNAPSHOT.brushOpacity,
     adjustedFields
   );
@@ -580,7 +602,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       stampTuning,
       // 신뢰할 수 없는 입력은 normalize 가 fail-closed 로 null 을 돌려주고, null 은 곧 "브러시
       // id 의 기본 조합"이다 — 저장된 브러시가 다시 열릴 때 없던 프로그램이 켜지지 않는다.
-      enginePrograms: normalizeStudioBrushEngineProgramSet(o.enginePrograms),
+      enginePrograms,
     },
     adjustedFields,
   };
@@ -1038,6 +1060,7 @@ export function brushMatchesSnapshot(
     && brush.tipAngle === snapshot.tipAngle
     && brush.tipRoundness === snapshot.tipRoundness
     && jsonStructureEqual(brush.stampTuning, snapshot.stampTuning)
+    && jsonStructureEqual(brush.enginePrograms ?? null, snapshot.enginePrograms ?? null)
     && studioBrushDynamicsSettingsEqual(brush.brushDynamics, snapshot.brushDynamics);
 }
 
@@ -1071,6 +1094,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     tipRoundness: snapshot.tipRoundness,
     brushDynamics: snapshot.brushDynamics,
     stampTuning: snapshot.stampTuning,
+    enginePrograms: snapshot.enginePrograms,
   };
   return JSON.stringify(payload, null, 2);
 }
@@ -1090,7 +1114,8 @@ export function brushFileName(brush: { name: string }): string {
 /**
  * writeBrushJson이 만든(또는 호환되는) JSON 텍스트 → StudioSavedBrush.
  * kind가 "toonspectrum-studio-brush"가 아니면 던진다(parseGplPalette의 매직 헤더 체크와 동일 역할).
- * 그 외 필드 누락·범위 이탈은 sanitizeBrushSnapshot이 조용히 기본값으로 보정하고 adjustedFields로 알린다.
+ * 엔진 설정을 손실 없이 복원할 수 없으면 다른 브러시로 바꾸지 않고 가져오기를 거부한다.
+ * 그 외 필드 누락·범위 이탈은 sanitizeBrushSnapshot이 기본값으로 보정하고 adjustedFields로 알린다.
  */
 export function importBrushFromJson(
   text: string,
@@ -1110,6 +1135,9 @@ export function importBrushFromJson(
   }
   const obj = parsed as Record<string, unknown>;
   const { snapshot, adjustedFields } = sanitizeBrushSnapshot(obj);
+  if (adjustedFields.includes("enginePrograms")) {
+    throw new Error("브러시 엔진 설정을 그대로 복원할 수 없어 가져오지 않았어요. 최신 스튜디오에서 다시 시도하거나 원본 브러시를 다시 내보내주세요.");
+  }
   const rawName = typeof obj.name === "string" ? obj.name.trim() : "";
   const now = Date.now();
   return {

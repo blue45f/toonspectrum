@@ -323,7 +323,8 @@ export function useStudioBg3dEditorState(props) {
     readonly key: string;
   } | null>(null);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
-  const [isRestoringScene, setIsRestoringScene] = useState(false);
+  // Engine admission may finish before Canvas.onCreated; edits must wait for initial hydration.
+  const [isRestoringScene, setIsRestoringScene] = useState(true);
   const sceneRestoreAbortRef = useRef<AbortController | null>(null);
   const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
   const [templateLibraryStatus, setTemplateLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");

@@ -560,7 +560,7 @@ export function StudioBg3dEditorViewport({ h }) {
 
                 {/* Webtoon composition and perspective guides overlay */}
                 {!immersiveSceneActive && !isCapturing ? (
-                  <StudioBg3dCompositionOverlay mode={compositionGuideMode} />
+                  <StudioBg3dCompositionOverlay mode={compositionGuideMode} viewportSize={viewportBoxSize} />
                 ) : null}
 
                 {placementSession.phase === "preview" && placementPreviewAsset ? (

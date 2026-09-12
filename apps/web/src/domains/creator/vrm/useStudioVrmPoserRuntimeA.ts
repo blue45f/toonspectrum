@@ -166,7 +166,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
     captureHelperLeaseCountRef,
   } = h;
   const acquireVrmCaptureOperation = useCallback((
-    operation: "insert" | "thumbnail" | "share",
+    operation: "insert" | "thumbnail" | "share" | "export",
   ): boolean => {
     if (captureOperationRef.current !== null) return false;
     captureOperationRef.current = operation;
@@ -174,7 +174,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
   }, []);
 
   const releaseVrmCaptureOperation = useCallback((
-    operation: "insert" | "thumbnail" | "share",
+    operation: "insert" | "thumbnail" | "share" | "export",
   ): void => {
     if (captureOperationRef.current === operation) {
       captureOperationRef.current = null;

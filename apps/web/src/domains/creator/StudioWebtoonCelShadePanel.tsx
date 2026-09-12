@@ -19,6 +19,8 @@ export interface StudioWebtoonCelShadePanelProps {
   readonly value: string;
   readonly onSelectColor: (hex: string) => void;
   readonly onSaveAsPalette?: (name: string, colors: string[]) => void;
+  /** An asynchronous persistence host owns its success/failure feedback. */
+  readonly saveFeedbackExternally?: boolean;
 }
 
 interface SkinPreset {
@@ -65,6 +67,7 @@ export function StudioWebtoonCelShadePanel({
   value,
   onSelectColor,
   onSaveAsPalette,
+  saveFeedbackExternally = false,
 }: StudioWebtoonCelShadePanelProps) {
   const [subTab, setSubTab] = useState<"hue-shift" | "skin-tones">("hue-shift");
   const [savedBadge, setSavedBadge] = useState<string | null>(null);
@@ -84,6 +87,7 @@ export function StudioWebtoonCelShadePanel({
     const name = `만화 음영 세트 (${value})`;
     const colors = celShadeSteps.map((s) => s.hex);
     onSaveAsPalette?.(name, colors);
+    if (saveFeedbackExternally) return;
     setSavedBadge("음영 세트 저장됨!");
     setTimeout(() => setSavedBadge(null), 1800);
   };

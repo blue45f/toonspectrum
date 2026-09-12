@@ -51,6 +51,11 @@ function getEyeDropperCtor(): EyeDropperCtor | null {
   return typeof ctor === "function" ? ctor : null;
 }
 
+function selectedSwatchIndex(colors: readonly string[], value: string): number {
+  const normalized = normalizeHexColor(value);
+  return normalized === null ? -1 : colors.findIndex((color) => normalizeHexColor(color) === normalized);
+}
+
 export type StudioColorPopoverTab = "palettes" | "wheel" | "harmonies" | "cel-shade" | "sliders";
 
 export type StudioColorPopoverProps = {
@@ -83,7 +88,7 @@ export function StudioColorPopover({
   const [activeTab, setActiveTab] = useState<StudioColorPopoverTab>("palettes");
   const [initialColor] = useState(value);
   const [copied, setCopied] = useState(false);
-  const [addedNotice, setAddedNotice] = useState<string | null>(null);
+  const [addedNotice, setAddedNotice] = useState<{ text: string; tone: "good" | "warn" } | null>(null);
 
   const [popupStyle, setPopupStyle] = useState<CSSProperties>({
     left: VIEWPORT_PADDING_PX,
@@ -100,11 +105,18 @@ export function StudioColorPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const hexInputRef = useRef<HTMLInputElement>(null);
+  const addedNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paletteSaveRequest = useRef(0);
   const popupId = `studio-color-popover-${useId().replaceAll(":", "")}`;
 
   useEffect(() => {
     setHexDraft(value);
   }, [value]);
+
+  useEffect(() => () => {
+    paletteSaveRequest.current += 1;
+    if (addedNoticeTimeout.current !== null) clearTimeout(addedNoticeTimeout.current);
+  }, []);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -260,21 +272,32 @@ export function StudioColorPopover({
   };
 
   const handleSavePaletteToLibrary = async (name: string, colors: string[]) => {
+    const request = ++paletteSaveRequest.current;
+    if (addedNoticeTimeout.current !== null) clearTimeout(addedNoticeTimeout.current);
+    setAddedNotice(null);
     try {
       const repo = getProductStudioPaletteSqliteRepository();
       const newPalette: StudioNamedPalette = createPalette(name, colors);
       await repo.save(newPalette);
-      setAddedNotice("팔레트 라이브러리에 저장됨!");
-      setTimeout(() => setAddedNotice(null), 2000);
+      if (request !== paletteSaveRequest.current) return;
+      setAddedNotice({ text: "팔레트 라이브러리에 저장됨!", tone: "good" });
     } catch {
-      setAddedNotice("저장 완료");
-      setTimeout(() => setAddedNotice(null), 2000);
+      if (request !== paletteSaveRequest.current) return;
+      setAddedNotice({ text: "팔레트를 저장하지 못했어요. 다시 시도해 주세요.", tone: "warn" });
     }
+    if (addedNoticeTimeout.current !== null) clearTimeout(addedNoticeTimeout.current);
+    addedNoticeTimeout.current = setTimeout(() => {
+      addedNoticeTimeout.current = null;
+      setAddedNotice(null);
+    }, 4000);
   };
 
   const friendlyName = getFriendlyColorName(value);
   const contrast = auditContrast(value);
   const tintsAndShades = getTintsAndShades(value, 9);
+  const selectedTintIndex = selectedSwatchIndex(tintsAndShades, value);
+  const selectedPaletteIndex = selectedSwatchIndex(activePalette?.colors ?? [], value);
+  const selectedRecentIndex = selectedSwatchIndex(recentColors, value);
 
   return (
     <div ref={rootRef} className={cx("relative inline-block", className)}>
@@ -416,13 +439,13 @@ export function StudioColorPopover({
                     role="radiogroup"
                     aria-label={`${activePalette.label} 팔레트`}
                   >
-                    {activePalette.colors.map((c) => (
+                    {activePalette.colors.map((c, index) => (
                       <button
-                        key={c}
+                        key={`${activePalette.id}-${index}`}
                         type="button"
                         aria-label={`${activePalette.label} 색상 ${c} 선택`}
                         role="radio"
-                        aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
+                        aria-checked={index === selectedPaletteIndex}
                         onClick={() => handleSelect(c)}
                         className="size-7 cursor-pointer rounded-lg border border-white/20 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-2 aria-checked:ring-offset-card transition-transform hover:scale-105 active:scale-95 shadow-sm"
                         style={{ background: c }}
@@ -457,6 +480,7 @@ export function StudioColorPopover({
               value={value}
               onSelectColor={handleSelect}
               onSaveAsPalette={handleSavePaletteToLibrary}
+              saveFeedbackExternally
             />
           )}
 
@@ -466,6 +490,7 @@ export function StudioColorPopover({
               value={value}
               onSelectColor={handleSelect}
               onSaveAsPalette={handleSavePaletteToLibrary}
+              saveFeedbackExternally
             />
           )}
 
@@ -489,10 +514,10 @@ export function StudioColorPopover({
               aria-label="명도 및 음영 단계"
             >
               {tintsAndShades.map((stepHex, idx) => {
-                const isSelected = stepHex.toLowerCase() === value.toLowerCase();
+                const isSelected = idx === selectedTintIndex;
                 return (
                   <button
-                    key={`${stepHex}-${idx}`}
+                    key={`shade-${idx}`}
                     type="button"
                     role="radio"
                     aria-checked={isSelected}
@@ -609,7 +634,7 @@ export function StudioColorPopover({
                     type="button"
                     aria-label={`최근 색상 ${c} 선택`}
                     role="radio"
-                    aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
+                    aria-checked={i === selectedRecentIndex}
                     onClick={() => handleSelect(c)}
                     className="size-7 cursor-pointer rounded-lg border border-white/20 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform hover:scale-105 active:scale-95 shadow-sm"
                     style={{ background: c }}
@@ -620,8 +645,15 @@ export function StudioColorPopover({
           )}
 
           {addedNotice && (
-            <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-good/15 border border-good/30 px-2.5 py-1 text-[0.62rem] font-semibold text-good">
-              <Check className="size-3" aria-hidden /> {addedNotice}
+            <div
+              role="status"
+              aria-label="팔레트 저장 결과"
+              className={cx(
+                "mt-2 flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[0.62rem] font-semibold",
+                addedNotice.tone === "good" ? "bg-good/15 border-good/30 text-good" : "bg-warn/15 border-warn/30 text-warn",
+              )}
+            >
+              {addedNotice.tone === "good" ? <Check className="size-3" aria-hidden /> : <X className="size-3" aria-hidden />} {addedNotice.text}
             </div>
           )}
         </div>,

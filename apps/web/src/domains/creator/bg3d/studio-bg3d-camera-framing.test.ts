@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
+import * as THREE from "three";
 
+import { applyStudioBg3dViewToThreeCamera } from "./studio-bg3d-camera-application";
+import { resolveStudioBg3dCaptureFrame } from "./studio-bg3d-capture-frame-geometry";
+import { applyStudioBg3dCaptureFrameViewOffset } from "./studio-bg3d-capture-frame-view-offset";
 import {
   fitStudioBg3dCameraToBounds,
   resolveStudioBg3dOrthographicZoom,
 } from "./studio-bg3d-camera-framing";
+import type { StudioBg3dCameraFramingBounds } from "./studio-bg3d-camera-framing";
+import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
 const CAMERA = Object.freeze({
   position: [4, 3, 6] as const,
@@ -18,8 +24,43 @@ const UNIT_BOUNDS = Object.freeze({
   max: [1, 1, 1] as const,
 });
 
+function projectedCorners(
+  view: StudioBg3dCameraSettings,
+  bounds: StudioBg3dCameraFramingBounds,
+  aspect: number,
+  frustum = { width: 20, height: 10 },
+  exportAspectRatio?: number,
+) {
+  const camera = view.projection === "orthographic"
+    ? new THREE.OrthographicCamera(-frustum.width / 2, frustum.width / 2, frustum.height / 2, -frustum.height / 2, 0.1, 20_000)
+    : new THREE.PerspectiveCamera(view.fovDegrees, aspect, 0.1, 20_000);
+  expect(applyStudioBg3dViewToThreeCamera(camera, null, view)).toBe(true);
+  if (camera instanceof THREE.PerspectiveCamera) expect(camera.aspect).toBeCloseTo(aspect);
+  if (exportAspectRatio !== undefined) {
+    const viewport = { width: aspect * 1_000, height: 1_000 };
+    const frame = resolveStudioBg3dCaptureFrame({
+      viewportWidth: viewport.width, viewportHeight: viewport.height, aspectRatio: exportAspectRatio,
+    });
+    expect(frame).not.toBeNull();
+    expect(applyStudioBg3dCaptureFrameViewOffset(camera, frame!, viewport)).not.toBeNull();
+  }
+  const points: THREE.Vector3[] = [];
+  for (const x of [bounds.min[0], bounds.max[0]]) {
+    for (const y of [bounds.min[1], bounds.max[1]]) {
+      for (const z of [bounds.min[2], bounds.max[2]]) {
+        const point = new THREE.Vector3(x, y, z).project(camera);
+        expect(Math.abs(point.x)).toBeLessThanOrEqual(1 + 1e-10);
+        expect(Math.abs(point.y)).toBeLessThanOrEqual(1 + 1e-10);
+        expect(Math.abs(point.z)).toBeLessThanOrEqual(1 + 1e-10);
+        points.push(point);
+      }
+    }
+  }
+  return points;
+}
+
 describe("Studio BG3D camera framing", () => {
-  it("fits a perspective bounding sphere while preserving the camera direction and composition fields", () => {
+  it("fits projected bounds while preserving the camera direction and composition fields", () => {
     const result = fitStudioBg3dCameraToBounds({
       camera: {
         ...CAMERA,
@@ -108,20 +149,20 @@ describe("Studio BG3D camera framing", () => {
 
   it("fits orthographic bounds from the live zoom-one frustum and preserves camera distance", () => {
     const result = fitStudioBg3dCameraToBounds({
-      camera: { ...CAMERA, projection: "orthographic", zoom: 7 },
+      camera: { ...CAMERA, position: [0, 0, 6], projection: "orthographic", zoom: 7 },
       bounds: UNIT_BOUNDS,
       viewportAspect: 2,
       orthographicFrustumAtZoomOne: { width: 20, height: 10 },
       padding: 1,
     });
-    const radius = Math.sqrt(3);
-    expect(result?.zoom).toBeCloseTo(10 / (radius * 2));
+    expect(result?.zoom).toBeCloseTo(5);
     expect(result?.projection).toBe("orthographic");
     expect(Math.hypot(
       result!.position[0] - result!.target[0],
       result!.position[1] - result!.target[1],
       result!.position[2] - result!.target[2],
-    )).toBeCloseTo(Math.hypot(4, 3, 6));
+    )).toBeCloseTo(6);
+    projectedCorners(result!, UNIT_BOUNDS, 2);
   });
 
   it("moves a perspective fit beyond the persisted near plane", () => {
@@ -139,14 +180,15 @@ describe("Studio BG3D camera framing", () => {
       result!.position[1] - result!.target[1],
       result!.position[2] - result!.target[2],
     );
-    expect(distance).toBeCloseTo(nearClip + Math.sqrt(3));
-    expect(distance - Math.sqrt(3)).toBeGreaterThanOrEqual(nearClip);
+    expect(distance).toBeGreaterThan(nearClip);
+    const corners = projectedCorners(result!, UNIT_BOUNDS, 16 / 9);
+    expect(Math.min(...corners.map((corner) => corner.z))).toBeCloseTo(-1);
   });
 
   it("moves an orthographic fit beyond the near plane without changing its fitted zoom", () => {
     const nearClip = 50;
     const result = fitStudioBg3dCameraToBounds({
-      camera: { ...CAMERA, projection: "orthographic", nearClip, zoom: 7 },
+      camera: { ...CAMERA, position: [0, 0, 6], projection: "orthographic", nearClip, zoom: 7 },
       bounds: UNIT_BOUNDS,
       viewportAspect: 2,
       orthographicFrustumAtZoomOne: { width: 20, height: 10 },
@@ -154,15 +196,14 @@ describe("Studio BG3D camera framing", () => {
     });
 
     expect(result).not.toBeNull();
-    const radius = Math.sqrt(3);
     const distance = Math.hypot(
       result!.position[0] - result!.target[0],
       result!.position[1] - result!.target[1],
       result!.position[2] - result!.target[2],
     );
-    expect(result?.zoom).toBeCloseTo(10 / (radius * 2));
-    expect(distance).toBeCloseTo(nearClip + radius);
-    expect(distance - radius).toBeGreaterThanOrEqual(nearClip);
+    expect(result?.zoom).toBeCloseTo(5);
+    expect(distance).toBeCloseTo(nearClip + 1);
+    projectedCorners(result!, UNIT_BOUNDS, 2);
   });
 
   it("clamps orthographic button zoom with the perspective distance-factor convention", () => {
@@ -182,6 +223,63 @@ describe("Studio BG3D camera framing", () => {
       currentZoom: 0.1,
       distanceFactor: 20,
     })).toBe(0.1);
+  });
+
+  it.each([
+    ["portrait subject", 9 / 16, [-0.4, -3, -0.2], [0.4, 3, 0.2], "y"],
+    ["wide room", 16 / 9, [-6, -1, -0.2], [6, 1, 0.2], "x"],
+  ] as const)("uses the available frame around a %s", (_label, aspect, min, max, axis) => {
+    const bounds = { min, max };
+    const result = fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, position: [0, 0, 10] }, bounds, viewportAspect: aspect,
+    });
+    expect(result).not.toBeNull();
+    const corners = projectedCorners(result!, bounds, aspect);
+    const occupied = Math.max(...corners.map((point) => point[axis]))
+      - Math.min(...corners.map((point) => point[axis]));
+    // At least 82.5% of the limiting frame dimension, with the full requested margin retained.
+    // The previous sphere fit shrank the portrait subject to roughly half the frame height.
+    expect(occupied).toBeGreaterThan(1.65);
+    expect(occupied).toBeLessThan(1.8);
+  });
+
+  for (const projection of ["perspective", "orthographic"] as const) {
+    it.each([
+      [16 / 9, 9 / 16], [9 / 16, 16 / 9], [1, 0.25], [1, 4],
+    ])(`${projection} keeps the selection inside the actual export crop from %s to %s`, (aspect, exportAspectRatio) => {
+      const bounds = { min: [-3, -1, -2], max: [4, 5, 1] } as const;
+      const frustum = { width: 10 * aspect, height: 10 };
+      const result = fitStudioBg3dCameraToBounds({
+        camera: { ...CAMERA, projection, zoom: 1.75, lensShift: [0.03, -0.02], up: [0.6, 0.8, 0] },
+        bounds, viewportAspect: aspect, exportAspectRatio, orthographicFrustumAtZoomOne: frustum,
+      });
+      expect(result).not.toBeNull();
+      projectedCorners(result!, bounds, aspect, frustum, exportAspectRatio);
+    });
+
+    it.each([9 / 16, 1, 16 / 9])(`${projection} contains every corner at aspect %s with roll, shift and zoom`, (aspect) => {
+      const bounds = { min: [-3, -1, -7], max: [1, 5, 2] } as const;
+      for (const up of [[0, 1, 0], [0.6, 0.8, 0], [-0.8, 0.6, 0]] as const) {
+        const result = fitStudioBg3dCameraToBounds({
+          camera: { ...CAMERA, projection, up, zoom: 2.5, lensShift: [0.18, -0.12] },
+          bounds,
+          viewportAspect: aspect,
+          orthographicFrustumAtZoomOne: { width: 10 * aspect, height: 10 },
+        });
+        expect(result).not.toBeNull();
+        projectedCorners(result!, bounds, aspect, { width: 10 * aspect, height: 10 });
+      }
+    });
+  }
+
+  it("frames a vertical legacy camera with the same stable up fallback as the live camera", () => {
+    const result = fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, position: [0, 10, 0] },
+      bounds: UNIT_BOUNDS,
+      viewportAspect: 9 / 16,
+    });
+    expect(result).not.toBeNull();
+    projectedCorners(result!, UNIT_BOUNDS, 9 / 16);
   });
 
   it("fails closed when a bounded perspective fit is impossible", () => {
@@ -220,6 +318,7 @@ describe("Studio BG3D camera framing", () => {
     ["invalid up vector", { camera: { ...CAMERA, up: [0, 0, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
     ["invalid aspect", { camera: CAMERA, bounds: UNIT_BOUNDS, viewportAspect: 0 }],
     ["unframeable lens shift", { camera: { ...CAMERA, lensShift: [0.5, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
+    ["lens target outside export crop", { camera: { ...CAMERA, lensShift: [0.2, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 16 / 9, exportAspectRatio: 9 / 16 }],
     ["missing ortho frustum", { camera: { ...CAMERA, projection: "orthographic" }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
     ["invalid ortho frustum", { camera: { ...CAMERA, projection: "orthographic" }, bounds: UNIT_BOUNDS, viewportAspect: 1, orthographicFrustumAtZoomOne: { width: 0, height: 10 } }],
   ] as const)("rejects %s", (_label, input) => {

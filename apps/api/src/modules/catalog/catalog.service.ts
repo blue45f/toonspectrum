@@ -1,3 +1,4 @@
+import { parseSearchPageQuery, searchPageItems, searchPagination, type SearchPageQuery } from "../../../../../packages/core/src/search-pagination";
 import "reflect-metadata";
 import {
   BadGatewayException,
@@ -13,7 +14,7 @@ import { desc, eq, inArray, sql } from "drizzle-orm";
 import { fromDb } from "../../../../web/src/shared/lib/api-helpers";
 import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../web/src/shared/lib/recommend";
-import { MAX_SEARCH_QUERY_LENGTH, searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
+import { MAX_SEARCH_QUERY_LENGTH, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
 import {
   activeTags,
   getAuthorData,
@@ -47,6 +48,8 @@ import { getTitleDetail as getTitleDetailFromLib } from "../../server/title";
 // (웹 앱·API가 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
 // 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
 
+import { CatalogSearchCache } from "./catalog-search-cache";
+
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../web/src/shared/lib/types";
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 
@@ -59,7 +62,7 @@ interface TitleQuery {
   sort?: string;
 }
 
-interface SearchRouteQuery {
+interface SearchRouteQuery extends SearchPageQuery {
   sort?: string;
   q?: string;
   types?: string;
@@ -127,6 +130,7 @@ type RatingMap = Record<string, number>;
 
 @Injectable()
 export class CatalogService implements OnModuleInit, OnModuleDestroy {
+  private readonly searchCache = new CatalogSearchCache();
   private readonly ingestConfig = normalizeCatalogIngestConfig();
   private ingestInProgress: Promise<CatalogIngestRunResult> | null = null;
   private consecutiveIngestFailures = 0;
@@ -276,13 +280,24 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getSearchData(query: SearchRouteQuery) {
+    let page: ReturnType<typeof parseSearchPageQuery>;
+    try {
+      page = parseSearchPageQuery(query);
+    } catch (error) {
+      throw new BadRequestException({ error: error instanceof Error ? error.message : "Invalid search page" });
+    }
     const q = validatedSearchQuery(query.q);
     void this.mergeKmasOnSiteAccess().catch(() => {});
-    const kmasLive = await getKmasSearchData({ q }).catch((error) => {
+    const kmasLive = page.ids !== undefined ? null : await getKmasSearchData({ q, limit: page.pageSize, page: page.page }).catch((error) => {
+      if (error instanceof RangeError) throw new BadRequestException("KMAS page exceeds provider limit");
       console.error("KMAS live search failed; falling back to existing catalog search", error);
       return null;
     });
-    if (kmasLive) return kmasLive;
+    if (kmasLive) {
+      const pagination = searchPagination(kmasLive.total, page);
+      if (page.page >= 10_000) { pagination.hasMore = false; pagination.nextPage = null; }
+      return { ...kmasLive, pagination, typeCountScope: "page" as const };
+    }
 
     const sort = validSorts.has(query.sort as SortKey) ? (query.sort as SortKey) : "popular";
     const filters: SearchFilters = {
@@ -299,21 +314,23 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
       freeOnly: boolParam(query.freeOnly),
       adaptedOnly: boolParam(query.adaptedOnly),
     };
-    const items = searchTitles(TITLES, filters, sort);
-    await this.enrichResponseTitles(items);
-    const typeCount = {
-      webtoon: items.filter((title) => title.type === "webtoon").length,
-      webnovel: items.filter((title) => title.type === "webnovel").length,
-    };
+    // Saved-title filtering happens BEFORE scoring, not after cutting the first page.
+    const catalogState = getCatalogState();
+    const result = this.searchCache.get(TITLES, { ...filters, ids: page.ids }, sort, catalogState.revision, !shouldMergeKmasOnAccess());
+    const { items, typeCount } = result;
+    const pageItems = searchPageItems(items, page);
+    await this.enrichResponseTitles(pageItems);
 
     return this.withKmasImages({
-      items,
+      items: pageItems,
       total: items.length,
+      pagination: searchPagination(items.length, page),
+      typeCountScope: "all" as const,
       typeCount,
       catalog: {
-        ...getCatalogState(),
-        platformCoverage: platformCoverage(TITLES),
-        filteredPlatformCoverage: platformCoverage(items),
+        ...catalogState,
+        platformCoverage: result.platformCoverage,
+        filteredPlatformCoverage: result.filteredPlatformCoverage,
       },
       topTags: activeTags().slice(0, 18).map((tag) => tag.tag),
       generatedAt: new Date().toISOString(),
@@ -588,20 +605,6 @@ function bayes(title: Title) {
   return (4 * 800 + ratingAvg * ratingCount) / (800 + ratingCount);
 }
 
-function platformCoverage(titles: Title[]) {
-  const counts = new Map<PlatformId, number>();
-  for (const title of titles) {
-    const ids = new Set(title.availability.map((entry) => entry.platformId));
-    ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
-  }
-  return [...counts.entries()]
-    .map(([id, count]) => ({
-      id,
-      count,
-      share: titles.length ? Math.round((count / titles.length) * 100) : 0,
-    }))
-    .sort((a, b) => b.count - a.count);
-}
 
 function validatedSearchQuery(value: unknown): string {
   if (value === undefined) return "";

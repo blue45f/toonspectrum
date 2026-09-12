@@ -138,8 +138,21 @@ describe("studio layer smart views and quality lens", () => {
     ]);
     expect(resultIds("view:output")).toEqual(["ink", "dialogue", "orphan"]);
     expect(resultIds("", { ...noFilters(), smart: "unclassified" })).toEqual(["dialogue", "orphan"]);
-    expect(resultIds("", { ...noFilters(), smart: "advanced" })).toEqual(["masked"]);
+    // 80% opacity is a compositing adjustment even without a mask or animation.
+    expect(resultIds("", { ...noFilters(), smart: "advanced" })).toEqual(["ink", "masked"]);
     expect(resultIds("view:attention")).toEqual(["masked", "orphan"]);
+  });
+
+  it("finds opacity adjustments in both smart views and queries until full opacity is restored", () => {
+    expect(resultIds("view:advanced")).toEqual(["ink", "masked"]);
+    const restored = items.map((item) => item.id === "ink" ? { ...item, opacity: 1 } : item);
+    for (const [query, filters] of [
+      ["view:advanced", noFilters()],
+      ["", { ...noFilters(), smart: "advanced" }],
+    ] as const) {
+      expect(filterStudioLayerNavigatorItems(restored, groups, query, filters).map((result) => result.item.id))
+        .toEqual(["masked"]);
+    }
   });
 
   it("returns deterministic issue codes for review automation", () => {

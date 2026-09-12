@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +9,7 @@ import {
   isStudioBg3dViewportControlTarget,
   readStudioBg3dObjectWorldBounds,
   readStudioBg3dWorldSurfaceHit,
+  resolveStudioBg3dMinimumOrbitDistance,
   type BgViewportApi,
 } from "./studio-bg3d-camera-application";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
@@ -81,6 +83,7 @@ describe("Studio BG3D complete camera application", () => {
 
     expect(applyStudioBg3dViewToThreeCamera(camera, { target, update }, view)).toBe(true);
     expect(camera.fov).toBe(37);
+    expect(camera.aspect).toBeCloseTo(16 / 9);
     expect(camera.zoom).toBe(1.75);
     expect(camera.near).toBe(0.025);
     expect(camera.up.toArray()).toEqual([0, 0.8, 0.6]);
@@ -188,6 +191,127 @@ describe("Studio BG3D complete camera application", () => {
     expect(camera.zoom).toBe(1.5);
   });
 
+  it.each([0.1, 0.01])("keeps the orbit target visible after repeated zoom at near clip %s", (nearClip) => {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+    camera.position.set(0, 0, 2);
+    const controls = new OrbitControls(camera);
+    controls.enableDamping = true;
+    // Start with the same minimum used by the viewport's mounted OrbitControls.
+    controls.minDistance = resolveStudioBg3dMinimumOrbitDistance(camera.near);
+    const view = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      position: [0, 0, nearClip * 1.2] as const,
+      target: [0, 0, 0] as const,
+      nearClip,
+    };
+    expect(applyStudioBg3dViewToThreeCamera(camera, controls, view)).toBe(true);
+    expect(camera.position.distanceTo(controls.target)).toBeCloseTo(nearClip * 1.2);
+    expect(controls.minDistance).toBe(resolveStudioBg3dMinimumOrbitDistance(nearClip));
+    for (let zoom = 0; zoom < 3; zoom += 1) {
+      expect(applyStudioBg3dProjectionAwareZoom(camera, controls, 0.5, [0, 0, 0])).toBe(true);
+      const committedPosition = camera.position.clone();
+      for (let frame = 0; frame < 20; frame += 1) {
+        controls.update();
+        camera.updateMatrixWorld();
+        const projectedTarget = controls.target.clone().project(camera);
+        expect(projectedTarget.z).toBeGreaterThanOrEqual(-1);
+        expect(projectedTarget.z).toBeLessThanOrEqual(1);
+        expect(camera.position.distanceTo(committedPosition)).toBeLessThan(1e-10);
+      }
+      expect(camera.position.distanceTo(controls.target)).toBeGreaterThan(nearClip);
+      expect(camera.near).toBe(nearClip);
+    }
+  });
+
+  it("rejects perspective zoom with an invalid near plane without mutating the view", () => {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+    camera.position.set(0, 0, 2);
+    camera.near = Number.NaN;
+    const controls = new OrbitControls(camera);
+    const position = camera.position.clone();
+    expect(applyStudioBg3dProjectionAwareZoom(camera, controls, 0.5, [0, 0, 0])).toBe(false);
+    expect(camera.position).toEqual(position);
+    expect(camera.far).toBe(200);
+  });
+
+  it.each([0.4, 400])("preserves an authored distance of %s through real OrbitControls and button zoom", (distance) => {
+    const camera = new THREE.PerspectiveCamera(50, 9 / 16, 0.1, 200);
+    camera.position.set(4, 3, 6);
+    const controls = new OrbitControls(camera);
+    controls.minDistance = 2;
+    controls.maxDistance = 60;
+    const view = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      position: [0, 0, distance] as const,
+      target: [0, 0, 0] as const,
+      lensShift: [0.1, -0.2] as const,
+    };
+    expect(applyStudioBg3dViewToThreeCamera(camera, controls, view)).toBe(true);
+    expect(camera.position.distanceTo(controls.target)).toBeCloseTo(distance);
+    expect(camera.aspect).toBeCloseTo(9 / 16);
+    expect(camera.far).toBeGreaterThan(distance);
+    expect(applyStudioBg3dProjectionAwareZoom(camera, controls, 1.22, [0, 0, 0])).toBe(true);
+    expect(camera.position.distanceTo(controls.target)).toBeCloseTo(distance * 1.22);
+    // No DOM was attached, so the real controls own no event listeners to disconnect.
+  });
+
+  it("keeps lens shift projection proportions after resize and an undo-style view restore", () => {
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 200);
+    const view = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      position: [0, 0, 10] as const,
+      target: [0, 0, 0] as const,
+      lensShift: [0.12, -0.08] as const,
+    };
+    for (const aspect of [16 / 9, 9 / 16, 4 / 3]) {
+      camera.aspect = aspect;
+      expect(applyStudioBg3dViewToThreeCamera(camera, null, view)).toBe(true);
+      const projection = camera.projectionMatrix.elements;
+      expect(camera.aspect).toBeCloseTo(aspect);
+      expect(projection[5] / projection[0]).toBeCloseTo(aspect);
+      expect(new THREE.Vector3(0, 0, 0).project(camera).x).toBeCloseTo(-0.24);
+      expect(new THREE.Vector3(0, 0, 0).project(camera).y).toBeCloseTo(-0.16);
+    }
+  });
+
+  it("stops a previous orbit's inertia before applying a saved camera view", () => {
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 200);
+    camera.position.set(0, 0, 10);
+    const controls = new OrbitControls(camera);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.rotateLeft(0.5);
+    const view = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      position: [0, 0, 10] as const,
+      target: [0, 0, 0] as const,
+    };
+    expect(applyStudioBg3dViewToThreeCamera(camera, controls, view)).toBe(true);
+    expect(camera.position.distanceTo(new THREE.Vector3(...view.position))).toBeLessThan(1e-10);
+    for (let frame = 0; frame < 100; frame += 1) controls.update();
+    expect(camera.position.distanceTo(new THREE.Vector3(...view.position))).toBeLessThan(1e-10);
+    expect(controls.target.toArray()).toEqual(view.target);
+    expect(controls.enableDamping).toBe(true);
+    expect(controls.autoRotate).toBe(false);
+  });
+
+  it.each(["perspective", "orthographic"] as const)("keeps %s button zoom stable after an orbit gesture", (projection) => {
+    const camera = projection === "perspective"
+      ? new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 200)
+      : new THREE.OrthographicCamera(-5, 5, 3, -3, 0.1, 200);
+    camera.position.set(0, 0, 10);
+    const controls = new OrbitControls(camera);
+    controls.enableDamping = true;
+    controls.rotateLeft(0.5);
+    const direction = camera.position.clone().sub(controls.target).normalize();
+    expect(applyStudioBg3dProjectionAwareZoom(camera, controls, 0.82, [0, 0, 0])).toBe(true);
+    const committedPosition = camera.position.clone();
+    for (let frame = 0; frame < 100; frame += 1) controls.update();
+    expect(camera.position.distanceTo(committedPosition)).toBeLessThan(1e-10);
+    expect(camera.position.clone().sub(controls.target).normalize().distanceTo(direction)).toBeLessThan(1e-10);
+    expect(controls.enableDamping).toBe(true);
+  });
+
   it("reads precise registered world bounds and rejects empty objects", () => {
     const parent = new THREE.Group();
     parent.position.set(4, 3, -2);
@@ -204,6 +328,45 @@ describe("Studio BG3D complete camera application", () => {
     expect(bounds?.max[1]).toBeCloseTo(5);
     expect(readStudioBg3dObjectWorldBounds(new THREE.Group())).toBeNull();
     mesh.geometry.dispose();
+  });
+
+  it("frames visible geometry without hidden descendants inflating the composition", () => {
+    const root = new THREE.Group();
+    root.position.set(4, 0, 0);
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshBasicMaterial();
+    const visibleMesh = new THREE.Mesh(geometry, material);
+    const hiddenGroup = new THREE.Group();
+    hiddenGroup.visible = false;
+    const distantMesh = new THREE.Mesh(geometry, material);
+    distantMesh.position.set(500, 0, 0);
+    hiddenGroup.add(distantMesh);
+    root.add(visibleMesh, hiddenGroup);
+    expect(readStudioBg3dObjectWorldBounds(root)?.max[0]).toBe(505);
+    expect(readStudioBg3dObjectWorldBounds(root, { visibleOnly: true })).toEqual({
+      min: [3, -1, -1], max: [5, 1, 1],
+    });
+    expect(hiddenGroup.visible).toBe(false);
+    expect(hiddenGroup.children).toEqual([distantMesh]);
+    visibleMesh.visible = false;
+    expect(readStudioBg3dObjectWorldBounds(root, { visibleOnly: true })).toBeNull();
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it("includes visible instanced geometry in selection bounds", () => {
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.InstancedMesh(geometry, material, 2);
+    mesh.position.x = 10;
+    mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-5, 0, 0));
+    mesh.setMatrixAt(1, new THREE.Matrix4().makeTranslation(5, 0, 0));
+    expect(readStudioBg3dObjectWorldBounds(mesh, { visibleOnly: true })).toEqual({
+      min: [4, -1, -1], max: [16, 1, 1],
+    });
+    geometry.dispose();
+    material.dispose();
+    mesh.dispose();
   });
 
   it("converts regular and instanced local normals through the complete world transform", () => {

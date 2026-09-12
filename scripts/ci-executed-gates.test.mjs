@@ -28,16 +28,6 @@ const requiredRegressions = Object.freeze([
   "apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx",
   "apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts",
   "apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx",
-  "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
-  "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
-  "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
-  "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
-  "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
-  "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
-  "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
-  "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
-  "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
-  "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
   "apps/api/src/config/catalog-initialization.test.ts",
   "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
   "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",
@@ -73,18 +63,107 @@ const requiredRegressions = Object.freeze([
   "apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts",
   "apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts",
   "apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-application.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-framing.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-selection.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-engine-remount-safety.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-surface-integration.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.lens.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dCompositionOverlay.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx",
+  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts",
+  "apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx",
+  "apps/web/src/domains/creator/vrm/studio-vrm-raster-capture.test.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts",
+  "apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts",
+  "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts",
+  "apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts",
+  "apps/web/src/app/studio-cross-origin-isolation.test.ts",
+  "scripts/verify-studio-3d-console.test.ts",
+  "scripts/verify-studio-menus.test.ts",
+  "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
+  "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
+  "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
+  "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
+  "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
+  "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
+  "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
+  "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
+  "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
+  "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
 ]);
 
 // Read the explicit file arguments of the Vitest commands used by this workflow.
-// Comments and echo text do not count as execution; keep packages/ and .tsx paths.
-function executedRegressions(block) {
-  return block
-    .replace(/\\\r?\n/g, " ")
+// Comments and echo text do not count as execution; retain app, package and script suites.
+// Lex only comments, quotes, escapes and continuations in our explicit static
+// commands. This is not a general Bash evaluator or a YAML execution proof.
+function normalizeShellSource(block) {
+  let result = "";
+  let quote = null;
+  let wordStart = true;
+  for (let index = 0; index < block.length; index += 1) {
+    const char = block[index];
+    const next = block[index + 1];
+    if (quote === null && char === "#" && wordStart) {
+      while (index < block.length && block[index] !== "\n") index += 1;
+      result += "\n";
+      wordStart = true;
+      continue;
+    }
+    if (quote !== "'" && char === "\\" && next !== undefined) {
+      if (next === "\n" || (next === "\r" && block[index + 2] === "\n")) {
+        index += next === "\r" ? 2 : 1;
+        continue;
+      }
+      if (quote === null || /[$`"\\]/.test(next)) {
+        result += char + next;
+        index += 1;
+        wordStart = false;
+        continue;
+      }
+    }
+    if (quote === null && (char === "'" || char === '"')) {
+      quote = char;
+    } else if (quote === char) {
+      quote = null;
+    }
+    result += char;
+    wordStart = quote === null && /[\s|&;()<>]/.test(char);
+  }
+  return result;
+}
+
+function executedVitestTargets(block) {
+  return normalizeShellSource(block)
     .split(/\r?\n/)
     .filter((line) => /^\s*(?:-\s*)?(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
-    .flatMap((line) => line.replace(/[ \t]+#.*$/u, "").trim().split(/\s+/))
+    .flatMap((line) => line.trim().split(/\s+/))
     .map((word) => word.replace(/^["']|["']$/g, ""))
-    .filter((word) => /^(?:apps|packages)\/[\w./-]+\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(word));
+    .filter((word) => /^(?:apps|packages|scripts)\/[\w./-]+$/.test(word));
+}
+
+function executedRegressions(block) {
+  return executedVitestTargets(block)
+    .filter((word) => /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(word));
 }
 
 function assertRequiredRegressions(block) {
@@ -107,6 +186,7 @@ test("core retains all executing main checks without a bypass", () => {
     "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
     "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
   for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {
@@ -172,13 +252,7 @@ test("duplicate arguments cannot inflate regression coverage", () => {
   assert.throws(() => assertRequiredRegressions(duplicated), /duplicate regression arguments/);
 });
 
-// Manual validation must not cancel push validation; retries keep prior evidence.
-test("isolates event concurrency and retry artifact names", () => {
-  assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
-  assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
-});
-
+// Preserve the concurrent production-audit runner fix from PR #1337.
 test("production visual audit uses the Vitest runner for its policy suite", () => {
   const audit = readFileSync(new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url), "utf8");
   assert.ok(audit.includes("      - name: Verify audit policy\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
@@ -187,6 +261,80 @@ test("production visual audit uses the Vitest runner for its policy suite", () =
 
 test("required core executes the production audit policy suite before merge", () => {
   assert.ok(job("static").includes("      - name: Studio 3D production audit policy regressions\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+});
+
+const requiredNon3DTargets = Object.freeze([
+  "apps/web/src/domains/creator/layer",
+  "apps/web/src/domains/creator/export",
+  "apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx",
+  "apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx",
+  "apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx",
+  "apps/web/src/domains/creator/studio-selection",
+  "apps/web/src/domains/creator/studio-color-range",
+  "apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts",
+  "apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts",
+]);
+
+function assertNon3DRegressions(block) {
+  const name = "      - name: Non-3D Studio editing and export regressions\n";
+  const step = block.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith(name));
+  assert.ok(step, "missing non-3D Studio regression step");
+  assert.doesNotMatch(step, /^ {8}if:/m, "non-3D Studio regressions must not be conditionally skipped");
+  const targets = new Set(executedVitestTargets(step));
+  for (const path of requiredNon3DTargets) {
+    assert.ok(targets.has(path), `missing non-3D Studio regression: ${path}`);
+  }
+}
+
+test("non-3D Studio editing and export regressions execute in the required static job", () => {
+  assertNon3DRegressions(job("static"));
+});
+
+test("non-3D directory and file targets cannot be replaced with commented coverage", () => {
+  for (const path of requiredNon3DTargets) {
+    const source = job("static");
+    const step = source.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith("      - name: Non-3D Studio editing and export regressions\n"));
+    assert.ok(step, "missing non-3D Studio regression step");
+    const missing = source.replace(step, step.replace(path, "apps/web/src/unrelated-replacement.test.ts"));
+    const decoy = `${missing}\n      # pnpm exec vitest run ${path}\n`;
+    assert.throws(() => assertNon3DRegressions(decoy), /missing non-3D Studio regression/, path);
+  }
+});
+
+// Manual validation must not cancel push validation; retries keep prior evidence.
+test("isolates event concurrency and retry artifact names", () => {
+  assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
+  assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
+});
+
+// Shell comments end at the physical newline, even when the comment ends in a
+// backslash. Keep these fixtures dependency-free for the Node-only preflight.
+test("commented mandatory arguments are rejected for every protected suite", () => {
+  for (const path of requiredRegressions) {
+    const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
+    const decoy = `${missing}\n      - run: pnpm exec vitest run apps/web/src/extra.test.ts \\\n          # ${path}\n`;
+    assert.throws(() => assertRequiredRegressions(decoy), /missing mandatory regression/, path);
+  }
+});
+
+const shellCommentFixtures = [
+  ["continued comment argument", "pnpm exec vitest run apps/kept.test.ts \\\n  # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["inline comment", "pnpm exec vitest run apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["comment backslash cannot consume the next command", "pnpm exec vitest run apps/first.test.ts # ignored \\\npnpm exec vitest run packages/second.test.ts\n", ["apps/first.test.ts", "packages/second.test.ts"]],
+  ["standalone comment continuation cannot enable a bare path", "pnpm exec vitest run apps/kept.test.ts \\\n  # ignored \\\n  packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["quoted hashes are not comments", "pnpm exec vitest run --testNamePattern '#literal' \"apps/kept.test.ts\" # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["escaped hashes are not comments", "pnpm exec vitest run --testNamePattern \\#literal apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
+  ["valid continued and quoted arguments remain visible", "pnpm exec vitest run \\\n  'apps/kept.test.ts' \\\n  \"packages/kept.test.tsx\"\n", ["apps/kept.test.ts", "packages/kept.test.tsx"]],
+];
+for (const [name, command, expected] of shellCommentFixtures) {
+  test(`regression arguments respect shell syntax: ${name}`, () => {
+    assert.deepEqual(executedRegressions(command), expected);
+  });
+}
+
+test("required core validates current production menu entry points", () => {
+  assert.ok(job("static").includes("      - name: Production menu entry point regressions\n        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts\n"));
 });
 
 test("removal and inline comments cannot replace mandatory execution", () => {

@@ -3962,12 +3962,17 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
       await step.click();
     }
     invariant(await step.getAttribute("aria-disabled") === "true", "Smart Shape edge audit did not reach the real zoom limit");
-    const zoom = await hud.getByRole("status").innerText();
+    const zoomValue = await hud.getByRole("textbox", { name: "캔버스 확대율 입력", exact: true }).inputValue();
+    invariant(/^\d+(?:\.\d+)?$/.test(zoomValue) && Number.isFinite(Number(zoomValue)) && Number(zoomValue) > 0,
+      `Smart Shape edge audit received an invalid zoom percentage: ${JSON.stringify(zoomValue)}`);
+    const zoom = `${zoomValue}%`;
     await hud.getByRole("button", { name: "보기 도구 닫기", exact: true }).click();
     await page.locator('[data-studio-view-tool-trigger="rotate"]').click();
     const rotationHud = page.getByRole("toolbar", { name: "캔버스 회전 보기 도구", exact: true });
     await rotationHud.getByRole("button", { name: "캔버스 오른쪽으로 90도 회전", exact: true }).click();
-    const rotation = await rotationHud.getByRole("status").innerText();
+    const rotation = await rotationHud.getByRole("group", { name: "캔버스 회전", exact: true }).getByRole("status").innerText();
+    invariant(/^(?:0|90|180|270)°$/.test(rotation),
+      `Smart Shape edge audit received an invalid rotation: ${JSON.stringify(rotation)}`);
     await rotationHud.getByRole("button", { name: "보기 도구 닫기", exact: true }).click();
     await page.locator("[data-studio-canvas-viewport]").evaluate((viewport) => {
       viewport.scrollTo({ left: viewport.scrollWidth, top: viewport.scrollHeight });

@@ -82,6 +82,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
     expect(autosave).toContain("sqlitePromise ?? Promise.resolve(null)");
     expect(autosave).toContain("sqlite,");
     expect(autosave).toContain("storage: globalThis.localStorage");
+    expect(autosave).toContain("isCurrent: canPublishSnapshot");
     expect(autosave).not.toContain("localStorage.setItem");
     const persistIndex = autosave.indexOf("persistStudioAutosaveWithOpfsPrimary");
     expect(persistIndex).toBeLessThan(
@@ -223,7 +224,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
     expect(lifecycle).not.toContain("writeStudioLifecycleAutosave(");
     expect(lifecycle).not.toContain("localStorage.setItem");
     expect(lifecycle).toContain("await session.write(emergency.payload)");
-    expect(lifecycle).toContain("await sqlite.write(autosaveKey, emergency.payload)");
+    expect(lifecycle).toContain('await sqlite.write(autosaveKey, emergency.payload, { mode: "emergency" })');
     expect(lifecycle).toContain("Promise.any(durableWrites)");
     expect(lifecycle).toContain("noteStudioSaveSucceeded(authority)");
     expect(lifecycle).toContain("reportStudioAutosaveFailure(cause)");

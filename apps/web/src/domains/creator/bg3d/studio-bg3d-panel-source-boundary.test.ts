@@ -96,7 +96,7 @@ describe("Studio BG3D panel source boundary", () => {
     for (const [componentName, tab, sourceFile] of expectations) {
       expect(editorSource).toContain(`<${componentName}`);
       expect(editorSource).toContain(`hidden={hideOnTab("${tab}")}`);
-      expect(moduleSource(sourceFile)).toContain("<section hidden={hidden}>");
+      expect(moduleSource(sourceFile)).toMatch(/<section\b[^>]*\bhidden=\{hidden\}(?:\s|>)/u);
     }
   });
 });

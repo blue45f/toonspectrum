@@ -77,6 +77,8 @@ describe("CharacterPlatformWorkbench drawing mode", () => {
     const f = renderWorkbench(true, true);
     Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => f.canvas });
     try {
+      const launcher = screen.getByRole("button", { name: /품질 도구.*V2/u });
+      expect(launcher.closest("[data-character-quality-launcher]")).toBeTruthy();
       await startDrawing();
       expect(document.querySelector('[data-character-shaper="true"]')).toBeTruthy();
       fireEvent.keyDown(window, { key: "Escape" });

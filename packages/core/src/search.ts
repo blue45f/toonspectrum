@@ -3,6 +3,7 @@ import { normalizedSearchText } from "./search-normalization";
 import type { Title, WorkType, SerialStatus, AgeRating, PlatformId } from "./types";
 
 export interface SearchFilters {
+  ids?: ReadonlySet<string>;
   q?: string;
   types?: WorkType[];
   genres?: string[];
@@ -98,6 +99,7 @@ function score(t: Title, nq: string, tokens: string[]): number {
 }
 
 interface PreparedFilters {
+  ids?: ReadonlySet<string>;
   q: string;
   nq: string;
   tokens: string[];
@@ -116,6 +118,7 @@ interface PreparedFilters {
 }
 
 function passPreparedFilters(t: Title, pf: PreparedFilters): boolean {
+  if (pf.ids && !pf.ids.has(t.id)) return false;
   if (pf.typesSet && !pf.typesSet.has(t.type)) return false;
   if (pf.statusSet && !pf.statusSet.has(t.status)) return false;
   if (pf.ageRatingsSet && !pf.ageRatingsSet.has(t.ageRating)) return false;
@@ -195,6 +198,7 @@ export function searchTitles(
   }
 
   const pf: PreparedFilters = {
+    ids: filters.ids,
     q,
     nq,
     tokens,

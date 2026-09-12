@@ -36,7 +36,7 @@ const STEPS = [
     icon: CheckCircle2,
     number: "4",
     title: "저장·게시·원고 적용",
-    description: "V6 프로그램을 저장·게시하고 공통 렌더 경로에서 결과를 확인합니다.",
+    description: "완성한 재료 브러시를 라이브러리에 저장하고 원고에서 사용합니다.",
   },
 ] as const;
 
@@ -102,8 +102,8 @@ export function StudioBrushLabPage() {
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
               비슷한 종류를 늘어놓지 않고 실제 결과가 구분되는 48개 제품 브러시만 사용합니다.
-              같은 목록에서 시작점을 고르고 V6 설정을 조절하면 live·commit·export 경로에
-              동일하게 적용됩니다.
+              시작점을 고른 뒤 종이 접촉·안료·강모·문양을 조절하고 기준 획과 비교하세요.
+              연결된 재료 설정은 원고의 획과 내보내기에도 보존됩니다.
             </p>
             <p className="mt-3 inline-flex rounded-full border border-line bg-panel/60 px-3 py-1 text-xs font-bold text-fg-3">
               {context.contextLabel}
@@ -149,9 +149,9 @@ export function StudioBrushLabPage() {
           </summary>
           <div className="mt-3 border-t border-line pt-3">
             <p className="text-xs leading-6 text-fg-3">
-              필압·기울기·펜 회전, 종이 접촉, 안료 혼합, 수채·유화·강모·입자 물리,
-              결정적 패턴과 출력 품질까지 조절할 수 있습니다. 현재 장치가 지원하지 않는 설정은
-              저장 전에 안전한 대체 방법과 함께 알려 줍니다.
+              필압·기울기·펜 회전, 종이 접촉, 분광 색 혼합, 안료 소모와 강모·입자,
+              문양을 조절할 수 있습니다. 현재 재료 획에 연결된 설정만 활성화되며,
+              외부 엔진과 유체 시뮬레이션의 설계 기록은 별도로 표시됩니다.
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[0.65rem] font-semibold text-fg-3">
               {["필압·기울기", "종이·재질", "수채·유화", "듀얼 팁·입자", "패턴·문양", "이 기기에 맞게 최적화", "가져오기·내보내기"].map((label) => (

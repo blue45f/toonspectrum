@@ -255,9 +255,14 @@ describe("character shaper catalog — entries", () => {
     for (const item of CHARACTER_SLOT_CATALOG.entries) expectPreviewMatchesApply(item);
   });
 
-  it("features four to eight entries per slot", () => {
+  it("recommends native clothing only and four to eight entries in the other slots", () => {
     for (const slot of CHARACTER_SLOT_KINDS) {
       const featured = listCharacterSlotEntries(slot).filter((item) => item.featured);
+      if (slot === "top" || slot === "bottom" || slot === "shoes") {
+        expect(featured.map((item) => item.id)).toEqual([`${slot}:original`]);
+        expect(listCharacterSlotEntries(slot).filter((item) => item.apply.kind === "wardrobe").every((item) => !item.featured)).toBe(true);
+        continue;
+      }
       expect(featured.length, slot).toBeGreaterThanOrEqual(4);
       expect(featured.length, slot).toBeLessThanOrEqual(8);
     }

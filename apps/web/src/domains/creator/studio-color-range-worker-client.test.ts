@@ -11,6 +11,7 @@ import type {
   StudioColorRangeWorkerResponseMessage,
   StudioColorRangeWorkerRunMessage,
   StudioColorRangeWorkerRunRequest,
+  StudioSelectionBorderWorkerRunRequest,
 } from "./studio-color-range-worker-protocol";
 import type { PixelSelection } from "./studio-selection-tools";
 
@@ -96,6 +97,24 @@ class ControlledWorker implements StudioColorRangeWorkerLike {
 }
 
 describe("createStudioColorRangeWorkerSession", () => {
+  it("runs bounded border requests without requiring or transferring image pixels", async () => {
+    const input: StudioSelectionBorderWorkerRunRequest = {
+      kind: "selection-border", selection: { subpaths: [], featherPx: 7, invert: true },
+      width: 64, height: 32, displayWidth: 128, displayHeight: 64, widthPx: 8, placement: "inside",
+    };
+    const worker = new ControlledWorker();
+    const session = createStudioColorRangeWorkerSession({ workerFactory: () => worker });
+    const pending = session.run(input);
+    worker.emitReady();
+    expect(worker.messages[0]!.request).toEqual(input);
+    expect(worker.transfers).toEqual([[]]);
+    worker.emitSuccess(worker.messages[0]!.requestId, null);
+    await expect(pending).resolves.toEqual({ execution: "worker", selection: null });
+    for (const invalid of [{ width: 641 }, { widthPx: NaN }, { displayHeight: 0 }]) {
+      await expect(session.run({ ...input, ...invalid })).rejects.toThrow();
+    }
+    session.dispose();
+  });
   it("uses the bounded direct path for small requests and preserves exact core output", async () => {
     const input = requestFixture();
     const expected = executeStudioColorRangeWorkerRequest(input);
@@ -178,8 +197,10 @@ describe("createStudioColorRangeWorkerSession", () => {
     worker.emitReady();
     expect(owner.byteLength).toBe(40);
     expect(partial.byteLength).toBe(24);
-    expect(worker.messages[0]!.request.data.byteOffset).toBe(0);
-    expect(worker.messages[0]!.request.data.buffer.byteLength).toBe(24);
+    const postedRequest = worker.messages[0]!.request;
+    if (postedRequest.kind === "selection-border") throw new Error("Expected a color-range request");
+    expect(postedRequest.data.byteOffset).toBe(0);
+    expect(postedRequest.data.buffer.byteLength).toBe(24);
     worker.emitSuccess(worker.messages[0]!.requestId, null);
     await expect(pending).resolves.toEqual({ execution: "worker", selection: null });
     session.dispose();

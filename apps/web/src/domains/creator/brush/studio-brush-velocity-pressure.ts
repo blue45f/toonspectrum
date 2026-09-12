@@ -25,6 +25,8 @@ import {
   type StudioVelocityPressureState,
 } from "../studio-velocity-pressure-response";
 
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+
 import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
@@ -40,6 +42,8 @@ export const STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION =
 
 export interface StudioBrushVelocityPressureSettings {
   readonly brushId?: unknown;
+  /** Material programs own calibration; persist normalized device pressure until that mapping. */
+  readonly rawMaterialPressure?: boolean;
   readonly pressureCurve?: unknown;
   readonly pressureMinSize?: unknown;
   readonly stylusPressureProfile?: StudioStylusPressureProfile;
@@ -73,6 +77,7 @@ interface StudioBrushVelocityPressurePointerStart {
 }
 
 interface StudioBrushVelocityPressureElementStart {
+  readonly brushEnginePrograms?: StudioBrushEngineProgramSet | null;
   readonly brush?: unknown;
   readonly pressures?: readonly number[];
   readonly pressureModel?: StudioInkPressureModel;
@@ -109,6 +114,14 @@ function clamp01(value: unknown, fallback: number): number {
   return clamp(finiteOr(value, fallback), 0, 1);
 }
 
+/** Matches the workbench contact convention without device, brush-family or speed curves. */
+export function normalizeStudioMaterialPointerPressure(
+  pointerType: unknown,
+  pressure: unknown,
+): number {
+  return pointerType === "mouse" ? 0.5 : clamp01(pressure, 0.5);
+}
+
 function pressureProfileForTransition(
   state: StudioVelocityPressureState | null | undefined,
   explicit: StudioStylusPressureProfile | undefined,
@@ -128,6 +141,24 @@ export function advanceStudioBrushVelocityPressure(
   pointer: StudioVelocityPressurePointerSample,
   settings: StudioBrushVelocityPressureSettings
 ): StudioBrushVelocityPressureTransition {
+  if (settings.rawMaterialPressure) {
+    const pressure = normalizeStudioMaterialPointerPressure(pointer.pointerType, pointer.pressure);
+    // Retain the causal velocity journal for timestamps/prediction, but material calibration is
+    // performed once by the saved program at rendering time, just as in the workbench.
+    const transition = advanceStudioVelocityPressure(state, { ...pointer, pressure }, {
+      nominalPressure: pressure,
+      velocitySensitivity: 0,
+      minimumWidthRatio: 0,
+      pressureExponent: 1,
+      penPolicy: "hardware-precedence",
+    });
+    return Object.freeze({
+      version: STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION,
+      state: transition.state,
+      sample: transition.sample,
+      pressure,
+    });
+  }
   // The default pen already has a persisted residual-pressure contract whose stationary nominal
   // width is 1. Treating it as the newer "ink" family would make the first move jump from 1 to
   // 0.72 even though the pointer pressure did not change. Named ink aliases still opt into their
@@ -221,6 +252,7 @@ export function initializeStudioBrushVelocityPressure(
     },
     {
       brushId: element.brush,
+      rawMaterialPressure: drawMode === "pen" && Boolean(element.brushEnginePrograms?.material),
       pressureCurve: settings?.pressureCurve,
       pressureMinSize: settings?.pressureMinSize,
       stylusPressureProfile: activeStrokePressureProfile,
@@ -250,6 +282,10 @@ export function resolveStudioBrushReleasePressure(
     // sample. Replacing the last real contact with the family nominal would make a fast tail pop
     // wider or darker on browsers/devices that omit release pressure.
     return lastContactPressure;
+  }
+
+  if (input.rawMaterialPressure) {
+    return normalizeStudioMaterialPointerPressure(input.pointerType, input.rawPressure);
   }
 
   const profiledRawPressure = resolveStudioStylusPressureInput(

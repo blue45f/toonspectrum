@@ -136,7 +136,7 @@ ToonStudio는 이미 다음 기능을 제공한다.
 
 - 프로젝트/CRDT에 영구 저장되는 Named Selection 채널
 - 저장 선택 썸네일과 폴더·검색·동기화
-- Border Selection과 안쪽/바깥쪽 경계 선택
+- Border Selection과 안쪽/중앙/바깥쪽 경계 선택은 [2026-09-12 고도화 기록](studio-selection-border-benchmark-2026-09-12.md)에서 구현했다.
 - 모든 표시 레이어·라벨 레이어·광도·채널 기반 선택
 - 선택 런처 명령 커스터마이즈
 - 라이브 피사체 미리보기와 정교한 전경/배경 브러시 보정

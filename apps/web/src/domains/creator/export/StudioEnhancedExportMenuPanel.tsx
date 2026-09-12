@@ -5,7 +5,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   buildStudioDownloadPackage,
@@ -21,6 +21,7 @@ import {
 import { drawWatermarkOnSlice } from "./studio-export-presets";
 import {
   StudioExportMenuPanel,
+  type StudioExportMenuPackageContext,
   type StudioExportMenuPanelProps,
 } from "./StudioExportMenuPanel";
 
@@ -78,10 +79,7 @@ export function StudioEnhancedExportMenuPanel(
     useState<PackageRunStatus | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lossless = props.exportFormat === "png";
-  const effectiveQuality = useMemo(
-    () => (lossless ? undefined : clampQuality(qualityPercent / 100)),
-    [lossless, qualityPercent],
-  );
+  const effectiveQuality = lossless ? undefined : clampQuality(qualityPercent / 100);
 
   useEffect(
     () => () => {
@@ -101,33 +99,23 @@ export function StudioEnhancedExportMenuPanel(
     });
   };
 
-  const downloadVerifiedPackage = async () => {
-    if (packageBusy || props.isExporting) return;
+  const downloadVerifiedPackage = async (context: StudioExportMenuPackageContext) => {
+    if (packageBusy || context.busy || !context.canExport) return;
     const controller = new AbortController();
     abortControllerRef.current?.abort();
     abortControllerRef.current = controller;
     setPackageBusy(true);
     setPackageStatus({
       tone: "info",
-      text: `페이지 캡처 준비 0/${props.pageCount}`,
+      text: `페이지 캡처 준비 0/${context.pageIndices.length} · ${context.rangeLabel}`,
       percent: 0,
     });
 
     try {
-      const indices = Array.from(
-        { length: props.pageCount },
-        (_, index) => index,
-      );
-      const canvases = props.capturePagesForIndices
-        ? await props.capturePagesForIndices(indices)
-        : await props.capturePagesForPreset("all");
+      const captured = await context.capturePages();
+      const canvases = captured.pages;
       if (controller.signal.aborted) {
         throw new DOMException("다운로드 패키지 생성을 취소했어요.", "AbortError");
-      }
-      if (canvases.length !== props.pageCount) {
-        throw new Error(
-          `페이지 캡처 결과가 예상과 달라요(${canvases.length}/${props.pageCount}). 다시 시도해주세요.`,
-        );
       }
 
       const encodedPages: Array<{
@@ -145,6 +133,7 @@ export function StudioEnhancedExportMenuPanel(
           );
         }
         const canvas = canvases[index]!;
+        const sourceIndex = captured.indices[index]!;
         drawWatermarkOnSlice(canvas, props.watermark);
         const image = await canvasToBlob(
           canvas,
@@ -152,8 +141,8 @@ export function StudioEnhancedExportMenuPanel(
           effectiveQuality ?? exportQuality(props.exportFormat),
         );
         encodedPages.push({
-          index,
-          label: props.pageLabels[index] || `${index + 1}페이지`,
+          index: sourceIndex,
+          label: props.pageLabels[sourceIndex] || `${sourceIndex + 1}페이지`,
           width: canvas.width,
           height: canvas.height,
           image,
@@ -191,7 +180,7 @@ export function StudioEnhancedExportMenuPanel(
       downloadBlob(result.blob, result.fileName);
       setPackageStatus({
         tone: "good",
-        text: `${result.manifest.pageCount}페이지와 SHA-256 매니페스트를 ZIP으로 저장했어요.`,
+        text: `${result.manifest.pageCount}페이지와 SHA-256 매니페스트를 ZIP으로 저장했어요. (${captured.rangeLabel})`,
         percent: 100,
       });
     } catch (error) {
@@ -225,8 +214,10 @@ export function StudioEnhancedExportMenuPanel(
         : "border-accent/25 bg-accent/10 text-fg-2";
 
   return (
-    <>
-      <StudioExportMenuPanel {...props} />
+    <StudioExportMenuPanel
+      {...props}
+      isExporting={props.isExporting || packageBusy}
+      renderAdditionalExports={(context) => (
       <section
         data-studio-verified-download-package="true"
         aria-labelledby="studio-verified-download-package-title"
@@ -257,7 +248,7 @@ export function StudioEnhancedExportMenuPanel(
 
         <div className="mt-2 grid grid-cols-2 gap-1.5 text-[0.61rem]">
           <span className="rounded-lg border border-line/70 bg-panel/70 px-2 py-1.5 text-fg-3">
-            {props.pageCount.toLocaleString("ko-KR")}페이지
+            {context.rangeLabel} · {context.pageIndices.length.toLocaleString("ko-KR")}P
           </span>
           <span className="rounded-lg border border-line/70 bg-panel/70 px-2 py-1.5 text-fg-3">
             {exportFormatLabel(props.exportFormat)} · {props.exportScale}×
@@ -320,11 +311,11 @@ export function StudioEnhancedExportMenuPanel(
         <div className="mt-2 flex gap-1.5">
           <button
             type="button"
-            onClick={() => void downloadVerifiedPackage()}
+            onClick={() => void downloadVerifiedPackage(context)}
             disabled={
               packageBusy ||
-              props.isExporting ||
-              props.pageCount === 0
+              context.busy ||
+              !context.canExport
             }
             className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-accent/30 bg-accent/15 px-2 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
@@ -356,6 +347,7 @@ export function StudioEnhancedExportMenuPanel(
           전달·업로드·장기 보관 전 파일 무결성을 확인해야 할 때 사용하세요.
         </p>
       </section>
-    </>
+      )}
+    />
   );
 }

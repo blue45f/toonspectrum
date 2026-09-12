@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createPortal } from "react-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,6 +19,8 @@ import {
 } from "./studio-brush-library";
 import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
 import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
+import { DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT } from "./studio-drawing-palettes";
+import { StudioDrawingPaletteStack } from "./StudioDrawingPaletteStack";
 import {
   StudioBrushDualBrushControls,
   StudioBrushDynamicsPreview,
@@ -62,6 +65,46 @@ function props(overrides: Partial<StudioBrushStudioProps> = {}): StudioBrushStud
 }
 
 describe("StudioBrushStudio", () => {
+  it("keeps its parent palette mounted during portal interaction and closes one layer per Escape", () => {
+    render(<StudioDrawingPaletteStack layout={DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT}
+      defaultPresentation="icon-popup" subTools={<span>도구 목록</span>}
+      toolProperties={<StudioBrushStudio {...props()} />} onLayoutChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "도구 속성 팝업 열기" }));
+    const parent = screen.getByRole("dialog", { name: "도구 속성 팝업" });
+    const launcher = screen.getByRole("button", { name: /브러시 스튜디오/u });
+    fireEvent.click(launcher);
+    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    expect(parent.contains(dialog)).toBe(false);
+    const engineTab = screen.getByRole("tab", { name: /엔진 조합/u });
+    fireEvent.pointerDown(engineTab);
+    expect(screen.getByRole("dialog", { name: "도구 속성 팝업" })).toBe(parent);
+    fireEvent.click(engineTab);
+    expect(engineTab.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(engineTab, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "브러시 스튜디오" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "도구 속성 팝업" })).toBe(parent);
+    fireEvent.keyDown(launcher, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "도구 속성 팝업" })).toBeNull();
+  });
+
+  it("keeps its parent palette after a portal backdrop click, while unrelated dialogs still dismiss it", () => {
+    render(<><StudioDrawingPaletteStack layout={DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT}
+      defaultPresentation="icon-popup" subTools={<span>도구 목록</span>}
+      toolProperties={<StudioBrushStudio {...props()} />} onLayoutChange={vi.fn()} />
+      {createPortal(<div role="dialog" aria-label="별도 대화상자"><button type="button">다른 작업</button></div>, document.body)}</>);
+    fireEvent.click(screen.getByRole("button", { name: "도구 속성 팝업 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/u }));
+    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    const backdrop = dialog.querySelector("button[aria-hidden='true']")!;
+    fireEvent.pointerDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole("dialog", { name: "브러시 스튜디오" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "도구 속성 팝업" })).toBeTruthy();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "다른 작업" }));
+    expect(screen.queryByRole("dialog", { name: "도구 속성 팝업" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "별도 대화상자" })).toBeTruthy();
+  });
+
   it("renders one compact, dialog-capable launcher with a dynamics summary", () => {
     const html = renderToStaticMarkup(<StudioBrushStudio {...props()} />);
     expect(html).toContain("브러시 스튜디오");

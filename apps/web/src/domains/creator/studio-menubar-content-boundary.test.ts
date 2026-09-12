@@ -99,7 +99,7 @@ describe("Studio menubar ownership boundary", () => {
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
-    for (const optionalModule of ["./StudioMainMenu", "./export/StudioExportMenuPanel"] as const) {
+    for (const optionalModule of ["./StudioMainMenu", "./export/StudioEnhancedExportMenuPanel"] as const) {
       expect(page.valueImports).not.toContain(optionalModule);
       expect(page.dynamicImports).not.toContain(optionalModule);
       expect(menubar.valueImports).not.toContain(optionalModule);
@@ -111,6 +111,9 @@ describe("Studio menubar ownership boundary", () => {
     }
 
     expect(menubar.valueImports).toContain("./studio-page-lazy-ui");
+    expect(registry.dynamicImports).not.toContain("./export/StudioExportMenuPanel");
+    expect(registry.source).toContain("default: mod.StudioEnhancedExportMenuPanel");
+    expect(menubar.source).toContain("<StudioExportMenuPanel");
     expect(menubar.source).toContain("preloadStudioExportMenuPanel();");
     expect(menubar.source).toContain("onMouseEnter={preloadStudioExportMenuPanel}");
     expect(menubar.source).toContain("onFocus={preloadStudioExportMenuPanel}");

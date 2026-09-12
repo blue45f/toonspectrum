@@ -1,5 +1,5 @@
 import { MoreHorizontal } from "lucide-react";
-import { useState, type ReactNode, type RefObject } from "react";
+import { useState, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 
 import {
   STUDIO_EASE,
@@ -30,6 +30,7 @@ export interface StudioDrawingPaletteFloatingSurfaceProps {
   readonly children: ReactNode;
   readonly onToggleOptions: () => void;
   readonly onClose: () => void;
+  readonly onDescendantPortalEventCapture?: (event: SyntheticEvent) => void;
 }
 
 /** Shared movable window presentation for detached Sub Tool and Tool Property palettes. */
@@ -44,6 +45,7 @@ export function StudioDrawingPaletteFloatingSurface({
   children,
   onToggleOptions,
   onClose,
+  onDescendantPortalEventCapture,
 }: StudioDrawingPaletteFloatingSurfaceProps) {
   const [layout, setLayout] = useState(() =>
     loadStudioDrawingPaletteFloatingLayout(id)
@@ -111,6 +113,8 @@ export function StudioDrawingPaletteFloatingSurface({
       ) : null}
       <div
         data-studio-drawing-palette-popup-content="true"
+        onPointerDownCapture={onDescendantPortalEventCapture}
+        onKeyDownCapture={onDescendantPortalEventCapture}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [scrollbar-gutter:stable]"
       >
         {children}

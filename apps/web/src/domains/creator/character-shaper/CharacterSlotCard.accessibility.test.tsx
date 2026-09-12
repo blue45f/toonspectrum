@@ -7,7 +7,9 @@ import { CharacterSlotCard } from "./CharacterSlotCard";
 import type { CharacterSlotEntry } from "./character-shaper-contract";
 
 vi.mock("./character-shaper-preview", () => ({ CharacterSlotPreview: () => <span aria-hidden>preview</span> }));
-afterEach(cleanup);
+const thumbnail = vi.hoisted(() => ({ url: null as string | null }));
+vi.mock("../character-platform/thumbnail/character-runtime-thumbnail-store", () => ({ useCharacterRuntimeThumbnail: () => thumbnail.url }));
+afterEach(() => { cleanup(); thumbnail.url = null; });
 const entry: CharacterSlotEntry = {
   id: "eyes:test", slot: "eyes", label: "모델별 지원 범위를 확인하는 눈 프리셋", hint: "테스트",
   tags: [], keywords: [], preview: { kind: "glyph", icon: "eye", caption: "눈" },
@@ -19,6 +21,24 @@ function card(status: "available" | "unavailable", onCommit = vi.fn(), onKeyNavi
     onCommit={onCommit} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={onKeyNavigate} />;
 }
 describe("CharacterSlotCard touch and keyboard accessibility", () => {
+  it("clearly identifies illustrated shapes as diagrams rather than applied model previews", () => {
+    render(card("available"));
+    expect(screen.getByText("모양 도해").title).toContain("실제 적용 결과는 3D 화면에서 확인");
+    expect(screen.queryByText("현재 조합 · 실제 3D")).toBeNull();
+  });
+  it("labels a valid selected capture as the whole current combination and preserves its aspect", () => {
+    thumbnail.url = "blob:current-combination";
+    const view = render(<CharacterSlotCard entry={entry} selected tabIndex={0}
+      availability={{ status: "available", reason: null, missing: [] }}
+      onCommit={vi.fn()} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()} />);
+    expect(screen.getByText("현재 조합 · 실제 3D").title).toContain("전체 캐릭터 조합");
+    const image = document.querySelector<HTMLImageElement>("img")!;
+    expect(image.src).toBe("blob:current-combination");
+    expect(image.className.split(" ")).toContain("object-contain");
+    view.rerender(card("available"));
+    expect(screen.getByText("모양 도해")).toBeTruthy();
+    expect(document.querySelector("img")).toBeNull();
+  });
   it("renders unsupported reason without hover-only or hidden classes", () => {
     render(card("unavailable"));
     const reason = screen.getByText("이 모델에는 눈 크기 셰이프키가 없습니다.");

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBg3dCinematicDirectorPanel } from "./StudioBg3dCinematicDirectorPanel";
@@ -9,6 +9,7 @@ import type { StudioBg3dShot } from "./studio-bg3d-scene-document";
 describe("StudioBg3dCinematicDirectorPanel", () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("renders transition controls, continuity review and local shot deck actions", () => {
@@ -84,5 +85,54 @@ describe("StudioBg3dCinematicDirectorPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "현재 컷을 AI 구도·포즈 참조로 보내기" }));
     expect(aiReference).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops deck playback when a retained panel is hidden and requires explicit restart", () => {
+    vi.useFakeTimers();
+    const shots: readonly StudioBg3dShot[] = [
+      {
+        id: "shot-a",
+        name: "대화 와이드",
+        camera: { position: [0, 1.6, 6], target: [0, 1.4, 0], fovDegrees: 50 },
+      },
+      {
+        id: "shot-b",
+        name: "표정 클로즈업",
+        camera: { position: [0, 1.6, 2], target: [0, 1.5, 0], fovDegrees: 24 },
+      },
+    ];
+    const apply = vi.fn();
+    const panel = (hidden: boolean) => (
+      <div hidden={hidden}>
+        <StudioBg3dCinematicDirectorPanel
+          disabled={hidden}
+          productionShots={shots}
+          onApplyProductionShot={apply}
+        />
+      </div>
+    );
+    const { rerender } = render(panel(false));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "이동 시간" }), {
+      target: { value: "2.4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "컷 순서 미리보기" }));
+    expect(apply.mock.calls).toEqual([["shot-a"]]);
+    act(() => vi.advanceTimersByTime(500));
+
+    // Pro Suite preserves visited panels, so leaving Director disables it without unmounting.
+    rerender(panel(true));
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(apply.mock.calls).toEqual([["shot-a"]]);
+
+    rerender(panel(false));
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(apply.mock.calls).toEqual([["shot-a"]]);
+    expect((screen.getByRole("spinbutton", { name: "이동 시간" }) as HTMLInputElement).value)
+      .toBe("2.4");
+
+    fireEvent.click(screen.getByRole("button", { name: "컷 순서 미리보기" }));
+    expect(apply.mock.calls).toEqual([["shot-a"], ["shot-a"]]);
+    act(() => vi.advanceTimersByTime(1_200));
+    expect(apply.mock.calls).toEqual([["shot-a"], ["shot-a"], ["shot-b"]]);
   });
 });

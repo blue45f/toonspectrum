@@ -90,6 +90,8 @@ jobs:
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
       - name: Strict lint
         run: pnpm run lint:strict
       - name: Typecheck application, API and realtime worker
@@ -106,6 +108,44 @@ jobs:
             apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts \
             packages/core/src/search-normalization.test.ts \
             packages/core/src/server/home.cpu-cache.test.ts
+      - name: API runtime follow-up regressions
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
+          node --test scripts/api-followup-ci-policy.test.mjs
+          pnpm exec vitest run \
+            apps/api/src/modules/catalog/catalog-search-cache.test.ts \
+            apps/api/src/runtime/serverless-partitions.test.ts \
+            apps/api/src/runtime/runtime-boundary.test.ts \
+            apps/api/src/server/marketplace-og.test.ts \
+            apps/api/src/modules/catalog/catalog-pagination.test.ts \
+            apps/web/src/shared/catalog/catalog-pagination.test.ts \
+            apps/web/src/infrastructure/use-paginated-search.test.tsx \
+            apps/web/src/infrastructure/search-client.test.ts \
+            apps/web/src/shared/lib/__tests__/og-ssr.test.ts \
+            apps/web/src/shared/lib/__tests__/search.test.ts \
+            apps/api/src/serverless.test.ts \
+            apps/api/src/csrf-middleware.test.ts \
+            apps/api/src/session-middleware.test.ts \
+            apps/api/src/config/security-headers.test.ts \
+            apps/api/src/config/cors.test.ts \
+            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
+      - name: Material brush execution and saved recipe regressions
+        run: pnpm run test:studio-material-brush
+      - name: Non-3D Studio editing and export regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/layer \
+            apps/web/src/domains/creator/export \
+            apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx \
+            apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx \
+            apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx \
+            apps/web/src/domains/creator/studio-selection \
+            apps/web/src/domains/creator/studio-color-range \
+            apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts \
+            apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts
       - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
@@ -141,6 +181,48 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts \
             apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
           pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
+      - name: Studio 3D camera, composition and character export regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-application.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-framing.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-selection.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-engine-remount-safety.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-camera-surface-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.lens.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dCompositionOverlay.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts \
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-raster-capture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts \
+            apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts \
+            apps/web/src/app/studio-cross-origin-isolation.test.ts \
+            scripts/verify-studio-3d-console.test.ts
+      - name: Production menu entry point regressions
+        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 
   serial:
     needs: preflight
@@ -191,7 +273,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/core
           git rev-parse HEAD > artifacts/core/commit.txt
-          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json && pnpm run verify:api-serverless-build) 2>&1 | tee artifacts/core/build.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:

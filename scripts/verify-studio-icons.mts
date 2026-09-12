@@ -143,7 +143,9 @@ async function main() {
       maxAttempts: 60,
       notReadyMessage: "preview not ready",
     });
-    log(`preview @ http://127.0.0.1:${port}/studio`);
+    // /studio is the project home; inspect icons on the actual canvas editor.
+    const studioUrl = `http://127.0.0.1:${port}/studio/canvas`;
+    log(`preview @ ${studioUrl}`);
 
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
@@ -161,7 +163,7 @@ async function main() {
       }
     }, { key: QUICKSTART_KEY });
 
-    await page.goto(`http://127.0.0.1:${port}/studio`, {
+    await page.goto(studioUrl, {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });

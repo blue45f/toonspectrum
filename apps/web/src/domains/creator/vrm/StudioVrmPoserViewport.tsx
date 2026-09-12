@@ -330,6 +330,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       webcamActive={webcamActive}
                       trackingDataRef={trackingDataRef}
                       idleAnimation={idleAnimation}
+                      capturePaused={isCapturing}
                       fingerEdits={effectiveFingerEdits}
                       bodyScale={bodyScale}
                       rigRevision={proportionRigRevision}
@@ -407,6 +408,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                           key={`${proportionRigRevision}:${item.uid}`}
                           vrm={vrm}
                           instance={item}
+                          capturePaused={isCapturing}
                           metrics={effectivePropRigMetrics}
                           rigRevision={proportionRigRevision}
                         />
@@ -419,6 +421,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       metrics={effectivePropRigMetrics}
                       rigRevision={proportionRigRevision}
                       lockedBones={lockedPoseBones}
+                      capturePaused={isCapturing}
                       disabled={webcamActive || broadcastPreviewActive || persistentIkReconciling || jointHandleInteracting || isViewportHandIkDragging || texturePaintInteractionEnabled}
                     />
                   ) : null}
@@ -426,6 +429,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                     <StudioVrmRuntimeCommit
                       vrm={vrm}
                       physicsPreview={physicsPreview}
+                      capturePaused={isCapturing}
                       webcamActive={webcamActive}
                     />
                   ) : null}
@@ -441,6 +445,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                             equip={equip}
                             metrics={wardrobeMetrics}
                             effectiveFit={fit?.effectiveFit ?? equip.fit}
+                            capturePaused={isCapturing}
                             rigRevision={proportionRigRevision}
                             onSurfaceReceipt={handleWardrobeSurfaceReceipt}
                             onXpbdCaptureSyncChange={handleWardrobeXpbdCaptureSyncChange}

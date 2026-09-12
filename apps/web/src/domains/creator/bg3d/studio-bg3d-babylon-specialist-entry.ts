@@ -180,6 +180,8 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       stencil: settings.stencil,
       timeStep: settings.timeStepSeconds,
       useHighPrecisionMatrix: true,
+      // glTF base-color images are sRGB. Preserve their dark RGB values across both backends.
+      useExactSrgbConversions: true,
     }) as StudioBg3dBabylonEngineHandle;
   },
   async createWebGpuEngine(
@@ -198,6 +200,7 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       stencil: settings.stencil,
       timeStep: settings.timeStepSeconds,
       useHighPrecisionMatrix: true,
+      useExactSrgbConversions: true,
     });
     const disposeEngine = createStudioBg3dBabylonPartialEngineDisposer(engine);
     initialization.registerPartialEngine(

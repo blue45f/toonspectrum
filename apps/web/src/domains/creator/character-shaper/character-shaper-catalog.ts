@@ -570,14 +570,14 @@ function buildGarmentEntries(slot: GarmentSlotKind): CharacterSlotEntry[] {
       name: item.id,
       label: item.label,
       labelEn: item.id,
-      hint: flavor.hint,
+      hint: `실험 의상 · ${flavor.hint}`,
       tags: flavor.tags,
       keywords: [item.label, ...flavor.keywords, item.slot === "outer" ? "겉옷" : ""],
       preview: { kind: "garment", slot: item.slot, glyph: garmentGlyph(item), color: item.defaultColor },
       apply: { kind: "wardrobe", slot: item.slot, itemId: item.id, color: item.defaultColor },
       requires: WARDROBE,
       exportLayer: spec.exportLayer,
-      featured: flavor.featured,
+      featured: false,
     });
   });
   return [original, ...garments];

@@ -14,6 +14,14 @@ interface MarketResourceFamilyExplorerProps {
   readonly compact?: boolean;
 }
 
+const FAMILY_STUDIES = {
+  template: { image: "/brand/atelier-process.webp", position: "12% 45%", label: "컷의 시작 · 구도와 이야기" },
+  "2d": { image: "/assets/studio/backgrounds/webtoon_classroom.jpg", position: "50% 50%", label: "장면의 재료 · 배경과 소품" },
+  "3d": { image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png", position: "50% 55%", label: "공간의 기준 · 구도와 투시" },
+  brush: { image: "/brand/atelier-materials.webp", position: "5% 40%", label: "선의 표정 · 필치와 질감" },
+  look: { image: "/brand/atelier-world.webp", position: "20% 20%", label: "장면의 온도 · 색과 빛" },
+} as const;
+
 function FamilyCard({
   family,
   featured = false,
@@ -27,22 +35,16 @@ function FamilyCard({
   const primary = family.subcategories.slice(0, 3);
   const rest = family.subcategories.slice(3);
   const first = family.subcategories[0];
+  const study = FAMILY_STUDIES[family.id];
 
   return (
     <article
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-line bg-card transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lg",
+        "group relative overflow-hidden rounded-2xl border border-line bg-card transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong motion-reduce:transform-none motion-reduce:transition-none",
         featured ? "p-5 sm:p-6" : "p-4",
       )}
     >
-      <div
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute rounded-full opacity-20 blur-3xl transition-transform duration-500 group-hover:scale-125",
-          featured ? "-right-12 -top-16 size-48" : "-right-10 -top-12 size-32",
-        )}
-        style={{ background: `oklch(0.72 0.15 ${family.accentHue})` }}
-      />
+      {!compact ? <figure className="relative mb-5 overflow-hidden rounded-lg border border-line"><img src={study.image} alt="" loading="lazy" width={640} height={360} className={cn("w-full object-cover", featured ? "h-40 sm:h-48" : "h-36")} style={{ objectPosition: study.position }} /><figcaption className="absolute inset-x-0 bottom-0 bg-panel/90 px-3 py-2 text-[0.65rem] text-fg-2">{study.label} · 탐색 예시</figcaption></figure> : null}
       <div className="relative flex items-start justify-between gap-3">
         <span
           className={cn(

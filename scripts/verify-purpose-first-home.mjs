@@ -39,6 +39,7 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
 
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.locator(".cf-continuity > summary").click();
     await page.locator("#product-intent-title").waitFor({ timeout: 60_000 });
     await page.locator('[data-creator-home="studio-first"]').waitFor({ timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);

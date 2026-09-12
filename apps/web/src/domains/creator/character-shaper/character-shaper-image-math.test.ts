@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CHARACTER_INK_HEX,
   alphaOnly,
+  deriveCharacterShadingLayers,
   isEmptyPass,
   lumaOf,
   maskMultiply,
@@ -76,6 +77,72 @@ describe("character shaper image math — pass difference", () => {
 
   it("refuses passes of different sizes instead of reading past the end", () => {
     expect(() => subtractClamped(rgba([1, 1, 1, 1]), rgba([1, 1, 1, 1], [2, 2, 2, 2])))
+      .toThrow(/크기가 다릅니다/u);
+  });
+});
+
+describe("character shaper image math — PSD shading reconstruction", () => {
+  /** Independent opaque-backdrop source-over reference with RGBA8 rounding after each layer. */
+  function compositeChannel(flat: number, multiply: number, multiplyAlpha: number, screen: number, screenAlpha: number) {
+    const darkened = Math.round(flat * (1 - multiplyAlpha / 255) + flat * multiply / 255 * multiplyAlpha / 255);
+    return Math.round(darkened * (1 - screenAlpha / 255) + (255 - (255 - darkened) * (255 - screen) / 255) * screenAlpha / 255);
+  }
+
+  it("separates mixed channel directions using neutral factors for the other channels", () => {
+    const flat = rgba([200, 180, 160, 255]);
+    const beauty = rgba([100, 180, 200, 255]);
+    const beforeFlat = flat.slice();
+    const beforeBeauty = beauty.slice();
+    const { shadow, highlight } = deriveCharacterShadingLayers(flat, beauty);
+
+    expect([...shadow]).toEqual([128, 255, 255, 255]);
+    expect([...highlight]).toEqual([0, 0, 107, 255]);
+    for (let channel = 0; channel < 3; channel += 1) {
+      expect(Math.abs(compositeChannel(flat[channel], shadow[channel], shadow[3], highlight[channel], highlight[3]) - beauty[channel]))
+        .toBeLessThanOrEqual(1);
+    }
+    expect(flat).toEqual(beforeFlat);
+    expect(beauty).toEqual(beforeBeauty);
+    expect(shadow.buffer).not.toBe(flat.buffer);
+    expect(highlight.buffer).not.toBe(beauty.buffer);
+    expect(highlight.buffer).not.toBe(shadow.buffer);
+  });
+
+  it("reconstructs all 65,536 opaque channel pairs, including black/white and mixed RGB directions", () => {
+    const flat = new Uint8ClampedArray(256 * 256 * 4);
+    const beauty = new Uint8ClampedArray(flat.length);
+    for (let source = 0; source <= 255; source += 1) {
+      for (let target = 0; target <= 255; target += 1) {
+        const index = (source * 256 + target) * 4;
+        flat.set([source, 255 - source, (source * 73) % 256, 255], index);
+        beauty.set([target, 255 - target, (target * 17) % 256, 255], index);
+      }
+    }
+    const { shadow, highlight } = deriveCharacterShadingLayers(flat, beauty);
+    let maximumError = 0;
+    for (let i = 0; i < flat.length; i += 4) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        const result = compositeChannel(flat[i + channel], shadow[i + channel], shadow[i + 3], highlight[i + channel], highlight[i + 3]);
+        maximumError = Math.max(maximumError, Math.abs(result - beauty[i + channel]));
+      }
+    }
+    expect(maximumError).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps unchanged pixels transparent and uses only shared silhouette coverage", () => {
+    const flat = rgba([100, 110, 120, 255], [240, 0, 0, 0], [100, 100, 100, 128], [100, 100, 100, 255]);
+    const beauty = rgba([100, 110, 120, 255], [0, 240, 0, 255], [50, 150, 100, 64], [100, 100, 100, 128]);
+    const { shadow, highlight } = deriveCharacterShadingLayers(flat, beauty);
+    expect(alphaChannel(shadow)).toEqual([0, 0, 64, 0]);
+    expect(alphaChannel(highlight)).toEqual([0, 0, 64, 0]);
+    expect([...shadow.slice(4, 8)]).toEqual([0, 0, 0, 0]);
+    expect([...highlight.slice(4, 8)]).toEqual([0, 0, 0, 0]);
+  });
+
+  it("rejects invalid buffers and different dimensions without partial output", () => {
+    expect(() => deriveCharacterShadingLayers(new Uint8ClampedArray(), rgba([0, 0, 0, 255]))).toThrow(TypeError);
+    expect(() => deriveCharacterShadingLayers(rgba([0, 0, 0, 255]), new Uint8ClampedArray(3))).toThrow(TypeError);
+    expect(() => deriveCharacterShadingLayers(rgba([0, 0, 0, 255]), rgba([0, 0, 0, 255], [0, 0, 0, 255])))
       .toThrow(/크기가 다릅니다/u);
   });
 });

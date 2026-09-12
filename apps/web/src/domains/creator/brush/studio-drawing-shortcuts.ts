@@ -5,9 +5,9 @@ import {
 } from "../studio-app-settings";
 
 import {
-  BRUSH_OPACITY_RANGE,
-  BRUSH_STROKE_WIDTH_RANGE,
+  studioBrushSnapshotRanges,
 } from "./studio-brush-library";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 export type StudioDrawingShortcut =
   | { type: "select-pen" }
@@ -291,20 +291,32 @@ export function resolveStudioDrawingShortcut(
   return null;
 }
 
-export function adjustStudioBrushWidth(current: number, delta: number): number {
-  const safeCurrent = Number.isFinite(current) ? current : BRUSH_STROKE_WIDTH_RANGE[0];
+export function adjustStudioBrushWidth(current: number, delta: number, programs?: StudioBrushEngineProgramSet | null): number {
+  const range = studioBrushSnapshotRanges(programs).strokeWidth;
+  const safeCurrent = Number.isFinite(current) ? current : range[0];
   const safeDelta = Number.isFinite(delta) ? delta : 0;
   return Math.min(
-    BRUSH_STROKE_WIDTH_RANGE[1],
-    Math.max(BRUSH_STROKE_WIDTH_RANGE[0], Math.round(safeCurrent + safeDelta))
+    range[1],
+    Math.max(range[0], Math.round(safeCurrent + safeDelta))
   );
 }
 
-export function adjustStudioBrushOpacity(current: number, delta: number): number {
-  const safeCurrent = Number.isFinite(current) ? current : BRUSH_OPACITY_RANGE[1];
+export function adjustStudioBrushWidthFromWheel(
+  current: number,
+  event: Pick<WheelEvent, "deltaY" | "shiftKey">,
+  reverseWheel: boolean,
+  programs?: StudioBrushEngineProgramSet | null,
+): number {
+  const direction = (event.deltaY < 0 ? 1 : -1) * (reverseWheel ? -1 : 1);
+  return adjustStudioBrushWidth(current, direction * (event.shiftKey ? 5 : 1), programs);
+}
+
+export function adjustStudioBrushOpacity(current: number, delta: number, programs?: StudioBrushEngineProgramSet | null): number {
+  const range = studioBrushSnapshotRanges(programs).opacity;
+  const safeCurrent = Number.isFinite(current) ? current : range[1];
   const safeDelta = Number.isFinite(delta) ? delta : 0;
   const rounded = Math.round((safeCurrent + safeDelta) * 100) / 100;
-  return Math.min(BRUSH_OPACITY_RANGE[1], Math.max(BRUSH_OPACITY_RANGE[0], rounded));
+  return Math.min(range[1], Math.max(range[0], rounded));
 }
 
 /** @internal exported for tests / docs — registry drawing action defaults. */

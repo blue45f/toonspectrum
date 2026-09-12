@@ -49,6 +49,7 @@ describe("live adjustment actual runtime and capture fence", () => {
     let completed = false;
     const captured = waitForStudioRasterImagePresentations(identities, () => scene.draw()).then(() => { completed = true; });
     expect(completed).toBe(false);
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     expect([...scene.output]).toEqual([245, 235, 225, 128]);
     expect([...scene.source]).toEqual([10, 20, 30, 128]);
@@ -59,6 +60,7 @@ describe("live adjustment actual runtime and capture fence", () => {
   });
   it("rebuilds the real parent compositor when a late image Worker publishes newer pixels", async () => {
     render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     scene.source = new Uint8ClampedArray([100, 120, 140, 255]);
     const imageNode = { getParent: () => scene.node } as unknown as Konva.Node;
@@ -68,6 +70,7 @@ describe("live adjustment actual runtime and capture fence", () => {
   });
   it("keys a changed graph separately and ignores the old receipt during immediate export", async () => {
     const view = render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     const old = snapshotStudioMountedRasterImagePresentations()[0]!;
     view.rerender(mount({ ...adjustment(), opacity: 0 }, "opacity-zero"));
@@ -76,6 +79,7 @@ describe("live adjustment actual runtime and capture fence", () => {
     let completed = false;
     const fence = waitForStudioRasterImagePresentations([next], () => scene.draw()).then(() => { completed = true; });
     expect(completed).toBe(false);
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     expect([...scene.output]).toEqual([...scene.source]);
     act(() => scene.draw()); await fence;
@@ -83,6 +87,7 @@ describe("live adjustment actual runtime and capture fence", () => {
   it("reports a cache failure, refuses export and retries on a new graph without accepting stale pixels", async () => {
     scene.cacheFailure = true;
     const view = render(mount());
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("error"));
     const controller = new AbortController();
     const fence = waitForStudioRasterImagePresentations(snapshotStudioMountedRasterImagePresentations(), () => scene.draw(), controller.signal);
@@ -90,6 +95,7 @@ describe("live adjustment actual runtime and capture fence", () => {
     await expect(fence).rejects.toThrow("capture cancelled");
     scene.cacheFailure = false;
     view.rerender(mount({ ...adjustment(), opacity: 0.5 }, "retry"));
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     expect([...scene.output]).toEqual([128, 128, 128, 128]);
     await waitForStudioRasterImagePresentations(snapshotStudioMountedRasterImagePresentations(), () => scene.draw());
@@ -107,6 +113,7 @@ describe("live adjustment actual runtime and capture fence", () => {
     } as unknown as ReturnType<typeof HTMLCanvasElement.prototype.getContext>);
     const element = { ...createStudioLiveAdjustment("adjustment", 1, 1), filterMaskSrc: "data:image/png;base64,mask", smartFilters: { version: 1 as const, entries: [{ id: "remove-white", engine: "color-to-alpha" as const, enabled: true, params: { keyColor: "#ffffff", strength: 100 } }] } };
     render(<StudioLiveAdjustmentGroup element={element} cacheKey="masked" width={1} height={1} sourceIds={["source"]} children={null} />);
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
     expect([...scene.output]).toEqual([85, 85, 85, 191]);
     expect([...scene.source]).toEqual([128, 128, 128, 255]);
@@ -115,6 +122,7 @@ describe("live adjustment actual runtime and capture fence", () => {
   it("fails capture when a durable mask has not hydrated instead of applying an unmasked effect", async () => {
     const element = { ...adjustment(), filterMaskSurfaceId: "filter-mask:v1:10000000-0000-4000-8000-000000000001" };
     render(mount(element));
+    await act(async () => { await vi.dynamicImportSettled(); });
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("error"));
     expect(readStudioLiveAdjustmentStatus("adjustment")?.message).toMatch(/복원/);
     const controller = new AbortController();

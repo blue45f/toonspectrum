@@ -43,6 +43,11 @@ import { useStudioStableHandlers } from "../studio-stable-handlers";
 
 import { studioLayerSourcesBakeToSingleLayer } from "./studio-layer-merge";
 import {
+  findStudioLayerTypeahead,
+  selectStudioLayerKeyboardRange,
+  type StudioLayerTypeaheadState,
+} from "./studio-layer-keyboard-navigation";
+import {
   DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
   STUDIO_LAYER_COLORS,
   STUDIO_LAYER_COLOR_LABELS,
@@ -381,6 +386,8 @@ export function StudioLayerNavigator({
   const actionFallbackKeyRef = useRef<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef(new Map<string, HTMLElement>());
+  const keyboardRangeAnchorRef = useRef<string | null>(null);
+  const typeaheadRef = useRef<StudioLayerTypeaheadState | null>(null);
   const dragPayloadRef = useRef<StudioLayerDragPayload | null>(null);
   const dropIntentRef = useRef<StudioLayerDropIntent | null>(null);
 
@@ -477,6 +484,15 @@ export function StudioLayerNavigator({
   const visibleItemIds = focusTargets.flatMap((target) =>
     target.kind === "item" ? [target.entry.item.id] : []
   );
+  function buildKeyboardRows() {
+    return focusTargets.map((target) => ({
+      key: target.key,
+      label: target.kind === "item" ? target.entry.item.label : target.group.name,
+      // Expanded descendants participate through their own displayed rows. Including all of
+      // them on the header would select siblings beyond the keyboard range's endpoint.
+      itemIds: target.kind === "item" ? [target.entry.item.id] : target.expanded ? [] : target.itemIds,
+    }));
+  }
   const focusKeySet = new Set(focusTargets.map((target) => target.key));
   const selectedFocusTarget = focusTargets.find(
     (target) => target.kind === "item" && selectedIdSet.has(target.entry.item.id)
@@ -512,6 +528,8 @@ export function StudioLayerNavigator({
 
   useEffect(() => {
     void pageKey;
+    keyboardRangeAnchorRef.current = null;
+    typeaheadRef.current = null;
     setSelectionAnchorId(null);
     setFocusedKey(null);
     setRenameTarget(null);
@@ -598,6 +616,8 @@ export function StudioLayerNavigator({
   ]);
 
   function applyItemSelection(targetId: string, mode: StudioLayerSelectionMode) {
+    keyboardRangeAnchorRef.current = null;
+    typeaheadRef.current = null;
     const next = reduceStudioLayerSelection({
       orderedVisibleIds: visibleItemIds,
       currentIds: selectedIds,
@@ -611,6 +631,8 @@ export function StudioLayerNavigator({
   }
 
   function selectGroupItems(itemIds: readonly string[]) {
+    keyboardRangeAnchorRef.current = null;
+    typeaheadRef.current = null;
     if (itemIds.length === 0) return;
     const allSelected = itemIds.every((id) => selectedIdSet.has(id));
     if (allSelected) {
@@ -623,6 +645,8 @@ export function StudioLayerNavigator({
   }
 
   function replaceWithGroupItems(itemIds: readonly string[]) {
+    keyboardRangeAnchorRef.current = null;
+    typeaheadRef.current = null;
     if (itemIds.length === 0) return;
     onSelectionChange([...new Set(itemIds)].slice(0, 500));
     setSelectionAnchorId(itemIds[0] ?? null);
@@ -633,7 +657,24 @@ export function StudioLayerNavigator({
     rowRefs.current.get(key)?.focus();
   }
 
-  function moveRowFocus(currentKey: string, key: "ArrowUp" | "ArrowDown" | "Home" | "End") {
+  function extendKeyboardSelection(currentKey: string, targetKey: string, additive: boolean) {
+    const storedAnchor = keyboardRangeAnchorRef.current;
+    const anchorKey = storedAnchor && focusKeySet.has(storedAnchor)
+      ? storedAnchor
+      : focusTargets.find((target) => target.kind === "item" && target.entry.item.id === selectionAnchorId)?.key
+        ?? currentKey;
+    keyboardRangeAnchorRef.current = anchorKey;
+    onSelectionChange(selectStudioLayerKeyboardRange({
+      rows: buildKeyboardRows(), anchorKey, targetKey, selectedIds, additive,
+    }));
+  }
+
+  function moveRowFocus(
+    currentKey: string,
+    key: "ArrowUp" | "ArrowDown" | "Home" | "End",
+    extend: boolean,
+    additive: boolean,
+  ) {
     if (focusTargets.length === 0) return;
     const currentIndex = Math.max(0, focusTargets.findIndex((target) => target.key === currentKey));
     const nextIndex = key === "ArrowUp"
@@ -644,7 +685,11 @@ export function StudioLayerNavigator({
           ? 0
           : focusTargets.length - 1;
     const next = focusTargets[nextIndex];
-    if (next) focusRow(next.key);
+    if (next) {
+      if (extend) extendKeyboardSelection(currentKey, next.key, additive);
+      else keyboardRangeAnchorRef.current = null;
+      focusRow(next.key);
+    }
   }
 
   function beginRename(kind: RenameTarget["kind"], id: string, value: string) {
@@ -713,6 +758,7 @@ export function StudioLayerNavigator({
 
   function handleTreeItemKeyDown(event: ReactKeyboardEvent<HTMLElement>, target: FocusTarget) {
     if (event.target !== event.currentTarget) return;
+    if (event.nativeEvent.isComposing || event.key === "Process") return;
     if (
       (event.metaKey || event.ctrlKey) &&
       !event.altKey &&
@@ -721,6 +767,17 @@ export function StudioLayerNavigator({
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) return;
+      if (mutationDisabled || groupingDisabled || filterActive
+        || (!event.shiftKey && createGroupUnavailableReason !== undefined)) {
+        setDragAnnouncement(readOnly
+          ? "읽기 전용 작업공간에서는 그룹을 바꿀 수 없어요."
+          : groupingDisabled
+            ? "현재 작업면은 레이어 그룹을 지원하지 않아요."
+            : filterActive
+              ? "검색·필터를 지운 뒤 그룹을 바꿀 수 있어요."
+              : selectionEditGate.reason ?? createGroupUnavailableReason ?? "현재 선택의 그룹을 바꿀 수 없어요.");
+        return;
+      }
       onAction({
         type: event.shiftKey ? "ungroup-selection" : "group-selection",
       });
@@ -729,8 +786,9 @@ export function StudioLayerNavigator({
     if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "a") {
       event.preventDefault();
       event.stopPropagation();
-      onSelectionChange(visibleItemIds.slice(0, 500));
-      setSelectionAnchorId(visibleItemIds[0] ?? null);
+      onSelectionChange(resultIds.slice(0, 500));
+      setSelectionAnchorId(resultIds[0] ?? null);
+      keyboardRangeAnchorRef.current = null;
       return;
     }
     const reorderDirection = layerOrderShortcutDirection(event);
@@ -782,12 +840,15 @@ export function StudioLayerNavigator({
     ) {
       event.preventDefault();
       event.stopPropagation();
-      moveRowFocus(target.key, event.key);
+      typeaheadRef.current = null;
+      moveRowFocus(target.key, event.key, event.shiftKey, event.metaKey || event.ctrlKey);
       return;
     }
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
       event.stopPropagation();
+      typeaheadRef.current = null;
+      keyboardRangeAnchorRef.current = null;
       if (target.kind === "group") {
         if (target.itemIds.length === 0) return;
         const expanded = target.expanded;
@@ -824,8 +885,24 @@ export function StudioLayerNavigator({
     if (event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
+      if (event.shiftKey) {
+        extendKeyboardSelection(target.key, target.key, event.metaKey || event.ctrlKey);
+        return;
+      }
       if (target.kind === "item") applyItemSelection(target.entry.item.id, "toggle");
       else selectGroupItems(target.itemIds);
+      return;
+    }
+    if (!event.metaKey && !event.ctrlKey && !event.altKey && /^[\p{L}\p{N}]$/u.test(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      keyboardRangeAnchorRef.current = null;
+      const match = findStudioLayerTypeahead({
+        rows: buildKeyboardRows(), currentKey: target.key, key: event.key,
+        previous: typeaheadRef.current, now: event.timeStamp,
+      });
+      typeaheadRef.current = match.state;
+      if (match.key) focusRow(match.key);
     }
   }
 
@@ -1390,6 +1467,9 @@ export function StudioLayerNavigator({
         <p aria-live="polite" aria-atomic="true" className="sr-only">
           {dragAnnouncement}
         </p>
+        <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+          Shift+↑↓로 범위 선택 · 이름을 입력해 레이어로 이동
+        </p>
       </div>
 
       <StudioLayerNavigatorFilterPanel
@@ -1474,7 +1554,7 @@ export function StudioLayerNavigator({
           actionTargetId={actionTarget?.id ?? null}
           actionPopoverId={actionPopoverId}
           onSelectionChange={onSelectionChange}
-          visibleItemIds={visibleItemIds}
+          visibleItemIds={resultIds}
           setFocusedKey={setFocusedKey}
           handleTreeItemKeyDown={handleTreeItemKeyDown}
           selectGroupItems={selectGroupItems}

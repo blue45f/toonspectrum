@@ -16,6 +16,7 @@ import {
   createBabylonAlignedRasterSmokeRequest,
   createBabylonStableIdParityRequests,
   classifyStudio3dWebGpuRetryableFailure,
+  classifyStudio3dPngEncoderWorker,
   collectStudioVrmMannequinChromaFailures,
   formatStudio3dWebGpuDiagnosticConsoleMessage,
   isExpectedStaticPreviewSocketIoHandshakeClose,
@@ -36,6 +37,13 @@ import {
 } from "./verify-studio-3d-console.mts";
 
 const PREVIEW_URL = "http://127.0.0.1:51758/studio";
+describe("3D PNG worker identities", () => {
+  it("keeps dedicated VRM single-image proof separate from the shared BG3D layered worker", () => {
+    expect(classifyStudio3dPngEncoderWorker("http://127.0.0.1/assets/studio-vrm-png.worker-Ab12.js")).toBe("vrm");
+    expect(classifyStudio3dPngEncoderWorker("http://127.0.0.1/assets/studio-bg3d-shot-png.worker-Cd34.js")).toBe("bg3d");
+    expect(classifyStudio3dPngEncoderWorker("http://127.0.0.1/assets/studio-local-database.worker-X.js")).toBeNull();
+  });
+});
 const EXPECTED_HANDSHAKE_CLOSE = [
   "WebSocket connection to ",
   "'ws://127.0.0.1:51758/socket.io/?EIO=4&transport=websocket' failed: ",
@@ -766,9 +774,9 @@ describe("3D WebGPU conformance browser boundary", () => {
     const webGpuProof = main.indexOf(
       "await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(",
     );
-    const normalBrowser = main.indexOf(
-      'browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });',
-    );
+    const normalBrowser = main.search(/browser = await chromium\.launch\(\{\s*headless: true,/u);
+    expect(main.slice(normalBrowser, main.indexOf("const context =", normalBrowser)))
+      .toContain('channel: "chromium"');
 
     expect(webGpuAttempt).toContain("await runStudio3dWebGpuShardWithCleanup(");
     expect(webGpuAttempt).toContain("await webGpuContext?.close()");

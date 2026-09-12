@@ -145,7 +145,7 @@ export function CommandPalette({
       return;
     }
 
-    fetchSearchResponse(`sort=relevance&q=${encodeURIComponent(queryToSearch)}`, controller.signal)
+    fetchSearchResponse(`sort=relevance&page=1&pageSize=8&q=${encodeURIComponent(queryToSearch)}`, controller.signal)
       .then((data) => {
         if (alive) setResults(data.items.slice(0, 8));
       })

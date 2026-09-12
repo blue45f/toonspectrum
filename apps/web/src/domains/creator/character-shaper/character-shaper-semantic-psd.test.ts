@@ -1,6 +1,6 @@
 import { initializeCanvas, readPsd } from "ag-psd";
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CHARACTER_SEMANTIC_MASK_ORDER,
@@ -37,8 +37,8 @@ initializeCanvas(
   }),
 );
 
-const WIDTH = 2;
-const HEIGHT = 2;
+const WIDTH = 4;
+const HEIGHT = 1;
 const PIXELS = WIDTH * HEIGHT;
 
 type MToonLike = THREE.MeshStandardMaterial & {
@@ -309,6 +309,59 @@ describe("character shaper semantic capture — passes", () => {
     expect(renderer.observations.every((observation) => observation.muted.length === 0)).toBe(true);
   });
 
+  it.each([
+    { reuse: "meshes", outcome: "success" },
+    { reuse: "meshes", outcome: "render failure" },
+    { reuse: "meshes", outcome: "cancel" },
+    { reuse: "slots", outcome: "success" },
+    { reuse: "slots", outcome: "render failure" },
+    { reuse: "slots", outcome: "cancel" },
+  ] as const)("restores shared material flags across $reuse after $outcome", async ({ reuse, outcome }) => {
+    const scene = buildMergedHeadScene();
+    if (reuse === "meshes") {
+      const secondHead = scene.head.clone();
+      secondHead.name = "N00_000_00_HeadMesh_Second";
+      scene.vrm.scene.add(secondHead);
+    } else {
+      scene.head.material = [scene.faceMaterial, scene.faceMaterial, scene.eyeMaterial, scene.eyeMaterial];
+    }
+    // A restore must preserve intentionally disabled flags, not simply enable every material.
+    scene.eyeMaterial.depthWrite = false;
+    const hidden = mesh("Hair_Hidden", mtoon("Hair", "#123456", "#102030"));
+    hidden.visible = false;
+    scene.vrm.scene.add(hidden);
+    const before = observe(scene.capture.scene);
+    const controller = new AbortController();
+    const renderer = fakeRenderer((observation, call) => {
+      if (call === 2) {
+        // The eye mask is the first pass that temporarily mutes shared face slots.
+        expect(observation.muted).toEqual([scene.faceMaterial.name]);
+        expect(scene.faceMaterial.depthWrite).toBe(false);
+        if (outcome === "render failure") throw new Error("mask render failed");
+        if (outcome === "cancel") controller.abort();
+      }
+      if (call === 3) expect(observation.muted).toEqual([scene.eyeMaterial.name]);
+      return null;
+    });
+    const pending = captureCharacterSemanticPasses({
+      capture: scene.capture, vrm: scene.vrm, width: WIDTH, height: HEIGHT, signal: controller.signal,
+    }, renderer.dependencies);
+    if (outcome === "success") {
+      const result = await pending;
+      expect(result.passes.map((entry) => entry.id)).toEqual(expect.arrayContaining(["mask-eyes", "mask-face"]));
+    } else if (outcome === "render failure") {
+      await expect(pending).rejects.toThrow("mask render failed");
+    } else {
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    }
+    expect(observe(scene.capture.scene)).toEqual(before);
+    expect(scene.faceMaterial.colorWrite).toBe(true);
+    expect(scene.faceMaterial.depthWrite).toBe(true);
+    expect(scene.eyeMaterial.colorWrite).toBe(true);
+    expect(scene.eyeMaterial.depthWrite).toBe(false);
+    if (outcome !== "success") expect(renderer.observations).toHaveLength(3);
+  });
+
   it("restores every material factor after the flat pass", async () => {
     const scene = buildCharacterScene();
     const before = Object.entries(scene.materials).map(([key, material]) =>
@@ -378,12 +431,61 @@ describe("character shaper semantic capture — passes", () => {
     );
 
     const byId = new Map(passes.map((entry) => [entry.id, entry]));
-    // pixel 0 is 60 darker in beauty → shadow; pixel 1 is 95 brighter → highlight.
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(0, 4)]).toEqual([60, 60, 60, 60]);
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(4, 8)]).toEqual([0, 0, 0, 0]);
-    expect([...(byId.get("highlight")?.rgba ?? []).slice(4, 8)]).toEqual([95, 95, 95, 95]);
+    const shadow = byId.get("shadow")!.rgba;
+    const highlight = byId.get("highlight")!.rgba;
+    const flat = byId.get("flat")!.rgba;
+    // Apply the actual PSD blend modes independently. Difference pixels alone cannot reproduce
+    // the beauty pass; normalized Multiply and Screen layers should match within RGBA8 rounding.
+    for (let index = 0; index < flat.length; index += 4) {
+      if (flat[index + 3] !== 255 || BEAUTY[index + 3] !== 255) continue;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const source = flat[index + channel];
+        const shadowAlpha = shadow[index + 3] / 255;
+        const dark = source * (1 - shadowAlpha + shadowAlpha * shadow[index + channel] / 255);
+        const highlightAlpha = highlight[index + 3] / 255;
+        const composite = dark + (255 - dark) * highlight[index + channel] / 255 * highlightAlpha;
+        expect(Math.abs(Math.round(composite) - BEAUTY[index + channel])).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(shadow[3]).toBe(255);
+    expect(shadow[7]).toBe(0);
+    expect(highlight[7]).toBe(255);
     expect(byId.get("line")).toBeDefined();
     expect(byId.get("beauty")?.rgba).toEqual(BEAUTY);
+  });
+
+  it("keeps the interior of dark hair or clothes transparent in the line layer", async () => {
+    const size = 9;
+    const raster = new Uint8ClampedArray(size * size * 4);
+    for (let y = 1; y < size - 1; y += 1) {
+      for (let x = 1; x < size - 1; x += 1) {
+        raster.set([12, 12, 12, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer(() => raster.slice()).dependencies,
+    );
+    const line = passes.find((pass) => pass.id === "line")!.rgba;
+    expect(line[(4 * size + 4) * 4 + 3]).toBe(0);
+    expect(line[(4 * size + 1) * 4 + 3]).toBeGreaterThan(0);
+  });
+
+  it("does not duplicate a toon shadow boundary into the line layer", async () => {
+    const size = 9;
+    const flat = new Uint8ClampedArray(size * size * 4).fill(255);
+    const beauty = flat.slice();
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < 4; x += 1) {
+        beauty.set([80, 80, 80, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer((_observation, call) => (call === 0 ? beauty : flat).slice()).dependencies,
+    );
+    expect(passes.some((pass) => pass.id === "shadow")).toBe(true);
+    expect(passes.some((pass) => pass.id === "line")).toBe(false);
   });
 
   it("names the passes a model cannot produce instead of faking them", async () => {
@@ -455,6 +557,22 @@ describe("character shaper semantic capture — passes", () => {
     expect(scene.materials.face.shadingShiftFactor).toBe(-0.25);
   });
 
+  it("rejects a stale editing authority before the next pass and restores temporary shading", async () => {
+    const scene = buildCharacterScene();
+    const before = observe(scene.capture.scene);
+    const renderer = fakeRenderer();
+    let checks = 0;
+    await expect(captureCharacterSemanticPasses({
+      ...baseInput(scene),
+      assertCurrent: () => {
+        checks += 1;
+        if (checks > 1) throw new Error("캐릭터가 바뀌었습니다");
+      },
+    }, renderer.dependencies)).rejects.toThrow("캐릭터가 바뀌었습니다");
+    expect(renderer.observations).toHaveLength(1);
+    expect(observe(scene.capture.scene)).toEqual(before);
+  });
+
   it("aborts between passes and leaves the scene untouched", async () => {
     const scene = buildCharacterScene();
     const controller = new AbortController();
@@ -471,6 +589,49 @@ describe("character shaper semantic capture — passes", () => {
     expect(renderer.observations).toHaveLength(1);
     expect(`#${scene.materials.face.shadeColorFactor.getHexString()}`).toBe("#c89878");
     expect(Object.values(scene.meshes).every((node) => node.visible)).toBe(true);
+  });
+
+  it("restores every scene scope before onCaptured and keeps authority through asynchronous assembly", async () => {
+    const scene = buildCharacterScene();
+    const original = observe(scene.capture.scene);
+    const calls: string[] = [];
+    const assembled = buildCharacterSemanticPsd([pass("beauty", BEAUTY.slice())], [], { title: "test" });
+    let finish!: (result: typeof assembled) => void;
+    const pending = exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test",
+      onCaptured: () => { expect(observe(scene.capture.scene)).toEqual(original); calls.push("captured"); },
+      assertCurrent: () => { calls.push("authority"); },
+    }, {
+      ...fakeRenderer().dependencies,
+      assemblePsd: async (_passes, _skipped, options) => {
+        expect(calls.at(-2)).toBe("captured");
+        expect(options.ownership).toBe("copy");
+        calls.push("assembly");
+        return new Promise((resolve) => { finish = resolve; });
+      },
+    });
+    await vi.waitFor(() => expect(calls).toContain("assembly"));
+    finish(assembled);
+    await expect(pending).resolves.toBe(assembled);
+    expect(calls.at(-1)).toBe("authority");
+  });
+
+  it("does not start assembly after onCaptured cancels and does not publish an assembly after authority changes", async () => {
+    const scene = buildCharacterScene();
+    const abort = new AbortController();
+    const assemblePsd = vi.fn();
+    await expect(exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test", signal: abort.signal, onCaptured: () => abort.abort(),
+    }, { ...fakeRenderer().dependencies, assemblePsd })).rejects.toMatchObject({ name: "AbortError" });
+    expect(assemblePsd).not.toHaveBeenCalled();
+
+    let changed = false;
+    await expect(exportCharacterSemanticPsd({
+      ...baseInput(scene), title: "test", assertCurrent: () => { if (changed) throw new Error("stale"); },
+    }, { ...fakeRenderer().dependencies, assemblePsd: async (passes, skipped, options) => {
+      changed = true;
+      return buildCharacterSemanticPsd(passes, skipped, options);
+    } })).rejects.toThrow("stale");
   });
 });
 
@@ -598,7 +759,7 @@ describe("character shaper semantic PSD", () => {
     expect(() => buildCharacterSemanticPsd(
       [
         pass("flat", FLAT.slice()),
-        { id: "mask-skin", width: 4, height: 1, rgba: new Uint8ClampedArray(16).fill(255) },
+        { id: "mask-skin", width: 4, height: 2, rgba: new Uint8ClampedArray(32).fill(255) },
       ],
       [],
       { title: "크기 불일치" },
@@ -612,7 +773,7 @@ describe("character shaper semantic PSD — end to end", () => {
 
     const { blob, receipt } = await exportCharacterSemanticPsd(
       { ...baseInput(scene), title: "캐릭터 셰이퍼" },
-      fakeRenderer().dependencies,
+      { ...fakeRenderer().dependencies, assemblePsd: async (passes, skipped, options) => buildCharacterSemanticPsd(passes, skipped, options) },
     );
 
     expect(blob.size).toBeGreaterThan(0);

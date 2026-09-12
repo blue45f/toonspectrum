@@ -40,6 +40,8 @@ try {
     });
     await context.addInitScript(({ key, now }) => {
       localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+      // Seed once: init scripts run again on reload and must not overwrite the user's new plan.
+      if (localStorage.getItem(key) !== null) return;
       localStorage.setItem(key, JSON.stringify({
         version: 1,
         recent: [
@@ -59,6 +61,7 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
 
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.locator(".cf-planner > summary").click();
     const launchpad = page.locator('[data-creator-launchpad="v1"]');
     await launchpad.waitFor({ state: "visible", timeout: 60_000 });
 
@@ -86,6 +89,7 @@ try {
     assert.equal(JSON.stringify(saved).includes("secret"), false);
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator(".cf-planner > summary").click();
     await page.locator('[data-creator-launchpad="v1"]').waitFor({ state: "visible" });
     await expect(page.locator('[data-creator-launchpad="v1"]').getByRole("link", { name: /이 계획으로 시작하기/ }))
       .toHaveAttribute("href", "/research/assets");

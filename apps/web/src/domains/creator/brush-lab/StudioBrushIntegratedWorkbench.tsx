@@ -70,8 +70,8 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
       <StudioBrushV6Workbench key={`${scope}:${generation}`} scope={scope} />
       <div className="rounded-2xl border border-line bg-card/45 p-4">
         <p className="text-xs leading-5 text-fg-3">
-          V6 프로그램은 제품 브러시의 편집 설정과 마켓 게시 브리지에 연결됩니다. 일반
-          캔버스에서는 저장된 프로그램을 공통 live·commit·export 런타임 resolver가 해석합니다.
+          완성한 브러시는 ‘스튜디오에 브러시 저장’으로 라이브러리에 추가하세요.
+          원고에서 사용한 재료 설정은 획마다 보존되며, 그리기와 내보내기에 같은 접촉 계산을 사용합니다.
         </p>
         <div className="mt-3">
           <MarketplaceBrushStudioBridge snapshot={snapshot} visible={snapshot !== null} />

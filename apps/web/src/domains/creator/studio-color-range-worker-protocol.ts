@@ -1,5 +1,6 @@
 import { MAGIC_WAND_TRACE_MAX_DIM } from "./studio-magic-wand";
 
+import { STUDIO_SELECTION_BORDER_MAX_WIDTH_PX, type StudioSelectionBorderOptions } from "./studio-selection-border";
 import type { ColorRangeSample } from "./studio-color-range";
 import type {
   PixelSelection,
@@ -26,6 +27,7 @@ const STUDIO_COLOR_RANGE_WORKER_POINT_MIN = -0.25;
 const STUDIO_COLOR_RANGE_WORKER_POINT_MAX = 1.25;
 
 export interface StudioColorRangeWorkerRunRequest {
+  readonly kind?: "color-range";
   readonly data: Uint8ClampedArray;
   readonly width: number;
   readonly height: number;
@@ -39,11 +41,22 @@ export interface StudioColorRangeWorkerRunRequest {
   readonly aspect?: number;
 }
 
+export interface StudioSelectionBorderWorkerRunRequest extends StudioSelectionBorderOptions {
+  readonly kind: "selection-border";
+  readonly width: number;
+  readonly height: number;
+  readonly selection: PixelSelection;
+}
+
+export type StudioSelectionComputeWorkerRunRequest =
+  | StudioColorRangeWorkerRunRequest
+  | StudioSelectionBorderWorkerRunRequest;
+
 export interface StudioColorRangeWorkerRunMessage {
   type: "studio-color-range/run";
   version: typeof STUDIO_COLOR_RANGE_WORKER_PROTOCOL_VERSION;
   requestId: number;
-  request: StudioColorRangeWorkerRunRequest;
+  request: StudioSelectionComputeWorkerRunRequest;
 }
 
 export interface StudioColorRangeWorkerReadyMessage {
@@ -158,6 +171,21 @@ export function isStudioColorRangeWorkerSelection(
 export function studioColorRangeRequestTransfers(
   message: StudioColorRangeWorkerRunMessage,
 ): Transferable[] {
+  if (message.request.kind === "selection-border") return [];
   const buffer = message.request.data.buffer;
   return buffer instanceof ArrayBuffer ? [buffer] : [];
+}
+
+/** Validate before allocating a raster, both at the client and at the Worker trust boundary. */
+export function assertStudioSelectionBorderWorkerRequest(request: StudioSelectionBorderWorkerRunRequest): void {
+  if (!Number.isSafeInteger(request.width) || !Number.isSafeInteger(request.height)
+    || request.width < 1 || request.height < 1
+    || request.width > MAGIC_WAND_TRACE_MAX_DIM || request.height > MAGIC_WAND_TRACE_MAX_DIM
+    || !isStudioColorRangeWorkerSelection(request.selection) || request.selection === null
+    || !Number.isFinite(request.widthPx) || request.widthPx <= 0 || request.widthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
+    || !["inside", "center", "outside"].includes(request.placement)
+    || !Number.isFinite(request.displayWidth) || request.displayWidth <= 0
+    || !Number.isFinite(request.displayHeight) || request.displayHeight <= 0) {
+    throw new RangeError("선택 테두리 Worker 요청이 올바르지 않습니다.");
+  }
 }

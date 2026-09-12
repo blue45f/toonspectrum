@@ -42,6 +42,7 @@ export interface StudioOptionsBarsDrawModel {
     undoAvailable: boolean;
   }> | null;
   brushOpacity: number;
+  materialBrush?: boolean;
   brushSlots: readonly (StudioBrushSlot | null)[];
   canvasFlipH: boolean;
   color: string;
@@ -174,6 +175,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             brushDefaultRestore={draw.brushDefaultRestore}
             strokeWidth={draw.strokeWidth}
             brushOpacity={draw.brushOpacity}
+            materialBrush={draw.materialBrush}
             stabilizer={draw.stabilizer}
             stabilizerMode={draw.stabilizerMode}
             onStabilizerModeChange={stableHandlers.setStabilizerMode}

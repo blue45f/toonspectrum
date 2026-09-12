@@ -455,6 +455,7 @@ export function bindStudioCuttoonStagePointersPublish(
           },
           {
             brushId: drawing.brush,
+            rawMaterialPressure: drawing.mode === "pen" && Boolean(drawing.brushEnginePrograms?.material),
             pressureCurve: settings?.pressureCurve ?? pressureCurve,
             pressureMinSize: settings?.pressureMinSize ?? pressureMinSize,
             useVelocityPressure: settings?.useVelocityPressure ?? useVelocityPressure,

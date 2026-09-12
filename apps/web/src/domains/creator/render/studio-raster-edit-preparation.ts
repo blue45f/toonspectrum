@@ -1,3 +1,4 @@
+import { studioMaterialBrushBounds } from "../brush/studio-material-brush-runtime";
 /**
  * Non-destructive "editable raster copy" preparation.
  *
@@ -516,6 +517,7 @@ function drawElementBounds(
   element: Extract<El, { type: "draw" }>,
 ): StudioRasterPreparationBounds | null {
   if (element.points.length < 2 || element.points.length % 2 !== 0) return null;
+  if (element.brushEnginePrograms?.material && element.mode !== "eraser" && (element.kind ?? "freehand") === "freehand") return studioMaterialBrushBounds(element);
   const xs: number[] = [];
   const ys: number[] = [];
   for (let index = 0; index < element.points.length; index += 2) {
