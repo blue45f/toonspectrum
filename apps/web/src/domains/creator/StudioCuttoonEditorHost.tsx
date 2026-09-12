@@ -5367,6 +5367,10 @@ export function StudioCuttoonEditor({
   useStudioMaterialBrushRequest(location.search, applySavedBrush, announceDrawingShortcut);
 
   function applySavedBrush(saved: StudioSavedBrush) {
+    // A saved paint→paint selection is explicit too. SQLite hydration can finish before
+    // React renders the state updates below, so publish the selected snapshot immediately.
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = saved;
     brushBaselineController.select({ kind: "saved", brush: saved });
     activatePrimaryCanvasTool(
       "draw",

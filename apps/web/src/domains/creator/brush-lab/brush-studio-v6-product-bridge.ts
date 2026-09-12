@@ -35,6 +35,9 @@ export async function saveBrushStudioV6ProductBrush(program: BrushStudioV6Progra
   const brush = createBrushStudioV6ProductBrush(program);
   const { openProductBrushLibraryRepository } = await loadStudioBrushLibrarySqliteRepository();
   const product = await openProductBrushLibraryRepository();
+  if (product.authority !== "sqlite") {
+    throw new Error("브러시를 영구 저장할 수 있는 SQLite 저장소를 열지 못했어요. 현재 설정을 JSON으로 내보내 보관하거나 저장소를 복구한 뒤 다시 저장해주세요.");
+  }
   const stored = await product.repository.put(brush);
   const verified = await product.repository.getById(stored.id);
   if (!verified?.enginePrograms?.material) throw new Error("저장된 브러시를 다시 읽지 못했어요.");

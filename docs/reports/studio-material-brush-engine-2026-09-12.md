@@ -23,8 +23,9 @@ and historical performance estimates are described as estimates.
 
 The workbench supports a pinned A/B reference, one-parameter three-way experiments, a pressure
 response curve and gesture-grouped undo/redo. Numeric entry is committed on blur or Enter.
-Saving writes to the product SQLite brush repository and reads the record back before showing
-the manuscript link. The editor applies the selected material through its existing saved-brush
+Saving requires SQLite authority and reads the record back before showing the manuscript link;
+a session-only memory fallback cannot claim a durable save. Explicit selection is captured
+synchronously so late startup tool restoration cannot overwrite a newly chosen material. The editor applies the selected material through its existing saved-brush
 path; its inspector edits the active material parameters and can reopen the same configuration
 in Brush Editor. Library and quick-shelf thumbnails render actual material samples.
 
@@ -56,3 +57,22 @@ density is exposed as `clippedDabs` rather than silently dropping the route tail
 Browser timings are local CPU observations. They do not certify physical stylus latency,
 device palm rejection or WebGPU performance. Actual stylus and device-specific assessment
 remain a separate acceptance surface.
+
+## Recorded acceptance run
+
+The final CPU material run on 2026-09-12 passed all 17 recipes and two symmetry cases. All 136
+normalized recipe pairs exceeded the minimum material distance of 0.025 (observed minimum
+0.030974845). Native live, settled and committed pixels matched exactly, including reflected
+chisel and four-way particle overlap. SVG antialiasing produced a maximum mean normalized
+channel error of 0.00037836 across those cases.
+
+The 10,000-input, 128-strand stress run generated 1,279,872 contacts. Early append mean was
+0.2271 ms and late mean was 0.2145 ms; a single append emitted at most 128 contacts. Total
+planner and Canvas submission time was 2,274.3 ms. These observations exclude physical input
+and GPU presentation. Held numeric samples are counted; they are not a measurement of heap bytes.
+
+After building and starting Vite preview, `TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:PORT pnpm verify:studio-brush-v6-workflow` exercises the real Brush Editor save, material application,
+pen stroke, authoritative OPFS/SQLite manuscript and visible restoration after reload. It leaves
+stage timings, screenshots, network diagnostics and the exact retained material data in its
+report. Optional library probes are for diagnosis only and stay disabled in acceptance runs
+because extra reads can change startup timing.
