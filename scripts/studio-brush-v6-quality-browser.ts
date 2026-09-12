@@ -10,7 +10,7 @@ import {
 } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-preview";
 
 import { brushV6InkDistance, brushV6InkField, brushV6InkStatistics } from "./studio-brush-v6-pixel-quality";
-import { verifyBrushV6LongStrokeQuality, verifyBrushV6ProductionQuality } from "./studio-brush-v6-production-quality-browser";
+import { verifyBrushV6LongStrokeQuality, verifyBrushV6ProductionQuality, verifyBrushV6ShortStartQuality, verifyBrushV6ReliefQuality } from "./studio-brush-v6-production-quality-browser";
 
 const WIDTH = 420;
 const HEIGHT = 180;
@@ -100,7 +100,12 @@ const harness = {
         : null;
     const symmetryProduction = symmetry ? await verifyBrushV6ProductionQuality(currentProgram, cards, symmetry) : null;
     if (symmetryProduction) failures.push(...symmetryProduction.failures.map((failure) => `${symmetry!.type} symmetry: ${failure}`));
-    return { previewHash, roundtripHash, previewSamplesMs: timings.splice(0), production, symmetryProduction };
+    const shortStarts = id === "oil-hair-mixer" || id === "mineral-bloom"
+      ? await verifyBrushV6ShortStartQuality(currentProgram, cards) : null;
+    if (shortStarts) failures.push(...shortStarts.failures);
+    const relief = id === "oil-hair-mixer" ? await verifyBrushV6ReliefQuality(currentProgram, cards) : null;
+    if (relief) failures.push(...relief.failures);
+    return { previewHash, roundtripHash, previewSamplesMs: timings.splice(0), production, symmetryProduction, shortStarts, relief };
   },
   location() {
     live.scrollIntoView({ block: "center" });

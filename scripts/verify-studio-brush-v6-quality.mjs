@@ -18,6 +18,8 @@ function writeReviewIndex(report) {
   const cards = report.results.map((entry) => `<section id="${escape(entry.id)}"><h2>${escape(entry.name ?? entry.label)}</h2>`
     + `<p>${escape(entry.id)} · ${entry.production.markCount.toLocaleString()} contacts · live/commit maximum channel error ${entry.production.liveCommitted.maximumChannelError}`
     + ` · SVG mean channel error ${(entry.production.svgPixels.meanChannelError * 100).toFixed(4)}%</p>`
+    + (entry.shortStarts ? `<p>Short first segments: ${entry.shortStarts.cases.map(item => `${escape(item.label)} · ${item.markCount} contacts · native/commit max ${item.liveCommitted.maximumChannelError}`).join("; ")}</p>` : "")
+    + (entry.relief ? `<p>Bristle relief 0 versus 1: normalized deposited-material distance ${entry.relief.distance.toFixed(6)} (minimum ${entry.relief.minimumDistance})</p>` : "")
     + `<img src="${escape(entry.id)}.png" alt="${escape(entry.label)} reference, live input, Studio settled, committed and SVG comparison" loading="lazy"></section>`).join("");
   writeFileSync(join(OUTPUT, "index.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">`
     + "<title>Studio brush material verification</title><style>body{font:15px/1.6 system-ui;margin:32px auto;padding:0 20px;max-width:1050px;color:#172334;background:#f4f6f9}h1{font-size:30px}h2{margin-bottom:0}section{border-top:1px solid #ccd6e0;margin-top:30px;padding-top:16px}img{display:block;max-width:100%;height:auto}a{color:#245b8a}.metadata{padding:18px;background:white;border:1px solid #ccd6e0}</style></head><body>"
@@ -112,7 +114,7 @@ async function main() {
       kind: "studio-brush-v6-material-quality-v1", generatedAt: new Date().toISOString(),
       backend: observations.backend, browserVersion: browser.version(),
       dimensions: { width: observations.width, height: observations.height },
-      scope: "V6 reference and native pen input, actual saved config, main Studio native retained overlay and committed contacts, full SVG document export, JSON roundtrip and PNG decode. No WebGPU, physical stylus latency or full editor UI automation.",
+      scope: "V6 reference and native pen input, actual saved config, main Studio native retained overlay and committed contacts, full SVG document export, JSON roundtrip and PNG decode; vertical/diagonal bristle and wet starts plus bristle relief output. No WebGPU, physical stylus latency or full editor UI automation.",
       normalization: { size: 26, opacity: 0.8, primaryColor: "#243c56", secondaryColor: "#76532f", seed: 912_2026 },
       minimumMaterialDistance: 0.025, results, longStroke, distances: observations.distances,
       diagnostics, failures, artifactDirectory: OUTPUT,

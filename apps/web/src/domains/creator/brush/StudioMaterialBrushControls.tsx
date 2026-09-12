@@ -78,12 +78,14 @@ export function StudioMaterialBrushControls({ material, programSet, onChange }: 
       </div>)}
     </div>
     <label htmlFor={`${instanceId}-secondary`} className="flex min-h-11 items-center justify-between gap-3 text-xs font-semibold text-fg-2">혼합·문양 색
-      <input id={`${instanceId}-secondary`} type="color" value={material.tuning.secondaryColor} className="h-9 w-16 rounded-lg"
+      <input id={`${instanceId}-secondary`} type="color" value={material.tuning.secondaryColor} disabled={!active.has("secondaryColor")}
+        aria-describedby={!active.has("secondaryColor") ? `${instanceId}-secondary-inactive` : undefined} className="h-9 w-16 rounded-lg disabled:opacity-55"
         onChange={(event) => {
           const next = normalizeBrushStudioV6MaterialConfig({ ...material, tuning: { ...material.tuning, secondaryColor: event.currentTarget.value } });
           if (next) onChange({ ...programSet, material: next });
         }} />
     </label>
+    {!active.has("secondaryColor") ? <p id={`${instanceId}-secondary-inactive`} className="text-[0.65rem] leading-4 text-fg-3">현재 재료 조합에서 사용하지 않음</p> : null}
     <div className="flex flex-wrap gap-2">
       <a href={editorHref} onClick={prepareEditor} className={`inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>브러시 편집기에서 비교·실험</a>
       <button type="button" onClick={() => onChange(null)} className={`min-h-11 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg-3 transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>기본 브러시로 전환</button>

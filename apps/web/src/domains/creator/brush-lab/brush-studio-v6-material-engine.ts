@@ -30,9 +30,15 @@ function contactMode(program: BrushStudioV6MaterialProgram): "bristle" | "partic
 
 /** Workbench controls use the same branch decision as the contact solver. */
 export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6MaterialProgram): ReadonlySet<keyof BrushStudioV6Tuning> {
-  const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor", "secondaryColor"]);
+  const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor"]);
   const mode = contactMode(program);
   const pattern = program.slots.pattern !== "pattern-none";
+  const gridUsesOnlyPrimary = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(program.slots.pattern);
+  const secondaryInBase = mode === "particle" || mode === "bristle" && program.tuning.pickup > 0
+    || mode === "relief" && program.tuning.relief > 0
+    || mode === "wet" && (program.tuning.wetness > 0 || program.tuning.granulation > 0);
+  if (program.slots.finish.includes("finish-neon") || program.slots.physics.includes("physics-thin-film")
+    || (pattern ? !gridUsesOnlyPrimary || mode === "particle" : secondaryInBase)) result.add("secondaryColor");
   if (pattern) {
     result.add("patternJitter");
     // Stitch rings use nib size/spacing; density and patternScale do not participate.
@@ -192,7 +198,7 @@ export function createBrushStudioV6MaterialStroke(
   let initializedBristles = false;
   let initializedWetEdges = false;
 
-  function deposit(point: BrushStudioV6MaterialPoint, direction: number, marks: BrushStudioV6MaterialMark[], densityMultiplier = 1): void {
+  function deposit(point: BrushStudioV6MaterialPoint, direction: number, marks: BrushStudioV6MaterialMark[], densityMultiplier = 1, directional = true): void {
     const index = dabIndex++;
     const pressure = unit(point.pressure);
     if (pressure === 0 || t.flow <= 0 || t.opacity <= 0) return;
@@ -255,6 +261,19 @@ export function createBrushStudioV6MaterialStroke(
       const compliance = Math.max(0.2, size * (0.015 + t.viscosity * 0.11 + t.friction * 0.07));
       for (let lane = 0; lane < laneCount; lane++) {
         const lanePosition = (lane / (laneCount - 1) - 0.5) * 2;
+        const initialLoading = (0.25 + t.reservoir * 0.75) * (0.65 + noise(lane, 0, seed) * 0.35);
+        if (!directional) {
+          // A stationary nib leaves a seeded, round contact patch. Its unknown heading
+          // must not initialize the strand positions later connected by the first movement.
+          const turn = noise(lane, 79, seed) * TAU;
+          const distance = radius * Math.sqrt(noise(lane, 83, seed)) * 0.8;
+          const thickness = Math.max(0.18, size / laneCount * (0.35 + pressure * 0.45 + t.viscosity * 0.2))
+            * (1 + initialLoading * unit(t.relief) * 0.6);
+          emit("bristle", point.x + Math.cos(turn) * distance, point.y + Math.sin(turn) * distance,
+            thickness, thickness, 0, alpha * pressure * initialLoading * 5,
+            noise(lane, 19, seed) * t.pickup, initialLoading * t.relief);
+          continue;
+        }
         const strandSpacing = (noise(lane, 61, seed) - 0.5) * radius / laneCount;
         const splay = lanePosition * radius * (0.6 + pressure * 0.55) + strandSpacing;
         // Real bundles have unequal strand lengths and stiffness. Fixed per-lane
@@ -263,7 +282,7 @@ export function createBrushStudioV6MaterialStroke(
         const response = 1 - Math.exp(-step / (compliance * (0.6 + noise(lane, 71, seed) * 0.85)));
         const targetX = point.x + normalX * splay + Math.cos(direction) * strandLength;
         const targetY = point.y + normalY * splay + Math.sin(direction) * strandLength;
-        if (!initializedBristles) { laneX[lane] = targetX; laneY[lane] = targetY; reservoir[lane] = (0.25 + t.reservoir * 0.75) * (0.65 + noise(lane, 0, seed) * 0.35); }
+        if (!initializedBristles) { laneX[lane] = targetX; laneY[lane] = targetY; reservoir[lane] = initialLoading; }
         const previousX = laneX[lane]!;
         const previousY = laneY[lane]!;
         laneX[lane] = previousX + (targetX - previousX) * response;
@@ -274,13 +293,16 @@ export function createBrushStudioV6MaterialStroke(
         reservoir[lane] = unit(loading - loss + refill);
         const paper = sampleBrushStudioV6PaperContact(program.slots.surface, laneX[lane]!, laneY[lane]!, seed);
         const contact = Math.max(0, pressure - Math.abs(lanePosition) * 0.18 - paper * t.surfaceTooth * 0.12);
-        const thickness = Math.max(0.18, size / laneCount * (0.35 + contact * 0.45 + t.viscosity * 0.2) * (0.7 + noise(lane, 7, seed) * 0.6));
+        // Loaded paint forms a wider raised ridge. Encode that relief in the actual
+        // shared contact geometry, so both Canvas and SVG show the same contribution.
+        const thickness = Math.max(0.18, size / laneCount * (0.35 + contact * 0.45 + t.viscosity * 0.2) * (0.7 + noise(lane, 7, seed) * 0.6))
+          * (1 + loading * unit(t.relief) * 0.6);
         const travelX = laneX[lane]! - previousX;
         const travelY = laneY[lane]! - previousY;
         const travel = Math.hypot(travelX, travelY);
         emit("bristle", (previousX + laneX[lane]!) * 0.5, (previousY + laneY[lane]!) * 0.5, travel * 0.5 + thickness, thickness, travel > 0.0001 ? Math.atan2(travelY, travelX) : direction, alpha * contact * loading * 5, noise(lane, 19, seed) * t.pickup, loading * t.relief, "capsule");
       }
-      initializedBristles = true;
+      if (directional) initializedBristles = true;
       return;
     }
 
@@ -330,7 +352,7 @@ export function createBrushStudioV6MaterialStroke(
       const tooth = sampleBrushStudioV6PaperContact(program.slots.surface, Math.floor(point.x / 2) * 2, Math.floor(point.y / 2) * 2, seed);
       const resist = physics.has("physics-dry-contact") ? unit((tooth - t.surfaceTooth * 0.5) * 3) : 1;
       emit("wet", point.x, point.y, radius, radius * (chisel ? 0.38 : 1), angle, alpha * (0.55 + tooth * t.granulation * 0.5) * resist, t.granulation * tooth * 0.35);
-      if (t.edgeDarkening > 0) {
+      if (t.edgeDarkening > 0 && directional) {
         const normalX = -Math.sin(direction);
         const normalY = Math.cos(direction);
         const edgeRadius = radius * spread * (0.96 + tooth * 0.06);
@@ -365,7 +387,7 @@ export function createBrushStudioV6MaterialStroke(
       if (![input.x, input.y, input.pressure].every(Number.isFinite)) return [];
       const point = { ...input, pressure: unit(input.pressure), tilt: unit(input.tilt ?? 0), twist: finite(input.twist ?? 0) };
       const marks: BrushStudioV6MaterialMark[] = [];
-      if (!previous) { deposit(point, 0, marks); previous = point; emittedMarks += marks.length; return marks; }
+      if (!previous) { deposit(point, 0, marks, 1, false); previous = point; emittedMarks += marks.length; return marks; }
       const dx = point.x - previous.x;
       const dy = point.y - previous.y;
       const distance = Math.hypot(dx, dy);

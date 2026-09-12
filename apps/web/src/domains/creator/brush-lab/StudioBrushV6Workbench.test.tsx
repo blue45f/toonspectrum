@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBrushV6Workbench } from "./StudioBrushV6Workbench";
@@ -38,6 +38,15 @@ afterEach(cleanup);
 const stored = (): BrushStudioV6Program => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
+  it("disables the secondary color when the contact engine uses only primary pigment", () => {
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    const input = screen.getByLabelText("혼합·패턴 색", { exact: false }) as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(input.getAttribute("aria-describedby")).toBe("brush-v6-secondary-inactive");
+    expect(document.getElementById("brush-v6-secondary-inactive")?.textContent).toBe("현재 재료 조합에서 사용하지 않음");
+  });
+
   it("disables the unimplemented finger-water policy and explains imported legacy values", () => {
     const program = createBrushStudioV6Program("mineral-bloom");
     localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({
@@ -141,5 +150,43 @@ describe("V6 brush experiments in the workbench", () => {
     expect((await screen.findByRole("link", { name: "원고에서 사용하기" })).getAttribute("href"))
       .toBe("/studio?materialBrush=saved-physical-brush");
     expect(save).toHaveBeenLastCalledWith(before);
+  });
+
+  it("does not publish an old save receipt after the recipe changes while SQLite is writing", async () => {
+    let resolveSave!: (saved: { id: string; name: string }) => void;
+    save.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+    render(<StudioBrushV6Workbench scope="test" />);
+    const captured = stored();
+    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "브러시 이름" }), {
+      target: { value: "저장 중 새 브러시" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.change(screen.getByRole("slider", { name: /도포 유량/u }), { target: { value: "0.23" } });
+    await act(async () => { resolveSave({ id: "old-recipe", name: captured.name }); });
+    expect(save).toHaveBeenCalledWith(captured);
+    expect(screen.queryByRole("link", { name: "원고에서 사용하기" })).toBeNull();
+    expect(screen.queryByText(/라이브러리에 저장하고 다시 읽어 확인했습니다/u)).toBeNull();
+    expect(stored()).toMatchObject({ name: "저장 중 새 브러시", tuning: { flow: 0.23 } });
+    expect((screen.getByRole("button", { name: "스튜디오에 브러시 저장" }) as HTMLButtonElement).disabled).toBe(false);
+    save.mockResolvedValueOnce({ id: "current-recipe", name: "저장 중 새 브러시" });
+    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    expect((await screen.findByRole("link", { name: "원고에서 사용하기" })).getAttribute("href"))
+      .toBe("/studio?materialBrush=current-recipe");
+  });
+
+  it.each(["button", "keyboard"])("invalidates an in-flight save when %s undo restores an earlier program", async (source) => {
+    let resolveSave!: (saved: { id: string; name: string }) => void;
+    save.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+    render(<StudioBrushV6Workbench scope="test" />);
+    const initial = stored();
+    fireEvent.change(screen.getByRole("textbox", { name: "브러시 이름" }), { target: { value: "저장 대상" } });
+    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    const undo = screen.getByRole("button", { name: "실행 취소" });
+    if (source === "button") fireEvent.click(undo);
+    else fireEvent.keyDown(undo, { key: "z", metaKey: true });
+    await act(async () => { resolveSave({ id: "undone-recipe", name: "저장 대상" }); });
+    expect(stored()).toEqual(initial);
+    expect(screen.queryByRole("link", { name: "원고에서 사용하기" })).toBeNull();
   });
 });

@@ -237,6 +237,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const liveRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<BrushStudioV6LiveController | null>(null);
   const currentRef = useRef(program);
+  const editGenerationRef = useRef(0);
   currentRef.current = program;
 
   const analysis = analyzeBrushStudioV6Program(program, capabilities);
@@ -282,6 +283,8 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
         : event.key.toLowerCase() === "y" && event.ctrlKey ? "redo" : null;
       if (!type) return;
       event.preventDefault();
+      editGenerationRef.current += 1;
+      setSavedHref(null);
       dispatchHistory({ type });
       setStatus(type === "undo" ? "이전 브러시 설정으로 되돌렸습니다." : "브러시 설정 변경을 다시 적용했습니다.");
     };
@@ -299,6 +302,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   }, []);
 
   const replace = (next: BrushStudioV6Program, message?: string, group?: string) => {
+    editGenerationRef.current += 1;
     dispatchHistory({ type: "edit", program: next, group });
     setSavedHref(null);
     if (message) setStatus(message);
@@ -313,17 +317,24 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   };
 
   const moveHistory = (type: "undo" | "redo") => {
+    editGenerationRef.current += 1;
+    setSavedHref(null);
     dispatchHistory({ type });
     setStatus(type === "undo" ? "이전 브러시 설정으로 되돌렸습니다." : "브러시 설정 변경을 다시 적용했습니다.");
   };
   const saveToStudio = async () => {
     if (saving) return;
+    const generation = editGenerationRef.current;
     setSaving(true);
     try {
       const saved = await saveBrushStudioV6ProductBrush(program);
+      // The committed row may remain in the library, but its receipt belongs only
+      // to the captured edit generation, including changes made before React renders.
+      if (generation !== editGenerationRef.current) return;
       setSavedHref(brushStudioV6ProductBrushHref(saved.id, scope));
       setStatus(`‘${saved.name}’ 브러시를 라이브러리에 저장하고 다시 읽어 확인했습니다. 원고에서 사용하기로 그릴 수 있습니다.`);
     } catch (error) {
+      if (generation !== editGenerationRef.current) return;
       setStatus(error instanceof Error ? `브러시 저장 실패: ${error.message}` : "브러시를 저장하지 못했습니다. 설정은 유지됩니다.");
     } finally { setSaving(false); }
   };
@@ -382,7 +393,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             { key: "pressureOnset", label: "접촉 시작", min: 0, max: 0.4, step: 0.01 }, { key: "pressureSaturation", label: "포화", min: 0.5, max: 1, step: 0.01 }, { key: "pressureGamma", label: "감마", min: 0.2, max: 3, step: 0.01 }, { key: "tiltDeadZoneDeg", label: "틸트 데드존", min: 0, max: 20, step: 0.5 },
           ].map((spec) => <label key={spec.key} htmlFor={`brush-v6-input-${spec.key}`} className={SUB}><span className="flex justify-between text-xs font-bold text-fg-2"><span>{spec.label}</span><span>{Number(program.input[spec.key as keyof BrushStudioV6InputPolicy]).toFixed(2)}</span></span><input id={`brush-v6-input-${spec.key}`} type="range" min={spec.min} max={spec.max} step={spec.step} value={Number(program.input[spec.key as keyof BrushStudioV6InputPolicy])} onChange={(event: ChangeEvent<HTMLInputElement>) => patchInput({ [spec.key]: event.currentTarget.valueAsNumber })} className="mt-2 min-h-8 w-full accent-accent" /></label>)}</div></Panel></> : null}
 
-          {tab === "material" ? <Panel title="재료·표면" description="종이 접촉, 도포, 안료 pickup과 높이 표현을 직접 조절합니다."><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{MATERIAL.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}<label htmlFor="brush-v6-primary" className={SUB}><span className="text-xs font-bold text-fg-2">기본 색</span><input id="brush-v6-primary" type="color" value={program.tuning.primaryColor} onChange={(event: ChangeEvent<HTMLInputElement>) => replace(patchBrushStudioV6Tuning(program, { primaryColor: event.currentTarget.value }))} className="mt-2 h-10 w-full rounded-lg" /></label><label htmlFor="brush-v6-secondary" className={SUB}><span className="text-xs font-bold text-fg-2">혼합·패턴 색</span><input id="brush-v6-secondary" type="color" value={program.tuning.secondaryColor} onChange={(event: ChangeEvent<HTMLInputElement>) => replace(patchBrushStudioV6Tuning(program, { secondaryColor: event.currentTarget.value }))} className="mt-2 h-10 w-full rounded-lg" /></label></div></Panel> : null}
+          {tab === "material" ? <Panel title="재료·표면" description="종이 접촉, 도포, 안료 pickup과 높이 표현을 직접 조절합니다."><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{MATERIAL.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}<label htmlFor="brush-v6-primary" className={SUB}><span className="text-xs font-bold text-fg-2">기본 색</span><input id="brush-v6-primary" type="color" value={program.tuning.primaryColor} onChange={(event: ChangeEvent<HTMLInputElement>) => replace(patchBrushStudioV6Tuning(program, { primaryColor: event.currentTarget.value }))} className="mt-2 h-10 w-full rounded-lg" /></label><label htmlFor="brush-v6-secondary" className={SUB}><span className="text-xs font-bold text-fg-2">혼합·패턴 색</span><input id="brush-v6-secondary" type="color" value={program.tuning.secondaryColor} disabled={!activeTuning.has("secondaryColor")} aria-describedby={!activeTuning.has("secondaryColor") ? "brush-v6-secondary-inactive" : undefined} onChange={(event: ChangeEvent<HTMLInputElement>) => replace(patchBrushStudioV6Tuning(program, { secondaryColor: event.currentTarget.value }))} className="mt-2 h-10 w-full rounded-lg disabled:opacity-55" />{!activeTuning.has("secondaryColor") ? <span id="brush-v6-secondary-inactive" className="mt-1 block text-[0.65rem] leading-4 text-fg-3">현재 재료 조합에서 사용하지 않음</span> : null}</label></div></Panel> : null}
 
           {tab === "physics" ? <><Panel title="물리 엔진" description="강모 접촉·안료 소모·입자·번짐 근사를 조합합니다. 실제 유체 격자나 캔버스 아래색 픽업은 실행하지 않습니다."><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{physicsNodes.map((node) => <ToggleNode key={node.id} node={node} selected={program.slots.physics.includes(node.id)} onChange={() => replace(toggleBrushStudioV6Node(program, "physics", node.id))} />)}</div></Panel><Panel title="물리 파라미터" description="현재 획에 실제로 쓰이는 설정만 조절할 수 있습니다. 회색 설정은 다른 재료 조합에서 활성화됩니다."><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{PHYSICS.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div></Panel><Panel title="마감 패스" description="현재 재료 계산에 연결된 마감만 선택할 수 있습니다. 회색 항목은 실행되지 않는 설계 기록입니다."><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{finishNodes.map((node) => <ToggleNode key={node.id} node={node} selected={program.slots.finish.includes(node.id)} onChange={() => replace(toggleBrushStudioV6Node(program, "finish", node.id))} />)}</div></Panel></> : null}
 

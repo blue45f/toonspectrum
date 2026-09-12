@@ -77,6 +77,67 @@ describe("portable V6 material contacts", () => {
     expect(stroke.push(points[0]!)).toEqual(first);
   });
 
+  it("renders bristle relief as wider loaded contact ridges in Canvas and SVG", () => {
+    const base = createBrushStudioV6Program("oil-hair-mixer");
+    const render = (relief: number) => {
+      const stroke = createBrushStudioV6MaterialStroke({ ...base, tuning: { ...base.tuning, relief } });
+      return line(12).flatMap((point) => stroke.push(point));
+    };
+    const flat = render(0);
+    const raised = render(1);
+    expect(raised.length).toBe(flat.length);
+    expect(raised.every((mark, index) => mark.radiusY > flat[index]!.radiusY)).toBe(true);
+    expect(raised.every((mark, index) => mark.radiusY <= flat[index]!.radiusY * 1.6)).toBe(true);
+    expect(brushStudioV6MaterialMarksToSvg(raised)).not.toBe(brushStudioV6MaterialMarksToSvg(flat));
+    const paths = (marks: readonly BrushStudioV6MaterialMark[]) => {
+      const roundRect = vi.fn(), ellipse = vi.fn();
+      const context = { globalAlpha: 1, save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+        beginPath: vi.fn(), closePath: vi.fn(), roundRect, ellipse, fill: vi.fn() };
+      renderBrushStudioV6MaterialMarks(context as unknown as CanvasRenderingContext2D, marks);
+      return { ridges: roundRect.mock.calls, taps: ellipse.mock.calls };
+    };
+    expect(paths(raised)).not.toEqual(paths(flat));
+  });
+
+  it.each(["oil-hair-mixer", "mineral-bloom"])("%s defers directional contacts until movement and rotates vertical/diagonal starts exactly", (id) => {
+    const base = createBrushStudioV6Program(id);
+    const program = { ...base, slots: { ...base.slots, surface: "surface-smooth" },
+      input: { ...base.input, tiltEnabled: false } };
+    const origin = { x: 100, y: 100, pressure: 0.7, tilt: 0, twist: 0 };
+    const paintHeading = (angle: number) => {
+      const stroke = createBrushStudioV6MaterialStroke(program);
+      const tap = stroke.push(origin);
+      const moving = stroke.push({ ...origin, x: origin.x + Math.cos(angle) * 36, y: origin.y + Math.sin(angle) * 36 });
+      return { tap, moving };
+    };
+    const horizontal = paintHeading(0);
+    expect(horizontal.tap.length).toBeGreaterThan(0);
+    expect(horizontal.tap.every((mark) => mark.shape === "ellipse")).toBe(true);
+    const firstRidges = horizontal.moving.filter((mark) => mark.shape === "capsule")
+      .slice(0, id === "oil-hair-mixer" ? program.tuning.bristleStrands : 2);
+    expect(firstRidges.length).toBeGreaterThan(0);
+    // The first moving contacts start locally, with no capsule connecting back to a made-up heading.
+    expect(firstRidges.every((mark) => Math.abs(mark.radiusX - mark.radiusY) < 1e-9)).toBe(true);
+    for (const angle of [Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
+      const rotated = paintHeading(angle);
+      expect(rotated.tap).toEqual(horizontal.tap);
+      expect(rotated.moving.length).toBe(horizontal.moving.length);
+      for (let index = 0; index < rotated.moving.length; index++) {
+        const original = horizontal.moving[index]!;
+        const actual = rotated.moving[index]!;
+        const dx = original.x - origin.x, dy = original.y - origin.y;
+        expect(actual.x).toBeCloseTo(origin.x + dx * Math.cos(angle) - dy * Math.sin(angle), 8);
+        expect(actual.y).toBeCloseTo(origin.y + dx * Math.sin(angle) + dy * Math.cos(angle), 8);
+        expect(actual.radiusX).toBeCloseTo(original.radiusX, 8);
+        expect(actual.radiusY).toBeCloseTo(original.radiusY, 8);
+        expect(actual.opacity).toBeCloseTo(original.opacity, 8);
+      }
+      // Tap plus streamed movement has the same SVG paint order as the complete plan.
+      expect(brushStudioV6MaterialMarksToSvg(rotated.tap) + brushStudioV6MaterialMarksToSvg(rotated.moving))
+        .toBe(brushStudioV6MaterialMarksToSvg([...rotated.tap, ...rotated.moving]));
+    }
+  });
+
   it("keeps particle reaction, bristles and dry contact mechanically distinct", () => {
     const copper = paint("dendritic-copper", line(20));
     expect(copper.some((mark) => mark.kind === "particle" && mark.shape === "rect")).toBe(true);

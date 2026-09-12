@@ -68,21 +68,21 @@ The final CPU material run on 2026-09-12 passed all 17 recipes and two symmetry 
 normalized recipe pairs exceeded the minimum material distance of 0.025 (observed minimum
 0.030974845). Native live, settled and committed pixels matched exactly, including reflected
 chisel and four-way particle overlap. SVG antialiasing produced a maximum mean normalized
-channel error of 0.000197466 across those cases.
+channel error of 0.000378359 across those cases.
 
 The 10,000-input, 128-strand stress run generated 1,279,872 contacts. The real committed
-Canvas entry point rendered the whole stroke in 2,278.1 ms, with exact pixels against the
+Canvas entry point rendered the whole stroke in 2,080.4 ms, with exact pixels against the
 incremental renderer. Both generated and submitted batches peaked at 128 contacts; this large
 stroke retained no cached output. Small-stroke caches are limited to 32,768 contacts total,
 8,192 contacts and 512 input samples per item, and detect in-place edits. These observations
 exclude physical input and GPU presentation. Contact counts are not heap-byte measurements.
-The extreme whole redraw still takes about 2.28 seconds; bounded memory does not remove its
+The extreme whole redraw still takes about 2.08 seconds; bounded memory does not remove its
 underlying drawing cost.
 
 The public SVG exporter enforces a 64 MiB UTF-16 output budget and reports an actionable error
 instead of downloading an incomplete file. The extreme stroke exceeded this budget after
-270.6 ms. A separate discarding sink verified full-path serialization of 423,960,130 UTF-16
-bytes in 1,692 ms, with a maximum 42,886-byte chunk. This sink is a stress measurement, not a
+264.1 ms. A separate discarding sink verified full-path serialization of 438,812,506 UTF-16
+bytes in 1,693.4 ms, with a maximum 44,400-byte chunk. This sink is a stress measurement, not a
 claim that the application permits an unbounded SVG download.
 
 After building and starting Vite preview, `TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:PORT pnpm verify:studio-brush-v6-workflow` exercises the real Brush Editor save, material application,
@@ -116,7 +116,26 @@ legacy oil switches and material contact equality.
 The full editor's fractional-zoom resize check separately compares the complete native drawing
 command sequence and pixel coverage. In Chromium 151, replaying the exact same 1,920 fills
 on fresh equivalent canvases in one batch versus across animation frames produced a 1.5203%
-normalized spatial RGBA difference. The actual resize measured 1.5046%, with identical path,
+normalized spatial RGBA difference. The final resize measured 1.1073803%, with identical path,
 transform, alpha, color and composition for every command. Its lifecycle criterion therefore
 requires exact command identity plus the existing 3% spatial pixel limit and visible alpha.
 This browser batching difference is distinct from the material kernel's exact pixel parity.
+
+Final review additionally covers save completions racing with edits or undo, and proves every
+advertised control changes actual serialized paint across all 17 recipes. A stale SQLite
+completion cannot publish a link for the currently edited program. Primary-only materials
+disable the unused secondary picker. Bristle relief increases loaded contact ridge thickness
+by at most 1.6 times without extra contacts. Tap marks do not seed a false horizontal lane or
+wet-edge direction; the first moving contact supplies the heading.
+
+Four short-stroke browser cases cover vertical and diagonal starts for bristle and wet brushes,
+with exact native/settled/committed pixels and matching SVG geometry. Two extra oil variants
+compare relief zero and one: normalized material distance 0.0367701 exceeds the 0.01 control
+effect threshold. These six cases supplement the 17 recipes and two symmetry cases.
+
+Three fresh profiles on the final relief/directional-start production build passed the complete
+save/apply/pen/resize/SQLite/reload/public-recovery workflow. Each retained all 49 raw pressure
+samples within 2.8e-8, restored the same 1,920 native drawing commands, and preserved material
+configuration and coordinates. Active replay spatial RGBA error was 1.1073803% with 0.1291211%
+alpha-mass difference; reopened manuscript error was 0.3467481%, with 39,299 visible committed
+ink pixels and no page exceptions. The final required material suite passed 32 files / 763 tests.

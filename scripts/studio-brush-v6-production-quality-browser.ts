@@ -8,6 +8,8 @@ import { createBrushStudioV6ProductBrush } from "../apps/web/src/domains/creator
 import { exportPageToSvg } from "../apps/web/src/domains/creator/export/studio-svg-export";
 import { StudioLiveRetainedMediaOverlayRenderer } from "../apps/web/src/domains/creator/live/studio-live-retained-media-overlay";
 
+import { brushV6InkDistance, brushV6InkField } from "./studio-brush-v6-pixel-quality";
+
 import type { BrushStudioV6Program } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-engine";
 import type { DrawEl } from "../apps/web/src/domains/creator/studio-element-model";
 
@@ -68,21 +70,33 @@ function prefix(element: DrawEl, count: number): DrawEl {
     tiltXs: element.tiltXs?.slice(0, count), tiltYs: element.tiltYs?.slice(0, count), twists: element.twists?.slice(0, count) };
 }
 
-export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Program, parent: HTMLElement, symmetry?: DrawEl["symmetry"]) {
+export async function verifyBrushV6ProductionQuality(
+  program: BrushStudioV6Program,
+  parent: HTMLElement,
+  symmetry?: DrawEl["symmetry"],
+  scenario?: { label: string; points?: number[] },
+) {
   const failures: string[] = [];
-  const label = symmetry ? `${symmetry.type} symmetry` : "Main Studio";
+  const label = scenario?.label ?? (symmetry ? `${symmetry.type} symmetry` : "Main Studio");
   const activeCanvas = document.createElement("canvas");
   const settledCanvas = surface(parent, `${label} · native retained live → settled`);
   const committedCanvas = surface(parent, `${label} · committed Canvas contacts`);
   const exportCanvas = surface(parent, `${label} · complete SVG export decoded`);
   const element = { ...stroke(program), ...(symmetry ? { symmetry } : {}) };
+  if (scenario?.points) {
+    element.points = scenario.points.slice();
+    element.pressures = Array(scenario.points.length / 2).fill(0.7);
+    element.tiltXs = Array(scenario.points.length / 2).fill(0);
+    element.tiltYs = Array(scenario.points.length / 2).fill(0);
+    element.twists = Array(scenario.points.length / 2).fill(0);
+  }
   const overlay = new StudioLiveRetainedMediaOverlayRenderer();
   overlay.attach({ activeCanvas, settledCanvas });
   overlay.setSurface({ left: 0, top: 0, width: WIDTH, height: HEIGHT, documentScale: 1, documentWidth: WIDTH, flipX: false });
   const begin = overlay.begin(prefix(element, 1));
   if (begin.status !== "started" || begin.kind !== "material") failures.push(`${program.id}: production overlay did not select material`);
   const appendSamplesMs: number[] = [];
-  for (let count = 2; count <= 61; count += 1) {
+  for (let count = 2; count <= element.points.length / 2; count += 1) {
     const start = performance.now();
     const result = overlay.appendFrom(prefix(element, count));
     appendSamplesMs.push(performance.now() - start);
@@ -126,6 +140,43 @@ export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Progr
   overlay.attach(null);
   return { failures, symmetry: symmetry ?? null, symmetryNewPixels, markCount: marks.length, appendSamplesMs, liveSettled, liveCommitted, svgPixels,
     savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
+}
+
+/** Two-point gestures expose false horizontal connectors hidden inside long horizontal starts. */
+export async function verifyBrushV6ShortStartQuality(program: BrushStudioV6Program, parent: HTMLElement) {
+  const cases = [
+    { label: "Vertical short start", points: [210, 58, 210, 82] },
+    { label: "Diagonal short start", points: [192, 58, 216, 82] },
+  ];
+  const results = [];
+  for (const gesture of cases) {
+    const production = await verifyBrushV6ProductionQuality(program, parent, undefined, gesture);
+    if (production.liveCommitted.alphaFirst < 255 * 10) production.failures.push(`${program.id}: ${gesture.label} has no visible contact`);
+    results.push({ ...gesture, ...production });
+  }
+  return { cases: results, failures: results.flatMap(result => result.failures) };
+}
+
+/** A visible material control must change deposited output, with seed/path/color held fixed. */
+export async function verifyBrushV6ReliefQuality(program: BrushStudioV6Program, parent: HTMLElement) {
+  const failures: string[] = [];
+  const fields = [];
+  const variants = [];
+  for (const relief of [0, 1]) {
+    const variant = { ...program, tuning: { ...program.tuning, relief } };
+    const production = await verifyBrushV6ProductionQuality(variant, parent, undefined, { label: `Bristle relief ${relief}` });
+    failures.push(...production.failures.map(failure => `relief=${relief}: ${failure}`));
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    renderStudioMaterialBrush(canvas.getContext("2d")!, stroke(variant));
+    const pixels = read(canvas);
+    fields.push(brushV6InkField(pixels, new Uint8ClampedArray(pixels.length)));
+    variants.push({ relief, ...production });
+  }
+  const distance = brushV6InkDistance(fields[0]!, fields[1]!);
+  if (distance < 0.01) failures.push(`${program.id}: relief0/1 output remains perceptually indistinct (${distance})`);
+  return { variants, distance, minimumDistance: 0.01, failures };
 }
 
 /** Exercise both incremental and whole-stroke production rendering for a max-strand stroke. */

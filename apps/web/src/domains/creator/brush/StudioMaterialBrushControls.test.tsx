@@ -11,6 +11,22 @@ import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-
 afterEach(() => { cleanup(); localStorage.clear(); });
 
 describe("material brush controls inside Studio", () => {
+  it("disables the secondary pigment for a primary-only material and enables it for bristle mixing", () => {
+    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("clean-ink"))!;
+    const { rerender } = render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
+    const inactive = screen.getByLabelText("혼합·문양 색") as HTMLInputElement;
+    expect(inactive.disabled).toBe(true);
+    expect(inactive.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByText("현재 재료 조합에서 사용하지 않음")).toBeTruthy();
+    const bristle = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    const onChange = vi.fn();
+    rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material: bristle }} onChange={onChange} />);
+    const active = screen.getByLabelText("혼합·문양 색") as HTMLInputElement;
+    expect(active.disabled).toBe(false);
+    fireEvent.change(active, { target: { value: "#113355" } });
+    expect(onChange.mock.calls[0]?.[0].material.tuning.secondaryColor).toBe("#113355");
+  });
+
   it("edits real contact parameters while retaining the material snapshot and suppressing legacy no-op switches", () => {
     const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
     const onChange = vi.fn();
