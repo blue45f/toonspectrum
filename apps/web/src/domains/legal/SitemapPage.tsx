@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { SiteDirectorySearch } from "./SiteDirectorySearch";
+
 import {
   SITE_NAVIGATION_GROUPS,
   SITE_NAVIGATION_ITEMS,
@@ -214,12 +216,18 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   },
 ];
 
+const DIRECTORY_ENTRIES = [
+  ...SITE_NAVIGATION_GROUPS.flatMap((group) => group.items),
+  ...PERSONAL_DESTINATIONS,
+  ...EXTENDED_DESTINATION_GROUPS.flatMap((group) => group.items),
+];
+
 const PAGE_COPY = {
   ko: {
     eyebrow: "TOONSTUDIO DIRECTORY",
     title: "하고 싶은 일에서\n바로 시작하세요.",
     description: "기능 이름을 찾기보다 만들기, 발견하기, 성장하기, 함께하기 중 지금의 목적을 고르세요. 전문 도구와 정책은 아래 보조 탐색에서 이어집니다.",
-    search: "작품·도구·메뉴 검색",
+    search: "작품 검색",
     core: "핵심 작업 흐름",
     coreDescription: "자주 쓰는 목적지를 창작 여정에 맞춰 네 갈래로 정리했습니다.",
     personal: "내 공간과 환경",
@@ -231,7 +239,7 @@ const PAGE_COPY = {
     eyebrow: "TOONSTUDIO DIRECTORY",
     title: "Start with what\nyou want to do.",
     description: "Choose your current purpose—create, discover, grow or connect—instead of hunting for a feature name. Specialized tools and policies continue below.",
-    search: "Search stories, tools and menus",
+    search: "Search stories",
     core: "Core creative flow",
     coreDescription: "Frequent destinations are organized into four paths that follow the creative journey.",
     personal: "Your space and preferences",
@@ -284,6 +292,8 @@ export function SitemapPage() {
           </div>
         </div>
       </section>
+
+      <SiteDirectorySearch entries={DIRECTORY_ENTRIES} locale={locale} />
 
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -449,7 +459,7 @@ export function SitemapPage() {
             {locale === "ko" ? "이용 문의" : "Support"}
           </Link>
           <Link href="/feedback" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">
-            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={15} aria-hidden="true" />
+            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </section>

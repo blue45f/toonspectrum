@@ -55,7 +55,7 @@ export function SearchPage() {
 
         <p className="mt-4 flex flex-wrap items-center gap-3 text-xs text-fg-3">
           <span>
-            {t("search.currentQuery")}:{" "}
+            {t("search.currentQuery")}: {" "}
             <span className="text-fg-2">{initialQuery ? `"${initialQuery}"` : t("search.queryAll")}</span>
           </span>
           <span className="h-1 w-1 rounded-full bg-fg-3" />
@@ -66,7 +66,7 @@ export function SearchPage() {
       </header>
 
       <div id="toonspectrum-search-explorer-top" />
-      <SearchExplorer initialQuery={initialQuery} initialFree={initialFree} initialPlatforms={initialPlatforms} />
+      <SearchExplorer key={JSON.stringify([initialQuery, initialFree, initialPlatforms])} initialQuery={initialQuery} initialFree={initialFree} initialPlatforms={initialPlatforms} />
     </Container>
   );
 }

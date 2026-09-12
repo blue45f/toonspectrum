@@ -7,7 +7,11 @@ on:
       - 'apps/web/src/app/App*.tsx'
       - 'apps/web/src/app/browser-compat-dismissal*'
       - 'apps/web/src/app/routes/route-titles.ts'
-      - 'apps/web/src/app/routes/app-route-title-ownership.test.ts'
+      - 'apps/web/src/app/routes/app-route-title-ownership*'
+      - 'apps/web/src/domains/legal/Site*'
+      - 'apps/web/src/domains/legal/site-directory*'
+      - 'apps/web/src/domains/catalog/SearchPage*'
+      - 'tools/package-non-studio-preview.py'
       - 'apps/web/src/domains/marketing/creator-prism.css'
       - 'apps/web/src/domains/marketing/CreatorHomeExperience.tsx'
       - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
@@ -55,14 +59,18 @@ jobs:
           apps/web/src/shared/components/public-site-journey.test.tsx
           apps/web/src/shared/components/site-public-routes.test.ts
           apps/web/src/app/routes/app-route-title-ownership.test.ts
-          apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
+          apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts
+          apps/web/src/domains/catalog/SearchPage.navigation.test.tsx
+          apps/web/src/domains/legal/site-directory-search.test.ts
+          apps/web/src/domains/legal/SiteDirectorySearch.test.tsx
+          apps/web/src/domains/legal/SitemapPage.test.ts
       - name: Production bundle
         run: pnpm run build:bundle
-      - name: Package non-Studio preview for interactive inspection
+      - name: Package bounded offline preview for interactive inspection
         run: |
           git rev-parse HEAD > dist/audit-source-sha.txt
-          tar -czf /tmp/non-studio-web-preview.tar.gz --exclude='*.wasm' --exclude='*.glb' --exclude='*.gltf' --exclude='*.fbx' --exclude='*.mp4' --exclude='*.webm' --exclude='*.onnx' --exclude='*.bin' dist
+          python tools/package-non-studio-preview.py
       - uses: actions/upload-artifact@v4
         with:
           name: non-studio-web-preview

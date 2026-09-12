@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-const ROOT = resolve(import.meta.dirname, "..");
+const ROOT = process.cwd();
 const routeDirectory = resolve(ROOT, "apps/web/src/app/routes/groups");
 const EXCLUDED = /^\/(?:studio|admin|make|shaper|brush-lab|music|creator-hub|publishing|auth)(?:\/|$)/u;
 const routes = [...new Set([...readdirSync(routeDirectory)
@@ -123,4 +123,26 @@ test("artwork contrast controls, theme surfaces and reduced motion remain functi
     await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
     await page.screenshot({ path: testInfo.outputPath(`home-320-${theme}.png`), fullPage: true, animations: "disabled" });
   }
+});
+
+test("directory search supports real navigation, a shared query, Back and recovery", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/sitemap");
+  const input = page.getByRole("searchbox", { name: "메뉴·도구 바로 찾기" });
+  await input.fill("학습 기록");
+  const results = page.getByRole("list", { name: "메뉴 검색 결과" });
+  await expect(results.getByRole("link")).toHaveCount(1);
+  await expect(page).toHaveURL(/menu=/u);
+  await input.press("Enter");
+  await expect(results.getByRole("link")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/learn\/records$/u);
+  await page.goBack();
+  await expect(input).toHaveValue("학습 기록");
+  await input.fill("unmatched-menu-xyz");
+  await expect(page.locator(".directory-search__status")).toContainText("0개의 목적지");
+  await page.getByRole("button", { name: "검색 초기화", exact: true }).click();
+  await expect(input).toHaveValue("");
+  await expect(input).toBeFocused();
+  await expect(page.locator("#sitemap-extended-title")).toBeVisible();
 });

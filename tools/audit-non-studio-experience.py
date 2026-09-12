@@ -18,21 +18,21 @@ BASE = os.environ.get("NON_STUDIO_AUDIT_URL", "https://www.toonstudio.cloud").rs
 
 
 def excluded(path):
-    return bool(re.match(r"^/(?:studio|shaper|admin)(?:/|$)", path))
+    return bool(re.match(r"^/(?:studio|shaper|admin|make|music|brush-lab|creator-hub|publishing|auth)(?:/|$)", path))
 
 
 def inventory():
-    routes = {"/", "/market", "/community", "/references", "/settings", "/guide"}
+    routes = {"/", "/learn", "/learn/glossary", "/learn/records", "/learn/studio"}
     unresolved = set()
-    directory = ROOT / "apps/web/src/app/routes"
-    for source in [*directory.glob("groups/*.routes.tsx"), directory / "route-titles.ts", directory / "creator-resource-titles.ts"]:
+    directory = ROOT / "apps/web/src/app/routes/groups"
+    for source in directory.glob("*.routes.tsx"):
         text = source.read_text(encoding="utf-8")
-        for path in re.findall(r'[\"\'](/[^\"\'\s]*)[\"\']', text):
-            if excluded(path) or path.startswith("/api/"):
+        for path in re.findall(r"\bpath:\s*[\"']([^\"']+)[\"']", text):
+            if not path.startswith("/") or excluded(path):
                 continue
             if ":" in path or "*" in path:
                 unresolved.add(path)
-            elif "?" not in path and "#" not in path:
+            else:
                 routes.add(path)
     return sorted(routes), sorted(unresolved)
 
@@ -48,8 +48,11 @@ async def inspect_page(context, route, device):
     try:
         response = await page.goto(BASE + route, wait_until="domcontentloaded", timeout=45000)
         result["status"] = response.status if response else None
-        await page.locator("main").wait_for(state="visible", timeout=20000)
+        await page.locator("main").first.wait_for(state="visible", timeout=15000)
         await page.wait_for_timeout(2500)
+        if excluded(urlparse(page.url).path):
+            result["excludedRedirect"] = page.url
+            raise RuntimeError("Redirected to an excluded workspace; no interactions or visual inspection performed")
         result.update(await page.evaluate("""() => {
           const visible = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
           const name = el => el.getAttribute('aria-label') || el.innerText || el.getAttribute('title') || '';
@@ -77,8 +80,9 @@ async def inspect_page(context, route, device):
         result["inspectionFailure"] = str(error)[:1500]
         result["inspected"] = False
         try:
-            result["text"] = (await page.locator("body").inner_text())[:22000]
-            await page.screenshot(path=str(OUT / f"{device}-{slug}-failure.png"), timeout=10000)
+            if "excludedRedirect" not in result:
+                result["text"] = (await page.locator("body").inner_text())[:22000]
+                await page.screenshot(path=str(OUT / f"{device}-{slug}-failure.png"), timeout=10000)
         except Exception:
             pass
     finally:
@@ -104,8 +108,13 @@ async def main():
                 else:
                     await request_route.continue_()
             await context.route("**/*", guard)
-            for route in routes:
-                report["results"].append(await inspect_page(context, route, device))
+            semaphore = asyncio.Semaphore(3)
+            async def bounded_inspection(route):
+                async with semaphore:
+                    result = await inspect_page(context, route, device)
+                    report["results"].append(result)
+                    (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+            await asyncio.gather(*(bounded_inspection(route) for route in routes))
             await context.close()
         await browser.close()
     (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
