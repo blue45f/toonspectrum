@@ -15,6 +15,7 @@ concurrency:
   group: finalize-brush-catalog-consolidation
   cancel-in-progress: true
 
+# This one-shot workflow is removed by its own successful commit.
 jobs:
   apply-and-validate:
     runs-on: ubuntu-latest
