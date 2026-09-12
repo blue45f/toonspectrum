@@ -1,3 +1,4 @@
+import type { StudioColorProofDocument } from "./color/studio-color-proof-document";
 import type { StudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import type { StudioPaperSurfaceSettings } from "./brush/studio-paper-granulation-runtime";
 import type { DialogueLocaleMap } from "./lettering/studio-dialogue-translate";
@@ -29,6 +30,8 @@ export interface PageState {
    * single authority; do not re-derive this flag at a call site.
    */
   paperGrainVisible?: boolean;
+  /** Selected RGB proof/output profile. Source artwork stays sRGB. */
+  colorProof?: StudioColorProofDocument;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
   layerComps?: StudioLayerComp[]; // 페이지 소유 표시 상태 프리셋. 미설정=저장된 콤프 없음.
