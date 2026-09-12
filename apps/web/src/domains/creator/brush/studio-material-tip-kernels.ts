@@ -1,6 +1,6 @@
 /**
  * Original material morphology programs. These are different coverage constructions, not
- * ordinal-seeded copies of a round stamp. They compile to portable R8 fields at selection time.
+ * ordinal-seeded copies of a round stamp. They compile to portable R8 fields at build time; selection reads the baked atlas.
  *
  * Names describe the mark, not an unimplemented fluid/optical simulation: diffusion, impasto
  * and spectral mixing remain the responsibility of their existing dedicated Studio engines.
@@ -229,9 +229,18 @@ export function createStudioMaterialTipField(
         return Math.max(warp * (over ? 1 : 0.45), weft * (over ? 0.38 : 0.9)) * disc;
       }
       case "gouache-craquelure": {
-        cellular(x * 6 + 10, y * 6 + 10, stableSeed, cell);
-        const plate = edge(0.065 - (cell[1]! - cell[0]!), 0.045);
-        return plate * (0.66 + cell[2]! * 0.34) * edge(r - 0.90, 0.05);
+        // A shrinking film fractures into broad lamellae, unlike the chalk's Voronoi pores.
+        // Longitudinal fissures remain aligned through overlapping deposits rather than averaging
+        // into another round opaque stroke. Short branch cracks stop inside each paint plate.
+        const warp = y + Math.sin(x * 3.2 + phase) * 0.018;
+        const fissure = Math.min(Math.abs(warp + 0.31), Math.abs(warp - 0.19));
+        const film = edge(0.06 - fissure, 0.026);
+        const branchX = periodicDistance((x + y * 0.32) * 2.2);
+        const branches = 1 - edge(branchX - 0.025, 0.025)
+          * edge(Math.abs(warp + 0.04) - 0.19, 0.04);
+        const plateTone = warp < -0.31 ? 0.7 : warp > 0.19 ? 0.92 : 0.83;
+        return film * branches * plateTone
+          * edge(Math.max(Math.abs(x) * 0.97, Math.abs(y) * 1.12) - 0.86, 0.035);
       }
       case "stipple-etch": {
         cellular(x * 11 + 20, y * 11 + 20, stableSeed, cell);

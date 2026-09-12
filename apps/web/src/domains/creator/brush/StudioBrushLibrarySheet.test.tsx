@@ -476,7 +476,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it("renders the complete single-batch product catalog and materializes a durable selection", async () => {
+  it("progressively reveals the complete product catalog and materializes a new durable material selection", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -488,7 +488,7 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    // Product inventory fits in one batch; large-list behavior is covered with explicit fixtures below.
+    // Keep the first render bounded, then exercise keyboard-accessible pagination on real inventory.
     fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
 
     expect(screen.getByRole("status").textContent).toBe(
@@ -500,13 +500,16 @@ describe("StudioBrushLibrarySheet", () => {
     );
     expect(screen.queryAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);
     expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
+    expect(exhaustiveCatalogCount).toBeGreaterThan(48);
+    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).not.toBeNull();
+    expect(container.querySelector("[data-studio-brush-progressive-fallback]")).not.toBeNull();
+    for (let batch = 0; batch < Math.ceil(exhaustiveCatalogCount / 48); batch++) {
+      const next = container.querySelector('[data-studio-brush-progressive-fallback="true"]');
+      if (!next) break;
+      fireEvent.click(next);
+    }
     expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
     expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();
-    while (container.querySelector('[data-studio-brush-progressive-fallback="true"]')) {
-      fireEvent.click(
-        container.querySelector('[data-studio-brush-progressive-fallback="true"]')!,
-      );
-    }
     expect(screen.getByRole("status").textContent).toBe(
       `${exhaustiveCatalogCount}/${exhaustiveCatalogCount}개의 브러시가 표시됩니다.`
     );
@@ -515,16 +518,16 @@ describe("StudioBrushLibrarySheet", () => {
     );
     expect(screen.getAllByText("PRO")).toHaveLength(exhaustiveProCount);
 
-    fireEvent.click(screen.getByRole("button", { name: "잎송이 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "고사리 깃잎 선택" }));
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({
-        catalogId: "leaf-cluster",
-        catalogName: "잎송이",
+        catalogId: "material-fern-frond",
+        catalogName: "고사리 깃잎",
         runtimeBrushId: "ink-particle",
-        defaultWidth: 34,
-        defaultOpacity: 0.78,
+        defaultWidth: 56,
+        defaultOpacity: 0.94,
         brushDynamics: expect.objectContaining({
           version: 1,
           tip: expect.objectContaining({

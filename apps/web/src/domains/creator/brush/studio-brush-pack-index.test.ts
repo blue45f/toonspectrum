@@ -137,11 +137,11 @@ describe("procedural brush pack catalogue", () => {
 
   it("appends the 73-preset 2026-07 expansion waves after every earlier stable id", () => {
     expect(STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS).toHaveLength(73);
-    expect(STUDIO_BRUSH_PACK_CATALOG_IDS.slice(87)).toEqual([
+    expect(STUDIO_BRUSH_PACK_CATALOG_IDS.slice(87, 160)).toEqual([
       ...STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
     ]);
 
-    const expansion = STUDIO_BRUSH_PACK_DESCRIPTORS.slice(87);
+    const expansion = STUDIO_BRUSH_PACK_DESCRIPTORS.slice(87, 160);
     expect(new Set(expansion.map((item) => item.catalogName)).size).toBe(73);
     expect(new Set(expansion.map((item) => item.shortName)).size).toBe(73);
     expect(new Set(expansion.map((item) => item.category))).toEqual(new Set([
@@ -223,7 +223,7 @@ describe("procedural brush pack catalogue", () => {
 
   it("keeps the 40-preset original material wave append-only and semantically searchable", () => {
     expect(STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS).toHaveLength(40);
-    expect(STUDIO_BRUSH_PACK_CATALOG_IDS.slice(-40)).toEqual([
+    expect(STUDIO_BRUSH_PACK_CATALOG_IDS.slice(120, 160)).toEqual([
       ...STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS,
     ]);
 

@@ -66,6 +66,7 @@ function percentile(values: number[], quantile: number): number {
 
 export async function auditStudioMaterialMorphology() {
   const cases = [], planTimes: number[] = [], submitTimes: number[] = [];
+  const renderedShapes: { id: string; rgba: Uint8ClampedArray; mass: number }[] = [];
   const sheets = [canvas(960, 1600), canvas(960, 1600)];
   for (const sheet of sheets) { const ctx = sheet.getContext("2d")!; ctx.fillStyle = "white"; ctx.fillRect(0, 0, sheet.width, sheet.height); }
   // Warm actual normalization/coverage modules separately from measured rows.
@@ -76,6 +77,7 @@ export async function auditStudioMaterialMorphology() {
     const replay = render(JSON.parse(JSON.stringify(source)) as DrawEl);
     const light = render(element(id, 0.15)), heavy = render(element(id, 0.85));
     const upright = render(element(id, 0.5, 0)), inclined = render(element(id, 0.5, 60));
+    renderedShapes.push({ id, rgba: retained.rgba, mass: retained.mass });
     const replayDifference = difference(retained.rgba, replay.rgba);
     const liveDifference = difference(retained.rgba, live.rgba);
     const tiltDifference = difference(upright.rgba, inclined.rgba);
@@ -102,11 +104,33 @@ export async function auditStudioMaterialMorphology() {
     ctx.drawImage(retained.target, x + 12, y + 28);
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
+  // Compare actual retained strokes after removing global opacity as a distinguishing feature.
+  // This catches different tip masks that converge into the same dense stroke after overlap.
+  let minimumStrokeDistance = Infinity;
+  let closestStrokePair: string[] = [];
+  let strokePairs = 0;
+  for (let i = 0; i < renderedShapes.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const a = renderedShapes[i]!, b = renderedShapes[j]!;
+      let distance = 0;
+      for (let p = 3; p < a.rgba.length; p += 4) {
+        distance += Math.abs(a.rgba[p]! / a.mass - b.rgba[p]! / b.mass);
+      }
+      distance /= 2;
+      strokePairs++;
+      if (distance < minimumStrokeDistance) {
+        minimumStrokeDistance = distance; closestStrokePair = [a.id, b.id];
+      }
+      invariant(distance > 0.10, `${a.id}/${b.id}: rendered shapes converge (${distance.toFixed(4)})`);
+    }
+  }
+  invariant(strokePairs === 496, "incomplete rendered-stroke pair coverage");
   const planningP95 = percentile(planTimes, 0.95), submissionP95 = percentile(submitTimes, 0.95);
   // Freeze guard, not a manufactured 120 Hz or physical-pen latency claim.
   invariant(planningP95 < 33, `planner P95 ${planningP95.toFixed(2)}ms exceeds 33ms`);
   invariant(submissionP95 < 50, `Canvas submission P95 ${submissionP95.toFixed(2)}ms exceeds 50ms`);
   return { version: 1, backend: "browser-canvas2d", cases,
+    distinctness: { strokePairs, minimumStrokeDistance, closestStrokePair, opacityNormalized: true },
     performance: { planningP95, submissionP95, sampleCount: planTimes.length, excludesPixelReadback: true },
     scope: "Synthetic input; same browser/device; no physical pen, competitor or WebGPU latency claim",
     sheets: sheets.map((sheet) => sheet.toDataURL("image/png")),

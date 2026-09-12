@@ -1,9 +1,0 @@
-[
-  {"offset":428,"remove":1,"expect":"E","insert":""},
-  {"offset":1836,"remove":0,"expect":"","insert":"K"},
-  {"offset":1837,"remove":1,"expect":"K","insert":""},
-  {"offset":5007,"remove":2,"expect":"HS","insert":""},
-  {"offset":5110,"remove":2,"expect":"yD","insert":"q"},
-  {"offset":5760,"remove":0,"expect":"","insert":"2"},
-  {"offset":10689,"remove":1,"expect":"Z","insert":""}
-]

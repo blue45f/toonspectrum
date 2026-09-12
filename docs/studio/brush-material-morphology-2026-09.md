@@ -106,3 +106,14 @@ pairwise differences, unknown ids, public picker exposure and persisted replay. 
 uses equal alpha mass and a total-variation floor of 0.18, so a mere opacity difference cannot pass.
 Existing catalogue, material/V6 persistence, continuity, UI, type, lint and build checks remain in
 force. Main protection is not relaxed.
+
+## Full-stroke anti-clone regression
+
+Different tip fields can still converge when dense deposits overlap. The browser gate therefore
+also compares all **496 pairs of actual retained strokes** with the same color, width and pressure
+trace, normalizing each alpha image to equal total mass. Every pair must exceed 0.10 total
+variation. This is independent of the 0.18 tip-field gate, and does not count opacity as novelty.
+The audit exposed a chalk/gouache convergence; the gouache construction was replaced with a
+separate lamellar film-fracture program, rather than changing only opacity, size or random seed.
+These trace-specific numerical guards still do not replace artist testing or physical paint
+simulation. The exact minimum and closest pair are retained in the browser report.
