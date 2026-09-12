@@ -1,0 +1,108 @@
+name: Residual branch reconciliation audit
+on:
+  push:
+    branches: [ops/residual-merge-reconcile-20260913]
+    paths: [.github/workflows/residual-merge-reconcile.yml]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Audit exact branch tips and recover three-way sources without changing refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, concurrent.futures, json, os, pathlib, subprocess, urllib.parse, urllib.request
+          root = pathlib.Path('artifacts/residual-audit')
+          root.mkdir(parents=True)
+          api = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          def read(path):
+              request = urllib.request.Request(api + path, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  return json.load(response)
+          branches = []
+          page = 1
+          while True:
+              batch = read('branches?per_page=100&page=' + str(page))
+              branches.extend(batch)
+              if len(batch) < 100: break
+              page += 1
+          refs = {item['name']: item['commit']['sha'] for item in branches}
+          main = refs['main']
+          pr = read('pulls/1339')
+          head = pr['head']['sha']
+          base = read('compare/' + main + '...' + head + '?per_page=1')['merge_base_commit']['sha']
+          trees = {}
+          tree_shas = {}
+          def tree(ref):
+              if ref not in trees:
+                  sha = read('git/commits/' + ref)['tree']['sha']
+                  data = read('git/trees/' + sha + '?recursive=1')
+                  assert not data.get('truncated'), 'Refuse incomplete tree: ' + ref
+                  tree_shas[ref] = sha
+                  trees[ref] = {item['path']: {key:item[key] for key in ('sha','mode','type')} for item in data['tree'] if item['type'] != 'tree'}
+              return trees[ref]
+          mt, bt, ht = tree(main), tree(base), tree(head)
+          changed = sorted(path for path in set(bt) | set(ht) if bt.get(path) != ht.get(path))
+          overlaps = [path for path in changed if mt.get(path) != bt.get(path)]
+          already_equal = [path for path in changed if mt.get(path) == ht.get(path)]
+          blobs = {}
+          wanted = {}
+          for path in changed:
+              for label, mapping in [('base',bt),('head',ht),('main',mt)]:
+                  entry = mapping.get(path)
+                  if entry is not None and entry['type'] == 'blob':
+                      wanted.setdefault(entry['sha'], []).append((label, path))
+          extras = ['.github/workflows/ci.yml','scripts/ci-core-gate.test.mjs','scripts/ci-executed-gates.test.mjs','scripts/api-followup-ci-policy.test.mjs','scripts/verify-api-runtime-imports.mjs','scripts/verify-api-runtime-imports.test.mjs','package.json','apps/api/package.json','vitest.config.ts']
+          for path in extras:
+              if path in mt:
+                  wanted.setdefault(mt[path]['sha'], []).append(('main', path))
+          def load(sha):
+              data = read('git/blobs/' + sha)
+              assert data['encoding'] == 'base64'
+              return sha, base64.b64decode(data['content'])
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+              for sha, data in pool.map(load, wanted):
+                  blobs[sha] = data
+                  for label, path in wanted[sha]:
+                      target = root / label / path
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(data)
+          conflicts = []
+          for path in overlaps:
+              if path in already_equal: continue
+              if not all(path in mapping and mapping[path]['type'] == 'blob' for mapping in (bt,ht,mt)):
+                  conflicts.append({'path':path,'reason':'add/delete/type conflict'})
+                  continue
+              target = root / 'merged' / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              result = subprocess.run(['git','merge-file','-p','-L','main','-L','base','-L','recovery',str(root/'main'/path),str(root/'base'/path),str(root/'head'/path)], capture_output=True)
+              target.write_bytes(result.stdout)
+              if result.returncode:
+                  conflicts.append({'path':path,'reason':'text conflict','returncode':result.returncode})
+          audits = []
+          for branch in ['fix/creator-work-500-core-import-20260912','ops/clear-obsolete-api-ci-20260912','work/api-merge-audit-20260913']:
+              if branch not in refs: continue
+              tip = refs[branch]
+              comparison = read('compare/' + main + '...' + tip + '?per_page=1')
+              ancestor = comparison['merge_base_commit']['sha']
+              old, feature = tree(ancestor), tree(tip)
+              delta = sorted(path for path in set(old)|set(feature) if old.get(path) != feature.get(path))
+              differing = [path for path in delta if mt.get(path) != feature.get(path)]
+              audits.append({'branch':branch,'head':tip,'base':ancestor,'status':comparison['status'],'ahead_by':comparison['ahead_by'],'behind_by':comparison['behind_by'],'changed':delta,'not_equal_to_main':differing})
+          report = {'main':main,'head':head,'base':base,'refs':refs,'tree_shas':tree_shas,'changed':changed,'overlaps':overlaps,'already_equal_to_main':already_equal,'conflicts':conflicts,'branch_audits':audits,'entries':{'base':{p:bt.get(p) for p in changed},'head':{p:ht.get(p) for p in changed},'main':{p:mt.get(p) for p in changed}}}
+          (root/'audit.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps({key:value for key,value in report.items() if key not in ('entries','tree_shas')},indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: residual-branch-three-way-audit
+          path: artifacts/residual-audit
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
