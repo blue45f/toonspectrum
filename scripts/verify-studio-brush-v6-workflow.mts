@@ -12,7 +12,7 @@ import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosa
 import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mjs";
 import { brushV6RelativeInkError } from "./studio-brush-v6-pixel-quality";
 
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, BrowserContext, Locator, Page } from "playwright";
 
 interface NativeMaterialFillTrace {
   transform: number[];
@@ -67,6 +67,36 @@ function materialStrokes(document: Awaited<ReturnType<typeof readDurableStudioAu
     const item = element as { brushEnginePrograms?: { material?: unknown } };
     return item.brushEnginePrograms?.material;
   }) ?? [];
+}
+
+async function setRange(control: Locator, value: number): Promise<void> {
+  const minimum = Number(await control.getAttribute("min"));
+  const maximum = Number(await control.getAttribute("max"));
+  const step = Number(await control.getAttribute("step") ?? 1);
+  const fromMaximum = maximum - value < value - minimum;
+  await control.press(fromMaximum ? "End" : "Home");
+  const count = Math.round(Math.abs(value - (fromMaximum ? maximum : minimum)) / step);
+  for (let index = 0; index < count; index += 1) await control.press(fromMaximum ? "ArrowLeft" : "ArrowRight");
+  await control.blur();
+  assert.equal(Number(await control.inputValue()), value);
+}
+
+async function expectRange(control: Locator, value: number): Promise<void> {
+  for (let attempt = 0; attempt < 30 && Number(await control.inputValue()) !== value; attempt += 1) await page.waitForTimeout(50);
+  assert.equal(Number(await control.inputValue()), value);
+}
+
+async function setWheelMode(mode: "브러시 크기" | "확대/축소"): Promise<void> {
+  await page.keyboard.press("Escape");
+  const edit = page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: "편집", exact: true });
+  await edit.click();
+  await page.getByRole("menuitem", { name: "애플리케이션 설정…", exact: true }).click();
+  // Opening a detail section replaces the center with the separately titled settings editor.
+  const dialog = page.getByRole("dialog", { name: /^(애플리케이션 설정|Studio 설정)$/u });
+  // The public settings center includes the current/default status in each section button.
+  await dialog.getByRole("button", { name: /^마우스\s/u }).click();
+  await dialog.getByRole("button", { name: mode, exact: true }).click();
+  await dialog.getByRole("button", { name: "설정 닫기", exact: true }).click();
 }
 
 async function probeLibrary(id: string) {
@@ -230,9 +260,33 @@ try {
     await page.goto(`${origin}/studio/assets/brushes/new`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "스튜디오에 브러시 저장", exact: true }).waitFor({ state: "visible" });
   });
-  await stage("configure-and-save-material", async () => {
+  await stage("choose-material-recipe", async () => {
     await page.getByRole("button", { name: /^레시피 \d+$/u }).click();
     await page.getByRole("button", { name: /^오일 헤어 믹서/u }).click();
+  });
+  await stage("truthful-output-and-pickup-controls", async () => {
+    const outputSelect = page.locator("#brush-v6-slot-output");
+    assert.equal(await outputSelect.inputValue(), "output-contact-canvas-svg");
+    const options = await outputSelect.locator("option").evaluateAll(elements => elements.map(element => ({
+      id: (element as HTMLOptionElement).value, disabled: (element as HTMLOptionElement).disabled, label: element.textContent,
+    })));
+    assert.deepEqual(options.filter(option => !option.disabled).map(option => option.id), ["output-contact-canvas-svg"]);
+    assert.equal(options.filter(option => option.disabled).length, 3);
+    assert.ok(options.filter(option => option.disabled).every(option => option.label?.includes("설계 기록")));
+    await page.getByText("가져온 다른 출력 선택은 설계 기록으로 보관하며 실제 출력은 이 공통 경로를 사용합니다.", { exact: false }).waitFor({ state: "visible" });
+    await page.locator("#brush-v6-slot-pickup").selectOption("pickup-none");
+    await page.getByRole("button", { name: "Material", exact: true }).click();
+    assert.equal(await page.locator("#brush-v6-pickup").isDisabled(), true);
+    assert.equal(await page.locator("#brush-v6-secondary").isDisabled(), true);
+    await page.getByRole("button", { name: "Engine Graph", exact: true }).click();
+    await page.locator("#brush-v6-slot-pickup").selectOption("pickup-pigment-reservoir");
+    await page.getByRole("button", { name: "Material", exact: true }).click();
+    assert.equal(await page.locator("#brush-v6-pickup").isEnabled(), true);
+    assert.equal(await page.locator("#brush-v6-secondary").isEnabled(), true);
+    evidence.outputOptions = options;
+    evidence.pickupControls = { noPickupDisabled: true, localReservoirEnabled: true };
+  });
+  await stage("configure-and-save-material", async () => {
     await page.getByLabel("브러시 이름", { exact: true }).fill("QA 재질 저장·재열기 0912");
     await page.getByRole("button", { name: "스튜디오에 브러시 저장", exact: true }).click();
     const use = page.getByRole("link", { name: "원고에서 사용하기", exact: true });
@@ -260,6 +314,42 @@ try {
     });
     evidence.toolbar = await page.getByRole("toolbar", { name: /그리기 옵션/u }).innerText();
     await page.screenshot({ path: join(output, "02-applied-canvas.png") });
+  });
+  await stage("material-size-and-opacity-shortcuts", async () => {
+    const size = page.locator('[data-studio-draw-primary-control="size"] input');
+    const opacity = page.locator('[data-studio-draw-primary-control="opacity"] input');
+    await setRange(size, 150);
+    for (const [key, value] of [["]", 151], ["[", 150], ["Shift+]", 155], ["Shift+[", 150]] as const) {
+      await page.keyboard.press(key);
+      await expectRange(size, value);
+    }
+    await setRange(size, 240);
+    await page.keyboard.press("]");
+    await expectRange(size, 240);
+    await setRange(opacity, 2);
+    for (const [key, value] of [["Alt+[", 1], ["Alt+[", 1], ["Alt+]", 6]] as const) {
+      await page.keyboard.press(key);
+      await expectRange(opacity, value);
+    }
+    await setRange(opacity, 95);
+    await setRange(size, 150);
+    evidence.materialShortcuts = { size: [150, 151, 150, 155, 150, 240, 240], opacityPercent: [2, 1, 1, 6], restoredOpacityPercent: 95 };
+  });
+  await stage("material-wheel-range", async () => {
+    await setWheelMode("브러시 크기");
+    const size = page.locator('[data-studio-draw-primary-control="size"] input');
+    const bounds = await page.locator(".konvajs-content").first().boundingBox();
+    assert.ok(bounds);
+    await page.mouse.move(bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5);
+    await page.mouse.wheel(0, -100);
+    await expectRange(size, 151);
+    await page.mouse.wheel(0, 100);
+    await expectRange(size, 150);
+    await setRange(size, 240);
+    await page.mouse.wheel(0, -100);
+    await expectRange(size, 240);
+    await setRange(size, 54);
+    evidence.materialWheel = { size: [150, 151, 150, 240, 240], restoredSize: 54 };
   });
   await stage("native-pen-stroke", async () => {
     const bounds = await page.locator(".konvajs-content").first().boundingBox();
@@ -335,6 +425,46 @@ try {
     assert.ok(restoredRelativeInkError <= 0.03, "Durable material data exists but the reopened canvas did not restore its visible ink");
     writeFileSync(join(output, "reopened-ink-region.png"), restored!);
     await page.screenshot({ path: join(output, "04-reopened-stroke.png") });
+  });
+  await stage("prepare-current-material-editor-transfer", async () => {
+    evidence.editorPreparationStep = "current size, opacity and primary color";
+    await setRange(page.locator('[data-studio-draw-primary-control="size"] input'), 150);
+    await setRange(page.locator('[data-studio-draw-primary-control="opacity"] input'), 1);
+    await page.getByRole("toolbar", { name: /그리기 옵션/u }).getByLabel(/^주 색 선택 · 현재/u).fill("#34ab67");
+    await page.getByRole("button", { name: "브러시 고급 설정", exact: true }).click();
+    evidence.editorPreparationStep = "open tool properties palette";
+    const openPalette = page.getByRole("button", { name: "도구 속성 팝업 열기", exact: true });
+    if (await openPalette.isVisible()) await openPalette.click();
+    evidence.editorPreparationStep = "expand brush studio inspector section";
+    const section = page.locator('[data-inspector-control-id="section.tool.brush-studio"]');
+    await section.waitFor({ state: "visible" });
+    if (await section.getAttribute("aria-expanded") === "false") await section.click();
+    evidence.editorPreparationStep = "open brush studio dialog";
+    await page.locator('[data-inspector-section="tool.brush-studio"] button[aria-haspopup="dialog"]').click();
+    const brushDialog = page.getByRole("dialog", { name: "브러시 스튜디오", exact: true });
+    await brushDialog.waitFor({ state: "visible", timeout: 8_000 });
+    await page.screenshot({ path: join(output, "04a-brush-studio-modal.png") });
+    evidence.editorPreparationStep = "open engine combination tab";
+    await brushDialog.getByRole("tab", { name: /엔진 조합/u }).click({ timeout: 8_000 });
+    const controls = page.getByRole("region", { name: "커스텀 재료 브러시 설정", exact: true });
+    await controls.waitFor({ state: "visible" });
+    evidence.editorPreparationStep = "edit current reservoir";
+    await setRange(controls.getByRole("slider", { name: "안료 저장량", exact: true }), 0.43);
+  });
+  await stage("modifier-editor-transfer-keeps-current-material", async () => {
+    const label = "브러시 편집기에서 비교·실험";
+    assert.equal(await page.getByRole("link", { name: label, exact: true }).count(), 0, "Material transfer must not expose an unsafe native new-tab link");
+    const pages = context.pages().length;
+    await page.getByRole("button", { name: label, exact: true }).click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] });
+    await page.waitForURL(/\/studio\/assets\/brushes\/material-\d+\/edit/u);
+    assert.equal(context.pages().length, pages, "Modifier click created a new tab before material transfer");
+    await page.getByRole("button", { name: "Material", exact: true }).click();
+    assert.equal(Number(await page.locator("#brush-v6-size").inputValue()), 150);
+    assert.equal(Number(await page.locator("#brush-v6-opacity").inputValue()), 0.01);
+    assert.equal(await page.locator("#brush-v6-primary").inputValue(), "#34ab67");
+    assert.equal(Number(await page.locator("#brush-v6-reservoir").inputValue()), 0.43);
+    evidence.editorTransfer = { size: 150, opacity: 0.01, primaryColor: "#34ab67", reservoir: 0.43, modifier: process.platform === "darwin" ? "Meta" : "Control", currentTab: true, url: page.url() };
+    await page.screenshot({ path: join(output, "05-current-material-editor.png"), fullPage: true });
   });
 } catch (error) {
   evidence.failure = String(error);

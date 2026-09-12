@@ -422,6 +422,14 @@ function jsonStructureEqual(
   return leftKeys.every((key) => jsonStructureEqual(leftRecord[key], rightRecord[key], seen));
 }
 
+/** Older oil payloads may omit switches whose documented default is false. */
+function engineProgramsComparisonValue(raw: unknown, normalized: StudioBrushEngineProgramSet | null): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !normalized?.oil) return raw;
+  const source = raw as Record<string, unknown>;
+  if (!source.oil || typeof source.oil !== "object" || Array.isArray(source.oil)) return raw;
+  return { ...source, oil: { ...normalized.oil, ...source.oil } };
+}
+
 /**
  * Phase-two material fields are additive identity defaults. A v1 saved brush that predates those
  * keys is already semantically normalized and should not be reported to the artist as repaired.
@@ -459,6 +467,9 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     adjustedFields.push("brushId");
   }
   const enginePrograms = normalizeStudioBrushEngineProgramSet(o.enginePrograms);
+  if (o.enginePrograms != null && !jsonStructureEqual(engineProgramsComparisonValue(o.enginePrograms, enginePrograms), enginePrograms)) {
+    adjustedFields.push("enginePrograms");
+  }
   const ranges = studioBrushSnapshotRanges(enginePrograms);
   const strokeWidth = clampedNumberField(
     o,
@@ -1103,7 +1114,8 @@ export function brushFileName(brush: { name: string }): string {
 /**
  * writeBrushJson이 만든(또는 호환되는) JSON 텍스트 → StudioSavedBrush.
  * kind가 "toonspectrum-studio-brush"가 아니면 던진다(parseGplPalette의 매직 헤더 체크와 동일 역할).
- * 그 외 필드 누락·범위 이탈은 sanitizeBrushSnapshot이 조용히 기본값으로 보정하고 adjustedFields로 알린다.
+ * 엔진 설정을 손실 없이 복원할 수 없으면 다른 브러시로 바꾸지 않고 가져오기를 거부한다.
+ * 그 외 필드 누락·범위 이탈은 sanitizeBrushSnapshot이 기본값으로 보정하고 adjustedFields로 알린다.
  */
 export function importBrushFromJson(
   text: string,
@@ -1123,6 +1135,9 @@ export function importBrushFromJson(
   }
   const obj = parsed as Record<string, unknown>;
   const { snapshot, adjustedFields } = sanitizeBrushSnapshot(obj);
+  if (adjustedFields.includes("enginePrograms")) {
+    throw new Error("브러시 엔진 설정을 그대로 복원할 수 없어 가져오지 않았어요. 최신 스튜디오에서 다시 시도하거나 원본 브러시를 다시 내보내주세요.");
+  }
   const rawName = typeof obj.name === "string" ? obj.name.trim() : "";
   const now = Date.now();
   return {

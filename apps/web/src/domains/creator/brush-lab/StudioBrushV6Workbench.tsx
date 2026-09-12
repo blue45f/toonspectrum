@@ -70,10 +70,10 @@ const SINGLE_SLOTS: readonly { slot: SingleSlot; label: string; description: str
   { slot: "tip", label: "촉", description: "SDF, 치즐, 실물 grain, 듀얼팁, 노멀, 모티프" },
   { slot: "surface", label: "표면", description: "필름, 종이 이빨, 수채지, 캔버스, 실물 샘플" },
   { slot: "deposition", label: "도포", description: "잉크, 마커, 건식, 습식, 유화, 입자, 빛" },
-  { slot: "pickup", label: "픽업", description: "Krita Color Smudge와 pigment-painter reservoir" },
+  { slot: "pickup", label: "픽업", description: "강모 조합에서만 CPU 안료 저장량 보충·보조 색 혼합이 적용됩니다. 캔버스 아래색을 읽는 스머지는 지원하지 않습니다." },
   { slot: "pigment", label: "안료", description: "RGB, Spectral, Open K/S, LUT, Mixbox, Inkwash" },
   { slot: "pattern", label: "패턴", description: "톤, 해칭, 직조, 벽돌, 모티프, flow field" },
-  { slot: "output", label: "출력 권위", description: "래스터 타일, 하이브리드, 순수 벡터" },
+  { slot: "output", label: "출력 권위", description: "현재 획은 입력·설정을 저장하고 Canvas 접촉과 SVG 도형으로 재생합니다. 가져온 다른 출력 선택은 설계 기록으로 보관하며 실제 출력은 이 공통 경로를 사용합니다." },
 ];
 
 const MATERIAL: readonly SliderSpec[] = [
@@ -86,7 +86,7 @@ const MATERIAL: readonly SliderSpec[] = [
   { key: "absorbency", label: "흡수율", min: 0, max: 1, step: 0.01 },
   { key: "granulation", label: "과립", min: 0, max: 1, step: 0.01 },
   { key: "edgeDarkening", label: "엣지 농축", min: 0, max: 1, step: 0.01 },
-  { key: "pickup", label: "아래색 픽업", min: 0, max: 1, step: 0.01 },
+  { key: "pickup", label: "안료 보충·혼합", min: 0, max: 1, step: 0.01 },
   { key: "reservoir", label: "안료 저장량", min: 0, max: 1, step: 0.01 },
   { key: "relief", label: "릴리프", min: 0, max: 1, step: 0.01 },
 ];
@@ -106,6 +106,13 @@ const PATTERN: readonly SliderSpec[] = [
   { key: "patternJitter", label: "불규칙성", min: 0, max: 1, step: 0.01 },
 ];
 const EMPTY_TELEMETRY: BrushStudioV6Telemetry = Object.freeze({ pointerType: "—", pressure: 0, tilt: 0, twist: 0, sampleRateHz: 0, rejectedPalm: false, transport: "auto" });
+
+function materialNodeStatus(id: string, activeTuning: ReadonlySet<keyof BrushStudioV6Tuning>): string {
+  if (id === "pickup-pigment-reservoir" && !activeTuning.has("pickup")) {
+    return "강모 조합에서만 적용 · 현재 재료에서는 사용하지 않음";
+  }
+  return isBrushStudioV6MaterialNodeImplemented(id) ? "공통 재료 계산기에 연결됨" : "설계 기록 · 현재 획에는 적용되지 않음";
+}
 
 function readProgram(key: string): BrushStudioV6Program {
   try {
@@ -386,7 +393,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             onChange={replace} /> : null}
           {tab === "recipes" ? <Panel title="시그니처 레시피" description="이름만 다른 프리셋이 아니라 실제 재료·물리·패턴 결과가 다른 조합입니다."><div className="space-y-5">{recipeGroups.map((group) => <section key={group}><h3 className="mb-2 text-xs font-black text-fg-2">{group}</h3><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{BRUSH_STUDIO_V6_RECIPES.filter((recipe) => recipe.group === group).map((recipe) => <button key={recipe.id} type="button" onClick={() => chooseRecipe(recipe.id)} className={`${SUB} min-h-[108px] text-left hover:border-accent/50 hover:bg-accent/10 ${STUDIO_FOCUS_RING}`}><span className="text-sm font-black text-fg">{recipe.label}</span><span className="mt-2 block text-xs leading-relaxed text-fg-3">{recipe.description}</span></button>)}</div></section>)}</div></Panel> : null}
 
-          {tab === "graph" ? <Panel title="Engine Graph" description="실제 획은 공통 CPU 접촉 계산기를 사용합니다. 회색 항목은 아직 연결되지 않은 설계 기록이며, 외부 엔진을 실행하지 않습니다."><div className="grid gap-4 lg:grid-cols-2">{SINGLE_SLOTS.map(({ slot, label, description }) => { const selected = program.slots[slot]; const node = brushStudioV6Node(selected); return <div key={slot} className={SUB}><Select id={`brush-v6-slot-${slot}`} label={label} value={selected} options={nodeOptions(slot)} onChange={(id) => choose(slot, id)} /><p className="mt-2 text-xs text-fg-3">{description}</p><p className="mt-1 text-[0.68rem] font-bold text-accent">{isBrushStudioV6MaterialNodeImplemented(node.id) ? "공통 재료 계산기에 연결됨" : "설계 기록 · 현재 획에는 적용되지 않음"}</p></div>; })}</div></Panel> : null}
+          {tab === "graph" ? <Panel title="Engine Graph" description="실제 획은 공통 CPU 접촉 계산기를 사용합니다. 회색 항목은 아직 연결되지 않은 설계 기록이며, 외부 엔진을 실행하지 않습니다."><div className="grid gap-4 lg:grid-cols-2">{SINGLE_SLOTS.map(({ slot, label, description }) => { const selected = program.slots[slot]; const node = brushStudioV6Node(selected); return <div key={slot} className={SUB}><Select id={`brush-v6-slot-${slot}`} label={label} value={selected} options={nodeOptions(slot)} onChange={(id) => choose(slot, id)} /><p className="mt-2 text-xs text-fg-3">{description}</p><p className="mt-1 text-[0.68rem] font-bold text-accent">{materialNodeStatus(node.id, activeTuning)}</p></div>; })}</div></Panel> : null}
 
           {tab === "input" ? <><Panel title="입력·장치 정책" description="필압·틸트·호버·팜리젝션을 조절합니다. 손가락 물붓은 현재 미지원이며, 해당 정책이 있는 이전 파일에서는 손가락으로 물을 칠할 수 없습니다."><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Select id="brush-v6-transport" label="입력 전송" value={program.input.transport} options={[{ id: "auto", label: "자동" }, { id: "raw-coalesced", label: "pointerrawupdate + coalesced" }, { id: "move-coalesced", label: "pointermove + coalesced" }, { id: "move-basic", label: "기본 pointermove" }]} onChange={(value) => patchInput({ transport: value as BrushStudioV6InputPolicy["transport"] })} /><Select id="brush-v6-touch" label="터치 정책" value={program.input.touchPolicy} options={[{ id: "pen-only", label: "펜 전용" }, { id: "pen-draw-finger-pan", label: "펜 그림·손가락 이동" }, { id: "pen-draw-two-finger-gesture", label: "펜 그림·두 손가락 제스처" }, { id: "pen-ink-finger-water", label: "손가락 물붓 · 미지원", disabled: true }, { id: "touch-draw", label: "터치 그리기" }]} onChange={(value) => patchInput({ touchPolicy: value as BrushStudioV6InputPolicy["touchPolicy"] })} /></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{([[
             "팜리젝션", "큰 접촉과 펜 동시 입력 차단", "palmRejection"], ["호버 프리뷰", "촉·틸트 예상 면적 표시", "hoverPreview"], ["틸트 인식", "접촉 폭·치즐·강모 방향", "tiltEnabled"]] as const).map(([label, detail, key]) => <button key={key} type="button" aria-pressed={program.input[key]} onClick={() => patchInput({ [key]: !program.input[key] })} className={`${SUB} text-left ${program.input[key] ? "border-accent/60 bg-accent/10" : ""} ${STUDIO_FOCUS_RING}`}><span className="text-xs font-black text-fg">{label}</span><span className="mt-1 block text-[0.68rem] text-fg-3">{detail}</span></button>)}</div></Panel><Panel title="필압·방향 교정" description="현재 펜에 맞게 접촉 시작과 힘의 범위를 조절합니다."><PressureCurve program={program} /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[

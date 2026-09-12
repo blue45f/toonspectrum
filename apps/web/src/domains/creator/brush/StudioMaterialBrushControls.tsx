@@ -1,4 +1,5 @@
-import { useId, useState, type MouseEvent } from "react";
+import { useId, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { normalizeBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
@@ -8,6 +9,7 @@ import {
   type BrushStudioV6MaterialConfig,
 } from "../brush-lab/brush-studio-v6-material-engine";
 import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+import type { StudioBrushSnapshot } from "./studio-brush-library";
 
 const FIELDS = [
   { key: "flow", label: "도포 유량", min: 0.01, max: 1, step: 0.01 },
@@ -39,12 +41,14 @@ function materialLabel(material: BrushStudioV6MaterialConfig): string {
 }
 
 /** Material strokes bypass legacy oil switches; expose only fields the contact solver consumes. */
-export function StudioMaterialBrushControls({ material, programSet, onChange }: {
+export function StudioMaterialBrushControls({ material, programSet, currentSnapshot, onChange }: {
   readonly material: BrushStudioV6MaterialConfig;
   readonly programSet: StudioBrushEngineProgramSet;
+  readonly currentSnapshot?: Pick<StudioBrushSnapshot, "strokeWidth" | "color" | "brushOpacity">;
   readonly onChange: (next: StudioBrushEngineProgramSet | null) => void;
 }) {
   const instanceId = useId();
+  const navigate = useNavigate();
   const [notice, setNotice] = useState("");
   const active = brushStudioV6MaterialActiveTuningKeys(material);
   const fields = FIELDS.filter((field) => active.has(field.key));
@@ -52,12 +56,20 @@ export function StudioMaterialBrushControls({ material, programSet, onChange }: 
   const editorId = `material-${material.seed}`;
   const editorHref = `/studio/assets/brushes/${editorId}/edit`;
 
-  const prepareEditor = (event: MouseEvent<HTMLAnchorElement>) => {
+  const openEditor = () => {
     try {
-      const program = normalizeBrushStudioV6Program({ ...material, schemaVersion: 6, id: editorId, name: label });
+      const program = normalizeBrushStudioV6Program({
+        ...material, schemaVersion: 6, id: editorId, name: label,
+        tuning: currentSnapshot ? {
+          ...material.tuning,
+          size: currentSnapshot.strokeWidth,
+          primaryColor: currentSnapshot.color,
+          opacity: currentSnapshot.brushOpacity,
+        } : material.tuning,
+      });
       window.localStorage.setItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`, JSON.stringify(program));
+      navigate(editorHref);
     } catch {
-      event.preventDefault();
       setNotice("브러시 편집기로 설정을 전달하지 못했습니다. 현재 원고 설정은 유지됩니다.");
     }
   };
@@ -87,7 +99,7 @@ export function StudioMaterialBrushControls({ material, programSet, onChange }: 
     </label>
     {!active.has("secondaryColor") ? <p id={`${instanceId}-secondary-inactive`} className="text-[0.65rem] leading-4 text-fg-3">현재 재료 조합에서 사용하지 않음</p> : null}
     <div className="flex flex-wrap gap-2">
-      <a href={editorHref} onClick={prepareEditor} className={`inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>브러시 편집기에서 비교·실험</a>
+      <button type="button" onClick={openEditor} className={`inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>브러시 편집기에서 비교·실험</button>
       <button type="button" onClick={() => onChange(null)} className={`min-h-11 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg-3 transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>기본 브러시로 전환</button>
     </div>
     {notice ? <p role="status" className="text-xs leading-5 text-fg-3">{notice}</p> : null}

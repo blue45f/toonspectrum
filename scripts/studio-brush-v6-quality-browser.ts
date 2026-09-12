@@ -10,7 +10,7 @@ import {
 } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-preview";
 
 import { brushV6InkDistance, brushV6InkField, brushV6InkStatistics } from "./studio-brush-v6-pixel-quality";
-import { verifyBrushV6LongStrokeQuality, verifyBrushV6ProductionQuality, verifyBrushV6ShortStartQuality, verifyBrushV6ReliefQuality } from "./studio-brush-v6-production-quality-browser";
+import { verifyBrushV6LongStrokeQuality, verifyBrushV6ProductionQuality, verifyBrushV6ShortStartQuality, verifyBrushV6ReliefQuality, verifyBrushV6PickupQuality } from "./studio-brush-v6-production-quality-browser";
 
 const WIDTH = 420;
 const HEIGHT = 180;
@@ -105,7 +105,9 @@ const harness = {
     if (shortStarts) failures.push(...shortStarts.failures);
     const relief = id === "oil-hair-mixer" ? await verifyBrushV6ReliefQuality(currentProgram, cards) : null;
     if (relief) failures.push(...relief.failures);
-    return { previewHash, roundtripHash, previewSamplesMs: timings.splice(0), production, symmetryProduction, shortStarts, relief };
+    const pickup = id === "oil-hair-mixer" ? await verifyBrushV6PickupQuality(currentProgram, cards) : null;
+    if (pickup) failures.push(...pickup.failures);
+    return { previewHash, roundtripHash, previewSamplesMs: timings.splice(0), production, symmetryProduction, shortStarts, relief, pickup };
   },
   location() {
     live.scrollIntoView({ block: "center" });

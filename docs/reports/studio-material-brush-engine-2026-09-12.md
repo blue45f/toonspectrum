@@ -64,25 +64,25 @@ remain a separate acceptance surface.
 
 ## Recorded acceptance run
 
-The final CPU material run on 2026-09-12 passed all 17 recipes and two symmetry cases. All 136
+The recorded CPU material run on 2026-09-12 passed all 17 recipes and two symmetry cases. All 136
 normalized recipe pairs exceeded the minimum material distance of 0.025 (observed minimum
 0.030974845). Native live, settled and committed pixels matched exactly, including reflected
 chisel and four-way particle overlap. SVG antialiasing produced a maximum mean normalized
 channel error of 0.000378359 across those cases.
 
 The 10,000-input, 128-strand stress run generated 1,279,872 contacts. The real committed
-Canvas entry point rendered the whole stroke in 2,080.4 ms, with exact pixels against the
+Canvas entry point rendered the whole stroke in 2,235.9 ms, with exact pixels against the
 incremental renderer. Both generated and submitted batches peaked at 128 contacts; this large
 stroke retained no cached output. Small-stroke caches are limited to 32,768 contacts total,
 8,192 contacts and 512 input samples per item, and detect in-place edits. These observations
 exclude physical input and GPU presentation. Contact counts are not heap-byte measurements.
-The extreme whole redraw still takes about 2.08 seconds; bounded memory does not remove its
+The extreme whole redraw still takes about 2.24 seconds; bounded memory does not remove its
 underlying drawing cost.
 
 The public SVG exporter enforces a 64 MiB UTF-16 output budget and reports an actionable error
 instead of downloading an incomplete file. The extreme stroke exceeded this budget after
-264.1 ms. A separate discarding sink verified full-path serialization of 438,812,506 UTF-16
-bytes in 1,693.4 ms, with a maximum 44,400-byte chunk. This sink is a stress measurement, not a
+267.3 ms. A separate discarding sink verified full-path serialization of 438,812,506 UTF-16
+bytes in 1,727.7 ms, with a maximum 44,400-byte chunk. This sink is a stress measurement, not a
 claim that the application permits an unbounded SVG download.
 
 After building and starting Vite preview, `TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:PORT pnpm verify:studio-brush-v6-workflow` exercises the real Brush Editor save, material application,
@@ -138,4 +138,46 @@ save/apply/pen/resize/SQLite/reload/public-recovery workflow. Each retained all 
 samples within 2.8e-8, restored the same 1,920 native drawing commands, and preserved material
 configuration and coordinates. Active replay spatial RGBA error was 1.1073803% with 0.1291211%
 alpha-mass difference; reopened manuscript error was 0.3467481%, with 39,299 visible committed
-ink pixels and no page exceptions. The final required material suite passed 32 files / 763 tests.
+ink pixels and no page exceptions. That recorded material suite passed 32 files / 763 tests.
+
+## Final navigation and graph contract corrections
+
+The shared bracket-key and wheel adjustments use the active material's size and opacity
+ranges, so a brush above 80 px is adjusted from its current value and 1% material opacity
+remains usable. Built-in brushes retain their existing ranges. Opening the material workbench
+uses a button that transfers the complete configuration before navigation; browser link actions
+cannot bypass that transfer and open a stale seed-scoped draft.
+The transfer also overlays the current manuscript tool's size, primary color and opacity in
+the destination draft, preserving recent toolbar and shortcut edits without mutating the
+source material program.
+
+New recipes identify the actual output authority as CPU contact Canvas rendering plus SVG
+primitives. Historical raster-tile, hybrid and vector-design node IDs remain readable on import,
+but are disabled as design-only choices and explicitly describe the common output used by the
+current renderer. The graph does not advertise distinct output pipelines that have not been
+implemented. Local pigment reservoirs are separately selectable from no-pickup: only the
+reservoir node enables bristle refill and secondary pigment mixing, while no-pickup disables
+those controls and ignores their retained values. Neither mode claims to sample existing
+canvas pigment.
+For materials such as palette knives that do not run the bristle calculation, the graph
+explicitly reports the retained reservoir selection as inactive for the current material.
+
+After these final graph and navigation corrections, the required material suite passed
+37 files / 870 tests. The browser harness additionally compares no-pickup and enabled-reservoir
+output and exercises large-brush shortcuts, low-opacity continuity and current-tool transfer.
+
+The final output gate passed all 29 production cases with no failures. No-pickup variants
+with retained pickup values zero and one produce identical native, committed and SVG pixels;
+the enabled local reservoir produces material distance 0.1426729, above the 0.01 effect bound.
+All 136 recipe pairs retain their previous minimum distance of 0.030974845.
+
+The public palette-to-workbench path retains its own descendant portal while interacting
+with the modal. Event-level React ownership preserves normal outside dismissal and separate
+Escape handling; no global dialog exemption is used. Actual portal tests fail on the prior
+behavior and cover child tab clicks, backdrop clicks and unrelated dialogs.
+
+Malformed or future engine-program JSON is rejected before library storage instead of
+importing a generic replacement brush. Legacy non-engine JSON and omitted false oil defaults
+remain supported. All 17 valid materials retain identical engine data and generated contacts
+after export/import. Public file-reader tests verify a visible error and zero writes for
+rejected engine sets and malformed nested material data.

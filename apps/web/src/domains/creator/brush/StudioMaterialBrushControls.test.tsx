@@ -8,7 +8,13 @@ import { createBrushStudioV6MaterialStroke, normalizeBrushStudioV6MaterialConfig
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
-afterEach(() => { cleanup(); localStorage.clear(); });
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react-router-dom")>(),
+  useNavigate: () => navigate,
+}));
+
+afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); navigate.mockReset(); });
 
 describe("material brush controls inside Studio", () => {
   it("disables the secondary pigment for a primary-only material and enables it for bristle mixing", () => {
@@ -47,17 +53,53 @@ describe("material brush controls inside Studio", () => {
     expect(onChange).toHaveBeenLastCalledWith(null);
   });
 
-  it("hands the exact material, seed and pressure response to a separate Brush Editor draft", () => {
+  it.each([false, true])("hands the exact material to the editor before navigating, modifier=%s", (metaKey) => {
     const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("dendritic-copper"))!;
     render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
-    const link = screen.getByRole("link", { name: "브러시 편집기에서 비교·실험" });
-    link.addEventListener("click", (event) => event.preventDefault());
-    fireEvent.click(link);
+    const action = screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" });
+    expect(screen.queryByRole("link", { name: "브러시 편집기에서 비교·실험" })).toBeNull();
+    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`;
+    navigate.mockImplementation(() => {
+      expect(JSON.parse(localStorage.getItem(storageKey)!).tuning).toEqual(material.tuning);
+    });
+    fireEvent.contextMenu(action);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem(storageKey)).toBeNull();
+    fireEvent.click(action, { metaKey });
     const program = JSON.parse(localStorage.getItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`)!);
     expect(program.tuning).toEqual(material.tuning);
     expect(program.input).toEqual(material.input);
     expect(program.slots).toEqual(material.slots);
     expect(program.seed).toBe(material.seed);
-    expect(link.getAttribute("href")).toBe(`/studio/assets/brushes/material-${material.seed}/edit`);
+    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/material-${material.seed}/edit`);
+  });
+
+  it("stays in Studio with an explicit error when the exact editor draft cannot be stored", () => {
+    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+    render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("설정을 전달하지 못했습니다");
+  });
+
+  it("transfers current main-tool size, opacity and color without mutating the material program", () => {
+    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    const original = structuredClone(material);
+    const onChange = vi.fn();
+    const programSet = { version: 1 as const, material };
+    const { rerender } = render(<StudioBrushEngineProgramControls brushId="brush" programSet={programSet}
+      currentSnapshot={{ strokeWidth: 54, brushOpacity: 0.95, color: "#112233" }} onChange={onChange} />);
+    rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={programSet}
+      currentSnapshot={{ strokeWidth: 150, brushOpacity: 0.01, color: "#34ab67" }} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
+    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`;
+    const draft = JSON.parse(localStorage.getItem(storageKey)!);
+    expect(draft.tuning).toEqual({ ...material.tuning, size: 150, opacity: 0.01, primaryColor: "#34ab67" });
+    expect(draft.slots).toEqual(material.slots);
+    expect(draft.input).toEqual(material.input);
+    expect(material).toEqual(original);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/material-${material.seed}/edit`);
   });
 });

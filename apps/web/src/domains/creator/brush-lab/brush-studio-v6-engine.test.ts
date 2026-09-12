@@ -13,11 +13,29 @@ import {
   replaceBrushStudioV6Slot,
   toggleBrushStudioV6Node,
 } from "./brush-studio-v6-engine";
+import { isBrushStudioV6MaterialNodeImplemented, normalizeBrushStudioV6MaterialConfig } from "./brush-studio-v6-material-engine";
 
 describe("Brush Studio V6 quality authority", () => {
   it("keeps node and recipe identities unique", () => {
     expect(new Set(BRUSH_STUDIO_V6_NODES.map((entry) => entry.id)).size).toBe(BRUSH_STUDIO_V6_NODES.length);
     expect(new Set(BRUSH_STUDIO_V6_RECIPES.map((entry) => entry.id)).size).toBe(BRUSH_STUDIO_V6_RECIPES.length);
+  });
+
+  it("creates recipes with the one actual contact output while preserving unsupported imported output intent", () => {
+    const outputNodes = BRUSH_STUDIO_V6_NODES.filter((node) => node.slot === "output" && isBrushStudioV6MaterialNodeImplemented(node.id));
+    expect(outputNodes.map((node) => node.id)).toEqual(["output-contact-canvas-svg"]);
+    expect(outputNodes[0]).toMatchObject({ label: "Canvas Contacts + SVG", domain: "main", provider: "ToonSpectrum CPU Contacts", requires: [] });
+    for (const recipe of BRUSH_STUDIO_V6_RECIPES) {
+      expect(recipe.create().slots.output).toBe("output-contact-canvas-svg");
+      expect(normalizeBrushStudioV6MaterialConfig(recipe.create())?.slots.output).toBe("output-contact-canvas-svg");
+    }
+    for (const output of ["output-raster-tiles", "output-hybrid", "output-vector"]) {
+      const original = createBrushStudioV6Program();
+      const imported = normalizeBrushStudioV6Program({ ...original, slots: { ...original.slots, output } });
+      expect(imported.slots.output).toBe(output);
+      expect(normalizeBrushStudioV6MaterialConfig(imported)?.slots.output).toBe(output);
+      expect(isBrushStudioV6MaterialNodeImplemented(output)).toBe(false);
+    }
   });
 
   it("compiles every signature recipe under the full capability profile", () => {

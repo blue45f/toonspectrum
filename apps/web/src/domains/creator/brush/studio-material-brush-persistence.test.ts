@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { BRUSH_STUDIO_V6_RECIPES, createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
 import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 import { parseStudioAutosave, serializeStudioAutosave } from "../studio-autosave";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "../studio-project-file";
 import { normalizeStudioToolOperationMemory, rememberStudioToolOperationSnapshot } from "../studio-tool-operation-memory";
-import { brushMatchesSnapshot, importBrushFromJson, normalizeStoredBrush, writeBrushJson } from "./studio-brush-library";
+import { brushMatchesSnapshot, importBrushFromJson, normalizeStoredBrush, sanitizeBrushSnapshot, writeBrushJson } from "./studio-brush-library";
 import { parseStudioToolOperationMemory, serializeStudioToolOperationMemory } from "../studio-tool-operation-memory-sqlite";
 import { planStudioMaterialBrush, studioMaterialBrushConfig } from "./studio-material-brush-runtime";
 
@@ -27,14 +27,51 @@ describe("saved material brush preservation", () => {
     }
   });
 
-  it("exports and imports the complete material program and produces the same marks", () => {
-    const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("oil-hair-mixer"));
-    const imported = importBrushFromJson(writeBrushJson(saved)).brush;
+  it.each(BRUSH_STUDIO_V6_RECIPES.map((recipe) => recipe.id))("exports and imports %s without changing the material renderer or marks", (recipe) => {
+    const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program(recipe));
+    const { brush: imported, adjustedFields } = importBrushFromJson(writeBrushJson(saved));
+    expect(adjustedFields).toEqual([]);
     expect(imported.enginePrograms).toEqual(saved.enginePrograms);
     expect(brushMatchesSnapshot(imported, saved)).toBe(true);
     const stroke = { points: [10, 20, 30, 38, 60, 45], pressures: [0.4, 0.7, 0.3], stroke: saved.color, strokeWidth: saved.strokeWidth };
     expect(planStudioMaterialBrush({ ...stroke, brushEnginePrograms: imported.enginePrograms! }))
       .toEqual(planStudioMaterialBrush({ ...stroke, brushEnginePrograms: saved.enginePrograms! }));
+  });
+
+  it.each([
+    ["future program set", { version: 2 }],
+    ["malformed program set", "material"],
+    ["missing program version", {}],
+    ["future material kernel", { version: 1, material: { version: 2 } }],
+    ["malformed material", { version: 1, material: { version: 1, seed: 12 } }],
+    ["malformed nested oil", { version: 1, oil: { bristlePhysics: "true" } }],
+    ["discarded unknown extension", { version: 1, nextRenderer: {} }],
+  ])("rejects %s at public import instead of returning a changed renderer", (_label, enginePrograms) => {
+    const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("oil-hair-mixer"));
+    const exported = JSON.parse(writeBrushJson(saved));
+    exported.enginePrograms = enginePrograms;
+    const text = JSON.stringify(exported);
+    expect(sanitizeBrushSnapshot(exported).adjustedFields).toContain("enginePrograms");
+    expect(() => importBrushFromJson(text)).toThrow(/브러시 엔진 설정을 그대로 복원할 수 없어 가져오지 않았어요/u);
+    expect(() => importBrushFromJson(text)).toThrow(/최신 스튜디오.*원본 브러시를 다시 내보내/u);
+  });
+
+  it("keeps valid legacy JSON without engine programs importable", () => {
+    const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("clean-ink"));
+    const exported = JSON.parse(writeBrushJson({ ...saved, enginePrograms: null }));
+    delete exported.enginePrograms;
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(exported));
+    expect(imported.enginePrograms).toBeNull();
+    expect(adjustedFields).toEqual([]);
+  });
+
+  it.each([{}, { bristlePhysics: true }])("accepts older oil switches with additive false defaults: %j", (oil) => {
+    const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("clean-ink"));
+    const exported = JSON.parse(writeBrushJson({ ...saved, enginePrograms: null }));
+    exported.enginePrograms = { version: 1, oil };
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(exported));
+    expect(adjustedFields).toEqual([]);
+    expect(imported.enginePrograms).toEqual({ version: 1, oil: { bristlePhysics: false, bristleLoadDynamics: false, impastoRelief: false, ...oil } });
   });
 
   it("preserves legacy oil, watercolor and composition programs in the same export format", () => {

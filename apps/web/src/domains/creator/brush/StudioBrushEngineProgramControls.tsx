@@ -140,6 +140,7 @@ function combinationComplexity(activeCount: number): {
 export interface StudioBrushEngineProgramControlsProps {
   readonly brushId: string;
   readonly programSet: StudioBrushEngineProgramSet | null | undefined;
+  readonly currentSnapshot?: Pick<import("./studio-brush-library").StudioBrushSnapshot, "strokeWidth" | "color" | "brushOpacity">;
   readonly onChange: (next: StudioBrushEngineProgramSet | null) => void;
 }
 
@@ -337,10 +338,11 @@ function StudioOilProgramMatrix({
 export function StudioBrushEngineProgramControls({
   brushId,
   programSet,
+  currentSnapshot,
   onChange,
 }: StudioBrushEngineProgramControlsProps) {
   if (programSet?.material) {
-    return <StudioMaterialBrushControls material={programSet.material} programSet={programSet} onChange={onChange} />;
+    return <StudioMaterialBrushControls material={programSet.material} programSet={programSet} currentSnapshot={currentSnapshot} onChange={onChange} />;
   }
   const family = resolveStudioBrushRenderFamily(brushId);
   const guide = ENGINE_FAMILY_GUIDE[family];

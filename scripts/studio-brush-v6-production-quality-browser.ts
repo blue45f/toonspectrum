@@ -20,6 +20,11 @@ function read(canvas: HTMLCanvasElement): Uint8ClampedArray {
   return canvas.getContext("2d")!.getImageData(0, 0, WIDTH, HEIGHT).data;
 }
 
+async function pixelHash(pixels: Uint8ClampedArray): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(pixels).buffer);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function difference(first: Uint8ClampedArray, second: Uint8ClampedArray) {
   let total = 0;
   let maximum = 0;
@@ -134,12 +139,42 @@ export async function verifyBrushV6ProductionQuality(
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exported.svg)}`;
   await image.decode();
   exportCanvas.getContext("2d")!.drawImage(image, 0, 0);
-  const svgPixels = difference(batch, read(exportCanvas));
+  const svgFrame = read(exportCanvas);
+  const svgPixels = difference(batch, svgFrame);
   // Browser SVG and Canvas antialias paths differ; preserve the measured error instead of claiming equality.
   if (svgPixels.meanChannelError > 0.01 || svgPixels.relativeAlphaError > 0.04) failures.push(`${program.id}: SVG paint/alpha differs materially from committed contacts`);
   overlay.attach(null);
+  const pixelHashes = { native: await pixelHash(live), committed: await pixelHash(batch), svg: await pixelHash(svgFrame) };
   return { failures, symmetry: symmetry ?? null, symmetryNewPixels, markCount: marks.length, appendSamplesMs, liveSettled, liveCommitted, svgPixels,
-    savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
+    pixelHashes, savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
+}
+
+/** No Pickup must suppress both refill and color mixing on every production output path. */
+export async function verifyBrushV6PickupQuality(program: BrushStudioV6Program, parent: HTMLElement) {
+  const failures: string[] = [];
+  const modes = [];
+  for (const pickupMode of ["pickup-none", "pickup-pigment-reservoir"] as const) {
+    const variants: (Awaited<ReturnType<typeof verifyBrushV6ProductionQuality>> & { pickup: number })[] = [];
+    const fields = [];
+    for (const pickup of [0, 1]) {
+      const variant = { ...program, slots: { ...program.slots, pickup: pickupMode }, tuning: { ...program.tuning, pickup } };
+      const production = await verifyBrushV6ProductionQuality(variant, parent, undefined, { label: `${pickupMode} · amount ${pickup}` });
+      failures.push(...production.failures);
+      const canvas = document.createElement("canvas");
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      renderStudioMaterialBrush(canvas.getContext("2d")!, stroke(variant));
+      const pixels = read(canvas);
+      fields.push(brushV6InkField(pixels, new Uint8ClampedArray(pixels.length)));
+      variants.push({ pickup, ...production });
+    }
+    const distance = brushV6InkDistance(fields[0]!, fields[1]!);
+    const equalPixels = (["native", "committed", "svg"] as const).every(output => variants[0]!.pixelHashes[output] === variants[1]!.pixelHashes[output]);
+    if (pickupMode === "pickup-none" && (!equalPixels || distance !== 0)) failures.push(`${program.id}: No Pickup amount0/1 changed deposited native/committed/SVG pixels`);
+    if (pickupMode === "pickup-pigment-reservoir" && (equalPixels || distance < 0.01)) failures.push(`${program.id}: enabled local reservoir amount0/1 has no meaningful output change (${distance})`);
+    modes.push({ pickupMode, variants, equalPixels, distance });
+  }
+  return { modes, minimumEnabledDistance: 0.01, failures };
 }
 
 /** Two-point gestures expose false horizontal connectors hidden inside long horizontal starts. */

@@ -32,9 +32,10 @@ function contactMode(program: BrushStudioV6MaterialProgram): "bristle" | "partic
 export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6MaterialProgram): ReadonlySet<keyof BrushStudioV6Tuning> {
   const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor"]);
   const mode = contactMode(program);
+  const bristlePickup = program.slots.pickup === "pickup-pigment-reservoir";
   const pattern = program.slots.pattern !== "pattern-none";
   const gridUsesOnlyPrimary = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(program.slots.pattern);
-  const secondaryInBase = mode === "particle" || mode === "bristle" && program.tuning.pickup > 0
+  const secondaryInBase = mode === "particle" || mode === "bristle" && bristlePickup && program.tuning.pickup > 0
     || mode === "relief" && program.tuning.relief > 0
     || mode === "wet" && (program.tuning.wetness > 0 || program.tuning.granulation > 0);
   if (program.slots.finish.includes("finish-neon") || program.slots.physics.includes("physics-thin-film")
@@ -50,7 +51,7 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
   if (program.slots.physics.includes("physics-thin-film")) for (const key of ["wetness", "gravity", "viscosity"] as const) result.add(key);
   if (pattern && mode !== "particle") return result;
   const modeKeys: Readonly<Record<typeof mode, readonly (keyof BrushStudioV6Tuning)[]>> = {
-    bristle: ["bristleStrands", "friction", "viscosity", "reservoir", "pickup", "relief", "surfaceTooth"],
+    bristle: ["bristleStrands", "friction", "viscosity", "reservoir", ...(bristlePickup ? ["pickup"] as const : []), "relief", "surfaceTooth"],
     particle: ["particleCount", "patternJitter", ...(program.slots.physics.includes("physics-reaction") ? ["reactionRate"] as const : [])],
     grain: ["surfaceTooth", "granulation"],
     relief: ["reservoir", "plasticity", "relief"],
@@ -134,7 +135,7 @@ export function sampleBrushStudioV6PaperContact(surface: string, x: number, y: n
 
 /** Selections with an observable implementation in this portable kernel. */
 export function isBrushStudioV6MaterialNodeImplemented(id: string): boolean {
-  return ["input-pointer-v3", "motion-direct", "carrier-webgpu-centerline", "carrier-perfect-outline", "carrier-webgpu-particles", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous", "deposit-ink", "deposit-marker", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "pickup-none", "pigment-rgb", "pigment-spectral", "pigment-inkwash-density", "physics-dry-contact", "physics-inkwash", "physics-thin-film", "physics-bristle", "physics-reaction", "physics-height", "pattern-none", "pattern-dot-tone", "pattern-cross-hatch", "pattern-weave", "pattern-brick", "pattern-foliage", "pattern-stitch", "pattern-kaleido", "finish-neon", "output-raster-tiles", "output-hybrid", "output-vector"].includes(id);
+  return ["input-pointer-v3", "motion-direct", "carrier-webgpu-centerline", "carrier-perfect-outline", "carrier-webgpu-particles", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous", "deposit-ink", "deposit-marker", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "pickup-none", "pickup-pigment-reservoir", "pigment-rgb", "pigment-spectral", "pigment-inkwash-density", "physics-dry-contact", "physics-inkwash", "physics-thin-film", "physics-bristle", "physics-reaction", "physics-height", "pattern-none", "pattern-dot-tone", "pattern-cross-hatch", "pattern-weave", "pattern-brick", "pattern-foliage", "pattern-stitch", "pattern-kaleido", "finish-neon", "output-contact-canvas-svg"].includes(id);
 }
 
 export function mapBrushStudioV6Pressure(raw: number, input: Pick<BrushStudioV6InputPolicy, "pressureOnset" | "pressureSaturation" | "pressureGamma">): number {
@@ -168,6 +169,8 @@ export function createBrushStudioV6MaterialStroke(
   options: { readonly maxMarksPerPush?: number } = {},
 ): BrushStudioV6MaterialStroke {
   const t = program.tuning;
+  // This is local seeded reservoir replenishment, never sampling pigment from the canvas.
+  const pickup = program.slots.pickup === "pickup-pigment-reservoir" ? unit(t.pickup) : 0;
   const size = bounded(t.size, 1, 240);
   const mode = contactMode(program);
   const spacing = mode === "relief" && t.spacing <= 0.3 ? Math.min(t.spacing, 0.035) : t.spacing;
@@ -271,7 +274,7 @@ export function createBrushStudioV6MaterialStroke(
             * (1 + initialLoading * unit(t.relief) * 0.6);
           emit("bristle", point.x + Math.cos(turn) * distance, point.y + Math.sin(turn) * distance,
             thickness, thickness, 0, alpha * pressure * initialLoading * 5,
-            noise(lane, 19, seed) * t.pickup, initialLoading * t.relief);
+            noise(lane, 19, seed) * pickup, initialLoading * t.relief);
           continue;
         }
         const strandSpacing = (noise(lane, 61, seed) - 0.5) * radius / laneCount;
@@ -289,7 +292,7 @@ export function createBrushStudioV6MaterialStroke(
         laneY[lane] = previousY + (targetY - previousY) * response;
         const loading = reservoir[lane]!;
         const loss = loading * (1 - Math.exp(-step * (0.08 + t.friction * 0.2) / size));
-        const refill = (1 - loading) * t.pickup * step / (size * 12);
+        const refill = (1 - loading) * pickup * step / (size * 12);
         reservoir[lane] = unit(loading - loss + refill);
         const paper = sampleBrushStudioV6PaperContact(program.slots.surface, laneX[lane]!, laneY[lane]!, seed);
         const contact = Math.max(0, pressure - Math.abs(lanePosition) * 0.18 - paper * t.surfaceTooth * 0.12);
@@ -300,7 +303,7 @@ export function createBrushStudioV6MaterialStroke(
         const travelX = laneX[lane]! - previousX;
         const travelY = laneY[lane]! - previousY;
         const travel = Math.hypot(travelX, travelY);
-        emit("bristle", (previousX + laneX[lane]!) * 0.5, (previousY + laneY[lane]!) * 0.5, travel * 0.5 + thickness, thickness, travel > 0.0001 ? Math.atan2(travelY, travelX) : direction, alpha * contact * loading * 5, noise(lane, 19, seed) * t.pickup, loading * t.relief, "capsule");
+        emit("bristle", (previousX + laneX[lane]!) * 0.5, (previousY + laneY[lane]!) * 0.5, travel * 0.5 + thickness, thickness, travel > 0.0001 ? Math.atan2(travelY, travelX) : direction, alpha * contact * loading * 5, noise(lane, 19, seed) * pickup, loading * t.relief, "capsule");
       }
       if (directional) initializedBristles = true;
       return;

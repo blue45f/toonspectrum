@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BRUSH_STUDIO_V6_RECIPES, createBrushStudioV6Program, patchBrushStudioV6Tuning } from "./brush-studio-v6-engine";
-import { brushStudioV6MaterialActiveTuningKeys, brushStudioV6MaterialMarksToSvg, createBrushStudioV6MaterialStroke, mapBrushStudioV6Pressure, mixBrushStudioV6MaterialColors, normalizeBrushStudioV6MaterialConfig, renderBrushStudioV6MaterialMarks, sampleBrushStudioV6PaperContact, type BrushStudioV6MaterialMark, type BrushStudioV6MaterialPoint } from "./brush-studio-v6-material-engine";
+import { brushStudioV6MaterialActiveTuningKeys, brushStudioV6MaterialMarksToSvg, createBrushStudioV6MaterialStroke, isBrushStudioV6MaterialNodeImplemented, mapBrushStudioV6Pressure, mixBrushStudioV6MaterialColors, normalizeBrushStudioV6MaterialConfig, renderBrushStudioV6MaterialMarks, sampleBrushStudioV6PaperContact, type BrushStudioV6MaterialMark, type BrushStudioV6MaterialPoint } from "./brush-studio-v6-material-engine";
 
 const line = (steps: number, length = 180): BrushStudioV6MaterialPoint[] => Array.from({ length: steps + 1 }, (_, index) => ({ x: index * length / steps, y: 30, pressure: 0.65, tilt: 0.3, twist: 20 }));
 function paint(id: string, points: readonly BrushStudioV6MaterialPoint[]): readonly BrushStudioV6MaterialMark[] {
@@ -75,6 +75,31 @@ describe("portable V6 material contacts", () => {
     expect(mean(last)).toBeLessThan(mean(first) * 0.5);
     stroke.reset();
     expect(stroke.push(points[0]!)).toEqual(first);
+  });
+
+  it("honors no-pickup for tap pigment, moving color and reservoir refill without changing saved tuning", () => {
+    const base = createBrushStudioV6Program("oil-hair-mixer");
+    const render = (pickupNode: string, pickup: number, secondaryColor = "#ef2010") => {
+      const program = { ...base, slots: { ...base.slots, pickup: pickupNode }, tuning: { ...base.tuning, pickup, secondaryColor } };
+      const stroke = createBrushStudioV6MaterialStroke(program);
+      const marks = line(40, 1200).flatMap((point) => stroke.push(point));
+      return { program, marks, svg: brushStudioV6MaterialMarksToSvg(marks) };
+    };
+    const none = render("pickup-none", 0);
+    const inherited = render("pickup-none", 1, "#10b0ef");
+    expect(inherited.program.tuning.pickup).toBe(1);
+    expect(inherited.marks).toEqual(none.marks);
+    expect(inherited.svg).toBe(none.svg);
+    expect(inherited.marks.every((mark) => mark.secondaryMix === 0)).toBe(true);
+    expect(brushStudioV6MaterialActiveTuningKeys(inherited.program).has("pickup")).toBe(false);
+    expect(brushStudioV6MaterialActiveTuningKeys(inherited.program).has("secondaryColor")).toBe(false);
+    const replenished = render("pickup-pigment-reservoir", 1);
+    expect(replenished.svg).not.toBe(none.svg);
+    expect(replenished.marks.some((mark) => mark.secondaryMix > 0)).toBe(true);
+    const opacity = (marks: readonly BrushStudioV6MaterialMark[]) => marks.slice(-base.tuning.bristleStrands).reduce((sum, mark) => sum + mark.opacity, 0);
+    expect(opacity(replenished.marks)).toBeGreaterThan(opacity(none.marks));
+    expect(brushStudioV6MaterialActiveTuningKeys(replenished.program).has("pickup")).toBe(true);
+    expect(isBrushStudioV6MaterialNodeImplemented("pickup-pigment-reservoir")).toBe(true);
   });
 
   it("renders bristle relief as wider loaded contact ridges in Canvas and SVG", () => {

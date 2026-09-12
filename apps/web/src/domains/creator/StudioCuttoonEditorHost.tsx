@@ -432,7 +432,7 @@ import {
   requireStudioDrawingPointerTransport,
 } from "./brush/studio-drawing-pointer-transport";
 import { createStudioDrawingShortcutNoticeStore } from "./brush/studio-drawing-shortcut-notice-store";
-import { adjustStudioBrushWidth } from "./brush/studio-drawing-shortcuts";
+import { adjustStudioBrushWidthFromWheel } from "./brush/studio-drawing-shortcuts";
 import { isStudioPasteScopeCurrent, resolveStudioEditAvailability } from "./studio-edit-controls";
 import {
   isStudioCuttoonSourceFormat,
@@ -5818,8 +5818,8 @@ export function StudioCuttoonEditor({
     if (preset) applyBuiltInBrushPreset(preset);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(settings));
   }
-  const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
-  drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
+  const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity, brushEnginePrograms });
+  drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity, brushEnginePrograms };
   const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
@@ -12343,8 +12343,7 @@ export function StudioCuttoonEditor({
       }
       if (wheelMode === "brush-size") {
         e.preventDefault();
-        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
-        setStrokeWidth((w) => adjustStudioBrushWidth(w, dir * (e.shiftKey ? 5 : 1)));
+        setStrokeWidth((w) => adjustStudioBrushWidthFromWheel(w, e, prefs.reverseWheel, currentBrushSnapshotRef.current?.enginePrograms));
         return;
       }
       if (wheelMode === "pan") {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBrushV6Workbench } from "./StudioBrushV6Workbench";
@@ -38,6 +38,49 @@ afterEach(cleanup);
 const stored = (): BrushStudioV6Program => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
+  it("offers one truthful output authority and explains preserved imported alternatives", () => {
+    const original = createBrushStudioV6Program("oil-hair-mixer");
+    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({ ...original, slots: { ...original.slots, output: "output-raster-tiles" } }));
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    const select = screen.getByLabelText("출력 권위") as HTMLSelectElement;
+    expect(select.value).toBe("output-raster-tiles");
+    expect([...select.options].filter((option) => !option.disabled).map((option) => option.value)).toEqual(["output-contact-canvas-svg"]);
+    expect(screen.getByText(/가져온 다른 출력 선택은 설계 기록으로 보관하며 실제 출력은 이 공통 경로/u)).toBeTruthy();
+    fireEvent.change(select, { target: { value: "output-contact-canvas-svg" } });
+    expect(stored().slots.output).toBe("output-contact-canvas-svg");
+  });
+
+  it.each([
+    ["impasto-knife", true, "강모 조합에서만 적용 · 현재 재료에서는 사용하지 않음"],
+    ["oil-hair-mixer", false, "공통 재료 계산기에 연결됨"],
+  ] as const)("describes retained reservoir pickup according to the %s material", (recipe, inactive, status) => {
+    const original = createBrushStudioV6Program(recipe);
+    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(original));
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    const pickup = screen.getByLabelText("픽업") as HTMLSelectElement;
+    expect(pickup.value).toBe("pickup-pigment-reservoir");
+    const card = pickup.closest("div.rounded-xl") as HTMLElement;
+    expect(within(card).getByText(status)).toBeTruthy();
+    expect(within(card).getByText(/강모 조합에서만 CPU 안료 저장량 보충/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    expect((screen.getByRole("slider", { name: /안료 보충·혼합/u }) as HTMLInputElement).disabled).toBe(inactive);
+    expect(stored().slots.pickup).toBe(original.slots.pickup);
+    expect(stored().tuning.pickup).toBe(original.tuning.pickup);
+  });
+
+  it("disables pickup and secondary pigment for a no-pickup bristle graph", () => {
+    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    fireEvent.change(screen.getByLabelText("픽업"), { target: { value: "pickup-none" } });
+    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    expect((screen.getByRole("slider", { name: /안료 보충·혼합/u }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("혼합·패턴 색", { exact: false }) as HTMLInputElement).disabled).toBe(true);
+    expect(stored().tuning.pickup).toBe(0.62);
+  });
+
   it("disables the secondary color when the contact engine uses only primary pigment", () => {
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "Material" }));
