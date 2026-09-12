@@ -6,7 +6,7 @@
  * `aria-disabled`). A deliberate hover or keyboard focus may enter a reversible runtime audition;
  * only a click promotes that candidate into document history.
  */
-import { Ban, Check, Eye, Image, TriangleAlert } from "lucide-react";
+import { Ban, Check, Eye, Image, PencilRuler, TriangleAlert } from "lucide-react";
 import { useId, useRef } from "react";
 
 import { useCharacterRuntimeThumbnail } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
@@ -125,17 +125,16 @@ export function CharacterSlotCard({
             src={runtimeThumbnail}
             alt=""
             draggable={false}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         ) : (
           <CharacterSlotPreview spec={entry.preview} selected={selected} className="h-full w-full" title={entry.label} />
         )}
-        {runtimeThumbnail ? (
-          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-line/70 bg-panel/85 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 backdrop-blur">
-            <Image size={9} aria-hidden />
-            실제 모델
-          </span>
-        ) : null}
+        <span title={runtimeThumbnail ? "현재 선택한 전체 캐릭터 조합의 실제 이미지입니다." : "모양을 설명하는 도해입니다. 실제 적용 결과는 3D 화면에서 확인하세요."}
+          className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-line/70 bg-panel/85 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 backdrop-blur">
+          {runtimeThumbnail ? <Image size={9} aria-hidden /> : <PencilRuler size={9} aria-hidden />}
+          {runtimeThumbnail ? "현재 조합 · 실제 3D" : "모양 도해"}
+        </span>
         {previewed ? (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full border border-accent/60 bg-panel/90 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent backdrop-blur">
             <Eye size={10} aria-hidden />
