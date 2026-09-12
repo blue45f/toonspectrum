@@ -21,7 +21,7 @@
 | 합성·파일 보존 | Photoshop Smart Object의 원본 유지 변형·필터·연결 인스턴스 [S9] | `studio-named-states.ts`의 희소 override 상태, 마스크/효과 스택. `studio-psd-import.ts`는 텍스트·Smart Object를 픽셀로 가져온다고 명시 | 기존 가져오기 손실 설명을 유지 | editable PSD text 가져오기, linked/embedded Smart Object 원본 편집과 왕복 |
 | 텍스트·식자 | CSP Story Editor의 다중 페이지 편집·이동·분할/병합·찾기/바꾸기 [S10] | `StudioDialogueBatchPanel.tsx`, `lettering/studio-dialogue-batch.ts`, `studio-dialogue-structure.ts`: 읽기 순서·일괄 편집. ruby·금칙·곡선 텍스트·자동 맞춤·번역 QA·낭독 존재 | 기존 구현을 재확인; 재구현하지 않음 | 컷 내 읽기 순서 직접 조절과 캔버스 미리보기, 다중 페이지 대사 밀도, 배치 변경 후 overflow 일관 검수 |
 | 컷·스토리보드 | CSP 프레임 폴더·분할 미리보기·간격·균등 분할·복제 정책 [S11] | `studio-panel-split.ts`, `lettering/studio-bubble-anchor.ts`, `StudioStoryboardGridPanel.tsx`, `studio-page-review.ts`, `StudioPublishPreflightPanel.tsx` | 컷·말풍선·페이지 검수 흐름의 기존 경로 확인 | 여러 페이지 상태/담당자/잠금 일괄 변경, revision 충돌 검증, 승인 변경 감사로그, sequence/scene/beat 참조 연결 |
-| 페이지·내보내기 | CSP JPG/PNG 분할, 너비/배율, 페이지 범위, 개별/연결 출력·휴대폰 영역 [S12] | `export/StudioExportMenuPanel.tsx`, `export/studio-export-presets.ts`, `useStudioRasterExportOrchestration.ts`: 여러 포맷·연합 스크롤·검증 ZIP. MIME·크기·SHA-256·취소 계약 존재 | `1, 3–5, 8` 직접 지정·중복 제거·원고 순서 적용 구현. 검증 ZIP도 같은 선택/사전 검사/캡처 잠금을 공유하고 원본 페이지 번호·라벨 보존; 누락 캡처 차단 | 편집 가능 포맷의 손실, 실제 투명도·해상도·장수, 플랫폼별 업로드 제한의 지속 검증 |
+| 페이지·내보내기 | CSP JPG/PNG 분할, 너비/배율, 페이지 범위, 개별/연결 출력·휴대폰 영역 [S12] | `export/StudioExportMenuPanel.tsx`, `export/studio-export-presets.ts`, `useStudioRasterExportOrchestration.ts`: 여러 포맷·연합 스크롤·검증 ZIP. MIME·크기·SHA-256·취소 계약 존재 | `1, 3–5, 8` 직접 지정·중복 제거·원고 순서 적용 구현. 검증 ZIP도 같은 선택/사전 검사/캡처 잠금을 공유하며 누락 캡처 차단. TXT는 원본 페이지 번호를, ZIP은 원본 `sourceIndex`·라벨을 보존하며 ZIP `pageNumber`·파일 접두사는 묶음 내 순번을 사용 | 편집 가능 포맷의 손실, 실제 투명도·해상도·장수, 플랫폼별 업로드 제한의 지속 검증 |
 | 색 관리·인쇄 | Krita 프린터 ICC·intent·black-point compensation·종이 시뮬레이션 [S14] | `studio-soft-proofing.ts`, `studio-highbit-*`, `studio-icc-profile-policy.ts`: RGB 공간·고비트 코어·ICC 검사 정책 | RGB 기능과 인쇄 범위를 구분 | 정책에 명시된 LUT/CMYK는 inspect/embed-only. 프린터 LUT 실행·정확한 gamut overlay는 미완료 |
 | 필터·리터치 | CSP 선택 영역 한정 필터, 원본 비교·강도, 전체 표시 레이어의 합성 사본 생성 [S18] | `StudioSmartFiltersPanel.tsx`, `StudioPhotoFilterPanel.tsx`, `studio-advanced-pixel-filters.ts`, `StudioColorBalancePanel.tsx`: 효과 스택·픽셀 보정·색 보정 | 기존 보정 경로를 유지; 새 효과 수로 품질을 주장하지 않음 | 효과마다 preview/commit/export·선택 경계·알파의 일치 검증, 큰 이미지 취소/진행률과 품질 측정 |
 | 애니메이션·애니매틱 | Procreate onion skin·재생·타임라인·프레임별 옵션 [S19] | `StudioAnimTimelinePanel.tsx`, `animatic/StudioAnimaticWorkspacePanel.tsx`, `studio-anim-tracks.ts`, `animation/studio-timeline-timebase.ts`: 프레임 노출·유리수 FPS·트랙 모델 | 코드에 독립 cel 노출 모델이 있으므로 과거 문서의 blanket 미구현 표현을 사용하지 않음 | 모든 UI/파일 경로의 exposure·오디오 동기화·반올림 왕복, 코덱별 출력과 장시간 playback 검증 |
@@ -37,12 +37,12 @@
 
 1. 기본값은 기존처럼 현재 그리기 색을 따른다. 사용자가 기준색을 고정하면 파생색을 연속 선택해도 배색이 변하지 않는다.
 2. `현재 색을 기준으로`는 고정을 유지하면서 기준만 바꾼다. 고정 해제는 즉시 현재 색을 따르는 모드로 돌아간다.
-3. 팔레트 저장은 화면에 표시된 조화 규칙·기준색·색상 배열을 함께 사용한다. 규칙 또는 기준이 바뀌면 이전 저장 성공 표시는 사라진다.
+3. 팔레트 저장은 화면에 표시된 조화 규칙·기준색·색상 배열을 함께 사용한다. 조화 패널을 단독으로 사용할 때는 규칙 또는 기준이 바뀌면 패널 자체의 이전 저장 성공 배지가 사라진다.
 4. 탭은 활성 항목 하나만 Tab 진입점으로 두고 panel과 연결한다. 색상도 한 진입점과 화살표/Home/End 조작을 제공한다.
 5. 파생색 선택으로 외부 `value`가 바뀌어도 같은 슬롯의 DOM을 유지한다. 같은 색이 반복되어도 하나만 선택 상태로 표시한다.
 6. 유사색의 가운데와 단색 조화의 세 번째 등 실제 기준색 위치를 표시한다. 첫 번째 색을 일괄 기준색으로 표시하던 오류를 수정한다.
-7. 저장 피드백 타이머는 다시 저장·규칙/기준 변경·unmount에서 해제한다. 패널 작업은 브러시 엔진의 stroke/pressure 경로를 바꾸지 않는다.
-8. 팝오버에서 조화/웹툰 음영 팔레트를 저장할 때 비동기 저장 결과는 부모가 전담한다. 저장소 성공 전의 자식 성공 배지를 억제하고 실패는 다시 시도할 수 있는 경고로 표시한다. 늦은 이전 저장 응답과 unmount 이후 응답이 안내를 덮어쓰지 않는다. 흰색/검정에서 같은 명도 단계가 반복되어도 radio 선택은 하나이며 파생색 재계산 후 슬롯 포커스를 유지한다.
+7. 단독 조화 패널의 저장 배지 타이머는 다시 저장·규칙/기준 변경·unmount에서 해제한다. 패널 작업은 브러시 엔진의 stroke/pressure 경로를 바꾸지 않는다.
+8. 팝오버에서 조화/웹툰 음영 팔레트를 저장할 때 비동기 저장 결과는 부모가 전담한다. 저장소 성공 전의 자식 성공 배지를 억제하고 실패는 다시 시도할 수 있는 경고로 표시한다. 부모 저장 결과 안내는 규칙/기준 변경과 독립적으로 4초 유지하며, 다시 저장하거나 unmount하면 이전 타이머를 해제한다. 늦은 이전 저장 응답과 unmount 이후 응답이 안내를 덮어쓰지 않는다. 흰색/검정에서 같은 명도 단계가 반복되어도 radio 선택은 하나이며 파생색 재계산 후 슬롯 포커스를 유지한다.
 
 ## 과거 문서에서 바로잡아야 할 상태
 
