@@ -769,24 +769,36 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
   readonly key: string;
   readonly payload: StudioAutosavePayload;
   readonly signal?: AbortSignal;
+  /** Recheck the captured document generation before starting another persistence authority. */
+  readonly isCurrent?: () => boolean;
   /**
    * OPFS 저널과 SQLite 권위가 모두 실패했을 때 호출된다. 현재 메모리 작업은 유지되지만
    * 브라우저 KV에 쓰거나 저장 성공으로 승격하지 않는다.
    */
   readonly onDurableAuthorityDegraded?: (cause: unknown) => void;
 }): Promise<StudioAutosavePersistenceReceipt> {
+  const snapshotIsCurrent = () => input.isCurrent?.() !== false;
+  const throwIfSnapshotStale = () => {
+    if (!snapshotIsCurrent()) {
+      throw new DOMException("Studio autosave snapshot was superseded.", "AbortError");
+    }
+  };
+  throwIfSnapshotStale();
   let durableFailure: unknown = !input.session && !input.sqlite
     ? new Error("OPFS journal and SQLite autosave authorities are unavailable")
     : null;
   if (input.session) {
     try {
       const receipt = await input.session.write(input.payload, input.signal);
+      // A newer pointerup snapshot can reach SQLite while this journal write is still in flight.
+      // Keep the actual OPFS receipt, but never mirror older ink over that newer recovery.
+      if (!snapshotIsCurrent()) return receipt;
       try {
         await input.sqlite?.write(input.key, input.payload);
       } catch {
         // OPFS가 권위이므로 SQLite 미러 실패는 저장 성공을 강등시키지 않는다.
       }
-      discardAutosaveBrowserCompatibility(input.storage, input.key);
+      if (snapshotIsCurrent()) discardAutosaveBrowserCompatibility(input.storage, input.key);
       return receipt;
     } catch (cause: unknown) {
       if (studioAutosaveDocumentBusy(cause)) {
@@ -799,10 +811,13 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
       durableFailure = cause;
     }
   }
+  // A failed old journal write is superseded work, not permission to overwrite the latest SQLite
+  // snapshot through fallback. Cancellation must not report a storage outage or a fabricated receipt.
+  throwIfSnapshotStale();
   if (input.sqlite) {
     try {
       await input.sqlite.write(input.key, input.payload);
-      discardAutosaveBrowserCompatibility(input.storage, input.key);
+      if (snapshotIsCurrent()) discardAutosaveBrowserCompatibility(input.storage, input.key);
       return Object.freeze({
         authority: "sqlite-fallback",
         savedAt: input.payload.savedAt,
@@ -818,6 +833,7 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
           );
     }
   }
+  throwIfSnapshotStale();
   if (durableFailure !== null) {
     try {
       input.onDurableAuthorityDegraded?.(durableFailure);
