@@ -103,13 +103,42 @@ describe("portable V6 material contacts", () => {
 
   it("anchors halftone centers to document coordinates and confines them to contacts", () => {
     const program = createBrushStudioV6Program("document-halftone");
-    const marks = paint("document-halftone", line(24));
+    const solver = createBrushStudioV6MaterialStroke({ ...program, tuning: { ...program.tuning, patternJitter: 0 } });
+    const marks = line(24).flatMap((point) => solver.push(point));
     const scale = 12 * program.tuning.patternScale;
     for (const mark of marks) {
       expect((mark.x / scale - 0.5) % 1).toBeCloseTo(0, 8);
       expect((mark.y / scale - 0.5) % 1).toBeCloseTo(0, 8);
       expect(Math.abs(mark.y - 30)).toBeLessThan(program.tuning.size);
     }
+  });
+
+  it.each(["pattern-dot-tone", "pattern-cross-hatch", "pattern-weave", "pattern-brick"])(
+    "%s applies density and document-seeded jitter to actual contacts",
+    (pattern) => {
+      const base = createBrushStudioV6Program("clean-ink");
+      const program = { ...base, slots: { ...base.slots, pattern }, tuning: { ...base.tuning, size: 80, patternScale: 1, patternDensity: 0.2, patternJitter: 0 } };
+      const render = (density: number, jitter: number) => {
+        const solver = createBrushStudioV6MaterialStroke({ ...program, tuning: { ...program.tuning, patternDensity: density, patternJitter: jitter } });
+        return solver.push({ x: 45, y: 45, pressure: 1, tilt: 0, twist: 0 });
+      };
+      const thin = render(0.2, 0);
+      expect(thin.length).toBeGreaterThan(0);
+      expect(render(0.9, 0).map((mark) => mark.radiusY)).not.toEqual(thin.map((mark) => mark.radiusY));
+      const jittered = render(0.2, 0.8);
+      expect(jittered.map(({ x, y }) => [x, y])).not.toEqual(thin.map(({ x, y }) => [x, y]));
+      expect(render(0.2, 0.8)).toEqual(jittered);
+      expect(brushStudioV6MaterialActiveTuningKeys(program).has("patternDensity")).toBe(true);
+      expect(brushStudioV6MaterialActiveTuningKeys(program).has("patternJitter")).toBe(true);
+    },
+  );
+
+  it("does not advertise density/scale controls for stitch rings driven by nib size and spacing", () => {
+    const base = createBrushStudioV6Program("clean-ink");
+    const keys = brushStudioV6MaterialActiveTuningKeys({ ...base, slots: { ...base.slots, pattern: "pattern-stitch" } });
+    expect(keys.has("patternDensity")).toBe(false);
+    expect(keys.has("patternScale")).toBe(false);
+    expect(keys.has("patternJitter")).toBe(true);
   });
 
   it("changes physical contact when paper is changed and keeps paper anchored across strokes", () => {

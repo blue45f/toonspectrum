@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { openStudioLocalDatabase } from "../studio-local-database";
+import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 
 import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
@@ -62,6 +64,24 @@ afterEach(async () => {
 });
 
 describe("brush quick slots SQLite repository", () => {
+  it("restores a material slot and its full width/opacity range through a new SQLite repository", async () => {
+    const database = await memoryDatabase();
+    const program = createBrushStudioV6Program("oil-hair-mixer");
+    const brush = createBrushStudioV6ProductBrush({ ...program, tuning: { ...program.tuning, size: 240, opacity: 0.01 } });
+    const state = assignStudioBrushSlot(emptyStudioBrushSlots(), 0, {
+      brushId: brush.brushId, strokeWidth: brush.strokeWidth, brushOpacity: brush.brushOpacity,
+      brushDynamics: brush.brushDynamics, enginePrograms: brush.enginePrograms,
+    });
+    const repository = createStudioBrushQuickSlotsSqliteRepository({ acquireDatabase: async () => database });
+    await repository.save(scope, state, 0);
+    const reopened = createStudioBrushQuickSlotsSqliteRepository({ acquireDatabase: async () => database });
+    const loaded = await reopened.load(scope);
+    expect(loaded.slots[0]).toEqual(state.slots[0]);
+    expect(loaded.slots[0]?.enginePrograms).toEqual(brush.enginePrograms);
+    expect(loaded.slots[0]?.strokeWidth).toBe(240);
+    expect(loaded.slots[0]?.brushOpacity).toBe(0.01);
+  });
+
   it("round-trips owner/device-scoped slots and the exact normalized dynamics snapshot", async () => {
     const database = await memoryDatabase();
     const repository = createStudioBrushQuickSlotsSqliteRepository({

@@ -72,6 +72,17 @@ export class StudioMaterialBrushPlanner {
     readonly reset: boolean;
     readonly marks: readonly StudioMaterialBrushMark[];
   } {
+    const marks: StudioMaterialBrushMark[] = [];
+    const result = this.appendBatches(element, (batch) => marks.push(...batch), verifyPrefix);
+    return { reset: result.reset, marks };
+  }
+
+  appendBatches(
+    element: StudioMaterialBrushElement,
+    visitor: StudioMaterialBrushBatchVisitor,
+    verifyPrefix = false,
+    onReset?: () => void,
+  ): StudioMaterialBrushBatchStatistics & { readonly reset: boolean } {
     const count = Math.floor(element.points.length / 2);
     const symmetryKey = JSON.stringify(element.symmetry ?? null);
     let reset = !this.stroke || this.source !== element.brushEnginePrograms?.material
@@ -86,6 +97,7 @@ export class StudioMaterialBrushPlanner {
       }
     }
     if (reset) {
+      onReset?.();
       this.config = studioMaterialBrushConfig(element);
       this.stroke = this.config ? createBrushStudioV6MaterialStroke(this.config) : null;
       this.source = element.brushEnginePrograms?.material;
@@ -95,20 +107,68 @@ export class StudioMaterialBrushPlanner {
       this.symmetryKey = symmetryKey;
       this.samples = [];
     }
-    const marks: StudioMaterialBrushMark[] = [];
-    if (!this.config || !this.stroke) return { reset, marks };
+    const statistics = emptyBatchStatistics();
+    if (!this.config || !this.stroke) return { reset, ...statistics };
     for (let i = this.samples.length; i < count; i += 1) {
       const sample = sampleAt(element, i, this.config);
       if (!Number.isFinite(sample.x) || !Number.isFinite(sample.y)) break;
-      marks.push(...this.stroke.push(sample));
+      visitMarkChunks(this.stroke.push(sample), visitor, statistics);
       this.samples.push(sample);
     }
-    return { reset, marks };
+    return { reset, ...statistics };
   }
 }
 
+export const STUDIO_MATERIAL_BRUSH_BATCH_MARKS = 1024;
+export type StudioMaterialBrushBatchVisitor = (marks: readonly StudioMaterialBrushMark[]) => void;
+export interface StudioMaterialBrushBatchStatistics {
+  readonly totalMarks: number;
+  readonly batches: number;
+  readonly maxBatchMarks: number;
+  /** Largest kernel result before subdivision; independent of whole-stroke contact count. */
+  readonly maxGeneratedBatchMarks: number;
+}
+function emptyBatchStatistics() {
+  return { totalMarks: 0, batches: 0, maxBatchMarks: 0, maxGeneratedBatchMarks: 0 };
+}
+function visitMarkChunks(
+  marks: readonly StudioMaterialBrushMark[],
+  visitor: StudioMaterialBrushBatchVisitor,
+  statistics: ReturnType<typeof emptyBatchStatistics>,
+): void {
+  statistics.maxGeneratedBatchMarks = Math.max(statistics.maxGeneratedBatchMarks, marks.length);
+  for (let offset = 0; offset < marks.length; offset += STUDIO_MATERIAL_BRUSH_BATCH_MARKS) {
+    const batch = marks.length <= STUDIO_MATERIAL_BRUSH_BATCH_MARKS
+      ? marks : marks.slice(offset, offset + STUDIO_MATERIAL_BRUSH_BATCH_MARKS);
+    visitor(batch);
+    statistics.totalMarks += batch.length;
+    statistics.batches += 1;
+    statistics.maxBatchMarks = Math.max(statistics.maxBatchMarks, batch.length);
+  }
+}
+
+/** Whole-stroke replay owns only one kernel suffix; it never duplicates the input or retains contacts. */
+export function visitStudioMaterialBrushBatches(
+  element: StudioMaterialBrushElement,
+  visitor: StudioMaterialBrushBatchVisitor,
+): StudioMaterialBrushBatchStatistics {
+  const statistics = emptyBatchStatistics();
+  const config = studioMaterialBrushConfig(element);
+  if (!config) return statistics;
+  const stroke = createBrushStudioV6MaterialStroke(config);
+  for (let index = 0; index < Math.floor(element.points.length / 2); index++) {
+    const sample = sampleAt(element, index, config);
+    if (!Number.isFinite(sample.x) || !Number.isFinite(sample.y)) break;
+    visitMarkChunks(stroke.push(sample), visitor, statistics);
+  }
+  return statistics;
+}
+
+/** Convenience for short previews/tests only. Production replay/export use the bounded visitor. */
 export function planStudioMaterialBrush(element: StudioMaterialBrushElement): readonly StudioMaterialBrushMark[] {
-  return new StudioMaterialBrushPlanner().append(element).marks;
+  const marks: StudioMaterialBrushMark[] = [];
+  visitStudioMaterialBrushBatches(element, (batch) => marks.push(...batch));
+  return marks;
 }
 
 /** Contact-major order is invariant to pointer batching, including overlaps between copies. */
@@ -127,7 +187,7 @@ function* materialSymmetryBatches(marks: readonly StudioMaterialBrushMark[], sym
         angle: Math.atan2(transform.b * cos + transform.d * sin, transform.a * cos + transform.c * sin),
       });
     }
-    if (batch.length === 1024) { yield batch; batch = []; }
+    if (batch.length === STUDIO_MATERIAL_BRUSH_BATCH_MARKS) { yield batch; batch = []; }
   }
   if (batch.length) yield batch;
 }
@@ -145,13 +205,13 @@ export function studioMaterialBrushMarksToSvg(marks: readonly StudioMaterialBrus
 
 /** Exact primitive bounds for raster-copy crops; particles and wet spread exceed nib width. */
 export function studioMaterialBrushBounds(element: StudioMaterialBrushElement): { x: number; y: number; width: number; height: number } | null {
-  const marks = planStudioMaterialBrush(element);
-  if (!marks.length) return null;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const transform of studioBrushSymmetryTransforms(element.symmetry)) for (const mark of marks) {
+  const transforms = studioBrushSymmetryTransforms(element.symmetry);
+  visitStudioMaterialBrushBatches(element, (marks) => {
+    for (const transform of transforms) for (const mark of marks) {
     const x = transform.a * mark.x + transform.c * mark.y + transform.e;
     const y = transform.b * mark.x + transform.d * mark.y + transform.f;
     const cos = Math.cos(mark.angle);
@@ -166,6 +226,106 @@ export function studioMaterialBrushBounds(element: StudioMaterialBrushElement): 
     minY = Math.min(minY, y - extentY);
     maxX = Math.max(maxX, x + extentX);
     maxY = Math.max(maxY, y + extentY);
+    }
+  });
+  return Number.isFinite(minX) ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null;
+}
+
+export const STUDIO_MATERIAL_BRUSH_CACHE_MARK_BUDGET = 32_768;
+const CACHE_STROKE_MARKS = 8192;
+const CACHE_STROKE_SAMPLES = 512;
+const SAMPLE_ARRAY_KEYS = ["points", "pressures", "tiltXs", "tiltYs", "twists"] as const;
+type SampleSnapshot = Pick<StudioMaterialBrushElement, typeof SAMPLE_ARRAY_KEYS[number]>;
+interface MaterialCacheEntry {
+  readonly key: string;
+  readonly samples: SampleSnapshot;
+  readonly marks: readonly StudioMaterialBrushMark[];
+}
+function sampleSnapshotMatches(snapshot: SampleSnapshot, element: StudioMaterialBrushElement): boolean {
+  return SAMPLE_ARRAY_KEYS.every((key) => {
+    const left = snapshot[key], right = element[key];
+    return left === undefined ? right === undefined : right !== undefined
+      && left.length === right.length && left.every((value, index) => value === right[index]);
+  });
+}
+
+/** Small immutable contact plans only; oversized strokes stream without being cached. */
+export class StudioMaterialBrushRenderCache {
+  private entries = new Map<readonly number[], MaterialCacheEntry>();
+  private retainedMarks = 0;
+
+  statistics(): { readonly entries: number; readonly retainedMarks: number } {
+    return { entries: this.entries.size, retainedMarks: this.retainedMarks };
   }
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+
+  render(context: CanvasRenderingContext2D, element: StudioMaterialBrushElement): StudioMaterialBrushBatchStatistics & { readonly cacheHit: boolean } {
+    const key = JSON.stringify([studioMaterialBrushConfig(element), element.symmetry ?? null]);
+    const cached = this.entries.get(element.points);
+    if (cached && cached.key === key && sampleSnapshotMatches(cached.samples, element)) {
+      this.entries.delete(element.points);
+      this.entries.set(element.points, cached);
+      const statistics = emptyBatchStatistics();
+      visitMarkChunks(cached.marks, (batch) => renderStudioMaterialBrushMarks(context, batch, element.symmetry), statistics);
+      return { ...statistics, cacheHit: true };
+    }
+    if (cached) { this.entries.delete(element.points); this.retainedMarks -= cached.marks.length; }
+    let candidate: StudioMaterialBrushMark[] | null = element.points.length <= CACHE_STROKE_SAMPLES * 2 ? [] : null;
+    const statistics = visitStudioMaterialBrushBatches(element, (marks) => {
+      renderStudioMaterialBrushMarks(context, marks, element.symmetry);
+      if (candidate && candidate.length + marks.length <= CACHE_STROKE_MARKS) candidate.push(...marks);
+      else candidate = null;
+    });
+    if (candidate) {
+      while (this.entries.size >= 32 || this.retainedMarks + candidate.length > STUDIO_MATERIAL_BRUSH_CACHE_MARK_BUDGET) {
+        const oldest = this.entries.keys().next().value;
+        if (oldest === undefined) break;
+        this.retainedMarks -= this.entries.get(oldest)!.marks.length;
+        this.entries.delete(oldest);
+      }
+      const samples: SampleSnapshot = {
+        points: [...element.points], pressures: element.pressures?.slice(),
+        tiltXs: element.tiltXs?.slice(), tiltYs: element.tiltYs?.slice(), twists: element.twists?.slice(),
+      };
+      this.entries.set(element.points, { key, samples, marks: candidate });
+      this.retainedMarks += candidate.length;
+    }
+    return { ...statistics, cacheHit: false };
+  }
+}
+
+const materialRenderCache = new StudioMaterialBrushRenderCache();
+export function renderStudioMaterialBrush(context: CanvasRenderingContext2D, element: StudioMaterialBrushElement): StudioMaterialBrushBatchStatistics & { readonly cacheHit: boolean } {
+  return materialRenderCache.render(context, element);
+}
+
+export const STUDIO_MATERIAL_BRUSH_SVG_UTF16_BYTE_BUDGET = 64 * 1024 * 1024;
+export class StudioMaterialBrushSvgBudgetError extends Error {
+  constructor(readonly byteBudget: number) {
+    super("재료 브러시 SVG가 내보내기 크기 한도를 넘었습니다. 획을 줄이거나 PNG로 내보내 주세요. 원고의 획은 보존됩니다.");
+    this.name = "StudioMaterialBrushSvgBudgetError";
+  }
+}
+
+/** Chunk sinks may write incrementally; the string adapter below always enforces its fixed budget. */
+export function writeStudioMaterialBrushSvg(
+  element: StudioMaterialBrushElement,
+  write: (chunk: string) => void,
+  byteBudget = STUDIO_MATERIAL_BRUSH_SVG_UTF16_BYTE_BUDGET,
+): StudioMaterialBrushBatchStatistics & { readonly serializedUtf16Bytes: number } {
+  let serializedUtf16Bytes = 0;
+  const statistics = visitStudioMaterialBrushBatches(element, (marks) => {
+    for (const batch of materialSymmetryBatches(marks, element.symmetry)) {
+      const chunk = brushStudioV6MaterialMarksToSvg(batch);
+      serializedUtf16Bytes += chunk.length * 2;
+      if (serializedUtf16Bytes > byteBudget) throw new StudioMaterialBrushSvgBudgetError(byteBudget);
+      write(chunk);
+    }
+  });
+  return { ...statistics, serializedUtf16Bytes };
+}
+
+export function studioMaterialBrushToSvg(element: StudioMaterialBrushElement): string {
+  const chunks: string[] = [];
+  writeStudioMaterialBrushSvg(element, (chunk) => chunks.push(chunk));
+  return chunks.join("");
 }

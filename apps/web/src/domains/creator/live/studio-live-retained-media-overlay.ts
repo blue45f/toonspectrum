@@ -689,11 +689,14 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (!context) return false;
       try {
         const planner = active.materialPlanner ??= new StudioMaterialBrushPlanner();
-        const result = planner.append(element, finalize);
-        if (result.reset && target === this.activeContext) this.clearCanvas(this.activeContext, this.activeCanvas);
         context.globalAlpha = 1;
-        renderStudioMaterialBrushMarks(context, result.marks, element.symmetry);
-        active.paintedDabs += result.marks.length;
+        const result = planner.appendBatches(element, (marks) => {
+          renderStudioMaterialBrushMarks(context, marks, element.symmetry);
+          if (marks.length > 0) this.markSettledPaint(active, context);
+        }, finalize, () => {
+          if (target === this.activeContext) this.clearCanvas(this.activeContext, this.activeCanvas);
+        });
+        active.paintedDabs += result.totalMarks;
         return true;
       } finally {
         context.restore();
@@ -1325,6 +1328,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     }
     const replayActive: ActiveRetainedStroke = {
       ...this.active,
+      materialPlanner: undefined,
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilPoints: null,
@@ -1334,10 +1338,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
-    // A replay repaints from zero onto a cleared surface; it keeps the live planner so the next
-    // append still reuses a verified prefix rather than paying a full replan for the resize.
+    // Material planners consume their emitted prefix. A cleared canvas needs a new planner;
+    // retain that rebuilt planner below so the next input emits only its new suffix.
 
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
+    this.active.materialPlanner = replayActive.materialPlanner;
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
     this.active.paintedOilPoints = replayActive.paintedOilPoints;

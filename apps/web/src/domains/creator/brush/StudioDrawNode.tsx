@@ -1,4 +1,4 @@
-import { planStudioMaterialBrush, renderStudioMaterialBrushMarks } from "./studio-material-brush-runtime";
+import { renderStudioMaterialBrush } from "./studio-material-brush-runtime";
 import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
@@ -844,9 +844,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
         if (kind === "freehand") {
           if (runtimeEnginePrograms?.material && !isEraserOperation) {
-            const marks = planStudioMaterialBrush({ ...el, points, brushEnginePrograms: runtimeEnginePrograms });
             return <Shape key={index} listening={false}
-              sceneFunc={(context) => renderStudioMaterialBrushMarks(context._context, marks, el.symmetry)} />;
+              sceneFunc={(context) => renderStudioMaterialBrush(context._context, { ...el, points, brushEnginePrograms: runtimeEnginePrograms })} />;
           }
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);

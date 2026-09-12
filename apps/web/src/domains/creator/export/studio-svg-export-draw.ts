@@ -1,4 +1,4 @@
-import { planStudioMaterialBrush, studioMaterialBrushMarksToSvg } from "../brush/studio-material-brush-runtime";
+import { studioMaterialBrushToSvg } from "../brush/studio-material-brush-runtime";
 import {
   DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
   isStudioDynamicBrushCausalDepositPipeline,
@@ -142,7 +142,7 @@ export function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   }
   const kind = el.kind ?? "freehand";
   if (kind === "freehand" && el.brushEnginePrograms?.material) {
-    return `<g data-brush-engine="material-contact-v1">${studioMaterialBrushMarksToSvg(planStudioMaterialBrush(el), el.symmetry)}</g>`;
+    return `<g data-brush-engine="material-contact-v1">${studioMaterialBrushToSvg(el)}</g>`;
   }
   const opacity = el.opacity ?? 1;
   const stroke = el.stroke;

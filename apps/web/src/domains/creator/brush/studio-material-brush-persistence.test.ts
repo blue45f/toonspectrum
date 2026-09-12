@@ -5,10 +5,28 @@ import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-pr
 import { parseStudioAutosave, serializeStudioAutosave } from "../studio-autosave";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "../studio-project-file";
 import { normalizeStudioToolOperationMemory, rememberStudioToolOperationSnapshot } from "../studio-tool-operation-memory";
-import { brushMatchesSnapshot, importBrushFromJson, writeBrushJson } from "./studio-brush-library";
-import { planStudioMaterialBrush } from "./studio-material-brush-runtime";
+import { brushMatchesSnapshot, importBrushFromJson, normalizeStoredBrush, writeBrushJson } from "./studio-brush-library";
+import { parseStudioToolOperationMemory, serializeStudioToolOperationMemory } from "../studio-tool-operation-memory-sqlite";
+import { planStudioMaterialBrush, studioMaterialBrushConfig } from "./studio-material-brush-runtime";
 
 describe("saved material brush preservation", () => {
+  it.each([[1, 0.01], [240, 0.01], [240, 1]])("retains material size %s and opacity %s through save, JSON, tool memory and runtime", (size, opacity) => {
+    const program = createBrushStudioV6Program("oil-hair-mixer");
+    const saved = createBrushStudioV6ProductBrush({ ...program, tuning: { ...program.tuning, size, opacity } });
+    const imported = importBrushFromJson(writeBrushJson(saved)).brush;
+    const stored = normalizeStoredBrush(JSON.parse(JSON.stringify(imported)))!;
+    const memory = rememberStudioToolOperationSnapshot(normalizeStudioToolOperationMemory(null), "paint", stored);
+    const reopened = parseStudioToolOperationMemory(serializeStudioToolOperationMemory(memory)).memory.paint;
+    for (const snapshot of [saved, imported, stored, reopened]) {
+      expect(snapshot.strokeWidth).toBe(size);
+      expect(snapshot.brushOpacity).toBe(opacity);
+      expect(studioMaterialBrushConfig({
+        points: [0, 0, 10, 10], stroke: snapshot.color, strokeWidth: snapshot.strokeWidth,
+        opacity: snapshot.brushOpacity, brushEnginePrograms: snapshot.enginePrograms!,
+      })?.tuning).toMatchObject({ size, opacity });
+    }
+  });
+
   it("exports and imports the complete material program and produces the same marks", () => {
     const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program("oil-hair-mixer"));
     const imported = importBrushFromJson(writeBrushJson(saved)).brush;

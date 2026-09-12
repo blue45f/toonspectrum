@@ -42,8 +42,8 @@ repository bridge, saved-brush application and pixel-analysis contract. This com
 the required core static CI job. Existing native-media, SVG, raster-edit and catalogue gates
 remain enabled. The typed live-media dispatcher selects one compatible renderer before provider
 startup, preserving material priority, eraser ownership and explicit GPU rejection. Its nine
-behavior cases are included in the material suite (15 files, 119 tests), alongside renderer
-ownership and curated catalogue compatibility checks. Extracting this policy
+behavior cases are included in the required material suite, alongside actual committed rendering,
+native replay, raster bounds, selection, SQLite and client/server CRDT regressions. Extracting this policy
 also brings the editor host below its existing size ceiling without increasing the limit.
 
 `pnpm verify:studio-brush-v6-quality` produces `report.json`, an HTML review and recipe PNGs.
@@ -68,15 +68,55 @@ The final CPU material run on 2026-09-12 passed all 17 recipes and two symmetry 
 normalized recipe pairs exceeded the minimum material distance of 0.025 (observed minimum
 0.030974845). Native live, settled and committed pixels matched exactly, including reflected
 chisel and four-way particle overlap. SVG antialiasing produced a maximum mean normalized
-channel error of 0.00037836 across those cases.
+channel error of 0.000197466 across those cases.
 
-The 10,000-input, 128-strand stress run generated 1,279,872 contacts. Early append mean was
-0.2271 ms and late mean was 0.2145 ms; a single append emitted at most 128 contacts. Total
-planner and Canvas submission time was 2,274.3 ms. These observations exclude physical input
-and GPU presentation. Held numeric samples are counted; they are not a measurement of heap bytes.
+The 10,000-input, 128-strand stress run generated 1,279,872 contacts. The real committed
+Canvas entry point rendered the whole stroke in 2,278.1 ms, with exact pixels against the
+incremental renderer. Both generated and submitted batches peaked at 128 contacts; this large
+stroke retained no cached output. Small-stroke caches are limited to 32,768 contacts total,
+8,192 contacts and 512 input samples per item, and detect in-place edits. These observations
+exclude physical input and GPU presentation. Contact counts are not heap-byte measurements.
+The extreme whole redraw still takes about 2.28 seconds; bounded memory does not remove its
+underlying drawing cost.
+
+The public SVG exporter enforces a 64 MiB UTF-16 output budget and reports an actionable error
+instead of downloading an incomplete file. The extreme stroke exceeded this budget after
+270.6 ms. A separate discarding sink verified full-path serialization of 423,960,130 UTF-16
+bytes in 1,692 ms, with a maximum 42,886-byte chunk. This sink is a stress measurement, not a
+claim that the application permits an unbounded SVG download.
 
 After building and starting Vite preview, `TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:PORT pnpm verify:studio-brush-v6-workflow` exercises the real Brush Editor save, material application,
 pen stroke, authoritative OPFS/SQLite manuscript and visible restoration after reload. It leaves
 stage timings, screenshots, network diagnostics and the exact retained material data in its
 report. Optional library probes are for diagnosis only and stay disabled in acceptance runs
 because extra reads can change startup timing.
+
+## Integration corrections verified during review
+
+Selecting a built-in or historical recent slot clears the previous material override; saved
+material slots retain their exact engine programs. Material size (1–240 px) and opacity
+(1–100%) survive the editor, library JSON, SQLite slots and tool memory. Unsupported finger
+water mode is visibly disabled. Grid pattern density and jitter change actual contacts;
+inactive stitch controls are omitted by the shared active-control contract.
+
+Raw pen force is retained through pointer start, coalesced movement, preview publication and
+release. Material calibration runs once in the contact engine. The native overlay reconstructs
+active strokes after canvas resize or viewport changes and retains settled material ownership
+for later highlighter blending. The browser workflow checks mid-stroke viewport resize and
+restoration of active ink, then verifies every saved pressure sample against the
+actual dispatched pen force before manuscript recovery.
+
+Engine programs now travel in stroke payload v6 through the actual Yjs document, using a pure
+shared canonical schema at the browser and API boundary. The encoder, decoder and server
+reject missing, malformed or future material data instead of losing renderer identity. Legacy
+stroke versions remain readable. The room protocol advances to v8 separately so an older peer
+cannot silently omit an unsupported new stroke. Real Yjs round trips cover all 17 recipes,
+legacy oil switches and material contact equality.
+
+The full editor's fractional-zoom resize check separately compares the complete native drawing
+command sequence and pixel coverage. In Chromium 151, replaying the exact same 1,920 fills
+on fresh equivalent canvases in one batch versus across animation frames produced a 1.5203%
+normalized spatial RGBA difference. The actual resize measured 1.5046%, with identical path,
+transform, alpha, color and composition for every command. Its lifecycle criterion therefore
+requires exact command identity plus the existing 3% spatial pixel limit and visible alpha.
+This browser batching difference is distinct from the material kernel's exact pixel parity.

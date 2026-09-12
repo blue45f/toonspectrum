@@ -321,6 +321,7 @@ export function bindStudioCuttoonStagePointersFreehand(
       },
       {
         brushId: current.brush,
+        rawMaterialPressure: current.mode === "pen" && Boolean(current.brushEnginePrograms?.material),
         pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
         pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
         useVelocityPressure: inputSettings?.useVelocityPressure ?? useVelocityPressure,

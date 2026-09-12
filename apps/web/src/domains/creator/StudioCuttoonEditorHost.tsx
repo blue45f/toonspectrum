@@ -91,7 +91,6 @@ import { StudioBg3dRecoveryAccessGate } from "./bg3d/studio-bg3d-recovery-access
 import { isStudioBrushAliasId, isStudioBrushEraserAliasId } from "./brush/studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
-  studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
 } from "./brush/studio-brush-dynamics";
@@ -113,6 +112,7 @@ import {
   studioCoreBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "./brush/studio-brush-selection";
+import { studioBrushCatalogSelectionSnapshot, studioBrushSlotSelectionSnapshot } from "./brush/studio-brush-selection-snapshot";
 import {
   assignStudioBrushSlot,
   rememberStudioBrushSlot,
@@ -778,7 +778,6 @@ import {
 import {
   BRUSH_DELETE_UNDO_MS,
   STUDIO_SERVER_AUTOSAVE_IDLE_MS,
-  defaultStampTuningForBrushId,
   filterSfxPresets,
   hasStudioBg3dServerPersistedTarget,
   isStudioBg3dRecoveryScopeLocallyCurrent,
@@ -5437,13 +5436,20 @@ export function StudioCuttoonEditor({
       brushOpacity,
       color,
     }, { operation: selection.operation });
+    const snapshot = studioBrushCatalogSelectionSnapshot(currentBrushSnapshot, selection, applied);
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = snapshot;
     brushBaselineController.select({ kind: "catalog", selection });
     activatePrimaryCanvasTool(
       "draw",
       selection.operation === "erase" ? "eraser" : "pen",
       true,
     );
+    toolOperationMemoryRef.current = rememberStudioToolOperationSnapshot(
+      toolOperationMemoryRef.current, selection.operation, snapshot,
+    );
     prepareStudioSymmetryForBrush(applied.brushId);
+    setBrushEnginePrograms(snapshot.enginePrograms ?? null);
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
     setActiveCatalogBrush({
@@ -5452,15 +5458,11 @@ export function StudioCuttoonEditor({
       sourcePresetId: extendedSource ? selection.catalogId : undefined,
       sourcePresetName: extendedSource ? selection.catalogName : undefined,
     });
-    setStampTuning(defaultStampTuningForBrushId(applied.brushId));
+    setStampTuning(snapshot.stampTuning);
     setStrokeWidth(applied.strokeWidth);
     setBrushOpacity(applied.brushOpacity);
     if (applied.color !== color) setColor(applied.color);
-    if (selection.brushDynamics) {
-      setBrushDynamics(normalizeStudioBrushDynamicsSettings(selection.brushDynamics));
-    } else {
-      setBrushDynamics(normalizeStudioBrushDynamicsSettings());
-    }
+    setBrushDynamics(snapshot.brushDynamics);
     commitProDrawPrefsMutation(
       (latest) => rememberRecentBrushId(latest, selection.catalogId)
     );
@@ -5476,6 +5478,7 @@ export function StudioCuttoonEditor({
         ...(selection.brushDynamics
           ? { brushDynamics: normalizeStudioBrushDynamicsSettings(selection.brushDynamics) }
           : {}),
+        enginePrograms: snapshot.enginePrograms,
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
       }),
@@ -5777,22 +5780,15 @@ export function StudioCuttoonEditor({
   }, [brush, brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: StudioBrushSlot) {
+    const snapshot = studioBrushSlotSelectionSnapshot(currentBrushSnapshot, slot);
+    toolOperationMemoryTouchedRef.current = true;
+    currentBrushSnapshotRef.current = snapshot;
     brushBaselineController.selectCatalog(slot.sourcePresetId ?? slot.brushId);
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
-    if (preset) {
-      setBrush(preset.id);
-      setStampTuning(defaultStampTuningForBrushId(preset.id));
-      const dynamics = slot.brushDynamics
-        ? normalizeStudioBrushDynamicsSettings(slot.brushDynamics)
-        : studioBrushDynamicsSettingsForBrushId(preset.id);
-      // Non-dynamics presets reset to neutral defaults. Keeping the previous brush's snapshot
-      // alive here leaked its presetId/depositPipeline into currentBrushSnapshot, polluting
-      // saved brushes, slots and tool memory with stale dynamics.
-      setBrushDynamics(dynamics ?? normalizeStudioBrushDynamicsSettings());
-    } else {
-      setBrush(slot.brushId);
-      setStampTuning(defaultStampTuningForBrushId(slot.brushId));
-    }
+    setBrush(snapshot.brushId);
+    setStampTuning(snapshot.stampTuning);
+    setBrushDynamics(snapshot.brushDynamics);
+    setBrushEnginePrograms(snapshot.enginePrograms ?? null);
     setActiveCatalogBrush({
       id: slot.sourcePresetId ?? slot.brushId,
       name: slot.sourcePresetName
@@ -5807,6 +5803,9 @@ export function StudioCuttoonEditor({
       "draw",
       resolveStudioBrushPresetDrawMode(slot.brushId),
       true,
+    );
+    toolOperationMemoryRef.current = rememberStudioToolOperationSnapshot(
+      toolOperationMemoryRef.current, resolveStudioBrushPresetOperation(slot.brushId), snapshot,
     );
     prepareStudioSymmetryForBrush(slot.brushId);
   }
@@ -27824,13 +27823,14 @@ function clearSelectionForEdit() {
       commitStudioBrushSlotsMutation(
         (prev) => assignStudioBrushSlot(prev, index, {
           brushId: brush,
-          ...(activeCatalogBrush.sourcePresetId
+          ...(activeCatalogBrush.sourcePresetId || brushEnginePrograms?.material
             ? {
                 sourcePresetId: activeCatalogBrush.sourcePresetId,
                 sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
               }
             : {}),
           brushDynamics,
+          enginePrograms: brushEnginePrograms,
           strokeWidth,
           brushOpacity,
         }),
@@ -27960,6 +27960,7 @@ function clearSelectionForEdit() {
         undoAvailable: brushBaselineController.restoreState.undoAvailable,
       },
       brushOpacity,
+      materialBrush: Boolean(brushEnginePrograms?.material),
       brushSlots: brushSlotsState.slots,
       canvasFlipH,
       color,
@@ -28022,6 +28023,7 @@ function clearSelectionForEdit() {
       brushBaselineController.restoreState.sourceName,
       brushBaselineController.restoreState.undoAvailable,
       brushOpacity,
+      brushEnginePrograms,
       brushSlotsState.slots,
       canvasFlipH,
       canvasOnlyMode,

@@ -1,3 +1,4 @@
+import { normalizeStudioBrushMaterialProgramContract } from "../../../shared/lib/studio-brush-material-program-contract";
 import { mixStudioSpectralWgm } from "../studio-spectral-wgm-mix-v1";
 import type { BrushStudioV6InputPolicy, BrushStudioV6Program, BrushStudioV6Tuning } from "./brush-studio-v6-engine";
 
@@ -12,56 +13,9 @@ export const BRUSH_STUDIO_V6_MATERIAL_ENGINE = Object.freeze({
   wet: "deterministic porous deposition approximation; no fluid grid or canvas color pickup",
 });
 
-/** Validate persisted contacts without importing the workbench's graph registry. */
+/** Validate persisted contacts through the schema also used by the collaboration server. */
 export function normalizeBrushStudioV6MaterialConfig(raw: unknown): BrushStudioV6MaterialConfig | null {
-  const object = (value: unknown): Record<string, unknown> | null => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-  const source = object(raw);
-  if (!source || typeof source.seed !== "number" || !Number.isFinite(source.seed) || source.version !== undefined && source.version !== 1 || source.schemaVersion !== undefined && source.schemaVersion !== 6) return null;
-  const sourceTuning = object(source.tuning);
-  const sourceSlots = object(source.slots);
-  const sourceInput = object(source.input);
-  if (!sourceTuning || !sourceSlots || !sourceInput) return null;
-  const tuning: Record<string, number | string> = {};
-  const ranges: Readonly<Record<string, readonly [number, number]>> = { size: [1, 240], opacity: [0, 1], flow: [0, 1], spacing: [0.01, 4], stabilization: [0, 1], surfaceTooth: [0, 1], friction: [0, 1], absorbency: [0, 1], granulation: [0, 1], edgeDarkening: [0, 1], pickup: [0, 1], reservoir: [0, 1], wetness: [0, 1], diffusion: [0, 1], advection: [0, 1], evaporation: [0, 1], viscosity: [0, 1], plasticity: [0, 1], gravity: [-1, 1], bristleStrands: [8, 256], bristleIterations: [1, 12], particleCount: [16, 4096], reactionRate: [0, 1], patternDensity: [0, 1], patternScale: [0.1, 4], patternJitter: [0, 1], relief: [0, 1], gloss: [0, 1] };
-  for (const [key, range] of Object.entries(ranges)) {
-    const value = sourceTuning[key];
-    if (typeof value !== "number" || !Number.isFinite(value)) return null;
-    tuning[key] = Math.min(range[1], Math.max(range[0], value));
-  }
-  for (const key of ["primaryColor", "secondaryColor"]) {
-    const value = sourceTuning[key];
-    if (typeof value !== "string" || !/^#[0-9a-f]{6}$/iu.test(value)) return null;
-    tuning[key] = value.toLowerCase();
-  }
-  const slots: Record<string, string | readonly string[]> = {};
-  for (const key of ["input", "motion", "carrier", "tip", "surface", "deposition", "pickup", "pigment", "pattern", "output"]) {
-    const value = sourceSlots[key];
-    if (typeof value !== "string" || !/^[a-z][a-z0-9-]{0,79}$/u.test(value)) return null;
-    slots[key] = value;
-  }
-  for (const key of ["physics", "finish"]) {
-    const value = sourceSlots[key];
-    if (!Array.isArray(value) || value.length > 16 || !value.every((entry): entry is string => typeof entry === "string" && /^[a-z][a-z0-9-]{0,79}$/u.test(entry))) return null;
-    slots[key] = Object.freeze([...new Set(value)]);
-  }
-  const input: Record<string, string | number | boolean> = {};
-  for (const key of ["predictionPreviewOnly", "palmRejection", "hoverPreview", "tiltEnabled", "audioFeedback", "hapticFeedback"]) {
-    if (typeof sourceInput[key] !== "boolean") return null;
-    input[key] = sourceInput[key];
-  }
-  const inputRanges: Readonly<Record<string, readonly [number, number]>> = { pressureOnset: [0, 0.4], pressureSaturation: [0.5, 1], pressureGamma: [0.2, 3], pressureHysteresis: [0, 0.2], tiltDeadZoneDeg: [0, 20], tiltSmoothing: [0, 1], twistSmoothing: [0, 1] };
-  for (const [key, range] of Object.entries(inputRanges)) {
-    const value = sourceInput[key];
-    if (typeof value !== "number" || !Number.isFinite(value)) return null;
-    input[key] = Math.min(range[1], Math.max(range[0], value));
-  }
-  const inputOptions: Readonly<Record<string, readonly string[]>> = { transport: ["auto", "raw-coalesced", "move-coalesced", "move-basic"], touchPolicy: ["pen-only", "pen-draw-finger-pan", "pen-draw-two-finger-gesture", "pen-ink-finger-water", "touch-draw"], film: ["glass", "matte", "paperlike-fine", "paperlike-rough"] };
-  for (const [key, values] of Object.entries(inputOptions)) {
-    const value = sourceInput[key];
-    if (typeof value !== "string" || !values.includes(value)) return null;
-    input[key] = value;
-  }
-  return Object.freeze({ version: 1, seed: Math.round(Math.min(2147483647, Math.max(1, source.seed))), tuning: Object.freeze(tuning), slots: Object.freeze(slots), input: Object.freeze(input) }) as unknown as BrushStudioV6MaterialConfig;
+  return normalizeStudioBrushMaterialProgramContract(raw) as unknown as BrushStudioV6MaterialConfig | null;
 }
 
 function contactMode(program: BrushStudioV6MaterialProgram): "bristle" | "particle" | "grain" | "relief" | "wet" | "ink" {
@@ -79,7 +33,14 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
   const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor", "secondaryColor"]);
   const mode = contactMode(program);
   const pattern = program.slots.pattern !== "pattern-none";
-  if (pattern) for (const key of ["patternDensity", "patternScale", "patternJitter"] as const) result.add(key);
+  if (pattern) {
+    result.add("patternJitter");
+    // Stitch rings use nib size/spacing; density and patternScale do not participate.
+    if (program.slots.pattern !== "pattern-stitch") {
+      result.add("patternDensity");
+      result.add("patternScale");
+    }
+  }
   if (program.slots.physics.includes("physics-thin-film")) for (const key of ["wetness", "gravity", "viscosity"] as const) result.add(key);
   if (pattern && mode !== "particle") return result;
   const modeKeys: Readonly<Record<typeof mode, readonly (keyof BrushStudioV6Tuning)[]>> = {
@@ -264,12 +225,16 @@ export function createBrushStudioV6MaterialStroke(
         const originX = Math.floor(point.x / scale);
         const originY = Math.floor(point.y / scale);
         for (let row = -cells; row <= cells; row++) for (let column = -cells; column <= cells; column++) {
-          const x = (originX + column + 0.5) * scale;
-          const y = (originY + row + 0.5) * scale;
+          const cellX = originX + column;
+          const cellY = originY + row;
+          // Stable document-cell offsets preserve the same pattern through replay and event batching.
+          const x = (cellX + 0.5 + (noise(cellX, cellY, seed + 101) - 0.5) * t.patternJitter * 0.7) * scale;
+          const y = (cellY + 0.5 + (noise(cellX, cellY, seed + 103) - 0.5) * t.patternJitter * 0.7) * scale;
           if (Math.hypot(x - point.x, y - point.y) > radius) continue;
           const dot = patternId === "pattern-dot-tone";
-          emit("pattern", x, y, dot ? scale * (0.06 + t.patternDensity * 0.25) : scale * 0.6, dot ? scale * (0.06 + t.patternDensity * 0.25) : scale * 0.04, patternId === "pattern-brick" ? 0 : Math.PI / 4, alpha, 0, 0, dot ? "ellipse" : "rect");
-          if (patternId === "pattern-weave") emit("pattern", x, y, scale * 0.6, scale * 0.04, -Math.PI / 4, alpha, 0.3, 0, "rect");
+          const lineRadius = scale * (0.01 + t.patternDensity * 0.12);
+          emit("pattern", x, y, dot ? scale * (0.06 + t.patternDensity * 0.25) : scale * 0.6, dot ? scale * (0.06 + t.patternDensity * 0.25) : lineRadius, patternId === "pattern-brick" ? 0 : Math.PI / 4, alpha, 0, 0, dot ? "ellipse" : "rect");
+          if (patternId === "pattern-weave") emit("pattern", x, y, scale * 0.6, lineRadius, -Math.PI / 4, alpha, 0.3, 0, "rect");
         }
       } else if (patternId === "pattern-stitch") {
         emit("pattern", point.x, point.y, radius, radius * 0.42, direction + Math.sin(index * 0.7) * t.patternJitter, alpha * 2, (index % 16) / 15, 0, "ring");

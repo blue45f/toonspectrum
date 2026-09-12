@@ -1,4 +1,8 @@
-import { planStudioMaterialBrush, renderStudioMaterialBrushMarks, StudioMaterialBrushPlanner } from "../apps/web/src/domains/creator/brush/studio-material-brush-runtime";
+import {
+  planStudioMaterialBrush, renderStudioMaterialBrush, renderStudioMaterialBrushMarks,
+  StudioMaterialBrushPlanner, StudioMaterialBrushRenderCache, StudioMaterialBrushSvgBudgetError,
+  writeStudioMaterialBrushSvg, STUDIO_MATERIAL_BRUSH_BATCH_MARKS,
+} from "../apps/web/src/domains/creator/brush/studio-material-brush-runtime";
 import { renderBrushStudioV6MaterialMarks } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-material-engine";
 import { createBrushStudioV6ProductBrush } from "../apps/web/src/domains/creator/brush-lab/brush-studio-v6-product-bridge";
 import { exportPageToSvg } from "../apps/web/src/domains/creator/export/studio-svg-export";
@@ -93,7 +97,7 @@ export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Progr
   const context = committedCanvas.getContext("2d")!;
   context.globalAlpha = 1;
   const marks = planStudioMaterialBrush(element);
-  renderStudioMaterialBrushMarks(context, marks, element.symmetry);
+  renderStudioMaterialBrush(context, element);
   const batch = read(committedCanvas);
   const liveCommitted = difference(settled, batch);
   if (liveCommitted.maximumChannelError !== 0) failures.push(`${program.id}: incremental/committed contacts differ`);
@@ -124,7 +128,7 @@ export async function verifyBrushV6ProductionQuality(program: BrushStudioV6Progr
     savedOpacity: element.opacity, backend: "production-native-retained-canvas2d-and-svg" };
 }
 
-/** Exercise production incremental planning for a long, densely sampled max-strand stroke. */
+/** Exercise both incremental and whole-stroke production rendering for a max-strand stroke. */
 export function verifyBrushV6LongStrokeQuality(program: BrushStudioV6Program) {
   const maximum = { ...program, tuning: { ...program.tuning, bristleStrands: 128, spacing: 0.01, size: 26 } };
   const element = stroke(maximum);
@@ -164,9 +168,43 @@ export function verifyBrushV6LongStrokeQuality(program: BrushStudioV6Program) {
   };
   const early = windowMetrics(1000, 2000);
   const late = windowMetrics(9000, 10000);
+  const failures: string[] = [];
+  const committedCanvas = document.createElement("canvas");
+  committedCanvas.width = WIDTH;
+  committedCanvas.height = HEIGHT;
+  const cache = new StudioMaterialBrushRenderCache();
+  const committedStart = performance.now();
+  const committedStatistics = cache.render(committedCanvas.getContext("2d")!, element);
+  const committedMs = performance.now() - committedStart;
+  const committedPixels = difference(read(canvas), read(committedCanvas));
+  if (committedPixels.maximumChannelError !== 0) failures.push("long stroke: incremental/committed pixels differ");
+  if (committedStatistics.totalMarks !== totalMarks) failures.push("long stroke: whole-stroke replay lost contacts");
+  if (committedStatistics.maxBatchMarks > STUDIO_MATERIAL_BRUSH_BATCH_MARKS) failures.push("long stroke: rendering batch exceeds bound");
+  if (cache.statistics().retainedMarks !== 0) failures.push("long stroke: oversized plan retained in cache");
+  let svgBudgetRejected = false;
+  const svgBudgetStart = performance.now();
+  try { writeStudioMaterialBrushSvg(element, () => {}); }
+  catch (error) {
+    if (!(error instanceof StudioMaterialBrushSvgBudgetError)) throw error;
+    svgBudgetRejected = true;
+  }
+  if (!svgBudgetRejected) failures.push("long stroke: expected oversized SVG export to reject explicitly");
+  const svgBudgetMs = performance.now() - svgBudgetStart;
+  // A discarding sink proves fullpath streaming without building a huge string. The product's
+  // string export still rejects at its fixed 64 MiB budget; this is not an export-success claim.
+  let largestSvgChunkBytes = 0;
+  const svgStreamStart = performance.now();
+  const svgStreaming = writeStudioMaterialBrushSvg(element, (chunk) => {
+    largestSvgChunkBytes = Math.max(largestSvgChunkBytes, chunk.length * 2);
+  }, 1024 * 1024 * 1024);
+  const svgStreamingMs = performance.now() - svgStreamStart;
+  if (svgStreaming.totalMarks !== totalMarks) failures.push("long stroke: streaming SVG lost contacts");
   return { recipe: program.id, sampleCount: 10_000, spacingPx: 0.35, bristleStrands: 128,
     totalMarks, maximumMarksPerAppend, inputNumericValueCount: element.points.length + 4 * element.pressures.length,
     retainedOutputMarkArrays: 0, early, late, lateToEarlyMeanRatio: late.meanMs / Math.max(0.001, early.meanMs),
-    totalMs: samplesMs.reduce((sum, value) => sum + value, 0), samplesMs,
-    timingScope: "Production planner append plus Canvas2D submission; excludes physical input and GPU presentation. Counts describe held input/transient output, not heap-byte measurements." };
+    totalMs: samplesMs.reduce((sum, value) => sum + value, 0), samplesMs, failures,
+    committed: { ...committedStatistics, totalMs: committedMs, pixels: committedPixels, cache: cache.statistics() },
+    svg: { productBudgetRejected: svgBudgetRejected, productBudgetMs: svgBudgetMs,
+      fullStreaming: { ...svgStreaming, totalMs: svgStreamingMs, largestChunkUtf16Bytes: largestSvgChunkBytes, sink: "discarding" } },
+    timingScope: "Production planner append and whole-stroke Canvas2D submission; excludes physical input and GPU presentation. Counts describe held input/transient output, not heap-byte measurements. Full SVG streaming uses a discarding sink; product string export rejects this oversized stroke." };
 }

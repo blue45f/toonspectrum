@@ -14,6 +14,19 @@ import { brushV6RelativeInkError } from "./studio-brush-v6-pixel-quality";
 
 import type { Browser, BrowserContext, Page } from "playwright";
 
+interface NativeMaterialFillTrace {
+  transform: number[];
+  alpha: number;
+  color: string | CanvasGradient | CanvasPattern;
+  composite: string;
+  filter: string;
+  shadow: readonly [string, number, number, number];
+  path: { method: string; args: unknown[] } | undefined;
+}
+interface NativeMaterialCanvasTrace { fills: NativeMaterialFillTrace[]; overflow: boolean }
+
+declare global { var __studioMaterialCanvasTrace: NativeMaterialCanvasTrace }
+
 const origin = process.env.TOONSPECTRUM_VERIFY_ORIGIN ?? "http://127.0.0.1:53991";
 const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonstudio-brush-v6-workflow");
 mkdirSync(output, { recursive: true });
@@ -29,6 +42,7 @@ const probeExport = process.env.TOONSPECTRUM_VERIFY_LIBRARY_EXPORT ?? "openProdu
 let current = "start";
 let strokeRegion: { x: number; y: number; width: number; height: number } | undefined;
 let blankRegion: Buffer | undefined, committedRegion: Buffer | undefined;
+const dispatchedPenPressures = [0.6, ...Array.from({ length: 48 }, (_, index) => 0.3 + 0.6 * Math.sin((index + 1) / 48 * Math.PI))];
 
 async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
   current = name;
@@ -98,6 +112,68 @@ function relativeInkDifference(paper: Buffer, original: Buffer, reopened: Buffer
   return brushV6RelativeInkError(backdrop.getRawImage().data, first.getRawImage().data, second.getRawImage().data);
 }
 
+/** Read the public native surface: no renderer state, hidden test hooks or synthetic fallback. */
+async function verifyActiveStrokeResize(): Promise<void> {
+  const selector = 'canvas[data-studio-live-retained-active="true"]';
+  const surface = page.locator(selector);
+  const commandsBefore = await page.evaluate(() => globalThis.__studioMaterialCanvasTrace);
+  const before = await surface.evaluate((canvas: HTMLCanvasElement) => ({
+    width: canvas.width, height: canvas.height, png: canvas.toDataURL("image/png"),
+    contextAttributes: canvas.getContext("2d")?.getContextAttributes(),
+  }));
+  const beforePng = Buffer.from(before.png.split(",")[1]!, "base64");
+  const first = decodePng(beforePng);
+  const original = first.getRawImage().data;
+  assert.equal(first.channels, 4, "Native material surface must expose RGBA pixels");
+  let paintedPixels = 0;
+  for (let index = 3; index < original.length; index += 4) if (original[index]! > 8) paintedPixels += 1;
+  assert.ok(paintedPixels > 200, "Active material stroke has no visible native ink before resize");
+  await page.setViewportSize({ width: 1320, height: 980 });
+  await page.waitForFunction(({ selector, width, height }) => {
+    const canvas = document.querySelector<HTMLCanvasElement>(selector);
+    return canvas && canvas.width > 1 && canvas.height > 1 && (canvas.width !== width || canvas.height !== height);
+  }, { selector, width: before.width, height: before.height });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.waitForFunction(({ selector, width, height }) => {
+    const canvas = document.querySelector<HTMLCanvasElement>(selector);
+    return canvas && canvas.width === width && canvas.height === height;
+  }, { selector, width: before.width, height: before.height });
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const commandsAfter = await page.evaluate(() => globalThis.__studioMaterialCanvasTrace);
+  assert.ok(!commandsBefore.overflow && !commandsAfter.overflow, "Native command trace exceeded its bounded100,000fill limit");
+  assert.ok(commandsBefore.fills.length > 0, "Native material emitted no observable paint commands");
+  assert.deepEqual(commandsAfter.fills, commandsBefore.fills, "Viewport replay changed material contact geometry, order, color or pressure");
+  writeFileSync(join(output, "active-replay-commands.json"), JSON.stringify({ before: commandsBefore.fills, after: commandsAfter.fills }));
+  const afterUrl = await surface.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL("image/png"));
+  const afterPng = Buffer.from(afterUrl.split(",")[1]!, "base64");
+  const second = decodePng(afterPng);
+  assert.equal(first.width, second.width);
+  assert.equal(first.height, second.height);
+  const restored = second.getRawImage().data;
+  let differentChannels = 0, maxChannelError = 0;
+  for (let index = 0; index < original.length; index += 1) {
+    const difference = Math.abs(original[index]! - restored[index]!);
+    if (difference > 0) differentChannels += 1;
+    maxChannelError = Math.max(maxChannelError, difference);
+  }
+  const spatialError = brushV6RelativeInkError(new Uint8Array(original.length), original, restored);
+  let originalAlpha = 0, restoredAlpha = 0;
+  for (let index = 3; index < original.length; index += 4) { originalAlpha += original[index]!; restoredAlpha += restored[index]!; }
+  const relativeAlphaMassError = Math.abs(originalAlpha - restoredAlpha) / Math.max(1, originalAlpha);
+  evidence.activeResize = {
+    width: before.width, height: before.height, paintedPixels, differentChannels, maxChannelError,
+    commandCount: commandsBefore.fills.length, commandsExactlyEqual: true,
+    spatialError, relativeAlphaMassError, contextAttributes: before.contextAttributes,
+  };
+  writeFileSync(join(output, "active-before-resize.png"), beforePng);
+  writeFileSync(join(output, "active-after-resize.png"), afterPng);
+  // Exact command equality above is the material-geometry gate. Chromium desynchronized Canvas
+  // rasterizes incremental frame flushes and one full replay with slightly different edge AA;
+  // independently replaying identical commands reproduces ~1.5% spatial RGBA error on this device.
+  assert.ok(spatialError <= 0.03, "Resizing away/back failed to restore the active material ink shape");
+  assert.ok(relativeAlphaMassError <= 0.01, "Resizing away/back lost or duplicated material coverage");
+}
+
 try {
   await stage("browser-startup", async () => {
     browser = await chromium.launch({ channel: "chromium", headless: process.platform !== "darwin", timeout: 15_000 });
@@ -112,6 +188,40 @@ try {
     page.on("response", response => { if (response.status() >= 400) responses.push({ url: response.url(), status: response.status() }); });
     page.on("console", message => { if (message.type() === "error") failures.push(`console: ${message.text()}`); });
     await page.addInitScript(() => {
+      // Observe native Canvas calls without inspecting or changing editor/renderer state. Retain
+      // only the current active surface's commands, with an explicit fixed cap for this QA stroke.
+      globalThis.__studioMaterialCanvasTrace = { fills: [], overflow: false };
+      const paths = new WeakMap<CanvasRenderingContext2D, NativeMaterialFillTrace["path"]>();
+      const isActive = (context: CanvasRenderingContext2D) => context.canvas.dataset.studioLiveRetainedActive === "true";
+      for (const method of ["roundRect", "ellipse"] as const) {
+        const native = CanvasRenderingContext2D.prototype[method];
+        CanvasRenderingContext2D.prototype[method] = function (...args: unknown[]) {
+          if (isActive(this)) paths.set(this, { method, args });
+          return Reflect.apply(native, this, args);
+        };
+      }
+      const clear = CanvasRenderingContext2D.prototype.clearRect;
+      CanvasRenderingContext2D.prototype.clearRect = function (...args: Parameters<typeof clear>) {
+        if (isActive(this)) globalThis.__studioMaterialCanvasTrace = { fills: [], overflow: false };
+        return Reflect.apply(clear, this, args);
+      };
+      const fill = CanvasRenderingContext2D.prototype.fill;
+      CanvasRenderingContext2D.prototype.fill = function (...args: unknown[]) {
+        if (isActive(this)) {
+          const trace = globalThis.__studioMaterialCanvasTrace;
+          if (trace.fills.length >= 100_000) trace.overflow = true;
+          else {
+            const matrix = this.getTransform();
+            trace.fills.push({
+              transform: [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f],
+              alpha: this.globalAlpha, color: this.fillStyle, composite: this.globalCompositeOperation,
+              filter: this.filter, shadow: [this.shadowColor, this.shadowBlur, this.shadowOffsetX, this.shadowOffsetY],
+              path: paths.get(this),
+            });
+          }
+        }
+        return Reflect.apply(fill, this, args);
+      };
       if (!/^https?:$/u.test(location.protocol)) return;
       localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
       localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
@@ -159,10 +269,11 @@ try {
     const startX = bounds.x + bounds.width * 0.32, startY = bounds.y + bounds.height * 0.4;
     strokeRegion = { x: Math.floor(startX - 50), y: Math.floor(startY - 110), width: Math.ceil(Math.min(bounds.width * 0.3, 360) + 100), height: 220 };
     blankRegion = await page.screenshot({ clip: strokeRegion });
-    await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: startX, y: startY, button: "left", buttons: 1, clickCount: 1, pointerType: "pen", force: 0.6, tiltX: 30, tiltY: 12 });
+    await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: startX, y: startY, button: "left", buttons: 1, clickCount: 1, pointerType: "pen", force: dispatchedPenPressures[0], tiltX: 30, tiltY: 12 });
     for (let index = 1; index <= 48; index += 1) {
       const t = index / 48;
-      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: startX + Math.min(bounds.width * 0.3, 360) * t, y: startY + Math.sin(t * Math.PI * 2) * 60, button: "left", buttons: 1, pointerType: "pen", force: 0.3 + 0.6 * Math.sin(t * Math.PI), tiltX: 30, tiltY: 12 });
+      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: startX + Math.min(bounds.width * 0.3, 360) * t, y: startY + Math.sin(t * Math.PI * 2) * 60, button: "left", buttons: 1, pointerType: "pen", force: dispatchedPenPressures[index], tiltX: 30, tiltY: 12 });
+      if (index === 24) await verifyActiveStrokeResize();
     }
     await client.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: startX + Math.min(bounds.width * 0.3, 360), y: startY, button: "left", buttons: 0, clickCount: 1, pointerType: "pen", force: 0 });
     await client.detach();
@@ -184,6 +295,14 @@ try {
     evidence.autosaveError = await readDurableStudioAutosaveError(page);
     assert.ok(materialStrokes(saved).length > 0, "No material stroke in authoritative OPFS/SQLite document");
     evidence.materialStrokes = materialStrokes(saved);
+    const stroke = materialStrokes(saved)[0] as { pressures?: number[]; points?: number[] };
+    assert.equal(stroke.pressures?.length, dispatchedPenPressures.length, "The lifecycle gesture lost or duplicated pressure contacts");
+    assert.equal(stroke.points?.length, dispatchedPenPressures.length * 2, "The lifecycle gesture lost or duplicated coordinates");
+    const maxPressureError = Math.max(...dispatchedPenPressures.map((pressure, index) => Math.abs(pressure - stroke.pressures![index]!)));
+    evidence.rawPressureParity = { dispatched: dispatchedPenPressures, saved: stroke.pressures, maxPressureError };
+    // Chromium exposes PointerEvent.pressure as Float32; material input must otherwise equal the
+    // workbench raw-contact convention (no family exponent, device curve or release-zero sample).
+    assert.ok(maxPressureError < 0.000002, `Raw material pressure changed before its program mapping: ${maxPressureError}`);
     writeFileSync(join(output, "manuscript-before-reopen.json"), saved!.raw);
     return saved!;
   });
@@ -207,7 +326,8 @@ try {
       restored = await page.screenshot({ clip: strokeRegion });
       restoredDifference = changedPixels(committedRegion!, restored);
       restoredRelativeInkError = relativeInkDifference(blankRegion!, committedRegion!, restored);
-      // Scaled native and reopened Canvas edges may antialias differently; compare actual ink mass.
+      // Scaled native and reopened Canvas edges may antialias differently; compare spatial channel
+      // error normalized by original ink mass so shifted or equal-mass wrong shapes cannot pass.
       if (restoredRelativeInkError <= 0.03) break;
       await page.waitForTimeout(300);
     }

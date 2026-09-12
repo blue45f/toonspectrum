@@ -38,6 +38,20 @@ afterEach(cleanup);
 const stored = (): BrushStudioV6Program => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
+  it("disables the unimplemented finger-water policy and explains imported legacy values", () => {
+    const program = createBrushStudioV6Program("mineral-bloom");
+    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({
+      ...program, input: { ...program.input, touchPolicy: "pen-ink-finger-water" },
+    }));
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Input·Device" }));
+    const unsupported = screen.getByRole("option", { name: "손가락 물붓 · 미지원" }) as HTMLOptionElement;
+    expect(unsupported.disabled).toBe(true);
+    expect(screen.getByText(/손가락 물붓은 현재 미지원/u)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("터치 정책"), { target: { value: "touch-draw" } });
+    expect(stored().input.touchPolicy).toBe("touch-draw");
+  });
+
   it("pins a full reference, applies a controlled sample, restores it and undoes the restore", () => {
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "비교·실험" }));

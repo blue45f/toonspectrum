@@ -24,6 +24,7 @@ function writeReviewIndex(report) {
     + `<h1>Studio brush material verification</h1><div class="metadata"><p>${report.results.length} recipes · ${report.failures.length} failures · ${escape(report.generatedAt)}</p>`
     + `<p>${escape(report.scope)}</p><p>Normalized size, colors, opacity and seed; paper removed from pairwise comparison. Native overlay and committed contacts are compared exactly; SVG antialias differences are measured.</p>`
     + `<p>10,000-sample stress: early mean ${report.longStroke.early.meanMs.toFixed(3)} ms, late mean ${report.longStroke.late.meanMs.toFixed(3)} ms; peak ${report.longStroke.maximumMarksPerAppend} contacts per append.</p>`
+    + `<p>Whole-stroke Canvas: ${report.longStroke.committed.totalMs.toFixed(1)} ms; ${report.longStroke.committed.totalMarks.toLocaleString()} contacts, peak ${report.longStroke.committed.maxBatchMarks} per submitted batch; exact incremental pixels. Product SVG budget rejected: ${report.longStroke.svg.productBudgetRejected}. Fullpath SVG discarding sink: ${report.longStroke.svg.fullStreaming.serializedUtf16Bytes.toLocaleString()} UTF-16 bytes; largest chunk ${report.longStroke.svg.fullStreaming.largestChunkUtf16Bytes.toLocaleString()} bytes.</p>`
     + `<p><a href="report.json">Full observations and raw timing samples</a> · <a href="contact-sheet.png">Complete contact sheet</a></p></div>${cards}</body></html>`);
 }
 
@@ -102,7 +103,7 @@ async function main() {
     }
     const observations = await page.evaluate(() => window.__studioBrushV6Quality.finish());
     const longStroke = await page.evaluate(() => window.__studioBrushV6Quality.stress());
-    const failures = [...observations.failures];
+    const failures = [...observations.failures, ...longStroke.failures];
     for (const [kind, errors] of Object.entries(diagnostics)) {
       if (errors.length > 0) failures.push(`${kind}: ${errors.join("; ")}`);
     }
