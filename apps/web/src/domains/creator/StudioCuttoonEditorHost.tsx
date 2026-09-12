@@ -25339,7 +25339,7 @@ function clearSelectionForEdit() {
     closeMenu: () => setMenu(null), setError,
     onApplied: (stroke) => {
       activatePrimaryCanvasTool("select");
-      setNodeEditTool("move");
+      setNodeEditTool("move", stroke.id);
       announceDrawingShortcut(stroke.smartShape ? "도형을 확정했어요. 캔버스의 점을 끌어 편집하세요." : "원래 자유선을 복원했어요.");
     },
   });

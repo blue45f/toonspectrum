@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultStudioAppSettings } from "../studio-app-settings";
@@ -71,6 +72,36 @@ function fixture() {
 }
 
 describe("node editing pointer ownership at the stage boundary", () => {
+  it("keeps an explicit Smart Shape node activation across the same-batch selection change", () => {
+    const hook = renderHook(() => {
+      const [selectedId, select] = useState<string | null>(null);
+      return { ...useStudioVectorNodeBubbleEdit({ selectedId }), select };
+    });
+    act(() => {
+      hook.result.current.select("corrected-shape");
+      hook.result.current.setNodeEditTool("move", "corrected-shape");
+    });
+    expect(hook.result.current.nodeEditTool).toBe("move");
+    act(() => hook.result.current.select("unrelated-shape"));
+    expect(hook.result.current.nodeEditTool).toBeNull();
+    act(() => hook.result.current.select("corrected-shape"));
+    expect(hook.result.current.nodeEditTool).toBeNull();
+  });
+
+  it("does not activate a different selection when a requested node target loses the selection race", () => {
+    const hook = renderHook(() => {
+      const [selectedId, select] = useState<string | null>(null);
+      return { ...useStudioVectorNodeBubbleEdit({ selectedId }), select };
+    });
+    act(() => {
+      hook.result.current.setNodeEditTool("move", "corrected-shape");
+      hook.result.current.select("unrelated-shape");
+    });
+    expect(hook.result.current.nodeEditTool).toBeNull();
+    act(() => hook.result.current.select("corrected-shape"));
+    expect(hook.result.current.nodeEditTool).toBeNull();
+  });
+
   it("keeps pen ownership across a second finger's down, move, up and cancel", () => {
     const f = fixture();
     f.begin();
