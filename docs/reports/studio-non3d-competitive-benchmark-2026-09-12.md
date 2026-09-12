@@ -55,10 +55,15 @@
 
 - 색상: `StudioColorHarmoniesPanel.test.tsx`의 제어된 부모 상태로 기본 follow, 잠긴 배색의 파생색 연속 선택, 저장 이름/배열, 키보드/포커스, 중복 색, 타이머 정리를 확인한다.
 - 부모 팝오버 연결과 흰색/검정의 중복 radio, 조화/웹툰 두 모드의 비동기 저장 실패도 확인했다. `pnpm_config_verify_deps_before_run=false pnpm exec vitest run apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx apps/web/src/domains/creator/StudioColorPopover.test.tsx apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx`: **3개 파일, 21개 테스트 통과**.
-- 선택·레이어·출력의 구현은 작업 브랜치에 완료했고 통합 검증을 진행한다. 펼친 그룹 헤더를 지나 첫 자식까지만 Shift 선택했는데 범위 밖 형제까지 선택되던 문제는 최종 리뷰에서 수정했다. 그룹 직접 클릭·접힌 그룹 범위 선택은 전체 그룹을 선택하는 기존 의미를 유지한다.
+- 선택·레이어·출력의 구현과 집중 회귀 검증을 완료했다. 펼친 그룹 헤더를 지나 첫 자식까지만 Shift 선택했는데 범위 밖 형제까지 선택되던 문제는 최종 리뷰에서 수정했다. 그룹 직접 클릭·접힌 그룹 범위 선택은 전체 그룹을 선택하는 기존 의미를 유지한다.
 - 레이어 최종 리뷰 회귀: `studio-layer-keyboard-navigation.test.ts`와 `StudioLayerNavigator.interaction.test.tsx` **2개 파일, 26개 테스트 통과**. 제어된 부모 상태에서 범위 확장/축소, 펼침/접힘 전환, 그룹 직접 선택을 확인했다.
 - 실제 native Worker 증거: `/private/tmp/toonstudio-non3d-qa/border-runtime/result.json`. Headless Chromium **151.0.7922.34**, Vite 개발 서버의 module Worker/OffscreenCanvas에서 **8개 시나리오, 28개 픽셀 검사**, 모든 실행 `worker`, `passed: true`, `errors: []`. 안쪽·바깥쪽·중앙·구멍·반전·전체 안쪽·전체 바깥쪽·페더 보존을 확인했다. 페더 사례는 부분 알파 5,288개를 확인했다. 이는 실제 Worker 실행/픽셀 결과 증거이며 운영 UI·실제 태블릿·GPU 성능 검증으로 확대하지 않는다.
-- 전체 lint/typecheck/build/필수 CI와 main 병합 여부는 담당자가 최종 실행 기록에 추가한다. 이 보고서의 구현 완료는 병합 또는 배포 완료를 뜻하지 않는다.
+- 집중 회귀는 **112개 파일·1,496개 테스트**, 직렬 성능 회귀는 **21개 파일·432개 테스트**가 통과했다. 엄격한 저장소 lint, 앱/API/실시간 워커 typecheck, 프로덕션 빌드와 번들 크기 회귀 검사도 통과했다. 이 수치는 실행한 검증 범위이며 저장소의 모든 진단 테스트가 성공했다는 뜻은 아니다.
+- 실제 다운로드한 ZIP에서 원고 1·3페이지의 PNG가 전체 3페이지 참조 출력의 해당 PNG와 바이트 단위로 일치하고 2페이지가 제외됨을 확인했다. 원본 인덱스·라벨·크기·CRC·SHA-256을 검사했으며 잘못된 페이지 선택은 다운로드를 차단했다.
+- 실제 OPFS/SQLite 복구에서 Undo는 빈 캔버스, Redo는 커밋 상태, 새로고침 후 복구는 Redo와 일치했다. 복구 전후 1440×2160 PNG는 동일한 SHA-256 `1dbdc297494a1c391e1576e5bd94bc894c85d4ae554d8efc233a7fe8253a7874`를 가진다.
+- 데스크톱 2회 진입, 모바일 그리기, 320·360·390px의 페이지/설정/브러시 패널 9개 계약을 실제 hit-test 클릭으로 검증했다. 44px 터치 영역·포커스 가두기와 복원·배경·키보드/탭 스냅·드래그 닫기·가로 넘침 검사를 통과했고 브라우저 오류가 없었다. 검증 중 확인한 닫힌 상태의 저장/펜 입력 런처가 다른 패널을 가리는 문제를 수정했다.
+- 도형 브라우저 검사의 오래된 확대율 status 선택자를 현재 정밀 입력란으로 교체하고 회전 상태 조회를 전용 그룹으로 한정했다. 기존 검사를 유지한 실제 shapes 레인이 통과했다. 6개 도형의 시각·저장 결과, 교정·점 이동·Undo/Redo·새로고침 복구·원본 복원·320px 조작과 24.67%/90° 및 616.67%/180°에서의 패널·도형 경계를 확인했다. 브라우저 오류는 없었다.
+- 위 브라우저 검증은 익명 로컬 Chromium 프로덕션 미리보기에서 수행했다. 최종 커밋의 필수 CI 및 main 병합 상태와 기존 진단 실패는 [PR #1343](https://github.com/blue45f/toonspectrum/pull/1343)의 실행 기록을 기준으로 확인한다. 브라우저 산출물의 커밋·소스 동등성·원본 로그는 별도 QA 기록에 보존했다.
 - 이 문서의 코드 감사만으로 태블릿 실제 입력, 원격 계정 저장/협업, 제공자 호출, main 병합 또는 운영 배포 성공을 선언하지 않는다.
 
 ## 공식 출처
