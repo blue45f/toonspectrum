@@ -1,4 +1,4 @@
-name: Finalize brush catalogue consolidation
+name: Prepare brush catalogue merge tree
 
 on:
   push:
@@ -16,11 +16,12 @@ concurrency:
   group: finalize-brush-catalog-consolidation
   cancel-in-progress: true
 
-# One-shot finalizer. The restored PR core repeats global contracts, strict lint and typechecks.
+# Source preparation only. Required PR core performs the full release validation.
+# Workflow changes are published separately by an authorized maintainer, not GITHUB_TOKEN.
 jobs:
-  apply-and-validate:
+  prepare-source:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -33,14 +34,14 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Apply final consolidation and integration cleanup
+      - name: Prepare final source and workflow changes
         run: |
           set -euo pipefail
           python scripts/maintenance/finalize-brush-catalog-consolidation.py
           python scripts/maintenance/repair-brush-core-integration.py
       - name: Install locked workspace
         run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Autofix changed JavaScript and TypeScript files
+      - name: Format and lint changed sources
         shell: bash
         run: |
           set -euo pipefail
@@ -48,15 +49,8 @@ jobs:
           files+=(apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.tsx)
           files+=(apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx)
           pnpm exec eslint --fix "${files[@]}"
-      - name: Validate audit and first-use view boundary
-        run: |
-          set -euo pipefail
-          pnpm exec eslint --max-warnings=0 \
-            scripts/audit-studio-brush-quality-portfolio.mts \
-            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.tsx \
-            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx
-          pnpm exec vitest run apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx
-      - name: Product catalogue and renderer tests
+          pnpm exec eslint --max-warnings=0 "${files[@]}"
+      - name: Check catalogue and BG3D regressions
         run: |
           set -euo pipefail
           pnpm exec vitest run \
@@ -70,23 +64,31 @@ jobs:
             apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts \
             apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
             apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
-            apps/web/src/domains/creator/studio-integration-closure.test.ts
+            apps/web/src/domains/creator/studio-integration-closure.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts
           pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
-      - name: Production build
+      - name: Record workflow patch for separate authorized publication
         run: |
-          set -euo pipefail
-          pnpm --filter @webtoon-nest/api build
-          pnpm run build
-          pnpm run check:studio-bundle
-      - name: Remove one-shot helpers and publish validated result
+          git diff -- .github/workflows/ci.yml .github/workflows/studio-brush-filter-stability.yml
+          git diff --name-only --diff-filter=D -- .github/workflows | while read -r path; do
+            printf '%s ' "$path"
+            git rev-parse "HEAD:$path"
+          done
+      - name: Publish prepared sources without changing workflows
         shell: bash
         run: |
           set -euo pipefail
           git rm scripts/maintenance/finalize-brush-catalog-consolidation.py
           git rm scripts/maintenance/repair-brush-core-integration.py
-          git rm .github/workflows/finalize-brush-catalog-consolidation.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'refactor(brush): consolidate product catalogue and restore core CI'
+          git add -A -- apps/web scripts docs
+          if git diff --cached --name-only | grep -q '^.github/'; then
+            echo 'Workflow changes must be published separately.' >&2
+            exit 1
+          fi
+          git commit -m 'refactor(brush): prepare consolidated catalogue and deferred BG3D controls'
           git push origin HEAD:fix/brush-catalog-consolidation-core-20260912
