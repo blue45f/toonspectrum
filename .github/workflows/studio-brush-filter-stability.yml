@@ -16,6 +16,11 @@ on:
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
+      - 'scripts/verify-studio-source-hydration.mts'
+      - 'apps/web/src/infrastructure/creator-work-read-options*'
+      - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+      - 'apps/web/src/domains/creator/studio-shared-document-client*'
+      - 'apps/web/src/domains/creator/studio-release-schedule-loader*'
       - '.github/workflows/studio-brush-filter-stability.yml'
   push:
     branches: [main, release/salvage-integration-20260908]
@@ -31,6 +36,11 @@ on:
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
+      - 'scripts/verify-studio-source-hydration.mts'
+      - 'apps/web/src/infrastructure/creator-work-read-options*'
+      - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+      - 'apps/web/src/domains/creator/studio-shared-document-client*'
+      - 'apps/web/src/domains/creator/studio-release-schedule-loader*'
       - '.github/workflows/studio-brush-filter-stability.yml'
   workflow_dispatch:
 
@@ -123,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [filters, desktop, long, shapes, mobile, durability]
+        suite: [filters, desktop, long, shapes, mobile, durability, source]
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_VERIFY_DIR: /tmp/studio-stability-evidence
@@ -149,13 +159,16 @@ jobs:
           TOONSPECTRUM_FILTER_DIALOG_ROUNDS: '3'
         run: pnpm run verify:studio-filter-dialog
       - name: Brush catalogue, long strokes, geometry, touch targets and save recovery
-        if: matrix.suite != 'filters'
+        if: matrix.suite != 'filters' && matrix.suite != 'source'
         env:
           TOONSPECTRUM_BRUSH_VERIFY_STAGE: ${{ matrix.suite }}
           TOONSPECTRUM_BRUSH_STABILITY_ROUNDS: '2'
           TOONSPECTRUM_BRUSH_SURVEY: '1'
           TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
         run: pnpm run verify:studio-brushes
+      - name: Manuscript source retries, authentication ordering and fail-closed UI
+        if: matrix.suite == 'source'
+        run: pnpm exec tsx scripts/verify-studio-source-hydration.mts
       - name: Preserve evidence even when a product check fails
         if: always()
         uses: actions/upload-artifact@v6
