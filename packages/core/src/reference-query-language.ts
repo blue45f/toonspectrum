@@ -52,11 +52,19 @@ export type ReferenceQueryResolution = Readonly<{
 
 const HANGUL = /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/u;
 
+function containsControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
 export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
   // Do not truncate or sanitize invalid input into a valid upstream request.
   const original = input.normalize("NFC").trim().replace(/ +/gu, " ");
   const base = { original, providerQuery: input, matched: [] as string[], unresolved: [] as string[] };
-  if (input.length > REFERENCE_QUERY_MAX_LENGTH || /[\u0000-\u001f\u007f]/u.test(input) || original.length < 2) {
+  if (input.length > REFERENCE_QUERY_MAX_LENGTH || containsControlCharacter(input) || original.length < 2) {
     return { ...base, status: "invalid" };
   }
   if (!HANGUL.test(original)) return { ...base, providerQuery: original, status: "unchanged" };

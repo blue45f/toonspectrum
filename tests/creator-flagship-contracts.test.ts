@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import { creatorSectionFromHash } from "../apps/web/src/domains/marketing/creator-home-navigation";
