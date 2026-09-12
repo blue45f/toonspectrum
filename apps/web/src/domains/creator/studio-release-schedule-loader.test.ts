@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
+  isEmptyStudioReleaseScheduleSnapshot,
+  normalizeStudioReleaseScheduleDeferred,
 } from "./studio-release-schedule-loader";
 
 function moduleImports(fileName: string) {
@@ -53,6 +55,15 @@ describe("Studio release schedule lazy boundary", () => {
     expect(second).toEqual(first);
     expect(second).not.toBe(first);
     expect(second.items).not.toBe(first.items);
+  });
+
+  it("recognizes only absent or exact empty optional schedules", async () => {
+    for (const value of [undefined, null, { version: 1, items: [] }]) {
+      await expect(normalizeStudioReleaseScheduleDeferred(value)).resolves.toEqual({ version: 1, items: [] });
+    }
+    for (const value of [[], {}, { version: 2, items: [] }, { version: 1, items: [], entries: [{}] }, { version: 1, items: [{}] }]) {
+      expect(isEmptyStudioReleaseScheduleSnapshot(value)).toBe(false);
+    }
   });
 
   it("shares one analyzable runtime request and exposes the canonical normalizer", async () => {

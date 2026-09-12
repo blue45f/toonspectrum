@@ -530,6 +530,8 @@ export type StudioCuttoonEditorViewSessionRest = {
   willImportChoice: any;
   workHydrated: any;
   workHydrationFailed: any;
+  workHydrationError?: string | null;
+  onRetrySourceHydration?: () => void;
   workHydrationUnsupportedFormat: any;
   workId: any;
   workspaceControlSide: any;

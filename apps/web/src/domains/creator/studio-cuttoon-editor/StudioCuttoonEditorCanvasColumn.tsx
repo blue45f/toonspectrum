@@ -340,6 +340,8 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
     wetMixArmed,
     wetMixRadius,
     workHydrationFailed,
+    workHydrationError,
+    onRetrySourceHydration,
     workHydrationUnsupportedFormat,
     workId,
     workspaceControlSide,
@@ -701,6 +703,8 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           webtoonGuides={webtoonGuides}
           webtoonTheme={webtoonTheme}
           workHydrationFailed={workHydrationFailed}
+        workHydrationError={workHydrationError}
+        onRetrySourceHydration={onRetrySourceHydration}
           workHydrationUnsupportedFormat={workHydrationUnsupportedFormat}
           workId={workId}
           wrapRef={wrapRef}

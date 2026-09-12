@@ -548,6 +548,8 @@ export interface StudioCanvasViewportProps {
   webtoonGuides: typeof import("../studio-webtoon-guides") | null;
   webtoonTheme: "classic" | "soft" | "vivid";
   workHydrationFailed: boolean;
+  workHydrationError?: string | null;
+  onRetrySourceHydration?: () => void;
   workHydrationUnsupportedFormat: boolean;
   workId: string | null;
   wrapRef: import("react").RefObject<HTMLDivElement | null>;

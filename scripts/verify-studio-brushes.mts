@@ -3847,7 +3847,7 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   invariant(before?.id, "current-stroke correction has no persisted source");
   const open = async () => {
     await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: /^(그리기|Draw)$/u }).click();
-    await page.getByRole("menuitem", { name: /^현재 스트로크 교정/u }).click();
+    await page.locator('[data-studio-menu-item-id="correct-current-stroke"]').click();
     await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
   };
   await open();

@@ -2,6 +2,7 @@ import { STUDIO_PROJECT_MAX_PAGES } from "./studio-project-file";
 import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
 
 import { api, isHttpError, toApiError } from "@/infrastructure/api";
+import { creatorWorkReadOptions } from "@/infrastructure/creator-work-read-options";
 
 const SHARED_DOCUMENT_BASE = "/creator/works";
 const MAX_REVISION = 2_147_483_647;
@@ -569,7 +570,7 @@ export async function getStudioSharedDocument(
   }
   let payload: unknown;
   try {
-    payload = await api.get<unknown>(sharedDocumentPath(workId), { signal });
+    payload = await api.get<unknown>(sharedDocumentPath(workId), creatorWorkReadOptions(signal));
   } catch (error) {
     const accessError = accessErrorFrom(
       error,

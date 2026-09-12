@@ -59,9 +59,9 @@ describe("StudioBrushTray", () => {
     const onSelect = vi.fn();
     render(
       <StudioBrushTray
-        activeBrushId="heart-stamp"
-        favoriteBrushIds={["heart-stamp"]}
-        recentBrushIds={["hair-fiber", "ink-particle"]}
+        activeBrushId="leaf-cluster"
+        favoriteBrushIds={["leaf-cluster"]}
+        recentBrushIds={["hair-curl-ribbon", "ink-particle"]}
         onSelect={onSelect}
         onOpenLibrary={vi.fn()}
       />
@@ -71,22 +71,22 @@ describe("StudioBrushTray", () => {
     expect(tray?.getAttribute("aria-busy")).toBe("true");
     expect(tray?.getAttribute("data-studio-pro-catalog-state")).toBe("loading");
     const heart = await screen.findByRole("option", {
-      name: /즐겨찾기 브러시 하트 도장 · 질감/,
+      name: /즐겨찾기 브러시 잎송이 · 질감/,
     });
     const hair = await screen.findByRole("option", {
-      name: /최근 사용 브러시 머리카락 결 · 질감/,
+      name: /최근 사용 브러시 곱슬 모발 리본 · 질감/,
     });
     expect(heart.getAttribute("aria-selected")).toBe("true");
-    expect(heart.getAttribute("data-studio-brush-chip")).toBe("heart-stamp");
-    expect(hair.getAttribute("data-studio-brush-chip")).toBe("hair-fiber");
+    expect(heart.getAttribute("data-studio-brush-chip")).toBe("leaf-cluster");
+    expect(hair.getAttribute("data-studio-brush-chip")).toBe("hair-curl-ribbon");
     expect(tray?.getAttribute("aria-busy")).toBeNull();
     expect(tray?.getAttribute("data-studio-pro-catalog-state")).toBe("loaded");
 
     fireEvent.click(hair);
     expect(onSelect).toHaveBeenCalledOnce();
     expect(onSelect.mock.calls[0]?.[0]).toMatchObject({
-      id: "hair-fiber",
-      name: "머리카락 결",
+      id: "hair-curl-ribbon",
+      name: "곱슬 모발 리본",
       quickSource: "recent",
     });
   });
@@ -115,15 +115,15 @@ describe("StudioBrushTray", () => {
     render(
       <StudioBrushTray
         activeBrushId="pen"
-        favoriteBrushIds={[quarantinedId, "heart-stamp"]}
+        favoriteBrushIds={[quarantinedId, "leaf-cluster"]}
         onSelect={vi.fn()}
         onOpenLibrary={vi.fn()}
       />
     );
     const heart = await screen.findByRole("option", {
-      name: /즐겨찾기 브러시 하트 도장/,
+      name: /즐겨찾기 브러시 잎송이/,
     });
-    expect(heart.getAttribute("data-studio-brush-chip")).toBe("heart-stamp");
+    expect(heart.getAttribute("data-studio-brush-chip")).toBe("leaf-cluster");
     expect(
       document.querySelector(`[data-studio-brush-chip="${quarantinedId}"]`)
     ).toBeNull();

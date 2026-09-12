@@ -103,7 +103,10 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
     expect(autosave).toContain("if (session) attempted.push(session.clear(savedAt))");
     expect(autosave).toContain("if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt))");
     expect(autosave).toContain("results.length === 0");
-    expect(autosave).toContain("studioRevisionProjectGenerationRef.current !== scheduledGeneration");
+    expect(autosave).toContain("createStudioAutosaveSnapshotFence");
+    expect(autosave).toContain("generation: studioRevisionProjectGenerationRef.current");
+    expect(autosave).toContain("pendingFingerprint: studioPendingStrokeFingerprint(pendingStrokeCommitsRef.current)");
+    expect(autosave).toContain("if (!canPublishSnapshot()) return;");
     expect(autosave.indexOf("Promise.allSettled(attempted)")).toBeLessThan(
       autosave.indexOf("globalThis.localStorage.removeItem(autosaveKey)"),
     );

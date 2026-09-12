@@ -17,6 +17,7 @@ import {
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
+import * as brushCatalogModule from "./studio-brush-catalog";
 import { isStudioBrushMaterialGroup } from "./studio-brush-material-group";
 import { STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE } from "./studio-brush-tip-stamp";
 import { STUDIO_BRUSH_LIBRARY_TABS } from "./studio-draw-ux";
@@ -61,12 +62,18 @@ const exhaustiveFirstBatchProCount = exhaustiveCatalogItems
   .filter((item) => item.source === "pro").length;
 const exhaustiveProCount = exhaustiveCatalogItems
   .filter((item) => item.source === "pro").length;
-// 헤더 카피는 SSOT 총계(격리 포함)를, 결과 카운터는 실제 목록(격리 제외)을 쓴다.
-const listedPaintCatalogCount = filterStudioBrushCatalogItems({
-  operation: "paint",
-  category: "all",
-  query: "",
-}).length;
+// Synthetic inventories exercise pagination independently of the shipped 46-paint product list.
+const LARGE_CATALOG_FIXTURE_COUNT = 123;
+function installLargeCatalogFixture(): void {
+  const items = Array.from({ length: LARGE_CATALOG_FIXTURE_COUNT }, (_, index) => ({
+    ...exhaustiveCatalogItems[index % exhaustiveCatalogItems.length]!,
+    id: `synthetic-brush-${index}`,
+    name: `synthetic brush ${index}`,
+  }));
+  vi.spyOn(brushCatalogModule, "filterStudioBrushCatalogItems").mockImplementation((options = {}) =>
+    options.query ? items.slice(0, 71) : items,
+  );
+}
 const sheetSource = readFileSync(
   resolve(process.cwd(), "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.tsx"),
   "utf8"
@@ -214,7 +221,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it(`publishes one unique ${STUDIO_ALL_BRUSH_CATALOG_ITEMS.length}-brush catalog while keeping the procedural runtime lazy`, () => {
+  it(`keeps the unique ${STUDIO_ALL_BRUSH_CATALOG_ITEMS.length}-entry internal renderer registry while keeping the procedural runtime lazy`, () => {
     const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
     const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
 
@@ -365,10 +372,10 @@ describe("StudioBrushLibrarySheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
     fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
-      target: { value: "heart-stamp" },
+      target: { value: "leaf-cluster" },
     });
 
-    const result = screen.getByRole("button", { name: "하트 도장 선택" });
+    const result = screen.getByRole("button", { name: "잎송이 선택" });
     expect(result.tabIndex).toBe(0);
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
     expect(screen.getByText(`재질 분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
@@ -433,12 +440,12 @@ describe("StudioBrushLibrarySheet", () => {
 
     expect(screen.getByRole("tab", { name: "시작 도구" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
-      target: { value: "heart-stamp" },
+      target: { value: "leaf-cluster" },
     });
 
     expect(screen.getByText(`재질 분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
-    expect(screen.getByRole("button", { name: "하트 도장 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "잎송이 선택" })).toBeTruthy();
   });
 
   it("shows brush-kind badges and re-applies the active catalogue defaults", async () => {
@@ -469,7 +476,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it("keeps an accessible fallback while progressively materializing a durable selection", async () => {
+  it("renders the complete single-batch product catalog and materializes a durable selection", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -481,18 +488,20 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    // 전체 탭은 compact 재질 탭에 흡수된 변형까지 모두 탐색할 수 있다.
+    // Product inventory fits in one batch; large-list behavior is covered with explicit fixtures below.
     fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
 
     expect(screen.getByRole("status").textContent).toBe(
-      `48/${exhaustiveCatalogCount}개의 브러시가 표시됩니다.`
+      `${Math.min(48, exhaustiveCatalogCount)}/${exhaustiveCatalogCount}개의 브러시가 표시됩니다.`
     );
-    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(48);
+    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(Math.min(48, exhaustiveCatalogCount));
     expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
       exhaustiveFirstBatchProCount,
     );
     expect(screen.queryAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);
     expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
+    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
+    expect(container.querySelector("[data-studio-brush-progressive-fallback]")).toBeNull();
     while (container.querySelector('[data-studio-brush-progressive-fallback="true"]')) {
       fireEvent.click(
         container.querySelector('[data-studio-brush-progressive-fallback="true"]')!,
@@ -506,16 +515,16 @@ describe("StudioBrushLibrarySheet", () => {
     );
     expect(screen.getAllByText("PRO")).toHaveLength(exhaustiveProCount);
 
-    fireEvent.click(screen.getByRole("button", { name: "하트 도장 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "잎송이 선택" }));
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({
-        catalogId: "heart-stamp",
-        catalogName: "하트 도장",
+        catalogId: "leaf-cluster",
+        catalogName: "잎송이",
         runtimeBrushId: "ink-particle",
-        defaultWidth: 26,
-        defaultOpacity: 0.94,
+        defaultWidth: 34,
+        defaultOpacity: 0.78,
         brushDynamics: expect.objectContaining({
           version: 1,
           tip: expect.objectContaining({
@@ -528,6 +537,7 @@ describe("StudioBrushLibrarySheet", () => {
   });
 
   it("reveals one batch for duplicate observer notifications and uses the scrollport root", () => {
+    installLargeCatalogFixture();
     const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
@@ -555,13 +565,14 @@ describe("StudioBrushLibrarySheet", () => {
     });
 
     expect(screen.getByRole("status").textContent).toBe(
-      `96/${listedPaintCatalogCount}개의 브러시가 표시됩니다.`,
+      `96/${LARGE_CATALOG_FIXTURE_COUNT}개의 브러시가 표시됩니다.`,
     );
     expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(96);
     expect(observer?.disconnect).toHaveBeenCalledOnce();
   });
 
   it("resets the batch, scroll position, and stale observer when a filter key changes", () => {
+    installLargeCatalogFixture();
     const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
@@ -603,6 +614,7 @@ describe("StudioBrushLibrarySheet", () => {
   });
 
   it("disconnects at the end of the catalog and removes the sentinel", () => {
+    installLargeCatalogFixture();
     const observers = installIntersectionObserver();
     const { container } = render(
       <StudioBrushLibrarySheet
@@ -620,13 +632,14 @@ describe("StudioBrushLibrarySheet", () => {
     }
 
     expect(screen.getByRole("status").textContent).toBe(
-      `${listedPaintCatalogCount}/${listedPaintCatalogCount}개의 브러시가 표시됩니다.`,
+      `${LARGE_CATALOG_FIXTURE_COUNT}/${LARGE_CATALOG_FIXTURE_COUNT}개의 브러시가 표시됩니다.`,
     );
     expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
     expect(observers.at(-1)?.disconnect).toHaveBeenCalledOnce();
   });
 
   it("disconnects on close and leaves a keyboard fallback when observers are unavailable", () => {
+    installLargeCatalogFixture();
     const { container, rerender } = render(
       <StudioBrushLibrarySheet
         open
@@ -637,7 +650,7 @@ describe("StudioBrushLibrarySheet", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
 
-    const remainingAfterFirstBatch = exhaustiveCatalogCount - 48;
+    const remainingAfterFirstBatch = LARGE_CATALOG_FIXTURE_COUNT - 48;
     const fallback = screen.getByRole("button", {
       name: `다음 브러시 ${Math.min(48, remainingAfterFirstBatch)}개 불러오기, `
         + `${remainingAfterFirstBatch}개 남음`,
@@ -646,11 +659,13 @@ describe("StudioBrushLibrarySheet", () => {
     expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
     fireEvent.click(fallback);
     expect(screen.getByRole("status").textContent).toContain(
-      `${Math.min(96, exhaustiveCatalogCount)}/`,
+      `${Math.min(96, LARGE_CATALOG_FIXTURE_COUNT)}/`,
     );
 
     const observers = installIntersectionObserver();
-    fireEvent.click(screen.getByRole("tab", { name: "전체" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: "synthetic" },
+    });
     const observer = observers.at(-1);
     rerender(
       <StudioBrushLibrarySheet

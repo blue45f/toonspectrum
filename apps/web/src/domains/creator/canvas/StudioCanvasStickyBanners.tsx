@@ -74,6 +74,8 @@ export interface StudioCanvasStickyBannersContext {
   readonly toggleHorizontalCanvasView: () => void;
   readonly viewTool: "zoom" | "rotate" | null;
   readonly workHydrationFailed: boolean;
+  readonly workHydrationError?: string | null;
+  readonly onRetrySourceHydration?: () => void;
   readonly workHydrationUnsupportedFormat: boolean;
   readonly workId: string | null;
   readonly zoom: number;
@@ -112,6 +114,8 @@ export function renderStudioCanvasStickyBanners({
   toggleHorizontalCanvasView,
   viewTool,
   workHydrationFailed,
+  workHydrationError,
+  onRetrySourceHydration,
   workHydrationUnsupportedFormat,
   workId,
   zoom,
@@ -297,6 +301,11 @@ export function renderStudioCanvasStickyBanners({
                   : "불러오기가 끝날 때까지 편집·저장·가져오기·내보내기를 잠급니다."
                 : "이전 계정이나 다른 작품의 캔버스는 표시·내보내지 않습니다."}
             </span>
+            {sourceHydrationPending && workHydrationFailed && workHydrationError ? (
+              <span role="alert" className="mt-2 block text-xs leading-relaxed text-warn">
+                {workHydrationError}
+              </span>
+            ) : null}
             {sourceHydrationPending && workHydrationFailed ? (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <button
@@ -312,7 +321,11 @@ export function renderStudioCanvasStickyBanners({
                       navigate(`/create/${encodeURIComponent(remixId)}`);
                       return;
                     }
-                    globalThis.location.reload();
+                    if (onRetrySourceHydration) {
+                      onRetrySourceHydration();
+                    } else {
+                      globalThis.location.reload();
+                    }
                   }}
                   className="min-h-11 rounded-lg border border-line bg-card px-4 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
