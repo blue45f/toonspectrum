@@ -44,6 +44,13 @@ const DRAWER_BUTTONS: readonly { readonly id: DrawerMode; readonly label: string
 ];
 
 const NOTICE_MS = 9000;
+const PSD_PROGRESS_LABELS: Readonly<Record<string, string>> = {
+  beauty: "미리보기", flat: "밑색", shading: "음영·하이라이트", line: "주선",
+  shadow: "음영", highlight: "하이라이트", "surface-paint": "표면 드로잉",
+  "mask-face": "얼굴 마스크", "mask-eyes": "눈 마스크", "mask-hair": "머리카락 마스크",
+  "mask-skin": "피부 마스크", "mask-top": "상의 마스크", "mask-bottom": "하의 마스크",
+  "mask-shoes": "신발 마스크", "mask-accessory": "액세서리 마스크",
+};
 
 const BUTTON = cn(
   "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.74rem] font-semibold text-fg-2",
@@ -247,6 +254,12 @@ export function CharacterShaperOutputDock({
             capture: { gl: capture.gl as never, scene: capture.scene as never, camera: exportCamera },
             vrm: h.vrm, width: size.width, height: size.height, title: modelName,
             signal: session.signal, assertCurrent: session.assertCurrent,
+            onProgress: ({ pass, phase, completed, total }) => {
+              if (!aliveRef.current || exportRef.current !== session || session.signal.aborted) return;
+              const label = PSD_PROGRESS_LABELS[pass] ?? "레이어";
+              const percent = total > 0 ? Math.round(Math.min(1, Math.max(0, completed / total)) * 100) : 0;
+              setProgress(`PSD ${label} ${phase === "render" ? "렌더링" : "계산"} 중 · ${percent}%`);
+            },
             onCaptured: () => {
               releaseHelpers?.();
               releaseHelpers = undefined;
