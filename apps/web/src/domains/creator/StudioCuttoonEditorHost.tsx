@@ -1,4 +1,5 @@
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
+import { useStudioAdjustmentLayerCommands } from "./useStudioAdjustmentLayerCommands";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
 import { useStudioRecentColors } from "./useStudioRecentColors";
@@ -24933,6 +24934,11 @@ function clearSelectionForEdit() {
       announceDrawingShortcut("현재 페이지 필터 미리보기를 준비하고 있어요");
       return;
     }
+    if (selected?.type === "image" && selected.adjustmentLayer) {
+      openSelectedLayerAdjustments();
+      announceDrawingShortcut("보정 레이어의 필터 관리에서 효과를 추가하거나 편집하세요.");
+      return;
+    }
     // Keyboard commands can bypass menu intent; fetch the dialog alongside raster preparation.
     preloadStudioFilterDialog();
   const selectedAnimated = selected?.type === "image" &&
@@ -25330,6 +25336,14 @@ function clearSelectionForEdit() {
   function handleImportProjectArchive(event: React.ChangeEvent<HTMLInputElement>) {
     return projectArchiveOrchestration.handleImportProjectArchive(event);
   }
+  const createAdjustmentLayer = useStudioAdjustmentLayerCommands({
+    getElements: () => (pagesHistoryRef.current[pagesHiRef.current] ?? pages).find((page) => page.id === currentPageIdRef.current)?.elements ?? elements,
+    prepare: () => !pendingStrokeCommitsRef.current || flushPendingStrokeCommitsRef.current(),
+    width: CANVAS_W, height: canvasH, commit, isDrawing: canvasEditingGestureIsOwned,
+    canMutate: () => !masterEditMode && !collaborationAccessRef.current.locked && !activeSurfaceReviewLocked,
+    select: (id) => { setSelectedId(id); setMarqueeIds([]); activatePrimaryCanvasTool("select"); },
+    closeMenu: () => setMenu(null), setError,
+  });
   const { openSmartShapeEditor, smartShapeDialog } = useStudioSmartShapeEditing({
     elements, selectedId, currentPageId: () => currentPageIdRef.current,
     isDrawing: canvasEditingGestureIsOwned,
@@ -25346,6 +25360,7 @@ function clearSelectionForEdit() {
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
+    createAdjustmentLayer,
     openSmartShapeEditor,
     activatePrimaryCanvasTool,
     addPage,
@@ -25783,9 +25798,8 @@ function clearSelectionForEdit() {
             preloadStudioAssetMenuPanel();
             setMenu("template");
           },
-          requestImageInsert: () => {
-            editMenuImageInputRef.current?.click();
-          },
+          createAdjustmentLayer: studioMainMenuActions.createAdjustmentLayer,
+          requestImageInsert: () => editMenuImageInputRef.current?.click(),
           openMannequinPoser: () => setMannequinPoserOpen(true),
           openReferencePanel: () => {
             preloadStudioReferencePanel();
@@ -26203,6 +26217,7 @@ function clearSelectionForEdit() {
         {
           scale: exportScale,
           background: { color: capturedPage.bg, gradient: capturedPage.bgGrad },
+          pageGrade: capturedPage.grade,
         }
       );
     } finally {
@@ -26956,13 +26971,13 @@ function clearSelectionForEdit() {
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
       layerMaskPaintArmed || filterMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
-    postProcessingActive: pageGrade.vignette > 0,
+    postProcessingActive: pageGrade.vignette > 0 || elements.some((element) => element.type === "image" && element.adjustmentLayer),
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
     editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
     bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, filterMaskPaintArmed, quickMaskArmed, historyBrushArmed,
-    puppetWarpArmed, pageGrade.vignette,
+    puppetWarpArmed, pageGrade.vignette, elements,
   ]);
   const {
     visibleDocumentRect: studioRasterVisibleDocumentRect,

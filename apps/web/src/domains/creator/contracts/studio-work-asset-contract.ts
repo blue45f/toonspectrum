@@ -1,4 +1,8 @@
+import { StudioWorkAssetSmartFiltersSchema } from "./studio-smart-filter-stack-contract";
+import { StudioLiveAdjustmentMetadataSchema } from "./studio-live-adjustment-contract";
 import { z } from "zod";
+
+export { StudioWorkAssetSmartFiltersSchema } from "./studio-smart-filter-stack-contract";
 
 export const STUDIO_WORK_ASSET_CONTRACT_VERSION = 1 as const;
 export const STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN =
@@ -121,6 +125,7 @@ export const STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS = [
   "lineCleanup",
   "screentoneRemoval",
   "smartFilters",
+  "adjustmentLayer",
 ] as const;
 export type StudioWorkAssetStructuredEditKey =
   (typeof STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS)[number];
@@ -136,87 +141,7 @@ const StudioWorkAssetScalarFiltersSchema = z.object(Object.fromEntries(
   [Key in keyof typeof STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES]: z.ZodOptional<z.ZodNumber>;
 });
 
-const STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS = [
-  "curves",
-  "levels",
-  "brightness-contrast",
-  "hue-saturation",
-  "color-balance",
-  "channel-mixer",
-  "gradient-map",
-  "blur",
-  "gaussian-blur",
-  "motion-blur",
-  "spin-blur",
-  "zoom-blur",
-  "lens-blur",
-  "field-iris-blur",
-  "tilt-shift-blur",
-  "selective-gaussian-blur",
-  "tileable-blur",
-  "sharpen",
-  "smart-sharpen",
-  "median-despeckle",
-  "high-pass",
-  "noise",
-  "invert",
-  "grayscale",
-  "sepia",
-  "pixelate",
-  "posterize",
-  "ink-threshold",
-  "line-extraction",
-  "line-cleanup",
-  "screentone-removal",
-  "jpeg-artifact-reduction",
-  "edge-aware-denoise",
-  "dust-scratches",
-  "difference-of-gaussians",
-  "color-to-alpha",
-  "screentone",
-  "color-halftone",
-  "chromatic-aberration",
-  "edge-detect",
-  "emboss",
-  "solarize",
-  "oil-paint",
-  "exposure",
-  "unsharp-mask",
-  "morphology",
-  "offset",
-  "custom-convolution",
-  "clouds",
-] as const;
 
-const StudioWorkAssetAdjustmentParamSchema = z.union([
-  z.number().finite(),
-  z.string().max(128),
-  z.boolean(),
-]);
-
-const StudioWorkAssetAdjustmentParamsSchema = z
-  .record(z.string().min(1).max(48), StudioWorkAssetAdjustmentParamSchema)
-  .superRefine((params, context) => {
-    if (Object.keys(params).length > 16) {
-      context.addIssue({
-        code: "custom",
-        message: "스마트 필터 매개변수가 안전 한도를 넘었습니다.",
-      });
-    }
-  });
-
-export const StudioWorkAssetSmartFiltersSchema = z
-  .object({
-    version: z.literal(1),
-    entries: z.array(z.object({
-      id: z.string().min(1).max(80),
-      engine: z.enum(STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS),
-      enabled: z.boolean(),
-      opacity: z.number().finite().min(0).max(1).optional(),
-      params: StudioWorkAssetAdjustmentParamsSchema,
-    }).strict()).max(24),
-  })
-  .strict();
 
 export const StudioWorkAssetBlurFxSchema = z
   .object({
@@ -468,7 +393,8 @@ export type StudioWorkAssetStructuredEditValue =
   | z.infer<typeof StudioWorkAssetJpegArtifactReductionSchema>
   | z.infer<typeof StudioWorkAssetLineCleanupSchema>
   | z.infer<typeof StudioWorkAssetScreentoneRemovalSchema>
-  | z.infer<typeof StudioWorkAssetSmartFiltersSchema>;
+  | z.infer<typeof StudioWorkAssetSmartFiltersSchema>
+  | z.infer<typeof StudioLiveAdjustmentMetadataSchema>;
 
 /** Parses and clones one structured reference edit through its exact bounded wire schema. */
 export function parseStudioWorkAssetStructuredEditValue(
@@ -508,6 +434,8 @@ export function parseStudioWorkAssetStructuredEditValue(
       return StudioWorkAssetLineCleanupSchema.parse(value);
     case "screentoneRemoval":
       return StudioWorkAssetScreentoneRemovalSchema.parse(value);
+    case "adjustmentLayer":
+      return StudioLiveAdjustmentMetadataSchema.parse(value);
     case "smartFilters":
       return StudioWorkAssetSmartFiltersSchema.parse(value);
   }
@@ -567,6 +495,7 @@ export const StudioWorkAssetElementSchema = z
     lineCleanup: StudioWorkAssetLineCleanupSchema.optional(),
     screentoneRemoval: StudioWorkAssetScreentoneRemovalSchema.optional(),
     smartFilters: StudioWorkAssetSmartFiltersSchema.optional(),
+    adjustmentLayer: StudioLiveAdjustmentMetadataSchema.optional(),
     ...StudioWorkAssetScalarFiltersSchema.shape,
   })
   .strict()

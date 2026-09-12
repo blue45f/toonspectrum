@@ -1,3 +1,4 @@
+import { StudioLiveAdjustmentMetadataSchema } from "./contracts/studio-live-adjustment-contract";
 /**
  * Studio Page Meta & Element Clipboard — 페이지 메타(이름·콘티 메모)와
  * 요소 클립보드(⌘C/⌘V 페이지 간 복사)의 순수 로직 (PPT급 편집 UX).
@@ -343,6 +344,8 @@ function hasSafeImageClipboardOptionals(value: Record<string, unknown>): boolean
     && (!isRecord(value.vrmScene) || serializeStudioVrmSceneDocument(value.vrmScene) === null)
   ) return false;
   if (value.smartFilters !== undefined && !isRecord(value.smartFilters)) return false;
+  if (value.adjustmentLayer !== undefined
+    && !StudioLiveAdjustmentMetadataSchema.safeParse(value.adjustmentLayer).success) return false;
   if (value.frames !== undefined) {
     if (!Array.isArray(value.frames) || value.frames.length > 60) return false;
     for (const frame of value.frames) {
