@@ -1,0 +1,56 @@
+name: API main integration audit
+on:
+  push:
+    branches: [work/api-merge-audit-20260913]
+    paths: [.github/workflows/api-merge-audit.yml]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Record exact refs, changed blobs and overlapping source files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json, pathlib, urllib.request
+          import os
+          root = pathlib.Path('artifacts/integration-audit')
+          root.mkdir(parents=True)
+          api = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          def read(path):
+              request = urllib.request.Request(api + path, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+          head = '6c7d126aaddedec893fd33f3bf8d098a9f9f9b3f'
+          base = 'a6a1f1b3d14265a9f43a3a8e2d93c45a15d237c0'
+          main = read('git/ref/heads/main')['object']['sha']
+          feature = read('compare/' + base + '...' + head + '?per_page=1')
+          upstream = read('compare/' + base + '...' + main + '?per_page=1')
+          assert len(feature['files']) < 300 and len(upstream['files']) < 300
+          changed = {item['filename'] for item in feature['files']}
+          overlaps = sorted(changed & {item['filename'] for item in upstream['files']})
+          result = {'head': head, 'main': main, 'base': base, 'mainTree': read('git/commits/' + main)['tree']['sha'], 'overlaps': overlaps,
+                    'files': [{key: item.get(key) for key in ('filename','sha','status','previous_filename')} for item in feature['files']]}
+          for name in overlaps:
+              for label, ref in [('base', base), ('head', head), ('main', main)]:
+                  data = read('contents/' + name + '?ref=' + ref)
+                  target = root / label / name
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(base64.b64decode(data['content']))
+          (root / 'audit.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result, indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: api-main-integration-audit
+          path: artifacts/integration-audit
+          if-no-files-found: error
+          retention-days: 1
