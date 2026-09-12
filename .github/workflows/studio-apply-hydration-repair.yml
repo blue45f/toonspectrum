@@ -25,6 +25,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           mkdir -p "$RUNNER_TEMP/repair-results"
           python3 scripts/__diag/apply-studio-hydration-repair.py
+          python3 scripts/__diag/finalize-studio-hydration-repair.py
           git add -- apps/web/src scripts/verify-studio-brushes.mts
           git diff --cached --check
           git diff --cached --stat > "$RUNNER_TEMP/repair-results/changes.txt"
@@ -40,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec vitest run apps/web/src/infrastructure/creator-work-read-options.test.ts apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts apps/web/src/domains/creator/studio-shared-document-client.test.ts apps/web/src/domains/creator/studio-release-schedule-loader.test.ts apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx 2>&1 | tee "$RUNNER_TEMP/repair-results/tests.log"
+          pnpm exec vitest run apps/web/src/infrastructure/creator-work-read-options.test.ts apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts apps/web/src/domains/creator/studio-shared-document-client.test.ts apps/web/src/domains/creator/studio-release-schedule-loader.test.ts apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx 2>&1 | tee "$RUNNER_TEMP/repair-results/tests.log"
       - name: Strict lint reviewed sources
         shell: bash
         run: |
