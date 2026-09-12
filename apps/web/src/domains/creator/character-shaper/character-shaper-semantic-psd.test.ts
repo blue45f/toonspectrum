@@ -378,12 +378,61 @@ describe("character shaper semantic capture — passes", () => {
     );
 
     const byId = new Map(passes.map((entry) => [entry.id, entry]));
-    // pixel 0 is 60 darker in beauty → shadow; pixel 1 is 95 brighter → highlight.
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(0, 4)]).toEqual([60, 60, 60, 60]);
-    expect([...(byId.get("shadow")?.rgba ?? []).slice(4, 8)]).toEqual([0, 0, 0, 0]);
-    expect([...(byId.get("highlight")?.rgba ?? []).slice(4, 8)]).toEqual([95, 95, 95, 95]);
+    const shadow = byId.get("shadow")!.rgba;
+    const highlight = byId.get("highlight")!.rgba;
+    const flat = byId.get("flat")!.rgba;
+    // Apply the actual PSD blend modes independently. Difference pixels alone cannot reproduce
+    // the beauty pass; normalized Multiply and Screen layers should match within RGBA8 rounding.
+    for (let index = 0; index < flat.length; index += 4) {
+      if (flat[index + 3] !== 255 || BEAUTY[index + 3] !== 255) continue;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const source = flat[index + channel];
+        const shadowAlpha = shadow[index + 3] / 255;
+        const dark = source * (1 - shadowAlpha + shadowAlpha * shadow[index + channel] / 255);
+        const highlightAlpha = highlight[index + 3] / 255;
+        const composite = dark + (255 - dark) * highlight[index + channel] / 255 * highlightAlpha;
+        expect(Math.abs(Math.round(composite) - BEAUTY[index + channel])).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(shadow[3]).toBe(255);
+    expect(shadow[7]).toBe(0);
+    expect(highlight[7]).toBe(255);
     expect(byId.get("line")).toBeDefined();
     expect(byId.get("beauty")?.rgba).toEqual(BEAUTY);
+  });
+
+  it("keeps the interior of dark hair or clothes transparent in the line layer", async () => {
+    const size = 9;
+    const raster = new Uint8ClampedArray(size * size * 4);
+    for (let y = 1; y < size - 1; y += 1) {
+      for (let x = 1; x < size - 1; x += 1) {
+        raster.set([12, 12, 12, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer(() => raster.slice()).dependencies,
+    );
+    const line = passes.find((pass) => pass.id === "line")!.rgba;
+    expect(line[(4 * size + 4) * 4 + 3]).toBe(0);
+    expect(line[(4 * size + 1) * 4 + 3]).toBeGreaterThan(0);
+  });
+
+  it("does not duplicate a toon shadow boundary into the line layer", async () => {
+    const size = 9;
+    const flat = new Uint8ClampedArray(size * size * 4).fill(255);
+    const beauty = flat.slice();
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < 4; x += 1) {
+        beauty.set([80, 80, 80, 255], (y * size + x) * 4);
+      }
+    }
+    const { passes } = await captureCharacterSemanticPasses(
+      { ...baseInput(buildCharacterScene()), width: size, height: size },
+      fakeRenderer((_observation, call) => (call === 0 ? beauty : flat).slice()).dependencies,
+    );
+    expect(passes.some((pass) => pass.id === "shadow")).toBe(true);
+    expect(passes.some((pass) => pass.id === "line")).toBe(false);
   });
 
   it("names the passes a model cannot produce instead of faking them", async () => {
@@ -453,6 +502,22 @@ describe("character shaper semantic capture — passes", () => {
     expect(`#${scene.materials.face.color.getHexString()}`).toBe("#f0c8a8");
     expect(`#${scene.materials.face.shadeColorFactor.getHexString()}`).toBe("#c89878");
     expect(scene.materials.face.shadingShiftFactor).toBe(-0.25);
+  });
+
+  it("rejects a stale editing authority before the next pass and restores temporary shading", async () => {
+    const scene = buildCharacterScene();
+    const before = observe(scene.capture.scene);
+    const renderer = fakeRenderer();
+    let checks = 0;
+    await expect(captureCharacterSemanticPasses({
+      ...baseInput(scene),
+      assertCurrent: () => {
+        checks += 1;
+        if (checks > 1) throw new Error("캐릭터가 바뀌었습니다");
+      },
+    }, renderer.dependencies)).rejects.toThrow("캐릭터가 바뀌었습니다");
+    expect(renderer.observations).toHaveLength(1);
+    expect(observe(scene.capture.scene)).toEqual(before);
   });
 
   it("aborts between passes and leaves the scene untouched", async () => {

@@ -1,7 +1,7 @@
 /**
  * Browser evidence for the Character Shaper surface.
  *
- * Drives /studio/character in headless Chromium (SwiftShader), loads the bundled sample VRM,
+ * Drives /studio/character in headless Chromium, loads the bundled sample VRM,
  * commits slot cards, checks the viewport pixels actually change, exercises transparent PNG and
  * semantic PSD export, and records desktop + mobile screenshots.
  *
@@ -10,7 +10,7 @@
  * Otherwise it spawns `vite preview` after `pnpm build`.
  */
 import { type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { readPsd } from "ag-psd";
@@ -41,6 +41,11 @@ const SWIFTSHADER_ARGS = [
   "--enable-unsafe-swiftshader",
   "--ignore-gpu-blocklist",
 ];
+const GPU_LANE = process.env.TOONSPECTRUM_CHARACTER_GPU_LANE
+  ?? (process.platform === "darwin" ? "native" : "swiftshader");
+if (GPU_LANE !== "native" && GPU_LANE !== "swiftshader") {
+  throw new Error("TOONSPECTRUM_CHARACTER_GPU_LANE must be native or swiftshader");
+}
 
 /**
  * The image ships one Chromium build under PLAYWRIGHT_BROWSERS_PATH. When the installed
@@ -50,9 +55,11 @@ const SWIFTSHADER_ARGS = [
 const CHROMIUM_PATH = process.env.TOONSPECTRUM_CHROMIUM_PATH ?? "/opt/pw-browsers/chromium";
 
 function launchOptions(): Parameters<typeof chromium.launch>[0] {
-  return existsSync(CHROMIUM_PATH)
-    ? { args: SWIFTSHADER_ARGS, executablePath: CHROMIUM_PATH }
-    : { args: SWIFTSHADER_ARGS };
+  return {
+    headless: true,
+    args: GPU_LANE === "native" ? ["--no-sandbox"] : SWIFTSHADER_ARGS,
+    executablePath: existsSync(CHROMIUM_PATH) ? CHROMIUM_PATH : chromium.executablePath(),
+  };
 }
 
 interface PixelStats {
@@ -75,7 +82,7 @@ function invariant(condition: boolean, message: string): void {
  * does — this keeps image decoding out of Node.
  */
 async function viewportStats(page: Page): Promise<PixelStats> {
-  const shot = await page.locator(`${DIALOG} [data-character-shaper-viewport]`).first().screenshot();
+  const shot = await page.locator(`${DIALOG} [data-character-shaper-viewport] canvas`).first().screenshot();
   return page.evaluate(async (encodedPng) => {
     const response = await fetch(`data:image/png;base64,${encodedPng}`);
     const bitmap = await createImageBitmap(await response.blob());
@@ -144,6 +151,100 @@ async function accessibleNameGaps(page: Page): Promise<string[]> {
   });
 }
 
+/** Outer overflow:hidden can hide broken children without increasing document.scrollWidth. */
+async function mobileChromeBounds(page: Page, exportOpen: boolean) {
+  return page.evaluate(({ dialogSelector, exportOpen }) => {
+    const root = document.querySelector<HTMLElement>(`${dialogSelector} [data-character-shaper-surface]`);
+    if (!root) throw new Error("character dialog surface missing");
+    const frame = root.getBoundingClientRect();
+    const violations: string[] = [];
+    const controls: { name: string; x: number; y: number; width: number; height: number }[] = [];
+    const selectors = [
+      "[data-character-shaper-summary] button",
+      "[data-character-shaper-dock] button",
+      ...(exportOpen ? ["[data-character-export-sheet] select"] : [
+        '[aria-label="뷰포트 보기 설정"] button',
+        'select[aria-label="부위·방향 확대 검사"]',
+        "[data-character-quality-trigger]",
+      ]),
+    ];
+    const elements = new Set(selectors.flatMap((selector) => [...root.querySelectorAll<HTMLElement>(selector)]));
+    for (const element of elements) {
+      const rect = element.getBoundingClientRect();
+      const name = element.getAttribute("aria-label") || element.textContent?.trim() || element.tagName;
+      controls.push({ name, x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      if (rect.width < 43.5 || rect.height < 43.5) violations.push(`${name}: target smaller than 44px`);
+      if (rect.left < frame.left - 0.5 || rect.right > frame.right + 0.5 || rect.top < frame.top - 0.5 || rect.bottom > frame.bottom + 0.5) {
+        violations.push(`${name}: outside dialog surface`);
+      }
+      let ancestor = element.parentElement;
+      while (ancestor && root.contains(ancestor)) {
+        const style = getComputedStyle(ancestor);
+        const bounds = ancestor.getBoundingClientRect();
+        if (/(hidden|clip|auto|scroll)/u.test(style.overflowX) && (rect.left < bounds.left - 0.5 || rect.right > bounds.right + 0.5)) {
+          violations.push(`${name}: horizontally clipped by ${ancestor.tagName}`);
+        }
+        if (/(hidden|clip|auto|scroll)/u.test(style.overflowY) && (rect.top < bounds.top - 0.5 || rect.bottom > bounds.bottom + 0.5)) {
+          violations.push(`${name}: vertically clipped by ${ancestor.tagName}`);
+        }
+        ancestor = ancestor.parentElement;
+      }
+      // Check both center and near-corner taps: a floating launcher can obscure only half a button.
+      for (const [x, y] of [[rect.left + rect.width / 2, rect.top + rect.height / 2],
+        [rect.left + 6, rect.top + 6], [rect.right - 6, rect.bottom - 6]]) {
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || (hit !== element && !element.contains(hit))) {
+          violations.push(`${name}: tap intercepted by ${hit?.getAttribute("aria-label") || hit?.tagName || "nothing"}`);
+          break;
+        }
+      }
+    }
+    if (!exportOpen && !root.querySelector("[data-character-quality-launcher] [data-character-quality-trigger]")) {
+      violations.push("mobile quality launcher must be in the sheet header");
+    }
+    const sheet = root.querySelector<HTMLElement>("[data-character-export-sheet]");
+    if (exportOpen) {
+      if (!sheet) violations.push("export sheet missing");
+      else {
+        const bounds = sheet.getBoundingClientRect();
+        if (bounds.left < frame.left || bounds.right > frame.right || sheet.scrollWidth > sheet.clientWidth + 1) {
+          violations.push("export sheet or its content overflows the dialog");
+        }
+        const help = sheet.querySelector<HTMLElement>("[data-character-export-size-help]");
+        if (!help || help.scrollWidth > help.clientWidth + 1) violations.push("export resolution help is clipped");
+      }
+    }
+    return { width: innerWidth, exportOpen, controls, violations };
+  }, { dialogSelector: DIALOG, exportOpen });
+}
+
+async function downloadedPngStats(page: Page, path: string) {
+  return page.evaluate(async (encodedPng) => {
+    const response = await fetch(`data:image/png;base64,${encodedPng}`);
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("2D context unavailable");
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    let transparent = 0;
+    let opaque = 0;
+    for (let offset = 3; offset < data.length; offset += 4) {
+      if (data[offset] === 0) transparent += 1;
+      else if (data[offset] > 250) opaque += 1;
+    }
+    const total = data.length / 4;
+    const corner = (x: number, y: number) => data[(y * bitmap.width + x) * 4 + 3];
+    const result = {
+      width: bitmap.width, height: bitmap.height,
+      transparentShare: transparent / total, opaqueShare: opaque / total,
+      corners: [corner(0, 0), corner(bitmap.width - 1, 0), corner(0, bitmap.height - 1), corner(bitmap.width - 1, bitmap.height - 1)],
+    };
+    bitmap.close();
+    return result;
+  }, readFileSync(path).toString("base64"));
+}
+
 async function openShaper(page: Page, origin: string): Promise<void> {
   await page.goto(`${origin}/studio/character`, { waitUntil: "domcontentloaded", timeout: 180_000 });
   await page.waitForSelector(DIALOG, { timeout: 300_000 });
@@ -162,7 +263,10 @@ async function main(): Promise<void> {
     await waitForServer(`${origin}/`, { timeoutMs: 60_000 });
   }
   const browser: Browser = await chromium.launch(launchOptions());
-  const evidence: Record<string, unknown> = { origin, capturedAt: new Date().toISOString() };
+  const evidence: Record<string, unknown> = {
+    origin, capturedAt: new Date().toISOString(),
+    browserVersion: browser.version(), browserLaunch: launchOptions(),
+  };
   try {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "ko-KR", acceptDownloads: true });
     await ctx.addInitScript({ content: "globalThis.__name ??= (value) => value;" });
@@ -174,6 +278,18 @@ async function main(): Promise<void> {
     evidence.consoleErrors = consoleErrors;
     page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message}`));
     await openShaper(page, origin);
+    const rendererIdentity = await page.locator(`${DIALOG} canvas`).first().evaluate((canvas) => {
+      const gl = (canvas as HTMLCanvasElement).getContext("webgl2");
+      if (!gl) return { backend: "unknown" };
+      const extension = gl.getExtension("WEBGL_debug_renderer_info");
+      return { backend: "webgl2", renderer: extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) };
+    });
+    evidence.renderer = { ...rendererIdentity, lane: GPU_LANE };
+    const rendererName = String(rendererIdentity.renderer);
+    const laneMatches = GPU_LANE === "swiftshader" ? /swiftshader/iu.test(rendererName)
+      : /apple|nvidia|amd|intel/iu.test(rendererName) && !/swiftshader|llvmpipe|software/iu.test(rendererName);
+    invariant(rendererIdentity.backend === "webgl2" && laneMatches,
+      `character fixture requires the declared ${GPU_LANE} WebGL2 lane: ${JSON.stringify(rendererIdentity)}`);
     await page.screenshot({ path: join(OUT_DIR, "character-desktop.png") });
 
     const before = await viewportStats(page);
@@ -208,7 +324,9 @@ async function main(): Promise<void> {
     await railPose.click();
     await page.screenshot({ path: join(OUT_DIR, "character-desktop-pose.png") });
 
-    evidence.accessibleNameGaps = await accessibleNameGaps(page);
+    const nameGaps = await accessibleNameGaps(page);
+    evidence.accessibleNameGaps = nameGaps;
+    invariant(nameGaps.length === 0, `character controls have no accessible name: ${nameGaps.join(", ")}`);
 
     // 투명 배경 PNG — 배경이 정말 비어 있는지는 알파로만 확인할 수 있다. "투명"이라 적어 놓고
     // 캔버스 색을 함께 구워 내보내는 것이 이 기능의 대표적인 실패 방식이다.
@@ -218,6 +336,8 @@ async function main(): Promise<void> {
       await page.waitForTimeout(500);
     }
     const pngButton = page.getByRole("button", { name: "PNG 저장" }).first();
+    const resolution = page.getByRole("combobox", { name: "파일 내보내기 해상도" });
+    invariant(await resolution.inputValue() === "2048", "character export must default to a 2048 px long edge");
     const pngDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await pngButton.click();
     const pngDownload: Download = await Promise.race([
@@ -227,38 +347,9 @@ async function main(): Promise<void> {
     ]);
     const pngPath = join(OUT_DIR, "character-export.png");
     await pngDownload.saveAs(pngPath);
-    const { readFileSync: readPngFile } = await import("node:fs");
-    const pngAlpha = await page.evaluate(async (encodedPng) => {
-      const response = await fetch(`data:image/png;base64,${encodedPng}`);
-      const bitmap = await createImageBitmap(await response.blob());
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("2D context unavailable");
-      context.drawImage(bitmap, 0, 0);
-      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
-      let transparent = 0;
-      let opaque = 0;
-      for (let offset = 3; offset < data.length; offset += 4) {
-        if (data[offset] === 0) transparent += 1;
-        else if (data[offset] > 250) opaque += 1;
-      }
-      const total = data.length / 4;
-      // 모서리는 캐릭터가 절대 닿지 않는 곳이다 — 여기가 불투명하면 배경이 함께 구워진 것이다.
-      const corner = (x: number, y: number) => data[(y * bitmap.width + x) * 4 + 3];
-      return {
-        width: bitmap.width,
-        height: bitmap.height,
-        transparentShare: transparent / total,
-        opaqueShare: opaque / total,
-        corners: [
-          corner(0, 0),
-          corner(bitmap.width - 1, 0),
-          corner(0, bitmap.height - 1),
-          corner(bitmap.width - 1, bitmap.height - 1),
-        ],
-      };
-    }, readPngFile(pngPath).toString("base64"));
+    const pngAlpha = await downloadedPngStats(page, pngPath);
     evidence.transparentPng = pngAlpha;
+    invariant(Math.max(pngAlpha.width, pngAlpha.height) === 2048, `PNG resolution regressed: ${pngAlpha.width}×${pngAlpha.height}`);
     invariant(
       pngAlpha.corners.every((alpha) => alpha === 0),
       `transparent PNG has an opaque corner: ${pngAlpha.corners.join(", ")}`,
@@ -269,20 +360,39 @@ async function main(): Promise<void> {
         + `(transparent ${pngAlpha.transparentShare.toFixed(3)}, opaque ${pngAlpha.opaqueShare.toFixed(3)})`,
     );
 
-    // PSD export
+    // The advertised 4K option must produce actual decoded 4096px content, at the same aspect.
+    await resolution.selectOption("4096");
+    const png4kDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
+    await pngButton.click();
+    const png4kDownload = await png4kDownloadPromise;
+    const png4kPath = join(OUT_DIR, "character-export-4096.png");
+    await png4kDownload.saveAs(png4kPath);
+    const png4k = await downloadedPngStats(page, png4kPath);
+    evidence.transparentPng4k = png4k;
+    invariant(Math.max(png4k.width, png4k.height) === 4096, `4K PNG resolution regressed: ${png4k.width}×${png4k.height}`);
+    invariant(Math.abs(png4k.width * pngAlpha.height - png4k.height * pngAlpha.width) <= 4096,
+      "4K export changed the 2048px composition aspect beyond integer-pixel rounding");
+    invariant(png4k.corners.every((alpha) => alpha === 0) && png4k.transparentShare > 0.1 && png4k.opaqueShare > 0.01,
+      "4K PNG must contain the character over transparent ground");
+    invariant(await pngButton.isEnabled(), "4K export did not release the editor capture lock");
+
+    // PSD export uses the same 2048px request as the first PNG for direct composition comparison.
+    await resolution.selectOption("2048");
     const psdButton = page.getByRole("button", { name: /PSD/ }).first();
     const downloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await psdButton.click();
     const download: Download = await downloadPromise;
     const psdPath = join(OUT_DIR, "character-export.psd");
     await download.saveAs(psdPath);
-    const { readFileSync } = await import("node:fs");
     const psd = readPsd(readFileSync(psdPath), { skipLayerImageData: true, skipCompositeImageData: true, skipThumbnail: true });
     const layerNames: string[] = [];
     const walk = (children: typeof psd.children) => children?.forEach((c) => { layerNames.push(c.name ?? "?"); walk(c.children); });
     walk(psd.children);
     evidence.psdLayers = layerNames;
+    evidence.psdDimensions = { width: psd.width, height: psd.height };
+    invariant(psd.width === pngAlpha.width && psd.height === pngAlpha.height, "PSD and PNG must preserve the same composition at 2048 px");
     invariant(layerNames.length >= 8, `PSD has too few layers: ${layerNames.join(", ")}`);
+    invariant(await pngButton.isEnabled(), "export did not release the editor capture lock");
 
     // Esc 순서 — 서랍이 열려 있으면 Esc는 서랍만 닫는다. 첫 Esc에 작업 전체가 닫히면
     // 참고 이미지를 보다가 실수로 편집 화면을 잃는다.
@@ -301,14 +411,38 @@ async function main(): Promise<void> {
 
     // Mobile
     const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "ko-KR", isMobile: true, hasTouch: true });
+    await mctx.addInitScript({ content: "globalThis.__name ??= (value) => value;" });
     await mctx.addInitScript(([q, m]) => {
       try { localStorage.setItem(q, "1"); localStorage.setItem(m, "1"); } catch { /* ignore */ }
     }, [QUICKSTART_KEY, MOBILE_HINT_KEY]);
     const mpage = await mctx.newPage();
+    mpage.on("pageerror", (error) => consoleErrors.push(`mobile pageerror: ${error.message}`));
     await openShaper(mpage, origin);
     await mpage.screenshot({ path: join(OUT_DIR, "character-mobile.png") });
     const overflow = await mpage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     invariant(!overflow, "mobile layout overflows horizontally");
+    const mobileBounds: Awaited<ReturnType<typeof mobileChromeBounds>>[] = [];
+    evidence.mobileControlBounds = mobileBounds;
+    const checkMobileBounds = async (exportOpen: boolean) => {
+      const result = await mobileChromeBounds(mpage, exportOpen);
+      mobileBounds.push(result);
+      invariant(result.violations.length === 0, `${result.width}px mobile controls: ${result.violations.join("; ")}`);
+    };
+    await checkMobileBounds(false);
+    await mpage.getByRole("button", { name: "내보내기 더 보기" }).click();
+    await mpage.getByRole("combobox", { name: "파일 내보내기 해상도" }).selectOption("1024");
+    await mpage.screenshot({ path: join(OUT_DIR, "character-mobile-export.png") });
+    await checkMobileBounds(true);
+    await mpage.setViewportSize({ width: 320, height: 740 });
+    await mpage.waitForTimeout(300);
+    await mpage.screenshot({ path: join(OUT_DIR, "character-mobile-320.png") });
+    invariant(await mpage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "320px mobile export layout overflows horizontally");
+    await checkMobileBounds(true);
+    await mpage.getByRole("button", { name: "내보내기 더 보기" }).click();
+    await checkMobileBounds(false);
+    await mpage.screenshot({ path: join(OUT_DIR, "character-mobile-320-controls.png") });
+    evidence.mobileWidths = [390, 320];
+    invariant(consoleErrors.length === 0, `character workflow page errors: ${consoleErrors.join("; ")}`);
     evidence.consoleErrors = consoleErrors;
     writeFileSync(RESULT_PATH, JSON.stringify(evidence, null, 2));
     console.log(`character shaper evidence → ${RESULT_PATH}`);

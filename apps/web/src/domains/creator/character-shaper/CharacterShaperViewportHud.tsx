@@ -120,7 +120,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         value={STUDIO_VRM_INSPECTION_VIEWS.some((view) => view.id === activeCameraId) ? activeCameraId : ""}
         onChange={(event) => { if (event.target.value) h.setActiveCameraId(event.target.value); }}
         className={cn(
-          "pointer-events-auto absolute left-2 top-16 min-h-11 max-w-[calc(100%-5rem)] rounded-xl border border-line/70 bg-panel/90 px-3 text-xs font-semibold text-fg shadow-sm backdrop-blur",
+          "pointer-events-auto absolute left-2 top-16 min-h-11 rounded-xl border border-line/70 bg-panel/90 px-3 text-xs font-semibold text-fg shadow-sm backdrop-blur",
+          compact ? "max-w-[calc(100%-7rem)]" : "max-w-[calc(100%-5rem)]",
           "disabled:cursor-not-allowed disabled:opacity-40",
           STUDIO_FOCUS_RING,
         )}
@@ -133,8 +134,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         role="group"
         aria-label="뷰포트 보기 설정"
         className={cn(
-          "pointer-events-auto absolute right-2 top-2 flex flex-col gap-1.5",
-          compact && "top-16",
+          "pointer-events-auto absolute right-2 gap-1.5",
+          compact ? "top-16 grid grid-cols-2" : "top-2 flex flex-col",
         )}
       >
         <button
@@ -186,7 +187,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         >
           {transparent ? <Eye size={17} aria-hidden /> : <EyeOff size={17} aria-hidden />}
         </button>
-        <div className="my-0.5 h-px w-full bg-line/70" aria-hidden />
+        <div className={cn("my-0.5 h-px w-full bg-line/70", compact && "hidden")} aria-hidden />
         <button
           type="button"
           aria-label="확대"

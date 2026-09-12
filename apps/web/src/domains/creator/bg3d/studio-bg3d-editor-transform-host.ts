@@ -5,6 +5,8 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
+import { readStudioBg3dSelectionBounds } from "./studio-bg3d-camera-selection";
 import { hasStudioBg3dSelectedAncestor } from "./studio-bg3d-template-instance";
 
 export function attachStudioBg3dEditorTransformHost(h) {
@@ -315,6 +317,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
   } = { ...R, ...h };
 
   const applyMultiSelectDelta = (snap: boolean) => {
+    if (!isStudioBg3dSceneEditReady(h)) return;
     const firstObj = primitiveObjectsRef.current.get(firstSelectedId!);
     const initialFirst = dragInitialFirstTransformRef.current;
     if (!firstObj || !initialFirst) return;
@@ -395,6 +398,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
     patch: Partial<Pick<BgPrimitive, "position" | "rotation" | "scale">>,
     options: { readonly snap?: boolean } = {}
   ) => {
+    if (!isStudioBg3dSceneEditReady(h)) return;
     const shouldSnap = options.snap !== false;
     setPrimitives((prev) =>
       prev.map((p) => {
@@ -422,6 +426,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
     patch: Partial<Pick<BgCustomModelInstance, "position" | "rotation" | "scale">>,
     options: { readonly snap?: boolean } = {}
   ) {
+    if (!isStudioBg3dSceneEditReady(h)) return;
     const shouldSnap = options.snap !== false;
     setCustomModels((prev) =>
       prev.map((m) => {
@@ -951,16 +956,15 @@ export function attachStudioBg3dEditorTransformHost(h) {
   }
   h.applyCameraPreset = applyCameraPreset;
   function focusSelectedEntity() {
-    if (selectedIds.size !== 1) {
-      setError("화면에 맞출 3D 객체를 하나만 선택해 주세요.");
+    if (captureInFlightRef.current || h.focusSelectionDisabledReason) {
+      setError(h.focusSelectionDisabledReason ?? "3D 장면 캡처가 끝난 뒤 화면 맞춤을 사용해 주세요.");
       return;
     }
-    const selectedId = selectedIds.values().next().value;
-    if (typeof selectedId !== "string") return;
-    const object = primitiveObjectsRef.current.get(selectedId);
-    const bounds = readStudioBg3dObjectWorldBounds(object);
+    const bounds = readStudioBg3dSelectionBounds(h.focusSelectionIds, (id) => (
+      readStudioBg3dObjectWorldBounds(primitiveObjectsRef.current.get(id), { visibleOnly: true })
+    ));
     const framing = viewportApiRef.current?.readFramingState() ?? null;
-    if (!object || !bounds || !framing) {
+    if (!bounds || !framing) {
       setError("선택한 객체의 실제 경계 또는 카메라 화면을 아직 준비하지 못했습니다. 모델이 표시된 뒤 다시 시도해 주세요.");
       return;
     }
@@ -968,6 +972,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
       camera: framing.view,
       bounds,
       viewportAspect: framing.viewportAspect,
+      exportAspectRatio: sceneBaseDocument.output.exportAspectRatio,
       ...(framing.orthographicFrustumAtZoomOne
         ? { orthographicFrustumAtZoomOne: framing.orthographicFrustumAtZoomOne }
         : {}),

@@ -1055,7 +1055,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   await page.waitForTimeout(500);
   assertCondition(
     babylonSpecialistRequests.length === 0,
-    `opening /studio eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
+    `opening /studio/canvas eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
   );
 
   const characterMenu = await openThreeDMenu(page);
@@ -3236,7 +3236,8 @@ async function main(): Promise<void> {
 
   const port = await findFreePort();
   const rootUrl = `http://127.0.0.1:${port}/`;
-  const studioUrl = `${rootUrl}studio`;
+  // /studio is the project home; the production editor now lives at its scoped route.
+  const studioUrl = `${rootUrl}studio/canvas`;
   const server: ChildProcess = spawn(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
     ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
@@ -3273,7 +3274,12 @@ async function main(): Promise<void> {
         );
       },
     );
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    browser = await chromium.launch({
+      headless: true,
+      // Use the pinned full Chromium; the old headless shell selects software ANGLE on macOS.
+      channel: "chromium",
+      args: ["--no-sandbox"],
+    });
     // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
     // locale so a developer machine or CI runner whose default locale is English does not turn a
     // healthy 3D runtime check into a menu-locator failure before either editor is opened.

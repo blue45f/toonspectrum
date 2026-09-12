@@ -23,7 +23,7 @@ import type { CharacterShaperMobileSheetProps } from "./character-shaper-ui-cont
 import { cn } from "@/shared/lib/utils";
 
 const SHEET_HEIGHT: Readonly<Record<CharacterShaperMobileSheetProps["state"], string>> = {
-  collapsed: "4.75rem",
+  collapsed: "6rem",
   half: "min(40dvh, 22rem)",
   full: "min(62dvh, 34rem)",
 };
@@ -74,7 +74,8 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
         />
       </button>
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-1.5">
-        <p className="truncate text-[0.8rem] font-bold text-fg">{title}</p>
+        <p className="min-w-0 flex-1 truncate text-[0.8rem] font-bold text-fg">{title}</p>
+        <div data-character-quality-launcher="true" className="shrink-0" />
         <button
           type="button"
           onClick={() => onStateChange(collapsed ? "half" : "collapsed")}

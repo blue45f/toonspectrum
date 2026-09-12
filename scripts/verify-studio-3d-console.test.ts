@@ -766,9 +766,9 @@ describe("3D WebGPU conformance browser boundary", () => {
     const webGpuProof = main.indexOf(
       "await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(",
     );
-    const normalBrowser = main.indexOf(
-      'browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });',
-    );
+    const normalBrowser = main.search(/browser = await chromium\.launch\(\{\s*headless: true,/u);
+    expect(main.slice(normalBrowser, main.indexOf("const context =", normalBrowser)))
+      .toContain('channel: "chromium"');
 
     expect(webGpuAttempt).toContain("await runStudio3dWebGpuShardWithCleanup(");
     expect(webGpuAttempt).toContain("await webGpuContext?.close()");

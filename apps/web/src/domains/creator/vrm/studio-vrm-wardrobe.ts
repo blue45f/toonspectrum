@@ -11,7 +11,6 @@
 import {
   sampleBodySilhouette,
   sanitizeBodySilhouette,
-  widestHalfWidth,
   type BodySilhouette,
   type BodySilhouetteRing,
 } from "./studio-vrm-body-silhouette";
@@ -769,7 +768,11 @@ export interface GarmentPart {
    * 골반에 매단 원통형 치마는 이 모드에서 밑단으로 갈수록 좌우 허벅지 본을 함께 따른다.
    * 생략한 파츠는 기존 관절 체인 웨이트 규칙을 그대로 사용한다.
    */
-  skinMode?: "lower-body-drape";
+  skinMode?: "lower-body-drape" | "shoulder-yoke";
+  /** Shoulder bridge ends at this arm; its horizontal axis is not a hips-to-chest axis. */
+  shoulderBone?: "leftUpperArm" | "rightUpperArm";
+  /** Anatomical joint interval along geometry-local Y, independent of garment coverage. */
+  skinJointRange?: readonly [number, number];
   /** 본 로컬 오프셋(미터). */
   offset: Vec3;
   /** 도형의 +Y축을 이 방향(본 로컬 단위 벡터)으로 정렬. 생략 시 그대로. */
@@ -868,12 +871,14 @@ function limbSleeve(
   const start = (opts.start ?? 0) - seat;
   const h = limb.len * (opts.coverage + seat);
   const center = scaleVec(limb.axis, limb.len * start + h / 2);
+  const centerAlongLimb = limb.len * start + h / 2;
   return {
     bone,
     shape: { kind: "cylinder", rTop: opts.r * (opts.flare ?? 1), rBottom: opts.r, h, open: true },
     offset: center,
     // +Y/rTop은 자식 관절(손목·발목), -Y/rBottom은 몸쪽이다. 플레어는 끝단에 적용한다.
     align: limb.axis,
+    skinJointRange: [-centerAlongLimb, limb.len - centerAlongLimb],
     color: opts.color,
     roughness: opts.roughness,
     metalness: opts.metalness,
@@ -959,9 +964,10 @@ function shoulderYokes(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentP
   }
   if (sleeveR <= 0) return [];
 
-  const y = m.spineToNeck * SHOULDER_YOKE_HEIGHT;
-  const ring = latheRing(sampleBodySilhouette(silhouette, torsoT(m, y)), cut.clearanceM);
-  const halfSpan = Math.max(widestHalfWidth(silhouette) + cut.clearanceM, m.shoulderW * 0.5);
+  const shoulderY = m.spineToNeck * SHOULDER_YOKE_HEIGHT;
+  const ring = latheRing(sampleBodySilhouette(silhouette, torsoT(m, shoulderY)), cut.clearanceM);
+  // Hip/chest width must never move a shoulder attachment away from its arm joint.
+  const halfSpan = m.shoulderW * 0.5;
   const lateral = lateralAxis(m);
   // A single cylinder across both shoulders reads as a horizontal tube. Two short,
   // tapered bridges leave the neck/clavicle silhouette open and only connect the shell
@@ -971,9 +977,15 @@ function shoulderYokes(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentP
   const span = Math.max(0.03, outer - inner);
   const innerRadius = sleeveR * SHOULDER_YOKE_OVER_SLEEVE * 1.08;
   const outerRadius = sleeveR * 1.01;
+  // Cloth spans the clavicle as a shallow cap. A full sleeve-radius horizontal tube extends
+  // above the shoulder into the neck and reads as two detached armour blocks in an arms-down pose.
+  const verticalScale = 0.5;
+  const y = shoulderY - innerRadius * verticalScale;
 
   return ([-1, 1] as const).map((side) => ({
     bone: "spine",
+    skinMode: "shoulder-yoke",
+    shoulderBone: side > 0 ? "leftUpperArm" : "rightUpperArm",
     shape: {
       kind: "lathe",
       profile: [
@@ -986,7 +998,7 @@ function shoulderYokes(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentP
     },
     offset: addVec(scaleVec(m.up, y), scaleVec(lateral, side * (inner + outer) * 0.5)),
     align: scaleVec(lateral, side),
-    squash: [1, 1, Math.min(0.9, Math.max(0.55, ring.depth))],
+    squash: [verticalScale, 1, Math.min(0.9, Math.max(0.55, ring.depth))],
     color: shell.color,
     roughness: shell.roughness,
     metalness: shell.metalness,

@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { resolveStudioBg3dFocusSelection } from "./studio-bg3d-camera-selection";
 
 export function bindStudioBg3dEditorLayoutViewModel(h) {
   const {
@@ -349,20 +350,19 @@ export function bindStudioBg3dEditorLayoutViewModel(h) {
             (placementSession.phase === "preview" && placementPreviewAsset !== null)
           ? "배치·물리·변형 작업이 끝난 뒤 줄자를 사용해 주세요."
           : null;
-  const focusSelectionDisabledReason = isCapturing || isBatchRenderingShots || isRestoringScene ||
-      physicsInteractionLocked
-    ? "다른 3D 작업이 끝난 뒤 화면 맞춤을 사용해 주세요."
-    : selectedIds.size !== 1 || !selectedEntity
-      ? "화면에 맞출 객체를 하나만 선택해 주세요."
-      : !effectivelyVisibleLayerIds.has(selectedEntity.id)
-        ? "숨겨진 객체는 화면에 맞출 수 없습니다."
-        : selectedCustomModel && !readyCloneIds.has(selectedCustomModel.id)
-          ? failedCloneIds.has(selectedCustomModel.id)
-            ? "선택한 모델 지오메트리를 불러오지 못했습니다."
-            : "선택한 모델 지오메트리를 준비하는 중입니다."
-          : !primitiveObjectsRef.current.has(selectedEntity.id)
-            ? "선택한 객체의 지오메트리를 준비하는 중입니다."
-            : null;
+  const focusSelection = resolveStudioBg3dFocusSelection({
+    selectedIds,
+    entities: layerListItems,
+    customModels,
+    visibleIds: effectivelyVisibleLayerIds,
+    readyModelIds: readyCloneIds,
+    failedModelIds: failedCloneIds,
+    registeredObjects: primitiveObjectsRef.current,
+    interactionLocked: isCapturing || isBatchRenderingShots || isRestoringScene ||
+      physicsInteractionLocked || isTransforming || placementSession.phase === "preview",
+  });
+  const focusSelectionDisabledReason = focusSelection.disabledReason;
+  h.focusSelectionIds = focusSelection.ids;
 
   let physicsSelectionUnavailableReason: string | null = null;
   if (selectedIds.size > STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES) {

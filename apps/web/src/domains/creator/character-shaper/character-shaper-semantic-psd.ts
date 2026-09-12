@@ -9,10 +9,10 @@
  *  - **flat** — the same frame with MToon shading neutralised (`shadeColorFactor` := base colour,
  *    `shadingShiftFactor`/`shadingToonyFactor` := 1). The light rig is untouched, so the only
  *    difference between the two frames is the toon shading itself.
- *  - **shadow** = `max(0, flat − beauty)` → 음영 (multiply) · **highlight** = `max(0, beauty − flat)`
- *    → 하이라이트 (screen).
- *  - **line** — Sobel over the beauty pass (alpha edge ∪ luminance edge) unioned with the near-black
- *    pixels of the flat pass, which is where MToon's outline draw survives shading neutralisation.
+ *  - **shadow/highlight** — normalized Multiply/Screen factors that reconstruct opaque beauty
+ *    from flat colour; translucent edges still require separate composite quality checks.
+ *  - **line** — Sobel over the flat pass (alpha edge ∪ luminance edge). Flat colour excludes toon
+ *    shadow boundaries. A dark surface is not itself ink: only its boundaries contribute.
  *  - **surface-paint** — only when the paint runtime hands over its paint-only textures.
  *  - **mask-**\* — one alpha silhouette per semantic group, rendered by hiding every other mesh.
  *
@@ -31,14 +31,11 @@ import { captureStudioVrmRgba } from "../vrm/studio-vrm-raster-capture";
 
 import {
   CHARACTER_INK_HEX,
-  CHARACTER_NEAR_BLACK_THRESHOLD,
   alphaOnly,
+  deriveCharacterShadingLayers,
   isEmptyPass,
   maskMultiply,
-  nearBlackAlpha,
   sobelEdgeAlpha,
-  subtractClamped,
-  unionAlpha,
 } from "./character-shaper-image-math";
 
 import type {
@@ -71,6 +68,8 @@ export interface CaptureCharacterSemanticPassesInput {
   readonly width: number;
   readonly height: number;
   readonly signal?: AbortSignal;
+  /** Reject a stale model or editing authority before every rendered pass. */
+  readonly assertCurrent?: () => void;
   /** Procedural wardrobe mounts; their meshes join 상의/하의/신발 masks. */
   readonly garmentRoots?: readonly THREE.Object3D[];
   /** Procedural prop mounts; their meshes join the 액세서리 mask. */
@@ -621,8 +620,11 @@ export async function captureCharacterSemanticPasses(
     if (isEmptyPass(rgba)) skipped.push({ pass: id, reason: emptyReason });
     else passes.push({ id, width, height, rgba });
   };
-  const render = () =>
-    dependencies.captureRgba(capture.gl, capture.scene, capture.camera, dimensions);
+  const render = () => {
+    if (signal?.aborted) throw abortError();
+    input.assertCurrent?.();
+    return dependencies.captureRgba(capture.gl, capture.scene, capture.camera, dimensions);
+  };
 
   if (signal?.aborted) throw abortError();
   const index = indexCharacterMeshes(vrm, input.garmentRoots ?? [], input.propRoots ?? []);
@@ -638,14 +640,12 @@ export async function captureCharacterSemanticPasses(
   const shadingReason = shading.count === 0
     ? "MToon(툰) 재질이 없어 음영과 하이라이트를 분리하지 못했습니다."
     : "빛과 그림자 차이가 없어 레이어를 만들지 않았습니다.";
-  record("shadow", subtractClamped(flat, beauty), shadingReason);
-  record("highlight", subtractClamped(beauty, flat), shadingReason);
+  const shadingLayers = deriveCharacterShadingLayers(flat, beauty);
+  record("shadow", shadingLayers.shadow, shadingReason);
+  record("highlight", shadingLayers.highlight, shadingReason);
   record(
     "line",
-    unionAlpha(
-      sobelEdgeAlpha(beauty, width, height, { inkColor: CHARACTER_INK_HEX }),
-      nearBlackAlpha(flat, CHARACTER_NEAR_BLACK_THRESHOLD),
-    ),
+    sobelEdgeAlpha(flat, width, height, { inkColor: CHARACTER_INK_HEX }),
     "외곽선으로 뽑을 만한 경계가 없습니다.",
   );
 
@@ -654,7 +654,7 @@ export async function captureCharacterSemanticPasses(
   if (!input.paintTextureProvider) {
     skipped.push({
       pass: "surface-paint",
-      reason: "표면 드로잉을 켜지 않아 드로잉 레이어를 만들지 않았습니다.",
+      reason: "독립된 표면 드로잉 텍스처가 제공되지 않아 드로잉 레이어를 만들지 않았습니다.",
     });
   } else if (!paint || paint.size === 0) {
     skipped.push({
@@ -886,5 +886,7 @@ export async function exportCharacterSemanticPsd(
   dependencies: CharacterSemanticCaptureDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<CharacterSemanticPsdResult> {
   const { passes, skipped } = await captureCharacterSemanticPasses(input, dependencies);
+  if (input.signal?.aborted) throw abortError();
+  input.assertCurrent?.();
   return buildCharacterSemanticPsd(passes, skipped, { title: input.title });
 }

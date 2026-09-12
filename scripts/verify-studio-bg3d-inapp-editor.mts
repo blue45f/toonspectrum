@@ -126,6 +126,124 @@ interface ProfileResult {
   readonly failures: readonly string[];
 }
 
+interface FramingProfileResult {
+  readonly id: string;
+  readonly fitMeanPixelDelta: number | null;
+  readonly undoMeanPixelDelta: number | null;
+  readonly guideAspectRatio: number | null;
+  readonly pageErrors: readonly string[];
+  readonly failures: readonly string[];
+}
+
+async function compareCompositedFrames(page: Page, left: Buffer, right: Buffer): Promise<number> {
+  return page.evaluate(async ([leftUrl, rightUrl]) => {
+    const pixels = async (url: string) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Could not decode framing evidence");
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      return { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
+    };
+    const [first, second] = await Promise.all([pixels(leftUrl), pixels(rightUrl)]);
+    if (first.width !== second.width || first.height !== second.height) {
+      throw new Error("Camera command changed the canvas dimensions during the comparison");
+    }
+    let delta = 0;
+    for (let index = 0; index < first.data.length; index += 4) {
+      delta += Math.abs(first.data[index] - second.data[index]);
+      delta += Math.abs(first.data[index + 1] - second.data[index + 1]);
+      delta += Math.abs(first.data[index + 2] - second.data[index + 2]);
+    }
+    return delta / (first.width * first.height * 3);
+  }, [left, right].map((buffer) => `data:image/png;base64,${buffer.toString("base64")}`));
+}
+
+/** Fresh contexts preserve the original in-app profiles' scene, selection, scroll and tab state. */
+async function verifyFramingProfile(
+  browser: Browser,
+  baseUrl: string,
+  profile: { readonly id: string; readonly width: number; readonly height: number; readonly mobile: boolean },
+): Promise<FramingProfileResult> {
+  const context = await browser.newContext({
+    viewport: { width: profile.width, height: profile.height },
+    ...(profile.mobile ? { ...INAPP_CONTEXT_OPTIONS, userAgent: PROFILES[0].userAgent } : {}),
+  });
+  const page = await context.newPage();
+  const failures: string[] = [];
+  const pageErrors: string[] = [];
+  let fitMeanPixelDelta: number | null = null;
+  let undoMeanPixelDelta: number | null = null;
+  let guideAspectRatio: number | null = null;
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  try {
+    await seedStudioPreferences(page);
+    await openBackground3d(page, baseUrl);
+    await selectWebGl2Engine(page);
+    // The backend badge reports the selected plan before R3F has created its renderer and
+    // restored the initial scene. Use the same painted-canvas readiness check as the original
+    // in-app profiles before building this framing fixture; otherwise late initial hydration
+    // can replace the just-added subject and its history with the initial empty document.
+    const initialCanvas = await readCanvasSignal(page);
+    if (initialCanvas.distinctColors < 3) {
+      throw new Error(`Framing fixture canvas has not painted (${initialCanvas.distinctColors} colours)`);
+    }
+    const dialog = page.getByTestId("studio-bg3d-dialog");
+    await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+    await dialog.getByRole("button", { name: "상자 추가", exact: true }).first().click();
+    for (const [axis, value] of [["X", "0.8"], ["Y", "6"], ["Z", "0.4"]]) {
+      const field = dialog.getByRole("spinbutton", { name: `크기 ${axis}`, exact: true }).first();
+      await field.fill(value);
+      // Vec3Field commits onChange, including on mobile; a physical Tab key is unnecessary.
+      if (Number(await field.inputValue()) !== Number(value)) {
+        throw new Error(`Framing fixture did not retain scale ${axis}=${value}`);
+      }
+    }
+    const reset = dialog.getByRole("button", { name: "시점 초기화", exact: true });
+    await reset.click();
+    const viewport = page.getByTestId("studio-bg3d-viewport");
+    const canvas = dialog.locator("canvas").first();
+    const capture = async (phase: string): Promise<Buffer> => {
+      await viewport.scrollIntoViewIfNeeded();
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(1_000);
+      return canvas.screenshot({ path: join(SCRATCH, `${profile.id}-${phase}.png`), type: "png" });
+    };
+    const baseline = await capture("before-fit");
+    await dialog.getByRole("button", { name: "선택 객체 화면 맞춤", exact: true }).click();
+    const fitted = await capture("fitted");
+    fitMeanPixelDelta = await compareCompositedFrames(page, baseline, fitted);
+    if (fitMeanPixelDelta <= 0.5) failures.push(`Screen fit did not visibly change the tall subject (${fitMeanPixelDelta})`);
+    await dialog.getByRole("button", { name: "실행 취소", exact: true }).click();
+    const restored = await capture("undo-restored");
+    undoMeanPixelDelta = await compareCompositedFrames(page, baseline, restored);
+    if (undoMeanPixelDelta > 1) failures.push(`Undo did not restore the baseline camera (${undoMeanPixelDelta} mean channel delta)`);
+    // none -> thirds -> verticalWebtoon. A physical SVG rect, not the normalized viewBox, is read.
+    const guideToggle = page.getByTestId("bg3d-composition-guide-toggle");
+    await guideToggle.click();
+    await guideToggle.click();
+    const guide = page.getByTestId("bg3d-vertical-webtoon-frame");
+    await guide.waitFor({ state: "visible", timeout: 5_000 });
+    const guideBox = await guide.boundingBox();
+    if (!guideBox || guideBox.height <= 0) throw new Error("Vertical composition guide has no physical bounds");
+    guideAspectRatio = guideBox.width / guideBox.height;
+    if (Math.abs(guideAspectRatio - 9 / 16) > 0.003) {
+      failures.push(`Vertical composition guide is ${guideAspectRatio}, expected physical 9:16`);
+    }
+    await viewport.screenshot({ path: join(SCRATCH, `${profile.id}-vertical-guide.png`) });
+  } catch (error) {
+    failures.push(error instanceof Error ? error.message : String(error));
+    await page.screenshot({ path: join(SCRATCH, `${profile.id}-failure.png`), timeout: 5_000 }).catch(() => undefined);
+  } finally {
+    await context.close();
+  }
+  if (pageErrors.length > 0) failures.push(`page errors: ${pageErrors.join("; ")}`);
+  return { id: profile.id, fitMeanPixelDelta, undoMeanPixelDelta, guideAspectRatio, pageErrors, failures };
+}
+
 interface NativeTouchEventSample {
   type: string;
   target: string;
@@ -741,14 +859,20 @@ async function main(): Promise<void> {
     });
     const results: ProfileResult[] = [];
     for (const profile of PROFILES) results.push(await runProfile(browser, baseUrl, profile));
+    const framingProfiles: FramingProfileResult[] = [];
+    for (const profile of [
+      { id: "framing-desktop", width: 1_440, height: 1_000, mobile: false },
+      { id: "framing-mobile", width: 390, height: 844, mobile: true },
+    ]) framingProfiles.push(await verifyFramingProfile(browser, baseUrl, profile));
 
-    const failures = results.flatMap((result) => result.failures.map((f) => `${result.id}: ${f}`));
+    const failures = [...results, ...framingProfiles].flatMap((result) => result.failures.map((f) => `${result.id}: ${f}`));
     const summary = {
       status: failures.length === 0 ? "ok" : "failed",
       browserVersion: browser.version(),
       execution: EXECUTION_ENVIRONMENT,
       contextOptions: INAPP_CONTEXT_OPTIONS,
       profiles: results,
+      framingProfiles,
       failures,
       evidenceDirectory: SCRATCH,
     };
