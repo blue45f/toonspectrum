@@ -14,7 +14,9 @@ jobs:
   apply:
     if: github.ref == 'refs/heads/feat/brush-material-engine-20260913'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
       - name: Verify exact source digest before applying
@@ -27,8 +29,7 @@ jobs:
           out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'brush-source-transfer'
           out.mkdir()
           (out / 'received.b64').write_text(payload)
-          repair_path = root / '.github/brush-material-repairs.json'
-          repairs = json.loads(repair_path.read_text()) if repair_path.exists() else []
+          repairs = json.loads((root / '.github/brush-material-repairs.json').read_text())
           for item in sorted(repairs, key=lambda r: r['offset'], reverse=True):
             start, count = item['offset'], item['remove']
             assert payload[start:start+count] == item['expect'], 'Transfer repair precondition failed'
@@ -37,34 +38,56 @@ jobs:
           digest = hashlib.sha256(data).hexdigest()
           (out / 'digest.txt').write_text(digest)
           assert digest == 'd827a6e2221469c1504a6a0be2af8c1d2473772cbf3652ab991972fbd7d3d1dc', 'Source transfer digest mismatch; refusing to apply'
-          patch = gzip.decompress(data)
           patch_path = out / 'material.patch'
-          patch_path.write_bytes(patch)
+          patch_path.write_bytes(gzip.decompress(data))
           subprocess.run(['git', 'apply', '--check', str(patch_path)], check=True)
           subprocess.run(['git', 'apply', str(patch_path)], check=True)
+          subprocess.run(['python3', '.github/brush-material-integration.py'], check=True)
           subprocess.run(['git', 'diff', '--check'], check=True)
           PY
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-          run_install: false
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.16.0
+          node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Compile original material alpha atlas
         run: pnpm exec tsx scripts/generate-studio-material-tip-atlas.mts
-      - name: Commit only feature source, tests and documentation
+      - name: Commit and push through the existing lint and typecheck hooks
         shell: bash
         run: |
           test "$GITHUB_REF" = refs/heads/feat/brush-material-engine-20260913
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/web/src/domains/creator/brush/ docs/studio/brush-material-morphology-2026-09.md scripts/generate-studio-material-tip-atlas.mts scripts/studio-material-morphology-browser.ts scripts/verify-studio-material-morphology.mjs
+          git add apps/web/src/domains/creator/ scripts/ docs/studio/brush-material-morphology-2026-09.md
           git diff --cached --check
           git commit -m 'feat(studio): add 32 distinct material morphologies and bounded antialiased tip compilation'
+          git diff HEAD~1 HEAD --binary > "$RUNNER_TEMP/brush-source-transfer/committed-source.patch"
           git push origin HEAD:feat/brush-material-engine-20260913
+      - name: Actual material and catalogue regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/brush/studio-procedural-tip-rasterizer.test.ts
+          apps/web/src/domains/creator/brush/studio-material-tip-kernels.test.ts
+          apps/web/src/domains/creator/brush/studio-material-morphology-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-material-brush-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-id.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-index.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-catalog-lazy-boundary.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-continuity-audit.test.ts
+          apps/web/src/domains/creator/brush/studio-dry-media-catalog-classification.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-library.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-semantic-quality.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-backend-quality-policy.test.ts
+          apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay.test.ts
+          apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
+      - name: Audit public catalogue
+        run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

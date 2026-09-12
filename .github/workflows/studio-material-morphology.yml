@@ -31,20 +31,16 @@ jobs:
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-          run_install: false
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.16.0
+          node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Verify generated atlas matches the original material programs
         run: |
           pnpm exec tsx scripts/generate-studio-material-tip-atlas.mts
@@ -66,9 +62,13 @@ jobs:
           apps/web/src/domains/creator/brush/studio-brush-continuity-audit.test.ts
           apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
           apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
+      - name: Existing material-engine, CRDT, pointer and export regressions
+        run: pnpm run test:studio-material-brush
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Compare all 32 materials in the real Canvas2D renderer at DPR 1, 2 and 3
+        env:
+          TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
         run: node scripts/verify-studio-material-morphology.mjs
       - name: Upload real-renderer images, pressure and performance receipts
         if: always()
