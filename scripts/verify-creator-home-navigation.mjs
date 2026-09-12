@@ -59,6 +59,11 @@ try {
 
     await page.locator('.cf-jump-nav a[href="#creator-process-title"]').click();
     await expect(page.locator("#creator-process-title")).toBeFocused();
+    await expect.poll(async () => {
+      const target = await page.locator("#creator-process-title").boundingBox();
+      const stickyHeader = await page.locator("header").first().boundingBox();
+      return Boolean(target && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1);
+    }, { message: "Clicked fragment heading must remain below the public journey header" }).toBe(true);
     const localPicker = page.locator(".cf-stage-switcher button");
     await localPicker.nth(1).click();
     await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "comic");

@@ -44,7 +44,9 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
 .creator-flagship .cf-shell { width: min(1440px, calc(100% - 80px)); margin-inline: auto; }
 .creator-flagship :is(h1,h2,h3,p,figure,dl) { margin: 0; }
 .creator-flagship :is(a,button,input,summary):focus-visible { outline: 3px solid var(--cf-accent); outline-offset: 5px; }
-.creator-flagship :is(h2[id],section[id]) { scroll-margin-top: 110px; }
+.creator-flagship :is(h2[id],section[id]) { scroll-margin-top: 136px; }
+/* Match the legacy ID selector so the public journey rail cannot obscure fragment headings. */
+.creator-home.creator-flagship :is(#creator-process-title,#creator-toolkit-title,#creator-film-title,#creator-faq-title) { scroll-margin-top: calc(136px + env(safe-area-inset-top,0px)); }
 .creator-flagship :is(button,a,summary) { -webkit-tap-highlight-color: transparent; }
 .creator-flagship button { cursor: pointer; font: inherit; }
 .creator-flagship button:disabled { cursor: not-allowed; opacity: .6; }
