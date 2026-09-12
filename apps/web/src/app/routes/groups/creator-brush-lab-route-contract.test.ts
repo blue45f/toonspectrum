@@ -79,7 +79,7 @@ describe("unified Brush Editor route contract", () => {
     expect(PAGE_SOURCE).toContain("<StudioBrushIntegratedWorkbench");
     expect(PAGE_SOURCE).toContain("<StudioBrushProductCataloguePanel");
     expect(PAGE_SOURCE).toContain("brushId?: string");
-    expect(PAGE_SOURCE).not.toContain("StudioBrushLegacyCataloguePanel");
+    expect(PAGE_SOURCE).not.toContain(["StudioBrush", "LegacyCataloguePanel"].join(""));
     expect(PAGE_SOURCE).not.toContain("StudioBrushV5RuntimeWorkbench");
   });
 });
