@@ -1,0 +1,28 @@
+name: API follow-up source snapshot
+on:
+  push:
+    branches: [work/api-runtime-followup-20260912]
+    paths: [.github/workflows/api-followup-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Export tracked implementation sources only
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/api-followup-source
+          git rev-parse HEAD > /tmp/api-followup-source/commit.txt
+          git ls-files -z -- api apps/api/src apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.build.json apps/web/src packages/core scripts .github/workflows/ci.yml package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json vitest.config.ts vitest.setup.ts eslint.config.mjs | python3 -c 'import sys; paths=sys.stdin.buffer.read().split(b"\0"); allowed=(b".ts",b".tsx",b".mts",b".cts",b".js",b".mjs",b".cjs",b".json",b".yml",b".yaml"); sys.stdout.buffer.write(b"\0".join(p for p in paths if p.endswith(allowed) and b"/experiments/" not in p and b"/evidence/" not in p)+b"\0")' > /tmp/api-followup-source/files.txt
+          tar --null -T /tmp/api-followup-source/files.txt -czf /tmp/api-followup-source/source.tar.gz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: api-followup-source
+          path: /tmp/api-followup-source
+          retention-days: 1
+          if-no-files-found: error
