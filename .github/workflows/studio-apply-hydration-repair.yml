@@ -1,0 +1,72 @@
+name: Apply Studio hydration repair
+on:
+  push:
+    branches: [fix/studio-hydration-ci-completion-20260912]
+    paths: [.github/workflows/studio-apply-hydration-repair.yml]
+permissions:
+  contents: write
+concurrency:
+  group: studio-hydration-repair-source
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-hydration-ci-completion-20260912
+      - name: Apply only reviewed source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/repair-results"
+          python3 scripts/__diag/apply-studio-hydration-repair.py
+          git add -- apps/web/src scripts/verify-studio-brushes.mts
+          git diff --cached --check
+          git diff --cached --stat > "$RUNNER_TEMP/repair-results/changes.txt"
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run exact repository regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run apps/web/src/infrastructure/creator-work-read-options.test.ts apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts apps/web/src/domains/creator/studio-shared-document-client.test.ts apps/web/src/domains/creator/studio-release-schedule-loader.test.ts apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx 2>&1 | tee "$RUNNER_TEMP/repair-results/tests.log"
+      - name: Strict lint reviewed sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --cached --name-only -z --diff-filter=ACMR -- '*.ts' '*.tsx' '*.mts' > "$RUNNER_TEMP/source-files"
+          mapfile -d '' -t files < "$RUNNER_TEMP/source-files"
+          pnpm exec eslint --max-warnings=0 "${files[@]}" 2>&1 | tee "$RUNNER_TEMP/repair-results/lint.log"
+      - name: Full application typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit --pretty false 2>&1 | tee "$RUNNER_TEMP/repair-results/types.log"
+      - name: Publish verified sources to working branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = fix/studio-hydration-ci-completion-20260912
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio): recover source hydration safely and fence stale autosaves'
+          git push origin HEAD:refs/heads/fix/studio-hydration-ci-completion-20260912
+          git rev-parse HEAD > "$RUNNER_TEMP/repair-results/source-commit.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-hydration-repair-validation
+          path: ${{ runner.temp }}/repair-results
+          if-no-files-found: warn
+          retention-days: 7
