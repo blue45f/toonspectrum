@@ -1,0 +1,73 @@
+name: Brand icon quality
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/index.html"
+      - "apps/web/public/favicon*"
+      - "apps/web/public/icon-*"
+      - "apps/web/public/apple-touch-icon.png"
+      - "apps/web/public/safari-pinned-tab.svg"
+      - "apps/web/public/manifest.webmanifest"
+      - "apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts"
+      - "scripts/*brand-icons*"
+      - ".github/workflows/brand-icon-quality.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/index.html"
+      - "apps/web/public/favicon*"
+      - "apps/web/public/icon-*"
+      - "apps/web/public/apple-touch-icon.png"
+      - "apps/web/public/safari-pinned-tab.svg"
+      - "apps/web/public/manifest.webmanifest"
+      - "apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts"
+      - "scripts/*brand-icons*"
+      - ".github/workflows/brand-icon-quality.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brand-icons-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  icons:
+    name: Brand icons and PWA contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify committed images before dependency installation
+        run: node scripts/verify-brand-icons.mjs
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Lint icon and PWA checks
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/verify-brand-icons.mjs
+          scripts/verify-brand-icons.test.mjs
+          apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts
+      - name: Run image and installation regressions
+        run: >-
+          pnpm exec vitest run
+          scripts/verify-brand-icons.test.mjs
+          apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts
