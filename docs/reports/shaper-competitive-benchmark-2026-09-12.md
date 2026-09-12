@@ -187,7 +187,7 @@
 | 사진 포즈 | 정면/측면/가림/다중 인물/비인물 | 실패를 명확히 반환, preview 취소는 문서 불변, 적용 후 undo 가능 | 입력 분류별 성공/실패/수정시간 |
 | PSD | 2048 표준, 투명 실루엣, 검은 의상, patterned cloth | 파일 파싱·레이어 비어 있지 않음; intended composite와 beauty 차이를 수치화. 목표 opaque 영역 MAE ≤2/255, 경계 오차 별도 | PSD, composite PNG, pixel diff |
 | 카메라와 컷 | wide/portrait/extreme aspect + 여러 shots | 저장 camera로 다시 렌더한 주요 landmark 위치 ≤1px(동일 backend/크기) | shot data와 이미지 diff |
-| 렌더 호환 | WebGPU와 실제 WebGL fallback | backend 식별, shader/texture 오류 0, alpha·색·선 폭의 승인 범위 | renderer 정보, console, 이미지 |
+| 렌더 호환 | WebGPU와 명시적으로 선택한 WebGL2 | backend 식별, shader/texture 오류 0, alpha·색·선 폭의 승인 범위 | renderer 정보, console, 이미지 |
 | 상호작용 성능 | 대표 캐릭터 2명+의상+실내 소품, 1920×1080 | 데스크톱 p95 frame ≤33.3ms와 p95 input-to-present ≤50ms를 초기 목표로 측정 | 장치·DPR·backend·cold/warm 기록 |
 | 모바일 | 같은 작업을 mobile tier에서 축소 렌더 | 최소 30fps 목표; 패널이 핵심 조작을 막지 않음; focus/터치 가능 | 실제 mobile 또는 지정 device 결과 |
 | 자원 수명 | 장면 load/unload 20회, 모드 전환, export 반복 | 지속 증가하는 GPU resource/context/JS heap 추세 없음 | 회차별 counts와 안정화 후 memory |

@@ -62,14 +62,18 @@ BG3D 엔진 선택 가능 여부와 실제 렌더러·초기 문서 복원 완�
 
 | 검증 | 실행 결과와 범위 |
 | --- | --- |
-| 단위/컴포넌트 회귀 | 카메라·구도·렌즈·출력·캐릭터·runtime 45개 파일 634개 통과. 이후 dock 안내 위치 수정의 17개 테스트도 재통과. 의상/모바일 후속 수정 결과는 아래에 추가한다. |
-| 프로덕션 | `pnpm run build`: 애플리케이션 TypeScript, Vite 빌드, 라이선스 고지 생성, 빌드 CSP 통과. API TypeScript 및 architecture 별도 통과. |
-| 변경 코드 정적 검사 | 43개 TS/TSX/MTS/MJS 파일 ESLint 경고 0, `git diff --check` 통과. 후속 변경은 최종 검사 시 다시 포함한다. |
+| 단위/컴포넌트 회귀 | 카메라·구도·렌즈·출력·캐릭터·실제 VRM 스키닝·워커·모바일·메뉴: `vitest run` 72개 파일 880개 통과. CI 실행 계약 Node 테스트 7개 통과. |
+| 프로덕션 | `pnpm run build`: 애플리케이션 TypeScript, Vite 빌드, 라이선스 고지 생성, 빌드 CSP 통과. API TypeScript 및 architecture 별도 통과. 최신 main의 API 런타임 변경도 통합했다. |
+| 변경 코드 정적 검사 | 81개 TS/TSX/MTS/MJS 파일 ESLint 경고 0, `git diff --check` 통과. |
 | 구조적 번들 | Studio 277개 chunk, gzip 1899.9 KiB, ratchet 통과. 출력된 과거 startup 기록은 29일 전이므로 현재 로딩 성능 근거로 사용하지 않는다. |
-| 실제 캐릭터 파일 | Chromium 151.0.7922.34, WebGL2 `ANGLE Metal Renderer: Apple M2 Max`. 실제 PNG와 11레이어 PSD 모두 1910×2048; 투명 모서리 알파 0; 출력 후 잠금 해제; 페이지 오류/접근성 이름 누락 0. |
-| 캐릭터 브라우저 명령 | `TOONSPECTRUM_CHARACTER_GPU_LANE=native pnpm run verify:studio-character-shaper`, 결과 `character-shaper-evidence.json`. 390/320px 기본 흐름 검사 후 별도 시각 검사에서 작은 화면 버튼 잘림과 의상 변형을 발견해 추가 수정 중. |
-| 전체 3D console | 현재 편집기 진입 경로 `/studio/canvas`로 검증기를 갱신했다. Babylon Metal WebGPU 두 proof shard, VRM 재질→마네킹→복원과 두 편집기의 자원 수명주기·실제 worker 경로를 포함한 `verify:studio-3d-console` 통과. 이 실행 뒤 의상/모바일/초기복원 수정이 있어 최종 재실행 대상으로 유지한다. |
-| 소프트웨어 엔진 비교 | `pnpm run verify:studio-bg3d-webgpu-engine`: 실제 WebGPU/WebGL 모두 SwiftShader임을 검증. 단순 fixture 일치와 VRM MToon 차이를 구분한 상세 결과는 엔진 보고서 참조. |
+| 실제 캐릭터 파일 | Chromium 151.0.7922.34, WebGL2 `ANGLE Metal Renderer: Apple M2 Max`. PNG 1926×2048 및 **3852×4096**, PSD 1926×2048. 투명 모서리 알파 0, 실제 캐릭터 픽셀 존재, 출력 후 잠금 해제, 페이지 오류·접근성 이름 누락 0. 실제 PNG/PSD를 디코딩해 확인했다. |
+| 캐릭터 브라우저 | `TOONSPECTRUM_CHARACTER_GPU_LANE=native pnpm run verify:studio-character-shaper` 통과. 실험 의상 opt-in과 원본 복귀, PNG/PSD, Escape 순서, 390·320px에서 출력 패널 열림/닫힘의 컨트롤 경계·터치 대상·44px 크기 및 카메라 도구/캔버스 비겹침을 검사했다. 최종 스크린샷에서 얼굴과 발의 가시성도 확인했다. |
+| BG3D 브라우저 | `pnpm run verify:studio-bg3d-inapp-editor` 통과. 인앱 UA 조건 3개와 별도 데스크톱/모바일 구도 시나리오 2개. 장면 화면 맞춤의 평균 RGB 변화 3.0599/2.6897, 실행 취소 후 장면 픽셀 차이 각각 0. 가이드 비율 0.56384/0.56319로 9:16 오차 0.003 이내. 버튼 상태 변화가 장면 회귀로 계산되지 않도록 실제 DOM 컨트롤 영역만 제외하고 충분한 장면 픽셀을 요구한다. |
+| 현행 메뉴 | `pnpm run verify:studio-menus` 통과. 10개 상단 메뉴와 섹션·레일·팝오버·드로잉/출력 옵션을 확인했다. 이전 표시명을 요구하던 검증기를 현재 선 교정·도움말 허브·실제 배경 패널의 동작에 맞췄고, 기능 실행 회귀 테스트를 추가했다. |
+| 전체 3D console | `pnpm run verify:studio-3d-console` 최종 통과. Babylon Metal WebGPU 두 proof shard, VRM 재질→마네킹→복원, 두 편집기의 자원 수명주기와 실제 전용 VRM PNG/기존 BG3D 워커 실행을 확인했다. 로그: `/private/tmp/shaper-3d-console-final.log`. |
+| 소프트웨어 엔진 비교 | `pnpm run verify:studio-bg3d-webgpu-engine` 통과. 실제 WebGPU/WebGL 모두 SwiftShader임을 검증. 단순 fixture 일치와 VRM MToon 차이를 구분한 상세 결과는 엔진 보고서 참조. |
+
+원본 실행 자료는 `/private/tmp/shaper-qa/character-native-final/character-shaper-evidence.json`, `/private/tmp/shaper-qa/bg3d-inapp-final/summary.json`, `/private/tmp/shaper-qa/webgpu-engine/summary.json`에 보관했다. 모바일 검증은 해당 Chromium에서 뷰포트·터치·UA를 설정한 실행이며, iOS Safari나 실제 Android 기기 검증으로 확장하지 않는다.
 
 SwiftShader로 전체 캐릭터 편집 화면을 실행한 시도는 screenshot 시간 초과로 완료되지 않았다. 작은 엔진 fixture 통과를 전체 캐릭터 소프트웨어 렌더링의 통과로 기록하지 않는다. 실기기 캐릭터 검증과도 다른 실행 조건이다.
 

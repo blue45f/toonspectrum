@@ -77,7 +77,7 @@ WebGPU, WASM, 게임 엔진은 서로 같은 의미가 아니다. WebGPU는 GPU 
 
 검증 스크립트 PASS는 모든 재질이 동등하다는 뜻이 아니다. 위 MToon 차이를 감지하고 의도한 보호 정책을 지킨 상태가 PASS에 포함된다. 해당 실행은 비교 성능, 브라우저 전체, 모바일, 4K 원고, Shaper 동등 품질의 증거가 아니다.
 
-**Babylon 전문 출력의 실기기 두 proof shard를 통과했다.** `pnpm run verify:studio-3d-console`, Chromium 151.0.7922.34의 headed 브라우저에서 실제 생성된 device의 adapter 정보가 `vendor=apple`, `architecture=metal-3`, `isFallbackAdapter=false`였다. 모델명은 이 adapter 정보가 노출하지 않아 추측하지 않는다. 로그는 `/private/tmp/shaper-3d-console.log`에 기록했다.
+**Babylon 전문 출력의 실기기 두 proof shard를 통과했다.** `pnpm run verify:studio-3d-console`, Chromium 151.0.7922.34의 headed 브라우저에서 실제 생성된 device의 adapter 정보가 `vendor=apple`, `architecture=metal-3`, `isFallbackAdapter=false`였다. 모델명은 이 adapter 정보가 노출하지 않아 추측하지 않는다. 로그는 `/private/tmp/shaper-3d-console-final.log`에 기록했다.
 
 - Babylon WebGPU와 WebGL2의 beauty/depth/normal 정렬: 64×64 fixture 통과.
 - canonical top-down object/material ID: row packing이 다른 폭 63·65×64에서 통과.
@@ -93,7 +93,7 @@ WebGPU, WASM, 게임 엔진은 서로 같은 의미가 아니다. WebGPU는 GPU 
 
 | 순서 | 구체적인 실험 | 승격 조건 |
 | --- | --- | --- |
-| 1 | Three의 동일 고정 문서에서 2K/4K PNG·PSD, 가로/세로 crop, 선택/숨김, idle/IK/cloth 동작 중 취소·재시도 | 규격 크기, 동일 snapshot, 취소 후 정상 편집, 원고 합성·알파 경계의 시각 검증 |
+| 1 | Three의 동일 고정 문서에서 2K/4K PNG·최대 2K PSD, 가로/세로 crop, 선택/숨김, idle/IK/cloth 동작 중 취소·재시도 | 규격 크기, 동일 snapshot, 취소 후 정상 편집, 원고 합성·알파 경계의 시각 검증 |
 | 2 | 기존 Babylon specialist에 정적 텍스처 장면 1종을 우선 지원하고 Three 출력과 비교 | 같은 문서·자산 SHA, 카메라·crop·색 공간, depth/normal/ID 정렬 및 asset provenance 보존 |
 | 3 | Character capture를 기존 엔진 독립 artifact 계약에 연결 | 기존 MToon·Surface Ink·옷·손 접촉·PSD 결과를 보존하고 backend 교환 없이도 capture 계약 시험 가능 |
 | 4 | 실제 GPU와 모바일에서 Three WebGL/WebGPU, Babylon을 동일 장면으로 실행 | 실제 장치·backend 기록, cold/warm startup·p95 frame/input·메모리·readback·30분 안정성 측정. 위 기존 성능·회귀 기준 충족 |

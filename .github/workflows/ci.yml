@@ -131,6 +131,7 @@ jobs:
             apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx \
             apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx \
             apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts \
             apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts \
             apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts \
@@ -144,6 +145,8 @@ jobs:
             apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
             scripts/verify-studio-3d-console.test.ts
+      - name: Production menu entry point regressions
+        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 
   serial:
     name: Core serial performance regressions

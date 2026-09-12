@@ -94,6 +94,7 @@ test("all current main product and API CPU regressions remain mandatory", () => 
     "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx",
     "apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx",
     "apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx",
+    "apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx",
     "apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts",
     "apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts",
     "apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts",
@@ -126,4 +127,8 @@ test("isolates event concurrency and retry artifact names", () => {
   assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
   assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
   assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
+});
+
+test("required core validates current production menu entry points", () => {
+  assert.ok(job("static").includes("      - name: Production menu entry point regressions\n        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts\n"));
 });
