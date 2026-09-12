@@ -1,0 +1,95 @@
+name: Verify adjustment planner lazy boundary
+on:
+  push:
+    branches: [ops/toonstudio-db-recovery-inspect-20260913]
+    paths: [.github/workflows/toonstudio-adjustment-boundary-verify.yml]
+permissions:
+  contents: read
+concurrency:
+  group: verify-adjustment-planner-boundary
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 6264457d8febd1023e63f787291af6a790444c43
+          persist-credentials: false
+      - name: Apply isolated candidate without modifying any remote ref
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6264457d8febd1023e63f787291af6a790444c43
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('apps/web/src/domains/creator')
+          model = root / 'studio-live-adjustment.ts'
+          source = model.read_text()
+          marker = 'export function createStudioLiveAdjustmentPlan('
+          assert source.count(marker) == 1
+          light, marker, body = source.partition(marker)
+          assert 'canonicalizeStudioLiveAdjustmentElement' not in light.split('\n', 1)[1]
+          light = light.replace('canonicalizeStudioLiveAdjustmentElement, ', '')
+          planner_import = 'import { buildStudioAdjustmentLayerCompositorPlan, type StudioAdjustmentLayerBlendMode } from "./studio-adjustment-layer-plan";\n'
+          assert light.count(planner_import) == 1
+          light = light.replace(planner_import, '')
+          model.write_text(light.rstrip() + '\n')
+          plan = root / 'studio-live-adjustment-plan.ts'
+          assert not plan.exists()
+          plan.write_text('import { canonicalizeStudioLiveAdjustmentElement } from "./contracts/studio-live-adjustment-contract";\n' + planner_import + 'import { createEmptyStudioAdjustmentStack } from "./studio-adjustment-stack";\n\nimport type { StudioLiveAdjustmentElement } from "./studio-live-adjustment";\n\n' + marker + body)
+          runtime = root / 'studio-live-adjustment-runtime.ts'
+          assert not runtime.exists()
+          runtime.write_text('// Activated only for a mounted adjustment graph; keep planning off the document shell.\nexport { createStudioLiveAdjustmentPlan } from "./studio-live-adjustment-plan";\nexport { createStudioAdjustmentLayerRuntimeRecipe, executeStudioAdjustmentLayerRuntimeSync } from "./studio-adjustment-layer-runtime";\n')
+          group = root / 'canvas/StudioLiveAdjustmentGroup.tsx'
+          text = group.read_text()
+          replacements = {
+            'import { createStudioLiveAdjustmentPlan, type StudioLiveAdjustmentElement } from "../studio-live-adjustment";': 'import type { StudioLiveAdjustmentElement } from "../studio-live-adjustment";',
+            'type Runtime = typeof import("../studio-adjustment-layer-runtime");': 'type Runtime = typeof import("../studio-live-adjustment-runtime");',
+            'const plan = createStudioLiveAdjustmentPlan(element, sourceIds, Boolean(mask));': 'const plan = runtime.createStudioLiveAdjustmentPlan(element, sourceIds, Boolean(mask));',
+            'void import("../studio-adjustment-layer-runtime").then(async (loaded) => {': 'void import("../studio-live-adjustment-runtime").then(async (loaded) => {',
+            'plan: createStudioLiveAdjustmentPlan(element, sourceIds, false),': 'plan: loaded.createStudioLiveAdjustmentPlan(element, sourceIds, false),',
+          }
+          for before, after in replacements.items():
+            assert text.count(before) == 1, before
+            text = text.replace(before, after)
+          group.write_text(text)
+          test = root / 'studio-live-adjustment.test.ts'
+          text = test.read_text()
+          old = 'import { buildStudioLiveAdjustmentRenderTree, createStudioLiveAdjustment, createStudioLiveAdjustmentPlan } from "./studio-live-adjustment";'
+          assert text.count(old) == 1
+          text = text.replace(old, 'import { buildStudioLiveAdjustmentRenderTree, createStudioLiveAdjustment } from "./studio-live-adjustment";\nimport { createStudioLiveAdjustmentPlan } from "./studio-live-adjustment-plan";')
+          test.write_text(text)
+          Path('artifacts/adjustment-boundary').mkdir(parents=True, exist_ok=True)
+          paths = [str(p) for p in (model, plan, runtime, group, test)]
+          Path('artifacts/adjustment-boundary/files.txt').write_text('\n'.join(paths) + '\n')
+          PY
+          git diff --check
+          git diff > artifacts/adjustment-boundary/tracked.patch
+          git rev-parse HEAD > artifacts/adjustment-boundary/base.txt
+          tar -czf artifacts/adjustment-boundary/changed-files.tgz -T artifacts/adjustment-boundary/files.txt
+          sha256sum artifacts/adjustment-boundary/changed-files.tgz > artifacts/adjustment-boundary/SHA256SUMS
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Existing pixel, capture fence, persistence and mutation regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run apps/web/src/domains/creator/studio-live-adjustment.test.ts apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts --reporter=default --reporter=json --outputFile=artifacts/adjustment-boundary/vitest.json 2>&1 | tee artifacts/adjustment-boundary/tests.log
+      - name: Compile and check unchanged production budget
+        run: |
+          set -euo pipefail
+          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && pnpm run verify:api-serverless-build) 2>&1 | tee artifacts/adjustment-boundary/build.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: adjustment-boundary-${{ github.run_id }}
+          path: artifacts/adjustment-boundary
+          if-no-files-found: error
+          retention-days: 3
