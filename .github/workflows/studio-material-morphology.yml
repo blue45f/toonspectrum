@@ -1,0 +1,80 @@
+name: Studio material morphology
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/web/src/domains/creator/brush/**
+      - apps/web/src/domains/creator/studio-dynamic-brush-*.ts
+      - scripts/generate-studio-material-tip-atlas.mts
+      - scripts/studio-material-morphology-browser.ts
+      - scripts/verify-studio-material-morphology.mjs
+      - .github/workflows/studio-material-morphology.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/web/src/domains/creator/brush/**
+      - scripts/*studio-material*
+      - .github/workflows/studio-material-morphology.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-material-morphology-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  material-morphology:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify generated atlas matches the original material programs
+        run: |
+          pnpm exec tsx scripts/generate-studio-material-tip-atlas.mts
+          git diff --exit-code -- apps/web/src/domains/creator/brush/studio-material-tip-atlas.generated.json
+      - name: Material, catalogue, persistence and existing-engine regressions
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/brush/studio-procedural-tip-rasterizer.test.ts
+          apps/web/src/domains/creator/brush/studio-material-tip-kernels.test.ts
+          apps/web/src/domains/creator/brush/studio-material-morphology-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-material-brush-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-id.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-index.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-pack-runtime.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-catalog-lazy-boundary.test.ts
+          apps/web/src/domains/creator/brush/studio-brush-continuity-audit.test.ts
+          apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Compare all 32 materials in the real Canvas2D renderer at DPR 1, 2 and 3
+        run: node scripts/verify-studio-material-morphology.mjs
+      - name: Upload real-renderer images, pressure and performance receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-material-morphology-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/studio-material-morphology
+          retention-days: 14
+          if-no-files-found: warn
