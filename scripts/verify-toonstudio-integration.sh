@@ -262,9 +262,54 @@ run_editor() {
     --pool=forks --maxWorkers=2
 }
 
+# Keep project lifecycle coverage in the permanent integration owner after the
+# one-shot integration workflow is removed. Reuse its cleanup and cache policy.
+run_lifecycle_core() {
+  typecheck_group lifecycle \
+    apps/web/src/domains/creator/studio-project-creation.ts \
+    apps/web/src/domains/creator/studio-project-document-store.ts \
+    apps/web/src/domains/creator/studio-project-library-store.ts
+
+  pnpm exec eslint --max-warnings=0 \
+    --cache --cache-strategy content \
+    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \
+    apps/web/src/domains/creator/studio-project-creation.ts \
+    apps/web/src/domains/creator/studio-project-document-store.ts \
+    apps/web/src/domains/creator/studio-project-library-store.ts
+
+  pnpm exec vitest run \
+    apps/web/src/domains/creator/studio-project-creation.test.ts \
+    apps/web/src/domains/creator/studio-project-document-store.test.ts \
+    apps/web/src/domains/creator/studio-project-library-store.test.ts \
+    --pool=forks --maxWorkers=2
+}
+
+run_lifecycle_ui() {
+  typecheck_group lifecycle \
+    apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.tsx
+
+  pnpm exec eslint --max-warnings=0 \
+    --cache --cache-strategy content \
+    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \
+    apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.tsx
+
+  pnpm exec vitest run \
+    apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx \
+    --pool=forks --maxWorkers=2
+}
+
 case "$track" in
-  core) run_core ;;
-  ui) run_ui ;;
+  core) run_core; run_lifecycle_core ;;
+  ui) run_ui; run_lifecycle_ui ;;
   editor) run_editor ;;
   *) echo "usage: $0 {core|ui|editor}" >&2; exit 2 ;;
 esac
