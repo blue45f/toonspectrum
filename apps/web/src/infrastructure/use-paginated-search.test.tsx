@@ -20,8 +20,11 @@ function deferred<T>() {
   const promise = new Promise<T>((done) => { resolve = done; });
   return { promise, resolve };
 }
-beforeEach(() => request.mockReset());
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  // Returning the mock registers it as a cleanup callback and calls it without a query.
+  request.mockReset();
+});
+afterEach(() => { vi.restoreAllMocks(); });
 
 describe("query-scoped paginated search", () => {
   it("loads one bounded page at a time and ignores simultaneous more clicks", async () => {
@@ -36,6 +39,7 @@ describe("query-scoped paginated search", () => {
     await waitFor(() => expect(result.current.items).toHaveLength(50));
     expect(result.current.hasMore).toBe(false);
     expect(new Set(result.current.items.map((item) => item.id)).size).toBe(50);
+    expect(request.mock.calls.map(([query]) => query.get("page"))).toEqual(["1", "2", "3"]);
   });
   it("retains loaded cards on a page error and retries that same page", async () => {
     request.mockResolvedValueOnce(page(1)).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(page(2));

@@ -1,0 +1,71 @@
+name: API runtime release verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/api-runtime-followup-20260912]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-runtime-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify exact-head runtime regressions
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/api-runtime
+          git rev-parse HEAD > artifacts/api-runtime/head.txt
+          node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
+          node --test scripts/api-followup-ci-policy.test.mjs
+          mapfile -t tests < <(node -e 'JSON.parse(require("fs").readFileSync("scripts/api-followup-test-files.json","utf8")).forEach(x=>console.log(x))')
+          test "${#tests[@]}" -gt 0
+          pnpm exec vitest run "${tests[@]}" --reporter=default --reporter=json --outputFile=artifacts/api-runtime/vitest.json
+      - name: Build and verify real packaged Lambda
+        run: |
+          set -euo pipefail
+          pnpm --filter @webtoon-nest/api build
+          pnpm run build
+          pnpm run check:studio-bundle
+          set +e
+          pnpm run verify:api-serverless-build 2>&1 | tee artifacts/api-runtime/packaging.log
+          result=${PIPESTATUS[0]}
+          set -e
+          python3 - <<'PY'
+          import pathlib, shutil
+          target = pathlib.Path('artifacts/api-runtime')
+          for directory in pathlib.Path('/tmp').glob('toonspectrum-api-lambda-*'):
+              out = target / directory.name
+              out.mkdir(exist_ok=True)
+              for path in directory.iterdir():
+                  if path.is_file() and path.suffix in {'.log', '.json'}:
+                      shutil.copy2(path, out / path.name)
+                      if path.suffix == '.log':
+                          print(path.name + '\n' + path.read_text(errors='replace')[-24000:])
+          PY
+          exit "$result"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: api-runtime-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/api-runtime
+          if-no-files-found: error
+          retention-days: 3
