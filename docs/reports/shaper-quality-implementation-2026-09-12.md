@@ -62,7 +62,8 @@ BG3D 엔진 선택 가능 여부와 실제 렌더러·초기 문서 복원 완�
 
 | 검증 | 실행 결과와 범위 |
 | --- | --- |
-| 단위/컴포넌트 회귀 | 카메라·구도·렌즈·출력·캐릭터·실제 VRM 스키닝·워커·모바일·메뉴: `vitest run` 72개 파일 880개 통과. CI 실행 계약 Node 테스트 7개 통과. |
+| 단위/컴포넌트 회귀 | 카메라·구도·렌즈·출력·캐릭터·실제 VRM 스키닝·워커·모바일·메뉴: `vitest run` 72개 파일 880개 통과. 최신 main의 사전 CI 검사와 통합한 실행 계약 Node 테스트 119개 통과. |
+| 직렬 성능 회귀 | 로컬 Node 24.16.0에서 `pnpm run test:perf`: 21개 파일 432개 통과. CI는 Node 24.20.0을 사용하므로 이 결과로 최종 커밋의 필수 CI를 대체하지 않는다. 기존 성능 임계값은 변경하지 않았다. |
 | 프로덕션 | `pnpm run build`: 애플리케이션 TypeScript, Vite 빌드, 라이선스 고지 생성, 빌드 CSP 통과. API TypeScript 및 architecture 별도 통과. 최신 main의 API 런타임 변경도 통합했다. |
 | 변경 코드 정적 검사 | 81개 TS/TSX/MTS/MJS 파일 ESLint 경고 0, `git diff --check` 통과. |
 | 구조적 번들 | Studio 277개 chunk, gzip 1899.9 KiB, ratchet 통과. 출력된 과거 startup 기록은 29일 전이므로 현재 로딩 성능 근거로 사용하지 않는다. |
