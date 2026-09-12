@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getHomeData } from "./home";
+
 import type { Title } from "../types";
 
 const model = vi.hoisted(() => ({ titles: [] as Title[], revision: 0, day: 0, ranks: vi.fn() }));
@@ -13,8 +15,6 @@ vi.mock("./catalog-store", () => ({
   adaptationsOf: () => [],
   activeTags: () => [{ tag: "성장", count: 1 }],
 }));
-
-import { getHomeData } from "./home";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
