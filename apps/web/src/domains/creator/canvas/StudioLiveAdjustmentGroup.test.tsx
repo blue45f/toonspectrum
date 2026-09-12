@@ -146,6 +146,16 @@ describe("live adjustment actual runtime and capture fence", () => {
 
 
 describe("density-aware live adjustment captures", () => {
+  it("bounds preview zoom independently from the artist's requested export density", async () => {
+    render(<StudioLiveAdjustmentGroup element={adjustment()} cacheKey="zoomed" width={1} height={1} sourceIds={["source"]} pixelRatio={99} children={null} />);
+    await act(async () => { await vi.dynamicImportSettled(); });
+    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
+    expect(scene.density).toBe(2);
+    const restore = prepareStudioRasterCapture(scene.stage, 3);
+    expect(scene.density).toBe(3);
+    restore();
+    expect(scene.density).toBe(2);
+  });
   it("recomputes the actual filter at output density and restores preview pixels", async () => {
     render(mount());
     await act(async () => { await vi.dynamicImportSettled(); });

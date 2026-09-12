@@ -151,6 +151,11 @@ export function StudioLiveAdjustmentGroup({ element, width, height, sourceIds, c
     layer.on("draw.studioLiveAdjustment", afterDraw);
     void import("../studio-adjustment-layer-runtime").then(async (loaded) => {
       if (controller.signal.aborted) return undefined;
+      // Zoom/DPR must not make a previously renderable long page exceed the preview budget.
+      // Export density is admitted independently below and never silently reduced.
+      const limits = loaded.STUDIO_ADJUSTMENT_LAYER_RUNTIME_LIMITS;
+      const previewPixelBudget = Math.min(limits.maxPixels, Math.floor(limits.maxWorkingBytes / 20));
+      density = Math.min(density, 2, Math.max(1, Math.floor(Math.sqrt(previewPixelBudget / (width * height)))));
       loaded.createStudioAdjustmentLayerRuntimeRecipe({
         plan: loaded.createStudioLiveAdjustmentPlan(element, sourceIds, false),
         source: { revision: 0, width: width * density, height: height * density, renderKinds: ["group"] },
