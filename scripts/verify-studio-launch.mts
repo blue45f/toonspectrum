@@ -1420,7 +1420,7 @@ async function runMobileDockLayout(
     dialog: propsDialog,
     dock,
     id: "props",
-    initialFocus: propsDialog.getByRole("button", { name: "작업 패널 닫기", exact: true }),
+    initialFocus: propsDialog.getByRole("button", { name: "설정 닫기", exact: true }),
     launcher: propsLauncher,
     open: async () => {
       await propsLauncher.click();
@@ -1600,7 +1600,7 @@ async function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error: unknown) => {
-    log(`FATAL: ${error instanceof Error ? error.message : String(error)}`);
+    log(`FATAL: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
     process.exitCode = 1;
   });
 }
