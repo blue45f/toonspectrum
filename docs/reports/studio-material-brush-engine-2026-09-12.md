@@ -40,7 +40,10 @@ crops use primitive bounds including wet spread, particles and symmetry copies.
 `pnpm test:studio-material-brush` exercises the material core, preview, experiments, product
 repository bridge, saved-brush application and pixel-analysis contract. This command runs in
 the required core static CI job. Existing native-media, SVG, raster-edit and catalogue gates
-remain enabled.
+remain enabled. The typed live-media dispatcher selects one compatible renderer before provider
+startup, preserving material priority, eraser ownership and explicit GPU rejection. Its nine
+behavior cases are included in the material suite (13 files, 107 tests). Extracting this policy
+also brings the editor host below its existing size ceiling without increasing the limit.
 
 `pnpm verify:studio-brush-v6-quality` produces `report.json`, an HTML review and recipe PNGs.
 It uses real Chromium pen events with pressure, tilt and twist, holding size, color, opacity
