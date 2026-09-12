@@ -36,13 +36,13 @@ jobs:
         run: python scripts/maintenance/finalize-brush-catalog-consolidation.py
       - name: Install locked workspace
         run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Format changed source and workflow files
+      - name: Autofix changed JavaScript and TypeScript files
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t files < <(git diff --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|mts|mjs|js|json|md|yml|yaml)$' || true)
+          mapfile -t files < <(git diff --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|mts|mjs|js)$' || true)
           if ((${#files[@]})); then
-            pnpm exec prettier --write "${files[@]}"
+            pnpm exec eslint --fix "${files[@]}"
           fi
       - name: Strict lint and typecheck
         run: |
