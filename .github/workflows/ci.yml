@@ -1,8 +1,7 @@
 name: CI
 
-# Required core is an aggregation of real checks, never an unconditional skip.
-# Browser/device/GPU benchmarks keep their dedicated workflows; root and serial
-# tests, global lint/types, and the deploy-equivalent build are mandatory here.
+# Preserve main's required contracts and bundle ratchet alongside the complete
+# root/serial test gates from the brush material branch. No skipped gate passes.
 on:
   workflow_dispatch:
   pull_request:
@@ -39,8 +38,31 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm run lint:strict
       - run: pnpm run typecheck
+      - run: pnpm run typecheck:cloudflare-realtime
+      - run: pnpm run validate:architecture
       - run: pnpm run verify:toolchain-coverage
       - run: pnpm run verify:csp
+      - name: Preserve main brush product, render and BG3D regression gate
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
+            apps/web/src/domains/creator/studio-integration-closure.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx \
+            apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
+          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
 
   unit:
     name: Core unit tests (${{ matrix.shard }}/4)
@@ -118,11 +140,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Build the API and production web bundle
+      - name: Build the API and production web bundle without relaxing the ratchet
         run: |
           set -o pipefail
           mkdir -p artifacts/core
-          (pnpm --filter @webtoon-nest/api build && pnpm run build && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -153,3 +175,18 @@ jobs:
             process.exit(1);
           }
           JS
+
+  verify:
+    name: verify
+    needs: core
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require deployable core
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+        run: |
+          set -euo pipefail
+          test "$CORE_RESULT" = success
+          echo "Required core validation passed."
