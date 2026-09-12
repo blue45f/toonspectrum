@@ -40,6 +40,20 @@ jobs:
         run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
+      - name: Recovered worktree regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/color/studio-color-proof.test.ts \
+            apps/web/src/domains/creator/studio-live-adjustment.test.ts \
+            apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx \
+            apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx \
+            apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts \
+            apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx \
+            apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts \
+            apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts \
+            apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
       - name: Repository contracts
         run: |
           set -euo pipefail

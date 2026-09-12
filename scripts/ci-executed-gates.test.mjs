@@ -46,6 +46,16 @@ test("all current main product and API CPU regressions remain mandatory", () => 
   // or lets a removed regression be replaced by an unrelated test.
   const tests = new Set(job("static").match(/(?:apps|packages)\/[^\s]+\.test\.[a-z]+/g) ?? []);
   const required = [
+    "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
+    "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
+    "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
+    "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
+    "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
+    "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
+    "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
+    "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
+    "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
     "apps/api/src/config/catalog-initialization.test.ts",
     "apps/api/src/modules/catalog/lazy-serverless-catalog.service.test.ts",
     "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",

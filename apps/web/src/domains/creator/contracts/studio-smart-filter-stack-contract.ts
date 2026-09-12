@@ -30,4 +30,3 @@ export const StudioWorkAssetSmartFiltersSchema = z
     }).strict()).max(24),
   })
   .strict();
-
