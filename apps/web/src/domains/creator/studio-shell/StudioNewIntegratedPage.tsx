@@ -11,7 +11,7 @@ import {
   studioTemplateById,
   writeStudioTemplateHandoff,
 } from "../studio-template-catalog";
-import { StudioNewPage } from "./StudioFrontDoorPages";
+import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 
 type Locale = "ko" | "en";
 
@@ -70,7 +70,7 @@ export function StudioNewIntegratedPage() {
           </Container>
         </div>
       ) : null}
-      <StudioNewPage />
+      <StudioProjectCreatePage />
     </>
   );
 }
