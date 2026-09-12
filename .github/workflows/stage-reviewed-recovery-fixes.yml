@@ -1,0 +1,76 @@
+name: Stage reviewed recovery product fixes
+on:
+  push:
+    branches: [ops/residual-merge-reconcile-20260913]
+    paths: [.github/workflows/stage-reviewed-recovery-fixes.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Apply only exact reviewed edits and stage immutable product blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          head='6264457d8febd1023e63f787291af6a790444c43'
+          patch_ref='9ff1d867f043063b2013fa98eb67191c2794f454'
+          def call(path,payload=None):
+              request=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(request,timeout=60) as response:return json.load(response)
+          def sha(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+          def blob(identifier):
+              data=call('git/blobs/'+identifier);assert data['encoding']=='base64'
+              raw=base64.b64decode(data['content']);assert sha(raw)==identifier
+              return raw.decode()
+          assert call('pulls/1339')['head']['sha']==head
+          assert call('branches/main')['commit']['sha']=='9d6d51dacb91fd40d06b23d166b7979ce98a2995'
+          tree=call('git/trees/dbe95303b26f118162a96fabc7b47d7d2ca0ea74?recursive=1');assert not tree.get('truncated')
+          existing={entry['path']:entry for entry in tree['tree'] if entry['type']=='blob'}
+          specs=[]
+          for number in (1,2):
+              data=call('contents/artifacts/ops/review-offsets-'+str(number)+'.json?ref='+patch_ref)
+              spec=json.loads(base64.b64decode(data['content']));assert spec['head']==head
+              specs.extend(spec['files'])
+          assert len(specs)==25 and len({entry['path'] for entry in specs})==25
+          staged=[]
+          for spec in specs:
+              path=spec['path'];assert path.startswith('apps/web/') or path=='.github/workflows/ci.yml'
+              assert existing.get(path,{}).get('sha')==spec['before'],path
+              text=blob(spec['before']) if spec['before'] else ''
+              last=len(text)
+              for edit in reversed(spec['edits']):
+                  start,end=edit['start'],edit['end'];assert 0<=start<=end<=last
+                  text=text[:start]+edit['new']+text[end:];last=start
+              raw=text.encode();assert sha(raw)==spec['after'],(path,sha(raw),spec['after'])
+              result=call('git/blobs',{'content':text,'encoding':'utf-8'});assert result['sha']==spec['after']
+              staged.append({'path':path,'mode':existing.get(path,{}).get('mode','100644'),'type':'blob','sha':result['sha']})
+              print('Staged reviewed file:',path,result['sha'],flush=True)
+          # These four already-eager leaves have no runtime imports. Co-location removes small
+          # shared requests without naming the effect planner, filter engines, ICC transform,
+          # or other lazy specialists. The normal CI still enforces every original bundle limit.
+          path='apps/web/config/vite-manual-chunks.ts'
+          assert existing[path]['sha']=='7ba9d09e5a8cdc755e59fb339ff068d3335fe637'
+          text=blob(existing[path]['sha'])
+          old='      || id.endsWith("/src/domains/creator/brush/studio-brush-engine-program-set.ts")\n'
+          assert text.count(old)==1
+          additions=''.join('      || id.endsWith("/src/domains/creator/'+leaf+'")\n' for leaf in ['contracts/studio-adjustment-engine-ids.ts','studio-live-adjustment-status.ts','render/studio-raster-presentation-cache.ts','color/studio-color-proof-document.ts'])
+          text=text.replace(old,old+additions)
+          result=call('git/blobs',{'content':text,'encoding':'utf-8'});assert result['sha']==sha(text.encode())
+          staged.append({'path':path,'mode':'100644','type':'blob','sha':result['sha']})
+          root=pathlib.Path('artifacts/review-staging');root.mkdir(parents=True)
+          report={'head':head,'base_tree':'dbe95303b26f118162a96fabc7b47d7d2ca0ea74','tree_elements':staged,'refs_updated':False}
+          (root/'staged-objects.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: reviewed-recovery-staged-objects
+          path: artifacts/review-staging/staged-objects.json
+          if-no-files-found: error
+          retention-days: 3
