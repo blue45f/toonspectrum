@@ -104,4 +104,26 @@ remaining = [relative for relative in TRANSIENT_WORKFLOWS if (ROOT / relative).e
 if remaining:
     raise RuntimeError(f"transient workflows remain: {remaining}")
 
-print("[done] integration closure matches the restored core gate")
+# Keep the existing BG3D byte/chunk ratchet unchanged. The view tab was previously imported
+# and mounted while hidden, paying for camera/environment controls before the user opened it.
+replace_once(
+    "apps/web/src/domains/creator/bg3d/studio-bg3d-editor-runtime-bindings.ts",
+    '''export {
+  StudioBg3dViewPanel,
+  type StudioBg3dBabylonDiagnosticBackend,
+  type StudioBg3dBabylonDiagnosticState,
+} from "./StudioBg3dViewPanel";''',
+    '''export { StudioBg3dViewPanel } from "./StudioBg3dViewPanelLazy";
+export type {
+  StudioBg3dBabylonDiagnosticBackend,
+  StudioBg3dBabylonDiagnosticState,
+} from "./StudioBg3dViewPanel";''',
+)
+replace_once(
+    ".github/workflows/ci.yml",
+    "          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts",
+    "          pnpm exec vitest run apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx\n"
+    "          pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts",
+)
+
+print("[done] integration closure and first-use view boundary match the restored core gate")
