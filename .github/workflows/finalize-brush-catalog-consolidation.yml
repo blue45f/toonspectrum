@@ -17,6 +17,7 @@ concurrency:
 
 # This one-shot workflow is removed by its own successful commit.
 # It also proves that the restored global core command set is green before opening the PR.
+# The validation snapshot includes the preserved governance panel with its explicit checkbox labels.
 jobs:
   apply-and-validate:
     runs-on: ubuntu-latest
