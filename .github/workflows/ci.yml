@@ -76,6 +76,8 @@ jobs:
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
       - name: Strict lint
         run: pnpm run lint:strict
       - name: Typecheck application, API and realtime worker
@@ -114,6 +116,21 @@ jobs:
             apps/api/src/config/security-headers.test.ts \
             apps/api/src/config/cors.test.ts \
             apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
+      - name: Material brush execution and saved recipe regressions
+        run: pnpm run test:studio-material-brush
+      - name: Non-3D Studio editing and export regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/layer \
+            apps/web/src/domains/creator/export \
+            apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx \
+            apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx \
+            apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx \
+            apps/web/src/domains/creator/studio-selection \
+            apps/web/src/domains/creator/studio-color-range \
+            apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts \
+            apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts
       - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
@@ -180,6 +197,14 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts \
             apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
+            apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts \
+            apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts \
+            apps/web/src/app/studio-cross-origin-isolation.test.ts \
             scripts/verify-studio-3d-console.test.ts
       - name: Production menu entry point regressions
         run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
