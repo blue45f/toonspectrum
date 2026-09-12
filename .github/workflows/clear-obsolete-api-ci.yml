@@ -1,0 +1,57 @@
+name: Clear superseded API CI execution
+on:
+  push:
+    branches: [ops/clear-obsolete-api-ci-20260912]
+    paths: [.github/workflows/clear-obsolete-api-ci.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  cancel-obsolete:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Cancel only the obsolete, explicitly identified PR 1344 run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request,urllib.error
+          repo='blue45f/toonspectrum'
+          base='https://api.github.com/repos/'+repo
+          run_id=34695174465
+          old_sha='8bacf6ea97fd5cc6da4bad0f985e85cd3ac76297'
+          branch='work/api-runtime-followup-20260912'
+          def call(path, method='GET'):
+              req=urllib.request.Request(base+path,method=method,headers={
+                  'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                  'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28'})
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as response:
+                      raw=response.read()
+                      return response.status,json.loads(raw) if raw else None
+              except urllib.error.HTTPError as error:
+                  if error.code==409: return error.code,None
+                  raise
+          _,run=call('/actions/runs/'+str(run_id))
+          _,ref=call('/git/ref/heads/'+branch)
+          assert run['head_sha']==old_sha and run['head_branch']==branch
+          assert run['workflow_id']==287571038 and run['event']=='pull_request'
+          assert any(pr['number']==1344 for pr in run['pull_requests'])
+          assert ref['object']['sha']!=old_sha, 'Never cancel the current feature head'
+          print('Verified superseded run:',run_id,'head:',old_sha,'status:',run['status'])
+          if run['status']!='completed':
+              status,_=call('/actions/runs/'+str(run_id)+'/cancel','POST')
+              print('Cancellation request status:',status)
+              for _ in range(3):
+                  time.sleep(10)
+                  _,run=call('/actions/runs/'+str(run_id))
+                  if run['status']=='completed': break
+              if run['status']!='completed':
+                  # GitHub's documented recovery for an obsolete execution that
+                  # ignored ordinary cancellation, e.g. waiting always() jobs.
+                  status,_=call('/actions/runs/'+str(run_id)+'/force-cancel','POST')
+                  print('Obsolete-run force cancellation status:',status)
+          print('Current-head CI and all other PRs were left untouched.')
+          PY
