@@ -5,9 +5,12 @@ on:
     paths: [.github/workflows/api-followup-assemble.yml]
 permissions:
   contents: write
+concurrency:
+  group: api-followup-source-integration
+  cancel-in-progress: true
 jobs:
   assemble:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -16,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Validate every source before applying any change
+      - name: Validate source hashes and apply product changes only
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/work/api-runtime-followup-20260912
@@ -42,17 +45,21 @@ jobs:
           old=(root/'vercel.json').read_text(); anchor='"includeFiles": "dist/index.html"'
           assert json.loads(old)['functions']['api/og.js']['includeFiles']=='dist/index.html' and old.count(anchor)==1
           staged['vercel.json']=old.replace(anchor,'"includeFiles": "{dist/index.html,dist/og/titles/**}"').encode()
-          for name,body in staged.items(): (root/name).write_bytes(body)
-          print('43 source hashes verified; 18 source edits and OG packaging applied')
+          # GITHUB_TOKEN cannot modify workflows. Those edits and cleanup are
+          # handled separately through the user's authorized repository connection.
+          staged.pop('.github/workflows/ci.yml')
+          for name,body in staged.items():
+              assert not name.startswith('.github/')
+              (root/name).write_bytes(body)
+          print('Verified 43 source hashes; applied only product edits and OG packaging')
           PY
           node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
-          node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
-      - name: Publish only the guarded feature branch
+      - name: Publish only product sources to the feature branch
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/work/api-runtime-followup-20260912
-          git rm -r .api-followup-edits .github/workflows/api-followup-apply.yml .github/workflows/api-followup-workspace.yml .github/workflows/api-followup-assemble.yml
-          git add -u
+          git add -u -- api apps packages scripts eslint.config.mjs package.json vercel.json
+          test -z "$(git diff --cached --name-only -- .github)"
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
