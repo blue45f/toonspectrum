@@ -7708,7 +7708,7 @@ export function StudioCuttoonEditor({
     });
   }
 
-  /** Confirm once, then recheck the same mutation ticket before and after durable deletion. */
+  /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
     const canClearAutosave = () => canApplyStudioMutation(ticket);
