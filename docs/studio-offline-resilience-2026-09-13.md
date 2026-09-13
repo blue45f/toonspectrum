@@ -13,6 +13,8 @@
 - The editor has a lazy, collapsible Korean offline-preparation panel. Preparation
   happens only on a click; it covers the app shells, critical code, Studio dictionaries
   and the same-origin build resources currently recorded by the page's resource timing.
+- The optional panel has its own error boundary and a non-reloading lazy loader.
+  A failed panel chunk cannot unmount or reload the drawing document.
 - Preparation is limited to 400 requested URLs, 32 MiB downloaded, 8 MiB per resource
   and a 30-second network preparation window. Fetches are sequential. Private API URLs,
   external hosts, credentialed/query URLs and non-build media are not admitted.
@@ -40,8 +42,10 @@ panel explicitly states these limits. First-ever visits without network remain u
 
 `node --test scripts/studio-offline-resilience.test.mjs` executes the production helper
 modules after TypeScript transpilation, using Node fetch/Response/streams. It is not a
-browser or production E2E. Worker wiring tests and React panel tests run through Vitest
-in the dedicated regression workflow. Existing required core checks remain untouched.
+browser or production E2E. Worker wiring tests and eight React panel/fault-isolation
+tests run through Vitest. Both commands are in the protected core workflow's static
+job: failing offline tests prevent a successful core. All pre-existing core commands,
+build/lint/type checks and performance gates are preserved; no duplicate runner is added.
 
 A real-device acceptance pass must additionally draw strokes, use eraser/layers/undo,
 wait for the existing local-save acknowledgement, disconnect the network, reload and
