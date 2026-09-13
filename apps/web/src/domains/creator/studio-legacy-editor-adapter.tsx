@@ -1,6 +1,7 @@
 import { Profiler } from "react";
 
 import { recordStudioRenderProfile } from "./canvas/studio-canvas-shared-runtime";
+import { studioEditorSourceRoute } from "./studio-editor-source-scope";
 import { StudioCuttoonEditor } from "./StudioPage";
 
 import type { StudioWorkspaceRoute } from "./studio-workspace-route";
@@ -20,9 +21,10 @@ export function LegacyStudioEditorAdapter({
   remixId,
   studioRoute,
 }: LegacyStudioEditorAdapterProps) {
+  const sourceRoute = studioEditorSourceRoute(studioRoute);
   return (
     <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
-      <StudioCuttoonEditor remixId={remixId} studioRoute={studioRoute} />
+      <StudioCuttoonEditor remixId={remixId} studioRoute={sourceRoute} />
     </Profiler>
   );
 }
