@@ -10,7 +10,8 @@ const server = await createServer({ configFile: false, root: `${root}apps/web`,
   resolve: { alias: { "@": `${root}apps/web/src` } },
   define: { "process.env": JSON.stringify({ NODE_ENV: "test" }) },
   optimizeDeps: { noDiscovery: false, include: ["react", "react/jsx-runtime", "react/compiler-runtime", "react-dom/client"] }, logLevel: "warn",
-  cacheDir: `${root}.qa/p2p-vite-cache`, server: { host: "127.0.0.1", port: 0, strictPort: false } });
+  // Keep generated dependency bundles outside the source lint boundary.
+  cacheDir: `${root}node_modules/.cache/studio-p2p-huddle`, server: { host: "127.0.0.1", port: 0, strictPort: false } });
 const deployment = JSON.parse(readFileSync(`${root}vercel.json`, "utf8"));
 const permissionsPolicy = deployment.headers.find((rule) => rule.source === "/(.*)").headers
   .find((header) => header.key === "Permissions-Policy").value;
