@@ -152,3 +152,14 @@ test("kit escaping prevents reference titles from injecting Markdown links", () 
   assert.ok(!kit.includes("[bad]")); assert.ok(!kit.includes("<script>"));
   assert.ok(kit.includes("\\[link\\]"));
 });
+
+
+test("nested and malformed markup cannot synthesize a new tag in plain metadata", () => {
+  for (const title of ["<scr<script>ipt>alert(1)</scr</script>ipt>", "<<b>iframe src=x>", "<img src=x onerror=alert(1)", "plain > text <"]) {
+    const saved = parseSavedOpenReference({ ...artwork, title });
+    assert.ok(saved);
+    assert.doesNotMatch(saved.title, /[<>]/u);
+    assert.doesNotMatch(buildCreationKit("comic", title, title, [saved]), /<script|<iframe|<img/iu);
+  }
+  assert.equal(parseSavedOpenReference({ ...artwork, title: "<b>Good</b> title" })?.title, "Good title");
+});

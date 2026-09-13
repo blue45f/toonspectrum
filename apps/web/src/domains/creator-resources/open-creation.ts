@@ -50,7 +50,7 @@ function row(value: unknown): Row {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
 }
 function text(value: unknown, max = 300): string {
-  return typeof value === "string" ? value.replace(/<[^>]*>/gu, "").replace(/\s+/gu, " ").trim().slice(0, max) : "";
+  return typeof value === "string" ? value.replace(/<[^>]*>/gu, "").replace(/[<>]/gu, "").replace(/\s+/gu, " ").trim().slice(0, max) : "";
 }
 export function safeOpenUrl(value: unknown, hosts?: string[]): string {
   if (typeof value !== "string" || value.length > 2000) return "";

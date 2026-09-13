@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { buildMarketCc0ReleaseManifests } from "../../../../../scripts/seed/market-cc0-release-manifests.mts";
+import { buildMarketCc0ReleaseManifests } from "../../../../../scripts/seed/market-cc0-release-manifests.mjs";
 import { parseStudioCc0Catalog } from "./studio-cc0-asset-delivery";
 import { getStudioCc0ReviewStatus, isStudioCc0EligibleForNewSelection } from "./studio-cc0-curation";
 import { STUDIO_MARKETPLACE_CC0_ASSETS } from "./studio-marketplace-cc0-catalog.generated";
@@ -113,8 +113,8 @@ describe("awaited marketplace image insertion", () => {
   it("keeps the real canvas scope guard after raster decoding and before insertion", () => {
     const host = readFileSync(new URL("./StudioCuttoonEditorHost.tsx", import.meta.url), "utf8");
     const section = host.slice(host.indexOf("insertAsset: async (projectedAsset)"));
-    expect(section.indexOf("await createStudioCommunityAssetRecord")).toBeGreaterThan(-1);
-    expect(section.indexOf("if (!isStudioPasteScopeCurrent({")).toBeGreaterThan(section.indexOf("await createStudioCommunityAssetRecord"));
+    expect(section.indexOf("await createStudioCommunityMarketplaceAssetRecord")).toBeGreaterThan(-1);
+    expect(section.indexOf("if (!isStudioPasteScopeCurrent({")).toBeGreaterThan(section.indexOf("await createStudioCommunityMarketplaceAssetRecord"));
     expect(section.indexOf("return addRenderedImage(asset.dataUrl")).toBeGreaterThan(section.indexOf("if (!isStudioPasteScopeCurrent({"));
   });
 });

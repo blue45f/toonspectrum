@@ -15811,6 +15811,7 @@ const puppetWarpArmed =
                   compatibilityContext,
                 ),
               insertAsset: async (projectedAsset) => {
+                if (!isCurrentOperation()) return false;
                 const asset = await createStudioCommunityMarketplaceAssetRecord(projectedAsset);
                 if (!isCurrentOperation()) return false;
                 if (!isStudioPasteScopeCurrent({

@@ -29,7 +29,7 @@ try {
   const output = "/private/tmp/toonstudio-free-content-browser-brief.md";
   await download.saveAs(output);
   const text = await readFile(output, "utf8");
-  if (!text.includes("https://www.artic.edu/artworks/116363") || !text.includes("Browser test fixture")) throw new Error("Missing exported provenance");
+  if (!text.split(/\r?\n/u).includes("- 원문: https://www.artic.edu/artworks/116363") || !text.split(/\r?\n/u).includes("- 크레딧: Browser test fixture")) throw new Error("Missing exported provenance");
   await page.screenshot({ path: "/private/tmp/toonstudio-free-content-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "/private/tmp/toonstudio-free-content-mobile.png", fullPage: true });
