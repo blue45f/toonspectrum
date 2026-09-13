@@ -65,6 +65,7 @@ export function useStudioCheckpoints({
         await createDurableStudioCheckpoint(undefined, checkpointKey, {
           name,
           payload: currentStudioProjectSnapshot(),
+          omitUndefinedObjectFields: true,
         })
       );
       setCheckpointError(null);
