@@ -107,7 +107,8 @@ const VALID_COMPANION_SESSION = "studio-inapp-verify-session-0001";
  * 마운트하므로 하나로 묶지 않는다 — 넘침과 타깃 크기는 마운트된 패널이 정한다.
  */
 const ROUTES: readonly RouteProbe[] = Object.freeze([
-  { id: "editor", path: "/studio", readySelector: '[data-studio-mobile-editing-dock="true"]' },
+  { id: "home", path: "/studio", readySelector: "h1" },
+  { id: "editor", path: "/studio/canvas", readySelector: '[data-studio-mobile-editing-dock="true"]' },
   { id: "comic", path: "/studio/comic", readySelector: '[data-studio-mobile-editing-dock="true"]' },
   { id: "animation", path: "/studio/animation", readySelector: '[data-studio-mobile-editing-dock="true"]' },
   { id: "brushes", path: "/studio/brushes", readySelector: '[data-studio-mobile-editing-dock="true"]' },
@@ -440,7 +441,11 @@ async function main(): Promise<void> {
     unavailableMessage: "could not allocate an in-app-browser preview port",
   });
   const baseUrl = `http://127.0.0.1:${port}`;
-  const server: ChildProcess = spawnVitePreview({ port, runner: "pnpm-exec" });
+  const server: ChildProcess = spawnVitePreview({
+    port,
+    runner: "node-vite-bin",
+    logPath: join(SCRATCH, "studio-inapp-preview.log"),
+  });
 
   let browser: Browser | null = null;
   try {
