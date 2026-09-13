@@ -13,7 +13,9 @@ const outbox = read("./studio-draft-save-outbox.ts");
 
 describe("draft save center product boundary", () => {
   it("mounts one real save center in the editor render tree", () => {
-    expect(view).toContain('import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter"');
+    expect(view).toContain('lazy(() => import("../StudioDraftSaveCenter")');
+    expect(view).toContain("default: module.StudioDraftSaveCenter");
+    expect(read("../../app/service-worker/studio-service-worker-drawing-plan.ts")).toContain('"StudioDraftSaveCenter"');
     expect(view.match(/<StudioDraftSaveCenter\b/gu)).toHaveLength(1);
     expect(view).toContain('s.studioMenubarContentHandlers.handleSave("draft")');
     expect(view).toContain("s.onContinuePendingSave()");
@@ -26,7 +28,8 @@ describe("draft save center product boundary", () => {
     expect(view).toContain("workHydrationFailed={s.workHydrationFailed}");
     expect(view).toContain("pendingSaveIntent={s.pendingSaveIntent}");
     expect(view).toContain("localCheckpointCount={s.checkpoints?.length ?? 0}");
-    expect(view).toContain('key={s.effectiveWorkId ?? s.workId ?? "new-work"}');
+    expect(view).toContain('key={JSON.stringify([s.saveIntentScope, s.effectiveWorkId ?? s.workId ?? "new-work"])}');
+    expect(view).toContain("saveIntentScope={s.saveIntentScope}");
   });
 
   it("does not introduce a second document-content or network authority", () => {
