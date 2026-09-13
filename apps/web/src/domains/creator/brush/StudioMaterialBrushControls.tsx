@@ -1,3 +1,5 @@
+import { StudioBrushTopologyControls } from "./StudioBrushTopologyControls";
+import { brushStudioV6Topology } from "../brush-lab/brush-studio-v6-topology-catalog";
 import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -12,6 +14,12 @@ import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-
 import type { StudioBrushSnapshot } from "./studio-brush-library";
 
 const FIELDS = [
+  { key: "friction", label: "접촉 마찰", min: 0, max: 1, step: 0.01 },
+  { key: "absorbency", label: "흡수율", min: 0, max: 1, step: 0.01 },
+  { key: "edgeDarkening", label: "가장자리 농축", min: 0, max: 1, step: 0.01 },
+  { key: "plasticity", label: "물감 소성", min: 0, max: 1, step: 0.01 },
+  { key: "gravity", label: "중력", min: -1, max: 1, step: 0.01 },
+
   { key: "flow", label: "도포 유량", min: 0.01, max: 1, step: 0.01 },
   { key: "spacing", label: "접촉 간격", min: 0.01, max: 4, step: 0.01 },
   { key: "surfaceTooth", label: "종이 요철", min: 0, max: 1, step: 0.01 },
@@ -31,6 +39,8 @@ const FIELDS = [
 ] as const;
 
 function materialLabel(material: BrushStudioV6MaterialConfig): string {
+  const topology = brushStudioV6Topology(material.slots.carrier);
+  if (topology) return `${topology.label} · 결합 브러시`;
   if (material.slots.pattern !== "pattern-none") return "문양·입자 브러시";
   if (material.slots.physics.includes("physics-bristle")) return "강모·안료 소모 브러시";
   if (material.slots.deposition === "deposit-particles") return "입자·성장 브러시";
@@ -51,7 +61,9 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
   const navigate = useNavigate();
   const [notice, setNotice] = useState("");
   const active = brushStudioV6MaterialActiveTuningKeys(material);
-  const fields = FIELDS.filter((field) => active.has(field.key));
+  const topology = brushStudioV6Topology(material.slots.carrier);
+  const topologyKeys = new Set(topology?.controls.map((control) => control.key));
+  const fields = [...FIELDS.filter((field) => active.has(field.key) && !topologyKeys.has(field.key)), ...(topology?.controls.filter((control) => active.has(control.key)) ?? [])];
   const label = materialLabel(material);
   const editorId = `material-${material.seed}`;
   const editorHref = `/studio/assets/brushes/${editorId}/edit`;
@@ -79,6 +91,7 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
       <h3 className="text-sm font-bold text-fg">{label}</h3>
       <p className="mt-1 text-xs leading-5 text-fg-3">다음 획부터 반영됩니다. 크기·기본 색·불투명도는 브러시의 기본 도구 설정에서 조절하세요.</p>
     </div>
+    <StudioBrushTopologyControls material={material} onChange={(next) => onChange({ ...programSet, material: next })} />
     <div className="space-y-2">
       {fields.map((field) => <div key={field.key} className="block rounded-xl border border-line bg-card/55 px-3 py-2">
         <div className="flex justify-between gap-3 text-xs font-semibold text-fg-2"><label htmlFor={`${instanceId}-${field.key}`}>{field.label}</label><span className="tabular-nums">{material.tuning[field.key]}</span></div>

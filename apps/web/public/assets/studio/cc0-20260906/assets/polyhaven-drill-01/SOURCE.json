@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Drill_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "name": "Drill 01",
+    "type": 2,
+    "authors": {
+      "Fernando Quinn": "All"
+    },
+    "categories": [
+      "props",
+      "tools",
+      "electronics",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "metal",
+      "plastic",
+      "tool",
+      "drill",
+      "prop"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 2926,
+    "texel_density": 14247.64339633634,
+    "dimensions": [
+      182.8799918293953,
+      52.41549015045166,
+      185.06235629320145
+    ],
+    "files_hash": "09a08d9e60a537490591e142ddef14428a140950",
+    "description": "Free 4K model of a cordless drill with lime plastic body, black rubber grip, metal chuck and 18V lithium-ion battery details.",
+    "category_id": "371262a4-64a1-5969-9633-4c80b3d79b3c",
+    "category": "Tools & Equipment/Power Tools/Drills",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "plastic",
+        "rubber",
+        "metal"
+      ]
+    },
+    "img_version": "8b7af9a3",
+    "download_count": 27608,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Drill_01.png?width=256&height=256&v=8b7af9a3"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Drill_01/Drill_01_2k.gltf",
+      "bytes": 2637,
+      "sha256": "c44753efa792f92f64ec0ced2abdf814f36b590f43ccdec4dedaa0e66f7a2d1f",
+      "sourceMd5": "10dab506e80d803d03607925893268bb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Drill_01/Drill_01_nor_gl_2k.jpg",
+      "bytes": 401331,
+      "sha256": "db4e34922c9c03dd5445152702918ee993903d0de7fed3bc44126d427f35a511",
+      "sourceMd5": "0ad5efd82adee10c5dff065308b4622e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Drill_01/Drill_01_arm_2k.jpg",
+      "bytes": 544044,
+      "sha256": "c77ad4912adb30f775609436c8cea102e920399b3c7144bf0a40dc8b60d1a81d",
+      "sourceMd5": "68e3e0f0e3d6bd361efdf55d55201967"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Drill_01/Drill_01.bin",
+      "bytes": 90100,
+      "sha256": "0353e743c05051546945fd2d79e9c96bfad7ad387e0d47bc5d408d78ae7b9fe8",
+      "sourceMd5": "ddba74e02f045bcfaacb687bccf5a855"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Drill_01/Drill_01_diff_2k.jpg",
+      "bytes": 311893,
+      "sha256": "2f1837a911e92fc3d48475695e67b7eb997eb597462fc94feaf231640b87736a",
+      "sourceMd5": "e228492108e8c22d0d4edb7508b24a47"
+    }
+  ]
+}

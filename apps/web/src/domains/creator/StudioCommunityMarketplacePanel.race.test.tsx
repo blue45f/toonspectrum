@@ -142,8 +142,8 @@ vi.mock("./studio-marketplace-runtime-compatibility", () => ({
   getProductStudioMarketplaceRuntimeCompatibility: mocks.runtimeCompatibility,
 }));
 
-vi.mock("./studio-original-free-asset-packs", () => ({
-  createStudioOriginalFreeAssetRecord: (asset: unknown) => asset,
+vi.mock("./studio-community-marketplace-asset", () => ({
+  createStudioCommunityMarketplaceAssetRecord: async (asset: unknown) => asset,
 }));
 
 function deferred<T>() {

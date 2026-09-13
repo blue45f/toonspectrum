@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Drill_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-drill-01",
+  "sourceModelSha256": "c2a77734defe626575ec7a0aa6b14f715137a93e50c1e1813237ba3fe61f3af5",
+  "render": {
+    "sourceId": "polyhaven-drill-01",
+    "sourceSha256": "c2a77734defe626575ec7a0aa6b14f715137a93e50c1e1813237ba3fe61f3af5",
+    "path": "high-resolution-props/polyhaven-drill-01.png",
+    "visiblePixels": 335904,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 2926
+  },
+  "independentOriginal": false
+}

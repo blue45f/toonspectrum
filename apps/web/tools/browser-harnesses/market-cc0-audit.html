@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Market CC0 browser integration audit</title></head>
+<body><h1>Market CC0 browser integration audit</h1><div id="results"></div>
+<script type="module">
+import { STUDIO_MARKETPLACE_CC0_ASSETS as assets } from '/src/domains/creator/studio-marketplace-cc0-catalog.generated.ts';
+import { createStudioCommunityMarketplaceAssetRecord } from '/src/domains/creator/studio-community-marketplace-asset.ts';
+import { prepareStudioMarketplaceCc0ModelScene } from '/src/domains/creator/studio-marketplace-cc0-model.ts';
+import { getStoredBg3dModelByHashV12 } from '/src/domains/creator/bg3d/bg3d-model-library.ts';
+window.runMarketCc0Audit = async () => {
+ const results=[];
+ for (const asset of assets) {
+  if(asset.kind !== 'model') {
+   const record=await createStudioCommunityMarketplaceAssetRecord(asset);
+   const image=new Image();image.src=record.dataUrl;await image.decode();
+   const figure=document.createElement('figure');const caption=document.createElement('figcaption');caption.textContent=asset.name;
+   image.style.width='240px';figure.append(image,caption);document.querySelector('#results').append(figure);
+   results.push({id:asset.id,kind:asset.kind,width:image.naturalWidth,height:image.naturalHeight,hash:record.contentHash});
+  } else {
+   const prepared=await prepareStudioMarketplaceCc0ModelScene('studio-3d-asset:'+asset.id,()=>true);
+   const attachment=prepared.scene.attachments[0];
+   const stored=await getStoredBg3dModelByHashV12(attachment.hash);
+   if(!stored || stored.byteSize!==asset.bytes || prepared.scene.nodes.length!==1)throw new Error('round-trip failed: '+asset.id);
+   results.push({id:asset.id,kind:asset.kind,hash:attachment.hash,storedBytes:stored.byteSize,nodes:prepared.scene.nodes.length});
+  }
+ }
+ return {crossOriginIsolated,results};
+};
+</script></body></html>

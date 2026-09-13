@@ -1,0 +1,111 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/power_box_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1635465600,
+    "name": "Power Box 01",
+    "type": 2,
+    "authors": {
+      "Rico Cilliers": "Modeling & Texturing",
+      "Yann Kervran": "Rigging"
+    },
+    "categories": [
+      "industrial",
+      "props",
+      "electronics",
+      "tools",
+      "rigged",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "box",
+      "electrical",
+      "power",
+      "wiring",
+      "db board",
+      "circuit",
+      "breakers",
+      "board",
+      "switch",
+      "prop",
+      "modern",
+      "damaged",
+      "utility",
+      "infrastructure"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 21272,
+    "texel_density": 7468.025590418062,
+    "dimensions": [
+      377.4920701980591,
+      418.45703125,
+      503.142774105072
+    ],
+    "files_hash": "4df156d1369da9a74510ad2ff012212cea3d4cfa",
+    "description": "Free 8K model of a modern, slightly damaged industrial power box with breakers, switches and exposed wiring - rugged, rigged prop ready for utility, electronics, and industrial scenes.",
+    "sponsors": [
+      "26820710",
+      "11109006"
+    ],
+    "category_id": "a30ab5d7-1df0-58ab-8650-c1aec8dcdd72",
+    "category": "Industrial & Infrastructure/Electrical/Utility & Power Boxes",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "metal",
+        "plastic"
+      ],
+      "rigged": true
+    },
+    "img_version": "c743d985",
+    "download_count": 39672,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/power_box_01.png?width=256&height=256&v=c743d985"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/power_box_01/power_box_01_2k.gltf",
+      "bytes": 4417,
+      "sha256": "c440e5e7f51cb148a5eb8d00f4d973f806817434a675168110cd2bb9cb0a7060",
+      "sourceMd5": "d0549520e06ea7437906992f4e9152f3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/power_box_01/power_box_01_nor_gl_2k.jpg",
+      "bytes": 2733825,
+      "sha256": "fff3e5b9037375226c10e7625b2d7735029cdae4d926ddc90567e02de61420e0",
+      "sourceMd5": "453ff402c8af7f09a53644fcdc604e7f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/power_box_01/power_box_01_arm_2k.jpg",
+      "bytes": 3011906,
+      "sha256": "792a1e04f9ab4740cbde8a70c1b720f4e411afc42d1359b24ab6602ef52d1c33",
+      "sourceMd5": "af49a41c1fa2c50456e3f7c2eaabd3b0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/power_box_01/power_box_01.bin",
+      "bytes": 782096,
+      "sha256": "b46efdf668ec2d4e04ff51604b5f1486caf20df632f442aab62601718058db05",
+      "sourceMd5": "e76df413e15ce8a76eb50971266d2450"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/power_box_01/power_box_01_diff_2k.jpg",
+      "bytes": 1883678,
+      "sha256": "045f04100a6a95bf6d43ea0989545b52008c84dd1d1d238ad0d7fa89789f8d0b",
+      "sourceMd5": "c911f1ffb29ea558069498a01d5ccc5a"
+    }
+  ]
+}

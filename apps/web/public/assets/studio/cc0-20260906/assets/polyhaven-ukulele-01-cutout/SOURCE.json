@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Ukulele_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-ukulele-01",
+  "sourceModelSha256": "a2fa1e3450228fe68d205ebc8ccb6cbf0d15a464a5ec38ef83b8a0bf54a2cd7d",
+  "render": {
+    "sourceId": "polyhaven-ukulele-01",
+    "sourceSha256": "a2fa1e3450228fe68d205ebc8ccb6cbf0d15a464a5ec38ef83b8a0bf54a2cd7d",
+    "path": "high-resolution-props/polyhaven-ukulele-01.png",
+    "visiblePixels": 113483,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 8912
+  },
+  "independentOriginal": false
+}

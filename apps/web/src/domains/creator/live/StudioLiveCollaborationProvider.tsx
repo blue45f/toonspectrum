@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -37,6 +39,8 @@ import type {
   StudioLiveTransportFactory,
   StudioLiveTransportMode,
 } from "./studio-live-collaboration-transport";
+
+const StudioP2pHuddleLauncher = lazy(() => import("./huddle/StudioP2pHuddleLauncher"));
 
 export type StudioCrdtAuthoritativeSaveBarrier = (
   timeoutMs?: number
@@ -906,6 +910,7 @@ export function StudioLiveCollaborationProvider({
   return (
     <StudioLiveCollaborationContext.Provider value={value}>
       {children}
+      {room && <Suspense fallback={null}><StudioP2pHuddleLauncher /></Suspense>}
     </StudioLiveCollaborationContext.Provider>
   );
 }
