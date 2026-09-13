@@ -42,3 +42,20 @@ worktree (base b160b71a7) were copied into an isolated worktree; the source work
 Captured patch SHA-256: `0f9e936b2c895c0352c78ecb3ddd8440bef0868f750aa09639ddbadaf6d5bb9e`.
 This integration also adds missing first-use watermark/receipt resources and persistent save intent.
 No CI thresholds, branch protection rules, dependency versions, or paid-service configuration changed.
+
+## Restart-owner correction and executed browser evidence
+
+An auto-published `?room=` survived Chromium shutdown while its tab-only origin record did not.
+The next launch incorrectly became a joiner and hid the SQLite recovery candidate behind the
+remote-convergence lock. A bounded local-origin navigation record is now scoped to account and
+local project/document/draft identity. It holds no artwork, token or server role. Reclaim requires
+an exact known origin and a non-stealing Web Lock with no active owner; saved works, remixes,
+unknown rooms, denied storage and unsupported locks are never promoted. Active companion tabs
+remain joiners. Server auth, ACL, source hydration and CRDT server acknowledgement remain unchanged.
+
+Actual Chromium production-preview verification after this correction: **PASS**. Network stayed
+disabled for pen/Undo/Redo/SQLite autosave, first-use PNG export, process close/reopen, local-origin
+reclaim, explicit manuscript recovery and pixel-identical PNG export. The save-intent reminder
+also survived with no inherited sessionStorage outbox. JavaScript page errors and unexpected
+failed responses: zero. This is one opaque-pen Chromium lifecycle, not all tools, all browsers,
+real devices, or an authenticated production-server save.
