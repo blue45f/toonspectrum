@@ -35,7 +35,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs
 
   static:
     needs: preflight
