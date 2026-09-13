@@ -15751,10 +15751,8 @@ const puppetWarpArmed =
                 projectCreatorMarketplaceRecordToAssets,
               },
               { installStudioCreatorPackProduct },
-              {
-                browserStudioCreatorPackStorage,
-                resolveStudioCreatorBundledCatalogTarget,
-              },
+              { browserStudioCreatorPackStorage },
+              { openStudioMarketplaceCatalog, confirmStudioMarketplacePackSync },
               { createStudioCommunityMarketplaceAssetRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
@@ -15763,6 +15761,7 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
+              import("./studio-marketplace-catalog-open"),
               import("./studio-community-marketplace-asset"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
@@ -15788,71 +15787,24 @@ const puppetWarpArmed =
                     message: "로그인하지 않아 계정 라이브러리에는 기록하지 않았습니다.",
                   };
                 }
-                guard.assertCurrent();
-                try {
-                  const synchronized =
-                    await synchronizeStudioCommunityMarketplaceInstalledPack(
-                      record,
-                      pack,
-                    );
-                  guard.assertCurrent();
-                  setStudioMarketplaceCloudSyncRetry(null);
-                  return {
-                    status: "synchronized" as const,
-                    message: synchronized.message,
-                  };
-                } catch (caught: unknown) {
-                  guard.assertCurrent();
-                  const issue = caught instanceof Error && caught.message.trim()
-                    ? caught.message
-                    : "계정 라이브러리 설치 확인을 동기화하지 못했습니다.";
-                  setStudioMarketplaceCloudSyncRetry({ record, pack, issue });
-                  throw caught;
-                }
+                return confirmStudioMarketplacePackSync(
+                  () => synchronizeStudioCommunityMarketplaceInstalledPack(record, pack), guard,
+                  () => setStudioMarketplaceCloudSyncRetry(null),
+                  (issue) => setStudioMarketplaceCloudSyncRetry({ record, pack, issue }),
+                );
               },
-              openBundledPackCatalog: async (pack) => {
-                const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
-                if (resolution.status === "unsupported") {
-                  return {
-                    status: "unsupported" as const,
-                    message: resolution.reason,
-                  };
-                }
-                if (resolution.target.kind === "scene-template-catalog") {
-                  setMenu("scene");
-                  setSceneSimilarAnchorId(resolution.target.templateId);
-                  return {
-                    status: "opened" as const,
-                    message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
-                  };
-                }
-                if (resolution.target.kind === "3d-asset-catalog") {
-                  const { prepareStudioMarketplaceCc0ModelScene } = await import("./studio-marketplace-cc0-model");
-                  const prepared = await prepareStudioMarketplaceCc0ModelScene(
-                    resolution.target.runtimeRef, isCurrentOperation,
-                  );
-                  if (!isCurrentOperation() || !isStudioPasteScopeCurrent({
-                    mutationAllowed: canApplyStudioMutation(mutationTicket),
-                    reviewLocked: activeSurfaceReviewLockedRef.current,
-                    targetPageId, currentPageId: currentPageIdRef.current,
-                    targetMasterEditMode, currentMasterEditMode: masterEditModeRef.current,
-                  })) {
-                    await prepared.cancel();
-                    return { status: "unsupported" as const, message: "작업 대상이 바뀌어 3D 에셋 열기를 취소했습니다." };
-                  }
-                  openBackground3dFromMenu();
-                  setBg3dInitialScene(prepared.scene);
-                  return {
-                    status: "opened" as const,
-                    message: `${prepared.name} 모델을 3D 편집기에 불러왔어요. 렌더링을 확인하고 컷에 삽입하세요.`,
-                  };
-                }
-                openBackground3dFromMenu();
-                return {
-                  status: "opened" as const,
-                  message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
-                };
-              },
+              openBundledPackCatalog: (pack) => openStudioMarketplaceCatalog(pack, {
+                isCurrent: isCurrentOperation,
+                canMutate: () => isStudioPasteScopeCurrent({
+                  mutationAllowed: canApplyStudioMutation(mutationTicket),
+                  reviewLocked: activeSurfaceReviewLockedRef.current,
+                  targetPageId, currentPageId: currentPageIdRef.current,
+                  targetMasterEditMode, currentMasterEditMode: masterEditModeRef.current,
+                }),
+                openTemplate: (id) => { setMenu("scene"); setSceneSimilarAnchorId(id); },
+                openBackground3d: openBackground3dFromMenu,
+                setInitialScene: setBg3dInitialScene,
+              }),
               projectAssets: (record) =>
                 projectCreatorMarketplaceRecordToAssets(
                   record,

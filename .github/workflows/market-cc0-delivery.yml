@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps/web/src/domains/creator/**'
       - 'apps/web/src/domains/market/**'
+      - 'apps/web/src/app/routes/**'
       - 'scripts/*market*'
       - 'scripts/seed/market-cc0-manifests.mts'
       - '.github/workflows/market-cc0-delivery.yml'
@@ -29,6 +30,9 @@ jobs:
       - run: node --import tsx scripts/generate-market-cc0-catalog.mts --check
       - run: |
           pnpm exec vitest run \
+            apps/web/src/app/routes/studio-entry-redirect.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-catalog-open.test.ts \
+            apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
             apps/web/src/domains/creator/studio-marketplace-cc0-catalog.test.ts \
             apps/web/src/domains/creator/studio-community-marketplace.test.ts \
             apps/web/src/domains/creator/studio-marketplace-deep-link.test.ts \

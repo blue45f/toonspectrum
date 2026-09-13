@@ -21,3 +21,8 @@ Base: `21c3f91f953a1fc00f44c30c3097703de40cf71f`.
 - Actual Chrome, isolated test context, real production modules and local files: eight image decodes with exact dimensions/hashes; six real model imports and hash-based storage readbacks with one scene node each; no page exceptions. Harness: `apps/web/tools/browser-harnesses/market-cc0-audit.html`.
 
 The browser harness above verifies delivery/storage, not the complete Studio UI, GPU artistic quality or account publishing. Browser account-creation automation was blocked by the tool security check; no bypass was attempted. Existing test account/products and production manuscripts were not changed during source development. Main merge, deployment and any new product registration must be recorded from their actual results separately.
+
+## Follow-up from required CI and built-UI observation
+- CI exposed the unchanged architecture ceiling: host 29531 > 29488 lines and AppRouter 131 > 100. Extracted typed marketplace catalog/sync orchestration and the legacy entry resolver; the original ceiling tests now pass without editing their limits (host 29483, router 97 before final formatting).
+- The built UI demonstrated that `/studio?installMarketResource=...` stopped at Studio home. The canonical legacy-entry resolver now preserves the complete market query while redirecting to the existing draft-canvas route. Unrelated home queries and existing work routes are unchanged.
+- Added ten entry-route and six catalog/sync regression cases. Architecture/deep-link/entry/catalog selection: 49 passed; full web/API typecheck and changed-file lint passed again.
