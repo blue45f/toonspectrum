@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/carrot_cake",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1660694400,
+    "name": "Carrot Cake",
+    "categories": [
+      "food",
+      "props"
+    ],
+    "type": 2,
+    "tags": [
+      "baked goods",
+      "cake",
+      "carrot",
+      "food",
+      "bakery",
+      "dish",
+      "cooking",
+      "dessert"
+    ],
+    "sponsors": [
+      "25436656"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 13790,
+    "texel_density": 18439.12503034317,
+    "dimensions": [
+      225.42137652635574,
+      225.38353502750397,
+      97.57296415045857
+    ],
+    "files_hash": "b1fa5ea224d02682e75f74b2f0e5b1cc52f3e4c5",
+    "description": "Free 8K model of a realistic carrot cake with cream-cheese frosting, walnut sprinkles, and baked crumb detail - perfect food prop for close-up renders.",
+    "authors": {
+      "Greg Zaal": "photography",
+      "James Ray Cock": "processing"
+    },
+    "category_id": "02fe0dc1-b3af-58f0-bfd7-e46c4085eec1",
+    "category": "Food & Kitchen/Prepared Food/Cakes & Pastries",
+    "attributes": {
+      "material": [
+        "food"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "399dad29",
+    "download_count": 14287,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/carrot_cake.png?width=256&height=256&v=399dad29"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/carrot_cake/carrot_cake_2k.gltf",
+      "bytes": 2682,
+      "sha256": "b12396657fd0d6d70138c67d51da807dd4db8dc66aa22e170112949e5148419a",
+      "sourceMd5": "eb9cfc6b482f504742316814522b888d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carrot_cake/carrot_cake_arm_2k.jpg",
+      "bytes": 3753463,
+      "sha256": "16394cf38c71a658f0a2d712131c222b80b43147fd70f9da698687a77f5882f2",
+      "sourceMd5": "72e4d17cb8c2d5b56583853970030b00"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/carrot_cake/carrot_cake.bin",
+      "bytes": 377492,
+      "sha256": "4390df681a8e7d1c1ec8640addb94e422073ccb88d0b1e73971e13cd48bb12cb",
+      "sourceMd5": "085b7ba8dc8de57f5e8aadb9ed68dfe5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carrot_cake/carrot_cake_nor_gl_2k.jpg",
+      "bytes": 4502170,
+      "sha256": "1761d9cf8b8d624b73bb34e68c4f8518a960a4d8a2495c3ef39b119e68b1ac93",
+      "sourceMd5": "fd3c408d93347da9229aaf9de04fa937"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carrot_cake/carrot_cake_diff_2k.jpg",
+      "bytes": 2596480,
+      "sha256": "fc951493885a7d42e9bfb884bd80f0f2a9c4181c65578cfc2e583e827b832521",
+      "sourceMd5": "2309f9e756251916830a2d88762f224e"
+    }
+  ]
+}

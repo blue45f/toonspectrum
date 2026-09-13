@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ClassicNightstand_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-classicnightstand-01",
+  "sourceModelSha256": "8e4ea304364fd3d6234db633b7319628db7d85c0a73ada42ad49fbac131eda6e",
+  "render": {
+    "sourceId": "polyhaven-classicnightstand-01",
+    "sourceSha256": "8e4ea304364fd3d6234db633b7319628db7d85c0a73ada42ad49fbac131eda6e",
+    "path": "high-resolution-props/polyhaven-classicnightstand-01.png",
+    "visiblePixels": 678454,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 2002
+  },
+  "independentOriginal": false
+}
