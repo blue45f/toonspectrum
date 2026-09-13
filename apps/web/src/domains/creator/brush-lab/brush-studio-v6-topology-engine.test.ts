@@ -91,8 +91,8 @@ describe("versioned stroke topology kernels", () => {
     expect(next.slots.physics).toEqual([]); expect(next.slots.pickup).toBe("pickup-none");
     expect(next.tuning).toEqual(program.tuning); expect(program).toEqual(original);
   });
-  it("has six distinct geometries independently of colors", () => {
+  it("has distinct geometries independently of colors", () => {
     const geometry = ids.map((id) => brushStudioV6MaterialMarksToSvg(paint(id).map((m) => ({ ...m, color: "#000000", opacity: 1 }))));
-    expect(new Set(geometry).size).toBe(6);
+    expect(new Set(geometry).size).toBe(ids.length);
   });
 });

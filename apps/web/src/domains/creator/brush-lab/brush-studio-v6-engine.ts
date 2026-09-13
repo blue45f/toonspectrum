@@ -148,7 +148,7 @@ export const BRUSH_STUDIO_V6_RECIPES: readonly BrushStudioV6Recipe[] = Object.fr
   recipe("moss-flow", "모스 플로우", "패턴", "플로우필드 위에서 성장하는 이끼 군집", { slots: { carrier: "carrier-p5-flow", tip: "tip-motif-atlas", surface: "surface-porous", deposition: "deposit-wet", pigment: "pigment-spectral", physics: ["physics-porous-paper"], pattern: "pattern-foliage", finish: ["finish-grain"], output: "output-contact-canvas-svg" }, tuning: { size: 20, patternDensity: 0.9, patternScale: 0.7, patternJitter: 0.72, absorbency: 0.52, primaryColor: "#365314", secondaryColor: "#65a30d" } }),
   recipe("document-halftone", "문서 고정 하프톤", "만화", "확대·이동에도 위상이 고정되는 망점", { slots: { motion: "motion-direct", pattern: "pattern-dot-tone" }, tuning: { size: 44, patternDensity: 0.62, patternScale: 0.82 } }),
   recipe("kaleido-swarm", "칼레이도 스웜", "프로시저럴", "반사·회전 대칭과 입자 군집을 결합", { slots: { carrier: "carrier-webgpu-particles", tip: "tip-motif-atlas", deposition: "deposit-particles", physics: ["physics-particles"], pattern: "pattern-kaleido", finish: ["finish-neon"], output: "output-contact-canvas-svg" }, tuning: { size: 18, particleCount: 1100, patternDensity: 0.8, patternJitter: 0.5, primaryColor: "#7c3aed", secondaryColor: "#22d3ee" } }),
-  ...BRUSH_STUDIO_V6_TOPOLOGIES.map((entry) => recipe(entry.recipeId, entry.label, "획 구조·물리", entry.description, {
+  ...BRUSH_STUDIO_V6_TOPOLOGIES.map((entry) => recipe(entry.recipeId, entry.label, entry.group ?? "획 구조·물리", entry.description, {
     slots: { motion: "motion-direct", carrier: entry.id, surface: "surface-kent", pigment: "pigment-spectral" },
     tuning: entry.tuning,
   })),

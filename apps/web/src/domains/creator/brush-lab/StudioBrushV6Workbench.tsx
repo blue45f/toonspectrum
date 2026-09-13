@@ -1,3 +1,4 @@
+import { StudioBrushV6RecipeShelf } from "./StudioBrushV6RecipeShelf";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import { isBrushStudioV6TopologyNodeCompatible } from "./brush-studio-v6-topology-material";
 import {
@@ -251,7 +252,6 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   currentRef.current = program;
 
   const analysis = analyzeBrushStudioV6Program(program, capabilities);
-  const recipeGroups = [...new Set(BRUSH_STUDIO_V6_RECIPES.map((recipe) => recipe.group))];
   const physicsNodes = brushStudioV6NodesForSlot("physics");
   const finishNodes = brushStudioV6NodesForSlot("finish");
   const activeTuning = brushStudioV6MaterialActiveTuningKeys(program);
@@ -395,7 +395,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             onPin={() => { setReference(program); setStatus("현재 브러시 전체 설정을 비교 기준으로 고정했습니다."); }}
             onRestore={() => replace(reference, "비교 기준의 전체 설정을 복원했습니다. 실행 취소로 돌아갈 수 있습니다.")}
             onChange={replace} /> : null}
-          {tab === "recipes" ? <Panel title="시그니처 레시피" description="이름만 다른 프리셋이 아니라 실제 재료·물리·패턴 결과가 다른 조합입니다."><div className="space-y-5">{recipeGroups.map((group) => <section key={group}><h3 className="mb-2 text-xs font-black text-fg-2">{group}</h3><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{BRUSH_STUDIO_V6_RECIPES.filter((recipe) => recipe.group === group).map((recipe) => <button key={recipe.id} type="button" onClick={() => chooseRecipe(recipe.id)} className={`${SUB} min-h-[108px] text-left hover:border-accent/50 hover:bg-accent/10 ${STUDIO_FOCUS_RING}`}><span className="text-sm font-black text-fg">{recipe.label}</span><span className="mt-2 block text-xs leading-relaxed text-fg-3">{recipe.description}</span></button>)}</div></section>)}</div></Panel> : null}
+          {tab === "recipes" ? <Panel title="시그니처 레시피" description="이름·용도·영문 ID로 찾아 실제 질감과 조절값을 확인하세요."><StudioBrushV6RecipeShelf selectedId={program.id} onChoose={chooseRecipe} /></Panel> : null}
 
           {tab === "graph" ? <Panel title="Engine Graph" description="실제 획은 공통 CPU 접촉 계산기를 사용합니다. 회색 항목은 아직 연결되지 않은 설계 기록이며, 외부 엔진을 실행하지 않습니다."><div className="grid gap-4 lg:grid-cols-2">{SINGLE_SLOTS.map(({ slot, label, description }) => { const selected = program.slots[slot]; const node = brushStudioV6Node(selected); return <div key={slot} className={SUB}><Select id={`brush-v6-slot-${slot}`} label={label} value={selected} options={nodeOptions(slot, Boolean(topology))} onChange={(id) => choose(slot, id)} /><p className="mt-2 text-xs text-fg-3">{description}</p><p className="mt-1 text-[0.68rem] font-bold text-accent">{materialNodeStatus(node.id, activeTuning, Boolean(topology))}</p></div>; })}</div></Panel> : null}
           {tab === "graph" && topology ? <Panel title={`${topology.label} · 구조 설정`} description={`${topology.description} 구조 전환 시 미지원 물리·패턴은 해제됩니다. 종이·도포·안료·네온은 재조합할 수 있습니다.`}><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{topology.controls.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div></Panel> : null}
