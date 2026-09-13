@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
-import { createRequire } from "node:module";
+import { createRequire, isBuiltin } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
@@ -33,7 +33,8 @@ function compiledFiles(directory) {
  * TypeScript paths do not rewrite emitted imports. Resolve local/workspace
  * dependencies with plain Node and require them to stay inside Vercel's dist
  * includeFiles boundary. A source file present in CI must not mask an omitted
- * production dependency. Third-party packages are traced separately by Vercel.
+ * production dependency. Resolve third-party imports from the emitted caller too:
+ * workspace-only dependencies can disappear when shared sources move under API dist.
  */
 export function verifyCompiledApiImports(directory) {
   const root = realpathSync(resolve(directory));
@@ -44,14 +45,15 @@ export function verifyCompiledApiImports(directory) {
   for (const filename of files) {
     const requireFromFile = createRequire(filename);
     for (const specifier of runtimeSpecifiers(readFileSync(filename, "utf8"), filename)) {
-      if (!specifier.startsWith(".") && !specifier.startsWith("@toonspectrum/")) continue;
+      if (isBuiltin(specifier)) continue;
+      const localOrWorkspace = specifier.startsWith(".") || specifier.startsWith("@toonspectrum/");
       importsChecked += 1;
       try {
         const target = realpathSync(requireFromFile.resolve(specifier));
         const targetRelative = relative(root, target);
         const outside = targetRelative === ".." || targetRelative.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)
           || isAbsolute(targetRelative);
-        if (outside || [".ts", ".tsx", ".mts", ".cts"].includes(extname(target))) {
+        if ((localOrWorkspace && outside) || [".ts", ".tsx", ".mts", ".cts"].includes(extname(target))) {
           failures.push(`${relative(root, filename)}: ${specifier} resolves outside compiled output (${target})`);
         }
       } catch (error) {
@@ -76,5 +78,5 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   const directory = fileURLToPath(new URL("../apps/api/dist/", import.meta.url));
   const result = verifyCompiledApiImports(directory);
   smokeCompiledCreatorResources(directory);
-  console.log(`API runtime import guard passed: ${result.filesChecked} compiled files, ${result.importsChecked} local/workspace imports; native resource-module load passed.`);
+  console.log(`API runtime import guard passed: ${result.filesChecked} compiled files, ${result.importsChecked} local/workspace/third-party imports; native resource-module load passed.`);
 }
