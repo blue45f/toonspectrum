@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { projectStudioCheckpointJson } from "./checkpoint/studio-checkpoint-json";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
@@ -156,9 +157,10 @@ function serializeSqliteCheckpointList(checkpoints: readonly StudioCheckpoint[])
     version: 1,
     checkpoints: checkpoints.slice(0, STUDIO_CHECKPOINT_LIMIT),
   });
-  if (!isJsonCheckpointValue(file)) throw createDurableStorageError();
+  const jsonFile = projectStudioCheckpointJson(file);
+  if (!isJsonCheckpointValue(jsonFile)) throw createDurableStorageError();
   try {
-    return JSON.stringify(file);
+    return JSON.stringify(jsonFile);
   } catch {
     throw createDurableStorageError();
   }
