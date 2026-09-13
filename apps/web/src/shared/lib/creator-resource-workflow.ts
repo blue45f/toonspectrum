@@ -6,8 +6,9 @@ export interface ProviderAvailability {
   provider: ResourceProvider;
   availability: "keyless" | "configured" | "not_configured";
 }
-const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd"]);
-const EXPECTED_PROVIDERS: ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo"];
+const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd", "aic", "cleveland"]);
+const LEGACY_PROVIDERS: ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo"];
+const EXPECTED_PROVIDERS: ResourceProvider[] = [...LEGACY_PROVIDERS, "aic", "cleveland"];
 /** Public configuration summary only; it is not a health check or a credential endpoint. */
 export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean }): ProviderAvailability[] {
   return [
@@ -16,22 +17,25 @@ export function providerAvailability(configured: { kakao: boolean; bizinfo: bool
     { provider: "openbd", availability: "keyless" },
     { provider: "kakao", availability: configured.kakao ? "configured" : "not_configured" },
     { provider: "bizinfo", availability: configured.bizinfo ? "configured" : "not_configured" },
+    { provider: "aic", availability: "keyless" },
+    { provider: "cleveland", availability: "keyless" },
   ];
 }
 export function parseProviderAvailability(value: unknown): ProviderAvailability[] | null {
-  if (!Array.isArray(value) || value.length !== EXPECTED_PROVIDERS.length) return null;
+  if (!Array.isArray(value) || ![LEGACY_PROVIDERS.length, EXPECTED_PROVIDERS.length].includes(value.length)) return null;
+  const expected = value.length === LEGACY_PROVIDERS.length ? LEGACY_PROVIDERS : EXPECTED_PROVIDERS;
   const entries: ProviderAvailability[] = [];
   for (const raw of value) {
     if (raw === null || typeof raw !== "object") return null;
     const item = raw as Record<string, unknown>;
-    if (!EXPECTED_PROVIDERS.includes(item.provider as ResourceProvider)) return null;
+    if (!expected.includes(item.provider as ResourceProvider)) return null;
     const provider = item.provider as ResourceProvider;
     if (item.availability !== "keyless" && item.availability !== "configured" && item.availability !== "not_configured") return null;
     if (KEYLESS_PROVIDERS.has(provider) !== (item.availability === "keyless")) return null;
     if (entries.some((entry) => entry.provider === provider)) return null;
     entries.push({ provider, availability: item.availability });
   }
-  if (EXPECTED_PROVIDERS.some((provider) => !entries.some((entry) => entry.provider === provider))) return null;
+  if (expected.some((provider) => !entries.some((entry) => entry.provider === provider))) return null;
   return entries;
 }
 /** Non-destructive restore: current resources/filled draft fields win; completion steps are unioned. */

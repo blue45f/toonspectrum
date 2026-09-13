@@ -1,5 +1,5 @@
 /** Versioned, dependency-free contracts shared by the API, browser and regression tests. */
-export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo";
+export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo" | "aic" | "cleveland";
 export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
 export type ResourceLicense = "CC0" | "metadata-only" | "book-promotion";
 
@@ -53,6 +53,8 @@ export interface ResourceSearchResult {
 
 export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
   met: "The Met · 공개 미술 자료",
+  aic: "시카고 미술관 · 공개 미술 자료",
+  cleveland: "클리블랜드 미술관 · 공개 미술 자료",
   openlibrary: "Open Library · 글로벌 도서",
   openbd: "openBD · 일본 서지",
   kakao: "카카오 · 도서 검색",
@@ -80,6 +82,8 @@ export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
 
 const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   met: ["www.metmuseum.org", "metmuseum.org"],
+  aic: ["www.artic.edu", "artic.edu"],
+  cleveland: ["www.clevelandart.org", "clevelandart.org"],
   openlibrary: ["openlibrary.org", "www.openlibrary.org"],
   openbd: ["openbd.jp", "www.openbd.jp"],
   kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
@@ -87,9 +91,14 @@ const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
 };
 
 const MET_IMAGE_HOSTS = ["images.metmuseum.org"] as const;
+const PUBLIC_IMAGE_HOSTS: Partial<Record<ResourceProvider, readonly string[]>> = {
+  met: MET_IMAGE_HOSTS, aic: ["www.artic.edu"], cleveland: ["openaccess-cdn.clevelandart.org"],
+};
 
 export function isProvider(value: unknown): value is ResourceProvider {
   return value === "met"
+    || value === "aic"
+    || value === "cleveland"
     || value === "openlibrary"
     || value === "openbd"
     || value === "kakao"
@@ -198,12 +207,12 @@ export function parseResource(value: unknown): CreatorResource | null {
   const sourceUrl = httpsUrl(v.sourceUrl, SOURCE_HOSTS[provider]);
   const fetchedAt = textOf(v.fetchedAt, 40);
   if (!id.startsWith(`${provider}:`) || id.length <= provider.length + 1 || !title || !sourceUrl || !Number.isFinite(Date.parse(fetchedAt))) return null;
-  const license: ResourceLicense = provider === "met" && v.license === "CC0"
+  const license: ResourceLicense = (provider === "met" || provider === "aic" || provider === "cleveland") && v.license === "CC0"
     ? "CC0"
     : provider === "openbd" && v.license === "book-promotion"
       ? "book-promotion"
       : "metadata-only";
-  const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, MET_IMAGE_HOSTS) : "";
+  const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, PUBLIC_IMAGE_HOSTS[provider] ?? []) : "";
   const licenseUrl = license === "CC0"
     ? "https://creativecommons.org/publicdomain/zero/1.0/"
     : license === "book-promotion"

@@ -16,6 +16,8 @@ export interface ResourceSource {
 }
 
 export const RESOURCE_SOURCES: ResourceSource[] = [
+  { name: "시카고 미술관 (Art Institute of Chicago)", category: "복식·소품·배경", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://api.artic.edu/docs/", note: "가입 없이 공식 API를 검색합니다. is_public_domain=true이며 저작권 제한이 없는 자료만 공개 미리보기를 표시합니다. CC BY 설명문은 수집하지 않고, 브리프에는 출처·조회일을 보존합니다." },
+  { name: "클리블랜드 미술관", category: "유물·문양·미술", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://openaccess-api.clevelandart.org/", note: "공식 API를 한 번에 최대 12건 검색합니다. share_license_status=CC0 및 이미지 호스트를 확인하며, 저작권 제한이나 권리 미확인 항목은 제외합니다. 검색 결과는 기존 저장 보드와 제작실에서 활용합니다." },
   { name: "The Met", category: "창작 자료", status: "검색 어댑터 구현", commercial: "상업 핵심 후보", url: "https://metmuseum.github.io/", note: "키 없는 v1.1 검색과 상세 조회를 사용합니다. isPublicDomain=true이고 권리 제한 문구가 없는 자료만 CC0 미리보기로 표시합니다." },
   { name: "Open Library", category: "글로벌 판본", status: "검색 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openlibrary.org/developers/api", note: "사람 중심의 저용량 작품·판본 발견에 사용합니다. 대량 카탈로그 동기화에는 월간 데이터 덤프를 별도로 검토하며 표지·원문 권리는 자동 승계하지 않습니다." },
   { name: "openBD", category: "일본 판본", status: "ISBN 조회 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openbd.jp/", note: "ISBN 정확 조회로 일본 도서 서지를 확인합니다. 도서 소개·홍보 목적, 원본 정보의 임의 변경 금지, 수정·삭제 반영 조건을 보존합니다." },
