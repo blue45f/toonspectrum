@@ -28,8 +28,35 @@
 
 세션/CSRF, 소유권 및 수정 버전 충돌, 신고·비공개 처리를 기존 구조에 통합했다. 지원서의 연락처는 공개 목록에 노출하지 않는다. 지원 철회·공고 삭제 시 비공개 지원 내용을 정리한다. 운영 DB 마이그레이션은 실행하지 않았고, 결제·에스크로·계약 보증·성인 인증·자동 검열·팔로우 알림은 제공하지 않는다.
 
-## 이번 실행의 검증 결과
+## 최초 제출 당시 검증 결과
 
 Node 입력·URL·응답·라우트·CSP 계약 테스트 84개, Vitest 116개, Chromium 데스크톱·모바일 8개 통과. 웹/API TypeScript 검사 및 변경 소스 ESLint 검사 통과. 저장 실패·계정별 초안·게시 동의 초기화·공개 성공 후 정리 시나리오를 포함한다.
 
 브라우저는 명시적 API fixture를 사용했다. 저장소 테스트는 mock DB 기반이다. 실제 운영 API E2E, PostgreSQL 0046/0047 마이그레이션 적용·재실행·동시성 검증, 전체 production build 및 GitHub CI 통과, 실제 영상 제공자 재생은 아직 완료로 간주하지 않는다. Vite에서 기존 public i18n import 경고가 관찰되었다. 운영 DB 변경·main 병합·배포를 완료했다는 기록이 아니다.
+
+## PR #1405 마무리 검증 · 2026-09-14
+
+최신 main을 별도 worktree에 충돌 없이 통합하고, 기존 작업 디렉터리와 미저장 변경은 수정하지 않았다.
+
+- 웹 production build (`pnpm run build`) 통과: TypeScript, Vite 번들, 서비스 워커 생성, 배포 CSP 검증 포함.
+- API production build (`pnpm --filter @webtoon-nest/api run build`) 통과: TypeScript 및 API runtime import/정책 검증 포함.
+- Node 계약 테스트 84개, 기존 Vitest 회귀 테스트 116개 통과.
+- Chromium 데스크톱·모바일 E2E 8개 통과. 모바일에서 숨겨진 헤더 텍스트를 선택하던 테스트를 실제 작성 화면의 `로그인 / 회원가입` 링크 검증으로 수정했다. 로그인 제한 자체를 제거하거나 검사를 생략하지 않았다.
+- PostgreSQL 18.4 격리 인스턴스에서 신규 통합 테스트 14개 통과. 0046/0047 추가 전용 마이그레이션 적용·재실행·데이터 보존, 작성자/지원자/제3자/운영자 권한, 지원 철회·공고 삭제 개인정보 정리, 동시 수정 충돌, 중복 지원, 실제 row-lock 대기 중 마감, 동시 등록 한도, 홍보 검색·댓글·보관·운영 처리를 확인했다.
+- 신규 테스트와 변경 E2E ESLint, API TypeScript 검사 통과.
+
+DB 통합 테스트는 명시적 `NODE_ENV=test`, `CREATOR_HUB_POSTGRES_INTEGRATION=1`, `TEST_DATABASE_URL`을 요구한다. literal loopback 주소, 자격증명, 전용 DB명 `toonspectrum_creator_hub_test`만 허용하고 임의 connection override를 거부한다. 매 실행 무작위 스키마에 합성 계정을 생성하고 해당 스키마만 정리한다. 서비스/저장소의 DB 의존성만 연결하며 SQL·Drizzle·transaction·lock은 실제 PostgreSQL에서 실행한다. 운영 DB, 기존 사용자 데이터 및 기존 Docker 서비스는 변경하지 않았다. 임시 DB는 검증 후 종료했다.
+
+재실행 예시(별도 로컬 PostgreSQL 필요):
+
+```sh
+NODE_ENV=test CREATOR_HUB_POSTGRES_INTEGRATION=1 \
+TEST_DATABASE_URL='postgresql://creator_hub_test:creator_hub_test@127.0.0.1:5432/toonspectrum_creator_hub_test' \
+pnpm exec vitest run --no-file-parallelism apps/api/src/modules/collaboration/creator-hub.postgres.integration.test.ts
+```
+
+`Creator hub validation` 워크플로에 같은 통합 테스트와 PostgreSQL 18 service를 연결했다. 위 결과는 직접 실행한 로컬 검증이며 GitHub Actions의 원격 실행 상태와 구분한다.
+
+### 운영 검증 경계
+
+실제 운영 API를 이용한 계정 로그인부터의 E2E, 운영 DB migration 적용, 외부 YouTube/Vimeo 실제 재생 및 운영 배포는 이 마무리 검증에서 실행하지 않았다. 브라우저 E2E는 계속 명시적 API fixture를 사용하며, 실제 PostgreSQL 서비스 검증과 구분한다. 기존 public i18n import 경고 및 three-vrm/three WebGPU `tslFn` export 경고가 관찰됐지만 production build는 성공했다. 해당 스튜디오 의존성 변경은 본 PR 범위에 포함하지 않았다.
