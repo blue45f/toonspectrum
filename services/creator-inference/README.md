@@ -103,6 +103,24 @@ are `no-store`; no private content is put in a service-worker cache.
   control structure and runs SDXL img2img. It preserves structure as conditioning,
   not as a mathematical guarantee of face, hand or character identity.
 
+## Dependency security baseline
+
+The model profile pins `diffusers==0.38.0` to address
+[GHSA-98h9-4798-4q5v](https://github.com/advisories/GHSA-98h9-4798-4q5v) and
+[GHSA-7wx4-6vff-v64p](https://github.com/advisories/GHSA-7wx4-6vff-v64p).
+Use stable `safetensors>=0.8,<1` with this release. The existing Transformers 4.x
+and Hugging Face Hub 0.x ranges remain in place; this security update does not
+require a major-version migration or changes to the model acquisition command.
+The CPU test profile pins `pytest==9.0.3` for
+[GHSA-6w46-j5rx-g56g](https://github.com/advisories/GHSA-6w46-j5rx-g56g).
+
+Run `python -m pytest services/creator-inference/test_runtime.py -q` from the
+repository root after installing `requirements-test.txt`. This includes regression
+checks on the dependency security floors. Dependency resolution and CPU tests do
+not qualify a CUDA/PyTorch pair or prove real model inference quality; retain the
+operator-run GPU acceptance process above. Do not download weights or enable an
+engine just to verify this dependency update.
+
 ## Licenses / primary implementation references
 
 Retain model notices and review usage restrictions before publishing the feature.
@@ -111,7 +129,7 @@ ControlNet: CreativeML Open RAIL++-M, including usage restrictions, not an unres
 MIT/Apache equivalent. Blender and each transitive runtime dependency retain their own
 licenses. No model weights or third-party source are vendored in this change.
 
-- https://huggingface.co/docs/diffusers/v0.35.1/api/pipelines/wan
+- https://huggingface.co/docs/diffusers/v0.38.0/api/pipelines/wan
 - https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P-Diffusers
 - https://github.com/VAST-AI-Research/TripoSR
 - https://huggingface.co/stabilityai/TripoSR
