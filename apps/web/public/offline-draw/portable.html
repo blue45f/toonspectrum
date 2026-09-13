@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-eQmOsgBciMY6z2pXsrqFUYz4y/u4SxKjvhX5Bp5DClg='; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><meta name="theme-color" content="#171823"><meta name="robots" content="noindex">
+  <title>툰스튜디오 · 로컬 드로잉</title>
+  <style>:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#eeeff6;background:#171823;color-scheme:dark;font-size:14px}*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column}button,input,select{font:inherit}button,.file-button{border:1px solid #414356;background:#292b3c;color:inherit;border-radius:9px;padding:10px 12px;min-height:44px;cursor:pointer}button:hover,.file-button:hover{background:#383b51}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #e9b86a;outline-offset:2px}button[aria-pressed=true],.primary{background:#6d4de2;border-color:#b8a3ff}.brand{font-weight:900;color:inherit;text-decoration:none;letter-spacing:-.04em;white-space:nowrap}.brand span{font-weight:400}.badge{font-size:10px;letter-spacing:.14em;padding:5px 8px;background:#30394a;border-radius:20px;color:#b6d5d4}header{display:flex;gap:14px;align-items:center;padding:12px 18px;border-bottom:1px solid #303247}#title{min-width:100px;flex:1;background:transparent;border:1px solid transparent;color:inherit;font-weight:700;border-radius:6px;padding:8px}#title:hover{border-color:#414356}.notice{padding:9px 18px;background:#222c34;font-size:12px;color:#c1d2db;line-height:1.5}#offline-state{display:inline-block;margin-left:8px;color:#b3efcf}main{display:flex;flex:1;min-height:0}.tools{width:100px;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;border-right:1px solid #303247}.tools label{font-size:11px;display:block}.tools input{width:100%;display:block;margin-top:6px}.tools input[type=color]{height:38px;padding:0;border:0}.workspace{min-width:0;min-height:0;flex:1;display:flex;flex-direction:column}#viewport{flex:1;min-height:0;overflow:auto;display:grid;align-items:start;justify-items:start;padding:24px;background:radial-gradient(#35364b 1px,transparent 1px);background-size:16px 16px}canvas{touch-action:none;display:block;background:white;box-shadow:0 12px 48px #0006;cursor:crosshair}canvas[data-locked=true]{cursor:not-allowed}.canvas-controls{display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 16px;font-size:12px;flex-wrap:wrap}.canvas-controls button{min-height:36px;padding:6px 10px}.canvas-controls label{display:flex;align-items:center;gap:6px}.canvas-controls input{width:100px}#dimensions{margin-left:auto;color:#adb1c9}aside{width:230px;overflow:auto;border-left:1px solid #303247;padding:16px}aside button,aside select,aside .file-button{width:100%;margin-bottom:8px}h2{font-size:14px;margin:8px 0 12px}aside label{display:block;line-height:1.8}select{background:#292b3c;border:1px solid #414356;color:inherit;padding:10px;border-radius:8px}.file-button{display:block;text-align:center}.file-button input{display:block;width:100%;margin-top:5px;font-size:10px}.layer{border:1px solid #414356;border-radius:8px;padding:8px;margin-bottom:8px}.layer.active{border-color:#b8a3ff;background:#312b48}.layer-row{display:flex;gap:8px;align-items:center}.layer-row button{margin:0;text-align:left;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layer input[type=range]{width:100%}.help{font-size:12px;color:#b4b8cc;line-height:1.7}footer{display:flex;gap:8px;align-items:center;padding:10px 18px max(10px,env(safe-area-inset-bottom));border-top:1px solid #303247}footer>div{margin-right:auto;min-width:0}footer strong{display:block;font-size:12px}footer small{display:block;font-size:11px;color:#adb1c9;margin-top:3px}#error{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);width:min(580px,calc(100vw - 24px));background:#5d293a;color:white;border:1px solid #e493a7;padding:14px;border-radius:12px;z-index:100;line-height:1.6}dialog{border:1px solid #676177;border-radius:14px;max-width:min(90vw,500px);background:#242535;color:inherit}dialog::backdrop{background:#0009}#history-list button{display:block;width:100%;margin-bottom:8px}[hidden]{display:none!important}@media(max-width:700px){header{padding:8px;gap:8px}.badge{display:none}header .brand{font-size:12px}header button{padding:8px;font-size:12px}.notice{font-size:11px;padding:6px 10px}.tools{width:76px;padding:6px;gap:5px}.tools button{font-size:11px;padding:8px 4px}#viewport{padding:12px}.canvas-controls{padding:4px 8px;gap:6px}#dimensions{display:none}aside{position:absolute;right:0;top:115px;bottom:85px;width:230px;background:#202131;z-index:10;box-shadow:-12px 0 30px #0006}footer{padding:8px;flex-wrap:wrap;gap:6px}footer>div{width:100%}footer button{flex:1;font-size:12px;padding:8px}#error{bottom:125px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="https://www.toonstudio.cloud/studio" title="온라인 스튜디오로 이동">TOON<span>STUDIO</span></a>
+  <span class="badge">LOCAL DRAW</span>
+  <input id="title" aria-label="작업 제목" value="새 로컬 드로잉" maxlength="120">
+  <button id="simple" aria-pressed="true">심플 모드</button>
+</header>
+<div class="notice">서버·로그인 없이 그리는 작업실입니다. 기존 스튜디오 프로젝트는 변경하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
+<main>
+  <nav class="tools" aria-label="드로잉 도구">
+    <button data-tool="pen" aria-pressed="true" title="펜 (B)">펜</button>
+    <button data-tool="pencil" aria-pressed="false">연필</button>
+    <button data-tool="marker" aria-pressed="false">마커</button>
+    <button data-tool="eraser" aria-pressed="false" title="지우개 (E)">지우개</button>
+    <label>색상<input id="color" type="color" value="#292b3a" aria-label="브러시 색상"></label>
+    <label>크기 <output id="size-value">8</output><input id="size" type="range" min="1" max="128" value="8" aria-label="브러시 크기"></label>
+    <button id="undo" title="실행 취소 (Ctrl/⌘ Z)" disabled>실행 취소</button>
+    <button id="redo" title="다시 실행 (Ctrl/⌘ Shift Z)" disabled>다시 실행</button>
+  </nav>
+  <section class="workspace" aria-label="그리기 작업 영역">
+    <div id="viewport"><canvas id="canvas" width="1280" height="960" aria-label="드로잉 캔버스. 펜, 마우스 또는 터치로 그리세요."></canvas></div>
+    <div class="canvas-controls"><button id="fit">화면 맞춤</button><label>확대 <input id="zoom" type="range" min="20" max="250" value="100" aria-label="캔버스 확대 비율"></label><output id="zoom-value">100%</output><span id="dimensions">1280 × 960</span></div>
+  </section>
+  <aside id="advanced" hidden>
+    <h2>레이어</h2><div id="layers"></div><button id="add-layer">레이어 추가</button><button id="clear-layer">선택 레이어 비우기</button>
+    <h2>작업 관리</h2><button id="new">새 드로잉</button>
+    <label class="file-button">이미지 / 복구 파일 열기<input id="import" type="file" accept="image/png,image/jpeg,image/webp,.json,.toonlocal"></label>
+    <label>저장된 작업<select id="documents" aria-label="저장된 로컬 작업"><option value="">작업 선택</option></select></label>
+    <button id="history">이전 저장본 복구</button>
+    <button id="persist">기기에 보관 요청</button>
+    <p class="help">브라우저 데이터 삭제·용량 정리로 로컬 저장이 사라질 수 있습니다. 중요한 작업은 복구 파일도 보관하세요. 클라우드에 자동 업로드하지 않습니다.</p>
+  </aside>
+</main>
+<footer>
+  <div><strong id="save-status" role="status" aria-live="polite">로컬 저장소 확인 중…</strong><small id="save-detail">서버를 사용하지 않습니다.</small></div>
+  
+  <button id="save">로컬 저장</button><button id="export-json">복구 파일</button><button id="export-png" class="primary">PNG 내보내기</button>
+</footer>
+<div id="error" role="alert" hidden></div>
+<dialog id="history-dialog"><h2>이전 저장본 복구</h2><p>선택한 저장본은 새 사본으로 열립니다. 현재 문서는 보존됩니다.</p><div id="history-list"></div><button id="close-history">닫기</button></dialog>
+<noscript>이 드로잉 작업실은 JavaScript가 필요합니다.</noscript>
+<script type="module">/** Server-independent drawing document. Never reads or mutates Studio's OPFS. */
+const DOCUMENT_VERSION = 1;
+const LIMITS = Object.freeze({ layers: 8, points: 120000, strokes: 10000, side: 4096, pixels: 8388608, fileBytes: 16777216 });
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const uid = () => globalThis.crypto?.randomUUID?.() ?? `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function makeLayer(name = '레이어 1') {
+  return { id: uid(), name, visible: true, opacity: 1, strokes: [], raster: null };
+}
+function makeDocument() {
+  return { format: 'toonstudio-local-drawing', version: DOCUMENT_VERSION, id: uid(), title: '새 로컬 드로잉', width: 1280, height: 960, background: '#ffffff', layers: [makeLayer()], updatedAt: Date.now() };
+}
+function finite(value, min, max, name) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) throw new Error(`${name} 값이 올바르지 않습니다.`);
+  return value;
+}
+function text(value, max, name) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`${name} 값이 올바르지 않습니다.`);
+  return value;
+}
+function color(value) {
+  if (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value)) throw new Error('색상 값이 올바르지 않습니다.');
+  return value;
+}
+/** Whitelist each field; do not merge untrusted backup objects into app state. */
+function validateDocument(input) {
+  if (!input || input.format !== 'toonstudio-local-drawing' || input.version !== 1) throw new Error('지원하지 않는 로컬 드로잉 파일입니다.');
+  const width = finite(input.width, 64, LIMITS.side, '너비');
+  const height = finite(input.height, 64, LIMITS.side, '높이');
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width * height > LIMITS.pixels) throw new Error('캔버스 크기 제한을 초과했습니다.');
+  if (!Array.isArray(input.layers) || input.layers.length < 1 || input.layers.length > LIMITS.layers) throw new Error('레이어 수 제한을 초과했습니다.');
+  let count = 0, strokeCount = 0;
+  const ids = new Set();
+  const layers = input.layers.map((layer) => {
+    if (!layer || !Array.isArray(layer.strokes)) throw new Error('레이어가 손상되었습니다.');
+    const id = text(layer.id, 100, '레이어 ID');
+    if (ids.has(id)) throw new Error('레이어 ID가 중복되었습니다.');
+    ids.add(id);
+    if (typeof layer.visible !== 'boolean') throw new Error('레이어 표시 값이 올바르지 않습니다.');
+    let raster = null;
+    if (layer.raster != null) {
+      if (typeof layer.raster !== 'string' || layer.raster.length > LIMITS.fileBytes || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(layer.raster)) throw new Error('지원하지 않는 이미지입니다. PNG/JPEG/WebP만 허용됩니다.');
+      raster = layer.raster;
+    }
+    const strokes = layer.strokes.map((stroke) => {
+      if (!stroke || !['pen', 'pencil', 'marker', 'eraser'].includes(stroke.tool)) throw new Error('브러시 정보가 올바르지 않습니다.');
+      if (!Array.isArray(stroke.points) || !stroke.points.length) throw new Error('빈 획은 불러올 수 없습니다.');
+      count += stroke.points.length; strokeCount++;
+      if (count > LIMITS.points || strokeCount > LIMITS.strokes) throw new Error('드로잉 파일 크기 제한을 초과했습니다.');
+      return { tool: stroke.tool, color: color(stroke.color), size: finite(stroke.size, 1, 128, '브러시 크기'), points: stroke.points.map((p) => ({ x: finite(p.x, 0, width, 'X'), y: finite(p.y, 0, height, 'Y'), p: finite(p.p, 0, 1, '필압') })) };
+    });
+    return { id, name: text(layer.name, 100, '레이어 이름'), visible: layer.visible, opacity: finite(layer.opacity, 0, 1, '불투명도'), strokes, raster };
+  });
+  return { format: input.format, version: 1, id: text(input.id, 100, '문서 ID'), title: text(input.title, 120, '제목'), width, height, background: color(input.background), layers, updatedAt: finite(input.updatedAt, 0, Number.MAX_SAFE_INTEGER, '수정 시간') };
+}
+function documentPointCount(doc) {
+  return doc.layers.reduce((sum, layer) => sum + layer.strokes.reduce((n, stroke) => n + stroke.points.length, 0), 0);
+}
+/** Deterministic texture: replay, undo and reload produce identical pixels. */
+function drawStroke(ctx, stroke) {
+  ctx.save();
+  ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
+  ctx.fillStyle = stroke.color; ctx.strokeStyle = stroke.color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const points = stroke.points;
+  const width = (p) => Math.max(.5, stroke.size * (.15 + .85 * p));
+  const dab = (p, index) => {
+    const r = width(p.p) / 2;
+    if (stroke.tool === 'pencil') {
+      let seed = (Math.round(p.x * 17) ^ Math.round(p.y * 131) ^ (index * 2654435761)) >>> 0;
+      const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      ctx.globalAlpha = .18 + .55 * p.p;
+      for (let k = 0; k < Math.max(4, r * 3); k++) {
+        const angle = random() * Math.PI * 2, radius = Math.sqrt(random()) * r;
+        ctx.fillRect(p.x + Math.cos(angle) * radius, p.y + Math.sin(angle) * radius, .5 + random(), .5 + random());
+      }
+    } else {
+      ctx.beginPath();
+      if (stroke.tool === 'marker') ctx.ellipse(p.x, p.y, Math.max(1, r * .45), Math.max(1, r), -.4, 0, Math.PI * 2);
+      else ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  dab(points[0], 0);
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    const steps = Math.min(8192, Math.max(1, Math.ceil(distance / Math.max(.7, Math.min(width(a.p), width(b.p)) * .18))));
+    for (let j = 1; j <= steps; j++) {
+      const t = j / steps;
+      dab({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, p: a.p + (b.p - a.p) * t }, i * 8192 + j);
+    }
+  }
+  ctx.restore();
+}
+
+/** Isolated IndexedDB namespace, optimistic concurrency, atomic last-known-good save. */
+const DB_NAME = 'toonstudio-emergency-drawing-v1';
+class LocalConflict extends Error { constructor() { super('다른 탭에서 같은 문서가 변경되었습니다.'); this.name = 'LocalConflict'; } }
+class LocalStore {
+  constructor() { this.connection = null; }
+  async open() {
+    if (this.connection) return this.connection;
+    return new Promise((resolve, reject) => {
+      let request;
+      try { request = indexedDB.open(DB_NAME, 1); } catch (error) { reject(error); return; }
+      const timer = setTimeout(() => reject(new Error('로컬 저장소에 연결하지 못했습니다. 복구 파일로 저장해 주세요.')), 4000);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        db.createObjectStore('documents', { keyPath: 'id' });
+        db.createObjectStore('revisions', { keyPath: ['id', 'revision'] });
+      };
+      request.onerror = () => { clearTimeout(timer); reject(request.error); };
+      request.onblocked = () => { clearTimeout(timer); reject(new Error('다른 창이 저장소 업그레이드를 막고 있습니다.')); };
+      request.onsuccess = () => {
+        clearTimeout(timer); this.connection = request.result;
+        this.connection.onversionchange = () => { this.connection.close(); this.connection = null; };
+        resolve(this.connection);
+      };
+    });
+  }
+  async list() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const rows = [];
+      const req = db.transaction('documents', 'readonly').objectStore('documents').openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) { resolve(rows.sort((a, b) => b.document.updatedAt - a.document.updatedAt)); return; }
+        const row = cursor.value; rows.push({ id: row.id, revision: row.revision, document: { title: row.document.title, updatedAt: row.document.updatedAt } }); cursor.continue();
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async get(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction('documents').objectStore('documents').get(id);
+      req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+    });
+  }
+  async save(document, expectedRevision) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['documents', 'revisions'], 'readwrite');
+      const documents = tx.objectStore('documents');
+      const revisions = tx.objectStore('revisions');
+      const next = expectedRevision + 1;
+      let failure;
+      const req = documents.get(document.id);
+      req.onsuccess = () => {
+        if ((req.result?.revision ?? 0) !== expectedRevision) { failure = new LocalConflict(); tx.abort(); return; }
+        const row = { id: document.id, revision: next, document };
+        documents.put(row); revisions.put(row);
+        if (next > 5) revisions.delete([document.id, next - 5]);
+      };
+      tx.oncomplete = () => resolve(next);
+      tx.onabort = () => reject(failure ?? tx.error ?? new Error('로컬 저장이 취소되었습니다.'));
+      tx.onerror = () => { failure ??= tx.error; };
+    });
+  }
+  async history(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction('revisions', 'readonly').objectStore('revisions').getAll(IDBKeyRange.bound([id, 0], [id, Number.MAX_SAFE_INTEGER]));
+      req.onsuccess = () => resolve(req.result.sort((a, b) => b.revision - a.revision));
+      req.onerror = () => reject(req.error);
+    });
+  }
+}
+
+
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('canvas'), context = canvas.getContext('2d', { alpha: false });
+const store = new LocalStore();
+let drawing = makeDocument(), activeLayer = drawing.layers[0].id, revision = 0;
+let dirty = false, changeNumber = 0, saveTimer = 0, saving = null, renderFrame = 0;
+let activeStroke = null, pointerId = null, tool = 'pen', previous = [], future = [], pointCount = 0;
+let cache = new Map(), rasters = new Map();
+const scratch = document.createElement('canvas');
+const preview = document.createElement('canvas');
+const scratchCtx = scratch.getContext('2d'), previewCtx = preview.getContext('2d');
+let initializationComplete = false;
+
+function showError(error) {
+  $('error').textContent = error instanceof Error ? error.message : String(error);
+  $('error').hidden = false;
+}
+$('error').addEventListener('click', () => { $('error').hidden = true; });
+function status(message, detail = '이 기기에만 저장합니다. 서버를 사용하지 않습니다.') {
+  $('save-status').textContent = message; $('save-detail').textContent = detail;
+}
+function layer() { return drawing.layers.find((entry) => entry.id === activeLayer) ?? drawing.layers[0]; }
+function surface() { const c = document.createElement('canvas'); c.width = drawing.width; c.height = drawing.height; return c; }
+function paintStroke(ctx, stroke) {
+  if (stroke.tool !== 'marker') { drawStroke(ctx, stroke); return; }
+  scratchCtx.clearRect(0, 0, scratch.width, scratch.height); drawStroke(scratchCtx, stroke);
+  ctx.save(); ctx.globalAlpha = .35; ctx.drawImage(scratch, 0, 0); ctx.restore();
+}
+function layerCanvas(entry) {
+  if (cache.has(entry.id)) return cache.get(entry.id);
+  const c = surface(), ctx = c.getContext('2d');
+  const image = rasters.get(entry.raster);
+  if (image) {
+    const scale = Math.min(c.width / image.width, c.height / image.height);
+    const w = image.width * scale, h = image.height * scale;
+    ctx.drawImage(image, (c.width - w) / 2, (c.height - h) / 2, w, h);
+  }
+  for (const stroke of entry.strokes) paintStroke(ctx, stroke);
+  cache.set(entry.id, c); return c;
+}
+function render(target = context, includeStroke = true) {
+  target.save(); target.globalCompositeOperation = 'source-over'; target.globalAlpha = 1;
+  target.fillStyle = drawing.background; target.fillRect(0, 0, drawing.width, drawing.height);
+  for (const entry of drawing.layers) {
+    if (!entry.visible) continue;
+    let c = layerCanvas(entry);
+    if (includeStroke && entry.id === activeLayer && activeStroke) {
+      previewCtx.clearRect(0, 0, drawing.width, drawing.height); previewCtx.drawImage(c, 0, 0);
+      paintStroke(previewCtx, activeStroke); c = preview;
+    }
+    target.globalAlpha = entry.opacity; target.drawImage(c, 0, 0);
+  }
+  target.restore();
+}
+function scheduleRender() {
+  if (!renderFrame) renderFrame = requestAnimationFrame(() => { renderFrame = 0; render(); });
+}
+function updateHistory() { $('undo').disabled = !previous.length; $('redo').disabled = !future.length; }
+function changed() {
+  dirty = true; changeNumber++; drawing.updatedAt = Date.now();
+  status('저장하지 않은 변경 사항', '자동 저장 대기 중 · 중요한 작업은 복구 파일도 보관하세요.');
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => { void flush(); }, 300);
+  updateHistory(); scheduleRender();
+}
+function applyCommand(command) {
+  command.redo(); previous.push(command); if (previous.length > 40) previous.shift(); future = [];
+  pointCount = documentPointCount(drawing); changed();
+}
+function undo() {
+  finishStroke(); const command = previous.pop(); if (!command) return;
+  command.undo(); future.push(command); cache.clear(); pointCount = documentPointCount(drawing); refreshLayers(); changed();
+}
+function redo() {
+  finishStroke(); const command = future.pop(); if (!command) return;
+  command.redo(); previous.push(command); cache.clear(); pointCount = documentPointCount(drawing); refreshLayers(); changed();
+}
+async function refreshDocuments() {
+  try {
+    const rows = await store.list();
+    $('documents').replaceChildren(new Option('작업 선택', ''));
+    for (const row of rows) $('documents').add(new Option(row.document.title, row.id));
+    $('documents').value = drawing.id;
+  } catch { /* Failure is already visible in save status. Drawing remains available. */ }
+}
+async function flush() {
+  clearTimeout(saveTimer);
+  if (saving) { await saving; return !dirty; }
+  if (!dirty) return true;
+  saving = (async () => {
+    try {
+      while (dirty) {
+        const generation = changeNumber;
+        const snapshot = validateDocument(structuredClone(drawing));
+        status('기기에 저장 중…');
+        try { revision = await store.save(snapshot, revision); }
+        catch (error) {
+          if (!(error instanceof LocalConflict)) throw error;
+          drawing.id = uid(); drawing.title = `${drawing.title.slice(0, 95)} (충돌 복구 사본)`; revision = 0;
+          $('title').value = drawing.title; changeNumber++;
+          showError('다른 탭의 변경을 보존하기 위해 새 복구 사본으로 저장합니다. 원래 문서는 덮어쓰지 않았습니다.');
+          continue;
+        }
+        dirty = changeNumber !== generation;
+      }
+      try { localStorage.setItem('toonstudio-local-last-document', drawing.id); } catch { /* Storage may be denied. */ }
+      status('기기에 저장됨', `${new Date(drawing.updatedAt).toLocaleTimeString()} · 클라우드에는 업로드하지 않았습니다.`);
+      await refreshDocuments();
+    } catch (error) {
+      dirty = true;
+      status('로컬 저장 실패 — 복구 파일을 내려받으세요', '현재 화면의 그림은 유지됩니다. 브라우저를 닫지 말고 파일로 보관하세요.');
+      showError(error);
+    }
+  })().finally(() => { saving = null; });
+  await saving; return !dirty;
+}
+function refreshLayers() {
+  $('layers').replaceChildren();
+  for (const entry of [...drawing.layers].reverse()) {
+    const row = document.createElement('div'); row.className = `layer${entry.id === activeLayer ? ' active' : ''}`;
+    const heading = document.createElement('div'); heading.className = 'layer-row';
+    const visible = document.createElement('input'); visible.type = 'checkbox'; visible.checked = entry.visible;
+    visible.setAttribute('aria-label', `${entry.name} 표시`);
+    visible.addEventListener('change', () => { finishStroke(); const old = entry.visible, value = visible.checked; applyCommand({ redo: () => { entry.visible = value; }, undo: () => { entry.visible = old; } }); refreshLayers(); });
+    const choose = document.createElement('button'); choose.textContent = entry.name;
+    choose.setAttribute('aria-pressed', String(entry.id === activeLayer));
+    choose.addEventListener('click', () => { finishStroke(); activeLayer = entry.id; refreshLayers(); });
+    const opacity = document.createElement('input'); opacity.type = 'range'; opacity.min = '0'; opacity.max = '100'; opacity.value = String(entry.opacity * 100);
+    opacity.setAttribute('aria-label', `${entry.name} 불투명도`);
+    opacity.addEventListener('change', () => { finishStroke(); const old = entry.opacity, value = Number(opacity.value) / 100; applyCommand({ redo: () => { entry.opacity = value; }, undo: () => { entry.opacity = old; } }); });
+    heading.append(visible, choose); row.append(heading, opacity); $('layers').append(row);
+  }
+  $('add-layer').disabled = drawing.layers.length >= LIMITS.layers;
+  canvas.dataset.locked = String(!layer().visible || layer().opacity === 0);
+}
+function updateScale(fit = false) {
+  if (fit) {
+    const view = $('viewport');
+    const value = Math.min((view.clientWidth - 48) / drawing.width, (view.clientHeight - 48) / drawing.height) * 100;
+    $('zoom').value = String(clamp(value, 20, 250));
+  }
+  const scale = Number($('zoom').value) / 100;
+  canvas.style.width = `${drawing.width * scale}px`; canvas.style.height = `${drawing.height * scale}px`;
+  $('zoom-value').textContent = `${Math.round(scale * 100)}%`;
+}
+async function decodeRaster(data) {
+  if (rasters.has(data)) return;
+  const image = new Image(); image.src = data; await image.decode();
+  if (image.naturalWidth * image.naturalHeight > 33554432) throw new Error('이미지가 너무 큽니다. 3,200만 픽셀 이하로 줄여 주세요.');
+  rasters.set(data, image);
+}
+async function openDocument(documentData, savedRevision = 0) {
+  const candidate = validateDocument(documentData);
+  const nextRasters = candidate.layers.filter((entry) => entry.raster).map((entry) => entry.raster);
+  // Decode before replacing the current document, so a corrupt backup cannot destroy it.
+  await Promise.all(nextRasters.map(decodeRaster));
+  finishStroke();
+  if (saving) await saving;
+  drawing = candidate; revision = savedRevision; activeLayer = candidate.layers[0].id;
+  dirty = false; changeNumber++; pointCount = documentPointCount(drawing); previous = []; future = []; cache.clear();
+  for (const key of rasters.keys()) if (!nextRasters.includes(key)) rasters.delete(key);
+  canvas.width = scratch.width = preview.width = drawing.width;
+  canvas.height = scratch.height = preview.height = drawing.height;
+  $('title').value = drawing.title; $('dimensions').textContent = `${drawing.width} × ${drawing.height}`;
+  refreshLayers(); updateHistory(); updateScale(true); render();
+  if (!savedRevision) changed(); else status('기기에 저장된 작업을 복구했습니다');
+}
+function eventPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: clamp((event.clientX - rect.left) * drawing.width / rect.width, 0, drawing.width), y: clamp((event.clientY - rect.top) * drawing.height / rect.height, 0, drawing.height), p: event.pointerType === 'pen' ? clamp(event.pressure || .08, .02, 1) : .75 };
+}
+function finishStroke() {
+  if (!activeStroke) return;
+  const stroke = activeStroke, targetLayer = layer(); activeStroke = null; pointerId = null;
+  const cached = layerCanvas(targetLayer); paintStroke(cached.getContext('2d'), stroke);
+  applyCommand({ redo: () => { targetLayer.strokes.push(stroke); }, undo: () => { targetLayer.strokes.pop(); cache.delete(targetLayer.id); } });
+}
+canvas.addEventListener('pointerdown', (event) => {
+  if (!initializationComplete || pointerId !== null || event.button !== 0) return;
+  if (!layer().visible || layer().opacity === 0) { showError('선택한 레이어가 숨겨져 있습니다. 고급 모드에서 레이어를 표시해 주세요.'); return; }
+  if (pointCount >= LIMITS.points || drawing.layers.reduce((n, entry) => n + entry.strokes.length, 0) >= LIMITS.strokes) { showError('작업 크기 제한에 도달했습니다. 파일로 보관한 뒤 새 드로잉을 시작해 주세요.'); return; }
+  event.preventDefault(); canvas.setPointerCapture(event.pointerId); pointerId = event.pointerId;
+  activeStroke = { tool, color: $('color').value, size: Number($('size').value), points: [eventPoint(event)] }; scheduleRender();
+});
+canvas.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== pointerId || !activeStroke) return;
+  event.preventDefault();
+  const samples = event.getCoalescedEvents?.() ?? [event];
+  for (const sample of samples.length ? samples : [event]) {
+    if (pointCount + activeStroke.points.length >= LIMITS.points || activeStroke.points.length >= 4096) { finishStroke(); showError('긴 획을 저장했습니다. 펜을 떼고 다음 획을 이어 그려 주세요.'); break; }
+    const p = eventPoint(sample), last = activeStroke.points.at(-1);
+    if (Math.hypot(p.x - last.x, p.y - last.y) >= .35 || Math.abs(p.p - last.p) > .03) activeStroke.points.push(p);
+  }
+  scheduleRender();
+});
+for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(name, (event) => { if (event.pointerId === pointerId) finishStroke(); });
+function selectTool(value) {
+  finishStroke(); tool = value;
+  document.querySelectorAll('[data-tool]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.tool === tool)));
+}
+document.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => selectTool(button.dataset.tool)));
+$('size').addEventListener('input', () => { $('size-value').value = $('size').value; });
+$('undo').addEventListener('click', undo); $('redo').addEventListener('click', redo);
+$('zoom').addEventListener('input', () => updateScale()); $('fit').addEventListener('click', () => updateScale(true));
+$('simple').addEventListener('click', () => { const simple = !$('advanced').hidden; $('advanced').hidden = simple; $('simple').setAttribute('aria-pressed', String(simple)); $('simple').textContent = simple ? '심플 모드' : '고급 모드'; });
+$('title').addEventListener('change', () => { drawing.title = $('title').value.trim().slice(0, 120) || '새 로컬 드로잉'; $('title').value = drawing.title; changed(); });
+$('save').addEventListener('click', () => { finishStroke(); void flush(); });
+$('add-layer').addEventListener('click', () => {
+  finishStroke(); if (drawing.layers.length >= LIMITS.layers) return;
+  const entry = makeLayer(`레이어 ${drawing.layers.length + 1}`), old = activeLayer;
+  applyCommand({ redo: () => { drawing.layers.push(entry); activeLayer = entry.id; }, undo: () => { drawing.layers.pop(); activeLayer = old; } }); refreshLayers();
+});
+$('clear-layer').addEventListener('click', () => {
+  finishStroke(); const entry = layer(); if (!entry.strokes.length && !entry.raster) return;
+  if (!confirm('선택 레이어를 비울까요? 실행 취소로 되돌릴 수 있습니다.')) return;
+  const strokes = entry.strokes, raster = entry.raster;
+  applyCommand({ redo: () => { entry.strokes = []; entry.raster = null; cache.delete(entry.id); }, undo: () => { entry.strokes = strokes; entry.raster = raster; cache.delete(entry.id); } });
+});
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+function filename(extension) { return `${drawing.title.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 90)}.${extension}`; }
+$('export-json').addEventListener('click', () => {
+  try { finishStroke(); download(new Blob([JSON.stringify(validateDocument(drawing))], { type: 'application/json' }), filename('toonlocal')); } catch (error) { showError(error); }
+});
+$('export-png').addEventListener('click', () => {
+  finishStroke(); const c = surface(); render(c.getContext('2d'), false);
+  c.toBlob((blob) => { if (blob) download(blob, filename('png')); else showError('PNG를 만들지 못했습니다. 복구 파일로 저장해 주세요.'); }, 'image/png');
+});
+async function confirmReplacement() {
+  finishStroke(); if (await flush()) return true;
+  return confirm('로컬 자동 저장에 실패했습니다. 필요한 복구 파일을 별도로 저장했으며 현재 그림을 교체할까요?');
+}
+$('new').addEventListener('click', async () => { try { if (await confirmReplacement()) await openDocument(makeDocument()); } catch (error) { showError(error); } });
+$('documents').addEventListener('change', async () => {
+  const id = $('documents').value; if (!id || id === drawing.id) return;
+  finishStroke(); if (!(await flush())) return;
+  try { const row = await store.get(id); if (row) await openDocument(row.document, row.revision); } catch (error) { showError(error); }
+});
+$('import').addEventListener('change', async () => {
+  const file = $('import').files?.[0]; $('import').value = ''; if (!file) return;
+  if (!(await confirmReplacement())) return;
+  try {
+    if (file.size > LIMITS.fileBytes) throw new Error('16MB 이하의 파일만 열 수 있습니다.');
+    if (/\.(json|toonlocal)$/i.test(file.name)) {
+      const next = validateDocument(JSON.parse(await file.text())); next.id = uid(); next.title = `${next.title.slice(0, 100)} (가져온 사본)`; await openDocument(next);
+    } else {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('PNG/JPEG/WebP 또는 로컬 복구 파일을 선택하세요.');
+      const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+      await decodeRaster(data); const next = makeDocument(); next.title = file.name.slice(0, 120);
+      next.layers[0].name = '가져온 이미지'; next.layers[0].raster = data; next.layers.push(makeLayer('드로잉'));
+      await openDocument(next); activeLayer = next.layers[1].id; refreshLayers();
+    }
+  } catch (error) { showError(error); }
+});
+$('persist').addEventListener('click', async () => {
+  try { const granted = await navigator.storage?.persist?.(); showError(granted ? '기기 보관 요청이 승인되었습니다. 브라우저 데이터 삭제까지 막는 것은 아니므로 파일 백업도 유지하세요.' : '브라우저가 기기 보관을 승인하지 않았습니다. 복구 파일을 별도로 보관해 주세요.'); } catch (error) { showError(error); }
+});
+$('history').addEventListener('click', async () => {
+  finishStroke(); if (!(await flush())) return;
+  try {
+    const rows = await store.history(drawing.id); $('history-list').replaceChildren();
+    for (const row of rows) {
+      const b = document.createElement('button'); b.textContent = `${new Date(row.document.updatedAt).toLocaleString()} · 저장본 ${row.revision}`;
+      b.addEventListener('click', async () => {
+        try {
+          if (!(await flush())) return;
+          const next = structuredClone(row.document); next.id = uid(); next.title = `${next.title.slice(0, 96)} (이전 저장 복구)`;
+          await openDocument(next); $('history-dialog').close();
+        } catch (error) { showError(error); }
+      }); $('history-list').append(b);
+    }
+    $('history-dialog').showModal();
+  } catch (error) { showError(error); }
+});
+$('close-history').addEventListener('click', () => $('history-dialog').close());
+document.addEventListener('keydown', (event) => {
+  if (event.isComposing || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName ?? '') || event.target?.isContentEditable || $('history-dialog').open) return;
+  const key = event.key.toLowerCase();
+  if ((event.ctrlKey || event.metaKey) && key === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
+  else if ((event.ctrlKey || event.metaKey) && key === 's') { event.preventDefault(); finishStroke(); void flush(); }
+  else if (!event.ctrlKey && !event.metaKey && !event.altKey) { if (key === 'b') selectTool('pen'); if (key === 'e') selectTool('eraser'); }
+});
+window.addEventListener('beforeunload', (event) => { if (dirty || activeStroke || saving) { event.preventDefault(); event.returnValue = ''; } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { finishStroke(); void flush(); } });
+window.addEventListener('pagehide', () => { finishStroke(); void flush(); });
+async function initialize() {
+  scratch.width = preview.width = canvas.width; scratch.height = preview.height = canvas.height;
+  refreshLayers(); updateScale(true); render();
+  try {
+    const rows = await store.list();
+    let id; try { id = localStorage.getItem('toonstudio-local-last-document'); } catch { /* Drawing works without preferences. */ }
+    const summary = rows.find((entry) => entry.id === id) ?? rows[0];
+    const row = summary ? await store.get(summary.id) : null;
+    if (row) await openDocument(row.document, row.revision); else changed();
+    await refreshDocuments();
+  } catch (error) { dirty = true; status('로컬 저장소 사용 불가 — 파일 저장을 사용하세요'); showError(error); }
+  initializationComplete = true;
+  document.documentElement.dataset.localDrawingReady = 'true';
+  if (location.protocol === 'file:') { $('offline-state').textContent = '휴대용 파일 · 네트워크 없이 실행'; return; }
+  try {
+    if (!('serviceWorker' in navigator)) throw new Error('서비스 워커 미지원');
+    await navigator.serviceWorker.register('/offline-draw/sw.js', { scope: '/offline-draw/' });
+    const check = async () => {
+      const ready = await caches.match('/offline-draw/ready-v1', { cacheName: 'toonstudio-emergency-drawing-shell-v1' });
+      $('offline-state').textContent = ready ? '로컬 드로잉 실행 파일 보관됨' : '오프라인 실행 파일 준비 중 · 완료 전 창을 닫지 마세요';
+      return Boolean(ready);
+    };
+    for (let i = 0; i < 12; i++) { if (await check()) break; await new Promise((resolve) => setTimeout(resolve, 500)); }
+  } catch { $('offline-state').textContent = '오프라인 재실행 준비를 확인하지 못했습니다. 파일 백업을 보관하세요.'; }
+}
+void initialize().catch(showError);
+</script>
+</body>
+</html>
