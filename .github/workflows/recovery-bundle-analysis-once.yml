@@ -100,7 +100,7 @@ jobs:
                 ["../../../../apps/web/src/domains/creator/studio-page-vector-ops.ts", "compile"],
               ];
               for (const [path, entry] of consumers) {
-                const source = read("../" + path);
+                const source = read(path);
                 expect(source).toContain(`from "@toonspectrum/studio-brush-platform/${entry}";`);
                 expect(source).not.toContain('from "@toonspectrum/studio-brush-platform";');
               }
