@@ -689,6 +689,18 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       await page.getByText("다시 켜도 저장 대기를 기억해요", { exact: true }).waitFor({ timeout: 12_000 });
       await page.getByRole("button", { name: "초안 저장 센터 닫기", exact: true }).click();
       log("DURABLE INTENT: real shared SQLite write/readback acknowledged before browser close");
+      const companion = await context.newPage();
+      await companion.goto(page.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await companion.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 20_000 });
+      const companionOwnsOrigin = await companion.evaluate(() => {
+        const room = new URL(location.href).searchParams.get("room");
+        return room !== null && sessionStorage.getItem("toonspectrum:studio-live-owner-room:v1") === room;
+      });
+      invariant(!companionOwnsOrigin, "a companion reclaimed an active origin tab");
+      await companion.close();
+      await page.bringToFront();
+      log("LOCAL OWNER LEASE: a second real browser tab did not reclaim the active origin");
+
     }
 
     const reloadStartedAt = performance.now();
@@ -713,6 +725,12 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       invariant(inheritedReceipts.length === 0, "restart reused a tab-scoped receipt instead of the durable intent");
       await page.getByRole("button", { name: "초안 저장 센터 닫기", exact: true }).click();
       log("DURABLE INTENT RESTART: SQLite reminder restored with empty tab outbox, no automatic server save");
+      await page.waitForFunction(() => {
+        const room = new URL(location.href).searchParams.get("room");
+        return room !== null && sessionStorage.getItem("toonspectrum:studio-live-owner-room:v1") === room;
+      }, undefined, { timeout: 10_000 });
+      log("LOCAL OWNER RESTART: known local origin reclaimed after old process released its lease");
+
 
     } else {
       await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
