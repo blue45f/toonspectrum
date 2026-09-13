@@ -42,6 +42,9 @@ try {
     await page.getByRole("img", { name: "공간 웹툰 검증 1페이지 · 3구간" }).waitFor();
     await page.getByLabel("공간 리더 페이지 바로가기").fill("1");
     await page.getByRole("img", { name: "공간 웹툰 검증 2페이지 · 1구간" }).waitFor();
+    await page.waitForFunction(() => document.querySelector(".spatial-reader-navigation [role=status]")?.textContent?.includes("1 / 5 구간"));
+    assert.equal(await next.isDisabled(), false);
+    await next.click(); await page.getByRole("img", { name: "공간 웹툰 검증 2페이지 · 2구간" }).waitFor();
     await page.getByLabel("읽기 배경").selectOption("paper");
     await page.locator("dialog").evaluate((dialog) => { dialog.scrollTop = 0; });
     const widths = await page.locator("dialog").evaluate((dialog) => ({ width: dialog.clientWidth, scroll: dialog.scrollWidth }));
