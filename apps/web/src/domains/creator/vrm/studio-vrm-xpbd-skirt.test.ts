@@ -51,26 +51,35 @@ function capsule(
   return { restHead, restTail, currentHead, currentTail, radius, friction: 0.4 };
 }
 
+// Hip and thigh roots follow the same rigid waist frame; lower endpoints author the pose.
+function posedRoot([x, y, z]: StudioVrmXpbdSkirtVec3): StudioVrmXpbdSkirtVec3 {
+  const length = Math.hypot(CURRENT_WAIST.right[0], CURRENT_WAIST.right[2]);
+  const cosine = CURRENT_WAIST.right[0] / length, sine = -CURRENT_WAIST.right[2] / length;
+  return [CURRENT_WAIST.center[0] + cosine * x + sine * z,
+    CURRENT_WAIST.center[1] + y - REST_WAIST.center[1],
+    CURRENT_WAIST.center[2] - sine * x + cosine * z];
+}
+
 function bodyProxies(): StudioVrmXpbdSkirtBodyProxies {
   return {
     hips: capsule(
       [-0.1, 0.9, 0],
       [0.1, 0.9, 0],
-      [-0.1, 0.93, 0.02],
-      [0.1, 0.93, 0.02],
+      posedRoot([-0.1, 0.9, 0]),
+      posedRoot([0.1, 0.9, 0]),
       0.11,
     ),
     leftThigh: capsule(
       [-0.08, 0.88, 0],
       [-0.08, 0.5, 0],
-      [-0.08, 0.9, 0.02],
+      posedRoot([-0.08, 0.88, 0]),
       [-0.22, 0.56, 0.1],
       0.075,
     ),
     rightThigh: capsule(
       [0.08, 0.88, 0],
       [0.08, 0.5, 0],
-      [0.08, 0.9, 0.02],
+      posedRoot([0.08, 0.88, 0]),
       [0.22, 0.56, -0.08],
       0.075,
     ),
@@ -95,7 +104,7 @@ function createTopology(
   kind: StudioVrmXpbdSkirtKind,
   metrics: StudioVrmXpbdSkirtMetrics = METRICS,
 ): StudioVrmXpbdSkirtTopology {
-  const result = createStudioVrmXpbdSkirtTopology({ kind, metrics, restWaist: REST_WAIST });
+  const result = createStudioVrmXpbdSkirtTopology({ kind, metrics, restWaist: REST_WAIST, restBody: bodyProxies() });
   if (!result.ok) throw new Error(`${result.code}: ${result.detail}`);
   return result.topology;
 }
@@ -141,6 +150,10 @@ function transformedRestWaistPoint(
     dx * topology.restWaist.right[0] +
     dy * topology.restWaist.right[1] +
     dz * topology.restWaist.right[2];
+  const localY =
+    dx * topology.restWaist.up[0] +
+    dy * topology.restWaist.up[1] +
+    dz * topology.restWaist.up[2];
   const localZ =
     dx * topology.restWaist.forward[0] +
     dy * topology.restWaist.forward[1] +
@@ -152,7 +165,7 @@ function transformedRestWaistPoint(
   const forward = [Math.fround(-right[2]!), 0, Math.fround(right[0]!)];
   return [
     Math.fround(frame.center[0] + right[0]! * localX + forward[0]! * localZ),
-    Math.fround(frame.center[1] + right[1]! * localX + forward[1]! * localZ),
+    Math.fround(frame.center[1] + right[1]! * localX + localY + forward[1]! * localZ),
     Math.fround(frame.center[2] + right[2]! * localX + forward[2]! * localZ),
   ];
 }
@@ -191,8 +204,8 @@ describe("Studio VRM XPBD skirt v1", () => {
       const offset = (ring * topology.segmentCount + segment) * 3;
       const x = topology.restPositions[offset]! - topology.restWaist.center[0];
       const z = topology.restPositions[offset + 2]! - topology.restWaist.center[2];
-      const radiusX = topology.dimensions.waistRadiusX * topology.dimensions.hemFlare;
-      const radiusZ = topology.dimensions.waistRadiusZ * topology.dimensions.hemFlare;
+      const radiusX = topology.dimensions.hemRadiusX;
+      const radiusZ = topology.dimensions.hemRadiusZ;
       return Math.hypot(x / radiusX, z / radiusZ);
     });
 
@@ -204,7 +217,7 @@ describe("Studio VRM XPBD skirt v1", () => {
     const topology = createTopology("pleated");
     const solved = solveStudioVrmXpbdSkirtPose(topology, solveInput(topology));
 
-    expect(solved.ok).toBe(true);
+    expect(solved.ok, solved.ok ? undefined : solved.detail).toBe(true);
     if (!solved.ok) return;
     for (let segment = 0; segment < topology.segmentCount; segment += 1) {
       const expected = transformedRestWaistPoint(topology, segment, CURRENT_WAIST);
@@ -224,7 +237,7 @@ describe("Studio VRM XPBD skirt v1", () => {
     const topology = createTopology("longskirt");
     const solved = solveStudioVrmXpbdSkirtPose(topology, solveInput(topology));
 
-    expect(solved.ok).toBe(true);
+    expect(solved.ok, solved.ok ? undefined : solved.detail).toBe(true);
     if (!solved.ok) return;
     expect(solved.mesh.receipt.capsuleCount).toBe(5);
     expect(solved.mesh.receipt.capsuleIds).toEqual([
@@ -246,7 +259,7 @@ describe("Studio VRM XPBD skirt v1", () => {
     const first = solveStudioVrmXpbdSkirtPose(topology, input);
     const second = solveStudioVrmXpbdSkirtPose(topology, input);
 
-    expect(first.ok).toBe(true);
+    expect(first.ok, first.ok ? undefined : first.detail).toBe(true);
     expect(second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
     expect(first.mesh.positions).toEqual(second.mesh.positions);
@@ -324,6 +337,18 @@ describe("Studio VRM XPBD skirt v1", () => {
     expect(solveBudget).toMatchObject({ ok: false, status: "unavailable", code: "budget-exceeded" });
     expect(missingFence).toMatchObject({ ok: false, status: "unavailable", code: "missing-input" });
     expect(topology.restPositions).toEqual(restBefore);
+  });
+
+  it("rejects an actual capsule that encloses fixed waistband faces without publishing a partial mesh", () => {
+    const topology = createTopology("pleated");
+    const original = new Float32Array(topology.restPositions);
+    const body = bodyProxies();
+    const result = solveStudioVrmXpbdSkirtPose(topology, solveInput(topology, {
+      body: { ...body, hips: { ...body.hips, radius: 0.5 } },
+    }));
+    expect(result).toMatchObject({ ok: false, status: "unavailable", code: "collision-unresolved" });
+    expect(result).not.toHaveProperty("mesh");
+    expect(topology.restPositions).toEqual(original);
   });
 
   it("detects topology mutation before entering the solver", () => {

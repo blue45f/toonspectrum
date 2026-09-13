@@ -665,19 +665,16 @@ describe("character shaper semantic PSD", () => {
     expect(blob.type).toBe("image/vnd.adobe.photoshop");
     expect(new TextDecoder().decode(bytes.slice(0, 4))).toBe("8BPS");
     expect(parsed.children?.map((layer) => layer.name)).toEqual([
-      "주선",
-      "하이라이트",
-      "음영",
-      "밑색",
+      "주선 (추출 참고 · 기본 숨김)",
+      "캐릭터",
       "미리보기 (Beauty)",
     ]);
-    expect(parsed.children?.map((layer) => layer.blendMode)).toEqual([
-      "normal",
-      "screen",
-      "multiply",
-      "normal",
-      "normal",
-    ]);
+    expect(parsed.children?.[0]?.hidden).toBe(true);
+    const character = parsed.children?.[1];
+    expect(character?.blendMode).toBe("normal");
+    expect(character?.mask).toBeDefined();
+    expect(character?.children?.map((layer) => layer.name)).toEqual(["하이라이트", "음영", "밑색"]);
+    expect(character?.children?.map((layer) => layer.blendMode)).toEqual(["screen", "multiply", "normal"]);
     expect(parsed.children?.at(-1)?.hidden).toBe(true);
     expect(receipt.width).toBe(WIDTH);
     expect(receipt.height).toBe(HEIGHT);
@@ -692,11 +689,12 @@ describe("character shaper semantic PSD", () => {
       skipThumbnail: true,
     });
 
-    const flats = parsed.children?.find((layer) => layer.name === "밑색");
+    const flats = parsed.children?.find((layer) => layer.name === "캐릭터")?.children?.find((layer) => layer.name === "밑색");
     expect(flats?.children?.map((layer) => layer.name)).toEqual(["얼굴", "머리", "상의", "피부"]);
     expect(receipt.layerNames).toEqual([
-      "주선",
+      "주선 (추출 참고 · 기본 숨김)",
       "윤곽선",
+      "캐릭터",
       "하이라이트",
       "밝은 면",
       "음영",
@@ -726,7 +724,7 @@ describe("character shaper semantic PSD", () => {
       skipThumbnail: true,
     });
 
-    const skin = parsed.children?.[0]?.children?.[0];
+    const skin = parsed.children?.[0]?.children?.[0]?.children?.[0];
     expect(skin?.name).toBe("피부");
     // Coverage is gated by the mask; the flat colour itself is carried through untouched.
     expect([...(skin?.imageData?.data ?? []).slice(0, 8)])
@@ -778,7 +776,7 @@ describe("character shaper semantic PSD — end to end", () => {
 
     expect(blob.size).toBeGreaterThan(0);
     expect(receipt.layerNames.length).toBeGreaterThanOrEqual(8);
-    expect(receipt.layerNames).toContain("주선");
+    expect(receipt.layerNames).toContain("주선 (추출 참고 · 기본 숨김)");
     expect(receipt.layerNames).toContain("액세서리");
     expect(receipt.skipped.map((entry) => entry.pass)).toContain("mask-eyes");
     expect(Object.values(scene.meshes).every((node) => node.visible)).toBe(true);

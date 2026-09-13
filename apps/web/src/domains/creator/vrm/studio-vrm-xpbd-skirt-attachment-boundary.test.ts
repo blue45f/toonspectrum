@@ -117,7 +117,7 @@ describe("Studio VRM XPBD skirt product boundary", () => {
     expect(attachmentSource).toContain("poseGeneration <= lastPoseGeneration");
     expect(attachmentSource).toContain("const currentRig = sampleRig(");
     expect(attachmentSource).toContain("const body = bodyProxies(");
-    expect(attachmentSource).toContain("expectedTopologySha256: topology.topologySha256");
+    expect(attachmentSource).toContain("expectedTopologySha256: nextTopology.topologySha256");
     expect(attachmentSource).toContain("expectedPoseGeneration: poseGeneration");
   });
 

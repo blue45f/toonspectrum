@@ -129,14 +129,14 @@ describe("character shaper image math — PSD shading reconstruction", () => {
     expect(maximumError).toBeLessThanOrEqual(1);
   });
 
-  it("keeps unchanged pixels transparent and uses only shared silhouette coverage", () => {
+  it("keeps unchanged factors transparent and leaves silhouette coverage to the parent mask", () => {
     const flat = rgba([100, 110, 120, 255], [240, 0, 0, 0], [100, 100, 100, 128], [100, 100, 100, 255]);
     const beauty = rgba([100, 110, 120, 255], [0, 240, 0, 255], [50, 150, 100, 64], [100, 100, 100, 128]);
     const { shadow, highlight } = deriveCharacterShadingLayers(flat, beauty);
-    expect(alphaChannel(shadow)).toEqual([0, 0, 64, 0]);
-    expect(alphaChannel(highlight)).toEqual([0, 0, 64, 0]);
-    expect([...shadow.slice(4, 8)]).toEqual([0, 0, 0, 0]);
-    expect([...highlight.slice(4, 8)]).toEqual([0, 0, 0, 0]);
+    expect(alphaChannel(shadow)).toEqual([0, 255, 255, 0]);
+    expect(alphaChannel(highlight)).toEqual([0, 255, 255, 0]);
+    expect([...shadow.slice(4, 8)]).toEqual([0, 255, 255, 255]);
+    expect([...highlight.slice(4, 8)]).toEqual([0, 240, 0, 255]);
   });
 
   it("rejects invalid buffers and different dimensions without partial output", () => {
