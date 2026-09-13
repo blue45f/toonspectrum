@@ -104,8 +104,10 @@ describe("PublishedWorkReader", () => {
 
     expect(screen.getByRole("heading", { name: "성인 대상 콘텐츠입니다" })).toBeTruthy();
     expect(screen.queryByTestId("vertical-reader")).toBeNull();
+    expect(screen.queryByTestId("spatial-webtoon-reader-launcher")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "확인하고 작품 보기" }));
     expect(screen.getByTestId("vertical-reader")).toBeTruthy();
+    expect(screen.getByTestId("spatial-webtoon-reader-launcher")).toBeTruthy();
   });
 
   it("lets an owner preview mature content without the public confirmation gate", () => {
@@ -122,5 +124,6 @@ describe("PublishedWorkReader", () => {
 
     expect(screen.queryByRole("heading", { name: "성인 대상 콘텐츠입니다" })).toBeNull();
     expect(screen.getByTestId("vertical-reader")).toBeTruthy();
+    expect(screen.getByTestId("spatial-webtoon-reader-launcher")).toBeTruthy();
   });
 });

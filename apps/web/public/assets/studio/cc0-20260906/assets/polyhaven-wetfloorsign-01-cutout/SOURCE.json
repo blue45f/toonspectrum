@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/WetFloorSign_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-wetfloorsign-01",
+  "sourceModelSha256": "d6aa6d8887c9b1880f17d31c91bdb7d8193a805f7b511de1dab69dba93b89ae3",
+  "render": {
+    "sourceId": "polyhaven-wetfloorsign-01",
+    "sourceSha256": "d6aa6d8887c9b1880f17d31c91bdb7d8193a805f7b511de1dab69dba93b89ae3",
+    "path": "high-resolution-props/polyhaven-wetfloorsign-01.png",
+    "visiblePixels": 389724,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 228
+  },
+  "independentOriginal": false
+}

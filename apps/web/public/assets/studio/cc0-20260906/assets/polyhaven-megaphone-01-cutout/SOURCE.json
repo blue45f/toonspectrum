@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Megaphone_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-megaphone-01",
+  "sourceModelSha256": "7e4ec29fe3f397b81649cfaad69afc7922424e950279f8759bbb81628e64f14d",
+  "render": {
+    "sourceId": "polyhaven-megaphone-01",
+    "sourceSha256": "7e4ec29fe3f397b81649cfaad69afc7922424e950279f8759bbb81628e64f14d",
+    "path": "high-resolution-props/polyhaven-megaphone-01.png",
+    "visiblePixels": 336249,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 15814
+  },
+  "independentOriginal": false
+}

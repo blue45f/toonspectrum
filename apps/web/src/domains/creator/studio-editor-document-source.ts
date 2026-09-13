@@ -49,6 +49,9 @@ export function studioEditorPersistenceWorkId(
   workId: string | null,
   projectId: string | null | undefined,
   documentId: string | null | undefined,
+  draftId?: string | null,
 ): string | null {
-  return workId ?? (projectId && documentId ? documentId : null);
+  // Explicit drafts must not share the legacy "new" recovery slot. Keep every existing
+  // server/project key and the unnamed draft key intact; never delete or migrate them implicitly.
+  return workId ?? (projectId && documentId ? documentId : draftId ? `draft:${draftId}` : null);
 }

@@ -1,0 +1,78 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_buildings_night",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 21,
+    "type": 0,
+    "tags": [
+      "building",
+      "europe",
+      "river",
+      "architecture",
+      "lamp"
+    ],
+    "date_published": 1511996400,
+    "name": "Modern Buildings Night",
+    "categories": [
+      "outdoor",
+      "urban",
+      "night",
+      "partly cloudy",
+      "high contrast",
+      "artificial light"
+    ],
+    "coords": [
+      52.520154,
+      13.376159
+    ],
+    "date_taken": 1478452440,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "8571269"
+    ],
+    "files_hash": "21cdd875cc03ed16e6ac59c052826f12efa875c7",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI of a Berlin riverside at night, high-contrast artificial lights, warm glass interiors and cool blue sky reflecting on water.",
+    "category_id": "90534497-6965-5735-bfbc-37f6fda902b7",
+    "category": "Streets & Town/Streets & Alleys/City Streets",
+    "attributes": {
+      "time_of_day": "night",
+      "weather": "partly_cloudy",
+      "light_type": "artificial",
+      "contrast": "high",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "308a00fb",
+    "download_count": 77533,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_buildings_night.png?width=256&height=256&v=308a00fb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/modern_buildings_night.jpg",
+      "bytes": 4369205,
+      "sha256": "f6f6a8b8d4c885c2124117c910ee109a105a1756561bf3b3ca5947098b7d0991",
+      "sourceMd5": "91e4166589c46bd2bee5fe60aefcfc79"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

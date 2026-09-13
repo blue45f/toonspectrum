@@ -22,6 +22,8 @@
     "express": "^4.22.2",
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",
+    "korean-lunar-calendar": "0.4.0",
+    "lunar-typescript": "1.8.6",
     "nestjs-pino": "^4.6.1",
     "nestjs-zod": "^5.4.0",
     "pg": "^8.21.0",
