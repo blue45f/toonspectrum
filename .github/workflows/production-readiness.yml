@@ -1,13 +1,7 @@
-name: Production readiness
+name: Production readiness (audit only)
 
 on:
   workflow_dispatch:
-    inputs:
-      deploy:
-        description: Apply missing variables and deploy production (false audits only)
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -80,89 +74,9 @@ jobs:
           fi
           echo "Vercel deployment credentials are available."
 
+      # Environment mutation and source-build deployment were retired by owner policy 2026-09-14.
       - name: Reconcile production variables without exposing values
         shell: bash
-        env:
-          DEPLOY: ${{ inputs.deploy }}
         run: |
           set -euo pipefail
-          if [[ "$DEPLOY" == "true" ]]; then
-            node scripts/configure-vercel-production.mjs
-          else
-            node scripts/configure-vercel-production.mjs --audit-only
-          fi
-
-      - name: Install and verify pinned Vercel CLI
-        if: ${{ inputs.deploy }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"
-          actual_version="$(vercel --version 2>&1 | awk '/Vercel CLI/{version=$NF} END {print version}')"
-          echo "Vercel CLI ${actual_version}"
-          test "$actual_version" = "$VERCEL_CLI_VERSION"
-
-      - name: Link the Vercel project
-        if: ${{ inputs.deploy }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
-
-      - name: Deploy production
-        id: deploy
-        if: ${{ inputs.deploy }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          deployment_url="$(vercel deploy --prod --yes --token "$VERCEL_TOKEN" | tail -n 1)"
-          if [[ ! "$deployment_url" =~ ^https:// ]]; then
-            echo "::error::Vercel did not return a production deployment URL."
-            exit 1
-          fi
-          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
-          echo "Production deployment created: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Smoke-test deployment and production domain
-        if: ${{ inputs.deploy }}
-        shell: bash
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
-        run: |
-          set -euo pipefail
-          check_page() {
-            local url="$1"
-            curl --silent --show-error --fail-with-body \
-              --retry 8 --retry-all-errors --retry-delay 10 \
-              --max-time 30 --output /dev/null "$url"
-          }
-          check_json_api() {
-            local base="$1"
-            local tmp
-            tmp="$(mktemp)"
-            if curl --silent --show-error --fail-with-body \
-              --retry 5 --retry-all-errors --retry-delay 5 \
-              --max-time 30 --output "$tmp" \
-              "$base/api/creator/marketplace/resources?limit=1"; then
-              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$tmp"
-              rm -f "$tmp"
-              return 0
-            fi
-            if curl --silent --show-error --fail-with-body \
-              --retry 5 --retry-all-errors --retry-delay 5 \
-              --max-time 30 --output "$tmp" \
-              "$base/creator/marketplace/resources?limit=1"; then
-              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$tmp"
-              rm -f "$tmp"
-              return 0
-            fi
-            rm -f "$tmp"
-            return 1
-          }
-
-          for base in "$DEPLOYMENT_URL" "https://www.toonstudio.cloud"; do
-            check_page "$base/"
-            check_page "$base/market"
-            check_json_api "$base"
-          done
-          echo "Root, market page, and public marketplace API smoke tests passed." >> "$GITHUB_STEP_SUMMARY"
+          node scripts/configure-vercel-production.mjs --audit-only

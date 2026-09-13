@@ -1,14 +1,18 @@
-# Production pushes are normally deployed by Vercel Git Integration.
-# This manual fallback builds on the GitHub runner and uploads immutable prebuilt output so a
-# Vercel remote-build quota incident cannot block an emergency production recovery.
+# Owner policy 2026-09-14: Git auto-deploy is disconnected; main merges never deploy.
+# This is the sole approved Vercel deployment workflow: explicit approval, one Linux build,
+# one immutable prebuilt upload. See docs/operations/minimum-cost-deployment-policy.md.
 name: Vercel CLI fallback deploy
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit SHA, tag, or branch already contained in main (defaults to the triggering ref)
-        required: false
+        description: Explicitly approved full 40-character commit SHA already contained in main
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY-TOONSPECTRUM-PREBUILT after owner approval and required CI verification
+        required: true
         type: string
 
 permissions:
@@ -33,8 +37,24 @@ jobs:
     steps:
       - name: Require fallback deployment configuration
         shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+          DEPLOY_CONFIRMATION: ${{ inputs.confirm }}
+          WORKFLOW_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
+          if [[ "${WORKFLOW_REF:-}" != "refs/heads/main" ]]; then
+            echo "::error::Dispatch this reviewed deployment workflow from main only."
+            exit 1
+          fi
+          if [[ "${DEPLOY_CONFIRMATION:-}" != "DEPLOY-TOONSPECTRUM-PREBUILT" ]]; then
+            echo "::error::Explicit owner-approved prebuilt deployment confirmation is required."
+            exit 1
+          fi
+          if [[ ! "${REQUESTED_REF:-}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::An explicitly approved full 40-character SHA is required; branches and tags are refused."
+            exit 1
+          fi
           if [[ -z "${VERCEL_TOKEN:-}" || -z "${VERCEL_ORG_ID:-}" || -z "${VERCEL_PROJECT_ID:-}" ]]; then
             echo "::error::VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are all required for the manual fallback deploy."
             exit 1

@@ -121,7 +121,12 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
       issues.push(`Vercel fallback preflight must reject an empty ${secretName}`);
     }
   }
-  if (!/(?:^|\n)\s*exit 1\s*(?:\n|$)/.test(preflightRun)) {
+  const preflightGuards = [...preflightRun.matchAll(/^\s*if\b[^\n]*;\s*then\s*\n([\s\S]*?)^\s*fi\s*$/gm)];
+  if (
+    preflightGuards.length !== 4 ||
+    preflightGuards.some((guard) => !/(?:^|\n)\s*exit 1\s*(?:\n|$)/.test(guard[1])) ||
+    /(?:^|\n)\s*exit 0\s*(?:\n|$)/.test(preflightRun)
+  ) {
     issues.push("Vercel fallback preflight must fail instead of reporting a successful no-op");
   }
 
