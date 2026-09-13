@@ -3,65 +3,97 @@ on:
   push:
     branches: [codex/studio-quality-assets-20260913]
 permissions:
-  contents: read
+  contents: write
+  actions: read
 concurrency:
   group: studio-quality-assets-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  candidates:
+  verify-and-publish:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/codex/studio-quality-assets-20260913'
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 50
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v4
         with:
           filter: blob:none
-          sparse-checkout: |
-            /.github/workflows/
-            /scripts/
-            /apps/web/src/domains/creator/
-            /apps/web/public/assets/studio/cc0-20260906/manifest.json
-            /package.json
-            /pnpm-lock.yaml
-            /tsconfig.json
-          sparse-checkout-cone-mode: false
-      - name: Export source for isolated review
-        run: |
-          mkdir -p /tmp/studio-asset-review
-          tar -czf /tmp/studio-asset-review/source.tgz .github/workflows scripts apps/web/src/domains/creator package.json pnpm-lock.yaml tsconfig.json apps/web/public/assets/studio/cc0-20260906/manifest.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: studio-quality-assets-source
-          path: /tmp/studio-asset-review/source.tgz
-          retention-days: 3
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24.16.0'
-      - name: Install isolated review tools
+          cache: pnpm
+      - name: Install the repository's locked toolchain
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-quality-assets-candidates
+          run-id: 34733128719
+          github-token: ${{ github.token }}
+          path: artifacts/studio-quality-assets-input
+      - name: Restore the exact reviewed candidate batch
+        run: tar -xzf artifacts/studio-quality-assets-input/candidates.tgz -C artifacts
+      - name: Verify all bytes, unchanged mobile budgets and Khronos GLB validation
+        run: node --import tsx scripts/studio-quality-assets-20260913/prepare-publication.mjs
+      - name: Publish only the 52 explicitly reviewed additions to this checkout
+        run: node scripts/publish-studio-asset-expansion.mjs artifacts/studio-quality-assets-20260913 artifacts/studio-quality-assets-20260913/decisions.json
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Decode and canvas-render every new original SVG in Chromium
+        run: node --import tsx scripts/studio-quality-assets-20260913/verify-illustrations.mjs
+      - name: Run asset catalog, marketplace, curation and GLB boundary regressions
         run: |
-          python -m pip install Pillow==11.3.0
-          mkdir -p /tmp/studio-asset-tools
-          cd /tmp/studio-asset-tools
-          npm init -y
-          npm install --save-exact three@0.184.0 playwright@1.62.1 gltf-validator@2.0.0-dev.3.10
-          npx playwright install --with-deps chromium
-      - name: Acquire distinct CC0 models and native 2K surfaces
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/catalog/studio-quality-assets-20260913.test.ts \
+            apps/web/src/domains/creator/studio-original-free-asset-packs.test.ts \
+            apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts \
+            apps/web/src/domains/creator/studio-cc0-curation.test.ts \
+            apps/web/src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx \
+            apps/web/src/domains/creator/studio-marketplace-placement-contract.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation.test.ts
+      - name: Lint changed application code and tests
         run: |
-          python scripts/acquire_studio_pbr_assets.py --output artifacts/studio-quality-assets-20260913 --exclude-manifest apps/web/public/assets/studio/cc0-20260906/manifest.json --profile expansion --max-download-mib 1536
-      - name: Render every model from three actual browser viewpoints
-        run: node scripts/render_studio_asset_delivery.mjs artifacts/studio-quality-assets-20260913 /tmp/studio-asset-tools
-      - name: Package review candidates without upstream duplicates
-        if: always()
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/catalog/studio-quality-assets-20260913.ts \
+            apps/web/src/domains/creator/catalog/studio-quality-assets-20260913.test.ts \
+            apps/web/src/domains/creator/studio-original-free-asset-packs.ts \
+            apps/web/src/domains/creator/studio-original-free-asset-packs.test.ts \
+            apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts \
+            apps/web/src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx
+      - name: Typecheck the complete web application
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Persist exact verification evidence
         run: |
-          if test -d artifacts/studio-quality-assets-20260913; then
-            tar --exclude='_source' -czf /tmp/studio-asset-review/candidates.tgz -C artifacts studio-quality-assets-20260913
-          fi
+          mkdir -p docs/quality/studio-quality-assets-20260913
+          cp artifacts/studio-quality-assets-20260913/visual-review.md docs/quality/studio-quality-assets-20260913/
+          cp artifacts/studio-quality-assets-20260913/publication-report.json docs/quality/studio-quality-assets-20260913/
+          cp artifacts/studio-quality-assets-20260913/admission-report.json docs/quality/studio-quality-assets-20260913/
+          cp artifacts/studio-quality-assets-20260913/browser-render-evidence.json docs/quality/studio-quality-assets-20260913/
+          cp artifacts/studio-quality-assets-20260913/illustrations/report.json docs/quality/studio-quality-assets-20260913/illustration-browser-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: studio-quality-assets-candidates
-          path: /tmp/studio-asset-review/candidates.tgz
+          name: studio-quality-assets-verification
+          path: |
+            docs/quality/studio-quality-assets-20260913
+            artifacts/studio-quality-assets-20260913/illustrations
+            artifacts/studio-quality-assets-20260913/admission-report.json
+            artifacts/studio-quality-assets-20260913/publication-report.json
+            artifacts/studio-quality-assets-20260913/visual-review.md
           retention-days: 7
           if-no-files-found: warn
+      - name: Commit verified assets only to the requested feature branch
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          BRANCH: codex/studio-quality-assets-20260913
+        run: |
+          set -euo pipefail
+          actual=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/web/public/assets/studio/cc0-20260906 docs/quality/studio-quality-assets-20260913
+          git diff --cached --stat
+          git -c core.hooksPath=/dev/null commit -m 'feat(studio): publish 52 reviewed native-2K assets with verification evidence'
+          git push origin "HEAD:refs/heads/$BRANCH"
