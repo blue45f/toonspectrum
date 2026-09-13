@@ -5,7 +5,7 @@ import {
 import {
   readStudioProjectDocuments,
   type StudioProjectDocumentEntry,
-} from "./studio-project-document-store";
+} from "./studio-project-document-reader";
 import {
   readStudioProjectLibrary,
   type StudioProjectLibraryStorage,
