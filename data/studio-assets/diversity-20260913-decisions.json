@@ -1,0 +1,972 @@
+{
+  "schema": "toonspectrum.asset-visual-decisions.v1",
+  "reviewedOn": "2026-09-13",
+  "reviewLevel": "contact-sheet-visual-triage",
+  "allAnglesArtisticallyApproved": false,
+  "fullStudioProjectRoundTripVerified": false,
+  "reviewNote": "전체 12개 컨택트 시트 직접 확인. 백색 말 조각상은 1536px 확대 확인 후 2D 파생본만 제외. 기술 검사와 시각 선별을 분리한다.",
+  "assets": [
+    {
+      "id": "polyhaven-coffeecart-01",
+      "sha256": "f3ffc98aef2fe321ae2c76c7da0e24a114880feb09aea004f5b08cd577cafaa0",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-cashregister-01",
+      "sha256": "444ec20199cc3de6423c7b29342edde7604c43b3bcc089d262ac7e555c6e3010",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-schooldesk-01",
+      "sha256": "cabfdcbc5a983c8710af07056c9820cb0eb9bac43762c4cc6ee55cfaee86a551",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-schoolchair-01",
+      "sha256": "f3b7b61ee57c154b979956a09ba6d7bbedd1222383fd6680c64068e1948dff75",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-barbershopchair-01",
+      "sha256": "7e9da03732fc21df7f5b86a54ec40488bc5df958b926fbc64de9346b9638d6bf",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-television-01",
+      "sha256": "af538f9989a9e36d214b023a1c9cc589e4e6150b4df42dc42fa1f4c173406186",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-lantern-01",
+      "sha256": "f28125f90216376db04506f2787c1aef0f4bd6bc4360db0c8c954eed536a195e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-wetfloorsign-01",
+      "sha256": "d6aa6d8887c9b1880f17d31c91bdb7d8193a805f7b511de1dab69dba93b89ae3",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-ukulele-01",
+      "sha256": "a2fa1e3450228fe68d205ebc8ccb6cbf0d15a464a5ec38ef83b8a0bf54a2cd7d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-drill-01",
+      "sha256": "c2a77734defe626575ec7a0aa6b14f715137a93e50c1e1813237ba3fe61f3af5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-megaphone-01",
+      "sha256": "7e4ec29fe3f397b81649cfaad69afc7922424e950279f8759bbb81628e64f14d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-power-box-01",
+      "sha256": "8b24b151fda1fc42e7908f078136a4d3be3bcecda18491c062d18ee34fea136a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-01.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-utility-box-02",
+      "sha256": "43e0494ef80d29d013cb48d479873c0eb7c7b53b7e222f9f7f404cfe41ff38eb",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-metal-trash-can",
+      "sha256": "bb2ee98fa996bb9094488dcb3785ac22b6c6b5c71e3d16ed44e01f231a1d394b",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "원통 금속 쓰레기통 세트 · Metal Trash Can"
+    },
+    {
+      "id": "polyhaven-concrete-road-barrier",
+      "sha256": "dbc5788bb54fa3646b19d127621ec2618cafb7b0b833676c157631cbb04ae695",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-covered-car",
+      "sha256": "32389568f3bf78aa4af1ebd604b05fab01ce569cdf90e8d1d44302e817bb6ffd",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-rollershutter-window-01",
+      "sha256": "5cb622fd3dd2871511d69af9982c12e5f8420cb338c0203ec79a0733abe3a3fc",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "상점 롤러 셔터 창문 세트 · Rollershutter Window 01"
+    },
+    {
+      "id": "polyhaven-old-tyre",
+      "sha256": "4cf3afbd144f3b56cf09218928c35ea8146794f600f14d0c54e27c5b640af608",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-metal-tool-chest",
+      "sha256": "a10dc3e9f5a657056444906515162d14c240105c12cc6bd22ab388610db52fb2",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-wooden-bucket-02",
+      "sha256": "d527fd7adc419c2947ed9fcaeafecbb5cad5603bf68e18c0ad52f34ec9cc9ed3",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-wicker-basket-01",
+      "sha256": "94630a425dfff2edb47270ff49f351e855d4851bca6350ecec93f839025f97d8",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "라탄 직조 바구니 · Wicker Basket 01"
+    },
+    {
+      "id": "polyhaven-throw-pillows-01",
+      "sha256": "7b262f73a66b527ad360e1334df0b6b71b7af8b49a16aa4346fce443d69af3c2",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-coffee-table-round-01",
+      "sha256": "e76d78cf83ec79e457fb1cb325a5b31837781e090ee1f50f1b17733b6985744a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-side-table-01",
+      "sha256": "106a04b45e6338a5e0026618d3fc0003e2c784095674bfa60a0974e7b7e354fe",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-02.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-rockingchair-01",
+      "sha256": "b196136fc3cf5278422511203870248e3188533e2c0aed3663c7efc1af066bf6",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-ottoman-01",
+      "sha256": "5b33a28a36549565174ecf192b467d5be665a1804a2bbf37e76fcc547b0ebe82",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "브라운 가죽 오토만 스툴 · Ottoman 01"
+    },
+    {
+      "id": "polyhaven-gothicbed-01",
+      "sha256": "f56eef6da6b462fe0aa793f477a3c1cd923b8c2f273a3e8d4cf1a7e29a67f7e3",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-classicnightstand-01",
+      "sha256": "8e4ea304364fd3d6234db633b7319628db7d85c0a73ada42ad49fbac131eda6e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-chandelier-03",
+      "sha256": "ec40b90205168265ee823ed9037bbe7f8e38eb3d43dd085e8da465f64139e56d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-rubber-duck-toy",
+      "sha256": "0d9dd0ce3d5404b68c60d83de4e550eaf0d3937a277e4dbc0df2a64db1b763dd",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-baseball-01",
+      "sha256": "1ac739a7d17744757e109577423898fd333a7a957d6f45f4b7a81cc984e53e0d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-football",
+      "sha256": "865f444b75a26ef30c898aefd27d661b95caf87aa54fce91e852e0c0a6634068",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "낡은 축구공과 바람 빠진 공 세트 · Football"
+    },
+    {
+      "id": "polyhaven-croissant",
+      "sha256": "e22d0dc4374b7d1ac9bde4a1ebcb9131b8b403c3f8322413684ce08a2872a17c",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-food-pomegranate-01",
+      "sha256": "091f3e637a283cb75ae11d36a0a550d741f0fc58658df38a7e0ac5bfa915fffc",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-food-pears-asian-01",
+      "sha256": "70a680af6b1c530a82d490baab5766103bb12c337e6426b9ff5bb6bed54c6c9e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-lemon",
+      "sha256": "60080c0dfed4a5be3eb6a10cd0f18a6b7b412aaaea62c34e1a679526cf8959dc",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-03.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-carrot-cake",
+      "sha256": "5a6c9e3fe92ac091f5fdb574afc500b1f145ed42e6252b2c3684810ff3ceac28",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-jug-01",
+      "sha256": "ca2467e354dc995588b832f1ad6b0c472430730a4b94e43a552bb44142001832",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과.",
+      "name": "장미 무늬 도자기 저그 · Jug 01"
+    },
+    {
+      "id": "polyhaven-anthurium-botany-01",
+      "sha256": "30aad56a01f78b56a2c33d17302ca22551bc3bc2de9a60dbe9446723ccfb6c2b",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "잎과 식재 부품이 흩어진 구성 세트로, 완성된 단일 화초 소품으로 제공하기 부적합."
+    },
+    {
+      "id": "polyhaven-calathea-orbifolia-01",
+      "sha256": "c349962fdd45ec993147340cec604ea8dfc4639fec85c40988230599dd559a41",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "작은 식재 구성 요소가 넓게 산재해 기본 소품의 가독성과 활용성이 낮음."
+    },
+    {
+      "id": "polyhaven-concrete-cat-statue",
+      "sha256": "0ba99fe163e376e74d6903e807153793a9019a153d4aa3ff430772b81b10f80a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-horse-statue-01",
+      "sha256": "07cdf7e91d697a9b6f1f9d7d10bd0ce26703ea738b9436f90de23587561adc79",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-wooden-lantern-01",
+      "sha256": "e05089321749ad809effdfce35685c93161495588ac76de6ccb3d1df561b3930",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 완결된 소품 형상과 PBR 표면을 확인. 브라우저 렌더 및 모바일 가져오기 검사 통과."
+    },
+    {
+      "id": "polyhaven-asphalt-pit-lane",
+      "sha256": "14c0685c1f179481ffacd7298d1b768fd8d2111534cd2dabb3e9a774d0d419bb",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-pavement-02",
+      "sha256": "d31b78d89f10cd7fa7e1b2636c6a5f647300a36178fd63a71646344072e1ef37",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-cobblestone-floor-04",
+      "sha256": "1d1c7b0240b632a37a24954919b620d6b77d0432b48f370fb4fdfdb8ea78d44c",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-roof-09",
+      "sha256": "2bec199523d149170edde4f9dd6d2b44e6d2b46b6ce086b4ad57fc006f7f2243",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-gravel-embedded-concrete",
+      "sha256": "a3dade988f388253bafb06a6b0c8395b3459ce4c172946e3f289b0fc5688cfc4",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-04.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-brick-wall-001",
+      "sha256": "aefb5987243cd2daed64259b2e2fa1f19b269dbdcadc71387ea7e1a9af70b413",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-white-rough-plaster",
+      "sha256": "763c3bfe14446006be773b9f3b8f09ca9619734f2587bd0ee11be23811e92d9a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-marble-cliff-03",
+      "sha256": "229969d34153baf8712b1631a61d57cffddc67657232271abfa3e05ceb0a8fe0",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과.",
+      "name": "갈색 대리암 절벽 암석 표면 · Marble Cliff 03"
+    },
+    {
+      "id": "polyhaven-stone-tiles-02",
+      "sha256": "7282acb52836d3a760cfa1a36e2d37236c75fa110b9ca710180859651e6d610d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-rough-wood",
+      "sha256": "239fdd891bc9691b669e4093859f5e99a59d0f344ff671d76c46c4f51a2be976",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-blue-metal-plate",
+      "sha256": "75b1a1ed6b15053b11cdf54eb4849cca3e90d6250b7cf52771dba570a87c24f4",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-gravel-concrete-03",
+      "sha256": "8f78359872d037c593ae05ab6d6b82b3a09e3084e044038b5b7d0b30026e82ab",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과.",
+      "name": "자갈이 박힌 콘크리트 표면 · Gravel Concrete 03"
+    },
+    {
+      "id": "polyhaven-snow-02",
+      "sha256": "67ae68fdcfb6a742bedc0a9124d140fe9466b4201f53b6aa0886c69bff2e272f",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-red-laterite-soil-stones",
+      "sha256": "94b8ab196f52a90efe6e02619afd2bc63ae2c1e5a85c55ac5eb67164f0131b73",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 표면 재질 패턴을 확인. 네이티브 2K 이미지와 보조 맵의 크기·무결성 검사 통과."
+    },
+    {
+      "id": "polyhaven-background-canary-wharf",
+      "sha256": "5997ef105082f0d9f22bc7b0276395d80fccfff0bad4f179581ec3b89e65de1b",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "이전 팩의 제외 판정을 유지: 높은 울타리가 장면을 막아 배경 구도와 공간 활용성이 낮음.",
+      "name": "고층 건물 앞 광장과 가림벽 · Canary Wharf"
+    },
+    {
+      "id": "polyhaven-background-hansaplatz",
+      "sha256": "980200218ba1a263b12d857449e5604028336b09ad6d1da75f327701e31c879a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-urban-street-01",
+      "sha256": "c9b64902d71886bb4a7c4cd0de93692b33fd3f3e2c511f25d230715f9dc6f9af",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-05.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-urban-street-03",
+      "sha256": "3382ebc47aa7c41f093ea3bc9a01bbda442e8a741e344f2f09cd3f70871beb4d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-crosswalk",
+      "sha256": "3f26ee79aa89bce82227bdabd1bd58e315bdd1557670ba904366db8284d42092",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "숲길 입구 도로와 횡단보도 · Crosswalk"
+    },
+    {
+      "id": "polyhaven-background-modern-buildings-night",
+      "sha256": "2edb1ea1ec984297aae2217da28dbb7d4f5a57cdc6ba32f03250ece4f7f37556",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "야간 유리 건물 아트리움 입구 · Modern Buildings Night"
+    },
+    {
+      "id": "polyhaven-background-venetian-crossroads",
+      "sha256": "f0996546876f4d26f92d237e9e93030752c51661ce2fc7bf7851d9ad7dc66a38",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-courtyard-night",
+      "sha256": "316019fed4b94e1313b0201d88b8b825b18cacbd7b6c48bcce40c5a3962f2213",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "야간 주택 차고문과 중정 · Courtyard Night"
+    },
+    {
+      "id": "polyhaven-background-comfy-cafe",
+      "sha256": "5290bf60e005776a528f3cfdf95eaa3698e56a46c79365172a4ed64385416847",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "화면 중심의 큰 기둥이 실내 공간을 가려 배경 구도 활용성이 낮음."
+    },
+    {
+      "id": "polyhaven-background-decor-shop",
+      "sha256": "b22bd156383755c4648a88bca06cba8cade13ca061216fa8e69d580bf557cce5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-machine-shop-02",
+      "sha256": "090769bbfb88dde0820468bacc1a20b4479b14b78d9c018979652c3e32f1bb74",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-carpentry-shop-02",
+      "sha256": "c40f994e3ec504fd1e3dde86e23841628a299f64501031c32270d4e37bd9f259",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-freight-station",
+      "sha256": "57e3acd889a3b6801d11d7867ed43d4eda5393de89946804bf626284813222fd",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "노을빛 옛 화물역 부지 · Freight Station"
+    },
+    {
+      "id": "polyhaven-background-dresden-station-night",
+      "sha256": "559b498e0bafd26a2f33abf31349a0f0ff41575cd9fb83b9d9b677e6bedf3a91",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-hamburg-hbf",
+      "sha256": "06bf8f856cda720151e6a7ac5ed7bdcfe31e3903071da7e6e3469d3a7dca2c03",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-06.jpg",
+      "reason": "중앙 광고와 자판기가 역 공간보다 지배적인 구도로 신규 추천 배경에서 제외."
+    },
+    {
+      "id": "polyhaven-background-subway-entrance",
+      "sha256": "990088ce73dfdd45abc6f32f5f7fa98af94317d999269338a536f80a98149bc5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-hotel-room",
+      "sha256": "ad28e2a0c0939b09ccfa034b60076be6401441bc84bc19529527936efcd26c45",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "창문과 커튼 클로즈업으로 객실 구조가 거의 드러나지 않음."
+    },
+    {
+      "id": "polyhaven-background-wooden-lounge",
+      "sha256": "0b90d29ee6af8e2182b9266d50bdc6d345c54406df57491c2f16ccf4e8187324",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-ballroom",
+      "sha256": "e9824290e5ba564b76e901db614ace3b42dc4e2191d07a6a514e8196d7e2f481",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-large-corridor",
+      "sha256": "6e1b45138541c5d2e2c30521f3eb77c23726585e3006c5d8da8201c42e24fd4e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "아치 창과 실내 발코니 문 · Large Corridor"
+    },
+    {
+      "id": "polyhaven-background-winter-lake-01",
+      "sha256": "b6d0237925ff9baa013f87797bda065a58f1e8773dc403afbca701457a31d8a6",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-winter-evening",
+      "sha256": "22934fe76bd97296b5c2aa2d31bdd0e5946a203eb87189a7c78a33b39c323cd7",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "이전 팩의 제외 판정을 유지: 상점 간판이 장면의 주요 요소여서 범용 창작 배경 선정에서 제외.",
+      "name": "눈 쌓인 건물 안뜰과 야간 조명 · Winter Evening"
+    },
+    {
+      "id": "polyhaven-background-misty-pines",
+      "sha256": "cc776f85921dd834c5333f765d50def1500b65d9a47a9e3958af1163aa8c77f5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-mossy-forest",
+      "sha256": "9c3545b50afd13807178fe4efa5d039083f4382c22968b155a97404be3a6bf95",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-river-walk-1",
+      "sha256": "4cc14fce4250b2d884d66c4c591f7839703a70b09126c2823fcb96260d10ab71",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "강변 숲속 산책길 · River Walk 1"
+    },
+    {
+      "id": "polyhaven-background-tiergarten",
+      "sha256": "73d32447af50bf6d5859ff530f5adc1d82ea6252fb62a07dde3a4559c63dd253",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-pond-bridge-night",
+      "sha256": "105a16848412494fe1611232b1b5fd3f53c5e160f9788a820a1d3c27df87872f",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-07.jpg",
+      "reason": "대부분의 숲과 수면이 너무 어두워 디테일 판독성이 부족함."
+    },
+    {
+      "id": "polyhaven-background-small-harbor-01",
+      "sha256": "09b85877513e9d05b6489adb357b6269f8b7da4284485928bca94b634c1d8611",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-venice-sunset",
+      "sha256": "df83b4b10bf24089f0e96cedf93ee385c61e774d2ac1a9ba0f6df58a9aa85499",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "노을빛 바다와 수평선 · Venice Sunset"
+    },
+    {
+      "id": "polyhaven-background-leadenhall-market",
+      "sha256": "a04f17e3234a62e891849426eb4e292433f173f7f85c95168a780eac12657bb8",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-mosaic-tunnel",
+      "sha256": "2de0b8669b3377e0939b09796391bc5620111443f45b7dc8d5eb3f5b58a30d3a",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "통로 대신 모자이크 벽화와 조명이 크게 잘려 공간 배경 활용성이 낮음."
+    },
+    {
+      "id": "polyhaven-background-derelict-overpass",
+      "sha256": "8cfe8d86df73f3dff4bebd22298a3ae31115198691b94931bf588b86551056c2",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지.",
+      "name": "시골 고가도로 난간과 들판 · Derelict Overpass"
+    },
+    {
+      "id": "polyhaven-background-rural-winter-roadside",
+      "sha256": "4cb45a46ecc0fb9fec367d4bde70c4b2bd38607c8e87d520c0e78f52b9721b5a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-background-royal-esplanade",
+      "sha256": "755a39b5444d7c36fe4f0e8c0bf0f76b536fc77ea0cde047fc690bd6efbebadd",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 사용 가능한 공간 구도와 디테일을 확인. 사진 레퍼런스이며 원본 시야각 해상도를 유지."
+    },
+    {
+      "id": "polyhaven-coffeecart-01-cutout",
+      "sha256": "3f818e0dc999a058bf2841a560a866d20875bb71abd1bba010db21d90c349b19",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-cashregister-01-cutout",
+      "sha256": "0dcf6fe8917656ab922f0f71809da0eb92e2d993ad410701049afbbb8faf1871",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-schooldesk-01-cutout",
+      "sha256": "f91ae5d69333e4d4e1d4dac3b5ca800e80e5d16fdb34e9f740395375d7d0dd7a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-schoolchair-01-cutout",
+      "sha256": "12f3441f74617e583c4cc44d39979a075c9b48986d7876efc3086921a0e8e304",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-barbershopchair-01-cutout",
+      "sha256": "32d8fc064a1896a95ec43a983b9a62c5ceabdee5aeb005a333b64ef39d2232b9",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-08.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-television-01-cutout",
+      "sha256": "1e3f332e10e89a6012a7ecc31d8c34b0f1db76adb4c3ea177967e9cf7a8d0086",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-lantern-01-cutout",
+      "sha256": "28bd80d297af9b16050a6f035ed3cda7ae40017da5c1c0f6e0d893fbecff488f",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-wetfloorsign-01-cutout",
+      "sha256": "e4f5fde580573391de966fe591cad933eb2b2ab08f884490bc04177e386cd05d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-ukulele-01-cutout",
+      "sha256": "58838fd33fafcb9645312fa862e2284de167d8cb1c361f756acb124c5c1dabc5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-drill-01-cutout",
+      "sha256": "75cc877fc843cc4f31ef7a5745e7c9f02d19f1db70efdf6345a4682a01a01980",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-megaphone-01-cutout",
+      "sha256": "03d3dc3ccac7877470adf03fe9beb635b45ffba93cd49c738f201cb457ff13cb",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-power-box-01-cutout",
+      "sha256": "aa39ebaf8974ec411e3cfb262ba9867e930f9b732c9c22a19caae72df50a45b5",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-utility-box-02-cutout",
+      "sha256": "2c719c0b699858aa9bfe650d99841f27bbde7a7640b5b477327aa117a4a5815e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-metal-trash-can-cutout",
+      "sha256": "be72cb1cb23ca037e8f87bd6596c07d5ee9abdf3e53e85037845397e3d9f69cb",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "원통 금속 쓰레기통 세트 · Metal Trash Can · 2D 소품"
+    },
+    {
+      "id": "polyhaven-concrete-road-barrier-cutout",
+      "sha256": "b25207ed06a365d097c43a9ee7df95e151616eea4cb49c1bd4ada3cbf75c3e5a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-covered-car-cutout",
+      "sha256": "a478ea6940bb11ca6fa3002ccdf1417c2571fbb788ed9535645e833495265bbb",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-rollershutter-window-01-cutout",
+      "sha256": "a98f46f14881fa254f2b86a0d00fb5e430887272002b1eb1b104cf88af0cdfbd",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-09.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "상점 롤러 셔터 창문 세트 · Rollershutter Window 01 · 2D 소품"
+    },
+    {
+      "id": "polyhaven-old-tyre-cutout",
+      "sha256": "d4095831f158f1b84268717297ee5fdf53e438c2838280a7e518069af734dea6",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-metal-tool-chest-cutout",
+      "sha256": "d7926aa17fb460a2797033259080bd3ced280604e0a7de98be4ea25689c6d964",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-wooden-bucket-02-cutout",
+      "sha256": "a932d8fe417f0364df8bad95e74fe980a06bf3784c672c346c73fe386d7abf71",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-wicker-basket-01-cutout",
+      "sha256": "075df4cbd41ce11d49a9359b09cd962797a88f9b64d2f9ab45317ef05ddc5989",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "라탄 직조 바구니 · Wicker Basket 01 · 2D 소품"
+    },
+    {
+      "id": "polyhaven-throw-pillows-01-cutout",
+      "sha256": "0f0ece103fe0afc471294e1110322eeb66fb92988185b644372cfdb1c6a1139d",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-coffee-table-round-01-cutout",
+      "sha256": "dfc8a4432a01dff52011d6207d458d15d77c664dd804d2910d048d4b7dd6572c",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-side-table-01-cutout",
+      "sha256": "a5f5ff4cf2d0b52d929f5281a7ffed95362e951a31c30fb621dfae22f7573733",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-rockingchair-01-cutout",
+      "sha256": "7f8371722fcdfa3c7d20b2ce16e5de76708c5d1cfcacd266c3c58a4d5ce2a3ea",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-ottoman-01-cutout",
+      "sha256": "abb77ee44411dffc4f8c1444888816e67646c9e0db06e8a73b0b1751ada3b725",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "브라운 가죽 오토만 스툴 · Ottoman 01 · 2D 소품"
+    },
+    {
+      "id": "polyhaven-gothicbed-01-cutout",
+      "sha256": "4f654355a2e357bb8649878fd018574ad59398777351d1cae6dd96c0f3d48a5c",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-classicnightstand-01-cutout",
+      "sha256": "d0ebd6dfcf6f750ba62f933bcf455ac398345f9a09743272525409f0a7bee82a",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-chandelier-03-cutout",
+      "sha256": "be38a4dcad3dd19d31d71987be2706f4d3e53663aabb36ee61e19f05feade282",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-10.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-rubber-duck-toy-cutout",
+      "sha256": "80c2df3e2ea196bcbc7f94d01b474eb5ec9eb7aa71d17cf3c053b28b20197796",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-baseball-01-cutout",
+      "sha256": "afa2dc3caa4fc951a9a7431972a2d35e6d3e1d263cd8b9212f6a08c03323a028",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-football-cutout",
+      "sha256": "210932103c21b1b8081ca566ab1c64281e4c9a4b0cf8987896e5a68483635035",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "낡은 축구공과 바람 빠진 공 세트 · Football · 2D 소품"
+    },
+    {
+      "id": "polyhaven-croissant-cutout",
+      "sha256": "e5503cbc00b90521c960a0a6b5c44656e898b7c655b289ac00eed1faf3f90480",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-food-pomegranate-01-cutout",
+      "sha256": "295fc60237bc7f0e97ab88aeefccde38852a8419af2fae78326612f1870ba56e",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-food-pears-asian-01-cutout",
+      "sha256": "0533f773366e27522461f19c091b583e148c414badc5e85be22c17e9fdf4d271",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-lemon-cutout",
+      "sha256": "5c66773ad2eb9b083d89fccc3a1113ba814adbb4ac277711fd34c064eb90f429",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-carrot-cake-cutout",
+      "sha256": "ada7608574be598f68136b56a6ad1e47fb8908cdcafc1a0d95e2d25caf26432c",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-jug-01-cutout",
+      "sha256": "89c3fee242e04ffc54ff40c68b5d754d8b008bdabed4dc6b3f1ce4ed6fdad110",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과.",
+      "name": "장미 무늬 도자기 저그 · Jug 01 · 2D 소품"
+    },
+    {
+      "id": "polyhaven-anthurium-botany-01-cutout",
+      "sha256": "7709cf991126c2d846f7044c629641c1e61c6d5218bb270f39462171685229e3",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "흩어진 식재 부품 원본의 렌더로 단일 완성 소품 용도에 부적합."
+    },
+    {
+      "id": "polyhaven-calathea-orbifolia-01-cutout",
+      "sha256": "db7be1a0df5cafecdc9e6e8d7811909aa2d776e4ca675861b31030b9d22d92a3",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "소품 실루엣이 작고 산재하여 2D 합성 소재로 사용하기 어려움."
+    },
+    {
+      "id": "polyhaven-concrete-cat-statue-cutout",
+      "sha256": "e9a2078a88ec1812e4e0581ebb64c8cd9e2eb43bb48494175189df648de44f40",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-11.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    },
+    {
+      "id": "polyhaven-horse-statue-01-cutout",
+      "sha256": "50543c36b6248b45d139ff3d7435520ed7b64d91224a0e764795f19561106ea2",
+      "decision": "exclude",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-12.jpg",
+      "reason": "1536px 확대 확인에서 밝은 도자기 표면의 명암과 형태 디테일 대비가 약함. 3D 원본은 유지."
+    },
+    {
+      "id": "polyhaven-wooden-lantern-01-cutout",
+      "sha256": "d27a3a294fb5f79dd0e53845fe086847bacb1c91c1ece99a92a52a069afafc41",
+      "decision": "admit",
+      "evidence": "artifacts/studio-diversity-20260913/review/sheet-12.jpg",
+      "reason": "검수 시트에서 소품 실루엣을 확인. 1536px 원본 렌더의 투명 알파와 테두리 잘림 검사 통과."
+    }
+  ]
+}

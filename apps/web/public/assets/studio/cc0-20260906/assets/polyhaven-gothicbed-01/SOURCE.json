@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/GothicBed_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "vintage",
+      "gothic",
+      "furniture",
+      "bed",
+      "wood",
+      "decorative"
+    ],
+    "date_published": 1585605600,
+    "name": "Gothic Bed 01",
+    "categories": [
+      "furniture",
+      "bed"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 18741,
+    "texel_density": 1182.0984415645028,
+    "dimensions": [
+      1493.751883506775,
+      2039.9999022483826,
+      1533.8402975614968
+    ],
+    "files_hash": "1ab8ed2b813d573962623fdafa37c84def8e8447",
+    "description": "Free 4K model of a vintage Gothic wooden four-poster bed with ornate carved headboard/footboard, rich dark finish and decorative medieval-inspired detailing.",
+    "category_id": "51157f97-6c7b-5c3c-9b53-c48dd454ee74",
+    "category": "Furniture/Beds",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "5d1af62c",
+    "download_count": 35511,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/GothicBed_01.png?width=256&height=256&v=5d1af62c"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/GothicBed_01/GothicBed_01_2k.gltf",
+      "bytes": 2683,
+      "sha256": "035406a8a44c6b8eb0f2ff0a0d828ffaff09885e2e520908e7be37c05999077f",
+      "sourceMd5": "2ed8e556673d9682a4a47004a1f42634"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicBed_01/GothicBed_01_arm_2k.jpg",
+      "bytes": 560639,
+      "sha256": "fc4bbdba4e14fd30d519c45bf942a4c7ab8446476a642bfe3bbc3f770cd35458",
+      "sourceMd5": "df7320503822440696b76851259707bd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicBed_01/GothicBed_01_diff_2k.jpg",
+      "bytes": 385789,
+      "sha256": "3a5c824295c49c9a7e8404781e12f0e3a969bd0dad245211e099c113ac006716",
+      "sourceMd5": "5673f5209402253ff82b3657b2f3923b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicBed_01/GothicBed_01_nor_gl_2k.jpg",
+      "bytes": 597156,
+      "sha256": "48c73272b35683c5eed9c50cebce96a21cdcae4c895fa8053d1e0460f5ca3f31",
+      "sourceMd5": "dc5a70695d2604ed846f2f9cf23d3d13"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/GothicBed_01/GothicBed_01.bin",
+      "bytes": 658648,
+      "sha256": "2276e86480c49dfb63a4671a9637621f88727708cf83342156c157a1d89f747b",
+      "sourceMd5": "6311b36b274a2062e20083631acddd18"
+    }
+  ]
+}

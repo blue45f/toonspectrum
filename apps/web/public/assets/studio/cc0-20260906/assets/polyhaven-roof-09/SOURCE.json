@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/roof_09",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1529359200,
+    "name": "Roof 09",
+    "categories": [
+      "roofing",
+      "man made",
+      "outdoor",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      4000,
+      4000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "3266fb10021af18ef9b383b65c707237fda3073a",
+    "tags": [
+      "ceramic",
+      "old",
+      "worn",
+      "tiles",
+      "roofing material",
+      "roofing",
+      "roof",
+      "clay tiles",
+      "overlapping tiles",
+      "discolored",
+      "traditional roofing ",
+      "tile roofing",
+      "weather-beaten"
+    ],
+    "description": "Free 8K texture of old weather-beaten clay roof tiles: overlapping curved ceramic tiles with faded terracotta, gray staining, chipped edges and gritty dirt.",
+    "category_id": "6165a492-c53c-5b5f-96df-20c96a7763df",
+    "category": "Ceramic/Terracotta",
+    "attributes": {
+      "surface_use": "roof",
+      "condition": [
+        "weathered",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "847771cd",
+    "download_count": 91366,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/roof_09.png?width=256&height=256&v=847771cd"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_09/roof_09_diff_2k.jpg",
+      "bytes": 2059711,
+      "sha256": "09c72186e2787dc4b77c21386eb2e2bf0349354af4747c6343c5aa344451601d",
+      "sourceMd5": "2a6c442ba9675851adf0bab8fad7c55c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_09/roof_09_rough_2k.jpg",
+      "bytes": 1889815,
+      "sha256": "2af588b0ba770febda87538881254e0b7a83710a46a168f53130de8ade93c330",
+      "sourceMd5": "9884934809e412506f2a567d74cc9025"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_09/roof_09_nor_gl_2k.jpg",
+      "bytes": 1055465,
+      "sha256": "5096bb0bf99f2b9bac9ad0b1939435b4b99178017e3d70fac15969133d0cc44d",
+      "sourceMd5": "53809b74f6ad5a6633c9c44af3482f15"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_09/roof_09_ao_2k.jpg",
+      "bytes": 599507,
+      "sha256": "67c37836db4b7ab2b1dc8e0d374da3f2e31f4cb7936b57cacaec50b12bcd18a9",
+      "sourceMd5": "f99e7178619791e603566be740a461c2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_09/roof_09_disp_2k.jpg",
+      "bytes": 340947,
+      "sha256": "c7b77a316fab3df1593b83a66f7f4ad00c4bbddb632965c2651b7bfc0743b838",
+      "sourceMd5": "a9a1e2d1c76e69b6d0fe7dcea0c96bfb"
+    }
+  ]
+}

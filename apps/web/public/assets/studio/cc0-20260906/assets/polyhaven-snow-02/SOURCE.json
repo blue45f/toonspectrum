@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/snow_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1548806533,
+    "name": "Snow 02",
+    "categories": [
+      "terrain",
+      "natural",
+      "outdoor",
+      "snow"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "sponsors": [
+      "3237733"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "a4bb49360f8e164e74ee396b76ac33c96d6282b7",
+    "tags": [
+      "snow",
+      "uneven",
+      "smooth",
+      "powdery",
+      "frosty",
+      "snowfield",
+      "soft",
+      "wintery"
+    ],
+    "description": "Free 8K texture of soft, powdery snow: smooth yet uneven drifts, frosty fine granularity, subtle ridges and sparse dark specks.",
+    "category_id": "b554e7e6-e9aa-5f27-a86a-a6af6942a6a8",
+    "category": "Ground & Terrain/Snow/Fresh Snow",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "0c06ec15",
+    "download_count": 228607,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/snow_02.png?width=256&height=256&v=0c06ec15"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/snow_02/snow_02_diff_2k.jpg",
+      "bytes": 1314409,
+      "sha256": "d185c2853c7e674161789db4eed1c5708d85e4f6e3dcb5698209568adf02aa98",
+      "sourceMd5": "5541e5601951b071691238ddc70632c0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/snow_02/snow_02_rough_2k.jpg",
+      "bytes": 628467,
+      "sha256": "9cfa994318ef190d4540875a166c7c745184c1a166e82271bca7c0a628f8820f",
+      "sourceMd5": "8b9787b4c7b1d7390a4b4a1ae67728b1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/snow_02/snow_02_nor_gl_2k.jpg",
+      "bytes": 4761595,
+      "sha256": "288539ee33387e91035be4dc8d10da574bf6a95c8374d33b6b1dc465c6949e8f",
+      "sourceMd5": "ef128fbdf1b31932c792eb6472c84574"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/snow_02/snow_02_ao_2k.jpg",
+      "bytes": 1356103,
+      "sha256": "3bb1a13af0ce8d5b8a0cc80e1d5b4f36a36b0d612b65b3dc16ebc4b7ea36f4cb",
+      "sourceMd5": "7d41f091dd46e66d6023804d030e682c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/snow_02/snow_02_disp_2k.jpg",
+      "bytes": 432399,
+      "sha256": "c3fe9fe26907138e23e685c53c43152858f27042b802931e0f71bc0c62286fdd",
+      "sourceMd5": "c7c8e7848b76819012cbac660a90a61c"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/croissant",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-croissant",
+  "sourceModelSha256": "e22d0dc4374b7d1ac9bde4a1ebcb9131b8b403c3f8322413684ce08a2872a17c",
+  "render": {
+    "sourceId": "polyhaven-croissant",
+    "sourceSha256": "e22d0dc4374b7d1ac9bde4a1ebcb9131b8b403c3f8322413684ce08a2872a17c",
+    "path": "high-resolution-props/polyhaven-croissant.png",
+    "visiblePixels": 176501,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 1990
+  },
+  "independentOriginal": false
+}

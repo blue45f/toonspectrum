@@ -1,5 +1,6 @@
 import { Download, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
+import { useLocation } from "react-router-dom";
 
 import {
   getPwaInstallServerSnapshot,
@@ -21,6 +22,7 @@ function readInstallNudgeDismissal(): boolean {
 }
 
 export function PwaInstallNudge() {
+  const { pathname } = useLocation();
   const language = useI18n((state) => state.lang);
   const locale = language.toLowerCase().startsWith("ko") ? "ko" : "en";
   const pwa = useSyncExternalStore(
@@ -29,8 +31,10 @@ export function PwaInstallNudge() {
     getPwaInstallServerSnapshot,
   );
   const [dismissed, setDismissed] = useState(readInstallNudgeDismissal);
+  // Market browsing is content-first; the hero install card competes with discovery chrome.
+  const hideOnMarket = pathname === "/market" || pathname.startsWith("/market/");
 
-  if (pwa.status !== "available" || dismissed) return null;
+  if (hideOnMarket || pwa.status !== "available" || dismissed) return null;
 
   const title = locale === "ko" ? "툰스튜디오를 앱처럼 열어보세요" : "Open ToonStudio like an app";
   const description = locale === "ko"

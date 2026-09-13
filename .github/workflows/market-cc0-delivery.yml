@@ -1,0 +1,44 @@
+name: Market CC0 delivery
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/**'
+      - 'apps/web/src/domains/market/**'
+      - 'apps/web/src/app/routes/**'
+      - 'scripts/*market*'
+      - 'scripts/seed/market-cc0-manifests.mts'
+      - '.github/workflows/market-cc0-delivery.yml'
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: node --import tsx scripts/generate-market-cc0-catalog.mts --check
+      - run: |
+          pnpm exec vitest run \
+            apps/web/src/app/routes/studio-entry-redirect.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-catalog-open.test.ts \
+            apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
+            apps/web/src/domains/creator/studio-pixel-selection-scene-target.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-cc0-catalog.test.ts \
+            apps/web/src/domains/creator/studio-community-marketplace.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-deep-link.test.ts \
+            apps/web/src/domains/creator/studio-creator-pack-runtime.test.ts \
+            apps/web/src/domains/creator/StudioCommunityMarketplacePanel.race.test.tsx \
+            apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts \
+            apps/web/src/domains/creator/StudioCommunityMarketplacePanel.test.tsx \
+            apps/web/src/domains/market/components/MarketResourceDetailArticle.test.tsx

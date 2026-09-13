@@ -55,7 +55,7 @@ describe("non-studio experience controls", () => {
   });
   it("marks the correct creation phase and limits next actions to known public destinations", () => {
     frame("/community");
-    expect(screen.getByRole("link", { name: /작품 나누기/ }).getAttribute("aria-current")).toBe("location");
+    expect(screen.getByRole("link", { name: /작품 나누기/ }).getAttribute("aria-current")).toBe("step");
     const next = screen.getByRole("navigation", { name: "다음 활동 추천" });
     expect(Array.from(next.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/discover", "/learn", "/market"]);
   });

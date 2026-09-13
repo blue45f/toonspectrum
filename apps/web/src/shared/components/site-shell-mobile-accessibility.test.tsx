@@ -122,6 +122,19 @@ describe("mobile site shell accessibility", () => {
     expect(language.selectedOptions[0]?.textContent).toContain("한국어");
   });
 
+  it("lists only fully translated languages in the floating control", () => {
+    useI18n.getState().setLang("ko");
+    render(<FloatingControls placement="static" showTheme={false} />);
+    const language = screen.getByRole<HTMLSelectElement>("combobox", { name: "언어 선택" });
+    const values = [...language.options].map((option) => option.value);
+    expect(values).toEqual(expect.arrayContaining(["ko", "en", "ja"]));
+    expect(values).not.toContain("af");
+    expect(values).not.toContain("en-us");
+    expect(values).not.toContain("en-gb");
+    expect(values.length).toBeLessThanOrEqual(8);
+  });
+
+
   it("releases the hidden dialog trap when the desktop navigation breakpoint takes over", async () => {
     const { container } = render(
       <MemoryRouter>

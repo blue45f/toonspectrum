@@ -54,7 +54,7 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     width = 0;
     height = 0;
     getContext(_kind, options) { contextOptions.push(options); return {}; }
-    captureStream() { return stream; }
+    captureStream(fps) { assert.equal(fps, 30, "recording must request its declared 30fps, never 5fps"); return stream; }
   }
   class Recorder {
     static isTypeSupported(mime) { return supportedMimes ? supportedMimes.includes(mime) : true; }
@@ -77,11 +77,15 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     addEventListener: (name, callback) => listeners.set(name, callback),
     removeEventListener: (name, callback) => { if (listeners.get(name) === callback) listeners.delete(name); },
   };
+  const scheduledGains = [];
   const mocks = {
-    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
+    "./promo-recording-audio": { schedulePromoRecordingGains: (...args) => scheduledGains.push(args) },
+    "../animatic/studio-animatic-recorded-webm": { finalizeStudioAnimaticRecordedWebm: async (blob) => blob },
+    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map(), releasePromoTextCache: () => {} },
     "./promo-model": {
       PROMO_FPS: 30,
-      promoAudioGain: () => 0,
+      promoMusicGain: () => 0,
+      promoVoiceGain: () => 0,
       promoFrameCount: (project) => project.seconds * 30,
       promoSize: () => ({ width: 720, height: 1280 }),
     },
@@ -114,7 +118,7 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     callbacks.forEach((callback) => callback(clock));
   };
   return {
-    recorder, document, canvases, controller, progress, data, tick, contextOptions,
+    recorder, document, canvases, controller, progress, data, tick, contextOptions, scheduledGains,
     frameRequests: () => frameRequests,
     audioStoppedAt: () => audioStoppedAt,
     runTimers(now) {
@@ -260,4 +264,25 @@ test("cancellation during the browser final-frame timer releases audio and clear
   context.controller.abort(); context.stopEvent();
   await rejectsRecording(context, /취소/u);
   assert.equal(context.audioStoppedAt(), 15_000);
+});
+
+
+test("progress does not rerender the entire editor on every captured frame", async () => {
+  const session = await recording();
+  for (let frame = 1; frame <= 30; frame += 1) session.tick(frame * 1000 / 30);
+  assert.ok(session.progress.length <= 6, "at most five progress updates per second after the initial update");
+  session.end(); session.stopEvent();
+  assert.ok((await session.result()).blob);
+  assert.equal(session.progress.at(-1), 1, "successful completion must still publish 100%");
+  session.cleaned();
+});
+
+test("the audio envelope is scheduled once instead of on animation callbacks", async () => {
+  const session = await recording({ withAudio: true });
+  assert.equal(session.scheduledGains.length, 1);
+  for (let frame = 1; frame < 60; frame += 1) session.tick(frame * 1000 / 30);
+  assert.equal(session.scheduledGains.length, 1);
+  session.end(); session.stopEvent();
+  assert.ok((await session.result()).blob);
+  session.cleaned();
 });

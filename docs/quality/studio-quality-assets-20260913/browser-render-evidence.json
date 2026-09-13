@@ -1,0 +1,952 @@
+{
+  "rendered": [
+    {
+      "id": "polyhaven-painted-wooden-chair-01",
+      "sourceBounds": [
+        0.43175144493579865,
+        0.9564821355743334,
+        0.5398241728544235
+      ],
+      "fitScale": 2.0909956659034425,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 15319,
+          "triangles": 724
+        },
+        {
+          "view": 1,
+          "visiblePixels": 12607,
+          "triangles": 724
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13284,
+          "triangles": 724
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-dining-chair-02",
+      "sourceBounds": [
+        0.4335707724094391,
+        0.9733776897192001,
+        0.5764201134443283
+      ],
+      "fitScale": 2.054700884480884,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 19196,
+          "triangles": 22013
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14759,
+          "triangles": 22013
+        },
+        {
+          "view": 2,
+          "visiblePixels": 15418,
+          "triangles": 22013
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool",
+      "sourceBounds": [
+        0.38483743369579315,
+        0.5789150850614533,
+        0.40607430040836334
+      ],
+      "fitScale": 3.4547380982267804,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 33212,
+          "triangles": 676
+        },
+        {
+          "view": 1,
+          "visiblePixels": 31028,
+          "triangles": 676
+        },
+        {
+          "view": 2,
+          "visiblePixels": 31496,
+          "triangles": 676
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool",
+      "sourceBounds": [
+        0.5278338193893433,
+        0.44196850061416626,
+        0.5470837950706482
+      ],
+      "fitScale": 3.655747104959905,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 36301,
+          "triangles": 6324
+        },
+        {
+          "view": 1,
+          "visiblePixels": 34112,
+          "triangles": 6324
+        },
+        {
+          "view": 2,
+          "visiblePixels": 37788,
+          "triangles": 6324
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table",
+      "sourceBounds": [
+        2.2409759759902954,
+        0.7459869086742401,
+        3.022329568862915
+      ],
+      "fitScale": 0.6617412014244548,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 18195,
+          "triangles": 10210
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20461,
+          "triangles": 10210
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17141,
+          "triangles": 10210
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-brass-candleholders",
+      "sourceBounds": [
+        1.0529398694634438,
+        0.8352597653865814,
+        0.3646823465824127
+      ],
+      "fitScale": 1.8994436985458234,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 6426,
+          "triangles": 42024
+        },
+        {
+          "view": 1,
+          "visiblePixels": 6491,
+          "triangles": 42024
+        },
+        {
+          "view": 2,
+          "visiblePixels": 5324,
+          "triangles": 42024
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-chinese-cabinet",
+      "sourceBounds": [
+        1.2624960541725159,
+        2.8720987772358058,
+        0.5452098585665226
+      ],
+      "fitScale": 0.6963548802192869,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16501,
+          "triangles": 15668
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15423,
+          "triangles": 15668
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12300,
+          "triangles": 15668
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-chinese-commode",
+      "sourceBounds": [
+        4.49048638343811,
+        2.019874095916748,
+        1.1699001789093018
+      ],
+      "fitScale": 0.4453860515815023,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 15412,
+          "triangles": 6775
+        },
+        {
+          "view": 1,
+          "visiblePixels": 16221,
+          "triangles": 6775
+        },
+        {
+          "view": 2,
+          "visiblePixels": 11617,
+          "triangles": 6775
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern",
+      "sourceBounds": [
+        0.12300453707575798,
+        0.3808239521458745,
+        0.12300454080104828
+      ],
+      "fitScale": 5.25177050637272,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 4785,
+          "triangles": 12982
+        },
+        {
+          "view": 1,
+          "visiblePixels": 4847,
+          "triangles": 12982
+        },
+        {
+          "view": 2,
+          "visiblePixels": 4885,
+          "triangles": 12982
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp",
+      "sourceBounds": [
+        0.27346082031726837,
+        0.42990660667419434,
+        0.14037844325849136
+      ],
+      "fitScale": 4.652173213787581,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16391,
+          "triangles": 9640
+        },
+        {
+          "view": 1,
+          "visiblePixels": 18810,
+          "triangles": 9640
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13872,
+          "triangles": 9640
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-mantel-clock-01",
+      "sourceBounds": [
+        0.34234005212783813,
+        0.160479417827446,
+        0.12616859376430511
+      ],
+      "fitScale": 5.842144346151911,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 17604,
+          "triangles": 26201
+        },
+        {
+          "view": 1,
+          "visiblePixels": 18228,
+          "triangles": 26201
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14877,
+          "triangles": 26201
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-wall-clock",
+      "sourceBounds": [
+        0.3204909861087799,
+        0.3204909861087799,
+        0.0472230945505423
+      ],
+      "fitScale": 6.240425118605885,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26392,
+          "triangles": 7844
+        },
+        {
+          "view": 1,
+          "visiblePixels": 33537,
+          "triangles": 7844
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13757,
+          "triangles": 7844
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01",
+      "sourceBounds": [
+        0.3715096414089203,
+        1.5561838150024414,
+        1.077760934829712
+      ],
+      "fitScale": 1.2851952196899454,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 30386,
+          "triangles": 3174
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20934,
+          "triangles": 3174
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28342,
+          "triangles": 3174
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04",
+      "sourceBounds": [
+        0.18112153559923172,
+        0.3419442092999816,
+        0.1811198815703392
+      ],
+      "fitScale": 5.848907352735532,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 17141,
+          "triangles": 9000
+        },
+        {
+          "view": 1,
+          "visiblePixels": 17265,
+          "triangles": 9000
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16889,
+          "triangles": 9000
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03",
+      "sourceBounds": [
+        0.1122405156493187,
+        0.4143718169798376,
+        0.11223961040377617
+      ],
+      "fitScale": 4.826583078398199,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 13585,
+          "triangles": 11136
+        },
+        {
+          "view": 1,
+          "visiblePixels": 12144,
+          "triangles": 11136
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12494,
+          "triangles": 11136
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-brass-vase-02",
+      "sourceBounds": [
+        0.21023856103420258,
+        0.5286410981789231,
+        0.2102375626564026
+      ],
+      "fitScale": 3.7832851189392067,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 7172,
+          "triangles": 6890
+        },
+        {
+          "view": 1,
+          "visiblePixels": 6874,
+          "triangles": 6890
+        },
+        {
+          "view": 2,
+          "visiblePixels": 7011,
+          "triangles": 6890
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-brass-vase-01",
+      "sourceBounds": [
+        0.2273191586136818,
+        0.6924719526432455,
+        0.22731918096542358
+      ],
+      "fitScale": 2.8882036194617977,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 8303,
+          "triangles": 21440
+        },
+        {
+          "view": 1,
+          "visiblePixels": 8307,
+          "triangles": 21440
+        },
+        {
+          "view": 2,
+          "visiblePixels": 8302,
+          "triangles": 21440
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02",
+      "sourceBounds": [
+        0.7518134415149689,
+        0.4999999701976776,
+        0.03307514381594956
+      ],
+      "fitScale": 2.660234427266727,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 21158,
+          "triangles": 3680
+        },
+        {
+          "view": 1,
+          "visiblePixels": 27045,
+          "triangles": 3680
+        },
+        {
+          "view": 2,
+          "visiblePixels": 9670,
+          "triangles": 3680
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-standing-picture-frame-01",
+      "sourceBounds": [
+        0.1002768725156784,
+        0.24965811520814896,
+        0.2007998526096344
+      ],
+      "fitScale": 8.010955295134421,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 30032,
+          "triangles": 1636
+        },
+        {
+          "view": 1,
+          "visiblePixels": 16530,
+          "triangles": 1636
+        },
+        {
+          "view": 2,
+          "visiblePixels": 31147,
+          "triangles": 1636
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-security-camera-02",
+      "sourceBounds": [
+        0.14066611975431442,
+        0.2085888534784317,
+        0.39378485083580017
+      ],
+      "fitScale": 5.078915544249713,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 13848,
+          "triangles": 12481
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14587,
+          "triangles": 12481
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16513,
+          "triangles": 12481
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver",
+      "sourceBounds": [
+        0.5739507067209151,
+        0.43439279100857675,
+        0.413083977664812
+      ],
+      "fitScale": 3.4846198054644173,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14037,
+          "triangles": 42350
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15057,
+          "triangles": 42350
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12565,
+          "triangles": 42350
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02",
+      "sourceBounds": [
+        0.9969334602355957,
+        2.568572537857108,
+        0.722343053062703
+      ],
+      "fitScale": 0.7786426003248276,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 18420,
+          "triangles": 966
+        },
+        {
+          "view": 1,
+          "visiblePixels": 19301,
+          "triangles": 966
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14190,
+          "triangles": 966
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-brass-pan-01",
+      "sourceBounds": [
+        0.1912703588604927,
+        0.052509385510347784,
+        0.4496646225452423
+      ],
+      "fitScale": 4.44775928486296,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 6059,
+          "triangles": 4340
+        },
+        {
+          "view": 1,
+          "visiblePixels": 4414,
+          "triangles": 4340
+        },
+        {
+          "view": 2,
+          "visiblePixels": 5746,
+          "triangles": 4340
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-food-lime-01",
+      "sourceBounds": [
+        0.0600700993090868,
+        0.0754411633242853,
+        0.06133793853223324
+      ],
+      "fitScale": 26.51072586729557,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28726,
+          "triangles": 8100
+        },
+        {
+          "view": 1,
+          "visiblePixels": 28287,
+          "triangles": 8100
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28755,
+          "triangles": 8100
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-fire-alarm",
+      "sourceBounds": [
+        0.09944874793291092,
+        0.14364254474639893,
+        0.026374715380370617
+      ],
+      "fitScale": 13.923451464404241,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26990,
+          "triangles": 2705
+        },
+        {
+          "view": 1,
+          "visiblePixels": 31563,
+          "triangles": 2705
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16900,
+          "triangles": 2705
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-water-manhole-cover",
+      "sourceBounds": [
+        0.6907604932785034,
+        0.06761780008673668,
+        0.6907604932785034
+      ],
+      "fitScale": 2.8953595630629567,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26018,
+          "triangles": 6301
+        },
+        {
+          "view": 1,
+          "visiblePixels": 26055,
+          "triangles": 6301
+        },
+        {
+          "view": 2,
+          "visiblePixels": 26054,
+          "triangles": 6301
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-binder-notebook",
+      "sourceBounds": [
+        0.5840288400650024,
+        0.025289426557719707,
+        0.19995832443237305
+      ],
+      "fitScale": 3.424488420430402,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 8558,
+          "triangles": 18077
+        },
+        {
+          "view": 1,
+          "visiblePixels": 8433,
+          "triangles": 18077
+        },
+        {
+          "view": 2,
+          "visiblePixels": 9000,
+          "triangles": 18077
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-wooden-crate-01",
+      "sourceBounds": [
+        0.8252729177474976,
+        0.3496182831004262,
+        0.4089537411928177
+      ],
+      "fitScale": 2.4234407272915317,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25934,
+          "triangles": 6576
+        },
+        {
+          "view": 1,
+          "visiblePixels": 26766,
+          "triangles": 6576
+        },
+        {
+          "view": 2,
+          "visiblePixels": 22362,
+          "triangles": 6576
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-wooden-crate-02",
+      "sourceBounds": [
+        0.5291009545326233,
+        0.46395455300807953,
+        1.1663258075714111
+      ],
+      "fitScale": 1.7147867148412945,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 24372,
+          "triangles": 5176
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20356,
+          "triangles": 5176
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25300,
+          "triangles": 5176
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-boulder-01",
+      "sourceBounds": [
+        1.272135615348816,
+        1.0038301944732666,
+        1.8303342461585999
+      ],
+      "fitScale": 1.092696595825317,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 18642,
+          "triangles": 66122
+        },
+        {
+          "view": 1,
+          "visiblePixels": 22411,
+          "triangles": 66122
+        },
+        {
+          "view": 2,
+          "visiblePixels": 18632,
+          "triangles": 66122
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02",
+      "sourceBounds": [
+        2.5321422815322876,
+        0.8826377838850021,
+        1.2342629432678223
+      ],
+      "fitScale": 0.7898450314528653,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14692,
+          "triangles": 97964
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14770,
+          "triangles": 97964
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12878,
+          "triangles": 97964
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-tree-stump-01",
+      "sourceBounds": [
+        1.4255504608154297,
+        0.5726675391197205,
+        1.5903143286705017
+      ],
+      "fitScale": 1.2576130164607109,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 24536,
+          "triangles": 41046
+        },
+        {
+          "view": 1,
+          "visiblePixels": 24392,
+          "triangles": 41046
+        },
+        {
+          "view": 2,
+          "visiblePixels": 24822,
+          "triangles": 41046
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk",
+      "sourceBounds": [
+        3.051015019416809,
+        0.29043155536055565,
+        0.27752751111984253
+      ],
+      "fitScale": 0.6555195524348133,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 2637,
+          "triangles": 101802
+        },
+        {
+          "view": 1,
+          "visiblePixels": 3172,
+          "triangles": 101802
+        },
+        {
+          "view": 2,
+          "visiblePixels": 2004,
+          "triangles": 101802
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-dandelion-01",
+      "sourceBounds": [
+        4.214293710887432,
+        0.17017221543937922,
+        0.25765838474035263
+      ],
+      "fitScale": 0.4745753706802857,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 214,
+          "triangles": 54764
+        },
+        {
+          "view": 1,
+          "visiblePixels": 195,
+          "triangles": 54764
+        },
+        {
+          "view": 2,
+          "visiblePixels": 189,
+          "triangles": 54764
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "sourceBounds": [
+        0.3520993459969759,
+        0.05800367915071547,
+        0.14641038584522903
+      ],
+      "fitScale": 5.680215037994355,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 2322,
+          "triangles": 3319
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2399,
+          "triangles": 3319
+        },
+        {
+          "view": 2,
+          "visiblePixels": 2417,
+          "triangles": 3319
+        }
+      ],
+      "renderer": "Three.js 184"
+    }
+  ],
+  "failed": [],
+  "artisticApproval": false,
+  "studioRoundTripVerified": false
+}

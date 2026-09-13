@@ -1,0 +1,3105 @@
+{
+  "sourceRun": 34733128719,
+  "sourceManifestSha256": "0eb4b20c123bf8d09cd2200b63d19483583d88cf1559caffee7077e8900f7196",
+  "results": [
+    {
+      "id": "polyhaven-painted-wooden-chair-01",
+      "sha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1531104,
+          "jsonByteSize": 1748,
+          "binByteSize": 1529328,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 724,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1492209,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 5244,
+          "estimatedDecodedGeometryBytes": 37112
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-dining-chair-02",
+      "sha256": "63f22f21a65010d3f3ac66eeef90a12e2ff98ea3f991f526b13159dc5a44daba",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1917724,
+          "jsonByteSize": 1716,
+          "binByteSize": 1915980,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 22013,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1371383,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 104712,
+          "estimatedDecodedGeometryBytes": 544590
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool",
+      "sha256": "1438f7f6e571369d6d0b153f9517cfc212bc10c1336753d9d32d97091a23ea4c",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6703496,
+          "jsonByteSize": 1784,
+          "binByteSize": 6701684,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 676,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 6678296,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 3840,
+          "estimatedDecodedGeometryBytes": 23384
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool",
+      "sha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 8099832,
+          "jsonByteSize": 1788,
+          "binByteSize": 8098016,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 6324,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 7904997,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 33510,
+          "estimatedDecodedGeometryBytes": 193016
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table",
+      "sha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 17641608,
+          "jsonByteSize": 3248,
+          "binByteSize": 17638332,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 10210,
+          "materials": 2,
+          "textures": 6,
+          "images": 6,
+          "imageBytes": 17359206,
+          "estimatedDecodedImageBytes": 100663296,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 51054,
+          "estimatedDecodedGeometryBytes": 279116
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-candleholders",
+      "sha256": "9928a78391d50e9d49b7f5f8435870cb60e84e69be2139067a95516c4c9026f7",
+      "decision": "exclude",
+      "admission": {
+        "ok": false,
+        "code": "texture-byte-budget-exceeded"
+      },
+      "validation": null
+    },
+    {
+      "id": "polyhaven-chinese-cabinet",
+      "sha256": "469f8ac72e1fb9afd22463985ad9130fdecd741cf7a0b59da69c8925b7005bb5",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 7216968,
+          "jsonByteSize": 5380,
+          "binByteSize": 7211560,
+          "nodes": 5,
+          "meshes": 5,
+          "meshPrimitives": 5,
+          "drawCalls": 5,
+          "triangles": 15668,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 6718594,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 84405,
+          "estimatedDecodedGeometryBytes": 492952
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 5,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/4/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-chinese-commode",
+      "sha256": "6f0b75409a88b045ff979c3709e07857cd104279f7ba3cc5e57cd7a87c05be1a",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6326932,
+          "jsonByteSize": 4236,
+          "binByteSize": 6322668,
+          "nodes": 4,
+          "meshes": 4,
+          "meshPrimitives": 4,
+          "drawCalls": 4,
+          "triangles": 6775,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 6106874,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 36744,
+          "estimatedDecodedGeometryBytes": 215786
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 4,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern",
+      "sha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 7170528,
+          "jsonByteSize": 6120,
+          "binByteSize": 7164380,
+          "nodes": 3,
+          "meshes": 3,
+          "meshPrimitives": 5,
+          "drawCalls": 5,
+          "triangles": 12742,
+          "materials": 3,
+          "textures": 10,
+          "images": 4,
+          "imageBytes": 6708667,
+          "estimatedDecodedImageBytes": 67108864,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 75507,
+          "estimatedDecodedGeometryBytes": 455708
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 5,
+          "numInfos": 0,
+          "numHints": 23,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/COLOR_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/1/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/1/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/1/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/1/attributes/COLOR_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/1/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/1/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/2/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/2/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/2/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/2/attributes/COLOR_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/2/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/2/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp",
+      "sha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 13962920,
+          "jsonByteSize": 3712,
+          "binByteSize": 13959180,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 4446,
+          "materials": 2,
+          "textures": 7,
+          "images": 7,
+          "imageBytes": 13817679,
+          "estimatedDecodedImageBytes": 117440512,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 24102,
+          "estimatedDecodedGeometryBytes": 141492
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-mantel-clock-01",
+      "sha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 9376428,
+          "jsonByteSize": 3472,
+          "binByteSize": 9372928,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 25721,
+          "materials": 2,
+          "textures": 6,
+          "images": 4,
+          "imageBytes": 8731036,
+          "estimatedDecodedImageBytes": 67108864,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 122871,
+          "estimatedDecodedGeometryBytes": 641878
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-wall-clock",
+      "sha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 4901440,
+          "jsonByteSize": 5440,
+          "binByteSize": 4895972,
+          "nodes": 4,
+          "meshes": 4,
+          "meshPrimitives": 5,
+          "drawCalls": 5,
+          "triangles": 3658,
+          "materials": 2,
+          "textures": 4,
+          "images": 4,
+          "imageBytes": 4763550,
+          "estimatedDecodedImageBytes": 67108864,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 21330,
+          "estimatedDecodedGeometryBytes": 132412
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 4,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01",
+      "sha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1408060,
+          "jsonByteSize": 4060,
+          "binByteSize": 1403972,
+          "nodes": 4,
+          "meshes": 4,
+          "meshPrimitives": 4,
+          "drawCalls": 4,
+          "triangles": 3174,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1297978,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 17673,
+          "estimatedDecodedGeometryBytes": 105988
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 4,
+          "numInfos": 0,
+          "numHints": 16,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04",
+      "sha256": "7729c02ae4a0d57e48ad05f81d8157f0d9ab7b0778816b50015b789362efd408",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1598608,
+          "jsonByteSize": 1696,
+          "binByteSize": 1596884,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 9000,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1357148,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 44412,
+          "estimatedDecodedGeometryBytes": 239728
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03",
+      "sha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 2198832,
+          "jsonByteSize": 1680,
+          "binByteSize": 2197124,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 11136,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1897887,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 55197,
+          "estimatedDecodedGeometryBytes": 299232
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-vase-02",
+      "sha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 5904336,
+          "jsonByteSize": 1676,
+          "binByteSize": 5902632,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 6890,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 5738116,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 32217,
+          "estimatedDecodedGeometryBytes": 164508
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-vase-01",
+      "sha256": "e782304ae87f4b32b3f4b2d7f385c1bca74518ffde62682a308b7b3f72488031",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1735664,
+          "jsonByteSize": 1696,
+          "binByteSize": 1733940,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 21440,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1235694,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 98970,
+          "estimatedDecodedGeometryBytes": 498240
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02",
+      "sha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+      "decision": "component",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 2234764,
+          "jsonByteSize": 3964,
+          "binByteSize": 2230772,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 3,
+          "drawCalls": 3,
+          "triangles": 3678,
+          "materials": 3,
+          "textures": 9,
+          "images": 6,
+          "imageBytes": 2115684,
+          "estimatedDecodedImageBytes": 100663296,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 19749,
+          "estimatedDecodedGeometryBytes": 115080
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 0,
+          "numHints": 11,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/2/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-standing-picture-frame-01",
+      "sha256": "af2fd405c6906b76686ccc4470b96976fe48ed0908f9652ec72bc7f36c42dfce",
+      "decision": "exclude",
+      "admission": {
+        "ok": false,
+        "code": "texture-byte-budget-exceeded"
+      },
+      "validation": null
+    },
+    {
+      "id": "polyhaven-security-camera-02",
+      "sha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6880576,
+          "jsonByteSize": 3864,
+          "binByteSize": 6876684,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 3,
+          "drawCalls": 3,
+          "triangles": 12477,
+          "materials": 2,
+          "textures": 6,
+          "images": 4,
+          "imageBytes": 6469592,
+          "estimatedDecodedImageBytes": 67108864,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 68577,
+          "estimatedDecodedGeometryBytes": 407086
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/1/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver",
+      "sha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 18345480,
+          "jsonByteSize": 15568,
+          "binByteSize": 18329884,
+          "nodes": 15,
+          "meshes": 14,
+          "meshPrimitives": 14,
+          "drawCalls": 14,
+          "triangles": 42350,
+          "materials": 2,
+          "textures": 6,
+          "images": 6,
+          "imageBytes": 16589852,
+          "estimatedDecodedImageBytes": 100663296,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 266355,
+          "estimatedDecodedGeometryBytes": 1740020
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 14,
+          "numInfos": 1,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/4/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/5/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/6/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/7/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/8/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/9/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/10/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/11/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/12/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/13/primitives/0/material"
+            },
+            {
+              "code": "NODE_EMPTY",
+              "message": "Empty node encountered.",
+              "severity": 2,
+              "pointer": "/nodes/6"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02",
+      "sha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6174736,
+          "jsonByteSize": 3688,
+          "binByteSize": 6171020,
+          "nodes": 3,
+          "meshes": 3,
+          "meshPrimitives": 3,
+          "drawCalls": 3,
+          "triangles": 966,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 6131687,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 6042,
+          "estimatedDecodedGeometryBytes": 39332
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-pan-01",
+      "sha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 5315360,
+          "jsonByteSize": 1684,
+          "binByteSize": 5313648,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 4340,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 5204305,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 20829,
+          "estimatedDecodedGeometryBytes": 109336
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-food-lime-01",
+      "sha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 1696468,
+          "jsonByteSize": 1688,
+          "binByteSize": 1694752,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 8100,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 1506145,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 37425,
+          "estimatedDecodedGeometryBytes": 188600
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 4,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-fire-alarm",
+      "sha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6733448,
+          "jsonByteSize": 2612,
+          "binByteSize": 6730808,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 2705,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 6618735,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 17100,
+          "estimatedDecodedGeometryBytes": 112070
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-water-manhole-cover",
+      "sha256": "c1c692b0fb455d68ea54b6abb5614e7946b386f37d9dd7c8104bb971e0b791fe",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 7954336,
+          "jsonByteSize": 2608,
+          "binByteSize": 7951700,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 6301,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 7749375,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 34326,
+          "estimatedDecodedGeometryBytes": 202318
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-binder-notebook",
+      "sha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 5136812,
+          "jsonByteSize": 2640,
+          "binByteSize": 5134144,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 18077,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 4608649,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 93327,
+          "estimatedDecodedGeometryBytes": 525486
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-wooden-crate-01",
+      "sha256": "350649e8949a525434709f9f0e19a7c6ff998905bf9aac28dd476e299a19f767",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 8283784,
+          "jsonByteSize": 3392,
+          "binByteSize": 8280364,
+          "nodes": 3,
+          "meshes": 3,
+          "meshPrimitives": 3,
+          "drawCalls": 3,
+          "triangles": 6576,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 8090950,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 33786,
+          "estimatedDecodedGeometryBytes": 189408
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-wooden-crate-02",
+      "sha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 8156536,
+          "jsonByteSize": 2544,
+          "binByteSize": 8153964,
+          "nodes": 2,
+          "meshes": 2,
+          "meshPrimitives": 2,
+          "drawCalls": 2,
+          "triangles": 5176,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 8003894,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 26685,
+          "estimatedDecodedGeometryBytes": 150064
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 0,
+          "numHints": 8,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-boulder-01",
+      "sha256": "272032bd07c7a98a47b8bbf7db9581e04b62951887514b25b776bc07635e293d",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 13535348,
+          "jsonByteSize": 1752,
+          "binByteSize": 13533568,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 66122,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 10594758,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 399492,
+          "estimatedDecodedGeometryBytes": 2938808
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02",
+      "sha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 13001580,
+          "jsonByteSize": 1748,
+          "binByteSize": 12999804,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 97964,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 10702029,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 454203,
+          "estimatedDecodedGeometryBytes": 2297768
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-tree-stump-01",
+      "sha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 11374160,
+          "jsonByteSize": 1756,
+          "binByteSize": 11372376,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 41046,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 10406990,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 190554,
+          "estimatedDecodedGeometryBytes": 965380
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk",
+      "sha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+      "decision": "admit",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 11289340,
+          "jsonByteSize": 1768,
+          "binByteSize": 11287544,
+          "nodes": 1,
+          "meshes": 1,
+          "meshPrimitives": 1,
+          "drawCalls": 1,
+          "triangles": 101802,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 8993754,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 463185,
+          "estimatedDecodedGeometryBytes": 2293788
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 1,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-dandelion-01",
+      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
+      "decision": "component",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 6332300,
+          "jsonByteSize": 5320,
+          "binByteSize": 6326952,
+          "nodes": 5,
+          "meshes": 5,
+          "meshPrimitives": 5,
+          "drawCalls": 5,
+          "triangles": 54764,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 4650300,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 290673,
+          "estimatedDecodedGeometryBytes": 1676648
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 5,
+          "numInfos": 0,
+          "numHints": 0,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/4/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "decision": "component",
+      "admission": {
+        "ok": true,
+        "code": "valid",
+        "metrics": {
+          "byteSize": 3695048,
+          "jsonByteSize": 10308,
+          "binByteSize": 3684712,
+          "nodes": 11,
+          "meshes": 11,
+          "meshPrimitives": 11,
+          "drawCalls": 11,
+          "triangles": 3319,
+          "materials": 1,
+          "textures": 3,
+          "images": 3,
+          "imageBytes": 3573771,
+          "estimatedDecodedImageBytes": 50331648,
+          "maxImageDimension": 2048,
+          "undeterminedImageDimensions": 0,
+          "lights": 0,
+          "animations": 0,
+          "animationChannels": 0,
+          "animationKeyframes": 0,
+          "animationValues": 0,
+          "skins": 0,
+          "joints": 0,
+          "morphTargets": 0,
+          "accessorElements": 18489,
+          "estimatedDecodedGeometryBytes": 110922
+        }
+      },
+      "validation": {
+        "validator": "2.0.0-dev.3.10",
+        "issues": {
+          "numErrors": 0,
+          "numWarnings": 11,
+          "numInfos": 0,
+          "numHints": 44,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/2/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/3/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/4/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/4/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/4/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/4/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/5/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/5/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/5/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/5/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/6/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/6/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/6/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/6/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/7/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/7/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/7/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/7/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/8/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/8/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/8/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/8/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/9/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/9/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/9/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/9/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/10/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/10/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/10/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/10/primitives/0/material"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": "polyhaven-marble-tiles",
+      "sha256": "9c036f92e2572a7da175a7078992595eb01180efab25bd2ea8ba502609b4974b",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-marble-cliff-05",
+      "sha256": "5e3679dd3f0e53b711c68319a2b3223eeeb549f0c008f3ff853a8d5e27db5219",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-wood-floor",
+      "sha256": "89d855a30d8b936d5b68d335b27d423469242ef687af9c840f178f7fc06a8143",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-wood-cabinet-worn-long",
+      "sha256": "5f453b80ffa6532acc79afe8f2fe1419ffca41d13e2554bac94f8ce1ac004a5e",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-concrete-wall-003",
+      "sha256": "6f47fbfc4d2b3971785c8b715de9ca32340a7418995535a0b3c4c3c4bfb7e91d",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-wood-peeling-paint-weathered",
+      "sha256": "8ca3152f12033dc1051ca44feddd528c7e01159ac85d7aa18c0369eda535fcd6",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-plaster-grey-04",
+      "sha256": "26b1cbc4b1d1f9e93c21637e6f2f3391faff996440ba6ed86383cf4274e1757f",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-plastered-wall",
+      "sha256": "fd3ccf41b627e647c15a40f4f04e6cc6a5c48d2d18d7aa184352464734927980",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-denim-fabric",
+      "sha256": "157195bf11a2e57e722a9160abf91d08373aacb1426e56da292c119759d7b169",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-factory-wall",
+      "sha256": "3b15a17ae71e771f8680891f87dcb853b4a29349ea4c9c5a4c82ad2a98007064",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-corrugated-iron",
+      "sha256": "e8704d26d2761055f75b89060107294d1b6997385d3e5a2978aec6c329152ae7",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-large-floor-tiles-02",
+      "sha256": "04186960cd53bd9dc93340d4e9e77005dfbd92358d16e4912b8b23365836c6f4",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-large-square-pattern-01",
+      "sha256": "7d001694a8129bf3df28b8e9607d98b4a9c8c7046ea0a62c5e4d154ebadeb95b",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-leafy-grass",
+      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-grassy-cobblestone",
+      "sha256": "da9278eb846822745b9f696df1b5d480e695307c63f92e89196c830f7aca591e",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-forest-leaves-04",
+      "sha256": "f00225934774540c6013154113710b6e249b9cf58af2b219a53a1254f37f13e1",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-dirt-floor",
+      "sha256": "a1773f89aa04e3e796e6acc0a594a7eda8905c62043e197400a1226c0f52769c",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-sand-01",
+      "sha256": "16d934d144f86803acc507b1c45c1e5523a212fd85d6064efd4bfe6983c572eb",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    },
+    {
+      "id": "polyhaven-sandstone-blocks-05",
+      "sha256": "e75a53731e573a3920842bac5efcfc037f6cd69ab248202b9ccf2477f7e1cc42",
+      "decision": "admit",
+      "admission": null,
+      "validation": null
+    }
+  ]
+}

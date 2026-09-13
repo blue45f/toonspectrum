@@ -1,0 +1,70 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/courtyard_night",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "tags": [
+      "brick",
+      "house",
+      "moon",
+      "lamp"
+    ],
+    "date_published": 1522879200,
+    "name": "Courtyard Night",
+    "categories": [
+      "outdoor",
+      "urban",
+      "night",
+      "clear",
+      "high contrast",
+      "artificial light"
+    ],
+    "date_taken": 1432397280,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "files_hash": "90322ed30d91f8c020e88e665df5ec24ffa38d48",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI: a clear, high-contrast courtyard at night with cool moonlit violet sky and warm amber lamp lighting on brick facades.",
+    "category_id": "530d8407-898c-5819-a7a8-85fe9a55b5a1",
+    "category": "Streets & Town/Squares & Plazas/Courtyards & Quads",
+    "attributes": {
+      "time_of_day": "night",
+      "weather": "clear",
+      "light_type": "mixed",
+      "contrast": "high",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "b297e8c5",
+    "download_count": 56697,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/courtyard_night.png?width=256&height=256&v=b297e8c5"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/courtyard_night.jpg",
+      "bytes": 6080923,
+      "sha256": "f0582e6dec01eb406b5299fbfcfb2847bc1335cf65611efd6950761182a75e33",
+      "sourceMd5": "68f9b2dde54813a788b650c22d631fea"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

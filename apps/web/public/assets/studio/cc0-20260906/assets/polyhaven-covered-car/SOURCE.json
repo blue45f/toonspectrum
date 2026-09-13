@@ -1,0 +1,105 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/covered_car",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Covered Car",
+    "type": 2,
+    "authors": {
+      "MP": "All"
+    },
+    "info": null,
+    "date_published": 1700611200,
+    "categories": [
+      "props",
+      "industrial",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "garage",
+      "stored",
+      "vehicle",
+      "car",
+      "workshop",
+      "mechanic",
+      "automotive",
+      "repair shop",
+      "junkyard",
+      "scrapyard"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 12592,
+    "texel_density": 1301.910383709177,
+    "dimensions": [
+      1788.962960243225,
+      4380.25426864624,
+      1411.1130833625793
+    ],
+    "files_hash": "22592d3c2b16533339ed1bf4e4320e25e5a76cf2",
+    "description": "Free 8K model of a car under a worn, dusty fabric cover with natural folds and visible wheels- aged garage/industrial character.",
+    "sponsors": [
+      "121968951",
+      "128081732"
+    ],
+    "category_id": "ce832bb2-6034-5e17-aa05-541bbf248198",
+    "category": "Vehicles & Transport/Road Vehicles/Cars",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "fabric",
+        "rubber",
+        "metal"
+      ]
+    },
+    "img_version": "2b0decc8",
+    "download_count": 34573,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/covered_car.png?width=256&height=256&v=2b0decc8"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/covered_car/covered_car_2k.gltf",
+      "bytes": 9687,
+      "sha256": "7d53067dc7b60c94e05eebc43c6b956f56d35a57ef3568e7619bb92227ab8a1f",
+      "sourceMd5": "08c62729bceb0226b8c5c55b28e9a151"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/covered_car/covered_car_nor_gl_2k.jpg",
+      "bytes": 2956251,
+      "sha256": "c37a276f7f55e8477e066f0b0bf83a6cf770ab82cdcf3439bad1b939ff762ceb",
+      "sourceMd5": "94fb37676d8235136a900b38ef1b9e83"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/covered_car/covered_car_diff_2k.jpg",
+      "bytes": 2034745,
+      "sha256": "d482fc7fe8ea8c523e9f29f581a4dd50e14bb060e09779c9633fc55a6473dffb",
+      "sourceMd5": "8407e04a1ab3a425a6f7369e8b80f340"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/covered_car/covered_car.bin",
+      "bytes": 394464,
+      "sha256": "dcbd7bf82d415e30d02c3e7056013b44729de7b712868b5ab9bf29f2b3b8bc57",
+      "sourceMd5": "38f16c2c092dff1191ac5383acaf2ca0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/covered_car/covered_car_arm_2k.jpg",
+      "bytes": 2661301,
+      "sha256": "09bb2ccf251ddd679dd147673443cd68ccc39db3f42ba037ad4185da1b8f6e1b",
+      "sourceMd5": "b8aac0571d16581540ec55e7280780ee"
+    }
+  ]
+}
