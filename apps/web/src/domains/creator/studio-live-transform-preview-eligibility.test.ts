@@ -15,8 +15,7 @@ function draw(overrides: Record<string, unknown> = {}): El {
     // "pen" is causal-ink, one of the audited exact-draft-safe engines, so the base fixture
     // exercises the allowed path and each test below varies exactly one thing.
     brush: "pen",
-    // A stored sampleSpacing is required for the preview: legacy strokes without one are
-    // reprocessed against a fixed 3px distance that does not scale.
+    // Current strokes store spacing; legacy omission is separately tested through exact drafts.
     sampleSpacing: 2,
     ...overrides,
   } as unknown as El;
@@ -221,16 +220,16 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     }
   });
 
-  it("refuses anything with no runtime contract at all", () => {
+  it("refuses unknown runtime ids but uses the renderer default for an omitted brush", () => {
     // The shape the denylist could never catch: a persisted render mode that is not an engine
     // (pixel-grid-v1 floors cells onto the document grid), an unknown id, a preset from a pack
-    // this build does not know, or no brush recorded at all.
+    // this build does not know. An omitted brush is different: StudioDrawNode defaults to pen.
     for (const brush of ["pixel-grid-v1", "some-future-brush", ""]) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
     }
     expect(
       studioLiveTransformPreviewBlockedForElement(draw({ brush: undefined }), false),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("still refuses a safe engine when an O(1) element property disqualifies it", () => {
@@ -238,14 +237,32 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     expect(studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen" }), true)).toBe(true);
   });
 
-  it("refuses legacy strokes that carry no sampleSpacing", () => {
-    // resolveStudioFreehandRenderPath reprocesses those points against a FIXED 3px legacy
-    // distance, so enlarging a densely sampled stroke keeps points the source render discarded
-    // and the committed centerline is not the previewed one scaled. A stored sampleSpacing scales
-    // with the transform, which is what makes the two resamplings agree.
-    expect(
-      studioLiveTransformPreviewBlockedForElement(draw({ sampleSpacing: undefined }), false),
-    ).toBe(true);
+  it("admits legacy spacing for audited exact renderers without admitting unknown brushes", () => {
+    for (const brush of [undefined, "pen", "gpen", "calligraphy", "flat-brush"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(
+        draw({ brush, sampleSpacing: undefined }), false,
+      )).toBe(false);
+    }
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "future-unknown-brush", sampleSpacing: undefined }), false,
+    )).toBe(true);
+  });
+
+  it("classifies geometric lines independently of the selected freehand brush and legacy spacing", () => {
+    for (const kind of ["line", "arrow"]) {
+      for (const brush of [undefined, "oil", "watercolor", "calligraphy", "unknown-brush"]) {
+        expect(studioLiveTransformPreviewBlockedForElement(
+          draw({ kind, brush, brushCatalogId: "dry-media", sampleSpacing: undefined }), false,
+        )).toBe(false);
+      }
+      // Geometric routing must never bypass backdrop or symmetry protection.
+      expect(studioLiveTransformPreviewBlockedForElement(
+        draw({ kind, mode: "eraser" }), false,
+      )).toBe(true);
+      expect(studioLiveTransformPreviewBlockedForElement(
+        draw({ kind, blendMode: "multiply" }), false,
+      )).toBe(true);
+    }
   });
 
   it("no longer previews capsule outlines or highlighters, whose clamps it cannot model", () => {
