@@ -243,7 +243,7 @@ export async function restoreStudioAutosaveRecovery(
     try {
       const saved = autosaveRecoveryCandidateRef.current;
       if (!saved) {
-        setError("복구할 내구 임시저장 데이터를 찾지 못했어요.");
+        setError("이어서 열 그림이 없어요.");
         return;
       }
       if (saved.authority === "browser-storage-compatibility") {
@@ -282,11 +282,11 @@ export async function restoreStudioAutosaveRecovery(
           return;
         }
         if (!(await ctx.preserveCurrentDocument())) {
-          setError("현재 그림을 보관하지 못해 이전 그림을 열지 않았어요. 저장 공간을 확인하거나 파일로 보관한 뒤 다시 시도해 주세요.");
+          setError("현재 그림을 보관하지 못해 이어 열기를 멈췄어요. 저장 공간을 확인하거나 파일로 보관해 주세요.");
           return;
         }
         if (autosaveRecoveryCandidateRef.current !== saved) {
-          setError("남겨 둔 그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
+          setError("그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
           return;
         }
         if (
@@ -294,11 +294,11 @@ export async function restoreStudioAutosaveRecovery(
           || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
           || pendingStrokeCommitsRef.current
         ) {
-          setError("임시저장본을 준비하는 동안 새 획이 시작되어 복구하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.");
+          setError("새 획이 시작되어 이어 열기를 멈췄어요. 획을 마친 뒤 다시 시도해 주세요.");
           return;
         }
         if (!canApplyStudioMutation(mutationTicket)) {
-          setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
+          setError("그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
           return;
         }
         if (parsed.pagesList.length > 0) {
@@ -378,7 +378,7 @@ export async function restoreStudioAutosaveRecovery(
         setHasAutosave(false);
       }
     } catch {
-      setError("임시저장 복구에 실패했어요.");
+      setError("이전 그림을 열지 못했어요.");
     }
 }
 

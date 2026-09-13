@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
@@ -54,7 +55,11 @@ describe("PwaInstallNudge", () => {
     useI18n.getState().setLang("ko");
     const { PwaInstallNudge } = await import("./pwa-install-nudge");
 
-    render(<PwaInstallNudge />);
+    render(
+      <MemoryRouter>
+        <PwaInstallNudge />
+      </MemoryRouter>,
+    );
     expect(screen.queryByRole("status")).toBeNull();
 
     act(dispatchInstallability);
@@ -69,9 +74,27 @@ describe("PwaInstallNudge", () => {
     vi.resetModules();
     installBrowserStubs();
     const { PwaInstallNudge: RemountedNudge } = await import("./pwa-install-nudge");
-    render(<RemountedNudge />);
+    render(
+      <MemoryRouter>
+        <RemountedNudge />
+      </MemoryRouter>,
+    );
     act(dispatchInstallability);
 
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("hides on market routes even when installable", async () => {
+    const { useI18n } = await import("@/shared/lib/i18n");
+    useI18n.getState().setLang("ko");
+    const { PwaInstallNudge } = await import("./pwa-install-nudge");
+
+    render(
+      <MemoryRouter initialEntries={["/market"]}>
+        <PwaInstallNudge />
+      </MemoryRouter>,
+    );
+    act(dispatchInstallability);
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

@@ -1,0 +1,126 @@
+{
+  "schema": "toonspectrum.asset-integration-quarantine.v1",
+  "sourceHead": "28af0a0a7b59539bb2b807e581d53aa55c187d74",
+  "activeCatalogCount": 1305,
+  "uniqueActiveCc0Additions": [
+    "polyhaven-shrub-sorrel-01"
+  ],
+  "originalIllustrationsAdded": 24,
+  "retainedDuplicateOriginals": 49,
+  "quarantinedCandidates": [
+    {
+      "id": "polyhaven-dandelion-01",
+      "name": "민들레 조립용 식생",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "plant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/dandelion_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-dandelion-01/dandelion_01.glb",
+      "bytes": 6332300,
+      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
+      "geometrySha256": "a5a8865a9d6515bc214f33ccc621b51c61218974106af37dfe70ebd6d50d088d",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-dandelion-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        4.214293710887432,
+        0.17017221543937922,
+        0.25765838474035263
+      ],
+      "previewFitScale": 0.4745753706802857,
+      "originalName": "Dandelion 01",
+      "role": "assembly-component",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-leafy-grass",
+      "name": "잎이 섞인 잔디",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "grass",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/leafy_grass",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-leafy-grass/leafy_grass.webp",
+      "bytes": 2443990,
+      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_rough_2k.jpg",
+          "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
+          "bytes": 2274652
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_nor_gl_2k.jpg",
+          "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
+          "bytes": 6047262
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_ao_2k.jpg",
+          "sha256": "bcce4368f6a1affe11b4a643e14cfed7dfb46abf6bb9e6a28a3b87c2de2ddb11",
+          "bytes": 4175463
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_disp_2k.jpg",
+          "sha256": "de34be0f135a3c92fe6e55cca9501a4cc40e02e84de9cc4c7fefded1da5bd3f3",
+          "bytes": 2545281
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ],
+      "originalName": "Leafy Grass",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
+    }
+  ],
+  "reason": "Existing September 8 regression explicitly rejects dandelion-01 framing and leafy-grass surface noise. Candidate import did not establish an accepted replacement for that rejection. Keep these out of active delivery until a separately reviewed repair.",
+  "originalFilesRetained": true,
+  "existingTestsModified": false
+}

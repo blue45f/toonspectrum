@@ -1,11 +1,10 @@
-
 import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { LibraryBackupImport } from "./LibraryBackupImport";
+
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
-import { MAX_LIBRARY_BACKUP_BYTES, parseLibraryBackup } from "@/shared/lib/library-backup";
-import type { HydratePayload } from "@/shared/lib/store-types";
 import { Container } from "@/shared/components/section";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
@@ -67,7 +66,7 @@ function Row({
           <p className="mt-0.5 text-[0.78rem] leading-relaxed text-fg-2">{desc}</p>
         </div>
       </div>
-      <div className="shrink-0 sm:pl-4">{children}</div>
+      <div className="min-w-0 sm:max-w-[60%] sm:pl-4">{children}</div>
     </div>
   );
 }
@@ -75,11 +74,8 @@ function Row({
 export function SettingsPage() {
   const hydrated = useHydrated();
   const experience = useSiteExperience();
-  const [pendingImport, setPendingImport] = useState<HydratePayload | null>(null);
-  const importReaderRef = useRef<FileReader | null>(null);
-  const importGenerationRef = useRef(0);
-  useEffect(() => () => { importGenerationRef.current += 1; importReaderRef.current?.abort(); }, []);
   const lang = useI18n((s) => s.lang);
+  const userId = useApp((s) => s.userId);
   const setLang = useI18n((s) => s.setLang);
   const ratingScale = useApp((s) => s.ratingScale);
   const setRatingScale = useApp((s) => s.setRatingScale);
@@ -100,10 +96,7 @@ export function SettingsPage() {
   const [searchesCleared, setSearchesCleared] = useState(false);
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [imported, setImported] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const t = useT();
   const langOptions = getLanguageOptions(lang).map((entry) => ({
     id: entry.code,
@@ -150,48 +143,6 @@ export function SettingsPage() {
     a.click();
     a.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  const onImportPick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    importGenerationRef.current += 1;
-    const generation = importGenerationRef.current;
-    importReaderRef.current?.abort();
-    setPendingImport(null);
-    setImported(false);
-    setImportError(null);
-    if (file.size > MAX_LIBRARY_BACKUP_BYTES) {
-      setImportError(t("settings.data.importError"));
-      return;
-    }
-    const reader = new FileReader();
-    importReaderRef.current = reader;
-    reader.onload = () => {
-      if (generation !== importGenerationRef.current) return;
-      try {
-        setPendingImport(parseLibraryBackup(String(reader.result)));
-      } catch {
-        setImportError(t("settings.data.importError"));
-      }
-    };
-    reader.onerror = () => {
-      if (generation === importGenerationRef.current) setImportError(t("settings.data.importError"));
-    };
-    reader.readAsText(file);
-  };
-
-  const applyImport = () => {
-    if (!pendingImport) return;
-    try {
-      hydrateFromServer(pendingImport);
-      setPendingImport(null);
-      setImported(true);
-      setImportError(null);
-    } catch {
-      setImportError(t("settings.data.importError"));
-    }
   };
 
   // 클라이언트에서만 localStorage 기반 선호값 반영.
@@ -346,34 +297,8 @@ export function SettingsPage() {
           </button>
         </Row>
         <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
-          <span className="inline-flex items-center gap-2">
-            {imported && (
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-good">
-                <Check size={14} /> {t("settings.data.confirmed")}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
-            >
-              <Upload size={14} /> {t("settings.data.import")}
-            </button>
-            <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onImportPick} />
-          </span>
+          <LibraryBackupImport onRestore={hydrateFromServer} locale={lang.toLowerCase().startsWith("ko") ? "ko" : "en"} ownerId={userId} />
         </Row>
-        {pendingImport && <div className="mb-4 rounded-xl border border-warn/50 bg-panel p-4 text-sm" role="region" aria-label={lang.startsWith("ko") ? "백업 적용 확인" : "Confirm backup import"}>
-          <p className="font-semibold">{lang.startsWith("ko") ? "가져올 백업을 확인하세요" : "Review this backup"}</p>
-          <p className="mt-2 text-fg-2">{lang.startsWith("ko")
-            ? `별점 ${Object.keys(pendingImport.ratings).length}개 · 읽기 상태 ${Object.keys(pendingImport.reads).length}개 · 컬렉션 ${pendingImport.collections.length}개`
-            : `${Object.keys(pendingImport.ratings).length} ratings · ${Object.keys(pendingImport.reads).length} reading states · ${pendingImport.collections.length} collections`}</p>
-          <p className="mt-2 text-fg-2">{lang.startsWith("ko") ? "적용하면 이 브라우저의 서재를 교체합니다. 기존 데이터를 먼저 내보내는 것을 권장합니다. 서버 백업 복원은 아닙니다." : "Applying replaces this browser's library. Export your current data first. This does not restore a server backup."}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="min-h-11 rounded-lg bg-accent px-4 text-on-accent" onClick={applyImport}>{lang.startsWith("ko") ? "확인 후 교체" : "Confirm and replace"}</button>
-            <button type="button" className="min-h-11 rounded-lg border border-line px-4" onClick={() => setPendingImport(null)}>{lang.startsWith("ko") ? "취소" : "Cancel"}</button>
-          </div>
-        </div>}
-        {importError && <p role="alert" className="-mt-1 pb-3 text-xs text-bad">{importError}</p>}
         <Row
           icon={Clock}
           title={t("settings.data.recent")}

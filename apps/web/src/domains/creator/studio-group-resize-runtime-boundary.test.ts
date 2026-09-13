@@ -249,7 +249,15 @@ describe("Studio group uniform-resize runtime boundary", () => {
   it("starts one exact multi-selection lease after validating IDs, locks, and source bounds", () => {
     const source = functionBody("beginCanvasSelectionResize");
     const idsHelper = functionBody("currentCanvasResizeSelectionIds");
-    const boundsGuard = functionBody("finitePositiveGroupResizeBounds");
+    // Geometry validation belongs to the pure guard module, not the editor host.
+    const boundsGuard = readFileSync(
+      new URL("./studio-group-resize-bounds.ts", import.meta.url), "utf8",
+    );
+    expectSourceToken(
+      pageSource,
+      'import { finitePositiveGroupResizeBounds } from "./studio-group-resize-bounds"',
+      "shared bounds guard ownership",
+    );
 
     expectSourceToken(source, "currentCanvasResizeSelectionIds()", "resize begin");
     expectSourceToken(idsHelper, "marqueeIdsRef.current", "resize ids helper");

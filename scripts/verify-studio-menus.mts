@@ -61,7 +61,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "내보내기 / 다운로드",
       "백업 (.json)",
       "빠른 시작 · 새 작업…",
-      "버전 체크포인트…",
+      "저장 기록…",
       "게시 패키지…",
       "에셋 권리 감사…",
     ],

@@ -3,6 +3,7 @@ import {
   Get,
   Header,
   Inject,
+  Logger,
   ServiceUnavailableException,
 } from "@nestjs/common";
 
@@ -14,9 +15,13 @@ import {
   type HealthReadyResponseDto,
 } from "./health.dto";
 import { HealthService } from "./health.service";
+import { createReadinessFailureReporter } from "./health-readiness-diagnostic";
 
 @Controller("health")
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name);
+  private readonly reportReadiness = createReadinessFailureReporter((message) => this.logger.warn(message));
+
   constructor(
     @Inject(HealthService)
     private readonly health: HealthService,
@@ -35,6 +40,7 @@ export class HealthController {
   @Header("Pragma", "no-cache")
   async ready(): Promise<HealthReadyResponseDto> {
     const readiness = await this.health.checkReadiness();
+    this.reportReadiness(readiness, process.env.DATABASE_URL);
     if (!readiness.ready) {
       throw new ServiceUnavailableException(
         HealthNotReadyResponseSchema.parse({

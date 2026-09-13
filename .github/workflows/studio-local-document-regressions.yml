@@ -1,0 +1,48 @@
+name: Studio local document regressions
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/**'
+      - '.github/workflows/studio-local-document-regressions.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/**'
+      - '.github/workflows/studio-local-document-regressions.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-local-document-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Local source identity and manuscript safety
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-local-document-source.test.ts \
+            apps/web/src/domains/creator/studio-project-library-reader.test.ts \
+            apps/web/src/domains/creator/studio-project-document-reader.test.ts \
+            apps/web/src/domains/creator/studio-project-document-store.test.ts \
+            apps/web/src/domains/creator/studio-document-persistence-scope.test.ts \
+            apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.local-source.test.tsx \
+            apps/web/src/domains/creator/studio-workspace-route.test.ts \
+            apps/web/src/domains/creator/studio-document-workspace.test.ts \
+            apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentSidecarsRuntime.test.tsx
