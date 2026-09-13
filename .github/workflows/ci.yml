@@ -97,6 +97,14 @@ jobs:
             apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
             apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
             apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Studio live drawing transform regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-live-transform-*.test.ts \
+            apps/web/src/domains/creator/StudioGroupUniformResizeProxy.test.tsx \
+            apps/web/src/domains/creator/studio-group-resize-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-object-transform*.test.ts
       - name: Repository contracts
         run: |
           set -euo pipefail

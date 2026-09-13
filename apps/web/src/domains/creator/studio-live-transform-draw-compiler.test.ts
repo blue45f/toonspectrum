@@ -48,7 +48,7 @@ describe("compileStudioLiveTransformDrawSnapshot", () => {
         strokeWidth: 4,
         strokeDistance: 50,
         pointCount: 2,
-        retainedAffinePolicy: "route-checked",
+        retainedAffinePolicy: "model-draft-only",
         drawsArrowHead: false,
         isPerfectFamily: false,
         isPerfectInk: false,
@@ -84,6 +84,11 @@ describe("compileStudioLiveTransformDrawSnapshot", () => {
     const gpen = compileStudioLiveTransformDrawSnapshot(draw({ brush: "gpen" }));
 
     expect(lineWithArrow.renderRoute.drawsArrowHead).toBe(true);
+    expect(lineWithArrow.renderRoute.retainedAffinePolicy).toBe("model-draft-only");
+    expect(lineWithArrow.exactDraftComplexity).toMatchObject({
+      rendererEngine: "geometric-path",
+      rendererMaxPaintRadius: 12,
+    });
     expect(perfectInk.renderRoute).toMatchObject({
       isPerfectFamily: true,
       isPerfectInk: true,
