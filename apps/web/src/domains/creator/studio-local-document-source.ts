@@ -9,7 +9,7 @@ import {
 import {
   readStudioProjectLibrary,
   type StudioProjectLibraryStorage,
-} from "./studio-project-library-store";
+} from "./studio-project-library-reader";
 
 import type { StudioWorkspaceRoute } from "./studio-workspace-route";
 
