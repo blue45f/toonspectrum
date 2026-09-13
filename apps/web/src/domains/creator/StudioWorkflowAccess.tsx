@@ -1,5 +1,5 @@
 import { BookOpen, ChevronDown, Search, X } from "lucide-react";
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { requestStudioCommandSearch } from "./studio-help-center-channel";
 import {
@@ -37,14 +37,44 @@ export function StudioWorkflowAccess({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState("");
 
-  const closeGuide = () => {
+  const closeGuide = useCallback(() => {
     const dialog = dialogRef.current;
     if (dialog?.open) {
       if (typeof dialog.close === "function") dialog.close();
       else dialog.removeAttribute("open");
     }
     triggerRef.current?.focus({ preventScroll: true });
-  };
+  }, []);
+
+  // The dialog remains a semantic dialog, not a button or presentation-only surface.
+  // Native lifecycle listeners also protect the explicitly non-modal embedded-browser fallback.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!dialog.open) return;
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeGuide();
+      }
+    };
+    const handleCancel = (event: Event) => {
+      event.preventDefault();
+      closeGuide();
+    };
+    const handleBackdropClick = (event: MouseEvent) => {
+      if (event.target === dialog && dialog.open) closeGuide();
+    };
+    dialog.addEventListener("keydown", handleKeyDown);
+    dialog.addEventListener("cancel", handleCancel);
+    dialog.addEventListener("click", handleBackdropClick);
+    return () => {
+      dialog.removeEventListener("keydown", handleKeyDown);
+      dialog.removeEventListener("cancel", handleCancel);
+      dialog.removeEventListener("click", handleBackdropClick);
+    };
+  }, [closeGuide]);
 
   const openGuide = () => {
     onBeforeOpen();
@@ -60,15 +90,6 @@ export function StudioWorkflowAccess({
       dialog.setAttribute("open", "");
     }
     dialog.querySelector<HTMLButtonElement>("button")?.focus();
-  };
-
-  const handleGuideKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-    // Do not let editor tool shortcuts mutate the canvas behind the guide.
-    event.stopPropagation();
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeGuide();
-    }
   };
 
   return (
@@ -109,8 +130,6 @@ export function StudioWorkflowAccess({
         ref={dialogRef}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        onKeyDown={handleGuideKeyDown}
-        onClick={(event) => { if (event.target === event.currentTarget) closeGuide(); }}
         className="fixed inset-0 z-[100] m-auto max-h-[85dvh] w-[42rem] max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/60"
       >
         <div className="space-y-5 bg-gradient-to-br from-accent-soft/30 to-transparent p-5 sm:p-7">
