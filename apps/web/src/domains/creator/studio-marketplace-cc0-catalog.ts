@@ -6,10 +6,10 @@ import type { StudioCc0Asset } from "./studio-cc0-asset-delivery";
 export function findStudioMarketplaceCc0Asset(reference: unknown): StudioCc0Asset | null {
   if (typeof reference !== "string") return null;
   const modelPrefix = "studio-3d-asset:";
-  const imagePrefix = "cc0/";
   const model = reference.startsWith(modelPrefix);
-  const id = model ? reference.slice(modelPrefix.length)
-    : reference.startsWith(imagePrefix) ? reference.slice(imagePrefix.length) : "";
+  const value = model ? reference.slice(modelPrefix.length)
+    : reference.startsWith("studio-asset:") ? reference.slice("studio-asset:".length) : reference;
+  const id = value.startsWith("cc0/") ? value.slice("cc0/".length) : model ? value : "";
   const asset = STUDIO_MARKETPLACE_CC0_ASSETS.find(item => item.id === id);
   return asset && (asset.kind === "model") === model && isStudioCc0EligibleForNewSelection(asset)
     ? asset : null;
