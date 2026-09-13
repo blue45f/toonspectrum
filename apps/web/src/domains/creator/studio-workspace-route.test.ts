@@ -9,6 +9,7 @@ import {
   parseStudioWorkspaceRoute,
   shouldPreserveStudioRouteLifecycle,
   studio2dHref,
+  studio2dSurfaceNavigationHref,
   studioCanvasHref,
   studioCanvasReturnHref,
   studioDccHref,
@@ -396,4 +397,31 @@ describe("canvas return preserves manuscript identity", () => {
     if (!parsed.valid) throw new Error("Invalid route fixture");
     expect(studioCanvasReturnHref(parsed, "?room=team-a")).toBe(`${expected}?room=team-a`);
   });
+});
+
+
+describe("editor surface navigation boundary", () => {
+  it.each([
+    "/studio/p/project-a/d/document-a?workspace=comic",
+    "/studio/draft/drawing-a?workspace=comic",
+    "/studio/work/server-a/comic",
+    "/studio/remix/source-a/comic",
+    "/studio/comic",
+  ])("preserves canvas return semantics for %s", (href) => {
+    const url = new URL(href, "https://studio.test");
+    const route = parseStudioWorkspaceRoute(url);
+    expect(route.valid).toBe(true);
+    if (!route.valid) throw new Error("Invalid navigation fixture");
+    expect(studio2dSurfaceNavigationHref(route, "canvas", "?room=team-a"))
+      .toBe(studioCanvasReturnHref(route, "?room=team-a"));
+  });
+
+  it.each(["brushes", "bg3d", "poser", "character", "animation", "comic"] as const)(
+    "keeps the existing non-canvas %s navigation", (surface) => {
+      const route = parseStudioWorkspaceRoute({ pathname: "/studio/work/server-a/canvas" });
+      if (!route.valid) throw new Error("Invalid server fixture");
+      expect(studio2dSurfaceNavigationHref(route, surface, "?room=team-a"))
+        .toBe(studio2dHref({ workId: "server-a", surface, search: "?room=team-a" }));
+    },
+  );
 });

@@ -363,6 +363,22 @@ export function studioCanvasReturnHref(
   });
 }
 
+/** Resolve 2D navigation outside the editor host while preserving document canvas identity. */
+export function studio2dSurfaceNavigationHref(
+  route: StudioWorkspaceRoute,
+  surface: Studio2dWorkspaceSurface,
+  search?: string | URLSearchParams,
+): string {
+  return surface === "canvas"
+    ? studioCanvasReturnHref(route, search)
+    : studio2dHref({
+        remixSourceWorkId: route.remixSourceWorkId,
+        search,
+        surface,
+        workId: route.workId,
+      });
+}
+
 export function studioDccHref({
   mode,
   remixSourceWorkId = null,
