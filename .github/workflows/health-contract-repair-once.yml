@@ -1,0 +1,134 @@
+name: Health contract repair once
+
+on:
+  push:
+    branches: [fix/readiness-recovery-diagnostics-20260913]
+    paths: [.github/workflows/health-contract-repair-once.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/readiness-recovery-diagnostics-20260913'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Apply only reviewed relation classification additions
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, pathlib
+          names = [
+              'studio_ai_comic_director_approval',
+              'studio_ai_comic_director_artifact',
+              'studio_ai_comic_director_job',
+              'studio_ai_comic_director_job_event',
+              'studio_ai_comic_director_session',
+              'studio_ai_visual_bible_revision',
+          ]
+          changes = [
+              ('scripts/run-production-database-migrations.mjs', 'e8b107d1d6573faa4bb927bc348ba4c3dbbcd9a8', '  ', 'export const POST_BASELINE_RELATIONS = Object.freeze(['),
+              ('scripts/run-production-database-migrations.test.mjs', '6ba3ad55dc54e8e8af23a5119ed111e9911c26f1', '    ', 'expect(POST_BASELINE_RELATIONS).toEqual(['),
+          ]
+          for name, expected, indent, declaration in changes:
+              path = pathlib.Path(name)
+              original = path.read_bytes()
+              actual = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
+              if actual != expected:
+                  raise RuntimeError(f'{name}: concurrent/source drift; refusing repair')
+              source = original.decode('utf-8')
+              start = source.index(declaration)
+              end = source.index(']);', start)
+              block = source[start:end]
+              if any('"' + item + '"' in block for item in names):
+                  raise RuntimeError('classification already changed; inspect instead of duplicating')
+              anchor = indent + '"creator_work_catalog_asset_binding",\n'
+              if block.count(anchor) != 1:
+                  raise RuntimeError('reviewed insertion context differs')
+              addition = ''.join(indent + '"' + item + '",\n' for item in names)
+              patched = block.replace(anchor, anchor + addition, 1)
+              path.write_bytes((source[:start] + patched + source[end:]).encode('utf-8'))
+          PY
+          git diff --check
+          git diff --stat
+      - name: Run actual health and migration regression suites
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/health-contract-repair
+          pnpm exec vitest run \
+            apps/api/src/modules/health/health-readiness-diagnostic.test.ts \
+            apps/api/src/modules/health/health-readiness.repository.test.ts \
+            apps/api/src/modules/health/health-runtime-readiness.test.ts \
+            apps/api/src/modules/health/health.controller.test.ts \
+            apps/api/src/modules/health/health.dto.test.ts \
+            apps/api/src/modules/health/health.service.test.ts \
+            scripts/run-production-database-migrations.test.mjs \
+            scripts/validate-production-database-url.test.mjs \
+            scripts/verify-production-database-capabilities.test.mjs \
+            --reporter=default --reporter=json --outputFile=artifacts/health-contract-repair/results.json
+          pnpm --filter @webtoon-nest/api build
+      - name: Publish only the two tested files to the unchanged PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          repo = 'blue45f/toonspectrum'
+          branch = 'fix/readiness-recovery-diagnostics-20260913'
+          expected = os.environ['GITHUB_SHA']
+          allowed = ['scripts/run-production-database-migrations.mjs', 'scripts/run-production-database-migrations.test.mjs']
+          def api(path, body=None, method=None):
+              command = ['gh', 'api', path]
+              data = None
+              if body is not None:
+                  command += ['--method', method or 'POST', '--input', '-']
+                  data = json.dumps(body)
+              result = subprocess.run(command, input=data, text=True, capture_output=True, check=True)
+              return json.loads(result.stdout)
+          pr = api(f'repos/{repo}/pulls/1351')
+          ref = api(f'repos/{repo}/git/ref/heads/{branch}')
+          if pr['state'] != 'open' or pr['merged'] or pr['head']['sha'] != expected or ref['object']['sha'] != expected:
+              raise RuntimeError('PR/ref moved; no commit or ref update attempted')
+          changed = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          if sorted(changed) != sorted(allowed):
+              raise RuntimeError('unexpected modified files; refusing publication')
+          parent = api(f'repos/{repo}/git/commits/{expected}')
+          entries = []
+          for path in allowed:
+              content = pathlib.Path(path).read_text()
+              blob = api(f'repos/{repo}/git/blobs', {'content': content, 'encoding': 'utf-8'})
+              entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+          tree = api(f'repos/{repo}/git/trees', {'base_tree': parent['tree']['sha'], 'tree': entries})
+          commit = api(f'repos/{repo}/git/commits', {
+              'message': 'fix(api): classify AI readiness relations after the historical baseline',
+              'tree': tree['sha'], 'parents': [expected],
+          })
+          latest = api(f'repos/{repo}/git/ref/heads/{branch}')
+          if latest['object']['sha'] != expected:
+              raise RuntimeError('PR branch advanced; prepared commit left unreferenced')
+          api(f'repos/{repo}/git/refs/heads/{branch}', {'sha': commit['sha'], 'force': False}, 'PATCH')
+          evidence = {'parentSha': expected, 'commitSha': commit['sha'], 'files': entries, 'productionDatabaseMutation': False}
+          pathlib.Path('artifacts/health-contract-repair/commit.json').write_text(json.dumps(evidence, indent=2) + '\n')
+          print(json.dumps(evidence))
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: health-contract-repair-${{ github.run_id }}
+          path: artifacts/health-contract-repair
+          if-no-files-found: error
+          retention-days: 3
