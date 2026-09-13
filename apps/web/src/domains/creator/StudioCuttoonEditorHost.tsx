@@ -764,6 +764,7 @@ import {
 import {
   clearStudioAutosaveDurableAuthority,
   clearStudioAutosaveRecord,
+  persistStudioAutosaveDeletion,
   downloadStudioAutosaveBackup,
   guardStudioDocumentReplacement,
   requestStudioAutosaveClear,
@@ -7671,6 +7672,7 @@ export function StudioCuttoonEditor({
 
   async function restoreAutosave() {
     await restoreStudioAutosaveRecovery({
+      preserveCurrentDocument: () => saveNamedCheckpoint("이어서 그리기 전 자동 보관"),
       autosaveRecoveryCandidateRef,
       canApplyStudioMutation: (ticket) => canApplyStudioMutation(ticket),
       captureStudioMutationTicket: () => captureStudioMutationTicket(),
@@ -7725,11 +7727,14 @@ export function StudioCuttoonEditor({
     });
   }
 
-  function clearAutosaveRecord() {
-    clearStudioAutosaveRecord({
+  function clearAutosaveRecord(canClearAutosave: () => boolean) {
+    return clearStudioAutosaveRecord({
+      canClearAutosave,
       autosaveKey,
       autosaveRecoveryCandidateRef,
-      clearAutosaveDurableAuthority,
+      clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+        autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+      }),
       remixId,
       setAutosaveRestoreBlockedReason,
       setHasAutosave,
@@ -7739,9 +7744,11 @@ export function StudioCuttoonEditor({
 
   /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
+    const ticket = captureStudioMutationTicket();
     await requestStudioAutosaveClear({
+      canClearAutosave: () => canApplyStudioMutation(ticket),
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord,
+      clearAutosaveRecord: () => clearAutosaveRecord(() => canApplyStudioMutation(ticket)),
     });
   }
 

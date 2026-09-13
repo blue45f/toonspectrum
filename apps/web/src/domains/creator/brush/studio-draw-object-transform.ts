@@ -97,7 +97,7 @@ export function studioDrawObjectRotationIsDropped(el: DrawEl): boolean {
  * planner lets preview eligibility and brush-tip rotation share the exact same semantic gate.
  */
 export function studioDrawHasEffectivePerSampleOrientation(el: DrawEl): boolean {
-  if (el.points.length <= 2) return false;
+  if ((el.kind ?? "freehand") !== "freehand" || el.points.length <= 2) return false;
   if (resolveStudioBrushRuntimeContract(el.brush)?.engine !== "calligraphy-segments") {
     return false;
   }

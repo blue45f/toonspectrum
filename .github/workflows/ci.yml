@@ -97,6 +97,14 @@ jobs:
             apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
             apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
             apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Studio live drawing transform regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-live-transform-*.test.ts \
+            apps/web/src/domains/creator/StudioGroupUniformResizeProxy.test.tsx \
+            apps/web/src/domains/creator/studio-group-resize-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-object-transform*.test.ts
       - name: Repository contracts
         run: |
           set -euo pipefail
@@ -175,6 +183,10 @@ jobs:
             apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts \
             apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts \
             apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts \
+            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
+            apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
+            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
+            apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx \
             apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx \

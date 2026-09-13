@@ -29,6 +29,7 @@ import {
 
 import { planStudioDrawObjectTransform } from "../apps/web/src/domains/creator/brush/studio-draw-object-transform";
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import {
   readDurableStudioAutosaveDocument,
@@ -54,7 +55,7 @@ const RESULT_PATH = join(SCRATCH, "studio-group-evidence.json");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
-/** The guest `/studio` draft this verifier authors — the document key Studio persists under. */
+/** The guest `/studio/canvas` draft this verifier authors — the document key Studio persists under. */
 const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-group-verifier-cleaned";
 /** Deliberately distinct from Transformer chrome/shadows so backing-canvas pixels are attributable. */
@@ -1930,7 +1931,7 @@ async function createMixedFixture(
     "fixture primary colour did not leave the draw pixel sentinel",
   );
   const addText = await visible(
-    page.getByRole("button", { name: "텍스트 추가", exact: true }),
+    page.locator('[data-studio-rail-tool-id="text"]'),
   );
   await addText.click();
   const textEditor = page.locator('textarea[aria-label="캔버스 글자 편집"]');
@@ -1985,6 +1986,7 @@ async function runDesktopGroupAudit(
 ): Promise<DesktopAuditResult> {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1100 },
+    deviceScaleFactor: 2,
     locale: STUDIO_UI_LOCALE,
   });
   const page = await context.newPage();
@@ -2965,7 +2967,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = new URL(STUDIO_DRAFT_CANVAS_PATHNAME, origin).href;
   const server: ChildProcess | null = externalOrigin
     ? null
     : spawn(
