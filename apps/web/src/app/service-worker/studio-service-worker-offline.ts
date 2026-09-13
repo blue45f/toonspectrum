@@ -15,6 +15,7 @@ export interface StudioOfflinePreparationOptions {
   readonly origin: string;
   readonly buildId: string;
   readonly urls: readonly string[];
+  readonly drawingUrls?: readonly string[];
   readonly shellUrls: readonly string[];
   readonly criticalUrls: readonly string[];
   readonly warmUrls: readonly string[];
@@ -110,7 +111,7 @@ export async function prepareStudioOfflineResources(
     if (normalized) assets.push(normalized);
     else missing.push("invalid-resource");
   }
-  const urls = [...new Set([...options.shellUrls, ...options.criticalUrls, ...options.warmUrls, ...assets])];
+  const urls = [...new Set([...options.shellUrls, ...options.criticalUrls, ...options.warmUrls, ...(options.drawingUrls ?? []), ...assets])];
   let downloadedBytes = 0;
   const deadline = Date.now() + PREPARATION_TIMEOUT_MS;
   // Sequential by design: one user's explicit click cannot launch hundreds of requests at once.

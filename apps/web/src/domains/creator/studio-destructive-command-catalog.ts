@@ -702,20 +702,18 @@ export function studioClearAutosaveRequest(input: {
 }): StudioDestructiveActionRequest {
   return {
     id: "studio.autosave.clear",
-    title: "임시저장본 비우기",
-    intro:
-      "브라우저가 꺼졌을 때 남은 마지막 작업본이에요. 지우기 전에 '복구하기'로 되살리거나"
-      + " 'JSON 백업'으로 내려받아 둘 수 있어요.",
+    title: "이전 그림을 삭제할까요?",
+    intro: "이 기기에 남겨 둔 이전 그림만 삭제합니다. 지금 화면의 그림과 서버에 저장한 작품을 지우는 기능이 아니에요. 삭제하면 되돌릴 수 없으니, 필요하다면 취소하고 백업 파일을 먼저 받아 주세요.",
     losses: [
       {
-        label: "임시저장본",
+        label: "이 기기에 남겨 둔 이전 그림",
         note:
           `페이지 ${input.pageCount}개 · 요소 ${input.elementCount}개`
           + (input.savedAtLabel ? ` (${input.savedAtLabel} 저장)` : ""),
       },
     ],
     reversibility: "irreversible",
-    confirmLabel: "임시저장본 영구 삭제",
+    confirmLabel: "이전 그림 영구 삭제",
     cancelLabel: "그대로 두기",
   };
 }

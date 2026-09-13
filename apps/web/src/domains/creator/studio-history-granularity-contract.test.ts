@@ -127,7 +127,9 @@ describe("B — 복구 배너의 비우기는 파괴 승인 seam을 지난다", 
     );
 
     expect(clear).toContain("studioClearAutosaveRequest({");
-    expect(clear).toContain("runStudioDestructiveAction({");
+    expect(clear).toContain("confirmStudioDestructiveAction(request)");
+    expect(clear).toContain("recordStudioDestructiveOutcome({");
+    expect(clear).toContain("await clearAutosaveRecord()");
     expect(clear).toContain("clearAutosaveRecord();");
     // 승인 없이 저장소를 직접 지우는 경로가 남아 있으면 안 된다.
     expect(clear).not.toContain("localStorage.removeItem(autosaveKey)");
@@ -153,13 +155,13 @@ describe("B — 복구 배너의 비우기는 파괴 승인 seam을 지난다", 
     expect(body).toContain('id: "studio.autosave.clear"');
     expect(body).toContain('reversibility: "irreversible"');
     expect(body).toContain('cancelLabel: "그대로 두기"');
-    expect(body).toContain("복구하기");
+    expect(body).toContain("백업 파일");
   });
 
   it("승인 창이 닫히면 포커스는 파괴 버튼이 아니라 복구 쪽으로 돌아간다", () => {
-    expect(statusRailSource).toContain("const autosaveSafeActionRef = useRef<HTMLButtonElement | null>(null)");
-    expect(statusRailSource).toContain("autosaveSafeActionRef.current?.focus()");
-    expect(statusRailSource).toContain("onClick={requestClearAutosave}");
+    expect(statusRailSource).toContain("<StudioRecoveryNotice");
+    expect(statusRailSource).toContain("onRestore={onRestoreAutosave}");
+    expect(statusRailSource).toContain("onDelete={onClearAutosave}");
   });
 });
 

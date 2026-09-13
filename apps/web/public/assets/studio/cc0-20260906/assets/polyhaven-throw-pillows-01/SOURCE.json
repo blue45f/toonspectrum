@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/throw_pillows_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1630022400,
+    "name": "Throw Pillows 01",
+    "categories": [
+      "decorative"
+    ],
+    "type": 2,
+    "tags": [
+      "decorative",
+      "pillow",
+      "throw",
+      "pattern",
+      "african",
+      "red",
+      "triangle",
+      "orange"
+    ],
+    "authors": {
+      "Serhii Khromov": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 6362,
+    "texel_density": 3393.691567163853,
+    "dimensions": [
+      1021.5678811073303,
+      627.4925470352173,
+      450.1592831220478
+    ],
+    "files_hash": "8a475b95a0956bd700394e0f5ed32822071e2f54",
+    "description": "Free 4K model of two decorative throw pillows with bold African-inspired zigzag chevrons in red, orange and ochre on a textured woven fabric.",
+    "category_id": "2d8a6ed6-8345-5c6f-8391-5fb3944ee86f",
+    "category": "Decor & Art/Ornaments/Cushions & Pillows",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "fabric"
+      ]
+    },
+    "img_version": "d1a30215",
+    "download_count": 22591,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/throw_pillows_01.png?width=256&height=256&v=d1a30215"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/throw_pillows_01/throw_pillows_01_2k.gltf",
+      "bytes": 4548,
+      "sha256": "3869830ba5fb524efc0d2dbc6fb3d01162fa06fc70c367b50594ccf8b15a61f1",
+      "sourceMd5": "2bc55dde790cb19b4d64ba8b8e8fd0a6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/throw_pillows_01/throw_pillows_01_nor_gl_2k.jpg",
+      "bytes": 2134240,
+      "sha256": "970d77b8ff6bca0d9482cd10d36d942ca1a26a61768103b6379986e66071902a",
+      "sourceMd5": "44490e3234340ea81c6be713b77fb688"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/throw_pillows_01/throw_pillows_01_rough_2k.jpg",
+      "bytes": 1275948,
+      "sha256": "d3e1956bfedf62d50b527bdfcfd053aabf674f4d6df931a2d8b87e554fe8b24f",
+      "sourceMd5": "f3bed6f9674ce715aa27feae8b35daa0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/throw_pillows_01/throw_pillows_01.bin",
+      "bytes": 146012,
+      "sha256": "cac134c38612894a301d265a0b2ad4ddbe57d15d7473d57592c397d445366476",
+      "sourceMd5": "dd26dd164ecfa138e0bb51d94a4197ed"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/throw_pillows_01/throw_pillows_01_diff_2k.jpg",
+      "bytes": 898774,
+      "sha256": "119dc2fa364113e862fd09805bf70fc24e96119f0cefd8ecf32d18ac3dbfb831",
+      "sourceMd5": "674fe201ddf5a98c3b806b842bc0e2ea"
+    }
+  ]
+}

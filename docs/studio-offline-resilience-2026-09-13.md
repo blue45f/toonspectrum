@@ -51,3 +51,24 @@ A real-device acceptance pass must additionally draw strokes, use eraser/layers/
 wait for the existing local-save acknowledgement, disconnect the network, reload and
 restart the browser, then verify restored pixels and source identity. That pass has not
 been claimed from helper or UI tests.
+
+## Real drawing verification follow-up
+
+The initial resource-timing-only preparation missed modules after the browser's timing buffer filled. Chromium could draw, but an offline reload failed on missing editor chunks; recovery subsequently exposed a missing release-schedule normalizer. These failures were reproduced before the fixes, not waived.
+
+- Build a bounded explicit-click static closure for the editor/router, inspector/hints, autosave/history, SQLite worker/WASM, and document recovery metadata. This is not an install or automatic warm-up payload.
+- Pin only this build-bounded core pack into the versioned precache. Remove duplicate runtime copies only after verifying the protected copy. Keep optional assets under the runtime cache bounds.
+- Supplement timing entries with actual module-preload/stylesheet/script URLs. The request limit is now 1,024 URLs; download/time/per-file limits still apply. This does not enable arbitrary origin, API, or query-string caching.
+- Include the drawing pack in the worker build fingerprint; reject a renamed/missing core module, missing storage worker/WASM, or a core pack over 32 MiB at build time.
+- Report a cached navigation separately from the browser's internet indicator. The label is navigation provenance, not a live API-health claim.
+
+Executed Chromium production-preview evidence:
+
+1. Real pen, Undo/Redo, and OPFS/SQLite autosave with the network disabled.
+2. Export code warmed once online, then network disabled again for reload, explicit recovery, and PNG export.
+3. Restored PNG retains 6,012 non-background pixels and the original dimensions (1440 x 2160). No unexpected browser errors remained. Four exact optional external-font/bootstrap URL failures are recorded separately, not hidden as editor successes.
+4. Real origin 500, 503, and a stalled response recover the isolated cached shell. 403/404 remain visible, and updates still require explicit activation.
+
+Run the offline lifecycle with `TOONSPECTRUM_VERIFY_OFFLINE_DRAWING=1 pnpm exec tsx scripts/verify-studio-lifecycle.mts`. Use the normal lifecycle command for the online baseline. Failure screenshots/body/error logs are retained.
+
+Scope remains limited: this verifies Chromium and one default opaque pen, not all browsers/brushes, full browser restart, authenticated cloud replay, or a server-manuscript offline-copy workflow. Server-save intent still uses its existing tab-scoped storage; no unverified SQLite migration or automatic cloud overwrite is introduced. The existing source/permission protections remain intact.

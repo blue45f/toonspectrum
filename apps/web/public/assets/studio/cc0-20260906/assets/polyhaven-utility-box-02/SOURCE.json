@@ -1,0 +1,106 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/utility_box_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Utility Box 02",
+    "type": 2,
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "info": null,
+    "date_published": 1700784000,
+    "categories": [
+      "structures",
+      "industrial",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "utility",
+      "box",
+      "electrical",
+      "power",
+      "urban",
+      "city",
+      "road",
+      "circuit",
+      "breakers",
+      "transformer",
+      "distributionpanel",
+      "junction box",
+      "control panel",
+      "utility box",
+      "infrastructure"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 6268,
+    "texel_density": 3300.9637371544427,
+    "dimensions": [
+      920.0001955032349,
+      431.999996304512,
+      1120.3334331512451
+    ],
+    "sponsors": [
+      "146648879"
+    ],
+    "files_hash": "8420d634a09db8508124f2086be28b992d0a26c0",
+    "description": "Free 8K model of a weathered green electrical utility box - weathered metal with rivets, high‑voltage stickers, latch and grime; great for city and road scenes.",
+    "category_id": "a30ab5d7-1df0-58ab-8650-c1aec8dcdd72",
+    "category": "Industrial & Infrastructure/Electrical/Utility & Power Boxes",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "img_version": "afaaf3e6",
+    "download_count": 27560,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/utility_box_02.png?width=256&height=256&v=afaaf3e6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/utility_box_02/utility_box_02_2k.gltf",
+      "bytes": 2764,
+      "sha256": "31abfd95a081532fcba40239cb9aa499c62394ae9b18e756ab49e8c4e1c5e4a7",
+      "sourceMd5": "b0765b82f8626dfa4655dd8d623a6ab2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/utility_box_02/utility_box_02.bin",
+      "bytes": 199784,
+      "sha256": "0f0a3f8ecc0358e36e97120aa752c2456a78bf922671e6f77e402b0aa58ecfce",
+      "sourceMd5": "bff3e7d9375d8c5ea5723ad007e45258"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/utility_box_02/utility_box_02_nor_gl_2k.jpg",
+      "bytes": 2335447,
+      "sha256": "e8963358ce46a96cd63e78a5a950f06043231dfd2a7e31e4a9ed9d176ceac638",
+      "sourceMd5": "cdf769cbc11505fcd2c9bc46a13842f1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/utility_box_02/utility_box_02_diff_2k.jpg",
+      "bytes": 1960930,
+      "sha256": "59554c019e3bf270cd59eae1ff4f105ba92383174d9b706120cc92de872751a6",
+      "sourceMd5": "626957b9988afe66fa14ebc53bfcc86c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/utility_box_02/utility_box_02_arm_2k.jpg",
+      "bytes": 2598114,
+      "sha256": "e767bef42b431106db00cfb50374dd399f8acfe8a8d05045ab2590593920a177",
+      "sourceMd5": "bbc7d0d06e8c1c3500d99fa772e64a5d"
+    }
+  ]
+}

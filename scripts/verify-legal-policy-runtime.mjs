@@ -11,9 +11,10 @@ const {
 const { createPolicyResolver } = require("../apps/api/dist/apps/api/src/modules/legal/legal-policy-resolver.js");
 const { LegalController } = require("../apps/api/dist/apps/api/src/modules/legal/legal.controller.js");
 const slug = "privacy-policy";
+const liveBody = "Published policy fixture, not legal text.";
 const live = {
-  policySlug: slug, name: "Privacy", body: "Published policy fixture, not legal text.",
-  versionLabel: "test-v1", contentHash: "a".repeat(64), effectiveAt: null,
+  policySlug: slug, name: "Privacy", body: liveBody,
+  versionLabel: "test-v1", contentHash: createHash("sha256").update(liveBody).digest("hex"), effectiveAt: null,
 };
 const response = (value = live) => Response.json(value);
 
@@ -166,4 +167,73 @@ test("both valid policy inputs select only their fixed destinations and reject r
     { url: "https://desk-platform.vercel.app/termsdesk/api/public/toonspectrum/policies/privacy-policy", redirect: "error" },
     { url: "https://desk-platform.vercel.app/termsdesk/api/public/toonspectrum/policies/terms-of-service", redirect: "error" },
   ]);
+});
+
+// Golden vector uses TermsDesk's deployed shared/hash.ts contract: only CRLF/CR -> LF.
+// No whitespace trimming, Unicode normalization, metadata hashing or body rewriting.
+// Source blob: blue45f/deskcloud 0e5be9228fc3f1e56fbc1274e81795c3dfb86ec3.
+test("a well-formed but unrelated hash cannot mark a policy as a published original", async () => {
+  const read = createPolicyResolver(async () => response({ ...live, contentHash: "a".repeat(64) }));
+  assert.deepEqual(await read(slug), getStaticPolicyDocument(slug));
+});
+
+test("a one-character body mutation with the previous hash falls back safely", async () => {
+  const read = createPolicyResolver(async () => response({ ...live, body: `${live.body}!` }));
+  assert.deepEqual(await read(slug), getStaticPolicyDocument(slug));
+});
+
+for (const [label, body] of [
+  ["LF", "첫째\n둘째\n셋째\n"],
+  ["CRLF", "첫째\r\n둘째\r\n셋째\r\n"],
+  ["mixed CR and CRLF", "첫째\r\n둘째\r셋째\n"],
+]) {
+  test(`${label}: match the TermsDesk UTF-8 golden hash without changing response body bytes`, async () => {
+    const document = { ...live, body, contentHash: "a5941ad1e1af5f744ed561e635333455cb73264098e8092bfd5e28422f49bc1a" };
+    const read = createPolicyResolver(async () => response(document));
+    assert.deepEqual(await read(slug), { ...document, source: "termsdesk" });
+  });
+}
+
+test("hash verification must not trim significant policy whitespace", async () => {
+  const document = { ...live, body: `  ${live.body}\n` };
+  assert.deepEqual(await createPolicyResolver(async () => response(document))(slug), getStaticPolicyDocument(slug));
+});
+
+test("hash verification must not silently normalize distinct Unicode sequences", async () => {
+  const document = {
+    ...live, body: "e\u0301",
+    contentHash: createHash("sha256").update("\u00e9").digest("hex"),
+  };
+  assert.deepEqual(await createPolicyResolver(async () => response(document))(slug), getStaticPolicyDocument(slug));
+});
+
+test("uppercase hexadecimal of the matching digest remains compatible", async () => {
+  const document = { ...live, contentHash: live.contentHash.toUpperCase() };
+  assert.deepEqual(await createPolicyResolver(async () => response(document))(slug), { ...document, source: "termsdesk" });
+});
+
+test("hash failures coalesce and a later valid publication can recover after cooldown", async () => {
+  let time = 0;
+  let calls = 0;
+  let fixed = false;
+  const read = createPolicyResolver(async () => {
+    calls += 1;
+    return response(fixed ? live : { ...live, body: "Corrupted fixture" });
+  }, () => time);
+  const results = await Promise.all(Array.from({ length: 20 }, () => read(slug)));
+  assert.ok(results.every((document) => document.source === "static"));
+  assert.equal(calls, 1);
+  fixed = true;
+  time = 59_999;
+  assert.equal((await read(slug)).source, "static");
+  assert.equal(calls, 1);
+  time = 60_000;
+  assert.deepEqual(await read(slug), { ...live, source: "termsdesk" });
+  assert.equal(calls, 2);
+});
+
+test("matching published text is not rejected just because it matches bundled copy text", async () => {
+  const body = getStaticPolicyDocument(slug).body;
+  const document = { ...live, body, contentHash: createHash("sha256").update(body).digest("hex") };
+  assert.deepEqual(await createPolicyResolver(async () => response(document))(slug), { ...document, source: "termsdesk" });
 });

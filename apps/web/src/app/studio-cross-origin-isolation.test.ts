@@ -41,7 +41,7 @@ describe("Studio cross-origin isolation headers", () => {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "credentialless",
       "Permissions-Policy":
-        "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)",
+        "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)",
     });
     expect(STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS).toEqual({
       "Cross-Origin-Embedder-Policy": "credentialless",
@@ -511,5 +511,21 @@ describe("Studio isolation runtime diagnostic", () => {
       element,
     );
     expect(attributes.size).toBe(0);
+  });
+});
+
+describe("P2P capture deployment policy", () => {
+  it("keeps Vercel and Vite same-origin capture permissions in sync", async () => {
+    const { readFileSync } = await import("node:fs");
+    const deployment = JSON.parse(readFileSync(new URL("../../../../vercel.json", import.meta.url), "utf8")) as {
+      headers: { source: string; headers: { key: string; value: string }[] }[];
+    };
+    const policy = deployment.headers.find((rule) => rule.source === "/(.*)")?.headers
+      .find((header) => header.key === "Permissions-Policy")?.value;
+    expect(policy).toBe(STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS["Permissions-Policy"]);
+    expect(policy).toContain("camera=(self)");
+    expect(policy).toContain("microphone=(self)");
+    expect(policy).not.toContain("*");
+    expect(policy).toContain("geolocation=()");
   });
 });

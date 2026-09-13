@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/covered_car",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-covered-car",
+  "sourceModelSha256": "32389568f3bf78aa4af1ebd604b05fab01ce569cdf90e8d1d44302e817bb6ffd",
+  "render": {
+    "sourceId": "polyhaven-covered-car",
+    "sourceSha256": "32389568f3bf78aa4af1ebd604b05fab01ce569cdf90e8d1d44302e817bb6ffd",
+    "path": "high-resolution-props/polyhaven-covered-car.png",
+    "visiblePixels": 208131,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 12592
+  },
+  "independentOriginal": false
+}

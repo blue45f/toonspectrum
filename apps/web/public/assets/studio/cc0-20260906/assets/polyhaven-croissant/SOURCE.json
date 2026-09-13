@@ -1,0 +1,94 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/croissant",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1659916800,
+    "sponsors": [
+      "26820710"
+    ],
+    "name": "Croissant",
+    "categories": [
+      "props",
+      "food"
+    ],
+    "type": 2,
+    "tags": [
+      "food",
+      "pastry",
+      "baked goods",
+      "french",
+      "breakfast",
+      "bakery",
+      "savory"
+    ],
+    "authors": {
+      "Greg Zaal": "Processing",
+      "Dario Barresi": "Scanning"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 1990,
+    "texel_density": 36987.25624446523,
+    "dimensions": [
+      200.00000298023224,
+      75.51151886582375,
+      61.99566961731762
+    ],
+    "files_hash": "16023b7dcc7d8c5660c4d128e079e878fc08ab23",
+    "description": "Free 8K croissant model with realistic golden-brown crust, flaky layered dough, subtle sheen and high-detail baked texture.",
+    "category_id": "02fe0dc1-b3af-58f0-bfd7-e46c4085eec1",
+    "category": "Food & Kitchen/Prepared Food/Cakes & Pastries",
+    "attributes": {
+      "material": [
+        "food"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "3a1ffb31",
+    "download_count": 22220,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/croissant.png?width=256&height=256&v=3a1ffb31"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/croissant/croissant_2k.gltf",
+      "bytes": 2680,
+      "sha256": "568ead4f5e173198f4c7650b51d6e5ebf0b9df64d58f413400647c3935a74407",
+      "sourceMd5": "10a51b2b36f47e9291b2c51a4dfc7a32"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/croissant/croissant_diff_2k.jpg",
+      "bytes": 1825723,
+      "sha256": "b7965b3b90b7885cb6117b0f70139cfcae3edce7a17200b7cbd06e7724030263",
+      "sourceMd5": "ee68d4ad86fc74b0c4c372e969a66e28"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/croissant/croissant.bin",
+      "bytes": 44932,
+      "sha256": "d770a5ab7e3bcf3572343d74c7941e87eda87349fe414dd4ab206fa5e1e1524a",
+      "sourceMd5": "8d343f5c5ea635334c05bd74a7f13fab"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/croissant/croissant_nor_gl_2k.jpg",
+      "bytes": 2925439,
+      "sha256": "2a25fbd103c703797a05b48357fabafe7e865b29d3767431be1b545260e28c6f",
+      "sourceMd5": "3b6dfa99a60aa83a0869c491eb47885b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/croissant/croissant_arm_2k.jpg",
+      "bytes": 2133588,
+      "sha256": "12ff3af92f3716f285771b58aded8d0dd5a417bdea49c433c58144596ad6380c",
+      "sourceMd5": "f04f5a228304357276ba0e36fc7b808d"
+    }
+  ]
+}

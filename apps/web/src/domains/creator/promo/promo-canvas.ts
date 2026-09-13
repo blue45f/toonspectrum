@@ -29,11 +29,82 @@ function lines(ctx: CanvasRenderingContext2D, value: string, width: number, maxL
   if (line) result.push(line);
   return result;
 }
+interface PromoTextTile { canvas: HTMLCanvasElement; left: number; top: number }
+interface PromoTextCache { entries: Map<string, PromoTextTile>; pixels: number }
+// Cache only small text tiles, never full-resolution frames or user artwork.
+// Weak keys release the cache with each preview/export canvas. Entries are bounded
+// even while scrubbing typewriter captions or editing many successive projects.
+const textCaches = new WeakMap<CanvasRenderingContext2D, PromoTextCache>();
+const TEXT_CACHE_PIXELS = 2_000_000;
+const TEXT_CACHE_ENTRIES = 16;
+
+export function releasePromoTextCache(ctx: CanvasRenderingContext2D): void {
+  const cache = textCaches.get(ctx);
+  if (!cache) return;
+  for (const { canvas } of cache.entries.values()) { canvas.width = 0; canvas.height = 0; }
+  textCaches.delete(ctx);
+}
 function drawText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, width: number, fontSize: number, maxLines: number): void {
   ctx.font = `700 ${fontSize}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  lines(ctx, value, width, maxLines).forEach((line, i) => ctx.fillText(line, x, y + i * fontSize * 1.4));
+  // Non-solid text paint or a non-DOM canvas uses the identical direct renderer.
+  const owner = ctx.canvas?.ownerDocument;
+  if (!owner || typeof ctx.fillStyle !== "string") {
+    lines(ctx, value, width, maxLines).forEach((line, i) => ctx.fillText(line, x, y + i * fontSize * 1.4));
+    return;
+  }
+  const padding = Math.ceil(fontSize + ctx.shadowBlur * 3);
+  const left = Math.floor(x - width / 2 - padding);
+  const top = Math.floor(y - padding);
+  // Include fractional alignment: moving a caption must not reuse a raster with
+  // different subpixel glyph placement. Opacity/clipping stay on the target ctx.
+  const key = JSON.stringify([value, width, fontSize, maxLines, x - left, y - top,
+    ctx.fillStyle, ctx.shadowColor, ctx.shadowBlur, ctx.shadowOffsetX, ctx.shadowOffsetY, ctx.direction]);
+  let cache = textCaches.get(ctx);
+  if (!cache) { cache = { entries: new Map(), pixels: 0 }; textCaches.set(ctx, cache); }
+  const cached = cache.entries.get(key);
+  if (cached) {
+    cache.entries.delete(key); cache.entries.set(key, cached);
+    paintTextTile(ctx, cached.canvas, left, top);
+    return;
+  }
+  const rows = lines(ctx, value, width, maxLines);
+  const canvas = owner.createElement("canvas");
+  canvas.width = Math.ceil(width + padding * 2 + 1);
+  canvas.height = Math.ceil(padding * 2 + Math.max(0, rows.length - 1) * fontSize * 1.4 + 1);
+  const tile = canvas.getContext("2d");
+  if (!tile || canvas.width * canvas.height > TEXT_CACHE_PIXELS) {
+    canvas.width = 0; canvas.height = 0;
+    rows.forEach((line, i) => ctx.fillText(line, x, y + i * fontSize * 1.4));
+    return;
+  }
+  tile.font = ctx.font; tile.textAlign = "center"; tile.textBaseline = "middle";
+  tile.direction = ctx.direction;
+  tile.fillStyle = ctx.fillStyle;
+  tile.shadowColor = ctx.shadowColor; tile.shadowBlur = ctx.shadowBlur;
+  tile.shadowOffsetX = ctx.shadowOffsetX; tile.shadowOffsetY = ctx.shadowOffsetY;
+  rows.forEach((line, i) => tile.fillText(line, x - left, y - top + i * fontSize * 1.4));
+  const pixels = canvas.width * canvas.height;
+  while (cache.entries.size >= TEXT_CACHE_ENTRIES || cache.pixels + pixels > TEXT_CACHE_PIXELS) {
+    const oldest = cache.entries.keys().next().value;
+    if (oldest === undefined) break;
+    const expired = cache.entries.get(oldest)!;
+    cache.pixels -= expired.canvas.width * expired.canvas.height;
+    expired.canvas.width = 0; expired.canvas.height = 0;
+    cache.entries.delete(oldest);
+  }
+  cache.entries.set(key, { canvas, left, top });
+  cache.pixels += pixels;
+  paintTextTile(ctx, canvas, left, top);
+}
+function paintTextTile(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, left: number, top: number): void {
+  ctx.save();
+  // The shadow is already in the tile; do not apply it twice on compositing.
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  ctx.drawImage(canvas, left, top);
+  ctx.restore();
 }
 /** No randomness, timers, fonts from the network, or platform-specific drawing dependencies. */
 export function drawPromoFrame(ctx: CanvasRenderingContext2D, project: PromoProject, images: PromoImages, inputFrame: number, width: number, height: number): void {
@@ -41,7 +112,6 @@ export function drawPromoFrame(ctx: CanvasRenderingContext2D, project: PromoProj
   const palette = PALETTES[project.style];
   const unit = Math.min(width, height);
   ctx.save();
-  ctx.clearRect(0, 0, width, height);
   const background = ctx.createLinearGradient(0, 0, width, height);
   background.addColorStop(0, palette[0]);
   background.addColorStop(1, palette[1]);
