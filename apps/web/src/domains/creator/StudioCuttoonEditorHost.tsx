@@ -1228,6 +1228,7 @@ import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
   studio2dHref,
+  studioCanvasReturnHref,
   type Studio2dWorkspaceSurface,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
@@ -5606,12 +5607,14 @@ export function StudioCuttoonEditor({
   ) {
     if (studioRoute.surface === surface && options?.force !== true) return;
     navigate(
-      studio2dHref({
-        remixSourceWorkId: studioRoute.remixSourceWorkId,
-        search: location.search,
-        surface,
-        workId: studioRoute.workId,
-      }),
+      surface === "canvas"
+        ? studioCanvasReturnHref(studioRoute, location.search)
+        : studio2dHref({
+            remixSourceWorkId: studioRoute.remixSourceWorkId,
+            search: location.search,
+            surface,
+            workId: studioRoute.workId,
+          }),
       // 패널을 닫아 표면이 canvas 로 내려오는 항목은 히스토리를 쌓지 않는다 — 뒤로가기가
       // "방금 닫은 패널을 다시 여는" 계단이 되면 라우트 대칭의 의미가 없다.
       options?.replace === true ? { replace: true } : undefined,

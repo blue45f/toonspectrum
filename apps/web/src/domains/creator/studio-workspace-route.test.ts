@@ -10,6 +10,7 @@ import {
   shouldPreserveStudioRouteLifecycle,
   studio2dHref,
   studioCanvasHref,
+  studioCanvasReturnHref,
   studioDccHref,
   studioRouteStageKey,
   studioWorkspaceCanonicalHref,
@@ -362,5 +363,37 @@ describe("studio workspace routes", () => {
     });
     if (!otherDccRoute.valid) throw new Error("fixture route failed");
     expect(studioWorkspaceReturnHref(state, otherDccRoute)).toBeNull();
+  });
+});
+
+describe("canvas return preserves manuscript identity", () => {
+  it.each([
+    ["/studio/p/project-1/d/document-1", "comic", "draw"],
+    ["/studio/p/project-1/d/document-1", "animation", "draw"],
+    ["/studio/p/project-1/d/document-1", "3d", "draw"],
+    ["/studio/p/project-1/d/document-1", "design", "design"],
+    ["/studio/draft/draft-1", "storyboard", "draw"],
+  ])("keeps %s when closing %s", (pathname, workspace, expectedWorkspace) => {
+    const search = `?workspace=${workspace}&room=team-a&focus=page-1`;
+    const parsed = parseStudioWorkspaceRoute({ pathname, search });
+    if (!parsed.valid) throw new Error("Invalid route fixture");
+    // Local-source resolution removes the remote id, not the document identity.
+    const href = studioCanvasReturnHref({ ...parsed, workId: null }, search);
+    const result = new URL(href, "https://studio.invalid");
+    expect(result.pathname).toBe(pathname);
+    expect(result.searchParams.get("workspace")).toBe(expectedWorkspace);
+    expect(result.searchParams.get("room")).toBe("team-a");
+    expect(result.searchParams.get("focus")).toBe("page-1");
+    expect(shouldPreserveStudioRouteLifecycle({ pathname, search }, result)).toBe(true);
+  });
+
+  it.each([
+    ["/studio/work/server-work/comic", "/studio/work/server-work/canvas"],
+    ["/studio/remix/source-work/animation", "/studio/remix/source-work/canvas"],
+    ["/studio/comic", "/studio/canvas"],
+  ])("retains legacy authority for %s", (pathname, expected) => {
+    const parsed = parseStudioWorkspaceRoute({ pathname });
+    if (!parsed.valid) throw new Error("Invalid route fixture");
+    expect(studioCanvasReturnHref(parsed, "?room=team-a")).toBe(`${expected}?room=team-a`);
   });
 });
