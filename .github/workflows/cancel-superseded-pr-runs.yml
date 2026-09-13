@@ -1,0 +1,53 @@
+name: Retire superseded PR checks
+on:
+  push:
+    branches: [ops/merge-final-check-20260913]
+    paths: [.github/workflows/cancel-superseded-pr-runs.yml]
+permissions:
+  contents: read
+  pull-requests: read
+  actions: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Cancel only older revisions of an open same-repository PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime,json,os,pathlib,urllib.request
+          repo='blue45f/toonspectrum';api='https://api.github.com/repos/'+repo+'/'
+          def call(path,method='GET'):
+              req=urllib.request.Request(api+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'},data=b'' if method=='POST' else None,method=method)
+              with urllib.request.urlopen(req,timeout=40) as r:return json.load(r) if r.headers.get('content-type','').startswith('application/json') else None
+          pulls=call('pulls?state=open&per_page=100');assert len(pulls)<100
+          by_branch={p['head']['ref']:p for p in pulls if p['head']['repo'] and p['head']['repo']['full_name']==repo}
+          cancelled=[];seen=set()
+          for state in ['queued','pending','in_progress','waiting','requested']:
+              for page in range(1,6):
+                  runs=call('actions/runs?event=pull_request&status='+state+'&per_page=100&page='+str(page))['workflow_runs']
+                  for run in runs:
+                      if run['id'] in seen:continue
+                      seen.add(run['id']);branch=run['head_branch'];p=by_branch.get(branch)
+                      if not p or branch=='main' or run['head_sha']==p['head']['sha']:continue
+                      if not any(item['number']==p['number'] for item in run['pull_requests']):continue
+                      current=call('pulls/'+str(p['number']))
+                      if current['state']!='open' or current['head']['sha']!=p['head']['sha']:continue
+                      fresh=call('actions/runs/'+str(run['id']))
+                      if fresh['status']=='completed' or fresh['head_sha']==current['head']['sha']:continue
+                      call('actions/runs/'+str(run['id'])+'/cancel','POST')
+                      cancelled.append({'run':run['id'],'pr':p['number'],'obsolete_head':run['head_sha'],'current_head':current['head']['sha'],'workflow':run['name']})
+                  if len(runs)<100:break
+          report={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'cancelled':cancelled,'current_head_checks_cancelled':False,'main_checks_cancelled':False}
+          folder=pathlib.Path('artifacts/superseded-runs');folder.mkdir(parents=True)
+          (folder/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: superseded-pr-run-cleanup
+          path: artifacts/superseded-runs/report.json
+          if-no-files-found: error
+          retention-days: 3
