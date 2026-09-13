@@ -40,7 +40,7 @@ class Runtime:
     def row(self, table, resource, owner):
         identifier(resource)
         with self.lock: row=self.db.execute(f'SELECT * FROM {table} WHERE id=? AND owner=?',(resource,owner)).fetchone()
-        if not row: raise HTTPException(404,'Resource not found')
+        if not row or (table=='jobs' and row['state']=='deleted'): raise HTTPException(404,'Resource not found')
         return dict(row)
     def public(self, row):
         return {key:row[key] for key in ['id','state','created','updated','progress','stage','error']} | {'mode':json.loads(row['request'])['mode'], 'artifacts':json.loads(row['artifacts'])}
@@ -98,6 +98,7 @@ class Runtime:
             old=self.db.execute('SELECT * FROM jobs WHERE owner=? AND idem=?',(owner,idem)).fetchone()
             if old:
                 if old['fingerprint']!=digest: raise HTTPException(409,'Idempotency key reused with another request')
+                if old['state']=='deleted': raise HTTPException(410,'This request was deleted; it will not be generated again')
                 return self.public(dict(old))
             caps=self.capabilities();engine=caps['engines'].get(request['mode'],{})
             if not engine.get('configured') or not caps.get('enabled'): raise HTTPException(503,'Inference engine is not configured and enabled')
@@ -127,7 +128,13 @@ class Runtime:
                     if active and resource in json.loads(active['request'])['assets']:raise HTTPException(409,'Worker is releasing this upload')
                 jobs=self.db.execute("SELECT request FROM jobs WHERE owner=? AND state IN ('queued','running')",(owner,)).fetchall()
                 if any(resource in json.loads(job['request'])['assets'] for job in jobs):raise HTTPException(409,'Upload is used by an active job')
-            self.db.execute(f'DELETE FROM {table} WHERE id=?',(resource,));self.db.commit();shutil.rmtree(self.root/resource,ignore_errors=True)
+            if table=='jobs':
+                # Keep only a receipt for idempotency/quota; erase prompts, input references,
+                # result metadata and files. Deletion must not grant more GPU jobs.
+                minimal=json.dumps({'mode':json.loads(row['request'])['mode'],'assets':[]})
+                self.db.execute("UPDATE jobs SET state='deleted',stage='deleted',request=?,artifacts='[]',error=NULL,progress=0,updated=? WHERE id=?",(minimal,time.time(),resource))
+            else:self.db.execute('DELETE FROM uploads WHERE id=?',(resource,))
+            self.db.commit();shutil.rmtree(self.root/resource,ignore_errors=True)
         return {'deleted':True}
     def cleanup_uploads(self, owner):
         # Explicit owner action. Protect active inputs, including a cancelling subprocess.
@@ -243,7 +250,7 @@ def create_app(runtime: Runtime):
     @app.get('/jobs')
     def jobs(request:Request):
         owner=runtime.authenticate(request)
-        with runtime.lock:rows=runtime.db.execute('SELECT * FROM jobs WHERE owner=? ORDER BY created DESC LIMIT 40',(owner,)).fetchall()
+        with runtime.lock:rows=runtime.db.execute("SELECT * FROM jobs WHERE owner=? AND state!='deleted' ORDER BY created DESC LIMIT 40",(owner,)).fetchall()
         return {'jobs':[runtime.public(dict(row)) for row in rows]}
     @app.get('/jobs/{job}')
     def get_job(request:Request,job:str):return runtime.public(runtime.row('jobs',job,runtime.authenticate(request)))

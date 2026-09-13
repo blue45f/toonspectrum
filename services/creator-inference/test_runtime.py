@@ -136,3 +136,51 @@ def test_glb_header_length_rejected(tmp_path):
 
 def test_authenticated_request_size_limit(client):
     assert client.put('/uploads/'+'1'*32+'/chunks/0',content=b'x'*(1536*1024+1),headers=HEADERS|{'content-type':'application/json'}).status_code==413
+
+
+def delete_terminal(client, job):
+    wait_job(client, job)
+    for _ in range(50):
+        response = client.delete('/jobs/' + job, headers=HEADERS)
+        if response.status_code == 200:
+            return
+        assert response.status_code == 409, response.text
+        time.sleep(.02)
+    raise AssertionError('Worker did not release the terminal job')
+
+
+def test_deleted_result_cannot_replay_generation(client):
+    asset = upload(client)
+    job = submit(client, asset).json()['id']
+    delete_terminal(client, job)
+    assert submit(client, asset).status_code == 410
+    assert client.get('/jobs', headers=HEADERS).json() == {'jobs': []}
+    assert client.get('/jobs/' + job, headers=HEADERS).status_code == 404
+
+
+def test_deleted_key_still_rejects_other_payload(client):
+    asset = upload(client)
+    delete_terminal(client, submit(client, asset).json()['id'])
+    response = client.post('/jobs', json=body(asset) | {'prompt': 'different'},
+                           headers=HEADERS | {'idempotency-key': 'idempotency-test-0001'})
+    assert response.status_code == 409
+
+
+def test_deleting_result_does_not_reset_daily_quota(client, monkeypatch):
+    monkeypatch.setenv('CREATOR_DAILY_JOB_LIMIT', '1')
+    asset = upload(client)
+    delete_terminal(client, submit(client, asset).json()['id'])
+    assert submit(client, asset, key='idempotency-another-request').status_code == 429
+
+
+def test_deleted_receipt_erases_private_payload_and_files(client, runtime):
+    asset = upload(client)
+    job = submit(client, asset).json()['id']
+    delete_terminal(client, job)
+    with runtime.lock:
+        receipt = runtime.db.execute('SELECT * FROM jobs WHERE id=?', (job,)).fetchone()
+    assert receipt['state'] == 'deleted'
+    assert json.loads(receipt['request']) == {'mode': 'image-to-video', 'assets': []}
+    assert receipt['artifacts'] == '[]'
+    assert receipt['error'] is None
+    assert not (runtime.root / job).exists()
