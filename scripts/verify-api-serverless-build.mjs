@@ -313,6 +313,10 @@ export async function verifyApiServerlessBuild() {
         },
       });
       await writeFile(resolve(output, `${prefix}bootstrap.log`), child.stdout + child.stderr);
+      if (child.status !== 0) {
+        // Probe processes receive synthetic credentials only. Keep their failure visible in CI.
+        console.error(`Lambda probe ${name} failed: ${child.error?.message ?? child.stderr.slice(-8_000)}`);
+      }
       assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
     }
   }
