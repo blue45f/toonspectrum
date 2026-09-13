@@ -108,3 +108,28 @@ describe("spatial reader interaction", () => {
     expect(runtime.start).not.toHaveBeenCalled();
   });
 });
+
+describe("spatial reader DOM XSS regression", () => {
+  it("keeps manuscript titles and imported filenames out of HTML sinks", () => {
+    const title = '<img src=x onerror="alert(1)">';
+    const file = new File(["raster"], '"><svg onload="alert(1)">.png', { type: "image/png" });
+    const source = `blob:${window.location.origin}/safe-manuscript`;
+    const createUrl = vi.fn(() => source);
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = revoke;
+    });
+    const view = render(<SpatialWebtoonReader title={title} pages={["/one.png"]} onClose={vi.fn()} />);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(title);
+    expect(screen.getByRole("img").getAttribute("alt")).toBe(`${title} 1페이지 · 1구간`);
+    expect(view.container.querySelector("script, svg, [onerror], [onload]")).toBeNull();
+    fireEvent.change(screen.getByLabelText("공간 리더 원고 이미지 선택"), { target: { files: [file] } });
+    expect(createUrl).toHaveBeenCalledWith(file);
+    expect(screen.getByRole("img").getAttribute("src")).toBe(source);
+    expect(view.container.querySelector("script, svg, [onerror], [onload]")).toBeNull();
+    expect(view.container.textContent).not.toContain(file.name);
+    view.unmount();
+    expect(revoke).toHaveBeenCalledWith(source);
+  });
+});
