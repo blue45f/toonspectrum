@@ -9,9 +9,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, normalizePath } from "vite";
 
 import { WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 
@@ -20,7 +21,10 @@ const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
 const PROBE_RESULTS_PATH = process.env.TOONSPECTRUM_LIVING_INK_PROBE_RESULTS_PATH
   ?? new URL("../tests/benchmarks/results/living-ink-probe.json", import.meta.url);
 const HARNESS_PATH = "/__studio_living_ink_execution__";
-const ENTRY = "/scripts/studio-living-ink-execution-browser.ts";
+// Vite owns apps/web; the independent GPU harness lives in workspace scripts.
+const ENTRY = `/@fs/${normalizePath(fileURLToPath(
+  new URL("./studio-living-ink-execution-browser.ts", import.meta.url),
+))}`;
 const TIMEOUT_MS = 180_000;
 const INKWASH_ORACLE = Object.freeze({
   pinnedCommit: "48b7cf0f4f2afaa8c4256460e696c1b46cfab985",
@@ -358,11 +362,16 @@ async function runLane(lane, port) {
       `http://127.0.0.1:${port}${HARNESS_PATH}?backend=${encodeURIComponent(lane.id)}`,
       { waitUntil: "domcontentloaded" },
     );
-    await page.waitForFunction(
-      () => window.__studioLivingInkExecutionResult !== undefined,
-      undefined,
-      { timeout: TIMEOUT_MS },
-    );
+    try {
+      await page.waitForFunction(
+        () => window.__studioLivingInkExecutionResult !== undefined,
+        undefined,
+        { timeout: TIMEOUT_MS },
+      );
+    } catch (cause) {
+      writeJson(join(lane.id, "browser-diagnostics.json"), diagnostics);
+      throw cause;
+    }
     const result = await page.evaluate(() => window.__studioLivingInkExecutionResult);
     writeJson(join(lane.id, "metrics.json"), result);
     writeJson(join(lane.id, "browser-diagnostics.json"), diagnostics);
