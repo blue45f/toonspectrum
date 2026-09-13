@@ -1,0 +1,55 @@
+name: Public site experience
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-site-experience.yml'
+      - 'scripts/audit-public-site-experience.mjs'
+      - 'apps/web/src/shared/components/public-site-*'
+      - 'apps/web/src/app/PublicSite*'
+      - 'apps/web/src/app/App.tsx'
+      - 'apps/web/src/app/AppShell.tsx'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-site-experience-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-observation:
+    name: Read-only production browser observation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            apps/web/src/app/routes/groups
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install isolated, pinned browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/public-site-browser" --no-save --ignore-scripts playwright@1.62.1
+          node "$RUNNER_TEMP/public-site-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          cp scripts/audit-public-site-experience.mjs "$RUNNER_TEMP/public-site-browser/audit.mjs"
+      - name: Observe public routes without submitting forms or entering Studio
+        env:
+          AUDIT_REPOSITORY: ${{ github.workspace }}
+          AUDIT_OUTPUT: ${{ github.workspace }}/public-site-audit
+          AUDIT_BASE_URL: https://www.toonstudio.cloud
+        run: node "$RUNNER_TEMP/public-site-browser/audit.mjs"
+      - name: Keep screenshots and complete coverage inventory
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-site-production-observation
+          path: public-site-audit
+          retention-days: 7
