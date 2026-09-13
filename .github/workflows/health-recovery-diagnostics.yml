@@ -33,7 +33,16 @@ jobs:
       - name: Verify health boundaries and migration contracts
         run: |
           set -euo pipefail
-          pnpm exec vitest run apps/api/src/modules/health scripts/run-production-database-migrations.test.mjs scripts/validate-production-database-url.test.mjs scripts/verify-production-database-capabilities.test.mjs
+          pnpm exec vitest run \
+            apps/api/src/modules/health/health-readiness-diagnostic.test.ts \
+            apps/api/src/modules/health/health-readiness.repository.test.ts \
+            apps/api/src/modules/health/health-runtime-readiness.test.ts \
+            apps/api/src/modules/health/health.controller.test.ts \
+            apps/api/src/modules/health/health.dto.test.ts \
+            apps/api/src/modules/health/health.service.test.ts \
+            scripts/run-production-database-migrations.test.mjs \
+            scripts/validate-production-database-url.test.mjs \
+            scripts/verify-production-database-capabilities.test.mjs
           pnpm exec eslint apps/api/src/modules/health/health-readiness-diagnostic.ts apps/api/src/modules/health/health-readiness-diagnostic.test.ts apps/api/src/modules/health/health.controller.ts --max-warnings 0
           pnpm --filter @webtoon-nest/api build
 
