@@ -252,6 +252,13 @@ export function beginStudioKonvaDrawTransformGesture(
   let chromeLift: StudioSingleObjectDragLayerSession | null = null;
   let sourceLift: StudioSingleObjectDragLayerSession | null = null;
   let sourceIsolationUnavailable = false;
+  // Clean geometric vectors have a cheap, deterministic exact draft. When z-order prevents moving
+  // their authored wrapper into the top transform Layer, keep the wrapper in place, hide it once,
+  // and present the replanned vector in that Layer instead. This is the office-editor convention:
+  // the actively transformed object rides above the page during the gesture, while pointer-up
+  // restores the authored stacking order and remains the only document mutation.
+  const vectorOverlayFallbackEligible = element.kind === "line" || element.kind === "arrow";
+  let vectorOverlayClaimed = false;
   let clipHost: StudioLiveTransformClipHost | null = null;
   let originalClip: StudioLiveTransformClipRect | null = null;
   let previewSession: ReturnType<typeof createStudioLiveTransformPreviewSession> | null = null;
@@ -380,9 +387,13 @@ export function beginStudioKonvaDrawTransformGesture(
     }
   };
 
-  const claimIsolatedSource = (): boolean => {
+  const claimPreviewSourceAuthority = (): boolean => {
     if (sourceLift && !sourceLift.restored) return true;
-    if (sourceIsolationUnavailable) return false;
+    if (vectorOverlayClaimed) return true;
+    if (sourceIsolationUnavailable) {
+      vectorOverlayClaimed = vectorOverlayFallbackEligible;
+      return vectorOverlayClaimed;
+    }
     const claimed = beginStudioSingleDrawTransformSourceLayer({
       elementId: snapshot.elementId,
       wrapper: node,
@@ -391,7 +402,8 @@ export function beginStudioKonvaDrawTransformGesture(
     });
     if (!claimed) {
       sourceIsolationUnavailable = true;
-      return false;
+      vectorOverlayClaimed = vectorOverlayFallbackEligible;
+      return vectorOverlayClaimed;
     }
     sourceLift = claimed;
     sourceVisible = node.visible();
@@ -408,6 +420,16 @@ export function beginStudioKonvaDrawTransformGesture(
    * document Layer and is neither transformed nor included in the chrome canvas redraw.
    */
   const returnSourceToDocumentLayer = (): void => {
+    if (vectorOverlayClaimed) {
+      if (sourceHiddenForDraft || draftClaim?.hasPresentation() === true) {
+        transferAuthorityToSource("clear", () => {
+          resetStudioLiveTransformPreviewNodeAttrs(node);
+          terminalDraft = null;
+        });
+      }
+      vectorOverlayClaimed = false;
+      return;
+    }
     if (!sourceLift) return;
     if (!sourceLift.restored) {
       transferAuthorityToSource("clear", () => {
@@ -431,7 +453,7 @@ export function beginStudioKonvaDrawTransformGesture(
     frame: StudioLiveSelectionTransformFrame,
   ): DrawEl | null => {
     if (!draftClaim) return null;
-    if (!frameAdmitted(frame) || !claimIsolatedSource()) {
+    if (!frameAdmitted(frame) || !claimPreviewSourceAuthority()) {
       returnSourceToDocumentLayer();
       return null;
     }
@@ -447,7 +469,7 @@ export function beginStudioKonvaDrawTransformGesture(
     }
     const transformed = plan.element;
     let published = false;
-    mutateAndDrawSourceLayerSynchronously(() => {
+    const publishExactDraft = (): void => {
       flushDraftPublication(() => {
         draftClaim?.present([{
           element: transformed,
@@ -475,7 +497,26 @@ export function beginStudioKonvaDrawTransformGesture(
       hideSourceForDraft();
       terminalDraft = transformed;
       published = true;
-    });
+    };
+    if (vectorOverlayClaimed) {
+      const sourceWasHidden = sourceHiddenForDraft;
+      const autoDrawEnabled = studioKonvaRuntime.autoDrawEnabled;
+      try {
+        // Publish the exact vector first, then remove the authored copy and paint both authority
+        // receipts in the same JavaScript turn. The first frame pays one document-Layer redraw;
+        // later pointer frames touch only the small transform Layer.
+        studioKonvaRuntime.autoDrawEnabled = false;
+        publishExactDraft();
+        if (published) {
+          if (!sourceWasHidden) node.getLayer()?.drawScene();
+          dragLayer?.drawScene();
+        }
+      } finally {
+        studioKonvaRuntime.autoDrawEnabled = autoDrawEnabled;
+      }
+    } else {
+      mutateAndDrawSourceLayerSynchronously(publishExactDraft);
+    }
     if (!published) {
       returnSourceToDocumentLayer();
       return null;
@@ -632,7 +673,7 @@ export function beginStudioKonvaDrawTransformGesture(
             targetBounds: frame.targetBounds,
             rotationDeg: frame.rotationDeg,
           };
-          if (!frameAdmitted(gestureFrame) || !claimIsolatedSource()) {
+          if (!frameAdmitted(gestureFrame) || !claimPreviewSourceAuthority()) {
             returnSourceToDocumentLayer();
             return false;
           }

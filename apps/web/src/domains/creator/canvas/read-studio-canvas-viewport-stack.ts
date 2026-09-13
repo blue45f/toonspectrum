@@ -8,6 +8,7 @@ export const STUDIO_CANVAS_VIEWPORT_STACK = [
   "studio-canvas-viewport-interaction.ts",
   "StudioCanvasViewportDocumentLayer.tsx",
   "StudioCanvasViewportToolLayers.tsx",
+  "../StudioLiveTransformLayer.tsx",
   "StudioCanvasViewportStageHost.tsx",
   "StudioCanvasViewportDomOverlays.tsx",
   "StudioCanvasViewportHudOverlays.tsx",
