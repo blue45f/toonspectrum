@@ -5,6 +5,7 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { drawLiveFreehandDraftToContext } from "../brush/studio-draw-rendering";
 import { StudioBrushCursor } from "../brush/StudioBrushCursor";
+import { StudioLiveTransformLayer } from "../StudioLiveTransformLayer";
 import { StudioLiveTransformDraftNode } from "../StudioLiveTransformDraftNode";
 import { CANVAS_W } from "../studio-assets";
 import { StudioDraftPreviewLayers } from "../StudioDraftPreviewLayers";
@@ -300,16 +301,13 @@ export function StudioCanvasViewportToolLayers({
                 then repaints this tiny layer per pointer frame instead of rasterizing every
                 committed stroke/image in the document layer. Composite-sensitive and grouped
                 objects deliberately stay on the authoritative main layer. */}
-            <Layer
-              ref={singleObjectDragLayerRef}
-              name="studio-single-object-drag-layer"
-            >
+            <StudioLiveTransformLayer layerRef={singleObjectDragLayerRef}>
               <StudioLiveTransformDraftNode
                 store={liveTransformDraftStore}
                 scope={liveTransformDraftScope}
                 paperSurface={paperSurfaceForLiveTransform}
               />
-            </Layer>
+            </StudioLiveTransformLayer>
             {/* 라이브 프리핸드 초안은 전용 레이어에서만 다시 그린다: 포인터 프레임마다 메인
                 레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
                 일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.
