@@ -1,92 +1,43 @@
 import { studioCreationPreset } from "./studio-creation-presets";
+import {
+  canonicalDocuments,
+  DOCUMENT_KIND_SET,
+  MAX_DOCUMENTS_PER_PROJECT,
+  readStudioProjectDocuments,
+  STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT,
+  studioProjectDocumentStorageKey,
+  validIdentity,
+  validTimestamp,
+} from "./studio-project-document-reader";
+
+import type {
+  CreateStudioProjectDocumentInput,
+  StudioDocumentKind,
+  StudioDocumentWorkspace,
+  StudioProjectDocumentEntry,
+  StudioProjectDocumentEventTarget,
+  StudioProjectDocumentState,
+  StudioProjectDocumentStorage,
+} from "./studio-project-document-reader";
 import type { StudioProjectKind } from "./studio-project-library-store";
 
-export const STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT =
-  "toonspectrum:studio-project-documents-updated";
-
-export const STUDIO_DOCUMENT_KINDS = [
-  "webtoon",
-  "illustration",
-  "image",
-  "design",
-  "slides",
-  "storyboard",
-  "whiteboard",
-  "three-d",
-  "animation",
-  "motion",
-  "audio",
-  "localization",
-] as const;
-
-export const STUDIO_DOCUMENT_WORKSPACES = [
-  "draw",
-  "comic",
-  "image",
-  "design",
-  "slides",
-  "storyboard",
-  "whiteboard",
-  "3d",
-  "animation",
-  "motion",
-  "audio",
-  "localization",
-  "review",
-] as const;
-
-export type StudioDocumentKind = (typeof STUDIO_DOCUMENT_KINDS)[number];
-export type StudioDocumentWorkspace = (typeof STUDIO_DOCUMENT_WORKSPACES)[number];
-export type StudioDocumentStatus = "active" | "archived" | "trashed";
-
-export interface StudioProjectDocumentEntry {
-  readonly id: string;
-  readonly projectId: string;
-  readonly title: string;
-  readonly kind: StudioDocumentKind;
-  readonly status: StudioDocumentStatus;
-  readonly statusBeforeTrash: Exclude<StudioDocumentStatus, "trashed"> | null;
-  readonly defaultWorkspace: StudioDocumentWorkspace;
-  readonly allowedWorkspaces: readonly StudioDocumentWorkspace[];
-  readonly width: number | null;
-  readonly height: number | null;
-  readonly pageCount: number;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-  readonly lastOpenedAt: string;
-}
-
-export interface StudioProjectDocumentState {
-  readonly schemaVersion: 1;
-  readonly projectId: string;
-  readonly documents: readonly StudioProjectDocumentEntry[];
-  readonly updatedAt: string;
-}
-
-export interface StudioProjectDocumentStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-export interface StudioProjectDocumentEventTarget {
-  dispatchEvent(event: Event): boolean;
-}
-
-export interface CreateStudioProjectDocumentInput {
-  readonly id?: string;
-  readonly title: string;
-  readonly kind: StudioDocumentKind;
-  readonly defaultWorkspace?: StudioDocumentWorkspace;
-  readonly width?: number | null;
-  readonly height?: number | null;
-  readonly pageCount?: number;
-  readonly createdAt?: string;
-}
-
-const DOCUMENT_KIND_SET = new Set<string>(STUDIO_DOCUMENT_KINDS);
-const DOCUMENT_WORKSPACE_SET = new Set<string>(STUDIO_DOCUMENT_WORKSPACES);
-const DOCUMENT_STATUS_SET = new Set<string>(["active", "archived", "trashed"]);
-const MAX_DOCUMENTS_PER_PROJECT = 10_000;
+export {
+  readStudioProjectDocuments,
+  STUDIO_DOCUMENT_KINDS,
+  STUDIO_DOCUMENT_WORKSPACES,
+  STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT,
+  studioProjectDocumentStorageKey,
+} from "./studio-project-document-reader";
+export type {
+  CreateStudioProjectDocumentInput,
+  StudioDocumentKind,
+  StudioDocumentStatus,
+  StudioDocumentWorkspace,
+  StudioProjectDocumentEntry,
+  StudioProjectDocumentEventTarget,
+  StudioProjectDocumentState,
+  StudioProjectDocumentStorage,
+} from "./studio-project-document-reader";
 
 const workspaceList = (
   ...workspaces: StudioDocumentWorkspace[]
@@ -117,30 +68,6 @@ const PROJECT_DEFAULT_DOCUMENT: Readonly<Record<StudioProjectKind, StudioDocumen
   "three-d": "three-d",
   animation: "animation",
 });
-
-function validTimestamp(value: unknown): value is string {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
-}
-
-function validIdentity(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  const normalized = value.trim();
-  if (
-    !normalized
-    || normalized.length > 160
-    || normalized !== value
-    || normalized === "."
-    || normalized === ".."
-    || normalized.includes("\\")
-  ) {
-    return false;
-  }
-  for (let index = 0; index < normalized.length; index += 1) {
-    const code = normalized.charCodeAt(index);
-    if (code <= 31 || code === 127) return false;
-  }
-  return true;
-}
 
 function normalizedTitle(value: string): string {
   const title = value.trim().replace(/\s+/gu, " ");
@@ -195,109 +122,6 @@ function generatedDocumentId(
     attempt += 1;
   }
   throw new Error("A unique document id could not be created.");
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-function parseDocument(value: unknown, projectId: string): StudioProjectDocumentEntry | null {
-  const item = record(value);
-  if (!item || item.projectId !== projectId || !validIdentity(item.id)) return null;
-  if (typeof item.title !== "string" || !item.title.trim()) return null;
-  if (typeof item.kind !== "string" || !DOCUMENT_KIND_SET.has(item.kind)) return null;
-  if (typeof item.status !== "string" || !DOCUMENT_STATUS_SET.has(item.status)) return null;
-  if (typeof item.defaultWorkspace !== "string" || !DOCUMENT_WORKSPACE_SET.has(item.defaultWorkspace)) {
-    return null;
-  }
-  if (!Array.isArray(item.allowedWorkspaces)) return null;
-  const allowedWorkspaces = item.allowedWorkspaces
-    .filter((workspace): workspace is StudioDocumentWorkspace => (
-      typeof workspace === "string" && DOCUMENT_WORKSPACE_SET.has(workspace)
-    ));
-  if (!allowedWorkspaces.includes(item.defaultWorkspace as StudioDocumentWorkspace)) return null;
-  if (!validTimestamp(item.createdAt) || !validTimestamp(item.updatedAt) || !validTimestamp(item.lastOpenedAt)) {
-    return null;
-  }
-  const status = item.status as StudioDocumentStatus;
-  return Object.freeze({
-    id: item.id,
-    projectId,
-    title: item.title.trim().slice(0, 120),
-    kind: item.kind as StudioDocumentKind,
-    status,
-    statusBeforeTrash: status === "trashed"
-      ? item.statusBeforeTrash === "archived" ? "archived" : "active"
-      : null,
-    defaultWorkspace: item.defaultWorkspace as StudioDocumentWorkspace,
-    allowedWorkspaces: Object.freeze([...new Set(allowedWorkspaces)]),
-    width: Number.isSafeInteger(item.width) && Number(item.width) > 0 ? Number(item.width) : null,
-    height: Number.isSafeInteger(item.height) && Number(item.height) > 0 ? Number(item.height) : null,
-    pageCount: Number.isSafeInteger(item.pageCount) && Number(item.pageCount) > 0
-      ? Number(item.pageCount)
-      : 1,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
-    lastOpenedAt: item.lastOpenedAt,
-  });
-}
-
-function emptyState(projectId: string, at = new Date().toISOString()): StudioProjectDocumentState {
-  if (!validIdentity(projectId)) throw new Error("A valid project id is required.");
-  if (!validTimestamp(at)) throw new Error("A valid document-library timestamp is required.");
-  return Object.freeze({
-    schemaVersion: 1,
-    projectId,
-    documents: Object.freeze([]),
-    updatedAt: at,
-  });
-}
-
-function canonicalDocuments(
-  documents: readonly StudioProjectDocumentEntry[],
-): readonly StudioProjectDocumentEntry[] {
-  const byId = new Map<string, StudioProjectDocumentEntry>();
-  for (const document of documents) byId.set(document.id, Object.freeze({ ...document }));
-  return Object.freeze([...byId.values()].sort((left, right) => {
-    const order = { active: 0, archived: 1, trashed: 2 } as const;
-    return order[left.status] - order[right.status]
-      || Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt)
-      || left.title.localeCompare(right.title);
-  }));
-}
-
-export function studioProjectDocumentStorageKey(projectId: string): string {
-  if (!validIdentity(projectId)) throw new Error("A valid project id is required.");
-  return `toonspectrum:studio-project-documents:v1:${encodeURIComponent(projectId)}`;
-}
-
-export function readStudioProjectDocuments(
-  storage: StudioProjectDocumentStorage,
-  projectId: string,
-): StudioProjectDocumentState {
-  const fallback = emptyState(projectId);
-  const raw = storage.getItem(studioProjectDocumentStorageKey(projectId));
-  if (!raw) return fallback;
-  try {
-    const parsed = record(JSON.parse(raw));
-    if (!parsed || parsed.schemaVersion !== 1 || parsed.projectId !== projectId || !Array.isArray(parsed.documents)) {
-      return fallback;
-    }
-    const documents = parsed.documents
-      .slice(0, MAX_DOCUMENTS_PER_PROJECT)
-      .map((document) => parseDocument(document, projectId))
-      .filter((document): document is StudioProjectDocumentEntry => document !== null);
-    return Object.freeze({
-      schemaVersion: 1,
-      projectId,
-      documents: canonicalDocuments(documents),
-      updatedAt: validTimestamp(parsed.updatedAt) ? parsed.updatedAt : fallback.updatedAt,
-    });
-  } catch {
-    return fallback;
-  }
 }
 
 export function writeStudioProjectDocuments(

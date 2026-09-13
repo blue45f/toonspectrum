@@ -11,9 +11,9 @@ import {
 } from "./studio-original-free-asset-packs";
 
 describe("ToonStudio original free starter asset packs", () => {
-  it("ships nine selectable packages and 72 unique non-blockout SVG assets", () => {
-    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(9);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(72);
+  it("preserves the starter catalog and adds 24 reviewed architectural illustrations", () => {
+    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(11);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(96);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.map((pkg) => pkg.id)).size)
       .toBe(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.length);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.id)).size)
@@ -36,7 +36,7 @@ describe("ToonStudio original free starter asset packs", () => {
         cloudSync: "unavailable",
       });
       expect(pkg.license).toBe(STUDIO_ORIGINAL_FREE_ASSET_LICENSE);
-      expect(pkg.includedItems).toHaveLength(8);
+      expect(pkg.includedItems).toHaveLength(pkg.id === "original-quality-20260913-street-and-living" ? 16 : 8);
       for (const asset of pkg.includedItems) {
         expect(asset.packageId).toBe(pkg.id);
         expect(asset.origin).toBe("original-procedural");

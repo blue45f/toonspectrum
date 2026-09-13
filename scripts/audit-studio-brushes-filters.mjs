@@ -16,8 +16,6 @@ async function dismissChrome(page) {
   }
   const dismissers = [
     "호환 모드로 계속하기",
-    "임시저장본 영구 삭제",
-    "비우기",
     "닫기",
     "레이어 필터 닫기",
   ];

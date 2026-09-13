@@ -8,10 +8,11 @@
 import { Maximize2 } from "lucide-react";
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
-import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter";
+import { lazy, Suspense } from "react";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
+import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
 import { Container } from "@/shared/components/container";
 import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorChrome } from "./StudioCuttoonEditorChrome";
@@ -21,7 +22,11 @@ import { StudioCuttoonEditorHosts } from "./StudioCuttoonEditorHosts";
 import { StudioCuttoonEditorWorkspace } from "./StudioCuttoonEditorWorkspace";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
+const StudioDraftSaveCenter = lazy(() => import("../StudioDraftSaveCenter").then((module) => ({ default: module.StudioDraftSaveCenter })));
+
 export type { StudioCuttoonEditorViewSession };
+
+const CHROME_LAYOUT = { version: 2, xRatio: 0.3, yRatio: 0.08, width: 980, height: 220, dock: "free", positionLocked: false, sizeLocked: false } as const;
 
 export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
   const {
@@ -130,9 +135,21 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           (isFullscreen || maximized) && "min-h-0"
         )}
       >
-        <StudioCuttoonEditorChrome {...s} />
+        <StudioWorkspaceRegion
+          surfaceId="top-chrome"
+          label="상단 메뉴·도구"
+          defaultLayout={CHROME_LAYOUT}
+          minWidth={560}
+          minHeight={160}
+          disabled={isMobile || canvasOnlyMode || mobileImmersive}
+          className="w-full"
+        >
+          <StudioCuttoonEditorChrome {...s} />
+        </StudioWorkspaceRegion>
+        <Suspense fallback={null}>
         <StudioDraftSaveCenter
-          key={s.effectiveWorkId ?? s.workId ?? "new-work"}
+          key={JSON.stringify([s.saveIntentScope, s.effectiveWorkId ?? s.workId ?? "new-work"])}
+          saveIntentScope={s.saveIntentScope}
           saving={s.saving}
           workId={s.workId}
           workHydrated={s.workHydrated}
@@ -156,6 +173,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           onOpenVersions={() => s.setCheckpointPanelOpen(true)}
           onExportBackup={() => s.studioMenubarContentHandlers.handleExportProject()}
         />
+        </Suspense>
         <StudioCuttoonEditorWorkspace {...s} />
         <StudioCuttoonEditorContextMenu {...s} />
       </Container>

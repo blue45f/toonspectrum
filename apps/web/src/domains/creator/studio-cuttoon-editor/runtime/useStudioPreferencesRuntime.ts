@@ -22,7 +22,7 @@ import { acquireProductStudioUiPreferencesRepository } from "../../studio-legacy
 import { applyStudioLaunchDensity, readStudioLaunchDensity } from "../../studio-launch-mode";
 
 import type { StudioDocumentWorkspaceId } from "../../studio-document-workspace";
-import { projectStudioTaskAppSettings } from "../../studio-task-tools";
+import { preserveStudioTaskToolbarPreference, projectStudioTaskAppSettings } from "../../studio-task-tools";
 import type { StudioUiDensityMode } from "../../studio-ui-density";
 import type { StudioUiBooleanPreferenceKey } from "../../studio-ui-preferences-sqlite";
 
@@ -201,13 +201,16 @@ export function useStudioPreferencesRuntime({
     persistAppSettings(next);
   }, [persistAppSettings]);
 
-  const commitAppSettings = useCallback((next: StudioAppSettings): void => {
+  const commitAppSettings = useCallback((proposed: StudioAppSettings): void => {
+    const stored = appSettingsRef.current;
+    const next = preserveStudioTaskToolbarPreference(stored,
+      projectStudioTaskAppSettings(stored, taskWorkspace, stored.general.densityMode), proposed);
     appSettingsRef.current = next;
     setAppSettings(next);
     persistAppSettings(next);
     setUiDensityMode(next.general.densityMode);
     applyMirroredSettingsRef.current(next);
-  }, [persistAppSettings]);
+  }, [persistAppSettings, taskWorkspace]);
 
   // Effect Events cannot cross a custom-hook boundary. The public command remains stable while the
   // callback refs above keep its host-owned side effects current without restarting hydration.

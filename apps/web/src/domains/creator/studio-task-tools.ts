@@ -27,3 +27,18 @@ export function projectStudioTaskAppSettings(
   if (!tools) return settings;
   return { ...settings, toolbar: { ...settings.toolbar, visibleIds: [...tools] } };
 }
+
+/** Unchanged recommendations are presentation, not a user toolbar customization. */
+export function preserveStudioTaskToolbarPreference(
+  stored: StudioAppSettings,
+  presented: StudioAppSettings,
+  next: StudioAppSettings,
+): StudioAppSettings {
+  if (presented === stored) return next;
+  const visible = next.toolbar.visibleIds;
+  const unchanged = visible.length === presented.toolbar.visibleIds.length
+    && visible.every((id, index) => id === presented.toolbar.visibleIds[index]);
+  return unchanged
+    ? { ...next, toolbar: { ...next.toolbar, visibleIds: stored.toolbar.visibleIds } }
+    : next;
+}

@@ -1,5 +1,6 @@
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
+import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
@@ -499,6 +500,7 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
+import { finitePositiveGroupResizeBounds } from "./studio-group-resize-bounds";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import { planHealCloneDabs } from "./studio-heal-clone";
@@ -1055,7 +1057,6 @@ import {
   normalizedPointToCanvas,
   planSelectionAdjust,
   rasterizeSelectionMask,
-  resolvePixelSelectionAutoTarget,
   resolveSelectionCombineOverride,
   selectAllPixels,
   selectionCombineModeForOperation,
@@ -1067,7 +1068,6 @@ import {
   translateSelection,
   updateSelectionDrag,
   type PixelSelection,
-  type PixelSelectionAutoTargetCandidate,
   type PixelSelectionAutoTargetResolution,
   type PolyLassoSession,
   type SelectionAdjustPlan,
@@ -1230,7 +1230,7 @@ import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canva
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
-  studio2dHref,
+  studio2dSurfaceNavigationHref,
   type Studio2dWorkspaceSurface,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
@@ -4260,18 +4260,6 @@ export function StudioCuttoonEditor({
       announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
     }
   }
-  function finitePositiveGroupResizeBounds(
-    bounds: StudioGroupUniformResizeBounds
-  ): boolean {
-    return (
-      Number.isFinite(bounds.x) &&
-      Number.isFinite(bounds.y) &&
-      Number.isFinite(bounds.width) &&
-      Number.isFinite(bounds.height) &&
-      bounds.width > 0 &&
-      bounds.height > 0
-    );
-  }
   /**
    * Active resize target IDs: multi-marquee first, else single selected object.
    * Single draw free-scale uses the same uniform-resize planner as groups (CSP-style).
@@ -5618,12 +5606,7 @@ export function StudioCuttoonEditor({
   ) {
     if (studioRoute.surface === surface && options?.force !== true) return;
     navigate(
-      studio2dHref({
-        remixSourceWorkId: studioRoute.remixSourceWorkId,
-        search: location.search,
-        surface,
-        workId: studioRoute.workId,
-      }),
+      studio2dSurfaceNavigationHref(studioRoute, surface, location.search),
       // 패널을 닫아 표면이 canvas 로 내려오는 항목은 히스토리를 쌓지 않는다 — 뒤로가기가
       // "방금 닫은 패널을 다시 여는" 계단이 되면 라우트 대칭의 의미가 없다.
       options?.replace === true ? { replace: true } : undefined,
@@ -7661,9 +7644,7 @@ export function StudioCuttoonEditor({
     workId,
   ]);
 
-  // 아래 여섯 동작의 본문은 studio-page-autosave-runtime.ts 로 옮겼다(2026-08, B-17).
-  // 페이지에는 얇은 래퍼 함수 선언만 남긴다 — effect 안에서 참조되는 심볼의 참조 안정성을
-  // react-hooks/exhaustive-deps 가 컴포넌트 스코프 함수 선언에 대해서만 전이 증명하기 때문이다.
+  // Autosave runtime owns these actions; wrappers preserve effect dependency tracking.
   function prepareStudioDocumentReplacement(
     label: string,
     options: { flushPending: boolean } = { flushPending: false }
@@ -7738,28 +7719,25 @@ export function StudioCuttoonEditor({
     });
   }
 
-  function clearAutosaveRecord(canClearAutosave: () => boolean) {
-    return clearStudioAutosaveRecord({
-      canClearAutosave,
-      autosaveKey,
-      autosaveRecoveryCandidateRef,
-      clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
-        autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
-      }),
-      remixId,
-      setAutosaveRestoreBlockedReason,
-      setHasAutosave,
-      workId,
-    });
-  }
-
   /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
+    const canClearAutosave = () => canApplyStudioMutation(ticket);
     await requestStudioAutosaveClear({
-      canClearAutosave: () => canApplyStudioMutation(ticket),
+      canClearAutosave,
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord: () => clearAutosaveRecord(() => canApplyStudioMutation(ticket)),
+      clearAutosaveRecord: () => clearStudioAutosaveRecord({
+        canClearAutosave,
+        autosaveKey,
+        autosaveRecoveryCandidateRef,
+        clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+          autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+        }),
+        remixId,
+        setAutosaveRestoreBlockedReason,
+        setHasAutosave,
+        workId,
+      }),
     });
   }
 
@@ -14189,22 +14167,8 @@ const pixelToolArmed =
   // arm-anytime(2026-07-24) — 포인터 아래 최상단의 편집 가능 이미지를 결정한다(순수 리졸버 위임).
   // 이미지 후보만 위→아래 z순서로 모아 넘긴다(숨김/잠금 판정은 그룹 상속까지 포함). 검토잠금
   // 표면에서는 후보를 비워 항상 none — 작업에셋 파괴잠금은 획득 후 커밋 단계에서 재차 가드된다.
-  const acquirePixelSelectionAutoTarget = (
-    pos: { x: number; y: number },
-  ): PixelSelectionAutoTargetResolution => {
-    if (activeSurfaceReviewLocked) return { kind: "none" };
-    const candidates: PixelSelectionAutoTargetCandidate[] = [];
-    for (const el of elements) {
-      if (el.type !== "image") continue;
-      candidates.push({
-        id: el.id,
-        frame: { x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation },
-        hidden: isEffectivelyHidden(el, groups),
-        locked: isEffectivelyLocked(el, groups),
-      });
-    }
-    return resolvePixelSelectionAutoTarget(candidates, pos);
-  };
+  const acquirePixelSelectionAutoTarget = (pos: { x: number; y: number }): PixelSelectionAutoTargetResolution =>
+    resolvePixelSelectionSceneTarget(elements, groups, pos, activeSurfaceReviewLocked);
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
   const pixelOverlayFrame: SelectionFrame | null = useMemo(
     () => selected?.type === "image"
@@ -26218,8 +26182,7 @@ function clearSelectionForEdit() {
     } | null;
     readonly recoveredMasterStroke?: DrawEl | null;
   } = {}): StudioProjectSnapshot {
-    // Immediate pointerup commits advance these refs before React renders, closing the same-task
-    // route/pagehide gap where this render's `pages` could still be one stroke behind.
+    // Ref-backed pointerup commits protect route/pagehide snapshots before React renders.
     const pendingBatch = options.pendingStrokeCommits === undefined
       ? pendingStrokeCommitsRef.current
       : options.pendingStrokeCommits;
@@ -29249,6 +29212,7 @@ function clearSelectionForEdit() {
       storyboardGridOpen={storyboardGridOpen}
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
+      saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}

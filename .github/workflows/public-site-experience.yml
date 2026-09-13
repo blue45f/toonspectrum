@@ -1,0 +1,114 @@
+name: Public site experience
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-site-experience.yml'
+      - 'scripts/*public-site-experience.mjs'
+      - 'apps/web/src/shared/components/public-site-*'
+      - 'apps/web/src/shared/components/site-public-routes.ts'
+      - 'apps/web/src/app/PublicSite*'
+      - 'apps/web/src/app/public-site-*'
+      - 'apps/web/src/app/App.tsx'
+      - 'apps/web/src/app/AppShell.tsx'
+      - 'apps/web/src/domains/catalog/SearchPage*'
+      - 'apps/web/src/components/NotFoundPage.tsx'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-site-experience-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  production-observation:
+    name: Read-only production browser observation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            apps/web/src/app/routes/groups
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install isolated, pinned browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/public-site-browser" --no-save --ignore-scripts playwright@1.62.1
+          node "$RUNNER_TEMP/public-site-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          cp scripts/audit-public-site-experience.mjs "$RUNNER_TEMP/public-site-browser/audit.mjs"
+      - name: Observe public routes without submitting forms or entering Studio
+        env:
+          AUDIT_REPOSITORY: ${{ github.workspace }}
+          AUDIT_OUTPUT: ${{ github.workspace }}/public-site-audit
+          AUDIT_BASE_URL: https://www.toonstudio.cloud
+        run: node "$RUNNER_TEMP/public-site-browser/audit.mjs"
+      - name: Keep screenshots and complete coverage inventory
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-site-production-observation
+          path: public-site-audit
+          retention-days: 7
+
+  candidate-regression:
+    name: Public site candidate regression gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Navigation, search, storage and public boundary regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/app/public-site-scroll.test.ts \
+            apps/web/src/app/RouteScrollRestoration.fragment.test.tsx \
+            apps/web/src/app/public-site-storage.test.ts \
+            apps/web/src/app/public-site-wiring.test.ts \
+            apps/web/src/shared/components/public-site-pathways.test.ts \
+            apps/web/src/shared/components/public-site-experience.test.tsx \
+            apps/web/src/domains/catalog/SearchPage.navigation.test.tsx \
+            apps/web/src/domains/catalog/SearchPage.fragment-navigation.test.tsx
+      - name: Build the exact candidate production bundle
+        run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Real browser layout, keyboard, history and recovery checks
+        run: |
+          set -euo pipefail
+          pnpm exec vite preview --host 127.0.0.1 --port 5281 > /tmp/public-site-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:5281/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/verify-public-webtoon-experience.mjs
+          node scripts/verify-public-site-experience.mjs
+          AUDIT_BASE_URL=http://127.0.0.1:5281 AUDIT_OUTPUT=artifacts/public-site-candidate-inventory node scripts/audit-public-site-experience.mjs
+      - name: Keep candidate screenshots and check results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-site-candidate-evidence
+          path: |
+            artifacts/public-webtoon-experience
+            artifacts/public-site-experience
+            artifacts/public-site-candidate-inventory
+          retention-days: 7

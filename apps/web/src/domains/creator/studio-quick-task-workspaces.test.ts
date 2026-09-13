@@ -6,7 +6,7 @@ import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
 import { readStudioLaunchDensity } from "./studio-launch-mode";
 import { createStudioProjectWithInitialDocument } from "./studio-project-creation";
 import { ensureInitialStudioProjectDocument } from "./studio-project-document-store";
-import { projectStudioTaskAppSettings } from "./studio-task-tools";
+import { preserveStudioTaskToolbarPreference, projectStudioTaskAppSettings } from "./studio-task-tools";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { createStudioWorkspaceDefaultState } from "./studio-workspaces";
 
@@ -75,6 +75,18 @@ describe("quick and task-specific studio workspaces", () => {
     const custom = { ...settings, toolbar: { ...settings.toolbar, visibleIds: ["pen" as const] } };
     expect(projectStudioTaskAppSettings(custom, "design", "simple")).toBe(custom);
     expect(projectStudioTaskAppSettings(custom, "draw", "focus")).toBe(custom);
+  });
+  it("does not save recommended tools when an unrelated preference changes", () => {
+    const stored = defaultStudioAppSettings();
+    const presented = projectStudioTaskAppSettings(stored, "draw", "focus");
+    const next = preserveStudioTaskToolbarPreference(stored, presented, {
+      ...presented, general: { ...presented.general, densityMode: "full" },
+    });
+    expect(next.toolbar.visibleIds).toEqual(stored.toolbar.visibleIds);
+    expect(next.general.densityMode).toBe("full");
+    expect(projectStudioTaskAppSettings(next, "draw", "full")).toBe(next);
+    const customized = { ...presented, toolbar: { ...presented.toolbar, visibleIds: ["pen" as const] } };
+    expect(preserveStudioTaskToolbarPreference(stored, presented, customized)).toBe(customized);
   });
   it("distinguishes quick, standard and complete launch modes", () => {
     expect(readStudioLaunchDensity("?uiMode=simple")).toBe("focus");

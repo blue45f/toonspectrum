@@ -1,5 +1,5 @@
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
-import { readStudioProjectDocuments, type StudioProjectDocumentStorage } from "./studio-project-document-store";
+import { readStudioProjectDocuments, type StudioProjectDocumentStorage } from "./studio-project-document-reader";
 import type { StudioWorkspaceRoute } from "./studio-workspace-route";
 
 export interface StudioLocalCanvasSeed { readonly canvasH: number; readonly title: string }

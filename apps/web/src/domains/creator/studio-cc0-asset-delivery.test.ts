@@ -119,9 +119,12 @@ describe("CC0 delivery catalog boundary", () => {
 describe("blockout-only starter retirement", () => {
   it("keeps eight draft backgrounds retired while the selectable catalog grows", () => {
     expect(STUDIO_RETIRED_ORIGINAL_FREE_ASSETS).toHaveLength(8);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(72);
-    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(9);
-    expect(filterStudioOriginalFreeAssets({categories: ["modern-background"]})).toHaveLength(0);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(96);
+    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(11);
+    const selectableBackgrounds = filterStudioOriginalFreeAssets({categories: ["modern-background"]});
+    expect(selectableBackgrounds).toHaveLength(8);
+    expect(selectableBackgrounds.every(asset => asset.id.startsWith("original-quality-20260913-"))).toBe(true);
+    expect(selectableBackgrounds.some(asset => STUDIO_RETIRED_ORIGINAL_FREE_ASSETS.some(retired => retired.id === asset.id))).toBe(false);
     for (const asset of STUDIO_RETIRED_ORIGINAL_FREE_ASSETS) {
       expect(findStudioOriginalFreeAsset(asset.id)).toBe(asset);
       expect(findStudioOriginalFreeAssetPackage(asset.packageId)?.includedItems).toContain(asset);

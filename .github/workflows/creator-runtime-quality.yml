@@ -1,0 +1,92 @@
+name: Creator runtime quality
+on:
+  push:
+    branches: ['feat/offline-inference-spatial-20260913']
+    paths:
+      - 'apps/web/public/offline-draw/**'
+      - 'apps/web/public/spatial-reader/**'
+      - 'apps/web/src/**'
+      - 'apps/api/src/modules/studio-ai/**'
+      - 'services/creator-inference/**'
+      - 'tools/creator-runtime/**'
+      - '.github/workflows/creator-runtime-quality.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/public/offline-draw/**'
+      - 'apps/web/public/spatial-reader/**'
+      - 'apps/web/src/app/service-worker/**'
+      - 'apps/web/src/domains/creator/ai/CreatorInference*'
+      - 'apps/api/src/modules/studio-ai/**'
+      - 'services/creator-inference/**'
+      - 'tools/creator-runtime/**'
+      - '.github/workflows/creator-runtime-quality.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: creator-runtime-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts-and-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            apps/web/public/offline-draw
+            apps/web/public/spatial-reader
+            apps/web/src/app/service-worker
+            services/creator-inference
+            tools/creator-runtime
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm install --prefix /tmp/creator-test typescript@6.0.3
+      - run: python -m pip install -r services/creator-inference/requirements-test.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Actual pure contracts and worker test bundle
+        env:
+          NODE_PATH: /tmp/creator-test/node_modules
+        run: |
+          node --test tools/creator-runtime/contracts.test.mjs
+          node tools/creator-runtime/build-portable.mjs --check
+          node tools/creator-runtime/compile-worker.mjs
+      - name: CPU API validation (not real model generation)
+        run: python -m pytest services/creator-inference/test_runtime.py -q --junitxml=creator-cpu-tests.xml
+      - name: Chromium offline drawing and origin outage
+        run: python tools/creator-runtime/offline-browser.py
+      - name: Chromium spatial reader and unsupported XR fallback
+        if: '!cancelled()'
+        run: python tools/creator-runtime/spatial-browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creator-runtime-evidence
+          path: |
+            creator-*-test-results.json
+            creator-cpu-tests.xml
+            creator-runtime-results/
+          retention-days: 7
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build

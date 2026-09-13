@@ -42,18 +42,31 @@ describe("spatial reader interaction", () => {
   it("maps RTL arrows on native navigation buttons without reversing sources", () => {
     render(<SpatialWebtoonReader title="RTL" direction="rtl" pages={["/one.png", "/two.png"]} onClose={vi.fn()} />);
     loaded(800, 1120); fireEvent.keyDown(screen.getByRole("button", { name: "다음 구간" }), { key: "ArrowLeft" });
-    expect(screen.getByAltText("RTL 2페이지 · 1구간").getAttribute("src")).toBe("/two.png");
+    expect(screen.getByAltText("RTL 2페이지 · 1구간").getAttribute("src")).toBe(new URL("/two.png", document.baseURI).href);
   });
   it("rejects non-raster local files without replacing the open work", () => {
     render(<SpatialWebtoonReader title="기존" pages={["/one.png"]} onClose={vi.fn()} />); loaded();
     fireEvent.change(screen.getByLabelText("공간 리더 원고 이미지 선택"), { target: { files: [new File(["bad"], "bad.svg", { type: "image/svg+xml" })] } });
     expect(screen.getByRole("alert").textContent).toContain("SVG");
-    expect(screen.getByRole("img").getAttribute("src")).toBe("/one.png");
+    expect(screen.getByRole("img").getAttribute("src")).toBe(new URL("/one.png", document.baseURI).href);
   });
   it("does not put unsupported source schemes in the DOM", () => {
     render(<SpatialWebtoonReader pages={["javascript:alert(1)"]} onClose={vi.fn()} />);
     expect(screen.queryByRole("img")).toBeNull(); expect(screen.getByRole("alert").textContent).toContain("이미지 주소");
   });
+  it("passes only the canonical image URL to the DOM", () => {
+    render(<SpatialWebtoonReader pages={["/page one.png?sig=a%2Fb&part=1"]} onClose={vi.fn()} />);
+    expect(screen.getByRole("img").getAttribute("src"))
+      .toBe(new URL("/page%20one.png?sig=a%2Fb&part=1", document.baseURI).href);
+  });
+  it.each(["javascript:alert(1)", "data:text/html;base64,PHN2Zz4=", "data:image/svg+xml;base64,PHN2Zz4=", "https://user:pass@example.com/page.png", "blob:https://other.test/id"])
+    ("removes the previous image when a new source is rejected: %s", (source) => {
+      const view = render(<SpatialWebtoonReader pages={["/one.png"]} onClose={vi.fn()} />);
+      loaded();
+      view.rerender(<SpatialWebtoonReader pages={[source]} onClose={vi.fn()} />);
+      expect(screen.queryByRole("img")).toBeNull();
+      expect(screen.getByRole("alert").textContent).toContain("이미지 주소");
+    });
   it("opens local pages in natural filename order and revokes URLs on close", () => {
     const createUrl = vi.fn((file: File) => `blob:${window.location.origin}/${file.name}`);
     const revoke = vi.fn(); vi.stubGlobal("URL", class extends URL { static createObjectURL = createUrl; static revokeObjectURL = revoke; });
