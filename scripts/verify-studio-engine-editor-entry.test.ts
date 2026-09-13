@@ -51,4 +51,14 @@ describe("production engine verifier entry", () => {
       expect(staticJob.split(target), `${target} must remain mandatory without duplicate execution`).toHaveLength(2);
     }
   });
+
+  it("loads the Living Ink worker harness from the workspace rather than the web root", () => {
+    const source = readFileSync(new URL("./verify-studio-living-ink-execution.mjs", import.meta.url), "utf8");
+    expect(source).not.toContain('const ENTRY = "/scripts/');
+    expect(source).toContain("const ENTRY = `/@fs/${normalizePath(fileURLToPath(");
+    expect(source).toContain('new URL("./studio-living-ink-execution-browser.ts", import.meta.url)');
+    expect(readFileSync(new URL("./studio-living-ink-execution-browser.ts", import.meta.url), "utf8"))
+      .toContain("__studioLivingInkExecutionResult");
+  });
+
 });
