@@ -1,5 +1,6 @@
 import {
   getStaticPolicyDocument,
+  isPolicySlug,
   parsePolicyDocument,
   TERMSDESK_BASE,
   TERMSDESK_ORG_SLUG,
@@ -12,6 +13,19 @@ const REFRESH_AFTER_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 3_000;
 
 type PolicyFetcher = (url: string, options: RequestInit) => Promise<Response>;
+
+// Request input only selects a fixed destination; it is never interpolated into a URL.
+// Keep the guard here as well as in the controller for non-HTTP callers.
+function policyEndpoint(slug: PolicySlug): string {
+  switch (slug) {
+    case "privacy-policy":
+      return `${TERMSDESK_BASE}/api/public/${TERMSDESK_ORG_SLUG}/policies/privacy-policy`;
+    case "terms-of-service":
+      return `${TERMSDESK_BASE}/api/public/${TERMSDESK_ORG_SLUG}/policies/terms-of-service`;
+    default:
+      throw new Error("policy_not_found");
+  }
+}
 
 async function readBoundedJson(response: Response): Promise<unknown> {
   const mediaType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
@@ -50,14 +64,11 @@ export function createPolicyResolver(
   async function refresh(slug: PolicySlug): Promise<PolicyDocument> {
     let document: PolicyDocument;
     try {
-      const response = await fetcher(
-        `${TERMSDESK_BASE}/api/public/${TERMSDESK_ORG_SLUG}/policies/${slug}`,
-        {
-          headers: { Accept: "application/json" },
-          redirect: "error",
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        },
-      );
+      const response = await fetcher(policyEndpoint(slug), {
+        headers: { Accept: "application/json" },
+        redirect: "error",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
       if (!response.ok) {
         await response.body?.cancel();
         throw new Error("policy_upstream_unavailable");
@@ -74,6 +85,7 @@ export function createPolicyResolver(
   }
 
   return async (slug: PolicySlug): Promise<PolicyDocument> => {
+    if (!isPolicySlug(slug)) throw new Error("policy_not_found");
     const entry = cache.get(slug);
     const age = entry ? now() - entry.checkedAt : -1;
     if (entry && age >= 0 && age < REFRESH_AFTER_MS) return { ...entry.document };

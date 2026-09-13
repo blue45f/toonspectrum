@@ -137,3 +137,33 @@ test("invalid upstream metadata is rejected before returning a published documen
     assert.throws(() => parsePolicyDocument({ ...live, ...change }, slug), /policy_payload_malformed/);
   }
 });
+
+test("direct resolver callers cannot inject URLs, paths, prototype keys or non-string slugs", async () => {
+  let calls = 0;
+  const read = createPolicyResolver(async () => { calls += 1; return response(); });
+  for (const value of [
+    "unknown", "__proto__", "constructor", "../privacy-policy", "Privacy-Policy",
+    "https://example.invalid/", "//example.invalid/", "privacy-policy?next=elsewhere",
+    "privacy-policy%2f..", "privacy-policy#fragment", "privacy-policy\u0000",
+    null, undefined, 0, {}, new String(slug),
+  ]) {
+    await assert.rejects(read(value), /policy_not_found/);
+  }
+  assert.equal(calls, 0, "invalid inputs must not reach fetch or create cache entries");
+  assert.equal((await read(slug)).source, "termsdesk");
+  assert.equal(calls, 1);
+});
+
+test("both valid policy inputs select only their fixed destinations and reject redirects", async () => {
+  const seen = [];
+  const read = createPolicyResolver(async (url, options) => {
+    seen.push({ url, redirect: options.redirect });
+    return new Response(null, { status: 302, headers: { location: "https://example.invalid/" } });
+  });
+  assert.equal((await read("privacy-policy")).source, "static");
+  assert.equal((await read("terms-of-service")).source, "static");
+  assert.deepEqual(seen, [
+    { url: "https://desk-platform.vercel.app/termsdesk/api/public/toonspectrum/policies/privacy-policy", redirect: "error" },
+    { url: "https://desk-platform.vercel.app/termsdesk/api/public/toonspectrum/policies/terms-of-service", redirect: "error" },
+  ]);
+});
