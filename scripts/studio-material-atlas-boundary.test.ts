@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createStudioManualChunks } from "../apps/web/config/vite-manual-chunks";
+
 import { verifyStudioMaterialAtlasBoundary } from "./verify-studio-material-atlas-boundary.mjs";
 
 const entry = "src/domains/creator/studio-legacy-editor-adapter.tsx";

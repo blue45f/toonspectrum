@@ -46,3 +46,6 @@ tests/benchmarks/
 # The API build explicitly runs this dependency-free Node contract test before
 # compilation. Preserve that build input; do not drop the runtime import guard.
 !scripts/verify-api-runtime-imports.test.mjs
+
+# The API build also runs the compiled legal-policy failover regression.
+!scripts/verify-legal-policy-failover.test.mjs
