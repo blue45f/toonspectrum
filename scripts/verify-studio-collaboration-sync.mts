@@ -22,6 +22,7 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
+import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -108,6 +109,11 @@ async function attachPage(
       `${request.method()} ${request.url()} :: ${request.failure()?.errorText ?? "unknown"}`,
     );
   });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      diagnostics.requestFailures.push(`${response.status()} ${response.request().method()} ${response.url()}`);
+    }
+  });
   await installStudioFirstRunState(page);
   return { page, diagnostics };
 }
@@ -156,40 +162,6 @@ async function waitForRoomUrl(page: Page): Promise<string> {
   return page.url();
 }
 
-
-/**
- * A production verification keeps the authenticated server-backed lane. A static Vite preview has
- * no Nest realtime-ticket endpoint, so its truthful browser contract is the user-visible
- * same-origin fallback. Switching through the real recovery UI keeps this proof end-to-end while
- * avoiding a false failure caused by an intentionally absent preview backend.
- */
-async function ensureLocalPreviewTransport(page: Page, label: string): Promise<void> {
-  if (EXISTING_ORIGIN) return;
-
-  const liveMode = page.locator("[data-studio-live-mode]").first();
-  const initialMode = await liveMode
-    .getAttribute("data-studio-live-mode", { timeout: 800 })
-    .catch(() => null);
-  if (initialMode === "local") return;
-
-  const localModeControl = page
-    .getByRole("button", { name: "로컬 탭 모드", exact: true })
-    .or(page.getByRole("button", { name: /로컬.*(?:탭|동기화|모드)/ }))
-    .or(
-      page.locator(
-        '[data-testid*="local"][data-testid*="transport"], [data-transport="local"]',
-      ),
-    )
-    .first();
-
-  // Newer Studio shells may enter the local BroadcastChannel lane automatically.
-  // Use the legacy recovery control when it is present; the following two-tab
-  // document convergence assertions remain the authoritative transport proof.
-  if (await localModeControl.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await localModeControl.click();
-  }
-  log(`${label} uses the same-origin collaboration fallback`);
-}
 async function waitForDocumentLane(
   page: Page,
   diagnostics: PageDiagnostics,
@@ -419,6 +391,7 @@ try {
     locale: "ko-KR",
     reducedMotion: "reduce",
   });
+  report.sessionBoundary = await installStudioCollaborationPreviewSession(context, ownedOrigin);
 
   const attachedA = await attachPage(context, "A");
   diagnostics.push(attachedA.diagnostics);
@@ -428,7 +401,6 @@ try {
   await waitForCanvasSurface(pageA);
   await dismissOverlays(pageA);
   const roomUrl = await waitForRoomUrl(pageA);
-  await ensureLocalPreviewTransport(pageA, "A");
   const phaseA = await waitForDocumentLane(pageA, attachedA.diagnostics);
 
   const attachedB = await attachPage(context, "B");
@@ -438,7 +410,6 @@ try {
   await pageB.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await waitForCanvasSurface(pageB);
   await dismissOverlays(pageB);
-  await ensureLocalPreviewTransport(pageB, "B");
   const phaseB = await waitForDocumentLane(pageB, attachedB.diagnostics);
 
   await pageA.waitForTimeout(700);
@@ -469,7 +440,6 @@ try {
   await pageC.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await waitForCanvasSurface(pageC);
   await dismissOverlays(pageC);
-  await ensureLocalPreviewTransport(pageC, "C");
   const phaseC = await waitForDocumentLane(pageC, attachedC.diagnostics);
   const lateJoinC = await settleCanvas(pageC);
   assert.ok(
@@ -506,11 +476,22 @@ try {
     "uncaught browser page errors were observed",
   );
 } catch (error) {
+  report.status = "FAIL";
   report.error = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
   report.diagnostics = diagnostics;
   for (const [index, page] of browser.contexts().flatMap((context) => context.pages()).entries()) {
     await page.screenshot({ path: join(SCRATCH, `failure-tab-${index}.png`), fullPage: true }).catch(() => undefined);
-    report[`failureTab${index}`] = { url: page.url(), body: await page.locator("body").innerText().catch(() => "unavailable") };
+    report[`failureTab${index}`] = {
+      url: page.url(),
+      body: await page.locator("body").innerText().catch(() => "unavailable"),
+      runtime: await page.evaluate(() => ({
+        isolated: globalThis.crossOriginIsolated,
+        secure: globalThis.isSecureContext,
+        storage: typeof navigator.storage?.getDirectory,
+        modes: [...document.querySelectorAll("[data-studio-live-mode]")].map((node) => node.getAttribute("data-studio-live-mode")),
+        phases: [...document.querySelectorAll("[data-studio-sync-phase]")].map((node) => node.getAttribute("data-studio-sync-phase")),
+      })).catch(() => null),
+    };
   }
   throw error;
 } finally {

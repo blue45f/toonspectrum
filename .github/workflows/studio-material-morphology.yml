@@ -7,14 +7,18 @@ on:
       - apps/web/src/domains/creator/brush/**
       - apps/web/src/domains/creator/studio-dynamic-brush-*.ts
       - apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay*
+      - apps/web/config/vite-manual-chunks.ts
       - scripts/generate-studio-material-tip-atlas.mts
       - scripts/studio-material-morphology-browser.ts
       - scripts/verify-studio-material-morphology.mjs
+      - scripts/verify-studio-material-atlas-boundary.mjs
+      - scripts/studio-material-atlas-boundary.test.ts
       - .github/workflows/studio-material-morphology.yml
   push:
     branches: [main]
     paths:
       - apps/web/src/domains/creator/brush/**
+      - apps/web/config/vite-manual-chunks.ts
       - scripts/*studio-material*
       - .github/workflows/studio-material-morphology.yml
   workflow_dispatch:
@@ -58,6 +62,7 @@ jobs:
             apps/web/src/domains/creator/studio-sketchpad-specialty.test.ts \
             apps/web/src/domains/creator/studio-competitor-specialty-brush-expansion.test.ts \
             scripts/studio-brush-long-matrix-quality.test.ts \
+            scripts/studio-material-atlas-boundary.test.ts \
             2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/brush-tests.log"
       - name: Quiet performance and incremental live streaming regressions
         run: |
@@ -76,6 +81,12 @@ jobs:
         env:
           TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
         run: node scripts/verify-studio-material-morphology.mjs
+      - name: Build and prove the atlas stays off the initial graph without relaxing any byte budget
+        run: |
+          pnpm run build:bundle 2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/build.log"
+          cp dist/.vite/manifest.json "$RUNNER_TEMP/studio-material-morphology/manifest.json"
+          node scripts/verify-studio-material-atlas-boundary.mjs | tee "$RUNNER_TEMP/studio-material-morphology/atlas-boundary.json"
+          node scripts/check-studio-bundle.mjs 2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/bundle-budget.log"
       - name: Upload real-renderer images, pressure, performance and test receipts
         if: always()
         uses: actions/upload-artifact@v4

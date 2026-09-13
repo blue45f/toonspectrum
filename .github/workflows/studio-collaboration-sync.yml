@@ -8,6 +8,7 @@ on:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-collaboration-entry.test.ts"
+      - "scripts/lib/studio-collaboration-preview-session.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -19,6 +20,7 @@ on:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-collaboration-entry.test.ts"
+      - "scripts/lib/studio-collaboration-preview-session.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -64,6 +66,7 @@ jobs:
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioCollaborationAccessRuntime.ts
+          scripts/lib/studio-collaboration-preview-session.ts
           scripts/verify-studio-collaboration-entry.test.ts
           scripts/verify-studio-collaboration-sync.mts
       - name: Resolve collaboration evidence directories
@@ -81,7 +84,7 @@ jobs:
         run: pnpm exec playwright install chromium
       - name: Install Chromium system dependencies
         run: pnpm exec playwright install-deps chromium
-      - name: Reproduce the currently deployed Studio
+      - name: Reproduce the currently deployed Studio with its real session API
         id: production-baseline
         continue-on-error: true
         env:
@@ -90,7 +93,7 @@ jobs:
         run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
       - name: Build production Studio assets without repeating the core typecheck
         run: pnpm run build:bundle
-      - name: Verify the pull-request build
+      - name: Verify the static pull-request build with an explicit signed-out session fixture
         run: |
           set -euo pipefail
 
