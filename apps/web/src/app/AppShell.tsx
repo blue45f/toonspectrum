@@ -17,6 +17,9 @@ import { pingVisit } from "@/shared/lib/visits-api";
 
 import "@toonspectrum/core/fx/fx.css";
 
+const SiteCreationCompass = lazy(() =>
+  import("@/shared/components/site-experience/SiteCreationCompass").then((mod) => ({ default: mod.SiteCreationCompass })),
+);
 const PublicSiteWayfinder = lazy(() =>
   import("@/shared/components/public-site-wayfinder").then((mod) => ({ default: mod.PublicSiteWayfinder })),
 );
@@ -119,6 +122,7 @@ export function AppShell({
         {enhancedSite ? <SiteConnectionNotice /> : null}
         <PwaInstallNudge />
         <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
+          {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
           <AppRouter />
           {publicCreativeRoute && pathname !== "/" ? (
             <ErrorBoundary resetKey={pathname}>

@@ -1,5 +1,5 @@
 /**
- * Studio immersive shell — site GNB/footer must not render on the first /studio render.
+ * Studio immersive shell — editor routes hide chrome; the product home keeps navigation.
  * Route truth owns web chrome; the ui-store remains a lifecycle mirror for other consumers.
  */
 import { readFileSync } from "node:fs";
@@ -15,9 +15,9 @@ describe("studio immersive shell", () => {
     useUi.setState({ commandPaletteOpen: false, immersiveSurface: null });
   });
 
-  it("treats /studio paths as immersive routes", () => {
-    expect(isImmersiveMobileRoute("/studio")).toBe(true);
-    expect(isImmersiveMobileRoute("/studio/")).toBe(true);
+  it("distinguishes Studio home from immersive editor routes", () => {
+    expect(isImmersiveMobileRoute("/studio")).toBe(false);
+    expect(isImmersiveMobileRoute("/studio/")).toBe(false);
     expect(isImmersiveMobileRoute("/studio/work/1")).toBe(true);
     expect(isImmersiveMobileRoute("/studio-guide")).toBe(false);
     expect(isImmersiveMobileRoute("/")).toBe(false);
