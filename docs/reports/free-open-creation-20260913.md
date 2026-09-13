@@ -49,8 +49,10 @@ AIC는 `is_public_domain === true`만 채택하며 별도 라이선스인 `descr
 - 독립 worktree에서 `pnpm install --frozen-lockfile --prefer-offline --ignore-scripts` 완료.
 - 실제 Vitest 러너에서 `open-creation.test.ts` 22개 통과. 중첩·미완성 HTML 입력의 텍스트 정제와 사전 객체의 상속 속성 방어를 추가했다.
 - 변경 소스 ESLint, 전체 웹·API `pnpm run typecheck`, `pnpm run build:bundle` 및 빌드 산출물 CSP 검증 통과.
-- 프로덕션 번들 Playwright 검증: 기존 flagship 7개와 창작 재료실 5개, 총 12개 통과. 390px 레이아웃, 두 자료실 진입점, 검색·권리 필터·로컬 보드·재로딩 캐시·6종 브리프·Markdown/JSON 다운로드·429 대기·손상 보드 보존을 확인했다.
-- AIC 이미지의 익명 CORS 요청 회귀 테스트를 추가해 동일한 CI 브라우저 작업에 포함했다. 단위 검증도 해당 워크플로에 명시적으로 연결했다.
+- 프로덕션 번들 Playwright 검증: 기존 flagship 7개와 창작 재료실 6개, 총 13개 통과. 390px 레이아웃, 두 자료실 진입점, 검색·권리 필터·로컬 보드·재로딩 캐시·6종 브리프·Markdown/JSON 다운로드·429 대기·손상 보드 보존을 확인했다.
+- AIC 이미지의 익명 CORS 속성, 실제 이미지 로드, 외부 이미지 출처를 검증하는 회귀 테스트도 통과했다. 단위 검증과 브라우저 검증을 동일한 CI 워크플로에 명시적으로 연결했다.
+- CI에서 실행하는 자료실·워크스페이스·홈 회귀 테스트를 함께 재실행하여 8개 파일 / 145개 테스트가 통과했다.
+- 추가로 자료실 폴더 전체를 포함한 확장 검사는 282개 통과 / 4개 실패였다. 실패는 `product-ux-foundation.test.ts`의 기존 홈 런처·전역 내비게이션·마켓 문구 검사이며, 검사 파일과 대상 소스가 통합한 main(599e316d)과 동일함을 확인했다. 이 기존 불일치를 신규 기능 검증 성공과 혼동하거나 검사에서 숨기지 않는다.
 - 운영 CSP를 적용한 실제 Chromium 페이지에서 AIC·Cleveland·한국어 Wikipedia 검색이 각각 HTTP 200/CORS 응답 및 유효한 결과 18개를 반환했다. 검색 키워드는 공개 테스트 소재인 갑옷/한복만 사용했다.
 - Cleveland 실제 이미지가 로드되어 너비 600px을 확인했다. AIC IIIF 이미지 서버는 이 검증 환경에 HTTP 403 및 Cloudflare challenge를 반환했다. 실제 AIC 썸네일 로드 성공으로 표시하지 않으며, 이미지 실패 안내와 원문 링크를 유지한다. 제공처 차단을 우회하지 않았다.
 - main의 무료 소재 도감 진입 카드 및 Poly Haven/ambientCG 정적 카탈로그 안내를 보존하면서 신규 창작 재료실을 함께 연결했다.
