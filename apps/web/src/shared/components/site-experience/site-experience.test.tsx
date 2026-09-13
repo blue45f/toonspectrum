@@ -92,7 +92,7 @@ describe("history restoration", () => {
     vi.spyOn(window, "scrollY", "get").mockImplementation(() => y);
     vi.spyOn(window, "scrollX", "get").mockReturnValue(0);
     vi.spyOn(document.documentElement, "scrollHeight", "get").mockReturnValue(5000);
-    vi.spyOn(window, "scrollTo").mockImplementation((options) => { if (typeof options === "object") y = options.top ?? 0; });
+    vi.spyOn(window, "scrollTo").mockImplementation((options?: ScrollToOptions | number) => { if (options && typeof options === "object") y = options.top ?? 0; });
     render(<MemoryRouter initialEntries={["/calendar"]}><NavigationHarness /></MemoryRouter>);
     y = 640; fireEvent.scroll(window);
     fireEvent.click(screen.getByRole("button", { name: "forward" }));

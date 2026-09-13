@@ -1,6 +1,8 @@
 import { ArrowRight, MessageCircle, UsersRound } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
+import { CommunityScopeDirectory } from "./components/community-scope-directory";
+
 import type { FanCafeScopeFilter } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
@@ -84,7 +86,7 @@ export function CommunityScopePage() {
         <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{COMMUNITY_SCOPE_LABEL[scope]} 커뮤니티</h1>
         <p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">{COMMUNITY_SCOPE_DESCRIPTION[scope]}</p>
       </header>
-      <FanCafePanel scope={scope} targetLabel={`${COMMUNITY_SCOPE_LABEL[scope]} 커뮤니티`} compact />
+      <CommunityScopeDirectory key={scope} scope={scope} />
     </Container>
   );
 }
