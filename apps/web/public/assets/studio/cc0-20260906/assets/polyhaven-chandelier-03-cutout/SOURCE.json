@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Chandelier_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-chandelier-03",
+  "sourceModelSha256": "ec40b90205168265ee823ed9037bbe7f8e38eb3d43dd085e8da465f64139e56d",
+  "render": {
+    "sourceId": "polyhaven-chandelier-03",
+    "sourceSha256": "ec40b90205168265ee823ed9037bbe7f8e38eb3d43dd085e8da465f64139e56d",
+    "path": "high-resolution-props/polyhaven-chandelier-03.png",
+    "visiblePixels": 144147,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 63082
+  },
+  "independentOriginal": false
+}

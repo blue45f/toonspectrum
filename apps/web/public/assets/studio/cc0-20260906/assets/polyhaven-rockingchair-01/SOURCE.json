@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Rockingchair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "date_published": 1588208147,
+    "name": "Rockingchair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "authors": {
+      "Jorge Camacho": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 11866,
+    "texel_density": 2936.8192993983985,
+    "dimensions": [
+      708.1280946731567,
+      833.482027053833,
+      994.9284568428993
+    ],
+    "files_hash": "cad30a6e8f6569971447bd4d7c4d9064ca17aec3",
+    "tags": [
+      "chair",
+      "vintage",
+      "prop",
+      "wood",
+      "furniture",
+      "rocking chair",
+      "rocking",
+      "decorative",
+      "curved legs",
+      "traditional",
+      "solid wood",
+      "armrest",
+      "slatted backrest",
+      "antique style"
+    ],
+    "description": "Free 4K model, solid wood vintage rocking chair with slatted back, curved legs, armrests, turned spindles and an antique worn finish.",
+    "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+    "category": "Furniture/Seating/Chairs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "738ac8ea",
+    "download_count": 31067,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Rockingchair_01.png?width=256&height=256&v=738ac8ea"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Rockingchair_01/Rockingchair_01_2k.gltf",
+      "bytes": 2712,
+      "sha256": "56d775f66b94589152d303d70ca1d80850fcb48b393c56f792b641916de11d49",
+      "sourceMd5": "a5f129f2a3ab5aa330a9e413975c8b78"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Rockingchair_01/Rockingchair_01_diff_2k.jpg",
+      "bytes": 476830,
+      "sha256": "dbfac1542de3426b62753596f699a861c9e88c22b1a896ad4ddf5b617f8d0cba",
+      "sourceMd5": "4b19506dd91d8a4acb7395d673754e78"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Rockingchair_01/Rockingchair_01_arm_2k.jpg",
+      "bytes": 421071,
+      "sha256": "5759c485c14b9c2da383e963c2e81285fbc0a293433065e9b106f369580b5d5a",
+      "sourceMd5": "2c950f3be283d933098dd9d3c1585790"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Rockingchair_01/Rockingchair_01_nor_gl_2k.jpg",
+      "bytes": 517877,
+      "sha256": "15941c542d5f70d3ba12e2f263f39793bca6ca77cfcd3ca1455873ab46096d3d",
+      "sourceMd5": "50231604b3a713d07c8ea5d8098d15e0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Rockingchair_01/Rockingchair_01.bin",
+      "bytes": 391740,
+      "sha256": "6c7c3c32a033a3697d9adf3e8c9d966265cf11b519717d92c1eb5a9cffe736e2",
+      "sourceMd5": "cd7cd396a8acd87802321d51cbe79725"
+    }
+  ]
+}

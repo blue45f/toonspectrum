@@ -1,0 +1,84 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/tiergarten",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 6,
+    "type": 0,
+    "tags": [
+      "tree",
+      "grass",
+      "autumn",
+      "leaves",
+      "field",
+      "park"
+    ],
+    "date_published": 1511910000,
+    "name": "Tiergarten",
+    "categories": [
+      "outdoor",
+      "nature",
+      "midday",
+      "overcast",
+      "low contrast",
+      "natural light"
+    ],
+    "coords": [
+      52.510872,
+      13.359528
+    ],
+    "date_taken": 1478349180,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "files_hash": "a4c6c0be8da9444e4c518b837def8398b535956a",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "sponsors": [
+      {
+        "name": "3DLux"
+      },
+      "11167855",
+      "128081732"
+    ],
+    "description": "Free 16K unclipped HDRI: soft midday overcast light in an autumn park, low-contrast natural illumination with cool tones and scattered fallen leaves on grass.",
+    "category_id": "cee4fcf5-2aae-5a6e-8d29-ce6185438fbc",
+    "category": "Parks & Gardens/Parks/Urban Parks",
+    "attributes": {
+      "time_of_day": "midday",
+      "weather": "overcast",
+      "light_type": "natural",
+      "contrast": "low",
+      "season": "autumn",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "d489b623",
+    "download_count": 180728,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/tiergarten.png?width=256&height=256&v=d489b623"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/tiergarten.jpg",
+      "bytes": 8536860,
+      "sha256": "949b4cdad0bfbb73b8ce5699a4695044634b547cb75d8a0496d5bb78f02f7b87",
+      "sourceMd5": "d8bb5454950e943cb612e87cac806137"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/boulder_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "lods": true,
+    "name": "Boulder 01",
+    "categories": [
+      "rocks",
+      "nature",
+      "collection: verdant_trail"
+    ],
+    "type": 2,
+    "version_required": {
+      "blend": "4.0.1"
+    },
+    "tags": [
+      "rocks",
+      "boulder",
+      "lichen",
+      "landscape",
+      "rock",
+      "geology",
+      "formation",
+      "weathered",
+      "rock face",
+      "cliff"
+    ],
+    "authors": {
+      "Rico Cilliers": "All"
+    },
+    "info": null,
+    "date_published": 1707177600,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 123976,
+    "texel_density": 2771.1478433030898,
+    "dimensions": [
+      1272.6830840110779,
+      1830.7338953018188,
+      1003.8918256759644
+    ],
+    "sponsors": [
+      "82322099"
+    ],
+    "files_hash": "83e2b16d6a089f8077d3eebe0462615c2ba0e7f6",
+    "description": "Free 8K photoreal boulder model with weathered, jagged surfaces, subtle lichen and rusty mineral streaks, and rugged, cliff-like rock face detail.",
+    "category_id": "229f6baa-7051-5eb5-8f2d-ed2aba17c8ea",
+    "category": "Nature/Rocks & Stone/Boulders",
+    "collections": [
+      "verdant_trail"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "stone"
+      ],
+      "lods": true
+    },
+    "img_version": "b3b100e5",
+    "download_count": 44104,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/boulder_01.png?width=256&height=256&v=b3b100e5"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/boulder_01/boulder_01_2k.gltf",
+      "bytes": 2773,
+      "sha256": "52d118b56748a18509e4ec0075d07b254d72a0401793f22363c0bb3a682e7361",
+      "sourceMd5": "3ef4b3c88c898e12b096eeb40f1edbb9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/boulder_01/boulder_01_nor_gl_2k.jpg",
+      "bytes": 4649207,
+      "sha256": "5174b318712ac7725cbcb55d422607f9c66d7f8d035c5412ab897b5939e2db6b",
+      "sourceMd5": "73ee1783fca7605fd454f0af3e5b85fa"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/boulder_01/boulder_01_diff_2k.jpg",
+      "bytes": 3672483,
+      "sha256": "90bbaa17c1fe0254d2b0b6e5148264fa834953a72724d566f14af029eebe3ca3",
+      "sourceMd5": "63571077317c9a2d1db95894e0268a07"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+      "bytes": 2938808,
+      "sha256": "7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7",
+      "sourceMd5": "27a19fa031d8b4c3a09261f19c444dc5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/boulder_01/boulder_01_arm_2k.jpg",
+      "bytes": 2273068,
+      "sha256": "ab52859dde519b4822111aa60916b6d21f8a6966c67b6cec44d1cd0775b8a86a",
+      "sourceMd5": "94c796dfd73f72b11e557cb2c05ff51e"
+    }
+  ]
+}

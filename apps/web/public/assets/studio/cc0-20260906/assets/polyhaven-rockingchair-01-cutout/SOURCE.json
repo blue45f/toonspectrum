@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Rockingchair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-rockingchair-01",
+  "sourceModelSha256": "b196136fc3cf5278422511203870248e3188533e2c0aed3663c7efc1af066bf6",
+  "render": {
+    "sourceId": "polyhaven-rockingchair-01",
+    "sourceSha256": "b196136fc3cf5278422511203870248e3188533e2c0aed3663c7efc1af066bf6",
+    "path": "high-resolution-props/polyhaven-rockingchair-01.png",
+    "visiblePixels": 272624,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 11866
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,78 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/freight_station",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 23,
+    "type": 0,
+    "whitebalance": 5250,
+    "date_published": 1578956400,
+    "name": "Freight Station",
+    "categories": [
+      "outdoor",
+      "skies",
+      "urban",
+      "sunrise-sunset",
+      "partly cloudy",
+      "medium contrast",
+      "natural light"
+    ],
+    "date_taken": 1567786440,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "backplates": true,
+    "tags": [
+      "sun",
+      "industrial",
+      "crane",
+      "backplates"
+    ],
+    "sponsors": [
+      "16608220",
+      "4714267"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "e0236b0f07fb0bc62165689a49d51d78b266a037",
+    "description": "Free 16K unclipped HDRI of an industrial freight yard at sunset, warm low sun, partly cloudy sky, silhouetted cranes and medium-contrast natural light.",
+    "category_id": "2eb6fffc-e779-5cca-bff3-eb5f8a05c13c",
+    "category": "Industrial/Yards & Terminals/Freight & Cargo Yards",
+    "attributes": {
+      "time_of_day": "sunset",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "8e31f012",
+    "download_count": 65670,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/freight_station.png?width=256&height=256&v=8e31f012"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/freight_station.jpg",
+      "bytes": 4188539,
+      "sha256": "381621ebbc2abe311cfbc1dad369005a5e8672765b3fdbc02251bd643259691f",
+      "sourceMd5": "d2659659db25c76faec99e4f8bcb6477"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

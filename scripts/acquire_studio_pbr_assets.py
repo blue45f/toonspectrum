@@ -21,6 +21,7 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from PIL import Image
 from studio_asset_delivery import gltf_to_glb, geometry_key
 from normalize_studio_asset_glb import read_glb
+from studio_asset_acquisition_plan import select_planned_assets
 
 ROOT = Path(__file__).resolve().parents[1]
 UA = 'ToonStudio-AssetCuration/1.0 (github.com/blue45f/toonspectrum; CC0 provenance retained)'
@@ -178,7 +179,7 @@ def select_assets(metadata: dict, *, exclude_ids: set[str] | None = None,
 
 
 def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str = 'pilot',
-            max_total: int = MAX_TOTAL) -> dict: # NOSONAR python:S3776
+            max_total: int = MAX_TOTAL, selection_plan: Path | None = None) -> dict: # NOSONAR python:S3776
     if output.exists() and any(output.iterdir()):
         raise ValueError('Use an empty review directory; existing assets are never overwritten')
     output.mkdir(parents=True, exist_ok=True)
@@ -187,19 +188,22 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
         raise ValueError('Invalid existing catalog')
     fetch = Fetcher(max_total)
     metadata = fetch.api('assets')
-    selected = select_assets(metadata, exclude_ids={asset['id'] for asset in existing}, profile=profile)
+    plan = json.loads(selection_plan.read_text(encoding='utf-8')) if selection_plan else None
+    excluded = {asset['id'] for asset in existing}
+    selected = select_planned_assets(metadata, plan, excluded) if plan is not None else select_assets(metadata, exclude_ids=excluded, profile=profile)
+    descriptions = {item['sourceId']: item for item in plan['assets']} if plan is not None else {}
     write_json(output / 'acquisition-plan.json', [{'id': k, 'kind': kind, 'selectionTerm': term, 'metadata': meta} for k, kind, term, meta in selected])
     assets, errors, receipts, seen = [], [], {}, {asset['geometrySha256'] for asset in existing if asset.get('geometrySha256')}
     for source_id, kind, term, source_meta in selected:
-        identifier = 'polyhaven-' + source_id.replace('_', '-')
+        identifier = 'polyhaven-' + source_id.replace('_', '-').lower()
         folder = output / 'assets' / identifier
         try:
             files = fetch.api('files/' + source_id)
             license_info = {'id': 'CC0-1.0', 'url': 'https://creativecommons.org/publicdomain/zero/1.0/',
                             'provider': 'Poly Haven', 'sourceUrl': 'https://polyhaven.com/a/' + source_id,
                             'commercialUse': True, 'redistributionAllowed': True, 'checkedOn': date.today().isoformat()}
-            common = {'id': identifier, 'name': source_meta.get('name', source_id), 'kind': kind,
-                      'category': 'pbr-detailed-prop' if kind == 'model' else 'surface-material',
+            common = {'id': identifier, 'name': descriptions.get(source_id, {}).get('name', source_meta.get('name', source_id)), 'kind': kind,
+                      'category': descriptions.get(source_id, {}).get('category', 'pbr-detailed-prop' if kind == 'model' else 'surface-material'),
                       'style': 'pbr-detailed', 'selectionTerm': term, 'license': license_info,
                       'visualReviewed': False, 'studioRuntimeVerified': False, 'curationStatus': 'candidate'}
             local_receipts = []
@@ -284,7 +288,7 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
         if fetch.total >= max_total - MAX_FILE:
             break
     report = {'schema': 'toonspectrum.asset-delivery.v1', 'selectedCandidates': len(selected),
-              'acquisitionProfile': profile, 'existingOriginalsExcluded': len(existing),
+              'acquisitionProfile': 'explicit-plan' if plan is not None else profile, 'existingOriginalsExcluded': len(existing),
               'deliveredOriginals': len(assets), 'byKind': dict(Counter(a['kind'] for a in assets)),
               'byCategory': dict(Counter(a['category'] for a in assets)), 'downloadedBytes': fetch.total,
               'errors': errors, 'approvedVisualOriginals': 0, 'productionPublished': 0,
@@ -302,6 +306,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--exclude-manifest', type=Path)
+    parser.add_argument('--selection-plan', type=Path)
     parser.add_argument('--profile', choices=('pilot', 'expansion'), default='pilot')
     parser.add_argument('--max-download-mib', type=int, default=640)
     args = parser.parse_args()
@@ -311,4 +316,4 @@ if __name__ == '__main__':
     if not 128 <= args.max_download_mib <= 2048:
         parser.error('Download budget must be between 128 and 2048 MiB')
     acquire(destination, exclude_manifest=args.exclude_manifest, profile=args.profile,
-            max_total=args.max_download_mib * 1024 * 1024)
+            max_total=args.max_download_mib * 1024 * 1024, selection_plan=args.selection_plan)

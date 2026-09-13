@@ -1,5 +1,6 @@
+import { collectStudioOfflineDrawingUrls } from "./apps/web/src/app/service-worker/studio-service-worker-drawing-plan";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
@@ -317,13 +318,19 @@ function studioServiceWorkerPlugin(): Plugin {
         );
       }
 
+      const offlineUrls = collectStudioOfflineDrawingUrls(manifest, readdirSync(path.join(outDir, "assets")));
+      const offlineBytes = offlineUrls.reduce((total, url) => total + (sizeOf(url) ?? 0), 0);
+      if (offlineUrls.length > 1024 || offlineBytes > 32 * 1024 * 1024) {
+        throw new Error("Offline drawing pack exceeds budget");
+      }
       const swManifest: StudioServiceWorkerManifest = {
         buildId: studioServiceWorkerBuildId(plan, (value) =>
-          createHash("sha256").update(value).digest("hex"),
+          createHash("sha256").update(value + offlineUrls.join("\n")).digest("hex"),
         ),
         shellUrls: plan.shellUrls,
         criticalUrls: plan.criticalUrls,
         warmUrls: plan.warmUrls,
+        offlineUrls,
       };
 
       await viteBuild({

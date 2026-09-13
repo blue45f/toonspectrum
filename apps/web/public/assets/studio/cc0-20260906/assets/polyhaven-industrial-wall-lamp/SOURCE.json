@@ -1,0 +1,115 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Industrial Wall Lamp",
+    "categories": [
+      "lighting"
+    ],
+    "tags": [
+      "industrial",
+      "factory",
+      "warehouse",
+      "wall light",
+      "metal",
+      "bunker",
+      "mine"
+    ],
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "donated": true,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 4446,
+    "texel_density": 7295.864075412908,
+    "dimensions": [
+      273.4608203172684,
+      140.37844325849136,
+      429.90660667419434
+    ],
+    "date_published": 1748822400,
+    "files_hash": "136c5533789630d2ab312385f75ad413c0d2c221",
+    "description": "Free 4K model, rusted metal industrial wall lamp with protective cage, frosted ribbed glass, bolted mounts and a weathered bunker/factory look.",
+    "category_id": "30d3bf62-e52b-5b8f-9ef0-d600b9067973",
+    "category": "Lighting/Wall/Sconces",
+    "attributes": {
+      "condition": [
+        "rusted"
+      ],
+      "material": [
+        "metal",
+        "glass"
+      ]
+    },
+    "img_version": "47811303",
+    "download_count": 9296,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/industrial_wall_lamp.png?width=256&height=256&v=47811303"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/industrial_wall_lamp/industrial_wall_lamp_2k.gltf",
+      "bytes": 5800,
+      "sha256": "8cddb3fdef56cfe8cdaa0d727933ca92b8084d2a53fc05941099e3654b5bd742",
+      "sourceMd5": "fad803ed23fad9b363d58c51639d971a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_emissive_2k.jpg",
+      "bytes": 228464,
+      "sha256": "3fa68f08cd29367d4075c7fd52679d36a9f104bd49072cd4731214e85e246846",
+      "sourceMd5": "c21e303803f101df54de47c5d58ad497"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_nor_gl_2k.jpg",
+      "bytes": 2829435,
+      "sha256": "6e720b06e39bc5bb307322146f68f775f8020140fa94f59e7d954d414ac3c3ad",
+      "sourceMd5": "f9659431eeb6494326df29f62d6097c6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_diff_2k.jpg",
+      "bytes": 2516823,
+      "sha256": "96021a7cfe4c1f575ea2fa94049ee0e88d21565353a75895e73cd569c940ea49",
+      "sourceMd5": "a5e4d50f7f00d7d2fe71a8b228e560a4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_arm_2k.jpg",
+      "bytes": 2665794,
+      "sha256": "425fac478959a6c749826faca4e3aaabe9638a6c3af478383596f4a11df4cdf2",
+      "sourceMd5": "d73af1d098c23678b330e57685343a8d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_glass_nor_gl_2k.jpg",
+      "bytes": 2498155,
+      "sha256": "4ea7997403abcf2ad389eb3aa87cb5fac94a0c5378aada47a4b5184071b2064f",
+      "sourceMd5": "da81e99ff94ed70607f227cec5d2a6be"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_glass_diff_2k.jpg",
+      "bytes": 1117269,
+      "sha256": "7a3684b068b597ecca9ef006db0063ce7011ffaed4c4b01636be688abbd4c183",
+      "sourceMd5": "a4c9d7c8240d4c9ffcbf6ee45046e4a5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/industrial_wall_lamp/industrial_wall_lamp_glass_arm_2k.jpg",
+      "bytes": 1961739,
+      "sha256": "917155e113d6669ef2c3a17763230016a5ac7c03372eb7c8cd3be7de19d674c2",
+      "sourceMd5": "16cfe811d379b8731a0e026bd7b15a6d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/industrial_wall_lamp/industrial_wall_lamp.bin",
+      "bytes": 141492,
+      "sha256": "d0a6a08b5e2e83ff8d6eb61bb5daa74654b4ff8d9c634348c87f83dbda4837a2",
+      "sourceMd5": "86407c4250e46ad39c5a86e1dc1034f9"
+    }
+  ]
+}

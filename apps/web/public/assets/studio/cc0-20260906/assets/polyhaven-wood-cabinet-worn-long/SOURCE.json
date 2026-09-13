@@ -1,0 +1,117 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wood_cabinet_worn_long",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1649116800,
+    "sponsors": [
+      "corp_cgaxis",
+      "7937391",
+      "11167855"
+    ],
+    "name": "Wood Cabinet Worn Long",
+    "categories": [
+      "man made",
+      "wood",
+      "indoor",
+      "wall",
+      "floor"
+    ],
+    "type": 1,
+    "tags": [
+      "wood",
+      "planks",
+      "cabinet",
+      "worn",
+      "non square",
+      "long",
+      "rough",
+      "old",
+      "weathered",
+      "damaged",
+      "discolored",
+      "wooden",
+      "wall",
+      "chipped",
+      "stained",
+      "red",
+      "cabin",
+      "aged",
+      "antique",
+      "rustic",
+      "vintage",
+      "distressed",
+      "ancient",
+      "historic",
+      "textured",
+      "grungy"
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "dimensions": [
+      1000,
+      500
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "8c3a4716ec60ff492d14322844c268855c9771b8",
+    "description": "Free 16K texture of worn red-brown cabinet planks, rough and stained with chips, scratches, nail holes and aged, grungy wood grain.",
+    "category_id": "30ac2613-5076-5364-b4da-130117ad592d",
+    "category": "Wood/Boards & Planks/Weathered Planks",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "damaged",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "indoor"
+    },
+    "img_version": "3cd59cfc",
+    "download_count": 277360,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_cabinet_worn_long.png?width=256&height=256&v=3cd59cfc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_cabinet_worn_long/wood_cabinet_worn_long_diff_2k.jpg",
+      "bytes": 1681201,
+      "sha256": "de86a6c12fed2284c57be666abfabfa6601dcd5226bd56e70fd6c9722df3291a",
+      "sourceMd5": "840e8337775eb56d0a51b1968a83067b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_cabinet_worn_long/wood_cabinet_worn_long_rough_2k.jpg",
+      "bytes": 1320234,
+      "sha256": "0f63854881c9c94145c9b06a9299493d74cd8d7bfd2ec12875573cd23dd14508",
+      "sourceMd5": "f798a3ddb2e471f68b36ce7c9f19fa47"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_cabinet_worn_long/wood_cabinet_worn_long_nor_gl_2k.jpg",
+      "bytes": 1863837,
+      "sha256": "c39684e3d84e9e639a9f5e53008d1efab9d3661f8bcdd385eadbd0dc67d14775",
+      "sourceMd5": "68edd44ff3851b65836d3bbabf7a4f58"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_cabinet_worn_long/wood_cabinet_worn_long_ao_2k.jpg",
+      "bytes": 1046363,
+      "sha256": "e08c3c39552f834b40e8603a596ca3af6434b050b9651ce14c2dde2651a26022",
+      "sourceMd5": "47d57e0395eebe5555fc046d641f1773"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_cabinet_worn_long/wood_cabinet_worn_long_disp_2k.jpg",
+      "bytes": 350614,
+      "sha256": "efcbe393405358d46d1b2cbcbc8436f9b782a28e8bf245ca51fac89bf5aed266",
+      "sourceMd5": "3f92160b10969d45c6c3153e186a049f"
+    }
+  ]
+}

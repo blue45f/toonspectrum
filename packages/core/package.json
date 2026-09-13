@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "embla-carousel-react": "^8.6.0"
+    "embla-carousel-react": "^8.6.0",
+    "korean-lunar-calendar": "0.4.0",
+    "lunar-typescript": "1.8.6"
   },
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -35,6 +37,7 @@
       "types": "./src/carousel/index.ts",
       "import": "./src/carousel/index.ts",
       "default": "./src/carousel/index.ts"
-    }
+    },
+    "./fortune": "./src/fortune/index.ts"
   }
 }

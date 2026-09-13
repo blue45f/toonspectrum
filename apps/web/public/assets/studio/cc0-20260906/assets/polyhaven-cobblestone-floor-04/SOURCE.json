@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/cobblestone_floor_04",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "cobblestone",
+      "moss",
+      "damp",
+      "wet"
+    ],
+    "date_published": 1560989332,
+    "name": "Cobblestone Floor 04",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "sponsors": [
+      "3237733"
+    ],
+    "dimensions": [
+      1500,
+      1500
+    ],
+    "categories": [
+      "floor",
+      "outdoor",
+      "dirty",
+      "man made",
+      "cobblestone"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "6e3f61fcc650eb9e004c0596cb35f87c4dcf9e1b",
+    "description": "Free 8K cobblestone texture showing damp, moss-filled joints and worn, slightly glossy stones with soil and small plants between uneven man-made cobbles.",
+    "category_id": "99762fb0-f134-5cd9-93f7-5b876875f7c9",
+    "attributes": {
+      "surface_use": "paving",
+      "condition": [
+        "weathered",
+        "mossy",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "category": "Stone/Cobblestone & Paving/Rough & Irregular Setts",
+    "img_version": "1b93f088",
+    "download_count": 67975,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/cobblestone_floor_04.png?width=256&height=256&v=1b93f088"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cobblestone_floor_04/cobblestone_floor_04_diff_2k.jpg",
+      "bytes": 2261344,
+      "sha256": "82be42e9e666d8da3da306cd47505e0940260389394ff68f74073261577252ac",
+      "sourceMd5": "6fd3d5dbaca10c763d813f1b9d532f1b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cobblestone_floor_04/cobblestone_floor_04_rough_2k.jpg",
+      "bytes": 1697046,
+      "sha256": "0a115827914a1cd8773ee8aed84f69417171d501c376882f04b74ec3c898b052",
+      "sourceMd5": "1be55c1917663ff6bca05276a7915a56"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cobblestone_floor_04/cobblestone_floor_04_nor_gl_2k.jpg",
+      "bytes": 2937425,
+      "sha256": "6b0846bd7f9bb6f9092da7144ac12960118d1c7721ccceaca7a17c8f1e68f0ff",
+      "sourceMd5": "051fb80cac9f261e1d21f10b2a664245"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cobblestone_floor_04/cobblestone_floor_04_ao_2k.jpg",
+      "bytes": 1499291,
+      "sha256": "706458c309283ddf8698f3e4dc7acf4cce9525fc75480e3b67f127dd42e6493d",
+      "sourceMd5": "262046a1e8d7160cef10a2549ef303ba"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cobblestone_floor_04/cobblestone_floor_04_disp_2k.jpg",
+      "bytes": 523398,
+      "sha256": "c50a2a6fc56c83f155f857b70ab607fe881a863e385f504905903903fcfbae2f",
+      "sourceMd5": "33a46de5772c9f71e8d82f3a7ead9fe1"
+    }
+  ]
+}

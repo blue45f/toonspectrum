@@ -1,0 +1,79 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/hansaplatz",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 19,
+    "type": 0,
+    "tags": [
+      "tree",
+      "shop",
+      "building",
+      "city",
+      "police",
+      "district"
+    ],
+    "date_published": 1508536800,
+    "name": "Hansaplatz",
+    "categories": [
+      "outdoor",
+      "urban",
+      "night",
+      "clear",
+      "high contrast",
+      "artificial light"
+    ],
+    "coords": [
+      53.554451,
+      10.012056
+    ],
+    "date_taken": 1478113140,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "7947474"
+    ],
+    "files_hash": "6aef3594c135145bfd92e273ee5efd946fd13241",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K, unclipped HDRI of a clear urban night plaza with warm high-contrast streetlights, lit shopfronts, bare trees, crisp shadows and reflective highlights.",
+    "category_id": "ce1574f8-1bf6-5451-9b08-038e5da578f5",
+    "category": "Streets & Town/Squares & Plazas/City Squares",
+    "attributes": {
+      "time_of_day": "night",
+      "weather": "clear",
+      "light_type": "artificial",
+      "contrast": "high",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "89c91e3f",
+    "download_count": 210870,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/hansaplatz.png?width=256&height=256&v=89c91e3f"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hansaplatz.jpg",
+      "bytes": 5901947,
+      "sha256": "ec9a725bd30dca34056a157f4293120bbf939ae4d05e986386df419a9349f34a",
+      "sourceMd5": "04248ba16fb3e34a9ef07f86683e36df"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

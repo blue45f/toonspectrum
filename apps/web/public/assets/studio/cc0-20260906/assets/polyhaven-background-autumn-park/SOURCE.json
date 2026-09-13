@@ -1,0 +1,80 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/autumn_park",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 26,
+    "type": 0,
+    "whitebalance": 5240,
+    "date_published": 1575332622,
+    "name": "Autumn Park",
+    "categories": [
+      "outdoor",
+      "skies",
+      "nature",
+      "morning-afternoon",
+      "clear",
+      "high contrast",
+      "natural light"
+    ],
+    "date_taken": 1570016220,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "backplates": true,
+    "tags": [
+      "tree",
+      "sun",
+      "grass",
+      "field",
+      "backplates"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "f0c651b437d5bc9af9922dbbc82561ce2a1ed0ff",
+    "sponsors": [
+      "3267566",
+      "37678923"
+    ],
+    "description": "Free 16K unclipped HDRI: bright, clear autumn afternoon sun casting warm, contrasty light over a grassy field and treeline beneath a crisp blue sky.",
+    "category_id": "b2c961af-7afa-5824-a379-c143e3aedf4d",
+    "category": "Parks & Gardens/Parks/Open Parkland",
+    "attributes": {
+      "time_of_day": "morning",
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "high",
+      "season": "autumn",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "3a0719a6",
+    "download_count": 315121,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/autumn_park.png?width=256&height=256&v=3a0719a6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/autumn_park.jpg",
+      "bytes": 8285763,
+      "sha256": "57fab029aa63df91853cac91381fbf300f26c1ceddebf82f194a9af1340b4de3",
+      "sourceMd5": "f88a69f678661c848b66383cae20ae7d"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

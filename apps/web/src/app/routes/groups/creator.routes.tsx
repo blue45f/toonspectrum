@@ -1,5 +1,7 @@
 import { Navigate } from "react-router-dom";
 
+import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
+
 import { studioRoutePath } from "@/domains/creator/studio-route-registry";
 
 import { defineAppRoutes } from "../app-route-definition";
@@ -20,13 +22,18 @@ import {
   StudioNewPage,
   StudioProjectShellPage,
   StudioPromoPage,
+  StudioGenerativePage,
+  StudioSpatialReaderPage,
   StudioTemplatesPage,
   StudioRouter,
 } from "./creator-route-pages";
 
+
 export const creatorRoutes = defineAppRoutes([
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
-  { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomePage /> },
+  { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
+  { id: "creator-studio-generative", path: "/studio/generate", element: <StudioGenerativePage /> },
+  { id: "creator-spatial-reader", path: "/read/spatial", element: <StudioSpatialReaderPage /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },
   { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
   { id: "creator-studio-recovery", path: studioRoutePath("recovery"), element: <Navigate to="/studio?view=archived" replace /> },

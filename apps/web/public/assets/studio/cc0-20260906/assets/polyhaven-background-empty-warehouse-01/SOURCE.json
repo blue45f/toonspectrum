@@ -1,0 +1,74 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/empty_warehouse_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 16,
+    "type": 0,
+    "whitebalance": 5900,
+    "date_published": 1595887200,
+    "name": "Empty Warehouse 01",
+    "categories": [
+      "indoor",
+      "urban",
+      "morning-afternoon",
+      "medium contrast",
+      "artificial light"
+    ],
+    "date_taken": 1589545260,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "22167459"
+    ],
+    "backplates": true,
+    "tags": [
+      "warehouse",
+      "derelict",
+      "fluorescent",
+      "concrete",
+      "industrial",
+      "backplates"
+    ],
+    "files_hash": "7e10341dec13cd2b0992c0b0c179458f55bf457e",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI of an empty warehouse interior, cool fluorescent ceiling light with a warm side window glow, medium contrast and an industrial mood.",
+    "category_id": "d19b2a03-269d-5ac7-9932-6967869a7184",
+    "category": "Abandoned & Ruins/Industrial/Derelict Factories & Warehouses",
+    "attributes": {
+      "light_type": "mixed",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "indoor"
+    },
+    "img_version": "9cfec28e",
+    "download_count": 146212,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/empty_warehouse_01.png?width=256&height=256&v=9cfec28e"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/empty_warehouse_01.jpg",
+      "bytes": 4072009,
+      "sha256": "c40091f113f33868fc966b3762749f48d8470da3a4267c09b152dff79e089511",
+      "sourceMd5": "c8bade16362fe4ffcc2f8c176b84daba"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

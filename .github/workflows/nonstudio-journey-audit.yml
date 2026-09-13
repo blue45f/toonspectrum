@@ -1,0 +1,100 @@
+name: Non-studio journey audit
+on:
+  push:
+    branches: [feat/nonstudio-luminous-journeys-20260913]
+  pull_request:
+    paths:
+      - apps/web/src/shared/components/site-experience/**
+      - apps/web/src/shared/components/public-site-journey.tsx
+      - apps/web/src/shared/lib/library-backup.ts
+      - apps/web/src/shared/lib/browser-preferences.ts
+      - apps/web/src/shared/lib/navigation-memory.ts
+      - apps/web/src/app/RouteScrollRestoration.tsx
+      - apps/web/src/domains/community/CommunityPage.tsx
+      - apps/web/src/domains/community/components/community-scope-directory*
+      - scripts/*nonstudio*
+      - .github/workflows/nonstudio-journey-audit.yml
+permissions:
+  contents: read
+concurrency:
+  group: nonstudio-journey-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Storage, backup and destination contracts
+        run: node --test scripts/nonstudio-journey-contract.test.mjs
+      - name: Component and existing policy regressions
+        run: pnpm exec vitest run apps/web/src/shared/components/site-experience/site-experience.test.tsx apps/web/src/domains/community/components/community-scope-directory.test.tsx apps/web/src/domains/legal/policy-page.test.tsx apps/web/src/shared/components/site-public-routes.test.ts apps/web/src/app/app-shell-no-splash.test.ts apps/web/src/app/StudioRouterDocumentNavigationBoundary.test.tsx
+      - name: Strict lint of modified public surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/shared/components/site-experience
+          apps/web/src/shared/components/public-site-journey.tsx
+          apps/web/src/shared/lib/library-backup.ts
+          apps/web/src/shared/lib/browser-preferences.ts
+          apps/web/src/shared/lib/navigation-memory.ts
+          apps/web/src/shared/lib/safe-route-text.ts
+          apps/web/src/app/App.tsx
+          apps/web/src/app/AppShell.tsx
+          apps/web/src/app/RouteScrollRestoration.tsx
+          apps/web/src/app/routes/route-titles.ts
+          apps/web/src/domains/account/SettingsPage.tsx
+          apps/web/src/domains/legal/PolicyPage.tsx
+          apps/web/src/domains/community/CommunityPage.tsx
+          apps/web/src/domains/community/components/community-scope-directory.tsx
+          apps/web/src/domains/community/components/community-scope-directory.test.tsx
+      - name: Install component browser
+        if: github.event_name == 'push'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Actual branch component browser checks with synthetic fixtures
+        if: github.event_name == 'push'
+        run: node scripts/verify-nonstudio-components.mjs
+      - name: Upload branch component evidence
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstudio-component-evidence-${{ github.run_id }}
+          path: artifacts/nonstudio-components
+          retention-days: 7
+  public-browser-audit:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            apps/web/src
+            scripts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install isolated browser audit dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/nonstudio-browser" --no-audit --no-fund playwright@1.62.1
+          "$RUNNER_TEMP/nonstudio-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Public production navigation and CSS preview audit
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/nonstudio-browser/node_modules/playwright/index.mjs
+          NONSTUDIO_BASE_URL: https://www.toonstudio.cloud
+        run: node scripts/verify-nonstudio-live.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstudio-browser-evidence-${{ github.run_id }}
+          path: artifacts/nonstudio-audit
+          retention-days: 7

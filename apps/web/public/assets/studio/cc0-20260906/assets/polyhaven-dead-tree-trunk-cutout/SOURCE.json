@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-dead-tree-trunk",
+  "sourceModelSha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+  "render": {
+    "sourceId": "polyhaven-dead-tree-trunk",
+    "sourceSha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+    "path": "high-resolution-props/polyhaven-dead-tree-trunk.png",
+    "visiblePixels": 40066,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 101802
+  },
+  "independentOriginal": false
+}

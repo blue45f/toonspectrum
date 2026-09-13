@@ -12,7 +12,7 @@ const PROJECT_CENTER_SYNONYM_GROUPS = Object.freeze([
   Object.freeze(["restore", "recovery", "복구", "복원", "되돌리기"]),
   Object.freeze(["publish", "release", "게시", "출고", "배포"]),
   Object.freeze(["review", "qa", "검수", "검사", "품질"]),
-  Object.freeze(["version", "history", "checkpoint", "버전", "이력", "복구지점"]),
+  Object.freeze(["version", "history", "checkpoint", "버전", "이력", "복구지점", "저장 기록", "체크포인트"]),
   Object.freeze(["import", "open", "가져오기", "불러오기"]),
   Object.freeze(["export", "download", "내보내기", "다운로드", "출력"]),
   Object.freeze(["share", "collaboration", "협업", "공유", "팀"]),

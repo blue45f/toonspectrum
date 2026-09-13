@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/CashRegister_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-cashregister-01",
+  "sourceModelSha256": "444ec20199cc3de6423c7b29342edde7604c43b3bcc089d262ac7e555c6e3010",
+  "render": {
+    "sourceId": "polyhaven-cashregister-01",
+    "sourceSha256": "444ec20199cc3de6423c7b29342edde7604c43b3bcc089d262ac7e555c6e3010",
+    "path": "high-resolution-props/polyhaven-cashregister-01.png",
+    "visiblePixels": 710860,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 9933
+  },
+  "independentOriginal": false
+}

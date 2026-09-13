@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useContext, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 import {
   createEmptyStudioAiImageReferenceDocument,
@@ -6,6 +6,8 @@ import {
 } from "../../ai/studio-ai-image-reference-roles";
 import { studioAutosaveKey } from "../../studio-autosave";
 import { studioCheckpointKey } from "../../studio-checkpoint-loader";
+import { studioEditorPersistenceWorkId } from "../../studio-editor-document-source";
+import { StudioDocumentLayoutContext } from "../../studio-router/studio-document-layout-context";
 import { StudioWorkAssetHydrator } from "../../studio-work-asset-hydrator";
 
 import { useStudioCollaborationAccessRuntime } from "./useStudioCollaborationAccessRuntime";
@@ -64,8 +66,15 @@ export function useStudioDocumentAccessRuntime({
   studioWorkAssetHydrator,
   workId,
 }: UseStudioDocumentAccessRuntimeOptions) {
-  const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
-  const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
+  const documentLayout = useContext(StudioDocumentLayoutContext);
+  const persistenceWorkId = studioEditorPersistenceWorkId(
+    workId,
+    documentLayout?.projectId,
+    documentLayout?.documentId,
+    documentLayout?.draftId,
+  );
+  const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });
+  const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocumentState] =
     useState<StudioAiImageReferenceDocument>(createEmptyStudioAiImageReferenceDocument);
 

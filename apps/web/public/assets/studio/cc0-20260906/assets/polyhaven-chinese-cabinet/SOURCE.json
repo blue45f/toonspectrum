@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/chinese_cabinet",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Chinese Cabinet",
+    "categories": [
+      "shelves",
+      "furniture"
+    ],
+    "type": 2,
+    "tags": [
+      "old",
+      "wooden",
+      "vintage",
+      "antique",
+      "ornate",
+      "traditional",
+      "asian",
+      "elegant",
+      "ornamental"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 15668,
+    "texel_density": 1618.0735916207282,
+    "dimensions": [
+      1262.4960541725159,
+      545.2098548412323,
+      2872.0987772358058
+    ],
+    "date_published": 1719187200,
+    "files_hash": "68eb3f19ce1eef5021e2dda705ad67d43f063cd0",
+    "description": "Free 8K model of an antique Chinese wooden cabinet: elegant traditional shelving with ornate carved panels, drawers, brass hardware and vintage character.",
+    "category_id": "14debc4f-6ceb-597a-a824-8de173aa95a9",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "brass"
+      ]
+    },
+    "img_version": "25921ebc",
+    "download_count": 6304,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/chinese_cabinet.png?width=256&height=256&v=25921ebc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/chinese_cabinet/chinese_cabinet_2k.gltf",
+      "bytes": 8975,
+      "sha256": "20e99d90bdcff55426a50643b9f9ecd21b5f618e0b6969929a999c9d5d52a41f",
+      "sourceMd5": "533dded7ef013de64e4824df2c4df8ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_cabinet/chinese_cabinet_arm_2k.jpg",
+      "bytes": 2572169,
+      "sha256": "d32e9b4c24719306d069f5b8788d168816ded09e25552f94c2e18ce0d395fe01",
+      "sourceMd5": "37b3204627a243a9d6853290198c3901"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/chinese_cabinet/chinese_cabinet.bin",
+      "bytes": 492960,
+      "sha256": "e0fa721a1536b426e70d2427f5068cd6b7467aac77cea92617862d05d981918f",
+      "sourceMd5": "392eda89aa40550e7c193efd4075235a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_cabinet/chinese_cabinet_nor_gl_2k.jpg",
+      "bytes": 1891330,
+      "sha256": "bf8715989fea712b7b1d6b38ee09ff3206f7d8a04cb149f8e6eaa231b18edcc9",
+      "sourceMd5": "2f5f8e0c35b879a019433d630fd1dca4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_cabinet/chinese_cabinet_diff_2k.jpg",
+      "bytes": 2255095,
+      "sha256": "a5ed497441a89aca93aae6b61f2cf6a65a5db6ff51cd418ac6a98d27d407728f",
+      "sourceMd5": "29ed9c90a22e08d21fa2ed4b497362d6"
+    }
+  ]
+}
