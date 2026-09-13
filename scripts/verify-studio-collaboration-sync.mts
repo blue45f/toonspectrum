@@ -20,6 +20,8 @@ import { join } from "node:path";
 
 import { chromium, type BrowserContext, type Page } from "playwright";
 
+import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
+
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -56,7 +58,7 @@ function log(step: string): void {
 async function waitForOrigin(origin: string): Promise<void> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
-      const response = await fetch(`${origin}/studio`);
+      const response = await fetch(`${origin}${STUDIO_DRAFT_CANVAS_PATHNAME}`);
       if (response.ok || response.status < 500) return;
     } catch {
       // The preview is still starting.
@@ -142,7 +144,7 @@ async function waitForCanvasSurface(page: Page): Promise<void> {
     await page.waitForTimeout(200);
   }
 
-  await canvas.waitFor({ state: "visible", timeout: 1 });
+  throw new Error(`canvas surface unavailable after 30 seconds at ${page.url()}`);
 }
 
 async function waitForRoomUrl(page: Page): Promise<string> {
@@ -422,7 +424,7 @@ try {
   diagnostics.push(attachedA.diagnostics);
   const pageA = attachedA.page;
   log("open A");
-  await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await pageA.goto(`${origin}${STUDIO_DRAFT_CANVAS_PATHNAME}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await waitForCanvasSurface(pageA);
   await dismissOverlays(pageA);
   const roomUrl = await waitForRoomUrl(pageA);
@@ -506,6 +508,10 @@ try {
 } catch (error) {
   report.error = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
   report.diagnostics = diagnostics;
+  for (const [index, page] of browser.contexts().flatMap((context) => context.pages()).entries()) {
+    await page.screenshot({ path: join(SCRATCH, `failure-tab-${index}.png`), fullPage: true }).catch(() => undefined);
+    report[`failureTab${index}`] = { url: page.url(), body: await page.locator("body").innerText().catch(() => "unavailable") };
+  }
   throw error;
 } finally {
   writeFileSync(join(SCRATCH, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
