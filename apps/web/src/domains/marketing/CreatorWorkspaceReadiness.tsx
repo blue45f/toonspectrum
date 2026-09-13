@@ -103,6 +103,9 @@ export function CreatorWorkspaceReadiness({ locale }: { locale: "ko" | "en" }) {
         <p className="cf-kicker"><HardDrive size={16} aria-hidden="true" />{copy.tag}</p>
         <h2 id="creator-offline-title" tabIndex={-1}>{copy.title}</h2>
         <p>{copy.body}</p>
+        <p><a className="cf-link" href="/offline-draw/">{locale === "ko" ? "서버 없이 로컬 드로잉 열기" : "Open server-independent local drawing"}</a></p>
+        <p><Link className="cf-link" href="/studio/ai-lab">{locale === "ko" ? "생성형 애니메이션 · 2D↔3D 제작실" : "Generative animation and 2D/3D studio"}</Link></p>
+        <p><a className="cf-link" href="/spatial-reader/">{locale === "ko" ? "공간형 웹툰 감상" : "Spatial webtoon reader"}</a></p>
         <Link className="cf-link" href="/studio?uiMode=simple">{copy.open}<ArrowRight size={17} aria-hidden="true" /></Link>
         <details className="cf-storage-note"><summary>{copy.stepsTitle}</summary><ol>{copy.steps.map((step) => <li key={step}>{step}</li>)}</ol></details>
       </div>

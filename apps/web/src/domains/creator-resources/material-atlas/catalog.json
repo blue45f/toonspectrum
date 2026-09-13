@@ -1,0 +1,3762 @@
+{
+  "schema": "toonstudio.material-atlas.v1",
+  "fetchedAt": "2026-09-13T15:34:25.771Z",
+  "assets": [
+    {
+      "id": "polyhaven:aerial_wood_snips",
+      "provider": "polyhaven",
+      "sourceId": "aerial_wood_snips",
+      "title": "Aerial Wood Snips",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "wood",
+        "mud",
+        "dirt",
+        "wood chips",
+        "wood splinters",
+        "tire tracks",
+        "organic debris",
+        "earth",
+        "terrain",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_wood_snips",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_wood_snips.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:blue_floor_tiles_01",
+      "provider": "polyhaven",
+      "sourceId": "blue_floor_tiles_01",
+      "title": "Blue Floor Tiles 01",
+      "kind": "texture",
+      "tags": [
+        "floor",
+        "moss",
+        "damp",
+        "wet",
+        "bright",
+        "walkway",
+        "pavement",
+        "man made",
+        "outdoor",
+        "dirty",
+        "brick"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/blue_floor_tiles_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/blue_floor_tiles_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:anti_slip_concrete",
+      "provider": "polyhaven",
+      "sourceId": "anti_slip_concrete",
+      "title": "Anti Slip Concrete",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "concrete",
+        "antislip",
+        "outdoor",
+        "weathered",
+        "exterior",
+        "scuffed",
+        "chipped",
+        "scratched",
+        "nonslip",
+        "pavement",
+        "coarse",
+        "floor",
+        "man made",
+        "plaster-concrete"
+      ],
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/anti_slip_concrete",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/anti_slip_concrete.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:blue_metal_plate",
+      "provider": "polyhaven",
+      "sourceId": "blue_metal_plate",
+      "title": "Blue Metal Plate",
+      "kind": "texture",
+      "tags": [
+        "scratched",
+        "metal sheet",
+        "metal",
+        "painted",
+        "industrial",
+        "scratches",
+        "scuffed",
+        "steel panel",
+        "abrasion marks",
+        "blue",
+        "metal plate"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/blue_metal_plate",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/blue_metal_plate.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bi_stretch",
+      "provider": "polyhaven",
+      "sourceId": "bi_stretch",
+      "title": "Bi Stretch",
+      "kind": "texture",
+      "tags": [
+        "yellow",
+        "fine",
+        "flexible",
+        "bi-stretch",
+        "polyester",
+        "textile",
+        "woven",
+        "fabric",
+        "stretchy"
+      ],
+      "authors": [
+        "colormass",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bi_stretch",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bi_stretch.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_ground_rock",
+      "provider": "polyhaven",
+      "sourceId": "aerial_ground_rock",
+      "title": "Aerial Ground Rock",
+      "kind": "texture",
+      "tags": [
+        "mud",
+        "rocks",
+        "stones",
+        "dirt",
+        "dry",
+        "terrain",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_ground_rock",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_ground_rock.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:anti_skid_tiles",
+      "provider": "polyhaven",
+      "sourceId": "anti_skid_tiles",
+      "title": "Anti Skid Tiles",
+      "kind": "texture",
+      "tags": [
+        "antislip",
+        "antiskid",
+        "tiles",
+        "patio",
+        "nonslip",
+        "grip",
+        "slipresistant",
+        "durable",
+        "floor",
+        "man made"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/anti_skid_tiles",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/anti_skid_tiles.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_grass_rock",
+      "provider": "polyhaven",
+      "sourceId": "aerial_grass_rock",
+      "title": "Aerial Grass Rock",
+      "kind": "texture",
+      "tags": [
+        "moss",
+        "grass",
+        "cliff",
+        "cave",
+        "rock face",
+        "terrain",
+        "rock",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_grass_rock",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_grass_rock.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bark_bluegum",
+      "provider": "polyhaven",
+      "sourceId": "bark_bluegum",
+      "title": "Bark Blue gum",
+      "kind": "texture",
+      "tags": [
+        "bark",
+        "tree",
+        "tree bark",
+        "tree bark texture",
+        "tree trunk",
+        "nature",
+        "outdoor",
+        "bluegum",
+        "organic",
+        "environment",
+        "forest",
+        "natural"
+      ],
+      "authors": [
+        "Dimitrios Savva"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bark_bluegum",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bark_bluegum.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:brown_leather",
+      "provider": "polyhaven",
+      "sourceId": "brown_leather",
+      "title": "Brown Leather",
+      "kind": "texture",
+      "tags": [
+        "leather",
+        "brown",
+        "chair",
+        "seat",
+        "upholstery",
+        "vintage",
+        "matte",
+        "wrinkled",
+        "textile",
+        "creased",
+        "fabric"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/brown_leather",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/brown_leather.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:gingham_check",
+      "provider": "polyhaven",
+      "sourceId": "gingham_check",
+      "title": "Gingham Check",
+      "kind": "texture",
+      "tags": [
+        "checker",
+        "green",
+        "table cloth",
+        "picnic",
+        "pattern",
+        "textile",
+        "checkered",
+        "plaid",
+        "woven",
+        "fabric",
+        "gingham",
+        "cotton"
+      ],
+      "authors": [
+        "colormass",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/gingham_check",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/gingham_check.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:book_pattern",
+      "provider": "polyhaven",
+      "sourceId": "book_pattern",
+      "title": "Book Pattern",
+      "kind": "texture",
+      "tags": [
+        "plain",
+        "book",
+        "cover",
+        "textile",
+        "olive",
+        "olive green",
+        "woven",
+        "fabric",
+        "cotton"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/book_pattern",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/book_pattern.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:brown_mud",
+      "provider": "polyhaven",
+      "sourceId": "brown_mud",
+      "title": "Brown Mud",
+      "kind": "texture",
+      "tags": [
+        "mud",
+        "dirt",
+        "stones",
+        "dry",
+        "ground",
+        "soil",
+        "plant debris",
+        "granular",
+        "organic matter",
+        "earthy",
+        "twigs",
+        "earth",
+        "terrain",
+        "natural",
+        "outdoor"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/brown_mud",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/brown_mud.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asbestos_sheet",
+      "provider": "polyhaven",
+      "sourceId": "asbestos_sheet",
+      "title": "Asbestos Sheet",
+      "kind": "texture",
+      "tags": [
+        "asbestos",
+        "corrugated",
+        "dirty",
+        "sheet",
+        "corrugation",
+        "industrial",
+        "material",
+        "fireresistant",
+        "wall",
+        "man made"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asbestos_sheet",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asbestos_sheet.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_asphalt_01",
+      "provider": "polyhaven",
+      "sourceId": "aerial_asphalt_01",
+      "title": "Aerial Asphalt 01",
+      "kind": "texture",
+      "tags": [
+        "road",
+        "flat",
+        "cracked",
+        "asphalt",
+        "outdoor",
+        "floor",
+        "man made",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_asphalt_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_asphalt_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asphalt_04",
+      "provider": "polyhaven",
+      "sourceId": "asphalt_04",
+      "title": "Asphalt 04",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "weathered",
+        "dry",
+        "cracked",
+        "discolored",
+        "asphalt",
+        "road",
+        "street",
+        "man made",
+        "outdoor"
+      ],
+      "authors": [
+        "Jenelle van Heerden",
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asphalt_04",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_04.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:corrugated_iron",
+      "provider": "polyhaven",
+      "sourceId": "corrugated_iron",
+      "title": "Corrugated Iron",
+      "kind": "texture",
+      "tags": [
+        "metal",
+        "corrugated",
+        "roof",
+        "roofing",
+        "steel",
+        "metallic",
+        "sheet",
+        "metal sheet",
+        "weathered",
+        "rusty",
+        "iron",
+        "galvanized",
+        "corrugation",
+        "steel sheeting",
+        "rust",
+        "corrugated iron",
+        "man made",
+        "wall"
+      ],
+      "authors": [
+        "Jenelle van Heerden",
+        "Dimitrios Savva"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/corrugated_iron",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/corrugated_iron.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asphalt_01",
+      "provider": "polyhaven",
+      "sourceId": "asphalt_01",
+      "title": "Asphalt 01",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "dirty",
+        "asphalt",
+        "road",
+        "worn",
+        "floor",
+        "outdoor"
+      ],
+      "authors": [
+        "Dario Barresi",
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_beach_01",
+      "provider": "polyhaven",
+      "sourceId": "aerial_beach_01",
+      "title": "Aerial Beach 01",
+      "kind": "texture",
+      "tags": [
+        "beach",
+        "wavy",
+        "costal",
+        "ocean",
+        "seaside",
+        "terrain",
+        "sand",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_beach_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_beach_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_beach_02",
+      "provider": "polyhaven",
+      "sourceId": "aerial_beach_02",
+      "title": "Aerial Beach 02",
+      "kind": "texture",
+      "tags": [
+        "beach",
+        "flat",
+        "costal",
+        "ocean",
+        "seaside",
+        "terrain",
+        "sand",
+        "natural",
+        "outdoor",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_beach_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_beach_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_beach_03",
+      "provider": "polyhaven",
+      "sourceId": "aerial_beach_03",
+      "title": "Aerial Beach 03",
+      "kind": "texture",
+      "tags": [
+        "beach",
+        "seaside",
+        "sand",
+        "trampled",
+        "uneven",
+        "brown",
+        "footprints",
+        "costal",
+        "ocean",
+        "outdoor",
+        "terrain",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_beach_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_beach_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_mud_1",
+      "provider": "polyhaven",
+      "sourceId": "aerial_mud_1",
+      "title": "Aerial Mud 1",
+      "kind": "texture",
+      "tags": [
+        "mud",
+        "tracks",
+        "tire tracks",
+        "wet soil",
+        "uneven surface",
+        "ruts",
+        "surface depressions",
+        "terrain",
+        "road",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_mud_1",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_mud_1.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_rocks_01",
+      "provider": "polyhaven",
+      "sourceId": "aerial_rocks_01",
+      "title": "Aerial Rocks 01",
+      "kind": "texture",
+      "tags": [
+        "rocks",
+        "moss",
+        "cliff",
+        "rock face",
+        "cave",
+        "terrain",
+        "outdoor",
+        "natural",
+        "rock",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_rocks_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_rocks_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_rocks_02",
+      "provider": "polyhaven",
+      "sourceId": "aerial_rocks_02",
+      "title": "Aerial Rocks 02",
+      "kind": "texture",
+      "tags": [
+        "rocks",
+        "rough",
+        "moss",
+        "cliff",
+        "rock face",
+        "cave",
+        "terrain",
+        "outdoor",
+        "natural",
+        "rock",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_rocks_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_rocks_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_rocks_04",
+      "provider": "polyhaven",
+      "sourceId": "aerial_rocks_04",
+      "title": "Aerial Rocks 04",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "rocks",
+        "moss",
+        "cliff",
+        "rock face",
+        "cave",
+        "terrain",
+        "outdoor",
+        "natural",
+        "rock",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_rocks_04",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_rocks_04.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aerial_sand",
+      "provider": "polyhaven",
+      "sourceId": "aerial_sand",
+      "title": "Aerial Sand",
+      "kind": "texture",
+      "tags": [
+        "sand",
+        "costal",
+        "seaside",
+        "ocean",
+        "sea",
+        "terrain",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aerial_sand",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_sand.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:american_walnut_veneer",
+      "provider": "polyhaven",
+      "sourceId": "american_walnut_veneer",
+      "title": "American Walnut Veneer",
+      "kind": "texture",
+      "tags": [
+        "american walnut",
+        "natural grain",
+        "hardwood",
+        "grain",
+        "natural wood grain",
+        "natural wood",
+        "gray",
+        "wood grain",
+        "veneer",
+        "walnut",
+        "wood",
+        "raw wood"
+      ],
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/american_walnut_veneer",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/american_walnut_veneer.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:angli_veneer",
+      "provider": "polyhaven",
+      "sourceId": "angli_veneer",
+      "title": "Angli Veneer",
+      "kind": "texture",
+      "tags": [
+        "veneer",
+        "veneer wood",
+        "natural grain",
+        "grain",
+        "wood",
+        "natural wood grain",
+        "wood grain",
+        "angli",
+        "light wood",
+        "flat wood surface",
+        "raw wood"
+      ],
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/angli_veneer",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/angli_veneer.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asbestos_sheet_02",
+      "provider": "polyhaven",
+      "sourceId": "asbestos_sheet_02",
+      "title": "Asbestos Sheet 02",
+      "kind": "texture",
+      "tags": [
+        "asbestos",
+        "sheet",
+        "asbestos sheet",
+        "corrugated",
+        "dirty",
+        "fireresistant",
+        "building material",
+        "durable",
+        "wall",
+        "man made"
+      ],
+      "authors": [
+        "Amal Kumar"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asbestos_sheet_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asbestos_sheet_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ash_veneer",
+      "provider": "polyhaven",
+      "sourceId": "ash_veneer",
+      "title": "Ash Veneer",
+      "kind": "texture",
+      "tags": [
+        "ash wood",
+        "ash",
+        "wood",
+        "hardwood",
+        "veneer",
+        "veneer wood",
+        "natural grain",
+        "natural veneer",
+        "fine grain",
+        "natural wood",
+        "raw wood"
+      ],
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ash_veneer",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ash_veneer.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asphalt_02",
+      "provider": "polyhaven",
+      "sourceId": "asphalt_02",
+      "title": "Asphalt 02",
+      "kind": "texture",
+      "tags": [
+        "asphalt",
+        "cracked",
+        "flat",
+        "road",
+        "asphalt road",
+        "tarmac road",
+        "gritty",
+        "weathered",
+        "grey",
+        "cracking",
+        "tar",
+        "cracks",
+        "terrain",
+        "man made",
+        "outdoor",
+        "floor"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asphalt_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:asphalt_03",
+      "provider": "polyhaven",
+      "sourceId": "asphalt_03",
+      "title": "Asphalt 03",
+      "kind": "texture",
+      "tags": [
+        "rough",
+        "worn",
+        "dirty",
+        "floor",
+        "road",
+        "asphalt",
+        "city",
+        "urban",
+        "outdoor",
+        "man made"
+      ],
+      "authors": [
+        "Dario Barresi",
+        "Charlotte Baglioni"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/asphalt_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ArmChair_01",
+      "provider": "polyhaven",
+      "sourceId": "ArmChair_01",
+      "title": "Arm Chair 01",
+      "kind": "model",
+      "tags": [
+        "gothic",
+        "vintage",
+        "chair",
+        "furniture",
+        "victorian",
+        "couch",
+        "wood",
+        "varnished",
+        "classic",
+        "seating"
+      ],
+      "authors": [
+        "Kirill Sannikov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ArmChair_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ArmChair_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:concrete_cat_statue",
+      "provider": "polyhaven",
+      "sourceId": "concrete_cat_statue",
+      "title": "Concrete Cat Statue",
+      "kind": "model",
+      "tags": [
+        "garden",
+        "outdoor",
+        "landscaping",
+        "gardening",
+        "statue",
+        "concrete",
+        "sculpture",
+        "cat",
+        "lawn decoration",
+        "decorative"
+      ],
+      "authors": [
+        "Rico Cilliers",
+        "Riley Queen"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/concrete_cat_statue",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_cat_statue.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ammo_box",
+      "provider": "polyhaven",
+      "sourceId": "ammo_box",
+      "title": "Ammo Box",
+      "kind": "model",
+      "tags": [
+        "old",
+        "vintage",
+        "antique",
+        "metal",
+        "rusted",
+        "army",
+        "military",
+        "box",
+        "cartridge",
+        "storage",
+        "machinegun",
+        "crate",
+        "industrial",
+        "tools",
+        "collection: project_lighthouse"
+      ],
+      "authors": [
+        "DanKit"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ammo_box",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ammo_box.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:GreenChair_01",
+      "provider": "polyhaven",
+      "sourceId": "GreenChair_01",
+      "title": "Green Chair 01",
+      "kind": "model",
+      "tags": [
+        "vintage",
+        "wood",
+        "gothic",
+        "furniture",
+        "chair",
+        "fabric",
+        "decorative",
+        "seating"
+      ],
+      "authors": [
+        "Kirill Sannikov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/GreenChair_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/GreenChair_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bark_debris_01",
+      "provider": "polyhaven",
+      "sourceId": "bark_debris_01",
+      "title": "Bark Debris 01",
+      "kind": "model",
+      "tags": [
+        "karoo",
+        "desert",
+        "dry",
+        "dead tree",
+        "stick",
+        "nature",
+        "ground cover",
+        "plants",
+        "collection: namaqualand"
+      ],
+      "authors": [
+        "Greg Zaal",
+        "Jenelle van Heerden"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bark_debris_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bark_debris_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:boulder_01",
+      "provider": "polyhaven",
+      "sourceId": "boulder_01",
+      "title": "Boulder 01",
+      "kind": "model",
+      "tags": [
+        "rocks",
+        "boulder",
+        "lichen",
+        "landscape",
+        "rock",
+        "geology",
+        "formation",
+        "weathered",
+        "rock face",
+        "cliff",
+        "nature",
+        "collection: verdant_trail"
+      ],
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/boulder_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/boulder_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:anthurium_botany_01",
+      "provider": "polyhaven",
+      "sourceId": "anthurium_botany_01",
+      "title": "Anthurium Botany 01",
+      "kind": "model",
+      "tags": [
+        "nature",
+        "bush",
+        "leaf",
+        "shrub",
+        "leaves",
+        "forest",
+        "plant",
+        "green",
+        "jungle",
+        "outdoor",
+        "botany",
+        "plants",
+        "collection: the_shed",
+        "collection: smugglers_cove"
+      ],
+      "authors": [
+        "Rob Tuytel",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/anthurium_botany_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/anthurium_botany_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:barrel_stove",
+      "provider": "polyhaven",
+      "sourceId": "barrel_stove",
+      "title": "Barrel Stove",
+      "kind": "model",
+      "tags": [
+        "urban",
+        "city",
+        "night",
+        "fire",
+        "heating",
+        "outdoor",
+        "barrel",
+        "industrial",
+        "containers",
+        "collection: hidden_alley"
+      ],
+      "authors": [
+        "MP"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/barrel_stove",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/barrel_stove.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bar_chair_round_01",
+      "provider": "polyhaven",
+      "sourceId": "bar_chair_round_01",
+      "title": "Bar Chair Round 01",
+      "kind": "model",
+      "tags": [
+        "bar",
+        "pub",
+        "stool",
+        "tall",
+        "wooden",
+        "classical",
+        "old",
+        "vintage",
+        "cigar",
+        "seating",
+        "furniture"
+      ],
+      "authors": [
+        "Dairon Sanchez"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bar_chair_round_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bar_chair_round_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:adjustable_wrench",
+      "provider": "polyhaven",
+      "sourceId": "adjustable_wrench",
+      "title": "Adjustable Wrench",
+      "kind": "model",
+      "tags": [
+        "vintage",
+        "worn",
+        "antique",
+        "aged",
+        "shed",
+        "garage",
+        "hand tool",
+        "rustic",
+        "pipe wrench",
+        "monkey wrench",
+        "collection: project_lighthouse",
+        "props",
+        "industrial",
+        "tools"
+      ],
+      "authors": [
+        "Mateusz Sadek"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/adjustable_wrench",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/adjustable_wrench.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:binder_notebook",
+      "provider": "polyhaven",
+      "sourceId": "binder_notebook",
+      "title": "Binder Notebook",
+      "kind": "model",
+      "tags": [
+        "old",
+        "leather",
+        "vintage",
+        "worn",
+        "paper",
+        "pencil",
+        "pen",
+        "journal",
+        "collection: project_lighthouse",
+        "books",
+        "props"
+      ],
+      "authors": [
+        "DaDrood"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/binder_notebook",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/binder_notebook.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:all_purpose_cleaner",
+      "provider": "polyhaven",
+      "sourceId": "all_purpose_cleaner",
+      "title": "All Purpose Cleaner",
+      "kind": "model",
+      "tags": [
+        "shed",
+        "cleaning",
+        "home",
+        "garage",
+        "chemicals",
+        "household",
+        "janitorial",
+        "cleaning supplies",
+        "sanitation",
+        "bottle",
+        "cleaner",
+        "multipurpose",
+        "allpurpose",
+        "plastic containers",
+        "clutter",
+        "props",
+        "containers",
+        "collection: the_shed"
+      ],
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/all_purpose_cleaner",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/all_purpose_cleaner.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:calathea_orbifolia_01",
+      "provider": "polyhaven",
+      "sourceId": "calathea_orbifolia_01",
+      "title": "Calathea Orbifolia 01",
+      "kind": "model",
+      "tags": [
+        "nature",
+        "bush",
+        "leaf",
+        "shrub",
+        "green",
+        "leaves",
+        "forest",
+        "plant",
+        "jungle",
+        "outdoor",
+        "botany",
+        "decorative",
+        "plants",
+        "ground cover",
+        "collection: smugglers_cove"
+      ],
+      "authors": [
+        "Rob Tuytel",
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/calathea_orbifolia_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/calathea_orbifolia_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:chinese_screen_panels",
+      "provider": "polyhaven",
+      "sourceId": "chinese_screen_panels",
+      "title": "Chinese Screen Panels",
+      "kind": "model",
+      "tags": [
+        "vintage",
+        "antique",
+        "old",
+        "wooden",
+        "ornate",
+        "asian",
+        "divider",
+        "wall",
+        "furniture"
+      ],
+      "authors": [
+        "Kirill Sannikov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/chinese_screen_panels",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/chinese_screen_panels.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:dead_tree_trunk",
+      "provider": "polyhaven",
+      "sourceId": "dead_tree_trunk",
+      "title": "Dead Tree Trunk",
+      "kind": "model",
+      "tags": [
+        "log",
+        "dead tree",
+        "tree",
+        "trunk",
+        "bark",
+        "natural",
+        "foliage",
+        "nature",
+        "forest",
+        "plant",
+        "dead",
+        "dry",
+        "woodland",
+        "decayed",
+        "rough texture",
+        "forest floor",
+        "plants",
+        "ground cover",
+        "collection: pine_forest",
+        "collection: verdant_trail"
+      ],
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/dead_tree_trunk.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:fire_hydrant",
+      "provider": "polyhaven",
+      "sourceId": "fire_hydrant",
+      "title": "Fire Hydrant",
+      "kind": "model",
+      "tags": [
+        "city",
+        "urban",
+        "street",
+        "road",
+        "emergency",
+        "valve",
+        "extinguisher",
+        "utility",
+        "municipal",
+        "infrastructure",
+        "industrial",
+        "structures",
+        "collection: hidden_alley"
+      ],
+      "authors": [
+        "Gonçalo Felício"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/fire_hydrant",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/fire_hydrant.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:can_rusted",
+      "provider": "polyhaven",
+      "sourceId": "can_rusted",
+      "title": "Can Rusted",
+      "kind": "model",
+      "tags": [
+        "shed",
+        "rubbish",
+        "dirty",
+        "outdoor",
+        "clutter",
+        "garage",
+        "used",
+        "old",
+        "containers",
+        "collection: the_shed"
+      ],
+      "authors": [
+        "Rahul Chaudhary"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/can_rusted",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/can_rusted.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bolt_action_rifle_7_62",
+      "provider": "polyhaven",
+      "sourceId": "bolt_action_rifle_7_62",
+      "title": "Bolt Action Rifle 7.62",
+      "kind": "model",
+      "tags": [
+        "vintage",
+        "worn",
+        "old",
+        "weathered",
+        "aged",
+        "gun",
+        "scope",
+        "bullet",
+        "collection: project_lighthouse",
+        "weapons",
+        "firearms"
+      ],
+      "authors": [
+        "Mateusz Sadek"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bolt_action_rifle_7_62",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bolt_action_rifle_7_62.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:alarm_clock_01",
+      "provider": "polyhaven",
+      "sourceId": "alarm_clock_01",
+      "title": "Alarm Clock 01",
+      "kind": "model",
+      "tags": [
+        "clock",
+        "time",
+        "alarm",
+        "bedside",
+        "old",
+        "90s",
+        "watch",
+        "blue",
+        "aqua",
+        "props",
+        "decorative",
+        "rigged"
+      ],
+      "authors": [
+        "Yann Kervran",
+        "James Ray Cock"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/alarm_clock_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/alarm_clock_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:american_football",
+      "provider": "polyhaven",
+      "sourceId": "american_football",
+      "title": "American Football",
+      "kind": "model",
+      "tags": [
+        "game",
+        "sports",
+        "sport",
+        "toy",
+        "ball",
+        "soccer",
+        "football",
+        "american",
+        "props"
+      ],
+      "authors": [
+        "Riley Queen"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/american_football",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/american_football.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:antique_ceramic_vase_01",
+      "provider": "polyhaven",
+      "sourceId": "antique_ceramic_vase_01",
+      "title": "Antique Ceramic Vase 01",
+      "kind": "model",
+      "tags": [
+        "vintage",
+        "antique",
+        "pot",
+        "fancy",
+        "pattern",
+        "vase",
+        "decorative",
+        "containers",
+        "vases"
+      ],
+      "authors": [
+        "James Ray Cock"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/antique_ceramic_vase_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/antique_ceramic_vase_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:antique_estoc",
+      "provider": "polyhaven",
+      "sourceId": "antique_estoc",
+      "title": "Antique Estoc",
+      "kind": "model",
+      "tags": [
+        "antique",
+        "vintage",
+        "old",
+        "sword",
+        "historic",
+        "traditional",
+        "ornamental",
+        "weapon",
+        "props"
+      ],
+      "authors": [
+        "James Ray Cock",
+        "Ulan Cabanilla"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/antique_estoc",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/antique_estoc.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:antique_katana_01",
+      "provider": "polyhaven",
+      "sourceId": "antique_katana_01",
+      "title": "Antique Katana 01",
+      "kind": "model",
+      "tags": [
+        "antique",
+        "ninja",
+        "katana",
+        "sword",
+        "sharp",
+        "blade",
+        "japanese",
+        "weapon",
+        "props"
+      ],
+      "authors": [
+        "Tal Swicegood"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/antique_katana_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/antique_katana_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bananas",
+      "provider": "polyhaven",
+      "sourceId": "bananas",
+      "title": "Bananas",
+      "kind": "model",
+      "tags": [
+        "banana bunch",
+        "yellow",
+        "single banana",
+        "ripe",
+        "fruit",
+        "food",
+        "collection: project_lighthouse",
+        "nature"
+      ],
+      "authors": [
+        "Alexander Shulha"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bananas",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bananas.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:BarberShopChair_01",
+      "provider": "polyhaven",
+      "sourceId": "BarberShopChair_01",
+      "title": "Barber Shop Chair 01",
+      "kind": "model",
+      "tags": [
+        "chair",
+        "vintage",
+        "wood",
+        "leather",
+        "fancy",
+        "upholstery",
+        "barber",
+        "salon",
+        "furniture",
+        "seating"
+      ],
+      "authors": [
+        "Fernando Quinn"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/BarberShopChair_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/BarberShopChair_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:Barrel_01",
+      "provider": "polyhaven",
+      "sourceId": "Barrel_01",
+      "title": "Barrel_01",
+      "kind": "model",
+      "tags": [
+        "barrel",
+        "oil",
+        "explosive",
+        "radioactive",
+        "metal",
+        "red barrel",
+        "oil barrel",
+        "drums",
+        "fuel barrel",
+        "explosive barrel",
+        "industrial",
+        "containers"
+      ],
+      "authors": [
+        "Jorge Camacho"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/Barrel_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/Barrel_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:Barrel_02",
+      "provider": "polyhaven",
+      "sourceId": "Barrel_02",
+      "title": "Barrel 02",
+      "kind": "model",
+      "tags": [
+        "barrel",
+        "water",
+        "plastic",
+        "garage",
+        "warehouse",
+        "industrial",
+        "storage",
+        "drums",
+        "cylindrical",
+        "containers",
+        "collection: the_shed"
+      ],
+      "authors": [
+        "Jorge Camacho"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/Barrel_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/Barrel_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:barrel_03",
+      "provider": "polyhaven",
+      "sourceId": "barrel_03",
+      "title": "Barrel 03",
+      "kind": "model",
+      "tags": [
+        "industrial",
+        "barrel",
+        "oil",
+        "fuel",
+        "truck",
+        "painted",
+        "blue",
+        "containers"
+      ],
+      "authors": [
+        "Serhii Khromov"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/barrel_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/barrel_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:baseball_01",
+      "provider": "polyhaven",
+      "sourceId": "baseball_01",
+      "title": "Baseball 01",
+      "kind": "model",
+      "tags": [
+        "ball",
+        "baseball",
+        "toy",
+        "kids",
+        "child",
+        "sport",
+        "stitches",
+        "round",
+        "props"
+      ],
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/baseball_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/baseball_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:baseball_bat",
+      "provider": "polyhaven",
+      "sourceId": "baseball_bat",
+      "title": "Baseball Bat",
+      "kind": "model",
+      "tags": [
+        "game",
+        "sports",
+        "baseball",
+        "toy",
+        "activities",
+        "bat",
+        "outdoor sports",
+        "competition",
+        "outdoor games",
+        "props",
+        "collection: hidden_alley"
+      ],
+      "authors": [
+        "Enrique Martín"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/baseball_bat",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/baseball_bat.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bench_vice_01",
+      "provider": "polyhaven",
+      "sourceId": "bench_vice_01",
+      "title": "Bench Vice 01",
+      "kind": "model",
+      "tags": [
+        "workshop",
+        "garage",
+        "used",
+        "metal",
+        "old",
+        "shed",
+        "woodwork",
+        "tools",
+        "industrial",
+        "rigged",
+        "collection: the_shed"
+      ],
+      "authors": [
+        "Yann Kervran",
+        "Antanas Kep"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bench_vice_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bench_vice_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:binoculars",
+      "provider": "polyhaven",
+      "sourceId": "binoculars",
+      "title": "Binoculars",
+      "kind": "model",
+      "tags": [
+        "leather",
+        "strap",
+        "vintage",
+        "antique",
+        "optical",
+        "collection: project_lighthouse",
+        "props",
+        "tools"
+      ],
+      "authors": [
+        "Derek Wight"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/binoculars",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/binoculars.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:afrikaans_church_interior",
+      "provider": "polyhaven",
+      "sourceId": "afrikaans_church_interior",
+      "title": "Afrikaans Church Interior",
+      "kind": "hdri",
+      "tags": [
+        "windows",
+        "pew",
+        "altar",
+        "red carpet",
+        "stage",
+        "wooden ceiling",
+        "pulpit",
+        "high ceiling",
+        "indoor",
+        "high contrast",
+        "natural light",
+        "urban",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/afrikaans_church_interior",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/afrikaans_church_interior.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_bakery",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_bakery",
+      "title": "Abandoned Bakery",
+      "kind": "hdri",
+      "tags": [
+        "abandoned",
+        "empty",
+        "industrial",
+        "windows",
+        "bare",
+        "rubble",
+        "brick",
+        "concrete",
+        "backplates",
+        "natural light",
+        "artificial light",
+        "urban",
+        "indoor",
+        "high contrast"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_bakery",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_bakery.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_greenhouse",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_greenhouse",
+      "title": "Abandoned Greenhouse",
+      "kind": "hdri",
+      "tags": [
+        "warehouse",
+        "concrete",
+        "greenhouse",
+        "abandoned",
+        "industrial",
+        "graffiti",
+        "low contrast",
+        "natural light",
+        "indoor",
+        "urban",
+        "overcast",
+        "midday"
+      ],
+      "authors": [
+        "Andreas Mischok"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_greenhouse",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_greenhouse.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:cowboy_town_hall",
+      "provider": "polyhaven",
+      "sourceId": "cowboy_town_hall",
+      "title": "Cowboy Town Hall",
+      "kind": "hdri",
+      "tags": [
+        "saloon",
+        "western decor",
+        "wild west",
+        "bench",
+        "lamp",
+        "table",
+        "corrugated metal ceiling",
+        "indoor",
+        "urban",
+        "natural light",
+        "artificial light",
+        "medium contrast",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/cowboy_town_hall",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/cowboy_town_hall.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:brown_photostudio_07",
+      "provider": "polyhaven",
+      "sourceId": "brown_photostudio_07",
+      "title": "Brown Photostudio 07",
+      "kind": "hdri",
+      "tags": [
+        "studio",
+        "bed",
+        "fabric",
+        "wood",
+        "wooden floor",
+        "white",
+        "windows",
+        "chair",
+        "natural light",
+        "indoor",
+        "medium contrast",
+        "urban"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/brown_photostudio_07",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/brown_photostudio_07.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aarfontein_pan",
+      "provider": "polyhaven",
+      "sourceId": "aarfontein_pan",
+      "title": "Aarfontein Pan",
+      "kind": "hdri",
+      "tags": [
+        "arid",
+        "dry lakebed",
+        "cracked mud",
+        "bare ground",
+        "salt pan",
+        "outdoor",
+        "nature",
+        "natural light",
+        "medium contrast",
+        "clear",
+        "sunrise-sunset"
+      ],
+      "authors": [
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aarfontein_pan",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aarfontein_pan.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_games_room_01",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_games_room_01",
+      "title": "Abandoned Games Room 01",
+      "kind": "hdri",
+      "tags": [
+        "abandoned",
+        "room",
+        "window",
+        "tile",
+        "rubble",
+        "indoor",
+        "urban",
+        "midday",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Octavian Tudose"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_games_room_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_games_room_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aarfontein_dusk",
+      "provider": "polyhaven",
+      "sourceId": "aarfontein_dusk",
+      "title": "Aarfontein Dusk",
+      "kind": "hdri",
+      "tags": [
+        "rocky",
+        "arid",
+        "hilltop",
+        "scrubland",
+        "outdoor",
+        "nature",
+        "natural light",
+        "low contrast",
+        "skies",
+        "overcast",
+        "sunrise-sunset"
+      ],
+      "authors": [
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aarfontein_dusk",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aarfontein_dusk.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:ahornsteig",
+      "provider": "polyhaven",
+      "sourceId": "ahornsteig",
+      "title": "Ahornsteig",
+      "kind": "hdri",
+      "tags": [
+        "tree",
+        "bench",
+        "leaves",
+        "autumn",
+        "path",
+        "road",
+        "berlin",
+        "cobblestone",
+        "forest",
+        "outdoor",
+        "nature",
+        "midday",
+        "overcast",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Greg Zaal"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/ahornsteig",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/ahornsteig.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:blaubeuren_church_square",
+      "provider": "polyhaven",
+      "sourceId": "blaubeuren_church_square",
+      "title": "Blaubeuren Church Square",
+      "kind": "hdri",
+      "tags": [
+        "snow",
+        "winter",
+        "town",
+        "europe",
+        "christmas",
+        "road",
+        "path",
+        "outdoor",
+        "urban",
+        "night",
+        "overcast",
+        "medium contrast",
+        "artificial light"
+      ],
+      "authors": [
+        "Andreas Mischok"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/blaubeuren_church_square",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/blaubeuren_church_square.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aarfontein_sunrise",
+      "provider": "polyhaven",
+      "sourceId": "aarfontein_sunrise",
+      "title": "Aarfontein Sunrise",
+      "kind": "hdri",
+      "tags": [
+        "grass",
+        "hilltop",
+        "sun",
+        "arid landscape",
+        "mountain",
+        "view",
+        "outdoor",
+        "nature",
+        "natural light",
+        "high contrast",
+        "partly cloudy",
+        "sunrise-sunset"
+      ],
+      "authors": [
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aarfontein_sunrise",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aarfontein_sunrise.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:art_studio",
+      "provider": "polyhaven",
+      "sourceId": "art_studio",
+      "title": "Art Studio",
+      "kind": "hdri",
+      "tags": [
+        "painting",
+        "art",
+        "workshop",
+        "window",
+        "atelier",
+        "indoor",
+        "urban",
+        "medium contrast",
+        "natural light",
+        "artificial light"
+      ],
+      "authors": [
+        "Oliksiy Yakovlyev"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/art_studio",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/art_studio.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aft_lounge",
+      "provider": "polyhaven",
+      "sourceId": "aft_lounge",
+      "title": "Aft Lounge",
+      "kind": "hdri",
+      "tags": [
+        "lounge",
+        "chair",
+        "ship",
+        "stage",
+        "carpet",
+        "window",
+        "ocean",
+        "sun",
+        "lamp",
+        "table",
+        "indoor",
+        "urban",
+        "sunrise-sunset",
+        "clear",
+        "high contrast",
+        "natural light",
+        "artificial light"
+      ],
+      "authors": [
+        "Greg Zaal"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aft_lounge",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aft_lounge.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:anniversary_lounge",
+      "provider": "polyhaven",
+      "sourceId": "anniversary_lounge",
+      "title": "Anniversary Lounge",
+      "kind": "hdri",
+      "tags": [
+        "window",
+        "room",
+        "couch",
+        "lamp",
+        "carpet",
+        "table",
+        "indoor",
+        "urban",
+        "medium contrast",
+        "natural light",
+        "artificial light"
+      ],
+      "authors": [
+        "Greg Zaal"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/anniversary_lounge",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/anniversary_lounge.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:christmas_photo_studio_01",
+      "provider": "polyhaven",
+      "sourceId": "christmas_photo_studio_01",
+      "title": "Christmas Photo Studio 01",
+      "kind": "hdri",
+      "tags": [
+        "couch",
+        "sofa",
+        "wood",
+        "book",
+        "blanket",
+        "tree",
+        "christmas",
+        "step",
+        "ladder",
+        "studio",
+        "backplates",
+        "indoor",
+        "urban",
+        "night",
+        "high contrast",
+        "artificial light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/christmas_photo_studio_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/christmas_photo_studio_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:colorful_studio",
+      "provider": "polyhaven",
+      "sourceId": "colorful_studio",
+      "title": "Colorful Studio",
+      "kind": "hdri",
+      "tags": [
+        "couch",
+        "bar",
+        "bottle",
+        "incandescent",
+        "set",
+        "lounge",
+        "backplates",
+        "indoor",
+        "urban",
+        "high contrast",
+        "artificial light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/colorful_studio",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/colorful_studio.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aloe_farm_shade_house",
+      "provider": "polyhaven",
+      "sourceId": "aloe_farm_shade_house",
+      "title": "Aloe Farm Shade House",
+      "kind": "hdri",
+      "tags": [
+        "sun",
+        "shade",
+        "net",
+        "greenhouse",
+        "farm",
+        "plants",
+        "agriculture",
+        "nursery",
+        "outdoor",
+        "nature",
+        "natural light",
+        "medium contrast",
+        "partly cloudy",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Dimitrios Savva",
+        "Jarod Guest"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aloe_farm_shade_house",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aloe_farm_shade_house.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:cave_wall",
+      "provider": "polyhaven",
+      "sourceId": "cave_wall",
+      "title": "Cave Wall",
+      "kind": "hdri",
+      "tags": [
+        "rock",
+        "tree",
+        "wall",
+        "river",
+        "vine",
+        "ledge",
+        "cave",
+        "outdoor",
+        "indoor",
+        "nature",
+        "morning-afternoon",
+        "medium contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Greg Zaal"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/cave_wall",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/cave_wall.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bell_tower",
+      "provider": "polyhaven",
+      "sourceId": "bell_tower",
+      "title": "Bell Tower",
+      "kind": "hdri",
+      "tags": [
+        "church",
+        "tower",
+        "wooden beams",
+        "stained glass",
+        "architecture",
+        "arched windows",
+        "empty",
+        "wooden floor",
+        "ladder",
+        "indoor",
+        "natural light",
+        "urban",
+        "medium contrast",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bell_tower",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bell_tower.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:bethnal_green_entrance",
+      "provider": "polyhaven",
+      "sourceId": "bethnal_green_entrance",
+      "title": "Bethnal Green Entrance",
+      "kind": "hdri",
+      "tags": [
+        "tree",
+        "europe",
+        "street",
+        "brick",
+        "fence",
+        "london",
+        "outdoor",
+        "urban",
+        "morning-afternoon",
+        "overcast",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Andreas Mischok"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/bethnal_green_entrance",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/bethnal_green_entrance.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:distribution_board",
+      "provider": "polyhaven",
+      "sourceId": "distribution_board",
+      "title": "Distribution Board",
+      "kind": "hdri",
+      "tags": [
+        "abandoned",
+        "industrial",
+        "factory",
+        "rust",
+        "rubble",
+        "electrical",
+        "machine",
+        "brick",
+        "natural light",
+        "urban",
+        "medium contrast",
+        "indoor",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/distribution_board",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/distribution_board.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:aarfontein_dirt_road",
+      "provider": "polyhaven",
+      "sourceId": "aarfontein_dirt_road",
+      "title": "Aarfontein Dirt Road",
+      "kind": "hdri",
+      "tags": [
+        "sun",
+        "arid",
+        "gravel",
+        "dirt road",
+        "scrubland",
+        "tracks",
+        "erosion",
+        "backplates",
+        "outdoor",
+        "nature",
+        "natural light",
+        "high contrast",
+        "clear",
+        "morning-afternoon"
+      ],
+      "authors": [
+        "Jarod Guest",
+        "Dario Barresi"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/aarfontein_dirt_road",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/aarfontein_dirt_road.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_church",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_church",
+      "title": "Abandoned Church",
+      "kind": "hdri",
+      "tags": [
+        "tree",
+        "autumn",
+        "church",
+        "abandoned",
+        "leaves",
+        "outdoor",
+        "nature",
+        "morning-afternoon",
+        "partly cloudy",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_church",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_church.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_construction",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_construction",
+      "title": "Abandoned Construction",
+      "kind": "hdri",
+      "tags": [
+        "brick",
+        "pillar",
+        "warehouse",
+        "rubble",
+        "abandoned",
+        "debris",
+        "desolate",
+        "empty",
+        "ruin",
+        "gloomy",
+        "indoor",
+        "urban",
+        "natural light",
+        "medium contrast",
+        "overcast"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_construction",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_construction.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_factory_canteen_01",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_factory_canteen_01",
+      "title": "Abandoned Factory Canteen 01",
+      "kind": "hdri",
+      "tags": [
+        "hall",
+        "abandoned",
+        "fluorescent",
+        "industrial",
+        "backplates",
+        "indoor",
+        "urban",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_factory_canteen_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_factory_canteen_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_factory_canteen_02",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_factory_canteen_02",
+      "title": "Abandoned Factory Canteen 02",
+      "kind": "hdri",
+      "tags": [
+        "hall",
+        "abandoned",
+        "industrial",
+        "boxes",
+        "backplates",
+        "indoor",
+        "urban",
+        "natural light",
+        "medium contrast"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_factory_canteen_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_factory_canteen_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_games_room_02",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_games_room_02",
+      "title": "Abandoned Games Room 02",
+      "kind": "hdri",
+      "tags": [
+        "abandoned",
+        "room",
+        "window",
+        "tile",
+        "arcade",
+        "rubble",
+        "indoor",
+        "urban",
+        "midday",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Octavian Tudose"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_games_room_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_games_room_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_garage",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_garage",
+      "title": "Abandoned Garage",
+      "kind": "hdri",
+      "tags": [
+        "abandoned",
+        "graffiti",
+        "grunge",
+        "workshop",
+        "tire",
+        "debris",
+        "trash",
+        "indoor",
+        "medium contrast",
+        "urban",
+        "natural light",
+        "midday",
+        "overcast"
+      ],
+      "authors": [
+        "Grzegorz Wronkowski"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_garage",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_garage.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_hall_01",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_hall_01",
+      "title": "Abandoned Hall 01",
+      "kind": "hdri",
+      "tags": [
+        "hall",
+        "window",
+        "abandoned",
+        "empty",
+        "bare",
+        "indoor",
+        "urban",
+        "low contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Octavian Tudose"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_hall_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_hall_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_hopper_terminal_01",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_hopper_terminal_01",
+      "title": "Abandoned Hopper Terminal 01",
+      "kind": "hdri",
+      "tags": [
+        "tree",
+        "sun",
+        "winter",
+        "road",
+        "tracks",
+        "rail",
+        "industrial",
+        "backplates",
+        "outdoor",
+        "nature",
+        "morning-afternoon",
+        "partly cloudy",
+        "medium contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_hopper_terminal_01",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_hopper_terminal_01.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_hopper_terminal_02",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_hopper_terminal_02",
+      "title": "Abandoned Hopper Terminal 02",
+      "kind": "hdri",
+      "tags": [
+        "sun",
+        "rail",
+        "tracks",
+        "tree",
+        "winter",
+        "birch",
+        "backplates",
+        "outdoor",
+        "nature",
+        "morning-afternoon",
+        "clear",
+        "high contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_hopper_terminal_02",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_hopper_terminal_02.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "polyhaven:abandoned_hopper_terminal_03",
+      "provider": "polyhaven",
+      "sourceId": "abandoned_hopper_terminal_03",
+      "title": "Abandoned Hopper Terminal 03",
+      "kind": "hdri",
+      "tags": [
+        "industrial",
+        "sun",
+        "tree",
+        "winter",
+        "field",
+        "backplates",
+        "outdoor",
+        "nature",
+        "morning-afternoon",
+        "partly cloudy",
+        "medium contrast",
+        "natural light"
+      ],
+      "authors": [
+        "Sergej Majboroda"
+      ],
+      "sourceUrl": "https://polyhaven.com/a/abandoned_hopper_terminal_03",
+      "thumbnailUrl": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_hopper_terminal_03.png?width=256&height=256",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Wood095",
+      "provider": "ambientcg",
+      "sourceId": "Wood095",
+      "title": "Wood 095",
+      "kind": "texture",
+      "tags": [
+        "095",
+        "95",
+        "beige",
+        "clean",
+        "indoor",
+        "light",
+        "minimalist",
+        "modern",
+        "natural",
+        "polished",
+        "rustic",
+        "smooth",
+        "subtle",
+        "uniform",
+        "wood",
+        "Wood"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Wood095",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Wood095.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Wood094",
+      "provider": "ambientcg",
+      "sourceId": "Wood094",
+      "title": "Wood 094",
+      "kind": "texture",
+      "tags": [
+        "94",
+        "brown",
+        "smooth",
+        "wood",
+        "wooden",
+        "Wood"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Wood094",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Wood094.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Wood092",
+      "provider": "ambientcg",
+      "sourceId": "Wood092",
+      "title": "Wood 092",
+      "kind": "texture",
+      "tags": [
+        "92",
+        "brown",
+        "clean",
+        "fine",
+        "orange",
+        "smooth",
+        "wood",
+        "wooden",
+        "Wood"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Wood092",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Wood092.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:WoodFloor051",
+      "provider": "ambientcg",
+      "sourceId": "WoodFloor051",
+      "title": "Wood Floor 051",
+      "kind": "texture",
+      "tags": [
+        "051",
+        "51",
+        "brown",
+        "clean",
+        "floor",
+        "indoor",
+        "light",
+        "modern",
+        "parquet",
+        "plank",
+        "polished",
+        "smooth",
+        "staggered",
+        "wood",
+        "woodfloor051",
+        "Wood Floor"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/WoodFloor051",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/WoodFloor051.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Wood051",
+      "provider": "ambientcg",
+      "sourceId": "Wood051",
+      "title": "Wood 051",
+      "kind": "texture",
+      "tags": [
+        "051",
+        "51",
+        "brown",
+        "dark",
+        "elegant",
+        "espresso",
+        "flooring",
+        "furniture",
+        "grain",
+        "hardwood",
+        "interior",
+        "modern",
+        "plain",
+        "polished",
+        "smooth",
+        "wood",
+        "Wood"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Wood051",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Wood051.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:WoodFloor064",
+      "provider": "ambientcg",
+      "sourceId": "WoodFloor064",
+      "title": "Wood Floor 064",
+      "kind": "texture",
+      "tags": [
+        "64",
+        "dark",
+        "floor",
+        "parquet",
+        "planks",
+        "wood",
+        "Wood Floor"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/WoodFloor064",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/WoodFloor064.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground111",
+      "provider": "ambientcg",
+      "sourceId": "Ground111",
+      "title": "Ground 111",
+      "kind": "texture",
+      "tags": [
+        "111",
+        "brick",
+        "brown",
+        "construction",
+        "debris",
+        "dirt",
+        "fragments",
+        "gravel",
+        "gray",
+        "ground",
+        "ground111",
+        "orange",
+        "rock",
+        "rough",
+        "rubble",
+        "scattered",
+        "urban",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground111",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground111.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground107",
+      "provider": "ambientcg",
+      "sourceId": "Ground107",
+      "title": "Ground 107",
+      "kind": "texture",
+      "tags": [
+        "107",
+        "brick",
+        "brown",
+        "debris",
+        "dirt",
+        "fragments",
+        "gray",
+        "ground",
+        "ground107",
+        "old",
+        "path",
+        "red",
+        "rough",
+        "rubble",
+        "scattered",
+        "stones",
+        "uneven",
+        "urban",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground107",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground107.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Bricks097",
+      "provider": "ambientcg",
+      "sourceId": "Bricks097",
+      "title": "Bricks 097",
+      "kind": "texture",
+      "tags": [
+        "97",
+        "brick",
+        "bricks",
+        "brown",
+        "damaged",
+        "dirty",
+        "factory",
+        "industrial",
+        "old",
+        "red",
+        "stone",
+        "stones",
+        "wall",
+        "Bricks"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Bricks097",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Bricks097.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Bricks060",
+      "provider": "ambientcg",
+      "sourceId": "Bricks060",
+      "title": "Bricks 060",
+      "kind": "texture",
+      "tags": [
+        "60",
+        "brick",
+        "bricks",
+        "bright",
+        "light",
+        "wall",
+        "white",
+        "Bricks"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Bricks060",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Bricks060.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Bricks100",
+      "provider": "ambientcg",
+      "sourceId": "Bricks100",
+      "title": "Bricks 100",
+      "kind": "texture",
+      "tags": [
+        "100",
+        "beige",
+        "brick",
+        "bricks",
+        "medival",
+        "old",
+        "stone",
+        "stones",
+        "wall",
+        "Bricks"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Bricks100",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Bricks100.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Bricks089",
+      "provider": "ambientcg",
+      "sourceId": "Bricks089",
+      "title": "Bricks 089",
+      "kind": "texture",
+      "tags": [
+        "89",
+        "brick",
+        "bricks",
+        "dark",
+        "gray",
+        "medieval",
+        "random",
+        "stone",
+        "wall",
+        "Bricks"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Bricks089",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Bricks089.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete034",
+      "provider": "ambientcg",
+      "sourceId": "Concrete034",
+      "title": "Concrete 034",
+      "kind": "texture",
+      "tags": [
+        "34",
+        "concrete",
+        "grey",
+        "light",
+        "plaster",
+        "smooth",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete034",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete034.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete048",
+      "provider": "ambientcg",
+      "sourceId": "Concrete048",
+      "title": "Concrete 048",
+      "kind": "texture",
+      "tags": [
+        "048",
+        "48",
+        "beige",
+        "clean",
+        "concrete",
+        "floor",
+        "grey",
+        "hard",
+        "indoor",
+        "industrial",
+        "layered",
+        "minimalist",
+        "modern",
+        "outdoor",
+        "smooth",
+        "stone",
+        "subtle",
+        "uniform",
+        "urban",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete048",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete048.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete047A",
+      "provider": "ambientcg",
+      "sourceId": "Concrete047A",
+      "title": "Concrete 047 A",
+      "kind": "texture",
+      "tags": [
+        "047",
+        "47",
+        "beige",
+        "clean",
+        "concrete",
+        "construction",
+        "durable",
+        "floor",
+        "grey",
+        "industrial",
+        "layered",
+        "minimalist",
+        "modern",
+        "neutral",
+        "outdoor",
+        "pavement",
+        "rough",
+        "solid",
+        "stone",
+        "urban",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete047A",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete047A.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete046",
+      "provider": "ambientcg",
+      "sourceId": "Concrete046",
+      "title": "Concrete 046",
+      "kind": "texture",
+      "tags": [
+        "46",
+        "concrete",
+        "gray",
+        "grey",
+        "plain",
+        "smooth",
+        "wall",
+        "white",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete046",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete046.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete042A",
+      "provider": "ambientcg",
+      "sourceId": "Concrete042A",
+      "title": "Concrete 042 A",
+      "kind": "texture",
+      "tags": [
+        "42",
+        "concrete",
+        "smooth",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete042A",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete042A.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Concrete031",
+      "provider": "ambientcg",
+      "sourceId": "Concrete031",
+      "title": "Concrete 031",
+      "kind": "texture",
+      "tags": [
+        "31",
+        "bunker",
+        "concrete",
+        "gray",
+        "green",
+        "tiles",
+        "Concrete"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Concrete031",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Concrete031.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Metal063",
+      "provider": "ambientcg",
+      "sourceId": "Metal063",
+      "title": "Metal 063",
+      "kind": "texture",
+      "tags": [
+        "063",
+        "63",
+        "aged",
+        "black",
+        "brown",
+        "dark",
+        "fine",
+        "glossy",
+        "industrial",
+        "metal",
+        "oxidized",
+        "polished",
+        "rust",
+        "rusty",
+        "smooth",
+        "steel",
+        "Metal"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Metal063",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Metal063.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Metal049A",
+      "provider": "ambientcg",
+      "sourceId": "Metal049A",
+      "title": "Metal 049 A",
+      "kind": "texture",
+      "tags": [
+        "49",
+        "clean",
+        "metal",
+        "silver",
+        "smooth",
+        "Metal"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Metal049A",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Metal049A.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:CorrugatedSteel009",
+      "provider": "ambientcg",
+      "sourceId": "CorrugatedSteel009",
+      "title": "Corrugated Steel 009",
+      "kind": "texture",
+      "tags": [
+        "009",
+        "9",
+        "corrugated",
+        "corrugatedsteel009",
+        "dark",
+        "gray",
+        "industrial",
+        "metal",
+        "pipe",
+        "ribbed",
+        "ridged",
+        "rough",
+        "steel",
+        "striped",
+        "urban",
+        "worn",
+        "Corrugated Steel"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/CorrugatedSteel009",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/CorrugatedSteel009.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Metal055A",
+      "provider": "ambientcg",
+      "sourceId": "Metal055A",
+      "title": "Metal 055 A",
+      "kind": "texture",
+      "tags": [
+        "55",
+        "iron",
+        "metal",
+        "Metal"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Metal055A",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Metal055A.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Metal046B",
+      "provider": "ambientcg",
+      "sourceId": "Metal046B",
+      "title": "Metal 046 B",
+      "kind": "texture",
+      "tags": [
+        "46",
+        "black",
+        "dark",
+        "dirty",
+        "metal",
+        "Metal"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Metal046B",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Metal046B.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Metal048A",
+      "provider": "ambientcg",
+      "sourceId": "Metal048A",
+      "title": "Metal 048 A",
+      "kind": "texture",
+      "tags": [
+        "48",
+        "clean",
+        "gold",
+        "metal",
+        "smooth",
+        "Metal"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Metal048A",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Metal048A.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Carpet016",
+      "provider": "ambientcg",
+      "sourceId": "Carpet016",
+      "title": "Carpet 016",
+      "kind": "texture",
+      "tags": [
+        "16",
+        "beige",
+        "carpet",
+        "fabric",
+        "floor",
+        "soft",
+        "white",
+        "wool",
+        "Carpet"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Carpet016",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Carpet016.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Fabric081C",
+      "provider": "ambientcg",
+      "sourceId": "Fabric081C",
+      "title": "Fabric 081 C",
+      "kind": "texture",
+      "tags": [
+        "81",
+        "fabric",
+        "plastisol",
+        "printed",
+        "white",
+        "Fabric"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Fabric081C",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Fabric081C.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Fabric061",
+      "provider": "ambientcg",
+      "sourceId": "Fabric061",
+      "title": "Fabric 061",
+      "kind": "texture",
+      "tags": [
+        "61",
+        "fabric",
+        "rough",
+        "Fabric"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Fabric061",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Fabric061.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Fabric066",
+      "provider": "ambientcg",
+      "sourceId": "Fabric066",
+      "title": "Fabric 066",
+      "kind": "texture",
+      "tags": [
+        "66",
+        "fabric",
+        "rough",
+        "Fabric"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Fabric066",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Fabric066.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Fabric083",
+      "provider": "ambientcg",
+      "sourceId": "Fabric083",
+      "title": "Fabric 083",
+      "kind": "texture",
+      "tags": [
+        "083",
+        "83",
+        "checkered",
+        "clean",
+        "cloth",
+        "fabric",
+        "gray",
+        "patterned",
+        "smooth",
+        "textile",
+        "woven",
+        "Fabric"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Fabric083",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Fabric083.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Fabric030",
+      "provider": "ambientcg",
+      "sourceId": "Fabric030",
+      "title": "Fabric 030",
+      "kind": "texture",
+      "tags": [
+        "30",
+        "cloth",
+        "fabric",
+        "grey",
+        "Fabric"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Fabric030",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Fabric030.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground110",
+      "provider": "ambientcg",
+      "sourceId": "Ground110",
+      "title": "Ground 110",
+      "kind": "texture",
+      "tags": [
+        "110",
+        "brown",
+        "dirt",
+        "dry",
+        "gravel",
+        "gray",
+        "ground",
+        "ground110",
+        "rocky",
+        "rough",
+        "scattered",
+        "uneven",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground110",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground110.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground108",
+      "provider": "ambientcg",
+      "sourceId": "Ground108",
+      "title": "Ground 108",
+      "kind": "texture",
+      "tags": [
+        "108",
+        "brown",
+        "debris",
+        "dirt",
+        "gravel",
+        "gray",
+        "ground",
+        "ground108",
+        "river",
+        "riverbed",
+        "rocky",
+        "rough",
+        "rubble",
+        "scattered",
+        "uneven",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground108",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground108.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground109",
+      "provider": "ambientcg",
+      "sourceId": "Ground109",
+      "title": "Ground 109",
+      "kind": "texture",
+      "tags": [
+        "109",
+        "beige",
+        "brown",
+        "dirt",
+        "dry",
+        "ground",
+        "ground109",
+        "mud",
+        "natural",
+        "pebbles",
+        "rocky",
+        "rough",
+        "scattered",
+        "soil",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground109",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground109.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground106",
+      "provider": "ambientcg",
+      "sourceId": "Ground106",
+      "title": "Ground 106",
+      "kind": "texture",
+      "tags": [
+        "106",
+        "beige",
+        "brown",
+        "dirt",
+        "earth",
+        "forest",
+        "ground",
+        "ground106",
+        "leaves",
+        "mud",
+        "muddy",
+        "natural",
+        "river",
+        "riverbed",
+        "rough",
+        "scattered",
+        "soil",
+        "uneven",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground106",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground106.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles141",
+      "provider": "ambientcg",
+      "sourceId": "Tiles141",
+      "title": "Tiles 141",
+      "kind": "texture",
+      "tags": [
+        "141",
+        "bathroom",
+        "beige",
+        "dirty",
+        "floor",
+        "grid",
+        "kitchen",
+        "rectangular",
+        "rough",
+        "stained",
+        "stone",
+        "tiles",
+        "tiles141",
+        "urban",
+        "white",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles141",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles141.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles139",
+      "provider": "ambientcg",
+      "sourceId": "Tiles139",
+      "title": "Tiles 139",
+      "kind": "texture",
+      "tags": [
+        "139",
+        "bathroom",
+        "beige",
+        "checkered",
+        "classic",
+        "cream",
+        "floor",
+        "grid",
+        "kitchen",
+        "limestone",
+        "natural",
+        "slightly",
+        "smooth",
+        "square",
+        "stone",
+        "tiles",
+        "tiles139",
+        "worn",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles139",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles139.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles140",
+      "provider": "ambientcg",
+      "sourceId": "Tiles140",
+      "title": "Tiles 140",
+      "kind": "texture",
+      "tags": [
+        "140",
+        "corroded",
+        "dark",
+        "gray",
+        "grid",
+        "industrial",
+        "old",
+        "rectangular",
+        "rough",
+        "stained",
+        "stone",
+        "tiles",
+        "tiles140",
+        "urban",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles140",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles140.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles143",
+      "provider": "ambientcg",
+      "sourceId": "Tiles143",
+      "title": "Tiles 143",
+      "kind": "texture",
+      "tags": [
+        "143",
+        "beige",
+        "flooring",
+        "grid",
+        "limestone",
+        "rectangular",
+        "rough",
+        "stained",
+        "stone",
+        "tan",
+        "tiles",
+        "tiles143",
+        "urban",
+        "wall",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles143",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles143.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles142",
+      "provider": "ambientcg",
+      "sourceId": "Tiles142",
+      "title": "Tiles 142",
+      "kind": "texture",
+      "tags": [
+        "142",
+        "aged",
+        "bathroom",
+        "beige",
+        "cream",
+        "floor",
+        "grid",
+        "limestone",
+        "rectangular",
+        "rough",
+        "spotted",
+        "stone",
+        "tiles",
+        "tiles142",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles142",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles142.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Tiles107",
+      "provider": "ambientcg",
+      "sourceId": "Tiles107",
+      "title": "Tiles 107",
+      "kind": "texture",
+      "tags": [
+        "107",
+        "tiles",
+        "white",
+        "Tiles"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Tiles107",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Tiles107.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Rock064",
+      "provider": "ambientcg",
+      "sourceId": "Rock064",
+      "title": "Rock 064",
+      "kind": "texture",
+      "tags": [
+        "064",
+        "64",
+        "forest",
+        "gray",
+        "green",
+        "irregular",
+        "moss",
+        "mossy",
+        "natural",
+        "old",
+        "rock",
+        "rock064",
+        "rough",
+        "stacked",
+        "stone",
+        "Rock"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Rock064",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Rock064.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Rock063",
+      "provider": "ambientcg",
+      "sourceId": "Rock063",
+      "title": "Rock 063",
+      "kind": "texture",
+      "tags": [
+        "063",
+        "63",
+        "aged",
+        "cliff",
+        "cracked",
+        "damaged",
+        "dirty",
+        "eroded",
+        "gray",
+        "green",
+        "layered",
+        "mossy",
+        "natural",
+        "outdoor",
+        "rock",
+        "rough",
+        "rustic",
+        "stone",
+        "Rock"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Rock063",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Rock063.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Rock058",
+      "provider": "ambientcg",
+      "sourceId": "Rock058",
+      "title": "Rock 058",
+      "kind": "texture",
+      "tags": [
+        "58",
+        "cliff",
+        "grey",
+        "rock",
+        "Rock"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Rock058",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Rock058.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Ground068",
+      "provider": "ambientcg",
+      "sourceId": "Ground068",
+      "title": "Ground 068",
+      "kind": "texture",
+      "tags": [
+        "68",
+        "dirt",
+        "ground",
+        "moss",
+        "rock",
+        "stone",
+        "Ground"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Ground068",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Ground068.webp",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ambientcg:Rock051",
+      "provider": "ambientcg",
+      "sourceId": "Rock051",
+      "title": "Rock 051",
+      "kind": "texture",
+      "tags": [
+        "51",
+        "cliff",
+        "mountain",
+        "rock",
+        "stone",
+        "wall",
+        "Rock"
+      ],
+      "authors": [
+        "ambientCG"
+      ],
+      "sourceUrl": "https://ambientcg.com/a/Rock051",
+      "thumbnailUrl": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-WEBP/Rock051.webp",
+      "license": "CC0-1.0"
+    }
+  ]
+}

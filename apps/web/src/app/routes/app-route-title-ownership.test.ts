@@ -4,7 +4,7 @@ import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 
 describe("AppRouter document title ownership", () => {
   it.each([
-    ["/studio", ""],
+    ["/studio/canvas", ""],
     ["/studio/work/work-1/canvas", ""],
     ["/studio/work/work-1/3d/dcc/model", ""],
     ["/studio/work/work-1/3d/dcc/shot", "?room=team-1"],
@@ -23,6 +23,14 @@ describe("AppRouter document title ownership", () => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname, search })).toBe(false);
   });
 
+  it.each(["/showcase/work/a", "/showcase/series/a", "/showcase/series/a/", "/showcase/challenges", "/create/legacy-id", "/learn/lessons/a", "/community/post/a"])("preserves child-owned public titles at %s", (pathname) => {
+    expect(shouldAppRouterOwnDocumentTitle({ pathname })).toBe(false);
+  });
+
+  it.each(["/showcase", "/showcase/unknown", "/showcases/work/a"])("retains generic titles for public hubs or unmatched paths at %s", (pathname) => {
+    expect(shouldAppRouterOwnDocumentTitle({ pathname })).toBe(true);
+  });
+
   it("does not overwrite the detached companion's surface-specific title", () => {
     expect(shouldAppRouterOwnDocumentTitle({
       pathname: "/studio/tools-companion",
@@ -35,6 +43,9 @@ describe("AppRouter document title ownership", () => {
   });
 
   it.each([
+    // The bare Studio home is not an editor (studio-route-manifest.home-boundary.test.ts).
+    ["/studio", ""],
+    ["/studio", "?utm_source=campaign"],
     ["/ranking", ""],
     ["/studio/avatar", ""],
     ["/studio//3d/dcc/model", ""],

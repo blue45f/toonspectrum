@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { SiteDirectorySearch } from "./SiteDirectorySearch";
+
 import {
   SITE_NAVIGATION_GROUPS,
   SITE_NAVIGATION_ITEMS,
@@ -80,7 +82,8 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       en: "Open drawing, animation, 3D and publishing workspaces directly",
     },
     items: [
-      destination("/studio", "빈 캔버스 편집기", "Blank canvas editor", "새 초안을 바로 열어 자유롭게 제작", "Open a draft and start creating immediately"),
+      destination("/studio", "Studio 홈", "Studio home", "새 프로젝트와 최근 작업으로 이동", "Start a project or return to recent work"),
+      destination("/studio/projects", "프로젝트 목록", "Project list", "기존 프로젝트를 찾아 이어서 작업", "Find an existing project and continue your work"),
       destination("/studio/animation", "애니메이션 작업실", "Animation workspace", "프레임과 움직임을 편집", "Edit frames and motion"),
       destination("/studio/brushes", "Studio 브러시", "Studio brushes", "작업 중 브러시를 선택하고 조정", "Choose and tune brushes while editing"),
       destination("/studio/bg3d", "3D 배경", "3D backgrounds", "장면 배경과 카메라 구도 설계", "Build scene backgrounds and camera composition"),
@@ -96,9 +99,10 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/studio/storyworld", "스토리월드", "Storyworld", "인물·장소·설정의 관계 정리", "Organize characters, locations and story relationships"),
       destination("/studio/publish", "Studio 게시", "Studio publish", "완성한 초안의 게시 준비", "Prepare a finished draft for publishing"),
       destination("/studio/manual", "Studio 사용 설명서", "Studio manual", "도구·작업 흐름·문제 해결 안내", "Learn tools, workflows and troubleshooting"),
+      destination("/studio/generate", "생성 도구 연결", "Generation tools", "생성 기능의 연결 상태와 사용 조건 확인", "Review generation availability and requirements"),
       destination("/brush-lab", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
       destination("/music", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
-      destination("/create/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
+      destination("/showcase/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
     ],
   },
   {
@@ -144,9 +148,10 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       en: "Explore and manage published work and creative materials in detail",
     },
     items: [
-      destination("/create/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
+      destination("/showcase/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
       destination("/authors", "작가별 보기", "Browse creators", "작가와 대표 작품 탐색", "Explore creators and representative work"),
       destination("/discover/works", "만화·작법서 탐색", "Comics & craft books", "만화와 창작 참고서를 함께 검색", "Search comics and creative craft books"),
+      destination("/read/spatial", "공간형 웹툰 감상", "Spatial comic reader", "준비한 컷을 공간형 또는 평면 화면으로 감상", "Read prepared panels in spatial or flat view"),
       destination("/market/browse", "에셋 상세 탐색", "Browse assets", "종류·사용권으로 리소스 찾기", "Find resources by type and license"),
       destination("/market/fit", "에셋 핏 랩", "Asset fit lab", "현재 작업에 맞는 에셋 점검", "Evaluate assets against the current project"),
       destination("/market/publish", "에셋 등록", "Publish an asset", "마켓에 리소스 제출·배포", "Submit and publish resources to Market"),
@@ -214,12 +219,18 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   },
 ];
 
+const DIRECTORY_ENTRIES = [
+  ...SITE_NAVIGATION_GROUPS.flatMap((group) => group.items),
+  ...PERSONAL_DESTINATIONS,
+  ...EXTENDED_DESTINATION_GROUPS.flatMap((group) => group.items),
+];
+
 const PAGE_COPY = {
   ko: {
     eyebrow: "TOONSTUDIO DIRECTORY",
     title: "하고 싶은 일에서\n바로 시작하세요.",
     description: "기능 이름을 찾기보다 만들기, 발견하기, 성장하기, 함께하기 중 지금의 목적을 고르세요. 전문 도구와 정책은 아래 보조 탐색에서 이어집니다.",
-    search: "작품·도구·메뉴 검색",
+    search: "작품 검색",
     core: "핵심 작업 흐름",
     coreDescription: "자주 쓰는 목적지를 창작 여정에 맞춰 네 갈래로 정리했습니다.",
     personal: "내 공간과 환경",
@@ -231,7 +242,7 @@ const PAGE_COPY = {
     eyebrow: "TOONSTUDIO DIRECTORY",
     title: "Start with what\nyou want to do.",
     description: "Choose your current purpose—create, discover, grow or connect—instead of hunting for a feature name. Specialized tools and policies continue below.",
-    search: "Search stories, tools and menus",
+    search: "Search stories",
     core: "Core creative flow",
     coreDescription: "Frequent destinations are organized into four paths that follow the creative journey.",
     personal: "Your space and preferences",
@@ -284,6 +295,8 @@ export function SitemapPage() {
           </div>
         </div>
       </section>
+
+      <SiteDirectorySearch entries={DIRECTORY_ENTRIES} locale={locale} />
 
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -449,7 +462,7 @@ export function SitemapPage() {
             {locale === "ko" ? "이용 문의" : "Support"}
           </Link>
           <Link href="/feedback" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">
-            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={15} aria-hidden="true" />
+            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </section>

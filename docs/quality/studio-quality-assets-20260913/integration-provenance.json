@@ -1,0 +1,454 @@
+{
+  "base": "8ed6c67e03660932c45916e26131e37533c5d30a",
+  "head": "c5492f734f0663e80ea12bbe619f256908e4921b",
+  "unique_additions": [
+    "polyhaven-dandelion-01",
+    "polyhaven-shrub-sorrel-01",
+    "polyhaven-leafy-grass"
+  ],
+  "same_byte_duplicates": [
+    {
+      "id": "polyhaven-painted-wooden-chair-01",
+      "sha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+      "retained_name": "화이트 페인트 원목 의자 · Painted Wooden Chair 01",
+      "alternate_name": "화이트 페인티드 목재 의자",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-dining-chair-02",
+      "sha256": "63f22f21a65010d3f3ac66eeef90a12e2ff98ea3f991f526b13159dc5a44daba",
+      "retained_name": "브라운 가죽 다이닝 의자 · Dining Chair 02",
+      "alternate_name": "브라운 다이닝 의자",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool",
+      "sha256": "1438f7f6e571369d6d0b153f9517cfc212bc10c1336753d9d32d97091a23ea4c",
+      "retained_name": "빈티지 사각 원목 스툴 · Painted Wooden Stool",
+      "alternate_name": "빈티지 페인티드 스툴",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool",
+      "sha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+      "retained_name": "접이식 원목 스툴 · Folding Wooden Stool",
+      "alternate_name": "접이식 목재 스툴",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table",
+      "sha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+      "retained_name": "공원 피크닉 테이블 벤치 · Wooden Picnic Table",
+      "alternate_name": "야외 피크닉 테이블",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-chinese-cabinet",
+      "sha256": "469f8ac72e1fb9afd22463985ad9130fdecd741cf7a0b59da69c8925b7005bb5",
+      "retained_name": "앤티크 원목 진열 수납장 · Chinese Cabinet",
+      "alternate_name": "중국풍 수납 장식장",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-chinese-commode",
+      "sha256": "6f0b75409a88b045ff979c3709e07857cd104279f7ba3cc5e57cd7a87c05be1a",
+      "retained_name": "앤티크 서랍 콘솔 테이블 · Chinese Commode",
+      "alternate_name": "중국풍 콘솔 테이블",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern",
+      "sha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+      "retained_name": "체인 황동 랜턴 조명 · Brass Diya Lantern",
+      "alternate_name": "황동 디야 랜턴",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp",
+      "sha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+      "retained_name": "빈티지 산업용 벽 조명 · Industrial Wall Lamp",
+      "alternate_name": "인더스트리얼 벽등",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-mantel-clock-01",
+      "sha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+      "retained_name": "앤티크 원목 탁상시계 · Mantel Clock 01",
+      "alternate_name": "우드 맨틀 시계",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wall-clock",
+      "sha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+      "retained_name": "금속 테두리 아날로그 벽시계 · Wall Clock",
+      "alternate_name": "클래식 벽시계",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01",
+      "sha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+      "retained_name": "원목 책장 진열 선반 · Wooden Display Shelves 01",
+      "alternate_name": "원목 디스플레이 선반",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04",
+      "sha256": "7729c02ae4a0d57e48ad05f81d8157f0d9ab7b0778816b50015b789362efd408",
+      "retained_name": "손잡이 백색 도자기 화병 · Ceramic Vase 04",
+      "alternate_name": "화이트 핸들 도자기 화병",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03",
+      "sha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+      "retained_name": "사각 백색 도자기 화병 · Ceramic Vase 03",
+      "alternate_name": "사각 도자기 화병",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-brass-vase-02",
+      "sha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+      "retained_name": "슬림 황동 화병 · Brass Vase 02",
+      "alternate_name": "슬림 황동 화병",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-brass-vase-01",
+      "sha256": "e782304ae87f4b32b3f4b2d7f385c1bca74518ffde62682a308b7b3f72488031",
+      "retained_name": "앤티크 황동 장식 화병 · Brass Vase 01",
+      "alternate_name": "라운드 황동 화병",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02",
+      "sha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+      "retained_name": "화이트 벽걸이 빈 액자 · Hanging Picture Frame 02",
+      "alternate_name": "사진 삽입용 행잉 프레임",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-security-camera-02",
+      "sha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+      "retained_name": "건물 거리 CCTV 보안 카메라 · Security Camera 02",
+      "alternate_name": "박스형 감시 카메라",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver",
+      "sha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+      "retained_name": "빈티지 무전기 라디오 송수신기 · Vintage Radio Transceiver",
+      "alternate_name": "빈티지 무선 송수신기",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02",
+      "sha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+      "retained_name": "블루 빈티지 원목 수납장 · Painted Wooden Cabinet 02",
+      "alternate_name": "페인티드 수납 선반",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-brass-pan-01",
+      "sha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "retained_name": "황동 조리 프라이팬 · Brass Pan 01",
+      "alternate_name": "황동 프라이팬",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-food-lime-01",
+      "sha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+      "retained_name": "라임 과일 소품 · Food Lime 01",
+      "alternate_name": "라임 과일",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-fire-alarm",
+      "sha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+      "retained_name": "벽 부착 화재 경보 발신기 · Fire Alarm",
+      "alternate_name": "벽부형 화재 경보 장치",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-water-manhole-cover",
+      "sha256": "c1c692b0fb455d68ea54b6abb5614e7946b386f37d9dd7c8104bb971e0b791fe",
+      "retained_name": "거리 수도 맨홀 뚜껑 · Water Manhole Cover",
+      "alternate_name": "주철 수도 맨홀 뚜껑",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-binder-notebook",
+      "sha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+      "retained_name": "빈티지 바인더 노트 세트 · Binder Notebook",
+      "alternate_name": "빈티지 바인더 노트 세트",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wooden-crate-01",
+      "sha256": "350649e8949a525434709f9f0e19a7c6ff998905bf9aac28dd476e299a19f767",
+      "retained_name": "사각 원목 보관 상자 · Wooden Crate 01",
+      "alternate_name": "목재 수납 상자",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wooden-crate-02",
+      "sha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+      "retained_name": "가로형 원목 보관 상자 · Wooden Crate 02",
+      "alternate_name": "우드 트렁크 상자",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-boulder-01",
+      "sha256": "272032bd07c7a98a47b8bbf7db9581e04b62951887514b25b776bc07635e293d",
+      "retained_name": "거친 암석 바위 · Boulder 01",
+      "alternate_name": "층리 바위 스캔",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02",
+      "sha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+      "retained_name": "풍화된 바위 군집 · Namaqualand Boulder 02",
+      "alternate_name": "나마퀄랜드 바위 스캔",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-tree-stump-01",
+      "sha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+      "retained_name": "나무 그루터기와 뿌리 · Tree Stump 01",
+      "alternate_name": "나무 그루터기 스캔",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk",
+      "sha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+      "retained_name": "마른 나무 쓰러진 줄기 · Dead Tree Trunk",
+      "alternate_name": "고사목 줄기",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-marble-tiles",
+      "sha256": "9c036f92e2572a7da175a7078992595eb01180efab25bd2ea8ba502609b4974b",
+      "retained_name": "빈티지 무늬 대리석 타일 · Marble Tiles",
+      "alternate_name": "앤티크 마블 타일",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-marble-cliff-05",
+      "sha256": "5e3679dd3f0e53b711c68319a2b3223eeeb549f0c008f3ff853a8d5e27db5219",
+      "retained_name": "자연 대리석 절벽 표면 · Marble Cliff 05",
+      "alternate_name": "마블 절벽 표면",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wood-floor",
+      "sha256": "89d855a30d8b936d5b68d335b27d423469242ef687af9c840f178f7fc06a8143",
+      "retained_name": "원목 마루 바닥 · Wood Floor",
+      "alternate_name": "원목 바닥",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wood-cabinet-worn-long",
+      "sha256": "5f453b80ffa6532acc79afe8f2fe1419ffca41d13e2554bac94f8ce1ac004a5e",
+      "retained_name": "마모된 긴 원목 판재 · Wood Cabinet Worn Long",
+      "alternate_name": "마모된 캐비닛 목재",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-concrete-wall-003",
+      "sha256": "6f47fbfc4d2b3971785c8b715de9ca32340a7418995535a0b3c4c3c4bfb7e91d",
+      "retained_name": "풍화된 콘크리트 벽 · Concrete Wall 003",
+      "alternate_name": "웨더드 콘크리트 벽",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-wood-peeling-paint-weathered",
+      "sha256": "8ca3152f12033dc1051ca44feddd528c7e01159ac85d7aa18c0369eda535fcd6",
+      "retained_name": "페인트가 벗겨진 목재 · Wood Peeling Paint Weathered",
+      "alternate_name": "벗겨진 목재 페인트",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-plaster-grey-04",
+      "sha256": "26b1cbc4b1d1f9e93c21637e6f2f3391faff996440ba6ed86383cf4274e1757f",
+      "retained_name": "거친 회색 회벽 · Plaster Grey 04",
+      "alternate_name": "그레이 플라스터",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-plastered-wall",
+      "sha256": "fd3ccf41b627e647c15a40f4f04e6cc6a5c48d2d18d7aa184352464734927980",
+      "retained_name": "고운 미장 회벽 · Plastered Wall",
+      "alternate_name": "플라스터 벽",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-denim-fabric",
+      "sha256": "157195bf11a2e57e722a9160abf91d08373aacb1426e56da292c119759d7b169",
+      "retained_name": "스티치가 있는 데님 청 원단 · Denim Fabric",
+      "alternate_name": "스티치 데님 패브릭",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-factory-wall",
+      "sha256": "3b15a17ae71e771f8680891f87dcb853b4a29349ea4c9c5a4c82ad2a98007064",
+      "retained_name": "녹색 산업용 철판 벽 · Factory Wall",
+      "alternate_name": "그린 팩토리 패널",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-corrugated-iron",
+      "sha256": "e8704d26d2761055f75b89060107294d1b6997385d3e5a2978aec6c329152ae7",
+      "retained_name": "은색 골판 철판 · Corrugated Iron",
+      "alternate_name": "골판 아연 철판",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-large-floor-tiles-02",
+      "sha256": "04186960cd53bd9dc93340d4e9e77005dfbd92358d16e4912b8b23365836c6f4",
+      "retained_name": "대형 석재 바닥 타일 · Large Floor Tiles 02",
+      "alternate_name": "대형 석재 바닥 타일",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-large-square-pattern-01",
+      "sha256": "7d001694a8129bf3df28b8e9607d98b4a9c8c7046ea0a62c5e4d154ebadeb95b",
+      "retained_name": "광장 사각 포장 블록 · Large Square Pattern 01",
+      "alternate_name": "사각 포장 패턴",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-grassy-cobblestone",
+      "sha256": "da9278eb846822745b9f696df1b5d480e695307c63f92e89196c830f7aca591e",
+      "retained_name": "풀이 자란 조약돌 보도 · Grassy Cobblestone",
+      "alternate_name": "잔디 돌길",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-forest-leaves-04",
+      "sha256": "f00225934774540c6013154113710b6e249b9cf58af2b219a53a1254f37f13e1",
+      "retained_name": "숲 낙엽과 잔가지 바닥 · Forest Leaves 04",
+      "alternate_name": "숲 낙엽 바닥",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-dirt-floor",
+      "sha256": "a1773f89aa04e3e796e6acc0a594a7eda8905c62043e197400a1226c0f52769c",
+      "retained_name": "야외 흙 바닥 · Dirt Floor",
+      "alternate_name": "흙바닥",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-sand-01",
+      "sha256": "16d934d144f86803acc507b1c45c1e5523a212fd85d6064efd4bfe6983c572eb",
+      "retained_name": "고운 모래 지면 · Sand 01",
+      "alternate_name": "자연 모래",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    },
+    {
+      "id": "polyhaven-sandstone-blocks-05",
+      "sha256": "e75a53731e573a3920842bac5efcfc037f6cd69ab248202b9ccf2477f7e1cc42",
+      "retained_name": "사암 블록 돌담 · Sandstone Blocks 05",
+      "alternate_name": "사암 벽돌",
+      "retained_review": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "alternate_review": "artifacts/studio-quality-assets-20260913/visual-review.md"
+    }
+  ],
+  "source_documents_retained": [
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-binder-notebook/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-boulder-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-brass-diya-lantern/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-brass-pan-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-brass-vase-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-brass-vase-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-ceramic-vase-03/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-ceramic-vase-04/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-chinese-cabinet/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-chinese-commode/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-concrete-wall-003/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-corrugated-iron/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-dead-tree-trunk/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-denim-fabric/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-dining-chair-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-dirt-floor/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-factory-wall/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-fire-alarm/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-folding-wooden-stool/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-food-lime-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-forest-leaves-04/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-grassy-cobblestone/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-hanging-picture-frame-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-industrial-wall-lamp/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-large-floor-tiles-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-large-square-pattern-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-mantel-clock-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-marble-cliff-05/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-marble-tiles/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-namaqualand-boulder-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-painted-wooden-cabinet-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-painted-wooden-chair-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-painted-wooden-stool/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-plaster-grey-04/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-plastered-wall/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-sand-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-sandstone-blocks-05/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-security-camera-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-tree-stump-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-vintage-radio-transceiver/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wall-clock/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-water-manhole-cover/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wood-cabinet-worn-long/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wood-floor/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wood-peeling-paint-weathered/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wooden-crate-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wooden-crate-02/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wooden-display-shelves-01/SOURCE.json",
+    "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-wooden-picnic-table/SOURCE.json"
+  ]
+}

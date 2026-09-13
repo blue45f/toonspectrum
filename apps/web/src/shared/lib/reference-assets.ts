@@ -1,4 +1,4 @@
-import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import { resolveReferenceQuery } from "../../../../../packages/core/src/reference-query-language";
 
 import type { CreatorResource } from "./creator-resources";
 

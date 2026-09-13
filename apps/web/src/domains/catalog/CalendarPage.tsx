@@ -1,6 +1,6 @@
 import { CalendarDays, CalendarPlus, Database, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useId, useState, type KeyboardEvent } from "react";
 
 
 import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
@@ -69,6 +69,22 @@ function CalItem({ title, className }: { title: TitleCard; className?: string })
   );
 }
 
+/** Keep both responsive layouts bounded; the complete day remains available on demand. */
+function CalendarDayItems({ items, day, compact = false }: { items: TitleCard[]; day: string; compact?: boolean }) {
+  const [limit, setLimit] = useState(compact ? 12 : 24);
+  const listId = useId();
+  const visible = items.slice(0, limit);
+  return <>
+    <div id={listId} className={compact ? "flex flex-col gap-2.5" : "grid gap-2 sm:grid-cols-2"}>
+      {visible.map((title) => <CalItem key={title.id} title={title} className={compact ? undefined : "border border-line bg-panel/30 p-2"} />)}
+    </div>
+    {items.length > (compact ? 12 : 24) && <div className="mt-3 border-t border-line pt-3">
+      <p role="status" className="mb-2 text-xs text-fg-3">{day}요일 {visible.length.toLocaleString("ko-KR")} / {items.length.toLocaleString("ko-KR")}편</p>
+      {limit < items.length && <button type="button" aria-controls={listId} onClick={() => setLimit((current) => current + 24)} className="min-h-11 w-full rounded-lg border border-line-strong bg-panel px-3 py-2 text-xs font-medium text-accent hover:bg-raised">{day}요일 {Math.min(24, items.length - limit)}편 더 보기</button>}
+    </div>}
+  </>;
+}
+
 export function CalendarPage() {
   const { data, loading, error, reload } = useApiResource<CalendarResponse>(
     "/api/calendar",
@@ -89,6 +105,7 @@ export function CalendarPage() {
     });
 
   const [showFilters, setShowFilters] = useState(false);
+  const dayTabsId = useId();
   // 모바일: 요일 탭으로 하루씩 본다(null = 오늘). 데스크톱(xl)은 7열 그리드 유지.
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
   const savedIds = useSavedTitleIds();
@@ -115,6 +132,17 @@ export function CalendarPage() {
     : data?.todayCount ?? 0;
   const selDay = Math.min(selectedDayIdx ?? todayIdx, Math.max(0, days.length - 1));
   const selItems = days[selDay]?.items ?? [];
+  const filterIdentity = JSON.stringify(filters);
+  const onDayKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const next = event.key === "ArrowRight" ? (index + 1) % days.length
+      : event.key === "ArrowLeft" ? (index + days.length - 1) % days.length
+        : event.key === "Home" ? 0 : event.key === "End" ? days.length - 1 : null;
+    if (next === null) return;
+    event.preventDefault();
+    setSelectedDayIdx(next);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]').item(next).focus({ preventScroll: true });
+  };
 
   // ICS 내보내기 대상: 현재 필터가 적용된 보드의 고유 작품. 같은 작품이 여러 요일에 보이면
   // VEVENT 1건으로 합치고 보드 버킷 요일을 RRULE BYDAY 다중으로 넣는다.
@@ -147,7 +175,7 @@ export function CalendarPage() {
             </p>
             <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
             <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              연재요일 정보가 있는 작품을 요일별로 모두 표시합니다. 오늘은{" "}
+              연재요일 정보가 있는 작품을 요일별로 찾아보세요. 오늘은{" "}
               <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가 올라오는 작품이{" "}
               <span className="numeral text-fg">{todayCount.toLocaleString("ko-KR")}</span>편입니다.
             </p>
@@ -296,7 +324,11 @@ export function CalendarPage() {
                     key={day}
                     type="button"
                     role="tab"
+                    id={`${dayTabsId}-tab-${index}`}
                     aria-selected={on}
+                    aria-controls={`${dayTabsId}-panel`}
+                    tabIndex={on ? 0 : -1}
+                    onKeyDown={(event) => onDayKey(event, index)}
                     onClick={() => setSelectedDayIdx(index)}
                     className={cn(
                       "relative inline-flex min-h-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
@@ -321,17 +353,13 @@ export function CalendarPage() {
                 );
               })}
             </div>
-            <div className="mt-3">
+            <div className="mt-3" id={`${dayTabsId}-panel`} role="tabpanel" aria-labelledby={`${dayTabsId}-tab-${selDay}`} tabIndex={0}>
               {selItems.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-line bg-card/40 px-4 py-10 text-center text-xs text-fg-3">
                   {days[selDay]?.day}요일 연재 없음
                 </p>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {selItems.map((title) => (
-                    <CalItem key={title.id} title={title} className="border border-line bg-panel/30 p-2" />
-                  ))}
-                </div>
+                <CalendarDayItems key={`${selDay}-${filterIdentity}`} items={selItems} day={days[selDay]?.day ?? ""} />
               )}
             </div>
           </div>
@@ -364,7 +392,7 @@ export function CalendarPage() {
                     {items.length === 0 ? (
                       <p className="px-1 py-6 text-center text-xs text-fg-3">연재 없음</p>
                     ) : (
-                      items.map((title) => <CalItem key={title.id} title={title} />)
+                      <CalendarDayItems key={`${day}-${filterIdentity}`} items={items} day={day} compact />
                     )}
                   </div>
                 </section>

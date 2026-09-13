@@ -33,6 +33,7 @@ jobs:
             apps/web/src/app/routes/studio-entry-redirect.test.ts \
             apps/web/src/domains/creator/studio-marketplace-catalog-open.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
+            apps/web/src/domains/creator/studio-pixel-selection-scene-target.test.ts \
             apps/web/src/domains/creator/studio-marketplace-cc0-catalog.test.ts \
             apps/web/src/domains/creator/studio-community-marketplace.test.ts \
             apps/web/src/domains/creator/studio-marketplace-deep-link.test.ts \

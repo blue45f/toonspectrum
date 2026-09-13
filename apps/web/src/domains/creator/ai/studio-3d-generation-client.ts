@@ -96,7 +96,8 @@ export function validateStudio3dGenerationJob(value: unknown): Studio3dGeneratio
   return value as unknown as Studio3dGenerationJob;
 }
 /** Stop streaming as soon as a response exceeds its budget; Content-Length is not trusted. */
-async function responseBytes(response: Response, maxBytes: number, signal?: AbortSignal): Promise<Uint8Array> {
+// The stream is assembled into an owned ArrayBuffer, suitable for Web Crypto and Blob.
+async function responseBytes(response: Response, maxBytes: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
   signal?.throwIfAborted();
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
