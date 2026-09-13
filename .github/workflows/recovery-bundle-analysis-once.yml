@@ -1,0 +1,86 @@
+name: Recovery bundle ownership analysis
+
+on:
+  push:
+    branches: [fix/recovery-bundle-analysis-20260913]
+    paths: [.github/workflows/recovery-bundle-analysis-once.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Build unchanged product with read-only chunk attribution
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/recovery-bundle
+          git rev-parse HEAD > artifacts/recovery-bundle/commit.txt
+          pnpm catalog:gen
+          pnpm exec tsc -p tsconfig.json
+          node --input-type=module <<'NODE' 2>&1 | tee artifacts/recovery-bundle/build.log
+          import { build } from 'vite';
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import { relative } from 'node:path';
+          import { gzipSync } from 'node:zlib';
+          const root = process.cwd();
+          const output = `${root}/artifacts/recovery-bundle`;
+          const clean = (id) => typeof id === 'string' && id.startsWith(root + '/') ? relative(root, id) : id;
+          const plugin = {
+            name: 'recovery-readonly-module-attribution',
+            apply: 'build',
+            enforce: 'post',
+            generateBundle(_options, bundle) {
+              const chunks = Object.values(bundle).filter((item) => item.type === 'chunk').map((chunk) => ({
+                fileName: chunk.fileName, name: chunk.name, facadeModuleId: clean(chunk.facadeModuleId),
+                isEntry: chunk.isEntry, isDynamicEntry: chunk.isDynamicEntry,
+                imports: chunk.imports, dynamicImports: chunk.dynamicImports,
+                rawBytes: Buffer.byteLength(chunk.code), gzipBytes: gzipSync(chunk.code).length,
+                modules: Object.entries(chunk.modules).map(([id, info]) => ({
+                  id: clean(id), renderedLength: info.renderedLength, originalLength: info.originalLength,
+                  renderedExports: info.renderedExports, removedExports: info.removedExports,
+                })),
+              }));
+              const modules = [...this.getModuleIds()].map((id) => {
+                const info = this.getModuleInfo(id);
+                return { id: clean(id), importers: (info?.importers ?? []).map(clean),
+                  dynamicImporters: (info?.dynamicImporters ?? []).map(clean),
+                  importedIds: (info?.importedIds ?? []).map(clean),
+                  dynamicallyImportedIds: (info?.dynamicallyImportedIds ?? []).map(clean),
+                };
+              });
+              mkdirSync(output, { recursive: true });
+              writeFileSync(`${output}/chunks.json`, JSON.stringify(chunks));
+              writeFileSync(`${output}/modules.json`, JSON.stringify(modules));
+            },
+          };
+          await build({ plugins: [plugin] });
+          NODE
+          cp dist/.vite/manifest.json artifacts/recovery-bundle/manifest.json
+          cp scripts/bundle-baseline.json artifacts/recovery-bundle/bundle-baseline.json
+      - name: Retain the actual unchanged ratchet outcome
+        run: |
+          set -euo pipefail
+          node scripts/check-studio-bundle.mjs --verbose 2>&1 | tee artifacts/recovery-bundle/bundle-check.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: recovery-bundle-analysis-${{ github.run_id }}
+          path: artifacts/recovery-bundle
+          if-no-files-found: error
+          retention-days: 3
