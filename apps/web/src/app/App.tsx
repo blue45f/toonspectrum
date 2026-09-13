@@ -18,6 +18,7 @@ import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { useUi } from "@/shared/lib/ui-store";
 
+// Optional public-page settings must not join the Studio startup bundle.
 const FloatingControls = lazy(() =>
   import("@/shared/components/FloatingControls").then((mod) => ({
     default: mod.FloatingControls,
