@@ -28,7 +28,7 @@ jobs:
       - name: Actual file URL, network disconnected, mobile viewport and storage denial
         shell: python
         run: |
-          import json, pathlib
+          import json, pathlib, time
           from playwright.sync_api import sync_playwright, expect
           root = pathlib.Path.cwd()
           results = []
@@ -37,6 +37,13 @@ jobs:
               print('PASS', name, flush=True)
           def ink(page):
               return page.evaluate("() => document.getElementById('canvas').toDataURL('image/png')")
+          def expect_ink(page, expected):
+              # Painting uses requestAnimationFrame; wait for exact pixels rather
+              # than assuming a busy browser renders within a fixed 100 ms.
+              deadline = time.monotonic() + 5
+              while ink(page) != expected and time.monotonic() < deadline:
+                  page.wait_for_timeout(50)
+              assert ink(page) == expected
           def draw(page):
               box = page.locator('#canvas').bounding_box()
               page.mouse.move(box['x'] + 20, box['y'] + 30)
@@ -65,11 +72,9 @@ jobs:
                       assert painted != blank
                       record('file:// mobile drawing without any origin' + suffix)
                       page.locator('#undo').click()
-                      page.wait_for_timeout(100)
-                      assert ink(page) == blank
+                      expect_ink(page, blank)
                       page.locator('#redo').click()
-                      page.wait_for_timeout(100)
-                      assert ink(page) == painted
+                      expect_ink(page, painted)
                       record('portable pixel-exact undo/redo' + suffix)
                       with page.expect_download() as downloaded:
                           page.locator('#export-json').click()

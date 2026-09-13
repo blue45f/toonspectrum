@@ -93,7 +93,7 @@ describe("Studio canonical document workspaces", () => {
 
   it("maps broad creation modes onto the nearest established editor surface", () => {
     expect(studioDocumentWorkspaceToLegacySurface("draw")).toBe("canvas");
-    expect(studioDocumentWorkspaceToLegacySurface("comic")).toBe("comic");
+    expect(studioDocumentWorkspaceToLegacySurface("comic")).toBe("canvas");
     expect(studioDocumentWorkspaceToLegacySurface("storyboard")).toBe("comic");
     expect(studioDocumentWorkspaceToLegacySurface("3d")).toBe("bg3d");
     expect(studioDocumentWorkspaceToLegacySurface("motion")).toBe("animation");

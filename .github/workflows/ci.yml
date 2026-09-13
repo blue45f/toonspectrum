@@ -62,6 +62,14 @@ jobs:
             apps/web/src/domains/creator/studio-editor-document-source.test.ts \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
+      - name: Studio quick start and task workspace regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-quick-task-workspaces.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-document-workspace.test.ts
       - name: Fortune observatory and calendar regressions
         run: |
           pnpm exec vitest run \
@@ -200,8 +208,8 @@ jobs:
             apps/web/src/domains/creator/studio-checkpoints.test.ts \
             apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
             apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
-            apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
             apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
+            apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx \

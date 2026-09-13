@@ -10,6 +10,8 @@ import {
 import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "../../../../web/src/shared/lib/creator-resources";
 import type { ReferenceSearchField } from "../../../../web/src/shared/lib/reference-assets";
 
+import { isOpenArtProvider, openArtSearch, validOpenArtShape } from "./open-art-providers";
+
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface ResourceEngineOptions {
   fetch: Fetcher;
@@ -25,6 +27,8 @@ const LIMIT = 20;
 const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler; blue45f@gmail.com)";
 const PROVIDER_KEY: Record<ResourceProvider, string> = {
   met: "",
+  aic: "",
+  cleveland: "",
   openlibrary: "",
   openbd: "",
   kakao: "KAKAO_REST_API_KEY",
@@ -69,6 +73,7 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 function validUpstreamShape(url: URL, value: unknown): boolean {
+  if (url.hostname === "api.artic.edu" || url.hostname === "openaccess-api.clevelandart.org") return validOpenArtShape(url, value);
   if (url.hostname === "api.openbd.jp") return Array.isArray(value);
   const shape = recordOf(value);
   if (url.hostname === "openlibrary.org") {
@@ -182,6 +187,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
   const cache = new Map<string, { until: number; value: unknown; fetchedAt: string; bytes: number }>();
   const pending = new Map<string, Promise<{ value: unknown; fetchedAt: string }>>();
   const cooldowns = new Map<string, number>();
+  const museumBudgets = new Map<string, { until: number; count: number }>();
   const clients = new Map<string, { until: number; count: number }>();
   let active = 0; let budgetStart = 0; let budget = 0; let cacheBytes = 0;
   function removeCached(key: string) {
@@ -215,6 +221,14 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     if (active >= 6) throw new Error("upstream_busy");
     if (time - budgetStart >= 60000) { budgetStart = time; budget = 0; }
     if (budget >= 120) throw new Error("upstream_budget");
+    // Per-process ceilings; these are not distributed billing quotas.
+    if (url.hostname === "api.artic.edu" || url.hostname === "openaccess-api.clevelandart.org") {
+      const previous = museumBudgets.get(url.hostname);
+      const bucket = previous && previous.until > time ? previous : { until: time + 60000, count: 0 };
+      if (bucket.count >= 30) throw new Error("upstream_budget");
+      bucket.count += 1;
+      museumBudgets.set(url.hostname, bucket);
+    }
     budget += 1; active += 1;
     const task = (async () => {
       const response = await options.fetch(url.href, {
@@ -512,6 +526,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       if (keyName && !key) return result("not_configured", "서버 API 인증키가 등록되지 않았습니다. 공식 사이트에서 직접 확인할 수 있습니다.");
       try {
         if (provider === "met" && metFilters) return await met(input.q.trim(), page, metFilters);
+        if (isOpenArtProvider(provider)) return await openArtSearch(provider, input.q.trim(), page, request);
         if (provider === "openlibrary") return await openLibrary(input.q.trim(), page);
         if (provider === "openbd") return await openBd(input.q.trim(), page);
         if (provider === "kakao") return await kakao(input.q.trim(), page, key);

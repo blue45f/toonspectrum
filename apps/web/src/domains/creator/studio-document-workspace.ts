@@ -14,7 +14,7 @@ export const STUDIO_DOCUMENT_WORKSPACES = [
     labelEn: "Webtoon",
     descriptionKo: "컷·말풍선·대사와 긴 세로 원고를 편집합니다.",
     descriptionEn: "Edit panels, balloons, dialogue and long vertical pages.",
-    legacySurface: "comic",
+    legacySurface: "canvas",
     family: "visual",
   },
   {
