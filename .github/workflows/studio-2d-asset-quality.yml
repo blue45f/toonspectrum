@@ -1,7 +1,7 @@
 name: Studio 2D asset quality
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/studio-bg*'
@@ -17,6 +17,7 @@ on:
       - 'apps/web/public/assets/studio/backgrounds/**'
       - '.github/workflows/studio-2d-asset-quality.yml'
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'apps/web/src/domains/creator/studio-bg*'
       - 'apps/web/src/domains/creator/studio-2d*'

@@ -2,10 +2,11 @@ name: Learning quality
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
   push:
+    branches: ["main"]
     paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
 
   workflow_dispatch:

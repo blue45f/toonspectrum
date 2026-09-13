@@ -2,7 +2,7 @@ name: Character contact naturalness
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - .github/workflows/character-contact-naturalness.yml
@@ -23,6 +23,7 @@ on:
       - apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
 
   push:
+    branches: ["main"]
     paths:
       - .github/workflows/character-contact-naturalness.yml
       - scripts/character-contact-naturalness-ci-policy.test.ts

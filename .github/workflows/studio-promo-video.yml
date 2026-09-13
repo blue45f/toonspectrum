@@ -1,7 +1,7 @@
 name: Studio promo video quality
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/domains/creator/promo/**'
@@ -17,6 +17,7 @@ on:
       - 'tools/verify-studio-promo-director-output.py'
       - '.github/workflows/studio-promo-video.yml'
   push:
+    branches: ["main"]
     paths:
       - 'apps/web/src/domains/creator/promo/**'
       - 'apps/web/src/app/routes/groups/creator.routes.tsx'

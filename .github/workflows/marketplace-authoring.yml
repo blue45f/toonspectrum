@@ -2,7 +2,7 @@ name: Marketplace authoring
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
       - "apps/web/src/domains/market/**"
@@ -12,12 +12,14 @@ on:
       - "marketplace-benchmark/**"
       - ".github/workflows/marketplace-authoring.yml"
   push:
+    branches: ["main"]
     paths:
       - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
       - "apps/web/src/domains/market/**"
       - "apps/web/src/domains/creator/MarketplaceBrush*"
       - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
       - "e2e/marketplace-authoring-*.spec.ts"
+      - "marketplace-benchmark/**"
       - ".github/workflows/marketplace-authoring.yml"
   workflow_dispatch:
 
