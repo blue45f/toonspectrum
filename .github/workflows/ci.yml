@@ -52,6 +52,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Fortune observatory and calendar regressions
+        run: |
+          pnpm exec vitest run \
+            packages/core/src/fortune/fortune-observatory.test.ts \
+            packages/core/src/fortune/fortune-engine.security.test.ts \
+            apps/api/src/modules/fortune/fortune.controller.test.ts \
+            apps/web/src/domains/fortune/fortune-observatory-storage.test.ts
       - name: Studio offline drawing resilience regressions
         run: |
           set -euo pipefail

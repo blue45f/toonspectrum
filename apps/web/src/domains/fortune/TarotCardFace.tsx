@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { getTarotVisual, tarotAccent, tarotFaceGradient } from "./tarot-visuals";
 
@@ -18,12 +18,13 @@ interface TarotCardFaceProps {
 // 메이저 아르카나 카드 한 장 — 카드별 고유 색상(hue)·모티프 글리프로 그려지는
 // 생성형 타로 카드 페이스. 정/역방향을 글리프 회전과 배지로 구분한다.
 export function TarotCardFace({ card, className }: TarotCardFaceProps) {
+  const reducedMotion = useReducedMotion();
   const visual = getTarotVisual(card.id);
   const accent = tarotAccent(visual.hue);
   const reversed = card.type === "reversed";
 
   return (
-    <Card3D maxTilt={14} scale={1.04} className={className}>
+    <Card3D maxTilt={reducedMotion ? 0 : 14} scale={reducedMotion ? 1 : 1.04} className={className}>
       <div
         className="relative flex aspect-[2/3] flex-col justify-between overflow-hidden rounded-2xl p-3 text-center"
       style={{
@@ -46,8 +47,8 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
           background: "linear-gradient(115deg, transparent 38%, oklch(0.98 0.02 90 / 0.35) 50%, transparent 62%)",
           backgroundSize: "260% 100%",
         }}
-        animate={{ backgroundPositionX: ["140%", "-40%"] }}
-        transition={{ duration: 3.2, ease: "easeInOut", repeat: Infinity, repeatDelay: 1.8 }}
+        animate={reducedMotion ? { backgroundPositionX: "-40%" } : { backgroundPositionX: ["140%", "-40%"] }}
+        transition={{ duration: 3.2, ease: "easeInOut", repeat: 0, repeatDelay: 1.8 }}
       />
 
       {/* 상단: 로마 숫자 + 영문명 */}
@@ -65,8 +66,8 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
         <motion.span
           className="text-[3.25rem] leading-none sm:text-6xl"
           style={{ transform: reversed ? "rotate(180deg)" : undefined, filter: `drop-shadow(0 3px 14px ${accent})` }}
-          animate={{ y: [0, -5, 0], scale: [1, 1.06, 1] }}
-          transition={{ duration: 3.4, ease: "easeInOut", repeat: Infinity }}
+          animate={reducedMotion ? { y: 0, scale: 1 } : { y: [0, -5, 0], scale: [1, 1.06, 1] }}
+          transition={{ duration: 3.4, ease: "easeInOut", repeat: 0 }}
         >
           {visual.glyph}
         </motion.span>
