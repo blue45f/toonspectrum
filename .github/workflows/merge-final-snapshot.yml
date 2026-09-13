@@ -1,0 +1,77 @@
+name: Remaining branch and PR snapshot
+on:
+  push:
+    branches: [ops/merge-final-check-20260913]
+    paths: [.github/workflows/merge-final-snapshot.yml]
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  actions: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Inspect every remaining branch and current PR head without modifying refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import concurrent.futures, datetime, json, os, pathlib, urllib.parse, urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          def read(path):
+              with urllib.request.urlopen(urllib.request.Request(api+path,headers=headers),timeout=60) as response: return json.load(response)
+          def pages(path,key=None):
+              rows=[]
+              for page in range(1,101):
+                  data=read(path+('&' if '?' in path else '?')+'per_page=100&page='+str(page))
+                  batch=data[key] if key else data
+                  rows.extend(batch)
+                  if len(batch)<100:return rows
+              raise RuntimeError('Pagination bound exceeded')
+          root=pathlib.Path('artifacts/merge-final-snapshot');root.mkdir(parents=True)
+          def save(name,data): (root/name).write_text(json.dumps(data,ensure_ascii=False,indent=2))
+          branches=pages('branches');main=next(b['commit']['sha'] for b in branches if b['name']=='main')
+          pulls=pages('pulls?state=open');closed=read('pulls?state=closed&sort=updated&direction=desc&per_page=100')
+          save('branches.json',branches);save('open-pulls.json',pulls);save('recent-closed-pulls.json',closed)
+          def branch_report(b):
+              head=b['commit']['sha'];name=b['name']
+              comparison=read('compare/'+main+'...'+head+'?per_page=1')
+              result={'branch':name,'head':head,'protected':b['protected'],'status':comparison['status'],'ahead':comparison['ahead_by'],'behind':comparison['behind_by'],'merge_base':comparison['merge_base_commit']['sha'],'paths':[f['filename'] for f in comparison.get('files',[])],'main_contains_head':comparison['ahead_by']==0,'open_prs':[p['number'] for p in pulls if p['head']['ref']==name],'base_of_prs':[p['number'] for p in pulls if p['base']['ref']==name],'exact_merged_prs':[p['number'] for p in closed if p.get('merged_at') and p['head']['ref']==name and p['head']['sha']==head and p['base']['ref']=='main']}
+              if comparison['ahead_by']:
+                  tip=read('git/commits/'+head);result['message']=tip['message'];result['date']=tip['committer']['date']
+              return result
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              reports=list(pool.map(branch_report,[b for b in branches if b['name'] not in ('main','ops/merge-final-check-20260913')]))
+          save('branch-report.json',reports)
+          def pr_report(p):
+              number=p['number'];detail=read('pulls/'+str(number));head=detail['head']['sha']
+              files=pages('pulls/'+str(number)+'/files');save('pr-'+str(number)+'-files.json',files)
+              reviews=pages('pulls/'+str(number)+'/reviews');comments=pages('pulls/'+str(number)+'/comments')
+              save('pr-'+str(number)+'-reviews.json',reviews);save('pr-'+str(number)+'-comments.json',comments)
+              checks=pages('commits/'+head+'/check-runs',key='check_runs')
+              runs=read('actions/runs?head_sha='+head+'&per_page=100')['workflow_runs']
+              ci=[]
+              for run in runs:
+                  if run['name']=='CI':
+                      jobs=pages('actions/runs/'+str(run['id'])+'/jobs',key='jobs')
+                      ci.append({'id':run['id'],'head_sha':run['head_sha'],'event':run['event'],'status':run['status'],'conclusion':run['conclusion'],'jobs':[{'id':j['id'],'name':j['name'],'status':j['status'],'conclusion':j['conclusion'],'failed_steps':[s['name'] for s in j.get('steps',[]) if s.get('conclusion')=='failure']} for j in jobs]})
+              return {'number':number,'title':detail['title'],'head':head,'branch':detail['head']['ref'],'base':detail['base']['sha'],'draft':detail['draft'],'mergeable':detail['mergeable'],'mergeable_state':detail['mergeable_state'],'auto_merge':detail['auto_merge'],'files':len(files),'checks':[{'name':c['name'],'status':c['status'],'conclusion':c['conclusion'],'url':c.get('details_url')} for c in checks],'runs':[{'id':r['id'],'name':r['name'],'event':r['event'],'status':r['status'],'conclusion':r['conclusion']} for r in runs],'ci':ci}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool: pr_reports=list(pool.map(pr_report,pulls))
+          save('pr-report.json',pr_reports)
+          query='{ repository(owner:"blue45f",name:"toonspectrum") {'+' '.join('p'+str(p['number'])+':pullRequest(number:'+str(p['number'])+'){number mergeStateStatus reviewDecision reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved isOutdated comments(first:1){nodes{body path url}}}}}' for p in pulls)+'} }'
+          req=urllib.request.Request('https://api.github.com/graphql',data=json.dumps({'query':query}).encode(),headers={**headers,'Content-Type':'application/json'})
+          with urllib.request.urlopen(req,timeout=60) as response: save('review-threads.json',json.load(response))
+          summary={'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat(),'main':main,'main_at_end':read('branches/main')['commit']['sha'],'branches':[{k:b[k] for k in ('branch','head','status','ahead','behind','main_contains_head','open_prs','exact_merged_prs')} for b in reports],'prs':[{'number':p['number'],'head':p['head'],'draft':p['draft'],'mergeable':p['mergeable'],'state':p['mergeable_state'],'files':p['files'],'ci':p['ci']} for p in pr_reports],'refs_modified':False}
+          save('summary.json',summary);print(json.dumps(summary,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: merge-final-snapshot
+          path: artifacts/merge-final-snapshot
+          if-no-files-found: error
+          retention-days: 3
