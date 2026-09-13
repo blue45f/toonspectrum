@@ -2,10 +2,11 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { chromium, expect } from '@playwright/test';
 
 const base = process.env.PLAYGROUND_BASE_URL || 'http://127.0.0.1:5270';
-const output = process.env.PLAYGROUND_QA_DIR || '/private/tmp/toonstudio-playground-qa';
+const output = process.env.PLAYGROUND_QA_DIR || path.join(tmpdir(), 'toonstudio-playground-qa');
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHANNEL === '' ? {} : { channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' }) });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
