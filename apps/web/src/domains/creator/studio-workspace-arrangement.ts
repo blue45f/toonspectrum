@@ -2,6 +2,7 @@ import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
 
 export interface StudioWorkspaceRegionSnapshot {
   readonly detached: boolean;
+  readonly collapsed?: boolean;
   readonly layout: StudioFloatingSurfaceLayout;
 }
 export interface StudioWorkspaceRegionController {
@@ -58,13 +59,52 @@ export function writeStudioWorkspaceRegionDetached(
   } catch { return false; }
 }
 /** UI preferences only: never serializes document content, credentials or canvas history. */
+export function captureStudioWorkspaceArrangement(): string {
+  const entries = [...regions].map(([id, controller]) => ({ id, ...controller.capture() }));
+  return JSON.stringify({ version: 1, entries });
+}
+export function decodeStudioWorkspaceArrangement(raw: string): ({ id: string } & StudioWorkspaceRegionSnapshot)[] | null {
+  try {
+    if (!raw || raw.length > 100_000) return null;
+    const saved: unknown = JSON.parse(raw);
+    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
+      || !("entries" in saved) || !Array.isArray(saved.entries) || saved.entries.length > 100) return null;
+    const ids = new Set<string>();
+    for (const entry of saved.entries) {
+      if (!entry || typeof entry !== "object" || typeof entry.id !== "string"
+        || !/^[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}$/.test(entry.id) || ids.has(entry.id)
+        || typeof entry.detached !== "boolean"
+        || (entry.collapsed !== undefined && typeof entry.collapsed !== "boolean")) return null;
+      const layout = entry.layout;
+      if (!layout || typeof layout !== "object" || layout.version !== 2
+        || !["free", "left", "right", "top", "bottom"].includes(layout.dock)
+        || typeof layout.positionLocked !== "boolean" || typeof layout.sizeLocked !== "boolean"
+        || ![layout.xRatio, layout.yRatio].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
+        || ![layout.width, layout.height].every(value => typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 10_000)) return null;
+      ids.add(entry.id);
+    }
+    return saved.entries;
+  } catch { return null; }
+}
+export function applyStudioWorkspaceArrangement(raw: string): boolean {
+  const entries = decodeStudioWorkspaceArrangement(raw);
+  if (!entries) return false;
+  let restored = false;
+  for (const entry of entries) {
+    const controller = regions.get(entry.id);
+    if (!controller) continue;
+    controller.restore(entry);
+    restored = true;
+  }
+  return restored;
+}
+
 export function saveStudioWorkspaceArrangement(
   storage: Pick<Storage, "setItem"> | null = sessionStorageOrNull(),
 ): boolean {
   try {
     if (!storage) return false;
-    const entries = [...regions].map(([id, controller]) => ({ id, ...controller.capture() }));
-    storage.setItem(STUDIO_WORKSPACE_ARRANGEMENT_KEY, JSON.stringify({ version: 1, entries }));
+    storage.setItem(STUDIO_WORKSPACE_ARRANGEMENT_KEY, captureStudioWorkspaceArrangement());
     return true;
   } catch { return false; }
 }
@@ -73,25 +113,6 @@ export function restoreStudioWorkspaceArrangement(
 ): boolean {
   try {
     const raw = storage?.getItem(STUDIO_WORKSPACE_ARRANGEMENT_KEY);
-    if (!raw || raw.length > 100_000) return false;
-    const saved: unknown = JSON.parse(raw);
-    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
-      || !("entries" in saved) || !Array.isArray(saved.entries) || saved.entries.length > 100) return false;
-    // Validate the complete envelope before applying anything. Each owner normalizes geometry.
-    const entries: { id: string; detached: boolean; layout: StudioFloatingSurfaceLayout }[] = [];
-    for (const entry of saved.entries as unknown[]) {
-      if (!entry || typeof entry !== "object" || !("id" in entry) || typeof entry.id !== "string"
-        || !("detached" in entry) || typeof entry.detached !== "boolean"
-        || !("layout" in entry) || !entry.layout || typeof entry.layout !== "object") return false;
-      entries.push(entry as { id: string; detached: boolean; layout: StudioFloatingSurfaceLayout });
-    }
-    let restored = false;
-    for (const entry of entries) {
-      const controller = regions.get(entry.id);
-      if (!controller) continue;
-      controller.restore(entry);
-      restored = true;
-    }
-    return restored;
+    return raw ? applyStudioWorkspaceArrangement(raw) : false;
   } catch { return false; }
 }

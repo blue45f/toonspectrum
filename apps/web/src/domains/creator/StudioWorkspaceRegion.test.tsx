@@ -101,10 +101,41 @@ describe("StudioWorkspaceRegion", () => {
     Object.defineProperty(globalThis, "innerWidth", { configurable: true, value: 1440 }); fireEvent.resize(window);
     expect(regionNode().dataset.studioRegionFloating).toBe("true");
   });
+  it("collapses without unmounting content and restores its size", () => {
+    render(<Harness />); edit(); fireEvent.click(screen.getByRole("button", { name: "영역 분리" }));
+    const child = screen.getByRole("button", { name: "도구 실행" });
+    const height = regionNode().style.height;
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 접기" }));
+    expect(regionNode().dataset.studioRegionCollapsed).toBe("true");
+    expect(child.isConnected).toBe(true);
+    expect(screen.queryByRole("button", { name: "도구 실행" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "테스트 도구 오른쪽 아래 크기 조절" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 펼치기" }));
+    expect(regionNode().style.height).toBe(height);
+    expect(screen.getByRole("button", { name: "도구 실행" })).toBe(child);
+  });
+  it("resizes by numeric entry and clamps oversized dimensions", () => {
+    render(<Harness />); edit(); fireEvent.click(screen.getByRole("button", { name: "테스트 도구 배치 설정" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "테스트 도구 너비" }), { target: { value: "520" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "테스트 도구 높이" }), { target: { value: "9999" } });
+    fireEvent.click(screen.getByRole("button", { name: "크기 적용" }));
+    expect(regionNode().style.width).toBe("520px");
+    expect(parseFloat(regionNode().style.height)).toBeLessThanOrEqual(912);
+    expect(regionNode().dataset.studioRegionFloating).toBe("true");
+  });
+  it("cancels all arrangement edits without touching the child", () => {
+    render(<Harness />); const child = screen.getByRole("button", { name: "도구 실행" });
+    edit(); fireEvent.click(screen.getByRole("button", { name: "영역 분리" }));
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 접기" }));
+    fireEvent.click(screen.getByRole("button", { name: "배치 취소" }));
+    expect(regionNode().dataset.studioRegionFloating).toBe("false");
+    expect(screen.getByRole("button", { name: "도구 실행" })).toBe(child);
+    expect(screen.getByRole("button", { name: "배치 편집" })).toBeTruthy();
+  });
   it("restores a saved region arrangement using the toolbar", () => {
     render(<Harness />); edit(); fireEvent.click(screen.getByRole("button", { name: "영역 분리" }));
-    fireEvent.click(screen.getByRole("button", { name: "배치 저장" })); fireEvent.click(screen.getByRole("button", { name: "원래 자리" }));
-    expect(regionNode().dataset.studioRegionFloating).toBe("false"); fireEvent.click(screen.getByRole("button", { name: "불러오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "탭에 저장" })); fireEvent.click(screen.getByRole("button", { name: "원래 자리" }));
+    expect(regionNode().dataset.studioRegionFloating).toBe("false"); fireEvent.click(screen.getByRole("button", { name: "탭 배치 불러오기" }));
     expect(regionNode().dataset.studioRegionFloating).toBe("true");
   });
 });
