@@ -27,13 +27,19 @@
  * Run:
  *   pnpm verify:studio-gpu-filters
  */
+import { fileURLToPath } from "node:url";
+
 import { chromium, type Browser } from "playwright";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, normalizePath } from "vite";
 
 import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const HARNESS_PATH = "/__studio_gpu_filters_parity__";
+// The web root is apps/web; resolve the workspace script without broadening Vite access.
+const HARNESS_ENTRY = `/@fs/${normalizePath(fileURLToPath(
+  new URL("./studio-gpu-filters-parity-browser.ts", import.meta.url),
+))}`;
 const RESULT_TIMEOUT_MS = 45_000;
 /** LUT-only plans are exact CPU byte maps — parity must be bit-identical. */
 const MAX_CHANNEL_DELTA_LUT_EXACT = 0;
@@ -87,7 +93,7 @@ async function main(): Promise<void> {
     res.setHeader("Content-Type", "text/html");
     res.end(
       "<!doctype html><meta charset=\"utf-8\">"
-      + "<script type=\"module\" src=\"/scripts/studio-gpu-filters-parity-browser.ts\"></script>"
+      + `<script type="module" src="${HARNESS_ENTRY}"></script>`
     );
   });
 
@@ -104,6 +110,11 @@ async function main(): Promise<void> {
 
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    const harnessEntry = await context.request.get(`${origin}${HARNESS_ENTRY.slice(1)}`);
+    invariant(harnessEntry.ok(), `GPU parity browser entry is unavailable: HTTP ${harnessEntry.status()}`);
+    invariant(harnessEntry.headers()["content-type"]?.includes("javascript"),
+      "GPU parity browser entry must be JavaScript, not an HTML fallback");
 
     await page.goto(`${origin}${HARNESS_PATH.slice(1)}`, { waitUntil: "load" });
 
