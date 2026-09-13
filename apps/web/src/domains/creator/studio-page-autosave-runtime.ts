@@ -1,3 +1,4 @@
+import { studioRecoveryDescription } from "./canvas/studio-recovery-notice-model";
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { recoverInterruptedStudioAiOperations } from "./ai/studio-ai-provenance-recorder";
@@ -10,7 +11,7 @@ import {
 } from "./studio-autosave";
 import { normalizeStudioCharacterBible } from "./studio-character-bible";
 import { normalizeStudioCommentsDocument } from "./studio-comments";
-import { runStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { confirmStudioDestructiveAction, recordStudioDestructiveOutcome } from "./studio-destructive-action-preview";
 import { studioClearAutosaveRequest } from "./studio-destructive-command-catalog";
 import { normalizeDocumentMaster, type DocumentMaster } from "./studio-master-page";
 import { normalizePageReviewState } from "./studio-page-review";
@@ -110,6 +111,8 @@ export function guardStudioDocumentReplacement(
  * 원본과 한 글자도 다르지 않게 하기 위한 seam 이다.
  */
 export interface StudioAutosaveRestoreContext {
+  /** Preserve the full current document separately before replacing it. */
+  readonly preserveCurrentDocument: () => Promise<boolean>;
   readonly autosaveRecoveryCandidateRef: MutableRefObject<StudioAutosaveRecoveryCandidate | null>;
   readonly canApplyStudioMutation: (ticket: StudioEditorMutationTicket) => boolean;
   readonly captureStudioMutationTicket: () => StudioEditorMutationTicket;
@@ -241,14 +244,12 @@ export async function restoreStudioAutosaveRecovery(
     try {
       const saved = autosaveRecoveryCandidateRef.current;
       if (!saved) {
-        setError("복구할 내구 임시저장 데이터를 찾지 못했어요.");
+        setError("이어서 열 그림이 없어요.");
         return;
       }
       if (saved.authority === "browser-storage-compatibility") {
         setAutosaveRestoreBlockedReason("legacy-unversioned");
-        setError(
-          "내구 저장소에서 확인되지 않은 호환 백업은 자동 복구하지 않아요. JSON 백업으로 내려받아 보관해 주세요."
-        );
+        setError(studioRecoveryDescription("legacy-unversioned"));
         return;
       }
       {
@@ -259,11 +260,7 @@ export async function restoreStudioAutosaveRecovery(
           });
           if (!compatibility.compatible) {
             setAutosaveRestoreBlockedReason(compatibility.reason);
-            setError(
-              compatibility.reason === "revision-mismatch"
-                ? "임시저장본의 서버 revision이 현재 공동 문서와 달라 자동 복구를 차단했어요. JSON 백업으로 내려받아 수동 병합해 주세요."
-                : "출처 revision을 확인할 수 없는 공동 임시저장본이라 자동 복구를 차단했어요. JSON 백업으로 내려받아 보관해 주세요."
-            );
+            setError(studioRecoveryDescription(compatibility.reason));
             return;
           }
         }
@@ -275,16 +272,28 @@ export async function restoreStudioAutosaveRecovery(
           loadStudioReleaseScheduleRuntime(),
           normalizeStudioPublicationAnalyticsDeferred(parsed.publicationAnalytics),
         ]);
+        if (!canApplyStudioMutation(mutationTicket) || autosaveRecoveryCandidateRef.current !== saved) {
+          setError("그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
+          return;
+        }
+        if (!(await ctx.preserveCurrentDocument())) {
+          setError("현재 그림을 보관하지 못해 이어 열기를 멈췄어요. 저장 공간을 확인하거나 파일로 보관해 주세요.");
+          return;
+        }
+        if (autosaveRecoveryCandidateRef.current !== saved) {
+          setError("그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
+          return;
+        }
         if (
           drawingRef.current
           || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
           || pendingStrokeCommitsRef.current
         ) {
-          setError("임시저장본을 준비하는 동안 새 획이 시작되어 복구하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.");
+          setError("새 획이 시작되어 이어 열기를 멈췄어요. 획을 마친 뒤 다시 시도해 주세요.");
           return;
         }
         if (!canApplyStudioMutation(mutationTicket)) {
-          setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
+          setError("그림이 바뀌어 이어 열기를 멈췄어요. 다시 확인해 주세요.");
           return;
         }
         if (parsed.pagesList.length > 0) {
@@ -364,7 +373,7 @@ export async function restoreStudioAutosaveRecovery(
         setHasAutosave(false);
       }
     } catch {
-      setError("임시저장 복구에 실패했어요.");
+      setError("이전 그림을 열지 못했어요.");
     }
 }
 
@@ -383,44 +392,39 @@ export interface StudioAutosaveDurableAuthorityContext {
 export function clearStudioAutosaveDurableAuthority(
   ctx: StudioAutosaveDurableAuthorityContext
 ): void {
+  // Housekeeping remains best-effort. User-requested deletion below is strict and awaited.
+  void persistStudioAutosaveDeletion(ctx, false).catch((cause: unknown) => {
+    if (import.meta.env.DEV) console.warn("Studio durable autosave tombstone could not be written.", cause);
+  });
+}
+
+/** Explicit deletion requires acknowledgement from every available durable store. */
+export async function persistStudioAutosaveDeletion(
+  ctx: StudioAutosaveDurableAuthorityContext,
+  requireEveryStore = true,
+): Promise<void> {
   const { autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef } = ctx;
-    const sessionPromise = autosaveOpfsSessionRef.current;
-    const sqlitePromise = autosaveSqliteStoreRef.current;
-    if (!sessionPromise && !sqlitePromise) return;
-    const savedAt = new Date().toISOString();
-    void Promise.all([
-      sessionPromise ?? Promise.resolve(null),
-      sqlitePromise ?? Promise.resolve(null),
-    ])
-      .then(async ([session, sqlite]) => {
-        const attempted: Promise<unknown>[] = [];
-        if (session) attempted.push(session.clear(savedAt));
-        if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
-        const results = await Promise.allSettled(attempted);
-        if (
-          results.length > 0
-          && results.every((result) => result.status === "rejected")
-        ) {
-          throw new AggregateError(
-            results.map((result) =>
-              result.status === "rejected" ? result.reason : null
-            ),
-            "Studio durable autosave tombstones failed",
-          );
-        }
-      })
-      .catch((cause: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn("Studio durable autosave tombstone could not be written.", cause);
-        }
-      });
+  const savedAt = new Date().toISOString();
+  const [session, sqlite] = await Promise.all([
+    autosaveOpfsSessionRef.current ?? Promise.resolve(null),
+    autosaveSqliteStoreRef.current ?? Promise.resolve(null),
+  ]);
+  const attempted: Promise<unknown>[] = [];
+  if (session) attempted.push(session.clear(savedAt));
+  if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
+  const results = await Promise.allSettled(attempted);
+  const failed = results.filter((result) => result.status === "rejected").length;
+  if (requireEveryStore ? results.length === 0 || failed > 0 : failed > 0 && failed === results.length) {
+    throw new Error("저장 공간에 접근하지 못해 삭제를 마치지 못했어요. 이 탭을 닫기 전에 백업 파일을 받아 주세요.");
+  }
 }
 
 /** 임시저장 기록 비우기가 읽고 쓰는 페이지 소유 상태. */
 export interface StudioAutosaveRecordClearContext {
+  readonly canClearAutosave: () => boolean;
   readonly autosaveKey: string;
   readonly autosaveRecoveryCandidateRef: MutableRefObject<StudioAutosaveRecoveryCandidate | null>;
-  readonly clearAutosaveDurableAuthority: () => void;
+  readonly clearAutosaveDurableAuthority: () => void | Promise<void>;
   readonly remixId: string | null;
   readonly setAutosaveRestoreBlockedReason: (
     next: "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null
@@ -434,7 +438,7 @@ export interface StudioAutosaveRecordClearContext {
  * 다음 재진입에서 되살아난다.
  * (StudioPage 의 clearAutosaveRecord 본문 — verbatim 이동.)
  */
-export function clearStudioAutosaveRecord(ctx: StudioAutosaveRecordClearContext): void {
+export async function clearStudioAutosaveRecord(ctx: StudioAutosaveRecordClearContext): Promise<boolean> {
   const {
     autosaveKey,
     autosaveRecoveryCandidateRef,
@@ -444,23 +448,28 @@ export function clearStudioAutosaveRecord(ctx: StudioAutosaveRecordClearContext)
     setHasAutosave,
     workId,
   } = ctx;
-    clearAutosaveDurableAuthority();
+    const candidate = autosaveRecoveryCandidateRef.current;
+    if (!candidate || !ctx.canClearAutosave()) return false;
+    await clearAutosaveDurableAuthority();
+    if (autosaveRecoveryCandidateRef.current !== candidate || !ctx.canClearAutosave()) return false;
     try {
       localStorage.removeItem(autosaveKey);
       localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
-      if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
+      if (!workId && !remixId && autosaveKey.endsWith(":new")) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
     } catch {
-      // 무시
+      throw new Error("이전 그림을 완전히 삭제하지 못했어요. 백업 파일을 받은 뒤 다시 시도해 주세요.");
     }
     autosaveRecoveryCandidateRef.current = null;
     setHasAutosave(false);
     setAutosaveRestoreBlockedReason(null);
+    return true;
 }
 
 /** 복구 배너 "비우기" 승인 트랜잭션이 읽는 페이지 소유 상태. */
 export interface StudioClearAutosaveContext {
   readonly autosaveRecoveryCandidateRef: MutableRefObject<StudioAutosaveRecoveryCandidate | null>;
-  readonly clearAutosaveRecord: () => void;
+  readonly clearAutosaveRecord: () => boolean | Promise<boolean>;
+  readonly canClearAutosave: () => boolean;
 }
 
 /**
@@ -475,8 +484,9 @@ export interface StudioClearAutosaveContext {
 export async function requestStudioAutosaveClear(
   ctx: StudioClearAutosaveContext
 ): Promise<void> {
-  const { autosaveRecoveryCandidateRef, clearAutosaveRecord } = ctx;
+  const { autosaveRecoveryCandidateRef, clearAutosaveRecord, canClearAutosave } = ctx;
     const saved = autosaveRecoveryCandidateRef.current;
+    if (!saved || !canClearAutosave()) return;
     const savedPages = saved?.payload.pagesList ?? [];
     const savedAt = saved ? new Date(saved.savedAt) : null;
     const savedAtLabel =
@@ -491,14 +501,17 @@ export async function requestStudioAutosaveClear(
       ),
       ...(savedAtLabel ? { savedAtLabel } : {}),
     });
-    // runStudioDestructiveAction 이 승인·실행·결과 고지를 한 흐름으로 묶는다 — 거절도
-    // 실패도 원장에 남으므로 "눌렀는데 아무 일도 없다"가 생기지 않는다.
-    await runStudioDestructiveAction({
-      request,
-      execute: () => {
-        clearAutosaveRecord();
-      },
-    });
+    if (!(await confirmStudioDestructiveAction(request))) return;
+    if (autosaveRecoveryCandidateRef.current !== saved || !canClearAutosave()) {
+      recordStudioDestructiveOutcome({ request, outcome: "refused", detail: "그림이 바뀌어 삭제하지 않았어요. 다시 확인해 주세요." });
+      return;
+    }
+    try {
+      const cleared = await clearAutosaveRecord();
+      recordStudioDestructiveOutcome({ request, outcome: cleared ? "committed" : "refused" });
+    } catch (cause: unknown) {
+      recordStudioDestructiveOutcome({ request, outcome: "failed", detail: cause instanceof Error ? cause.message : "삭제하지 못했어요. 백업 파일을 받은 뒤 다시 시도해 주세요." });
+    }
 }
 
 /** JSON 백업 내려받기가 읽는 페이지 소유 상태. */
@@ -526,13 +539,13 @@ export function downloadStudioAutosaveBackup(ctx: StudioAutosaveBackupContext): 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${(title.trim() || "toonspectrum-autosave").replace(/[\\/:*?"<>|]+/g, "-")}-autosave.json`;
+      link.download = `${(saved.payload.title?.trim() || title.trim() || "toonspectrum-autosave").replace(/[\\/:*?"<>|]+/g, "-")}-autosave.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
       setError(null);
     } catch {
-      setError("임시저장 JSON 백업을 만들지 못했어요.");
+      setError("백업 파일을 만들지 못했어요. 이전 그림은 그대로 두었습니다.");
     }
 }

@@ -1,8 +1,10 @@
-
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3 } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { LibraryBackupImport } from "./LibraryBackupImport";
+
+import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
@@ -64,14 +66,16 @@ function Row({
           <p className="mt-0.5 text-[0.78rem] leading-relaxed text-fg-2">{desc}</p>
         </div>
       </div>
-      <div className="shrink-0 sm:pl-4">{children}</div>
+      <div className="min-w-0 sm:max-w-[60%] sm:pl-4">{children}</div>
     </div>
   );
 }
 
 export function SettingsPage() {
   const hydrated = useHydrated();
+  const experience = useSiteExperience();
   const lang = useI18n((s) => s.lang);
+  const userId = useApp((s) => s.userId);
   const setLang = useI18n((s) => s.setLang);
   const ratingScale = useApp((s) => s.ratingScale);
   const setRatingScale = useApp((s) => s.setRatingScale);
@@ -92,10 +96,7 @@ export function SettingsPage() {
   const [searchesCleared, setSearchesCleared] = useState(false);
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [imported, setImported] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const t = useT();
   const langOptions = getLanguageOptions(lang).map((entry) => ({
     id: entry.code,
@@ -138,35 +139,10 @@ export function SettingsPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `toonspectrum-library-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(a);
     a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const onImportPick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const d = JSON.parse(String(reader.result)) as Partial<Record<string, unknown>>;
-        if (!d || typeof d !== "object") throw new Error("invalid");
-        hydrateFromServer({
-          ratings: (d.ratings as Record<string, number>) ?? {},
-          reads: (d.reads as Record<string, never>) ?? {},
-          subscriptions: (d.subscriptions as Record<string, boolean>) ?? {},
-          reviews: (d.reviews as Record<string, never>) ?? {},
-          likedReviews: (d.likedReviews as Record<string, boolean>) ?? {},
-          collections: Array.isArray(d.collections) ? (d.collections as never[]) : [],
-        });
-        setImported(true);
-        setImportError(null);
-      } catch {
-        setImportError(t("settings.data.importError"));
-        setImported(false);
-      }
-    };
-    reader.readAsText(file);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // 클라이언트에서만 localStorage 기반 선호값 반영.
@@ -220,6 +196,14 @@ export function SettingsPage() {
             </select>
           </label>
         </Row>
+        {experience && <Row icon={Sparkles}
+          title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
+          desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
+          <Choice options={[
+            { id: "vivid", label: lang.startsWith("ko") ? "화려하게" : "Vivid" },
+            { id: "calm", label: lang.startsWith("ko") ? "차분하게" : "Calm" },
+          ]} value={experience.mode} onChange={experience.setMode} />
+        </Row>}
         <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
           <Choice options={scaleOptions} value={ratingScale} onChange={setRatingScale} />
         </Row>
@@ -313,23 +297,8 @@ export function SettingsPage() {
           </button>
         </Row>
         <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
-          <span className="inline-flex items-center gap-2">
-            {imported && (
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-good">
-                <Check size={14} /> {t("settings.data.confirmed")}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
-            >
-              <Upload size={14} /> {t("settings.data.import")}
-            </button>
-            <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onImportPick} />
-          </span>
+          <LibraryBackupImport onRestore={hydrateFromServer} locale={lang.toLowerCase().startsWith("ko") ? "ko" : "en"} ownerId={userId} />
         </Row>
-        {importError && <p className="-mt-1 pb-3 text-xs text-bad">{importError}</p>}
         <Row
           icon={Clock}
           title={t("settings.data.recent")}

@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/binder_notebook",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-binder-notebook",
+  "sourceModelSha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+  "render": {
+    "sourceId": "polyhaven-binder-notebook",
+    "sourceSha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+    "path": "high-resolution-props/polyhaven-binder-notebook.png",
+    "visiblePixels": 92137,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 18077
+  },
+  "independentOriginal": false
+}

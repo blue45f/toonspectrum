@@ -190,7 +190,7 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       try { await activePage.reload({ waitUntil: "domcontentloaded" }); }
       finally { cancellationScope = null; }
       await viewport.waitFor({ state: "visible", timeout: 30_000 });
-      const restore = activePage.getByRole("button", { name: "복구하기", exact: true });
+      const restore = activePage.getByRole("button", { name: "이어서 그리기", exact: true });
       await restore.waitFor({ state: "visible" });
       await restore.click();
       await restore.waitFor({ state: "hidden" });

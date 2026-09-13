@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/asphalt_pit_lane",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Asphalt Pit Lane",
+    "categories": [
+      "floor",
+      "asphalt",
+      "road"
+    ],
+    "type": 1,
+    "tags": [
+      "asphalt",
+      "asphalt road",
+      "road",
+      "roadway",
+      "tarmac road",
+      "race track",
+      "pit lane"
+    ],
+    "authors": {
+      "Dimitrios Savva": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1723593600,
+    "files_hash": "a04beb641ce5cbf5307a31f51f402f5a9fb675a0",
+    "description": "Free 8K asphalt texture: dark pit-lane tarmac with fine gravel aggregate, gritty roughness, subtle tire wear and a low-reflective matte surface.",
+    "category_id": "330aa03f-5063-50ab-a052-4f6b7214707e",
+    "category": "Asphalt & Bitumen/Tracks/Race Tracks",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "db57df04",
+    "download_count": 66436,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_pit_lane.png?width=256&height=256&v=db57df04"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_diff_2k.jpg",
+      "bytes": 4187951,
+      "sha256": "35f41f618a4342454b9a46d136b5086e8f1872a866aa1a7db2f813be3c6059d3",
+      "sourceMd5": "45339b41f99b4b5424882f8b4ae5d908"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_rough_2k.jpg",
+      "bytes": 1971034,
+      "sha256": "cf54b6ad76bd641cc5e9fc2fa0378899839c1e2a95630f844e6ed825510d0644",
+      "sourceMd5": "c6a6b989c3679028d42ea89837a738c3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_nor_gl_2k.jpg",
+      "bytes": 4348614,
+      "sha256": "ff7aea390e34d05cb41afb93b90f043711736c252e9c5766e412efe756bf3660",
+      "sourceMd5": "26c9cde27e15ce966abf0189e1b836b8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_ao_2k.jpg",
+      "bytes": 2804038,
+      "sha256": "970e4caab74698cda10ce7cd44a71fe65e27c57812b6cf2cf0689ebdaef70a9b",
+      "sourceMd5": "7b9845e2204907f1d49c444a0df766fe"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_pit_lane/asphalt_pit_lane_disp_2k.jpg",
+      "bytes": 1019156,
+      "sha256": "48e0a29f7dd2735f89d89334c0ae46d1eadcfc89a96554a87fe8ec921ba7666b",
+      "sourceMd5": "ed423bc8b688a87fc3da6283e75624cd"
+    }
+  ]
+}

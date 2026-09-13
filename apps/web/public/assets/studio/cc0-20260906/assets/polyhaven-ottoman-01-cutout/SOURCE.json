@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Ottoman_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-ottoman-01",
+  "sourceModelSha256": "5b33a28a36549565174ecf192b467d5be665a1804a2bbf37e76fcc547b0ebe82",
+  "render": {
+    "sourceId": "polyhaven-ottoman-01",
+    "sourceSha256": "5b33a28a36549565174ecf192b467d5be665a1804a2bbf37e76fcc547b0ebe82",
+    "path": "high-resolution-props/polyhaven-ottoman-01.png",
+    "visiblePixels": 633319,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4240
+  },
+  "independentOriginal": false
+}

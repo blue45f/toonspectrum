@@ -85,3 +85,11 @@ describe("studio project center search model", () => {
     ]);
   });
 });
+
+
+it("finds the simple history label through old checkpoint terminology", () => {
+  const record = { key: "history", label: "저장 기록", description: "이전 그림 열기", sectionLabel: "파일", order: 0 };
+  for (const query of ["저장 기록", "체크포인트", "history"]) {
+    expect(rankStudioProjectCenterActions([record], query)).toEqual([record]);
+  }
+});

@@ -1,0 +1,85 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/derelict_overpass",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 21,
+    "type": 0,
+    "whitebalance": 5400,
+    "date_published": 1565042400,
+    "name": "Derelict Overpass",
+    "categories": [
+      "outdoor",
+      "skies",
+      "urban",
+      "morning-afternoon",
+      "partly cloudy",
+      "high contrast",
+      "natural light"
+    ],
+    "coords": [
+      -25.78159111,
+      27.9432042
+    ],
+    "date_taken": 1547915760,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "3237733"
+    ],
+    "backplates": true,
+    "tags": [
+      "asphalt",
+      "sun",
+      "highway",
+      "bridge",
+      "overpass",
+      "road",
+      "backplates",
+      "backplates"
+    ],
+    "files_hash": "ae3505577c037bc16143bf6d83a0da3991b87a47",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K HDRI, unclipped. Bright, high-contrast sun over a derelict overpass with warm directional light, long shadows, partly cloudy sky and crisp asphalt reflections.",
+    "category_id": "7af94676-1dd6-5047-b064-dd3c176d498b",
+    "category": "Streets & Town/Bridges & Underpasses/Overpasses & Flyovers",
+    "attributes": {
+      "time_of_day": "afternoon",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "high",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "258d56dd",
+    "download_count": 129942,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/derelict_overpass.png?width=256&height=256&v=258d56dd"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/derelict_overpass.jpg",
+      "bytes": 4922643,
+      "sha256": "670878cdcec6d9d5bf40d68d42a6e3eacd026adccf816df8e36b70439cef5d1d",
+      "sourceMd5": "850524fd7dd1b1dce026db7daa962c2f"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

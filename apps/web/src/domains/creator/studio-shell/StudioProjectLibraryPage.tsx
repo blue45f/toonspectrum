@@ -32,6 +32,7 @@ import type {
   StudioProjectLibraryEntry,
   StudioProjectStatus,
 } from "../studio-project-library-store";
+import { StudioQuickStart } from "./StudioQuickStart";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 
 type Locale = "ko" | "en";
@@ -382,6 +383,11 @@ export function StudioProjectLibraryPage({
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
+        <nav className="mb-5 flex flex-wrap gap-3 text-sm font-semibold text-accent" aria-label={locale === "ko" ? "확장 제작실" : "Extended studio"}>
+          <a href="/offline-draw/">{locale === "ko" ? "로컬 드로잉" : "Local drawing"}</a>
+          <Link href="/studio/ai-lab">{locale === "ko" ? "생성형 애니메이션 · 2D↔3D" : "Generative animation · 2D/3D"}</Link>
+          <a href="/spatial-reader/">{locale === "ko" ? "공간형 웹툰 감상" : "Spatial webtoon reader"}</a>
+        </nav>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO</p>
@@ -412,6 +418,8 @@ export function StudioProjectLibraryPage({
             </Link>
           </div>
         </div>
+
+        {view === "active" ? <StudioQuickStart locale={locale} /> : null}
 
         <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label={locale === "ko" ? "프로젝트 목록" : "Project lists"} className="overflow-x-auto">

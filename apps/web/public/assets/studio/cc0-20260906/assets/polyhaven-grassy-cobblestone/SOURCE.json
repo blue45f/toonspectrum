@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/grassy_cobblestone",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1658188800,
+    "name": "Grassy Cobblestone",
+    "type": 1,
+    "authors": {
+      "Dario Barresi": "Processing ",
+      "Charlotte Baglioni": "Photography"
+    },
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "categories": [
+      "natural",
+      "sand",
+      "outdoor",
+      "floor",
+      "cobblestone"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "tags": [
+      "ground",
+      "dirt",
+      "rock",
+      "grass",
+      "dirty",
+      "path",
+      "trampled",
+      "pathway"
+    ],
+    "files_hash": "6093a2264b43e4fe5a7b6ab741894ae3e7b9163c",
+    "description": "Free 8K texture of grassy cobblestone: weathered stone pavers with dirt-filled seams, scattered moss and trampled grass, with pronounced height and roughness.",
+    "category_id": "99762fb0-f134-5cd9-93f7-5b876875f7c9",
+    "attributes": {
+      "surface_use": "paving",
+      "condition": [
+        "weathered",
+        "mossy"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "category": "Stone/Cobblestone & Paving/Rough & Irregular Setts",
+    "img_version": "74e599ff",
+    "download_count": 54027,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/grassy_cobblestone.png?width=256&height=256&v=74e599ff"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grassy_cobblestone/grassy_cobblestone_diff_2k.jpg",
+      "bytes": 3004490,
+      "sha256": "dace14cfb2726a96df34606ca7c20fb7e4f5a267f1da43e8865baeb8a135693c",
+      "sourceMd5": "e4f8ec87a0b0b793277119f0fff77f22"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grassy_cobblestone/grassy_cobblestone_rough_2k.jpg",
+      "bytes": 1933445,
+      "sha256": "93302879a495ceb7d724b8af74c08ba37221126bc66d671fc4b5e39d9761caea",
+      "sourceMd5": "d4ad83937e66036bada919d39e1fba4a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grassy_cobblestone/grassy_cobblestone_nor_gl_2k.jpg",
+      "bytes": 3957719,
+      "sha256": "02b3dbb258f993380bab554e2f7ea7913d45f4659945a449e138dfef021f07f9",
+      "sourceMd5": "9c1138bb9662b3248166778cd1afca6c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grassy_cobblestone/grassy_cobblestone_ao_2k.jpg",
+      "bytes": 2875405,
+      "sha256": "3f2123168f7259d899db56925531ca2b07c00a0f78ff18fba79d900b70bf81a8",
+      "sourceMd5": "e54a4466883c1f3b85d1daa27d956d2c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grassy_cobblestone/grassy_cobblestone_disp_2k.jpg",
+      "bytes": 1321939,
+      "sha256": "37fde0eeca634e40dac14b89264567409edc2c056df641afe498c45418b4c760",
+      "sourceMd5": "93fdafeeb1dd94b79ff09d30d997319c"
+    }
+  ]
+}

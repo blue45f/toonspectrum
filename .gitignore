@@ -133,3 +133,6 @@ crates/**/target/
 
 # default HTML report from Playwright CLI --reporter=html
 /playwright-report/
+
+# Local P2P browser verification cache
+.qa/p2p-vite-cache/

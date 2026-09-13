@@ -1,0 +1,76 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/carpentry_shop_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "files_hash": "ed7f29254afc82db97c799b70a7ab0a363534baf",
+    "type": 0,
+    "whitebalance": 4000,
+    "tags": [
+      "lamp",
+      "fluorescent",
+      "workshop",
+      "machine",
+      "tools",
+      "wood",
+      "carpentry",
+      "workbench"
+    ],
+    "date_published": 1570485600,
+    "sponsors": [
+      {
+        "name": "_blankRepository",
+        "url": "http://www.blankrepository.org/"
+      }
+    ],
+    "name": "Carpentry Shop 02",
+    "categories": [
+      "indoor",
+      "urban",
+      "high contrast",
+      "artificial light"
+    ],
+    "date_taken": 1554722640,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI of a dusty carpentry shop with warm fluorescent ceiling lamps, high-contrast shadows, gritty yellowed tones and strong fill.",
+    "category_id": "9bea9c37-bde3-543a-95df-1952e71ad430",
+    "category": "Interiors/Workshops & Garages/Industrial Workshops",
+    "attributes": {
+      "light_type": "artificial",
+      "contrast": "high",
+      "environment": "indoor"
+    },
+    "img_version": "570bece0",
+    "download_count": 39535,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/carpentry_shop_02.png?width=256&height=256&v=570bece0"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/carpentry_shop_02.jpg",
+      "bytes": 5833753,
+      "sha256": "2d25db59ac92da22cfb17bf7bcbb31adde21d1b75798ee970fd5ab060a9ff829",
+      "sourceMd5": "99815bf3304396bb61c7ccbbcb1a67da"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

@@ -1,9 +1,8 @@
 /**
- * Bounded, deterministic Korean vocabulary for the Met reference search.
- * This is NOT a general-purpose translator. Unknown tokens are preserved.
- * Keep the browser hint and server request on the same versioned contract.
+ * Bounded Korean vocabulary shared by the browser and the Met adapter.
+ * Not a general-purpose translator: unknown words and names are preserved.
  */
-export const REFERENCE_QUERY_LANGUAGE_VERSION = 1;
+export const REFERENCE_QUERY_LANGUAGE_VERSION = 2;
 export const REFERENCE_QUERY_MAX_LENGTH = 80;
 
 const TERMS: Readonly<Record<string, string>> = Object.freeze({
@@ -40,6 +39,23 @@ const TERMS: Readonly<Record<string, string>> = Object.freeze({
   "한국": "Korea", "조선": "Joseon", "일본": "Japan", "중국": "China",
   "유럽": "Europe", "이집트": "Egypt", "그리스": "Greece", "로마": "Rome",
   "중세": "medieval", "르네상스": "Renaissance", "전통": "traditional",
+  "수묵화": "ink painting", "민화": "Korean folk painting",
+  "백자": "white porcelain", "청자": "celadon", "분청사기": "buncheong",
+  "저고리": "Korean jacket", "치마": "skirt", "바지": "trousers", "두루마기": "Korean coat",
+  "왕관": "crown", "귀걸이": "earrings", "반지": "ring", "비녀": "hairpin",
+  "신전": "temple", "사원": "temple", "성당": "cathedral", "탑": "tower",
+  "기둥": "column", "회랑": "corridor", "천장": "ceiling", "분수": "fountain",
+  "마차": "carriage", "기차": "train", "배": "boat", "돛단배": "sailboat",
+  "벚꽃": "cherry blossom", "대나무": "bamboo", "소나무": "pine tree", "연꽃": "lotus",
+  "폭포": "waterfall", "해변": "beach", "사막": "desert", "일몰": "sunset",
+  "인체": "human figure", "해부학": "anatomy", "근육": "muscles", "손가락": "fingers",
+  "눈동자": "eyes", "눈썹": "eyebrows", "입술": "lips", "머리카락": "hair",
+  "옆모습": "profile", "뒷모습": "back view", "전신": "full length figure",
+  "달리는 사람": "running figure", "걷는 사람": "walking figure",
+  "앉은 자세": "seated figure", "누운 자세": "reclining figure",
+  "손 포즈": "hand gesture", "두 손": "hands", "인물 눈": "human eyes",
+  "옷 주름": "drapery", "천 주름": "drapery", "무도회": "ballroom",
+  "로코코": "Rococo", "바로크": "Baroque", "빅토리아": "Victorian",
 });
 
 export type ReferenceQueryResolution = Readonly<{
@@ -51,6 +67,28 @@ export type ReferenceQueryResolution = Readonly<{
 }>;
 
 const HANGUL = /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/u;
+const PARTICLES = ["에서", "으로", "에게", "까지", "부터", "처럼", "보다", "의", "을", "를", "은", "는", "이", "가", "에", "와", "과", "도", "로"] as const;
+// Only compact known phrases. Never segment an arbitrary Korean name into substrings.
+const COMPACT_TERMS = new Map(Object.entries(TERMS)
+  .filter(([term]) => term.includes(" "))
+  .map(([term, translation]) => [term.replace(/ /gu, ""), translation]));
+
+function lookupTerm(term: string): string | undefined {
+  if (Object.prototype.hasOwnProperty.call(TERMS, term)) return TERMS[term];
+  return COMPACT_TERMS.get(term);
+}
+
+function lookupPhrase(phrase: string): string | undefined {
+  const direct = lookupTerm(phrase);
+  if (direct) return direct;
+  for (const particle of PARTICLES) {
+    if (!phrase.endsWith(particle)) continue;
+    const stem = phrase.slice(0, -particle.length);
+    const translated = lookupTerm(stem);
+    if (translated) return translated;
+  }
+  return undefined;
+}
 
 function containsControlCharacter(value: string): boolean {
   for (let index = 0; index < value.length; index++) {
@@ -61,19 +99,18 @@ function containsControlCharacter(value: string): boolean {
 }
 
 export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
-  // Do not truncate or sanitize invalid input into a valid upstream request.
   const original = input.normalize("NFC").trim().replace(/ +/gu, " ");
   const base = { original, providerQuery: input, matched: [] as string[], unresolved: [] as string[] };
-  if (input.length > REFERENCE_QUERY_MAX_LENGTH || containsControlCharacter(input) || original.length < 2) {
+  const exact = lookupPhrase(original);
+  // A single known Korean noun (숲, 손, 검...) is a useful complete search.
+  if (input.length > REFERENCE_QUERY_MAX_LENGTH || containsControlCharacter(input)
+    || !original || (original.length < 2 && !exact)) {
     return { ...base, status: "invalid" };
   }
   if (!HANGUL.test(original)) return { ...base, providerQuery: original, status: "unchanged" };
-  const exact = TERMS[original];
   if (exact) return { ...base, providerQuery: exact, matched: [original], status: "translated" };
 
-  // Match entire whitespace-delimited terms, never substrings of names.
-  // A phrase such as '한국화' must not silently become 'Korea화'.
-  const tokens = original.split(/\s+/u);
+  const tokens = original.split(/[\s,，、;；]+/u).filter(Boolean);
   const matched: string[] = [];
   const unresolved: string[] = [];
   const translated: string[] = [];
@@ -81,8 +118,9 @@ export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
     let found = false;
     for (let length = Math.min(4, tokens.length - i); length >= 1; length--) {
       const phrase = tokens.slice(i, i + length).join(" ");
-      if (Object.prototype.hasOwnProperty.call(TERMS, phrase)) {
-        translated.push(TERMS[phrase]);
+      const translation = lookupPhrase(phrase);
+      if (translation) {
+        translated.push(translation);
         matched.push(phrase);
         i += length;
         found = true;
@@ -91,24 +129,24 @@ export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
     }
     if (!found) {
       const token = tokens[i++];
+      if (token === undefined) break;
       translated.push(token);
       if (HANGUL.test(token)) unresolved.push(token);
     }
   }
   const providerQuery = translated.join(" ");
-  // Preserve the whole original if expansion would exceed the provider contract.
   if (providerQuery.length > REFERENCE_QUERY_MAX_LENGTH) {
     return { ...base, providerQuery: original, unresolved: tokens.filter((token) => HANGUL.test(token)), status: "unsupported" };
   }
   return {
-    original, providerQuery, matched, unresolved,
+    original, providerQuery: matched.length ? providerQuery : original, matched, unresolved,
     status: matched.length === 0 ? "unsupported" : unresolved.length ? "partial" : "translated",
   };
 }
 
-/** Only the Met adapter gets vocabulary expansion; other providers keep their contract. */
+/** Museum adapters share bounded vocabulary expansion; books keep their contract. */
 export function localizeReferenceProviderQuery(query: Record<string, unknown>): Record<string, unknown> {
-  if (query.provider !== "met" || typeof query.q !== "string") return query;
+  if (!["met", "aic", "cleveland"].includes(String(query.provider)) || typeof query.q !== "string") return query;
   const resolution = resolveReferenceQuery(query.q);
   return resolution.status === "translated" || resolution.status === "partial"
     ? { ...query, q: resolution.providerQuery }

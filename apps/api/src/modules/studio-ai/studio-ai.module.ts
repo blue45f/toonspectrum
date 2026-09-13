@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
+import { CreatorInferenceController, CreatorInferenceGateway } from "./creator-inference.controller";
 
 import { Studio3dGenerationController } from "./studio-3d-generation.controller";
 import { Studio3dGenerationService } from "./studio-3d-generation.service";
+import { StudioMediaInferenceController } from "./studio-media-inference.controller";
+import { StudioMediaInferenceService } from "./studio-media-inference.service";
 import { studioAiAdmissionSchemaPreflightProvider } from "./studio-ai-admission-schema-preflight";
 import { studioAiAdmissionRepositoryProvider } from "./studio-ai-admission.repository";
 import { StudioAiComicDirectorController } from "./studio-ai-comic-director.controller";
@@ -19,11 +22,14 @@ import { StudioAiService } from "./studio-ai.service";
 
 @Module({
   controllers: [
+    CreatorInferenceController,
     StudioAiController,
     StudioAiComicDirectorController,
     Studio3dGenerationController,
+    StudioMediaInferenceController,
   ],
   providers: [
+    CreatorInferenceGateway,
     studioAiAdmissionRepositoryProvider,
     studioAiAdmissionSchemaPreflightProvider,
     studioAiIdempotencySchemaPreflightProvider,
@@ -31,6 +37,7 @@ import { StudioAiService } from "./studio-ai.service";
     StudioAiService,
     StudioAiComicDirectorService,
     Studio3dGenerationService,
+    StudioMediaInferenceService,
     {
       provide: STUDIO_AI_COMIC_DIRECTOR_REPOSITORY,
       useFactory: () => new PostgresStudioAiComicDirectorRepository(),

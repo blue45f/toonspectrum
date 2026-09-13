@@ -1,0 +1,79 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/large_corridor",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "whitebalance": 4950,
+    "date_published": 1612825200,
+    "name": "Large Corridor",
+    "categories": [
+      "indoor",
+      "urban",
+      "morning-afternoon",
+      "medium contrast",
+      "natural light"
+    ],
+    "date_taken": 1602151560,
+    "coords": [
+      50.045216,
+      35.432872
+    ],
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "16608220"
+    ],
+    "backplates": true,
+    "tags": [
+      "entrance",
+      "hall",
+      "arch",
+      "empty",
+      "victorian",
+      "backplates"
+    ],
+    "files_hash": "f0f93d1dfbdc73aa994befb36e8e56276f6cc4a1",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI. Warm morning/afternoon light fills a Victorian corridor, with medium-contrast natural shadows and arched-window highlights casting patterned beams.",
+    "category_id": "a672e8cd-b5a0-53c4-b77e-e8b1db5e56ca",
+    "category": "Interiors/Halls & Venues/Arcades & Colonnades",
+    "attributes": {
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "indoor"
+    },
+    "img_version": "2e2a0d1b",
+    "download_count": 93310,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/large_corridor.png?width=256&height=256&v=2e2a0d1b"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/large_corridor.jpg",
+      "bytes": 5329410,
+      "sha256": "54f46bb011840dc6d876f8940bc65721f56799cd882b9b058b286cea6f7fd289",
+      "sourceMd5": "5a394a380d3fafc3844b1f257913d33e"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

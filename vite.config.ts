@@ -1,5 +1,6 @@
+import { collectStudioOfflineDrawingUrls } from "./apps/web/src/app/service-worker/studio-service-worker-drawing-plan";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
@@ -49,6 +50,74 @@ const INITIAL_ICON_MODULES = new Set([
   "star",
 ]);
 const STUDIO_CORE_ICON_MODULES = new Set([
+  // Already-static Studio icon leaves (production manifest audited 2026-09-13).
+  // Share the core request/compression dictionary; no lazy-only icon is admitted.
+  "activity",
+  "aperture",
+  "arrow-down",
+  "arrow-down-to-line",
+  "arrow-left",
+  "arrow-right",
+  "arrow-up",
+  "ban",
+  "book-marked",
+  "box",
+  "boxes",
+  "bring-to-front",
+  "bug",
+  "camera",
+  "circle-question-mark",
+  "cloud-off",
+  "combine",
+  "contrast",
+  "crop",
+  "crosshair",
+  "database",
+  "ellipsis",
+  "file-plus-corner",
+  "file-text",
+  "file-up",
+  "files",
+  "flip-vertical-2",
+  "focus",
+  "gauge",
+  "info",
+  "keyboard",
+  "languages",
+  "layers-2",
+  "library-big",
+  "life-buoy",
+  "list-checks",
+  "messages-square",
+  "monitor-smartphone",
+  "monitor-up",
+  "package",
+  "package-check",
+  "panel-left-close",
+  "panels-top-left",
+  "person-standing",
+  "pin",
+  "presentation",
+  "printer",
+  "rotate-cw",
+  "save",
+  "scale",
+  "scaling",
+  "scan",
+  "scan-search",
+  "scan-text",
+  "scroll-text",
+  "search-x",
+  "shield-alert",
+  "shrink",
+  "square-chart-gantt",
+  "square-dashed",
+  "square-play",
+  "sticky-note",
+  "tv",
+  "users",
+  "waves-horizontal",
+  "zap",
   "a-large-small",
   "align-justify",
   "arrow-up-to-line",
@@ -317,13 +386,19 @@ function studioServiceWorkerPlugin(): Plugin {
         );
       }
 
+      const offlineUrls = collectStudioOfflineDrawingUrls(manifest, readdirSync(path.join(outDir, "assets")));
+      const offlineBytes = offlineUrls.reduce((total, url) => total + (sizeOf(url) ?? 0), 0);
+      if (offlineUrls.length > 1024 || offlineBytes > 32 * 1024 * 1024) {
+        throw new Error("Offline drawing pack exceeds budget");
+      }
       const swManifest: StudioServiceWorkerManifest = {
         buildId: studioServiceWorkerBuildId(plan, (value) =>
-          createHash("sha256").update(value).digest("hex"),
+          createHash("sha256").update(value + offlineUrls.join("\n")).digest("hex"),
         ),
         shellUrls: plan.shellUrls,
         criticalUrls: plan.criticalUrls,
         warmUrls: plan.warmUrls,
+        offlineUrls,
       };
 
       await viteBuild({

@@ -1,0 +1,109 @@
+name: Creator portable drawing quality
+on:
+  push:
+    branches: ['feat/offline-inference-spatial-20260913']
+    paths: ['apps/web/public/offline-draw/**', '.github/workflows/creator-portable-quality.yml']
+  pull_request:
+    branches: [main]
+    paths: ['apps/web/public/offline-draw/**', '.github/workflows/creator-portable-quality.yml']
+permissions:
+  contents: read
+concurrency:
+  group: creator-portable-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: apps/web/public/offline-draw
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.57.0
+      - run: python -m playwright install --with-deps chromium
+      - name: Actual file URL, network disconnected, mobile viewport and storage denial
+        shell: python
+        run: |
+          import json, pathlib, time
+          from playwright.sync_api import sync_playwright, expect
+          root = pathlib.Path.cwd()
+          results = []
+          def record(name):
+              results.append(name)
+              print('PASS', name, flush=True)
+          def ink(page):
+              return page.evaluate("() => document.getElementById('canvas').toDataURL('image/png')")
+          def expect_ink(page, expected):
+              # Painting uses requestAnimationFrame; wait for exact pixels rather
+              # than assuming a busy browser renders within a fixed 100 ms.
+              deadline = time.monotonic() + 5
+              while ink(page) != expected and time.monotonic() < deadline:
+                  page.wait_for_timeout(50)
+              assert ink(page) == expected
+          def draw(page):
+              box = page.locator('#canvas').bounding_box()
+              page.mouse.move(box['x'] + 20, box['y'] + 30)
+              page.mouse.down()
+              page.mouse.move(box['x'] + 90, box['y'] + 80, steps=10)
+              page.mouse.up()
+              page.wait_for_timeout(600)
+          try:
+              with sync_playwright() as p:
+                  browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+                  for denied in [False, True]:
+                      suffix = ' with blocked storage' if denied else ''
+                      context = browser.new_context(offline=True, accept_downloads=True, viewport={'width': 390, 'height': 844})
+                      if denied:
+                          context.add_init_script("Object.defineProperty(window,'indexedDB',{get(){throw new DOMException('storage denied','SecurityError')}})")
+                      page = context.new_page()
+                      requests, errors = [], []
+                      page.on('request', lambda r: requests.append(r.url) if r.url.startswith(('http:', 'https:')) else None)
+                      page.on('pageerror', lambda e: errors.append(str(e)))
+                      page.goto((root / 'apps/web/public/offline-draw/portable.html').as_uri())
+                      page.wait_for_selector('html[data-local-drawing-ready="true"]')
+                      assert '휴대용 파일' in page.locator('#offline-state').inner_text()
+                      blank = ink(page)
+                      draw(page)
+                      painted = ink(page)
+                      assert painted != blank
+                      record('file:// mobile drawing without any origin' + suffix)
+                      page.locator('#undo').click()
+                      expect_ink(page, blank)
+                      page.locator('#redo').click()
+                      expect_ink(page, painted)
+                      record('portable pixel-exact undo/redo' + suffix)
+                      with page.expect_download() as downloaded:
+                          page.locator('#export-json').click()
+                      document = json.loads(pathlib.Path(downloaded.value.path()).read_text())
+                      assert document['format'] == 'toonstudio-local-drawing'
+                      assert document['layers'][0]['strokes']
+                      with page.expect_download() as downloaded:
+                          page.locator('#export-png').click()
+                      assert pathlib.Path(downloaded.value.path()).read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
+                      record('portable editable backup and actual PNG export' + suffix)
+                      if denied:
+                          # Undo/redo starts a fresh autosave debounce. Wait for the actual
+                          # failed transaction with a CSP-safe locator assertion, not eval.
+                          expect(page.locator('#save-status')).to_contain_text('실패')
+                          assert '실패' in page.locator('#save-status').inner_text()
+                      assert not requests, requests
+                      assert not errors, errors
+                      record('zero external requests and zero uncaught browser exceptions' + suffix)
+                      if not denied:
+                          page.screenshot(path=str(root / 'portable-mobile.png'), full_page=True)
+                      context.close()
+                  browser.close()
+          finally:
+              (root / 'creator-portable-test-results.json').write_text(json.dumps({'passed': len(results), 'checks': results, 'serverStarted': False}, ensure_ascii=False, indent=2))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creator-portable-evidence
+          path: |
+            creator-portable-test-results.json
+            portable-mobile.png
+          retention-days: 7

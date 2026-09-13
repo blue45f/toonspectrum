@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/power_box_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-power-box-01",
+  "sourceModelSha256": "8b24b151fda1fc42e7908f078136a4d3be3bcecda18491c062d18ee34fea136a",
+  "render": {
+    "sourceId": "polyhaven-power-box-01",
+    "sourceSha256": "8b24b151fda1fc42e7908f078136a4d3be3bcecda18491c062d18ee34fea136a",
+    "path": "high-resolution-props/polyhaven-power-box-01.png",
+    "visiblePixels": 847925,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 21272
+  },
+  "independentOriginal": false
+}

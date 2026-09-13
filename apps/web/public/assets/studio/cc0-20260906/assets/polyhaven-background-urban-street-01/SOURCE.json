@@ -1,0 +1,79 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/urban_street_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "tags": [
+      "europe",
+      "london",
+      "tree",
+      "road",
+      "asphalt",
+      "car",
+      "street",
+      "building",
+      "city"
+    ],
+    "date_published": 1566862801,
+    "name": "Urban Street 01",
+    "categories": [
+      "outdoor",
+      "urban",
+      "morning-afternoon",
+      "overcast",
+      "low contrast",
+      "natural light"
+    ],
+    "coords": [
+      51.528295,
+      -0.053879
+    ],
+    "date_taken": 1566112140,
+    "authors": {
+      "Andreas Mischok": "All"
+    },
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "3a77b598435e3c0dbee7ae4eb51549a5b6b9bbc4",
+    "description": "Free 16K, unclipped HDRI of a London urban street - soft overcast morning/afternoon light, low-contrast natural illumination, parked cars, trees, asphalt.",
+    "category_id": "90534497-6965-5735-bfbc-37f6fda902b7",
+    "category": "Streets & Town/Streets & Alleys/City Streets",
+    "attributes": {
+      "time_of_day": "morning",
+      "weather": "overcast",
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "af58f632",
+    "download_count": 173252,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/urban_street_01.png?width=256&height=256&v=af58f632"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/urban_street_01.jpg",
+      "bytes": 10618444,
+      "sha256": "0f4845792c6c3836240ca310c3b1a10fd53827fce85f71333369617d0f7631a5",
+      "sourceMd5": "42eba20814329ee90dc78a4753c5142d"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

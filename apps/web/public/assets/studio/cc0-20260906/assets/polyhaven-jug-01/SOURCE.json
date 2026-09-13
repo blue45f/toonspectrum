@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/jug_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Jug 01",
+    "categories": [
+      "props",
+      "decorative",
+      "dishes",
+      "containers"
+    ],
+    "type": 2,
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "tags": [
+      "ceramic",
+      "milk",
+      "white",
+      "antique",
+      "vintage",
+      "old",
+      "fancy",
+      "decorative"
+    ],
+    "date_published": 1661472000,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 5770,
+    "texel_density": 14145.936781948765,
+    "dimensions": [
+      275.3216624259949,
+      167.5262302160263,
+      211.31345149478875
+    ],
+    "files_hash": "c9c08b43eee157b95f9f8d0102a7a88259bbccfe",
+    "description": "Free 8K model of a white ceramic milk jug featuring glossy antique glazing, a metallic rim, rounded handle, and a hand-painted pink tulip bouquet decal.",
+    "category_id": "f3bacf0f-3dc8-548f-b50b-c51cf4140973",
+    "category": "Food & Kitchen/Tableware/Jugs & Pitchers",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "ceramic",
+        "metal"
+      ]
+    },
+    "img_version": "accaeb42",
+    "download_count": 14306,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/jug_01.png?width=256&height=256&v=accaeb42"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/jug_01/jug_01_2k.gltf",
+      "bytes": 2612,
+      "sha256": "4ac09cde8eae1f4f338430833f62eba5619b74eb8f9d0c72a292247fcdd9fc63",
+      "sourceMd5": "a86f1dbf4b5f175c267bf317b76a445f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/jug_01/jug_01_nor_gl_2k.jpg",
+      "bytes": 403384,
+      "sha256": "25cf8bcc5100126741496b42104eac50369016692892403826f8c9c804df6254",
+      "sourceMd5": "8fc8a99ba8d36f2a259296710d4fa65d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/jug_01/jug_01_arm_2k.jpg",
+      "bytes": 2600319,
+      "sha256": "d6e7bbe6c0bb3c1fa2ba7d13d587bded40ef76275d19ad2c7b59076e271ba7d6",
+      "sourceMd5": "29737febb9f6706113b9b862a9acbff8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/jug_01/jug_01.bin",
+      "bytes": 137084,
+      "sha256": "2dd3772547ae41cc7beeaa5f002e741cfe2c014ed4717731c5076810154bedb9",
+      "sourceMd5": "f4818dd15e25681e1fcf718c9c488998"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/jug_01/jug_01_diff_2k.jpg",
+      "bytes": 1686960,
+      "sha256": "23582ddf55627f7920ce32edc14f465f67aa938d3fde0247f4564278c00211b1",
+      "sourceMd5": "9a822a2a6b6308d20b53afdf4b09d9c9"
+    }
+  ]
+}

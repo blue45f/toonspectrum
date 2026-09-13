@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/BarberShopChair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "sponsors": [
+      "44302755"
+    ],
+    "name": "Barber Shop Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "type": 2,
+    "tags": [
+      "chair",
+      "vintage",
+      "wood",
+      "leather",
+      "fancy",
+      "upholstery",
+      "barber",
+      "salon"
+    ],
+    "authors": {
+      "Fernando Quinn": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 4280,
+    "texel_density": 3344.6078905459185,
+    "dimensions": [
+      756.5155327320099,
+      1327.9063999652863,
+      1489.0052630568675
+    ],
+    "files_hash": "f111fa76f5ccc8748e6f665ad8eca21b8e2a4001",
+    "description": "Free (CC0) vintage barber shop chair model with detailed wood, tufted leather upholstery and brass fittings - perfect for salon scenes, interiors, games, and archviz",
+    "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+    "category": "Furniture/Seating/Chairs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "leather",
+        "wood",
+        "brass"
+      ]
+    },
+    "img_version": "5ed6c0ec",
+    "download_count": 20347,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/BarberShopChair_01.png?width=256&height=256&v=5ed6c0ec"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/BarberShopChair_01/BarberShopChair_01_2k.gltf",
+      "bytes": 2706,
+      "sha256": "70e1c0270984d508e24f553458050e799e53e27e3c03b7b0f5b6d5f900e703d9",
+      "sourceMd5": "323b36b16b21a2a0d1f226849e71b095"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/BarberShopChair_01/BarberShopChair_01_arm_2k.jpg",
+      "bytes": 688585,
+      "sha256": "0b4461ae9d1477ca4e061569cf8a9d506ce0da3210732b8d877767c4bd88ea32",
+      "sourceMd5": "267512eafb5acaa0a8a34b16f3294069"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/BarberShopChair_01/BarberShopChair_01_nor_gl_2k.jpg",
+      "bytes": 702892,
+      "sha256": "12357ebf18fbfe85fe02a69fa325d2a1411f3f94649d44d16e357bbc3a22c2e7",
+      "sourceMd5": "7449818e5e64fbbbd4004e6d92e28b28"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/BarberShopChair_01/BarberShopChair_01.bin",
+      "bytes": 268464,
+      "sha256": "39ecebfef975af4e812134b7f056e243f6404ce60c4dc2e9dec30930802ea24b",
+      "sourceMd5": "af6ef39c13bdca2c84a7fe3e38dc63a2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/BarberShopChair_01/BarberShopChair_01_diff_2k.jpg",
+      "bytes": 520691,
+      "sha256": "51d7d0c9194f8cfd80e44ad8ce37a3fa35fe165319431085a8d2172e6856101c",
+      "sourceMd5": "2808e90e4863cd5f7ebac1aa63270cb9"
+    }
+  ]
+}

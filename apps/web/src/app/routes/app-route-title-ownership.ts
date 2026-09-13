@@ -13,12 +13,16 @@ export function shouldAppRouterOwnDocumentTitle({
   pathname,
   search = "",
 }: AppRouteTitleLocation): boolean {
+  if (pathname === "/collaborate" || pathname.startsWith("/collaborate/")) return false;
   if (pathname.startsWith("/title/")) return false;
   if (pathname.startsWith("/create/")) return false;
+  // Canonical showcase details render the same title-owning children as legacy /create URLs.
+  if (/^\/showcase\/(?:work|series)\/[^/]+\/?$/u.test(pathname) || pathname === "/showcase/challenges") return false;
   if (pathname === "/learn" || pathname.startsWith("/learn/")) return false;
   if (pathname.startsWith("/u/")) return false;
   if (pathname.startsWith("/community/cafes/")) return false;
   if (pathname.startsWith("/community/post/")) return false;
+  if (pathname === "/community/promote" || pathname.startsWith("/community/promote/")) return false;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
   if (pathname === "/studio/manual" || pathname.startsWith("/studio/manual/")) return false;
   if (pathname === "/studio" || pathname.startsWith("/studio/")) {

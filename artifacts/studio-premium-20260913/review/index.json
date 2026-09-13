@@ -1,0 +1,705 @@
+{
+  "assets": [
+    {
+      "id": "polyhaven-painted-wooden-chair-01",
+      "name": "의자 · Painted Wooden Chair 01",
+      "kind": "model",
+      "sha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01"
+    },
+    {
+      "id": "polyhaven-dining-chair-02",
+      "name": "의자 · Dining Chair 02",
+      "kind": "model",
+      "sha256": "63f22f21a65010d3f3ac66eeef90a12e2ff98ea3f991f526b13159dc5a44daba",
+      "sourceUrl": "https://polyhaven.com/a/dining_chair_02"
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool",
+      "name": "스툴 · Painted Wooden Stool",
+      "kind": "model",
+      "sha256": "1438f7f6e571369d6d0b153f9517cfc212bc10c1336753d9d32d97091a23ea4c",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_stool"
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool",
+      "name": "스툴 · Folding Wooden Stool",
+      "kind": "model",
+      "sha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+      "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool"
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table",
+      "name": "테이블 · Wooden Picnic Table",
+      "kind": "model",
+      "sha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+      "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table"
+    },
+    {
+      "id": "polyhaven-chinese-cabinet",
+      "name": "수납장 · Chinese Cabinet",
+      "kind": "model",
+      "sha256": "469f8ac72e1fb9afd22463985ad9130fdecd741cf7a0b59da69c8925b7005bb5",
+      "sourceUrl": "https://polyhaven.com/a/chinese_cabinet"
+    },
+    {
+      "id": "polyhaven-chinese-commode",
+      "name": "수납장 · Chinese Commode",
+      "kind": "model",
+      "sha256": "6f0b75409a88b045ff979c3709e07857cd104279f7ba3cc5e57cd7a87c05be1a",
+      "sourceUrl": "https://polyhaven.com/a/chinese_commode"
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern",
+      "name": "조명 · Brass Diya Lantern",
+      "kind": "model",
+      "sha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+      "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern"
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp",
+      "name": "조명 · Industrial Wall Lamp",
+      "kind": "model",
+      "sha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+      "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp"
+    },
+    {
+      "id": "polyhaven-mantel-clock-01",
+      "name": "시계 · Mantel Clock 01",
+      "kind": "model",
+      "sha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+      "sourceUrl": "https://polyhaven.com/a/mantel_clock_01"
+    },
+    {
+      "id": "polyhaven-wall-clock",
+      "name": "시계 · Wall Clock",
+      "kind": "model",
+      "sha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+      "sourceUrl": "https://polyhaven.com/a/wall_clock"
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01",
+      "name": "책 · Wooden Display Shelves 01",
+      "kind": "model",
+      "sha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+      "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04",
+      "name": "도자기 · Ceramic Vase 04",
+      "kind": "model",
+      "sha256": "7729c02ae4a0d57e48ad05f81d8157f0d9ab7b0778816b50015b789362efd408",
+      "sourceUrl": "https://polyhaven.com/a/ceramic_vase_04"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03",
+      "name": "도자기 · Ceramic Vase 03",
+      "kind": "model",
+      "sha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+      "sourceUrl": "https://polyhaven.com/a/ceramic_vase_03"
+    },
+    {
+      "id": "polyhaven-brass-vase-02",
+      "name": "꽃병 · Brass Vase 02",
+      "kind": "model",
+      "sha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+      "sourceUrl": "https://polyhaven.com/a/brass_vase_02"
+    },
+    {
+      "id": "polyhaven-brass-vase-01",
+      "name": "꽃병 · Brass Vase 01",
+      "kind": "model",
+      "sha256": "e782304ae87f4b32b3f4b2d7f385c1bca74518ffde62682a308b7b3f72488031",
+      "sourceUrl": "https://polyhaven.com/a/brass_vase_01"
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02",
+      "name": "액자 · Hanging Picture Frame 02",
+      "kind": "model",
+      "sha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+      "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02"
+    },
+    {
+      "id": "polyhaven-security-camera-02",
+      "name": "카메라 · Security Camera 02",
+      "kind": "model",
+      "sha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+      "sourceUrl": "https://polyhaven.com/a/security_camera_02"
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver",
+      "name": "라디오 · Vintage Radio Transceiver",
+      "kind": "model",
+      "sha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+      "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver"
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02",
+      "name": "컵 · Painted Wooden Cabinet 02",
+      "kind": "model",
+      "sha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02"
+    },
+    {
+      "id": "polyhaven-brass-pan-01",
+      "name": "팬 냄비 · Brass Pan 01",
+      "kind": "model",
+      "sha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "sourceUrl": "https://polyhaven.com/a/brass_pan_01"
+    },
+    {
+      "id": "polyhaven-food-lime-01",
+      "name": "과일 · Food Lime 01",
+      "kind": "model",
+      "sha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+      "sourceUrl": "https://polyhaven.com/a/food_lime_01"
+    },
+    {
+      "id": "polyhaven-fire-alarm",
+      "name": "소화전 · Fire Alarm",
+      "kind": "model",
+      "sha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+      "sourceUrl": "https://polyhaven.com/a/fire_alarm"
+    },
+    {
+      "id": "polyhaven-water-manhole-cover",
+      "name": "쓰레기통 · Water Manhole Cover",
+      "kind": "model",
+      "sha256": "c1c692b0fb455d68ea54b6abb5614e7946b386f37d9dd7c8104bb971e0b791fe",
+      "sourceUrl": "https://polyhaven.com/a/water_manhole_cover"
+    },
+    {
+      "id": "polyhaven-binder-notebook",
+      "name": "쓰레기통 · Binder Notebook",
+      "kind": "model",
+      "sha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+      "sourceUrl": "https://polyhaven.com/a/binder_notebook"
+    },
+    {
+      "id": "polyhaven-wooden-crate-01",
+      "name": "상자 · Wooden Crate 01",
+      "kind": "model",
+      "sha256": "350649e8949a525434709f9f0e19a7c6ff998905bf9aac28dd476e299a19f767",
+      "sourceUrl": "https://polyhaven.com/a/wooden_crate_01"
+    },
+    {
+      "id": "polyhaven-wooden-crate-02",
+      "name": "상자 · Wooden Crate 02",
+      "kind": "model",
+      "sha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+      "sourceUrl": "https://polyhaven.com/a/wooden_crate_02"
+    },
+    {
+      "id": "polyhaven-boulder-01",
+      "name": "바위 · Boulder 01",
+      "kind": "model",
+      "sha256": "272032bd07c7a98a47b8bbf7db9581e04b62951887514b25b776bc07635e293d",
+      "sourceUrl": "https://polyhaven.com/a/boulder_01"
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02",
+      "name": "바위 · Namaqualand Boulder 02",
+      "kind": "model",
+      "sha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+      "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02"
+    },
+    {
+      "id": "polyhaven-tree-stump-01",
+      "name": "나무 · Tree Stump 01",
+      "kind": "model",
+      "sha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+      "sourceUrl": "https://polyhaven.com/a/tree_stump_01"
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk",
+      "name": "나무 · Dead Tree Trunk",
+      "kind": "model",
+      "sha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+      "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk"
+    },
+    {
+      "id": "polyhaven-dandelion-01",
+      "name": "식물 · Dandelion 01",
+      "kind": "model",
+      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
+      "sourceUrl": "https://polyhaven.com/a/dandelion_01"
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "name": "식물 · Shrub Sorrel 01",
+      "kind": "model",
+      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01"
+    },
+    {
+      "id": "polyhaven-marble-tiles",
+      "name": "대리석 · Marble Tiles",
+      "kind": "surface-texture",
+      "sha256": "9c036f92e2572a7da175a7078992595eb01180efab25bd2ea8ba502609b4974b",
+      "sourceUrl": "https://polyhaven.com/a/marble_tiles"
+    },
+    {
+      "id": "polyhaven-marble-cliff-05",
+      "name": "대리석 · Marble Cliff 05",
+      "kind": "surface-texture",
+      "sha256": "5e3679dd3f0e53b711c68319a2b3223eeeb549f0c008f3ff853a8d5e27db5219",
+      "sourceUrl": "https://polyhaven.com/a/marble_cliff_05"
+    },
+    {
+      "id": "polyhaven-wood-floor",
+      "name": "나무 목재 · Wood Floor",
+      "kind": "surface-texture",
+      "sha256": "89d855a30d8b936d5b68d335b27d423469242ef687af9c840f178f7fc06a8143",
+      "sourceUrl": "https://polyhaven.com/a/wood_floor"
+    },
+    {
+      "id": "polyhaven-wood-cabinet-worn-long",
+      "name": "나무 목재 · Wood Cabinet Worn Long",
+      "kind": "surface-texture",
+      "sha256": "5f453b80ffa6532acc79afe8f2fe1419ffca41d13e2554bac94f8ce1ac004a5e",
+      "sourceUrl": "https://polyhaven.com/a/wood_cabinet_worn_long"
+    },
+    {
+      "id": "polyhaven-concrete-wall-003",
+      "name": "페인트 · Concrete Wall 003",
+      "kind": "surface-texture",
+      "sha256": "6f47fbfc4d2b3971785c8b715de9ca32340a7418995535a0b3c4c3c4bfb7e91d",
+      "sourceUrl": "https://polyhaven.com/a/concrete_wall_003"
+    },
+    {
+      "id": "polyhaven-wood-peeling-paint-weathered",
+      "name": "페인트 · Wood Peeling Paint Weathered",
+      "kind": "surface-texture",
+      "sha256": "8ca3152f12033dc1051ca44feddd528c7e01159ac85d7aa18c0369eda535fcd6",
+      "sourceUrl": "https://polyhaven.com/a/wood_peeling_paint_weathered"
+    },
+    {
+      "id": "polyhaven-plaster-grey-04",
+      "name": "회벽 · Plaster Grey 04",
+      "kind": "surface-texture",
+      "sha256": "26b1cbc4b1d1f9e93c21637e6f2f3391faff996440ba6ed86383cf4274e1757f",
+      "sourceUrl": "https://polyhaven.com/a/plaster_grey_04"
+    },
+    {
+      "id": "polyhaven-plastered-wall",
+      "name": "회벽 · Plastered Wall",
+      "kind": "surface-texture",
+      "sha256": "fd3ccf41b627e647c15a40f4f04e6cc6a5c48d2d18d7aa184352464734927980",
+      "sourceUrl": "https://polyhaven.com/a/plastered_wall"
+    },
+    {
+      "id": "polyhaven-denim-fabric",
+      "name": "직물 천 · Denim Fabric",
+      "kind": "surface-texture",
+      "sha256": "157195bf11a2e57e722a9160abf91d08373aacb1426e56da292c119759d7b169",
+      "sourceUrl": "https://polyhaven.com/a/denim_fabric"
+    },
+    {
+      "id": "polyhaven-factory-wall",
+      "name": "금속 · Factory Wall",
+      "kind": "surface-texture",
+      "sha256": "3b15a17ae71e771f8680891f87dcb853b4a29349ea4c9c5a4c82ad2a98007064",
+      "sourceUrl": "https://polyhaven.com/a/factory_wall"
+    },
+    {
+      "id": "polyhaven-corrugated-iron",
+      "name": "금속 · Corrugated Iron",
+      "kind": "surface-texture",
+      "sha256": "e8704d26d2761055f75b89060107294d1b6997385d3e5a2978aec6c329152ae7",
+      "sourceUrl": "https://polyhaven.com/a/corrugated_iron"
+    },
+    {
+      "id": "polyhaven-large-floor-tiles-02",
+      "name": "벽돌 · Large Floor Tiles 02",
+      "kind": "surface-texture",
+      "sha256": "04186960cd53bd9dc93340d4e9e77005dfbd92358d16e4912b8b23365836c6f4",
+      "sourceUrl": "https://polyhaven.com/a/large_floor_tiles_02"
+    },
+    {
+      "id": "polyhaven-large-square-pattern-01",
+      "name": "벽돌 · Large Square Pattern 01",
+      "kind": "surface-texture",
+      "sha256": "7d001694a8129bf3df28b8e9607d98b4a9c8c7046ea0a62c5e4d154ebadeb95b",
+      "sourceUrl": "https://polyhaven.com/a/large_square_pattern_01"
+    },
+    {
+      "id": "polyhaven-leafy-grass",
+      "name": "잔디 · Leafy Grass",
+      "kind": "surface-texture",
+      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
+      "sourceUrl": "https://polyhaven.com/a/leafy_grass"
+    },
+    {
+      "id": "polyhaven-grassy-cobblestone",
+      "name": "잔디 · Grassy Cobblestone",
+      "kind": "surface-texture",
+      "sha256": "da9278eb846822745b9f696df1b5d480e695307c63f92e89196c830f7aca591e",
+      "sourceUrl": "https://polyhaven.com/a/grassy_cobblestone"
+    },
+    {
+      "id": "polyhaven-forest-leaves-04",
+      "name": "숲 바닥 · Forest Leaves 04",
+      "kind": "surface-texture",
+      "sha256": "f00225934774540c6013154113710b6e249b9cf58af2b219a53a1254f37f13e1",
+      "sourceUrl": "https://polyhaven.com/a/forest_leaves_04"
+    },
+    {
+      "id": "polyhaven-dirt-floor",
+      "name": "숲 바닥 · Dirt Floor",
+      "kind": "surface-texture",
+      "sha256": "a1773f89aa04e3e796e6acc0a594a7eda8905c62043e197400a1226c0f52769c",
+      "sourceUrl": "https://polyhaven.com/a/dirt_floor"
+    },
+    {
+      "id": "polyhaven-sand-01",
+      "name": "모래 · Sand 01",
+      "kind": "surface-texture",
+      "sha256": "16d934d144f86803acc507b1c45c1e5523a212fd85d6064efd4bfe6983c572eb",
+      "sourceUrl": "https://polyhaven.com/a/sand_01"
+    },
+    {
+      "id": "polyhaven-sandstone-blocks-05",
+      "name": "모래 · Sandstone Blocks 05",
+      "kind": "surface-texture",
+      "sha256": "e75a53731e573a3920842bac5efcfc037f6cd69ab248202b9ccf2477f7e1cc42",
+      "sourceUrl": "https://polyhaven.com/a/sandstone_blocks_05"
+    },
+    {
+      "id": "polyhaven-background-wide-street-01",
+      "name": "골목 거리 · Wide Street 01",
+      "kind": "background",
+      "sha256": "f0833abc600e49583d4fa8872e6815eb9a201c573e4afaea92ef83d85eba5b15",
+      "sourceUrl": "https://polyhaven.com/a/wide_street_01"
+    },
+    {
+      "id": "polyhaven-background-kiara-1-dawn",
+      "name": "골목 거리 · Kiara 1 Dawn",
+      "kind": "background",
+      "sha256": "af64ba65fb5f1336b8cc12b96921edfc42f4a636af38bb2f05809eae064b413d",
+      "sourceUrl": "https://polyhaven.com/a/kiara_1_dawn"
+    },
+    {
+      "id": "polyhaven-background-canary-wharf",
+      "name": "도심 거리 · Canary Wharf",
+      "kind": "background",
+      "sha256": "6a5d7f6c7d0733ac4021c7c67a0b56ceccdfc7ab70f66dabfb6d933e3f92c673",
+      "sourceUrl": "https://polyhaven.com/a/canary_wharf"
+    },
+    {
+      "id": "polyhaven-background-wide-street-02",
+      "name": "도심 거리 · Wide Street 02",
+      "kind": "background",
+      "sha256": "c1251fc09efe99cac0200e56a3de29583288a6cbb7719018b581252fc367a8ff",
+      "sourceUrl": "https://polyhaven.com/a/wide_street_02"
+    },
+    {
+      "id": "polyhaven-background-urban-courtyard-02",
+      "name": "건축 중정 · Urban Courtyard 02",
+      "kind": "background",
+      "sha256": "e7f87901f90a2637a286fe6bb383dca2b575e6ad3999057a09f9f082fcde4fbf",
+      "sourceUrl": "https://polyhaven.com/a/urban_courtyard_02"
+    },
+    {
+      "id": "polyhaven-background-winter-evening",
+      "name": "건축 중정 · Winter Evening",
+      "kind": "background",
+      "sha256": "710fcc33f48cf9e59189150baacd299e10b899256c2dcb5e9aeb086695d9a54e",
+      "sourceUrl": "https://polyhaven.com/a/winter_evening"
+    },
+    {
+      "id": "polyhaven-background-rooftop-night",
+      "name": "옥상 전망 · Rooftop Night",
+      "kind": "background",
+      "sha256": "740cf1eba221659ab7581b19ad79d060ce1e39b3eace3dfdef2376d8b4aab4c0",
+      "sourceUrl": "https://polyhaven.com/a/rooftop_night"
+    },
+    {
+      "id": "polyhaven-background-portland-landing-pad",
+      "name": "옥상 전망 · Portland Landing pad",
+      "kind": "background",
+      "sha256": "eff8b41fdb037cf81ad8121379d90630b1f97e72296f0cf905d49e335d1101c4",
+      "sourceUrl": "https://polyhaven.com/a/portland_landing_pad"
+    },
+    {
+      "id": "polyhaven-background-rooitou-park",
+      "name": "정원 · Rooitou Park",
+      "kind": "background",
+      "sha256": "259a547ea8cc527eebf37c9c104001e85747073877c7baa8eb57d5595fdc5960",
+      "sourceUrl": "https://polyhaven.com/a/rooitou_park"
+    },
+    {
+      "id": "polyhaven-background-autumn-park",
+      "name": "정원 · Autumn Park",
+      "kind": "background",
+      "sha256": "d09d81651a7b86c19dd7be5da853429db4557df0eefa260b6258f9bd7a8f6f7a",
+      "sourceUrl": "https://polyhaven.com/a/autumn_park"
+    },
+    {
+      "id": "polyhaven-background-the-sky-is-on-fire",
+      "name": "해안 풍경 · The Sky Is On Fire",
+      "kind": "background",
+      "sha256": "0170ee54dfa7d490ff484e2b2e3f19e7748b6576d1b36b4d2cb71f30eca4ab8d",
+      "sourceUrl": "https://polyhaven.com/a/the_sky_is_on_fire"
+    },
+    {
+      "id": "polyhaven-background-shanghai-bund",
+      "name": "해안 풍경 · Shanghai Bund",
+      "kind": "background",
+      "sha256": "d79ed10f66f186d6afcbff3bb87129080315f3f376db84dff129f70a18ea9e45",
+      "sourceUrl": "https://polyhaven.com/a/shanghai_bund"
+    },
+    {
+      "id": "polyhaven-background-fireplace",
+      "name": "실내 공간 · Fireplace",
+      "kind": "background",
+      "sha256": "cb09dc88c6dd911cf617d9ebb7173de7f9b2fa8454c1253ea74a7e719b6bb306",
+      "sourceUrl": "https://polyhaven.com/a/fireplace"
+    },
+    {
+      "id": "polyhaven-background-cayley-interior",
+      "name": "실내 공간 · Cayley Interior",
+      "kind": "background",
+      "sha256": "4afe9120595a14d6d37b55b372eb7c5cbbf141e77662db49b836b45c6e582547",
+      "sourceUrl": "https://polyhaven.com/a/cayley_interior"
+    },
+    {
+      "id": "polyhaven-background-empty-warehouse-01",
+      "name": "창고 공간 · Empty Warehouse 01",
+      "kind": "background",
+      "sha256": "994b5c82468c2ac096ff6a85a3730ebc8160088ebf52d687c296f87a8c55085e",
+      "sourceUrl": "https://polyhaven.com/a/empty_warehouse_01"
+    },
+    {
+      "id": "polyhaven-background-abandoned-slipway",
+      "name": "창고 공간 · Abandoned Slipway",
+      "kind": "background",
+      "sha256": "f4f93ce987ca75d53acd74c17c28ae69bbb0284df79369065fd2351726107c14",
+      "sourceUrl": "https://polyhaven.com/a/abandoned_slipway"
+    },
+    {
+      "id": "polyhaven-painted-wooden-chair-01-cutout",
+      "name": "의자 · Painted Wooden Chair 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "48560676fb72d1a7cc126e9b51d40fa2f5e3a6bcba95a00cf3bfb5f192bb5071",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01"
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool-cutout",
+      "name": "스툴 · Painted Wooden Stool · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "5998b73f46f806221159df18e0d3debe88a2c0548941dbbc45fee9384c7c2860",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_stool"
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table-cutout",
+      "name": "테이블 · Wooden Picnic Table · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "04f09a16e5bb99da1c5e5b1018bcc3eae51936612f8e76c41732c018a83d89af",
+      "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table"
+    },
+    {
+      "id": "polyhaven-chinese-cabinet-cutout",
+      "name": "수납장 · Chinese Cabinet · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "7b95679721eb7c0be13e29e46125c9bd6450bd1294a9341c71ffbdacf8fa8766",
+      "sourceUrl": "https://polyhaven.com/a/chinese_cabinet"
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern-cutout",
+      "name": "조명 · Brass Diya Lantern · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "465140eab18808d37ca8e247d24616b826c060d06c6ddc6ef8e05cdeb03ea79d",
+      "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern"
+    },
+    {
+      "id": "polyhaven-mantel-clock-01-cutout",
+      "name": "시계 · Mantel Clock 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "7ed540f69ffa056d9b78729ec6e170e46a014e1036ce57947c43185249aa824e",
+      "sourceUrl": "https://polyhaven.com/a/mantel_clock_01"
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01-cutout",
+      "name": "책 · Wooden Display Shelves 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "59abb0593d3b57218136f2e142b4beef5db0a326bcd5f0d603f279e622f5138d",
+      "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04-cutout",
+      "name": "도자기 · Ceramic Vase 04 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "7c0e056bb099885f1ea28107e34b25a2eefa9e0bf76161ca0dc6ecee16f42458",
+      "sourceUrl": "https://polyhaven.com/a/ceramic_vase_04"
+    },
+    {
+      "id": "polyhaven-brass-vase-02-cutout",
+      "name": "꽃병 · Brass Vase 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "0706a3475c7e615d87b16fe4042c145dd2cbdcdd08fe6e386686615523bba544",
+      "sourceUrl": "https://polyhaven.com/a/brass_vase_02"
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02-cutout",
+      "name": "액자 · Hanging Picture Frame 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "7d3842dfd45a0392640cdea10226ccb9ace861cf3eb6bbf3b43e6c3f798f24a5",
+      "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02"
+    },
+    {
+      "id": "polyhaven-security-camera-02-cutout",
+      "name": "카메라 · Security Camera 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "0cdc10bd60690b4f299611cc2bfefc48cf7c5622298efa3571c90a5075aa5418",
+      "sourceUrl": "https://polyhaven.com/a/security_camera_02"
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver-cutout",
+      "name": "라디오 · Vintage Radio Transceiver · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "187e8dc8af4d2f882acdd710be921501d675bc82e7d603cba1e2263c4737c214",
+      "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver"
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02-cutout",
+      "name": "컵 · Painted Wooden Cabinet 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "5b606edcd6d6a63d2817b4fb5324de1e975e14c531b366d85307ff6fe8c926e0",
+      "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02"
+    },
+    {
+      "id": "polyhaven-brass-pan-01-cutout",
+      "name": "팬 냄비 · Brass Pan 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "7f370340aeb4b0fd0e6bbf581880b6fb86883ced5ecc163be31338eed1c8562c",
+      "sourceUrl": "https://polyhaven.com/a/brass_pan_01"
+    },
+    {
+      "id": "polyhaven-food-lime-01-cutout",
+      "name": "과일 · Food Lime 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "41e3bbc9ac07bfb49173036583c59aa87290a893686c5427402fc1fc05bae80f",
+      "sourceUrl": "https://polyhaven.com/a/food_lime_01"
+    },
+    {
+      "id": "polyhaven-fire-alarm-cutout",
+      "name": "소화전 · Fire Alarm · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "365678183000796844c85f3370777fbc267846f3a9c8a3eaeac4e110df7c68f6",
+      "sourceUrl": "https://polyhaven.com/a/fire_alarm"
+    },
+    {
+      "id": "polyhaven-water-manhole-cover-cutout",
+      "name": "쓰레기통 · Water Manhole Cover · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "a53397ac22b1d4b11ab4a51340acf2c01b78ed34215f709a4a7ae0eb9eb7318c",
+      "sourceUrl": "https://polyhaven.com/a/water_manhole_cover"
+    },
+    {
+      "id": "polyhaven-wooden-crate-01-cutout",
+      "name": "상자 · Wooden Crate 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "e5b75d4e1fcce601e7aed340150ca634390aa7dc62a60d4b07511f6e4e23b478",
+      "sourceUrl": "https://polyhaven.com/a/wooden_crate_01"
+    },
+    {
+      "id": "polyhaven-boulder-01-cutout",
+      "name": "바위 · Boulder 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "ac2fea6d22b3ed288cc152f3f0bf4e7e15b98805ea654d157db1cbcbc5f18658",
+      "sourceUrl": "https://polyhaven.com/a/boulder_01"
+    },
+    {
+      "id": "polyhaven-tree-stump-01-cutout",
+      "name": "나무 · Tree Stump 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "f995dae143b4e99c796d178367dee1e5d3c28d880edc54ba2a246051a9caed7e",
+      "sourceUrl": "https://polyhaven.com/a/tree_stump_01"
+    },
+    {
+      "id": "polyhaven-dining-chair-02-cutout",
+      "name": "의자 · Dining Chair 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "0ab2f8ac5af76868efeec29a09ef88620a6455b74923fad61c094c55da33aa73",
+      "sourceUrl": "https://polyhaven.com/a/dining_chair_02"
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool-cutout",
+      "name": "스툴 · Folding Wooden Stool · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "9eb27bf41fbe4c9b7ebfa5ff2d2a5b104b17602aa51026c55bd2112893ad21c5",
+      "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool"
+    },
+    {
+      "id": "polyhaven-chinese-commode-cutout",
+      "name": "수납장 · Chinese Commode · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "4b27cfa3af8c524a67be624118f244ee5547e643d6a1c7236bdfbafec34b450d",
+      "sourceUrl": "https://polyhaven.com/a/chinese_commode"
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp-cutout",
+      "name": "조명 · Industrial Wall Lamp · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "477f58cf05eb9e642819f002bcb60a8edf2867c52b212b5f1d8330b85a7871c1",
+      "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp"
+    },
+    {
+      "id": "polyhaven-wall-clock-cutout",
+      "name": "시계 · Wall Clock · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "ccfa0d9c3fa2eaf0427fb6203b850e081ae21ada2fc3f8c5a09e9963162adfd6",
+      "sourceUrl": "https://polyhaven.com/a/wall_clock"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03-cutout",
+      "name": "도자기 · Ceramic Vase 03 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "6b250422d5d401030279a5ea3a398cdc020641b46305b6fb0b2d6c6a3be06d8c",
+      "sourceUrl": "https://polyhaven.com/a/ceramic_vase_03"
+    },
+    {
+      "id": "polyhaven-brass-vase-01-cutout",
+      "name": "꽃병 · Brass Vase 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "ca4a3077f5cb89b70257dfe171eed457c04dec249e52f908fff3c88a0f9ee0dd",
+      "sourceUrl": "https://polyhaven.com/a/brass_vase_01"
+    },
+    {
+      "id": "polyhaven-binder-notebook-cutout",
+      "name": "쓰레기통 · Binder Notebook · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "b1b096d3a6982c28e6f6f4c8200b5ad3bbe6d429b357c0bf1e76fead80fbfea9",
+      "sourceUrl": "https://polyhaven.com/a/binder_notebook"
+    },
+    {
+      "id": "polyhaven-wooden-crate-02-cutout",
+      "name": "상자 · Wooden Crate 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "b4cc7a7699e22a322aee5a5b06ee70bad55527e9d3b41b928f96c82b65f48832",
+      "sourceUrl": "https://polyhaven.com/a/wooden_crate_02"
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02-cutout",
+      "name": "바위 · Namaqualand Boulder 02 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "4cd72acc212776baa93cb63e52b8a0e0b18c71860825d4786c4896613cd792ca",
+      "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02"
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk-cutout",
+      "name": "나무 · Dead Tree Trunk · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "618a01ba3ba1a1094e38fea05935fa513d08214f617c63d48ccead367e16ccb9",
+      "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk"
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01-cutout",
+      "name": "식물 · Shrub Sorrel 01 · 2D 소품",
+      "kind": "prop-image",
+      "sha256": "1109f1cc8757856a3a579e914c4e944ec3a8860844fb86c36959c5148aecd512",
+      "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01"
+    }
+  ],
+  "reviewStatus": "pending-visual-inspection"
+}

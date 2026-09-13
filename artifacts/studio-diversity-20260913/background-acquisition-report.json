@@ -1,0 +1,15 @@
+{
+  "deliveredOriginals": 34,
+  "errors": [
+    {
+      "id": "photo_studio_loft_hall",
+      "reason": "Panorama exceeds bounded source size"
+    },
+    {
+      "id": "shanghai_riverside",
+      "reason": "Panorama exceeds bounded source size"
+    }
+  ],
+  "downloadedBytes": 200482113,
+  "artisticApproval": false
+}

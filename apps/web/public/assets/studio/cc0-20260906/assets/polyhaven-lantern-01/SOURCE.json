@@ -1,0 +1,100 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Lantern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1590680464,
+    "name": "Lantern 01",
+    "categories": [
+      "props",
+      "lighting"
+    ],
+    "type": 2,
+    "tags": [
+      "prop",
+      "metal",
+      "glass",
+      "lantern",
+      "antique",
+      "vintage",
+      "hurricane",
+      "lamp",
+      "bronze",
+      "oldfashioned",
+      "brass",
+      "copper"
+    ],
+    "authors": {
+      "Rajil Jose Macatangay": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 33902,
+    "texel_density": 10425.298212954804,
+    "dimensions": [
+      122.08568677306175,
+      97.18310832977295,
+      294.2466139793396
+    ],
+    "files_hash": "e8a56bd66bee21140aa3272268bd207bac37a7e1",
+    "description": "Free 4K model of an antique brass/bronze hurricane lantern with textured glass globe, worn patina, metal handle and detailed rivets for vintage character.",
+    "sponsors": [
+      "11109006",
+      "84390067"
+    ],
+    "category_id": "96b36a4f-e094-52da-912e-e51ca9eb7aa0",
+    "category": "Lighting/Portable/Lanterns",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "brass",
+        "glass"
+      ]
+    },
+    "img_version": "0b1827f5",
+    "download_count": 65213,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Lantern_01.png?width=256&height=256&v=0b1827f5"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Lantern_01/Lantern_01_2k.gltf",
+      "bytes": 4866,
+      "sha256": "86f12126e0a5c1c369249371537eed653fa308de8b3554fa088b3fe503d9ec8c",
+      "sourceMd5": "547ce8bced853073ef9d9367f0ee1930"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_diff_2k.jpg",
+      "bytes": 519828,
+      "sha256": "85d0e815adce257bc8288d21ba585f37d612a8a13bde9d54e7a98b08510ed869",
+      "sourceMd5": "e28d5e3c524040c2910bd9d19ce45a35"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_nor_gl_2k.jpg",
+      "bytes": 805944,
+      "sha256": "d0c090bbc39cf26828070fe816fa996959578888a9a661713d4c2d1b2f79449e",
+      "sourceMd5": "ddf52226353a7329997c143d5c26a79b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_arm_2k.jpg",
+      "bytes": 847840,
+      "sha256": "f35b2f236301c13da9c127f1a480d06fd61815750c6b0d4a55dc857d576f6385",
+      "sourceMd5": "10a5d10c22dca0ededd3b65e65f70107"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Lantern_01/Lantern_01.bin",
+      "bytes": 864852,
+      "sha256": "cb0c7eaaea361546201ba1c4324581ac7147c221851657b6e23d2f854beabe49",
+      "sourceMd5": "857a868798e7e5f40d78c2d09e6f8ea0"
+    }
+  ]
+}

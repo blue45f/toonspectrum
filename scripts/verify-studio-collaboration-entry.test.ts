@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { resolveStudioRoute } from "../apps/web/src/domains/creator/studio-router/studio-route-manifest";
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
+
 import {
   installStudioCollaborationPreviewSession,
   studioOwnedPreviewSessionEndpoint,

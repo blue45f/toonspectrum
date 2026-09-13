@@ -13,7 +13,7 @@ export const STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS = Object.freeze({
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "credentialless",
   "Permissions-Policy":
-    "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)",
+    "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)",
 } as const);
 
 /**

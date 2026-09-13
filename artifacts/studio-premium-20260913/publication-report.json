@@ -1,0 +1,32 @@
+{
+  "schema":"toonspectrum.asset-expansion-publication.v1",
+  "previousCatalogCount":1212,
+  "addedEntries":92,
+  "addedOriginals":61,
+  "renderedDerivatives":31,
+  "catalogCount":1304,
+  "countingNote":"The legacy publisher counted all entries as addedOriginals. This release separates 61 independent originals and 31 2D renders derived from the delivered models.",
+  "byKind":{"model":31,"surface-texture":18,"background":12,"prop-image":31},
+  "addedIds":[
+    "polyhaven-painted-wooden-chair-01","polyhaven-dining-chair-02","polyhaven-painted-wooden-stool","polyhaven-folding-wooden-stool","polyhaven-wooden-picnic-table","polyhaven-chinese-cabinet","polyhaven-chinese-commode","polyhaven-brass-diya-lantern","polyhaven-industrial-wall-lamp","polyhaven-mantel-clock-01","polyhaven-wall-clock","polyhaven-wooden-display-shelves-01","polyhaven-ceramic-vase-04","polyhaven-ceramic-vase-03","polyhaven-brass-vase-02","polyhaven-brass-vase-01","polyhaven-hanging-picture-frame-02","polyhaven-security-camera-02","polyhaven-vintage-radio-transceiver","polyhaven-painted-wooden-cabinet-02","polyhaven-brass-pan-01","polyhaven-food-lime-01","polyhaven-fire-alarm","polyhaven-water-manhole-cover","polyhaven-binder-notebook","polyhaven-wooden-crate-01","polyhaven-wooden-crate-02","polyhaven-boulder-01","polyhaven-namaqualand-boulder-02","polyhaven-tree-stump-01","polyhaven-dead-tree-trunk",
+    "polyhaven-marble-tiles","polyhaven-marble-cliff-05","polyhaven-wood-floor","polyhaven-wood-cabinet-worn-long","polyhaven-concrete-wall-003","polyhaven-wood-peeling-paint-weathered","polyhaven-plaster-grey-04","polyhaven-plastered-wall","polyhaven-denim-fabric","polyhaven-factory-wall","polyhaven-corrugated-iron","polyhaven-large-floor-tiles-02","polyhaven-large-square-pattern-01","polyhaven-grassy-cobblestone","polyhaven-forest-leaves-04","polyhaven-dirt-floor","polyhaven-sand-01","polyhaven-sandstone-blocks-05",
+    "polyhaven-background-wide-street-01","polyhaven-background-kiara-1-dawn","polyhaven-background-wide-street-02","polyhaven-background-urban-courtyard-02","polyhaven-background-rooftop-night","polyhaven-background-portland-landing-pad","polyhaven-background-rooitou-park","polyhaven-background-autumn-park","polyhaven-background-the-sky-is-on-fire","polyhaven-background-cayley-interior","polyhaven-background-empty-warehouse-01","polyhaven-background-abandoned-slipway",
+    "polyhaven-painted-wooden-chair-01-cutout","polyhaven-painted-wooden-stool-cutout","polyhaven-wooden-picnic-table-cutout","polyhaven-chinese-cabinet-cutout","polyhaven-brass-diya-lantern-cutout","polyhaven-mantel-clock-01-cutout","polyhaven-wooden-display-shelves-01-cutout","polyhaven-ceramic-vase-04-cutout","polyhaven-brass-vase-02-cutout","polyhaven-hanging-picture-frame-02-cutout","polyhaven-security-camera-02-cutout","polyhaven-vintage-radio-transceiver-cutout","polyhaven-painted-wooden-cabinet-02-cutout","polyhaven-brass-pan-01-cutout","polyhaven-food-lime-01-cutout","polyhaven-fire-alarm-cutout","polyhaven-water-manhole-cover-cutout","polyhaven-wooden-crate-01-cutout","polyhaven-boulder-01-cutout","polyhaven-tree-stump-01-cutout","polyhaven-dining-chair-02-cutout","polyhaven-folding-wooden-stool-cutout","polyhaven-chinese-commode-cutout","polyhaven-industrial-wall-lamp-cutout","polyhaven-wall-clock-cutout","polyhaven-ceramic-vase-03-cutout","polyhaven-brass-vase-01-cutout","polyhaven-binder-notebook-cutout","polyhaven-wooden-crate-02-cutout","polyhaven-namaqualand-boulder-02-cutout","polyhaven-dead-tree-trunk-cutout"
+  ],
+  "rejected":[
+    {"id":"polyhaven-dandelion-01","reason":"산재한 작은 식물로 실루엣과 구도가 약하고 고해상도 렌더 잘림 검사에도 실패."},
+    {"id":"polyhaven-shrub-sorrel-01","reason":"분리된 작은 식물 배치여서 완성형 고품질 소품으로 쓰기 어려움."},
+    {"id":"polyhaven-leafy-grass","reason":"미세 잎 무늬가 과밀하고 시각적 잡음이 커 기존 제외 정책 유지."},
+    {"id":"polyhaven-background-canary-wharf","reason":"높은 울타리가 장면을 막아 배경 구도와 공간 활용성이 낮음."},
+    {"id":"polyhaven-background-winter-evening","reason":"상점 간판이 장면의 주요 요소여서 범용 창작 배경 선정에서 제외."},
+    {"id":"polyhaven-background-shanghai-bund","reason":"흐릿한 군중과 강한 간판이 포함되어 범용 배경으로 부적합."},
+    {"id":"polyhaven-background-fireplace","reason":"실내가 지나치게 어둡고 벽난로가 프레임 아래에서 잘림."},
+    {"id":"polyhaven-shrub-sorrel-01-cutout","reason":"분리된 작은 식물 군집으로 2D 소품 구도와 가독성이 부족."}
+  ],
+  "preservedAllPreviousIdsAndUrls":true,
+  "reviewLevel":"contact-sheet-visual-triage",
+  "allAnglesArtisticallyApproved":false,
+  "productionPublished":false,
+  "beforeManifestSha256":"eb6959ec56eedb64073a022e632886c8822c9d194d18f40dcdcbd4511b2d62bc",
+  "afterManifestSha256":"d4254584d68ad35dfd264ed15572073c963d41ace301eb1e9af34457c885a338"
+}

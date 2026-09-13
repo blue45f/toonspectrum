@@ -338,7 +338,7 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).toContain('page.keyboard.press("Meta+z")');
     expect(source).toContain('page.keyboard.press("Meta+Shift+z")');
     expect(source).toContain('page.reload({ waitUntil: "domcontentloaded"');
-    expect(source).toContain('name: "복구하기"');
+    expect(source).toContain('name: "이어서 그리기"');
     expect(source).not.toContain("waitForWorkerReady");
     expect(source).not.toContain("readStoredDocument");
     expect(source).not.toContain("waitForStoredDocument");

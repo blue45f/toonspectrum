@@ -5,7 +5,7 @@ const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
-export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture";
+export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture" | "background" | "prop-image";
 export interface StudioCc0OriginalDelivery {
   readonly path: string;
   readonly bytes: number;
@@ -51,6 +51,10 @@ export const STUDIO_CC0_CATEGORY_LABELS: Readonly<Record<string, string>> = Obje
   "pbr-detailed-prop": "디테일 가구 · 생활 소품",
   "effect-mask": "투명 효과 마스크",
   "surface-material": "표면 재질",
+  "background-street": "거리 · 골목 · 건축 배경",
+  "background-nature": "숲 · 정원 · 해안 배경",
+  "background-interior": "실내 · 홀 · 창고 배경",
+  "rendered-prop": "2D 투명 소품 · 3D 원본 렌더",
 });
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -157,7 +161,7 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
     const license = record(asset?.license);
     if (!asset || typeof asset.id !== "string" || !/^[a-z0-9-]{1,200}$/u.test(asset.id)
       || ids.has(asset.id) || typeof asset.name !== "string" || asset.name.length > 160
-      || !["model", "effect-mask", "surface-texture"].includes(String(asset.kind))
+      || !["model", "effect-mask", "surface-texture", "background", "prop-image"].includes(String(asset.kind))
       || typeof asset.category !== "string" || asset.category.length > 80
       || typeof asset.path !== "string" || typeof asset.sha256 !== "string" || !SHA256.test(asset.sha256)
       || !Number.isSafeInteger(asset.bytes) || Number(asset.bytes) <= 0 || Number(asset.bytes) > 64 * 1024 * 1024
@@ -169,6 +173,10 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
     if (source.protocol !== "https:" || !["kenney.nl", "ambientcg.com", "polyhaven.com"].includes(source.hostname)
       || source.username || source.password || source.port) throw new TypeError("확인되지 않은 에셋 공급처입니다.");
     studioCc0AssetUrl(asset.path);
+    if (asset.previewPath !== undefined) {
+      if (typeof asset.previewPath !== "string") throw new TypeError("에셋 미리보기 경로가 올바르지 않습니다.");
+      studioCc0AssetUrl(asset.previewPath);
+    }
     const kind = asset.kind as StudioCc0AssetKind;
     if ((kind === "model") !== asset.path.endsWith(".glb")) throw new TypeError("에셋 형식이 맞지 않습니다.");
     if (kind === "model") {
@@ -197,8 +205,8 @@ export function filterStudioCc0Assets(assets: readonly StudioCc0Asset[], query: 
       .join(" ").normalize("NFKC").toLocaleLowerCase("ko-KR").includes(term)));
 }
 
-async function boundedBytes(url: string, limit: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
-  const response = await fetch(url, {signal, credentials: "same-origin", redirect: "error"});
+async function boundedBytes(url: string, limit: number, signal?: AbortSignal, cache: RequestCache = "default"): Promise<Uint8Array<ArrayBuffer>> {
+  const response = await fetch(url, {signal, credentials: "same-origin", redirect: "error", cache});
   if (!response.ok || Number(response.headers.get("content-length") ?? 0) > limit) throw new Error("에셋을 불러오지 못했습니다.");
   if (!response.body) throw new Error("에셋 응답 본문이 없습니다.");
   const reader = response.body.getReader();
@@ -220,7 +228,7 @@ async function boundedBytes(url: string, limit: number, signal?: AbortSignal): P
 }
 
 export async function loadStudioCc0Catalog(signal?: AbortSignal): Promise<readonly StudioCc0Asset[]> {
-  const bytes = await boundedBytes(STUDIO_CC0_DELIVERY_ROOT + "manifest.json", MAX_MANIFEST_BYTES, signal);
+  const bytes = await boundedBytes(STUDIO_CC0_DELIVERY_ROOT + "manifest.json?v=diversity-20260913", MAX_MANIFEST_BYTES, signal, "no-cache");
   return parseStudioCc0Catalog(JSON.parse(new TextDecoder().decode(bytes)) as unknown);
 }
 
@@ -241,4 +249,18 @@ export async function createStudioCc0ImageRecord(asset: StudioCc0Asset, signal?:
     rights: {sourceKind: "imported", sourceId: asset.id, licenseId: "CC0-1.0", licenseLabel: "CC0 1.0",
       licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/", attributionRequired: false,
       attributionText: `${asset.provider} — ${asset.sourceUrl}`, rightsConfirmed: true}};
+}
+
+/** Fetch the exact catalogue model; the GLB importer performs structural and device admission. */
+export async function createStudioCc0ModelFile(asset: StudioCc0Asset, signal?: AbortSignal): Promise<File> {
+  if (asset.kind !== "model" || asset.browserRenderVerified !== true
+    || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 || asset.bytes > 64 * 1024 * 1024) {
+    throw new TypeError("검증된 3D 모델이 아닙니다.");
+  }
+  const bytes = await boundedBytes(studioCc0AssetUrl(asset.path), asset.bytes, signal);
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+    byte => byte.toString(16).padStart(2, "0")).join("");
+  signal?.throwIfAborted();
+  if (bytes.byteLength !== asset.bytes || hash !== asset.sha256) throw new Error("3D 에셋 무결성 검증에 실패했습니다.");
+  return new File([bytes], `${asset.name}.glb`, { type: "model/gltf-binary" });
 }

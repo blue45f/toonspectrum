@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/fire_alarm",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-fire-alarm",
+  "sourceModelSha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+  "render": {
+    "sourceId": "polyhaven-fire-alarm",
+    "sourceSha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+    "path": "high-resolution-props/polyhaven-fire-alarm.png",
+    "visiblePixels": 485881,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 2705
+  },
+  "independentOriginal": false
+}

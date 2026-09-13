@@ -1,0 +1,105 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_crate_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1645747200,
+    "name": "Wooden Crate 01",
+    "type": 2,
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "categories": [
+      "containers",
+      "collection: smugglers_cove"
+    ],
+    "tags": [
+      "vintage",
+      "wood",
+      "old",
+      "wooden",
+      "fancy",
+      "colonial",
+      "chest",
+      "box",
+      "prop",
+      "antique",
+      "farmhouse",
+      "crate",
+      "maritime",
+      "commercial",
+      "container"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 6576,
+    "texel_density": 4578.689151712849,
+    "dimensions": [
+      825.2729177474976,
+      408.9537411928177,
+      349.6182831004262
+    ],
+    "files_hash": "1ac5d053ce4c72e3fbb4c3065e7979522bf1908e",
+    "description": "Free 8K model of a vintage wooden crate - weathered colonial chest with rope handles, metal rivets and latch; ideal as maritime, farmhouse or prop container.",
+    "category_id": "7db08e6b-4676-50ac-8387-ecec2d7ffeb2",
+    "category": "Containers & Storage/Boxes & Crates/Wooden Crates",
+    "sponsors": [
+      "7934315"
+    ],
+    "collections": [
+      "smugglers_cove"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "3b8df674",
+    "download_count": 25545,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_crate_01.png?width=256&height=256&v=3b8df674"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_crate_01/wooden_crate_01_2k.gltf",
+      "bytes": 5612,
+      "sha256": "747c26810ddcca99454ccd27fa0079b3718edda34c75d2a792b2c9bd28772a20",
+      "sourceMd5": "0fcc2eefac2c31d293152daf68667afe"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_crate_01/wooden_crate_01.bin",
+      "bytes": 189408,
+      "sha256": "85f381f8035f7a6f2f3b848640894c6d3333b261946dd8a338c0fe19e0bea21e",
+      "sourceMd5": "8318f76b0c24b5538ce23051dbcb79a0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_crate_01/wooden_crate_01_arm_2k.jpg",
+      "bytes": 2808807,
+      "sha256": "00568882a62e4870a3ca9bbaad72606381bf3da857f0cb7a71b004edde39653c",
+      "sourceMd5": "cab0dc371ff6d90a091737d4b6f92d0f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_crate_01/wooden_crate_01_nor_gl_2k.jpg",
+      "bytes": 2553649,
+      "sha256": "d163fac0801aa15a6153a8b19de898442b849f82bd720ce1418e300fee9f2c75",
+      "sourceMd5": "2d693bd47dd55fc02c2ff8b6195a9181"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_crate_01/wooden_crate_01_diff_2k.jpg",
+      "bytes": 2728494,
+      "sha256": "0ba1a7745837c7b5495b6a90051ddb92b25224476526ebd19418286afc3d429b",
+      "sourceMd5": "d4e0552359a0e8fddcb15827f9781cef"
+    }
+  ]
+}

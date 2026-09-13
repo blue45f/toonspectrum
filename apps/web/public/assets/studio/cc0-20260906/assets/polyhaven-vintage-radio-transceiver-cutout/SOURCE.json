@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-vintage-radio-transceiver",
+  "sourceModelSha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+  "render": {
+    "sourceId": "polyhaven-vintage-radio-transceiver",
+    "sourceSha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+    "path": "high-resolution-props/polyhaven-vintage-radio-transceiver.png",
+    "visiblePixels": 203076,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 42350
+  },
+  "independentOriginal": false
+}

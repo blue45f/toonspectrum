@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/metal_trash_can",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-metal-trash-can",
+  "sourceModelSha256": "bb2ee98fa996bb9094488dcb3785ac22b6c6b5c71e3d16ed44e01f231a1d394b",
+  "render": {
+    "sourceId": "polyhaven-metal-trash-can",
+    "sourceSha256": "bb2ee98fa996bb9094488dcb3785ac22b6c6b5c71e3d16ed44e01f231a1d394b",
+    "path": "high-resolution-props/polyhaven-metal-trash-can.png",
+    "visiblePixels": 300982,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 13960
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-industrial-wall-lamp",
+  "sourceModelSha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+  "render": {
+    "sourceId": "polyhaven-industrial-wall-lamp",
+    "sourceSha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+    "path": "high-resolution-props/polyhaven-industrial-wall-lamp.png",
+    "visiblePixels": 280105,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 9640
+  },
+  "independentOriginal": false
+}

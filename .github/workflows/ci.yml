@@ -35,7 +35,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs
 
   static:
     needs: preflight
@@ -52,6 +52,38 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: P2P browser verification cache regression
+        run: node --test scripts/verify-studio-p2p-huddle.test.mjs
+      - name: P2P merge source-reader and recovery regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-project-library \
+            apps/web/src/domains/creator/studio-project-document \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
+            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
+            apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
+      - name: Studio quick start and task workspace regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-quick-task-workspaces.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-document-workspace.test.ts
+      - name: Fortune observatory and calendar regressions
+        run: |
+          pnpm exec vitest run \
+            packages/core/src/fortune/fortune-observatory.test.ts \
+            packages/core/src/fortune/fortune-engine.security.test.ts \
+            apps/api/src/modules/fortune/fortune.controller.test.ts \
+            apps/web/src/domains/fortune/fortune-observatory-storage.test.ts
+      - name: Studio offline drawing resilience regressions
+        run: |
+          set -euo pipefail
+          node --test scripts/studio-offline-resilience.test.mjs
+          pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
       - name: Recovered worktree regressions
@@ -85,6 +117,14 @@ jobs:
             apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
             apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
             apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Studio live drawing transform regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-live-transform-*.test.ts \
+            apps/web/src/domains/creator/StudioGroupUniformResizeProxy.test.tsx \
+            apps/web/src/domains/creator/studio-group-resize-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-object-transform*.test.ts
       - name: Repository contracts
         run: |
           set -euo pipefail
@@ -146,7 +186,9 @@ jobs:
             apps/web/src/domains/creator/studio-selection \
             apps/web/src/domains/creator/studio-color-range \
             apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts \
-            apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts
+            apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts \
+            apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal-bridge.test.tsx
       - name: Preserve main brush product, rendering and BG3D regressions
         run: |
           set -euo pipefail
@@ -161,6 +203,11 @@ jobs:
             apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts \
             apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts \
             apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints.test.ts \
+            apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
+            apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
+            apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx \
             apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx \

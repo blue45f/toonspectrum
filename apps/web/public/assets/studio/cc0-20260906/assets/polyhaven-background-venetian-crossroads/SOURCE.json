@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/venetian_crossroads",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 22,
+    "type": 0,
+    "whitebalance": 5400,
+    "date_published": 1518483651,
+    "name": "Venetian Crossroads",
+    "categories": [
+      "outdoor",
+      "urban",
+      "midday",
+      "clear",
+      "high contrast",
+      "natural light"
+    ],
+    "coords": [
+      45.4312,
+      12.3571
+    ],
+    "date_taken": 1509704040,
+    "sponsors": [
+      {
+        "name": "Karonis"
+      }
+    ],
+    "backplates": true,
+    "tags": [
+      "sun",
+      "europe",
+      "building",
+      "architecture",
+      "street",
+      "town",
+      "brick",
+      "intersection",
+      "backplates"
+    ],
+    "files_hash": "fa2e22848b0ec031b56ac2fce78faa18fc0df6bf",
+    "authors": {
+      "Greg Zaal": "All",
+      "Rico Cilliers": "Backplates"
+    },
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI of a Venetian street crossroads at clear midday - strong sun, high-contrast hard shadows, warm brick highlights and cool shaded alleys.",
+    "category_id": "d683e4db-110d-5c86-9e8d-68f7c19615a3",
+    "category": "Streets & Town/Streets & Alleys/Historic & Old-Town Streets",
+    "attributes": {
+      "time_of_day": "midday",
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "high",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "00a8b92d",
+    "download_count": 72250,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/venetian_crossroads.png?width=256&height=256&v=00a8b92d"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/venetian_crossroads.jpg",
+      "bytes": 4516831,
+      "sha256": "e0588913c07def9b4ee3c71900854ac4eb2144e752b75a4607dc8acbc190bc06",
+      "sourceMd5": "d5b575ac38d6822e6ff86d522c06c56d"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

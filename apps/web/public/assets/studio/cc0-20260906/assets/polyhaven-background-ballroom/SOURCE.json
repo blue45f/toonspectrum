@@ -1,0 +1,72 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ballroom",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "prepaid": true,
+    "type": 0,
+    "tags": [
+      "tile",
+      "victorian",
+      "window",
+      "piano",
+      "chandelier"
+    ],
+    "date_published": 1590098400,
+    "name": "Ballroom",
+    "categories": [
+      "indoor",
+      "urban",
+      "medium contrast",
+      "artificial light",
+      "natural light"
+    ],
+    "date_taken": 1555594080,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "11167855"
+    ],
+    "files_hash": "6bacfadd9630987bf4871c04788bf5dc22720d9d",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K, unclipped HDRI of a Victorian ballroom with warm chandelier glow and soft daylight from tall windows, medium-contrast lighting and reflections.",
+    "category_id": "7aeeff22-cfe4-5f61-be65-e85c4317fe10",
+    "category": "Interiors/Halls & Venues/Ballrooms & Banquet Halls",
+    "attributes": {
+      "light_type": "mixed",
+      "contrast": "medium",
+      "environment": "indoor",
+      "weather": "overcast"
+    },
+    "img_version": "a806925e",
+    "download_count": 108278,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/ballroom.png?width=256&height=256&v=a806925e"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/ballroom.jpg",
+      "bytes": 5086299,
+      "sha256": "5f84348e9493f1a6e9b36002ada8ea0caeecbd9b51d1aa3baf279dd11e0e3349",
+      "sourceMd5": "4c379e9bfbe70eee5d3e01cd865bfb78"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

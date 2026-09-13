@@ -60,6 +60,7 @@ const STUDIO_WORK_EXCLUDED_PREFIXES = [
   "/studio/templates",
 ] as const;
 const COMMUNITY_PURPOSE_PREFIXES = [
+  "/collaborate",
   "/community",
   "/reviews",
   "/showcase",

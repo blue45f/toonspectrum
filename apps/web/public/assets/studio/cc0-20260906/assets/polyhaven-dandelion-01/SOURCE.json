@@ -1,0 +1,106 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dandelion_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1659484800,
+    "name": "Dandelion 01",
+    "categories": [
+      "plants",
+      "flowers",
+      "nature",
+      "ground cover"
+    ],
+    "type": 2,
+    "authors": {
+      "Rob Tuytel": "Photography",
+      "Rico Cilliers": "Modeling"
+    },
+    "tags": [
+      "plant",
+      "nature",
+      "green",
+      "shrub",
+      "outdoor",
+      "leaf",
+      "bush",
+      "botany",
+      "field",
+      "flower",
+      "meadow",
+      "foliage",
+      "small",
+      "floral"
+    ],
+    "lods": true,
+    "sponsors": [
+      "25436656",
+      "4047949"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 64099,
+    "texel_density": 47587.96139122278,
+    "dimensions": [
+      4214.337892830372,
+      257.75373727083206,
+      170.49064673483372
+    ],
+    "files_hash": "1aaae5d9ce759a84e3b9d381821c8647cefa7a85",
+    "description": "Free 8K model - photoreal dandelion rosettes with serrated green leaves, slender stems and bright yellow flower heads, natural texture and high detail.",
+    "category_id": "081de04a-c797-537e-abf1-c0ce1a92552f",
+    "category": "Nature/Plants/Wildflowers",
+    "attributes": {
+      "lods": true,
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "plant"
+      ]
+    },
+    "img_version": "fa2b2a70",
+    "download_count": 61057,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/dandelion_01.png?width=256&height=256&v=fa2b2a70"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/dandelion_01/dandelion_01_2k.gltf",
+      "bytes": 8915,
+      "sha256": "06f560226c9a54fa29c60cb7cb3f6b508c07f5787ceaf0ab9146da291d00ed57",
+      "sourceMd5": "4bf8d20857e23781978a238d0552e3bf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dandelion_01/dandelion_01.bin",
+      "bytes": 1676648,
+      "sha256": "ccff5a564f56a69374c09c25ae86c3684c46329309b4eef4569255b1ad54bdd0",
+      "sourceMd5": "a44fda5ce48c4f194791dc0d2e2b1312"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dandelion_01/dandelion_01_arm_2k.jpg",
+      "bytes": 1499438,
+      "sha256": "3bee6803f9b0775901524da1a7feb711c0857c0305eef4cd2d721ae3d3e50a60",
+      "sourceMd5": "4dd92440607d04ba33a63fa6f851fe90"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dandelion_01/dandelion_01_nor_gl_2k.jpg",
+      "bytes": 1684671,
+      "sha256": "d709fa1f58abc1d3e6c3b5b023122a06bf10f7b3e32f6ea547dd7e2e1c155f96",
+      "sourceMd5": "1a949a215faea1ff3a8a34d11cb552e6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dandelion_01/dandelion_01_diff_2k.jpg",
+      "bytes": 1466191,
+      "sha256": "565a926562a7a2e7b4af99b85da2a7aabff70d7e2238511245a601901fab182f",
+      "sourceMd5": "e8336416dbb341895680642f0cea619a"
+    }
+  ]
+}

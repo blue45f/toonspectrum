@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wicker_basket_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-wicker-basket-01",
+  "sourceModelSha256": "94630a425dfff2edb47270ff49f351e855d4851bca6350ecec93f839025f97d8",
+  "render": {
+    "sourceId": "polyhaven-wicker-basket-01",
+    "sourceSha256": "94630a425dfff2edb47270ff49f351e855d4851bca6350ecec93f839025f97d8",
+    "path": "high-resolution-props/polyhaven-wicker-basket-01.png",
+    "visiblePixels": 389595,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 22276
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/leafy_grass",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1685145600,
+    "name": "Leafy Grass",
+    "categories": [
+      "outdoor",
+      "floor"
+    ],
+    "type": 1,
+    "tags": [
+      "grass",
+      "green",
+      "nature",
+      "ground",
+      "foliage",
+      "leaves",
+      "plants",
+      "outdoors",
+      "twigs",
+      "sticks",
+      "trampled"
+    ],
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "90fd49a21ddface404d32d9956c3a9f3ca8e0679",
+    "description": "Free 8K leafy grass texture: trampled green blades with scattered brown leaves and twigs, low-relief rough soil surface with a natural matte finish.",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor"
+    },
+    "category_id": "21e06d88-2ab6-5bdd-ad11-869b7ff0b573",
+    "category": "Ground & Terrain/Grass & Vegetation/Lush & Green Grass",
+    "img_version": "8866acdc",
+    "download_count": 90863,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/leafy_grass.png?width=256&height=256&v=8866acdc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_diff_2k.jpg",
+      "bytes": 4766204,
+      "sha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
+      "sourceMd5": "8014f4dace676a62ed71b3dd76119dae"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_rough_2k.jpg",
+      "bytes": 2274652,
+      "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
+      "sourceMd5": "b5c551ed91162aab5afbfb03b73ae3f5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_nor_gl_2k.jpg",
+      "bytes": 6047262,
+      "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
+      "sourceMd5": "ea5e91abe01dc5e5d7028c68c3bc9194"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_ao_2k.jpg",
+      "bytes": 4175463,
+      "sha256": "bcce4368f6a1affe11b4a643e14cfed7dfb46abf6bb9e6a28a3b87c2de2ddb11",
+      "sourceMd5": "f25065162a26693b29a10587582df688"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_disp_2k.jpg",
+      "bytes": 2545281,
+      "sha256": "de34be0f135a3c92fe6e55cca9501a4cc40e02e84de9cc4c7fefded1da5bd3f3",
+      "sourceMd5": "9c0a5f6c375be590bda0c28e2c1dfa2a"
+    }
+  ]
+}

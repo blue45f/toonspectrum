@@ -20,6 +20,8 @@ import { createHash } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
+  mkdtempSync,
+  rmSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -196,11 +198,24 @@ function isExpectedStaticPreviewError(message: string, studioUrl: string): boole
   }
 }
 
-function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollector {
-  const collector: BrowserErrorCollector = { messages: [], failedResponses: [] };
+function collectBrowserErrors(page: Page, studioUrl: string, collector: BrowserErrorCollector = { messages: [], failedResponses: [] }): BrowserErrorCollector {
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
+    // These resources are intentionally outside offline preparation. Preserve
+    // their evidence separately; never ignore failed editor modules or page errors.
+    if (VERIFY_OFFLINE_DRAWING && entry.text().includes("net::ERR_INTERNET_DISCONNECTED")) {
+      const origin = new URL(studioUrl).origin;
+      const optionalUrls = [
+        `${origin}/bootstrap-compat.js`, `${origin}/bootstrap-theme.js`,
+        "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap",
+        "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css",
+      ];
+      if (optionalUrls.includes(location)) {
+        log(`EXPECTED OFFLINE OPTIONAL RESOURCE: ${location}`);
+        return;
+      }
+    }
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
     if (!isExpectedStaticPreviewError(message, studioUrl)) collector.messages.push(message);
   });
@@ -529,14 +544,27 @@ function cleanScratch(): void {
   });
 }
 
+const VERIFY_OFFLINE_DRAWING = process.env.TOONSPECTRUM_VERIFY_OFFLINE_DRAWING === "1";
+
+async function prepareOfflineLifecycle(page: Page): Promise<void> {
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), undefined, { timeout: 20_000 });
+  const panel = page.locator('[data-studio-offline-panel="true"]');
+  await panel.locator("summary").click();
+  await panel.getByRole("button", { name: /오프라인 리소스 준비|리소스 다시 확인/u }).click();
+  await panel.getByRole("status").filter({ hasText: /현재 불러온 리소스 \d+개를 확인했습니다/u })
+    .waitFor({ state: "visible", timeout: 50_000 });
+  await panel.locator("summary").click();
+}
+
 async function runLifecycle(browser: Browser, origin: string): Promise<LifecycleResult> {
   // /studio is the project home; draw/undo/reload/export exercise the explicit canvas route.
   const studioUrl = `${origin}studio/canvas`;
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 1000 },
-    acceptDownloads: true,
-  });
-  const page = await context.newPage();
+  const contextOptions = { viewport: { width: 1440, height: 1000 }, acceptDownloads: true };
+  const profile = VERIFY_OFFLINE_DRAWING ? mkdtempSync(join(tmpdir(), "toonstudio-offline-profile-")) : null;
+  let context = profile
+    ? await chromium.launchPersistentContext(profile, { ...contextOptions, headless: true, args: ["--no-sandbox"] })
+    : await browser.newContext(contextOptions);
+  let page = await context.newPage();
   const browserErrors = collectBrowserErrors(page, studioUrl);
   await installCleanStudioState(page);
 
@@ -559,6 +587,13 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // Dismiss it through the shipped keyboard action before capturing the blank artwork.
     await page.keyboard.press("Escape");
     await page.locator('[data-studio-tool-hint="true"]:visible').waitFor({ state: "hidden" });
+    if (VERIFY_OFFLINE_DRAWING) {
+      await prepareOfflineLifecycle(page);
+      await context.setOffline(true);
+      log("OFFLINE: real pen/undo/redo and durable autosave run with the network disabled");
+      await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
+      await page.keyboard.press("Escape");
+    }
     const baseline = await captureStableStage(page, stage);
     writeFileSync(baselinePath, baseline);
     const surfaceDiagnostics = [await recordStageSurfaces(stage, "baseline")];
@@ -632,6 +667,8 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       "durable autosave left a browser compatibility record before reload",
     );
 
+    // The explicit preparation pack must include first-use PNG/backup resources.
+    // Do not reconnect or warm the export UI online to make this test pass.
     const beforeDownload = await captureDownload(page, beforeExportPath);
     const beforePng = inspectPngIntegrity(beforeDownload.bytes);
     const beforeStats = await decodedPngStats(page, beforeDownload.bytes);
@@ -646,26 +683,73 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       `PNG dimensions are ${beforePng.width}x${beforePng.height}, expected ${expectedWidth}x${expectedHeight}`,
     );
 
+    if (profile) {
+      await page.getByRole("button", { name: /^저장 상태:/u }).click();
+      await page.getByRole("button", { name: "연결 후 저장 예약", exact: true }).click();
+      await page.getByText("다시 켜도 저장 대기를 기억해요", { exact: true }).waitFor({ timeout: 12_000 });
+      await page.getByRole("button", { name: "초안 저장 센터 닫기", exact: true }).click();
+      log("DURABLE INTENT: real shared SQLite write/readback acknowledged before browser close");
+      const companion = await context.newPage();
+      await companion.goto(page.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await companion.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 20_000 });
+      const companionOwnsOrigin = await companion.evaluate(() => {
+        const room = new URL(location.href).searchParams.get("room");
+        return room !== null && sessionStorage.getItem("toonspectrum:studio-live-owner-room:v1") === room;
+      });
+      invariant(!companionOwnsOrigin, "a companion reclaimed an active origin tab");
+      await companion.close();
+      await page.bringToFront();
+      log("LOCAL OWNER LEASE: a second real browser tab did not reclaim the active origin");
+
+    }
+
     const reloadStartedAt = performance.now();
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
+    if (profile) {
+      const reopenUrl = page.url();
+      await context.close();
+      context = await chromium.launchPersistentContext(profile, {
+        ...contextOptions, headless: true, args: ["--no-sandbox"], offline: true,
+      });
+      log(`RESTART PAGES: ${JSON.stringify(context.pages().map((tab) => tab.url()))}`);
+      page = context.pages()[0] ?? await context.newPage();
+      for (const other of context.pages()) { if (other !== page) await other.close(); }
+      collectBrowserErrors(page, studioUrl, browserErrors);
+      // Reuse only persisted browser storage, not storageState or injected artwork.
+      await page.goto(reopenUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      log("OFFLINE RESTART: fresh Chromium process, same profile, no network and no injected recovery data");
+      await page.locator('[data-studio-draft-save-center]').waitFor({ state: "visible", timeout: 20_000 });
+      await page.getByRole("button", { name: /^저장 상태:/u }).click();
+      await page.getByText("다시 켜도 저장 대기를 기억해요", { exact: true }).waitFor({ timeout: 12_000 });
+      const inheritedReceipts = await page.evaluate(() => Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("toonstudio:studio-draft-save-outbox:")));
+      invariant(inheritedReceipts.length === 0, "restart reused a tab-scoped receipt instead of the durable intent");
+      await page.getByRole("button", { name: "초안 저장 센터 닫기", exact: true }).click();
+      log("DURABLE INTENT RESTART: SQLite reminder restored with empty tab outbox, no automatic server save");
+      await page.waitForFunction(() => {
+        const room = new URL(location.href).searchParams.get("room");
+        return room !== null && sessionStorage.getItem("toonspectrum:studio-live-owner-room:v1") === room;
+      }, undefined, { timeout: 10_000 });
+      log("LOCAL OWNER RESTART: known local origin reclaimed after old process released its lease");
+
+
+    } else {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
+    }
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
     await dismissQuickStart(page);
     // Playwright preserves the physical pointer across navigation. The pre-reload download leaves
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
-    const recoveryMessage = page.getByText(
-      "이전에 작성 중이던 임시저장 데이터가 있습니다.",
-      { exact: false },
-    );
-    await recoveryMessage.waitFor({ state: "visible", timeout: 8_000 });
+    const recoveryMessage = page.locator("[data-studio-recovery-notice]");
+    await recoveryMessage.waitFor({ state: "visible", timeout: profile ? 30_000 : 8_000 });
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
     invariant(
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "복구하기", exact: true }).click();
+    await recoveryMessage.getByRole("button", { name: "이어서 그리기", exact: true }).click();
     await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
 
     const restoredStage = page.locator(".konvajs-content").first();
@@ -767,6 +851,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       },
       browserErrors,
       limitations: [
+        VERIFY_OFFLINE_DRAWING
+          ? "Network disabled continuously for pen/undo/redo/autosave, first-use PNG export, full Chromium process restart, recovery and pixel-identical PNG export. This is not an every-tool test."
+          : "Network remains online in this baseline lifecycle run.",
         "Persistence coverage is the shipped OPFS/SQLite autosave and reload/recovery UI path, not authenticated server/database save.",
         "historyReadyAfterPointerUpMs includes Playwright transport and DOM polling overhead; it is diagnostic, not input-latency p95.",
         "The gate covers Chromium production preview and one default opaque pen stroke, not every brush/backend/browser.",
@@ -775,8 +862,35 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     };
     writeFileSync(REPORT_PATH, `${JSON.stringify(result, null, 2)}\n`);
     return result;
+  } catch (error) {
+    // Preserve diagnostics without changing the gate's failure result.
+    const liveDiagnostics = await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-editor]");
+      if (!root) return null;
+      const key = Object.keys(root).find((name) => name.startsWith("__reactFiber"));
+      let fiber = key ? (root as unknown as Record<string, unknown>)[key] as { return?: unknown; memoizedProps?: { value?: { sync?: unknown; syncSnapshot?: unknown; error?: unknown; availability?: unknown } } } : null;
+      const observations = [];
+      for (let i = 0; fiber && i < 100; i++) {
+        const value = fiber.memoizedProps?.value;
+        const props = fiber.memoizedProps as Record<string, unknown> | undefined;
+        if (typeof props?.checkpointError === "string") observations.push({ checkpointError: props.checkpointError });
+        if (props && "sourceHydrationPending" in props) observations.push({ sourceHydrationPending: props.sourceHydrationPending, collaborationDocumentUnavailable: props.collaborationDocumentUnavailable, workHydrated: props.workHydrated });
+        if (value && value.availability !== undefined) observations.push({ error: value.error, availability: value.availability, sync: value.sync ?? value.syncSnapshot });
+        fiber = fiber.return as typeof fiber;
+      }
+      return observations;
+    }).catch(() => null);
+    writeFileSync(join(SCRATCH, "studio-lifecycle-live-diagnostic.json"), JSON.stringify(liveDiagnostics, null, 2));
+    const riskDetails = page.getByRole("button", { name: /저장 보호 필요/u });
+    if (await riskDetails.count() === 1) await riskDetails.click({ timeout: 1000 }).catch(() => undefined);
+    await page.screenshot({ path: join(SCRATCH, "studio-lifecycle-failure.png"), timeout: 5_000 }).catch(() => undefined);
+    await page.locator("body").innerText({ timeout: 5_000 }).then((text) =>
+      writeFileSync(join(SCRATCH, "studio-lifecycle-failure.txt"), text), () => undefined);
+    writeFileSync(join(SCRATCH, "studio-lifecycle-failure-errors.json"), JSON.stringify(browserErrors, null, 2));
+    throw error;
   } finally {
     await context.close();
+    if (profile) rmSync(profile, { recursive: true, force: true });
   }
 }
 

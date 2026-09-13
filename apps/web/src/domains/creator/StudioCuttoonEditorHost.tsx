@@ -1,3 +1,6 @@
+import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
+import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
+import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
@@ -497,6 +500,7 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
+import { finitePositiveGroupResizeBounds } from "./studio-group-resize-bounds";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import { planHealCloneDabs } from "./studio-heal-clone";
@@ -764,6 +768,7 @@ import {
 import {
   clearStudioAutosaveDurableAuthority,
   clearStudioAutosaveRecord,
+  persistStudioAutosaveDeletion,
   downloadStudioAutosaveBackup,
   guardStudioDocumentReplacement,
   requestStudioAutosaveClear,
@@ -1052,7 +1057,6 @@ import {
   normalizedPointToCanvas,
   planSelectionAdjust,
   rasterizeSelectionMask,
-  resolvePixelSelectionAutoTarget,
   resolveSelectionCombineOverride,
   selectAllPixels,
   selectionCombineModeForOperation,
@@ -1064,7 +1068,6 @@ import {
   translateSelection,
   updateSelectionDrag,
   type PixelSelection,
-  type PixelSelectionAutoTargetCandidate,
   type PixelSelectionAutoTargetResolution,
   type PolyLassoSession,
   type SelectionAdjustPlan,
@@ -1227,7 +1230,7 @@ import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canva
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
-  studio2dHref,
+  studio2dSurfaceNavigationHref,
   type Studio2dWorkspaceSurface,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
@@ -1458,6 +1461,7 @@ export function StudioCuttoonEditor({
   } = useStudioDocumentLayout();
   const { data: session, ready: studioAuthReady } = useSession();
   const workId = studioRoute.workId;
+  const [localCanvasSeed] = useState(() => readStudioLocalCanvasSeed(studioRoute));
   const linked3dCloudSaveRecoveryNotice = studioLinked3dCloudSaveRecoveryNotice(
     location.state,
     workId,
@@ -1558,6 +1562,7 @@ export function StudioCuttoonEditor({
     uiBooleanPreferenceRevisionsRef,
     uiDensityMode,
   } = useStudioPreferencesRuntime({
+    taskWorkspace: studioRoute.documentWorkspace,
     applyMirroredSettings: applyMirroredStudioSettings,
     closeRightPanelForFocusMode: closeStudioRightPanelForFocusMode,
   });
@@ -1809,6 +1814,7 @@ export function StudioCuttoonEditor({
     setPagesHistory,
     setPagesHistoryState,
   } = useStudioPageHistorySnapshots({
+    initialCanvasHeight: localCanvasSeed?.canvasH,
     effectiveWorkId,
     markStudioDocumentChanged,
     workId,
@@ -3146,9 +3152,10 @@ export function StudioCuttoonEditor({
   // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 첫 페인트는 안전한 기본값으로
   // 시작하고, owner-scoped SQLite/OPFS snapshot을 비동기로 hydration한다. 그 사이의 UI 편집은
   // 아래 dirty revision fence가 보존하므로 늦은 load가 사용자의 새 배치를 덮지 않는다.
+  const taskWorkspaceId = studioTaskWorkspaceId(studioRoute.documentWorkspace);
   const currentWorkspaceOwnerScope = studioWorkspaceOwnerScope(studioAuthUserId);
   const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() => ({
-    state: createStudioWorkspaceDefaultState(studioAuthUserId),
+    state: applyStudioTaskWorkspace(createStudioWorkspaceDefaultState(studioAuthUserId), taskWorkspaceId),
     ownerScope: currentWorkspaceOwnerScope,
     source: "default",
     status: "session-only",
@@ -3846,6 +3853,10 @@ export function StudioCuttoonEditor({
     };
     setLeftPanelOpenWithOverride(presented.desktop.leftPanelOpen);
     setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen);
+    if (source === "owner-scope-change" && uiDensityMode === "focus") {
+      setForceLeftPanelOpen(false);
+      setForceRightPanelOpen(false);
+    }
     leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(presented.desktop.rightPanelWidth);
     setWorkspaceControlSide(
@@ -3861,6 +3872,7 @@ export function StudioCuttoonEditor({
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
   const { persistStudioWorkspaceState } = useStudioPageWorkspacePersistence({
+    taskWorkspaceId,
     applyStudioWorkspaceLayout,
     currentWorkspaceOwnerScope,
     drawingPaletteDragging,
@@ -4247,18 +4259,6 @@ export function StudioCuttoonEditor({
     ) {
       announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
     }
-  }
-  function finitePositiveGroupResizeBounds(
-    bounds: StudioGroupUniformResizeBounds
-  ): boolean {
-    return (
-      Number.isFinite(bounds.x) &&
-      Number.isFinite(bounds.y) &&
-      Number.isFinite(bounds.width) &&
-      Number.isFinite(bounds.height) &&
-      bounds.width > 0 &&
-      bounds.height > 0
-    );
   }
   /**
    * Active resize target IDs: multi-marquee first, else single selected object.
@@ -5606,12 +5606,7 @@ export function StudioCuttoonEditor({
   ) {
     if (studioRoute.surface === surface && options?.force !== true) return;
     navigate(
-      studio2dHref({
-        remixSourceWorkId: studioRoute.remixSourceWorkId,
-        search: location.search,
-        surface,
-        workId: studioRoute.workId,
-      }),
+      studio2dSurfaceNavigationHref(studioRoute, surface, location.search),
       // 패널을 닫아 표면이 canvas 로 내려오는 항목은 히스토리를 쌓지 않는다 — 뒤로가기가
       // "방금 닫은 패널을 다시 여는" 계단이 되면 라우트 대칭의 의미가 없다.
       options?.replace === true ? { replace: true } : undefined,
@@ -6612,7 +6607,7 @@ export function StudioCuttoonEditor({
     uiBooleanPreferenceRevisionsRef,
   });
 
-  const [title, setTitleState] = useState("");
+  const [title, setTitleState] = useState(localCanvasSeed?.title ?? "");
   const [pendingSaveIntent, setPendingSaveIntent] = useState<"draft" | "published" | null>(null);
   const setTitle = useStudioDocumentMutationSetter(title, setTitleState, {
     markStudioDocumentChanged, onAcceptedMutation: invalidatePendingRetainedRedo,
@@ -7649,9 +7644,7 @@ export function StudioCuttoonEditor({
     workId,
   ]);
 
-  // 아래 여섯 동작의 본문은 studio-page-autosave-runtime.ts 로 옮겼다(2026-08, B-17).
-  // 페이지에는 얇은 래퍼 함수 선언만 남긴다 — effect 안에서 참조되는 심볼의 참조 안정성을
-  // react-hooks/exhaustive-deps 가 컴포넌트 스코프 함수 선언에 대해서만 전이 증명하기 때문이다.
+  // Autosave runtime owns these actions; wrappers preserve effect dependency tracking.
   function prepareStudioDocumentReplacement(
     label: string,
     options: { flushPending: boolean } = { flushPending: false }
@@ -7671,6 +7664,7 @@ export function StudioCuttoonEditor({
 
   async function restoreAutosave() {
     await restoreStudioAutosaveRecovery({
+      preserveCurrentDocument: () => saveNamedCheckpoint("이어서 그리기 전 자동 보관"),
       autosaveRecoveryCandidateRef,
       canApplyStudioMutation: (ticket) => canApplyStudioMutation(ticket),
       captureStudioMutationTicket: () => captureStudioMutationTicket(),
@@ -7725,23 +7719,25 @@ export function StudioCuttoonEditor({
     });
   }
 
-  function clearAutosaveRecord() {
-    clearStudioAutosaveRecord({
-      autosaveKey,
-      autosaveRecoveryCandidateRef,
-      clearAutosaveDurableAuthority,
-      remixId,
-      setAutosaveRestoreBlockedReason,
-      setHasAutosave,
-      workId,
-    });
-  }
-
   /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
+    const ticket = captureStudioMutationTicket();
+    const canClearAutosave = () => canApplyStudioMutation(ticket);
     await requestStudioAutosaveClear({
+      canClearAutosave,
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord,
+      clearAutosaveRecord: () => clearStudioAutosaveRecord({
+        canClearAutosave,
+        autosaveKey,
+        autosaveRecoveryCandidateRef,
+        clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+          autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+        }),
+        remixId,
+        setAutosaveRestoreBlockedReason,
+        setHasAutosave,
+        workId,
+      }),
     });
   }
 
@@ -14171,22 +14167,8 @@ const pixelToolArmed =
   // arm-anytime(2026-07-24) — 포인터 아래 최상단의 편집 가능 이미지를 결정한다(순수 리졸버 위임).
   // 이미지 후보만 위→아래 z순서로 모아 넘긴다(숨김/잠금 판정은 그룹 상속까지 포함). 검토잠금
   // 표면에서는 후보를 비워 항상 none — 작업에셋 파괴잠금은 획득 후 커밋 단계에서 재차 가드된다.
-  const acquirePixelSelectionAutoTarget = (
-    pos: { x: number; y: number },
-  ): PixelSelectionAutoTargetResolution => {
-    if (activeSurfaceReviewLocked) return { kind: "none" };
-    const candidates: PixelSelectionAutoTargetCandidate[] = [];
-    for (const el of elements) {
-      if (el.type !== "image") continue;
-      candidates.push({
-        id: el.id,
-        frame: { x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation },
-        hidden: isEffectivelyHidden(el, groups),
-        locked: isEffectivelyLocked(el, groups),
-      });
-    }
-    return resolvePixelSelectionAutoTarget(candidates, pos);
-  };
+  const acquirePixelSelectionAutoTarget = (pos: { x: number; y: number }): PixelSelectionAutoTargetResolution =>
+    resolvePixelSelectionSceneTarget(elements, groups, pos, activeSurfaceReviewLocked);
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
   const pixelOverlayFrame: SelectionFrame | null = useMemo(
     () => selected?.type === "image"
@@ -14458,6 +14440,8 @@ const puppetWarpArmed =
       && workHydrated
       && autosaveChecked
       && !hasAutosave
+      && uiDensityMode !== "focus"
+      && !localCanvasSeed
       && !quickStartDismissed
       && !menu
       && elements.length === 0)
@@ -15751,11 +15735,9 @@ const puppetWarpArmed =
                 projectCreatorMarketplaceRecordToAssets,
               },
               { installStudioCreatorPackProduct },
-              {
-                browserStudioCreatorPackStorage,
-                resolveStudioCreatorBundledCatalogTarget,
-              },
-              { createStudioOriginalFreeAssetRecord },
+              { browserStudioCreatorPackStorage },
+              { openStudioMarketplaceCatalog, confirmStudioMarketplacePackSync },
+              { createStudioCommunityMarketplaceAssetRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
@@ -15763,7 +15745,8 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
-              import("./studio-original-free-asset-packs"),
+              import("./studio-marketplace-catalog-open"),
+              import("./studio-community-marketplace-asset"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
             ]);
@@ -15788,63 +15771,32 @@ const puppetWarpArmed =
                     message: "로그인하지 않아 계정 라이브러리에는 기록하지 않았습니다.",
                   };
                 }
-                guard.assertCurrent();
-                try {
-                  const synchronized =
-                    await synchronizeStudioCommunityMarketplaceInstalledPack(
-                      record,
-                      pack,
-                    );
-                  guard.assertCurrent();
-                  setStudioMarketplaceCloudSyncRetry(null);
-                  return {
-                    status: "synchronized" as const,
-                    message: synchronized.message,
-                  };
-                } catch (caught: unknown) {
-                  guard.assertCurrent();
-                  const issue = caught instanceof Error && caught.message.trim()
-                    ? caught.message
-                    : "계정 라이브러리 설치 확인을 동기화하지 못했습니다.";
-                  setStudioMarketplaceCloudSyncRetry({ record, pack, issue });
-                  throw caught;
-                }
+                return confirmStudioMarketplacePackSync(
+                  () => synchronizeStudioCommunityMarketplaceInstalledPack(record, pack), guard,
+                  () => setStudioMarketplaceCloudSyncRetry(null),
+                  (issue) => setStudioMarketplaceCloudSyncRetry({ record, pack, issue }),
+                );
               },
-              openBundledPackCatalog: (pack) => {
-                const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
-                if (resolution.status === "unsupported") {
-                  return {
-                    status: "unsupported" as const,
-                    message: resolution.reason,
-                  };
-                }
-                if (resolution.target.kind === "scene-template-catalog") {
-                  setMenu("scene");
-                  setSceneSimilarAnchorId(resolution.target.templateId);
-                  return {
-                    status: "opened" as const,
-                    message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
-                  };
-                }
-                if (resolution.target.kind === "3d-asset-catalog") {
-                  openBackground3dFromMenu();
-                  return {
-                    status: "opened" as const,
-                    message: "3D 에셋 카탈로그를 열었어요. 3D 모델·소품을 선택해 캔버스 장면에 배치하세요.",
-                  };
-                }
-                openBackground3dFromMenu();
-                return {
-                  status: "opened" as const,
-                  message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
-                };
-              },
+              openBundledPackCatalog: (pack) => openStudioMarketplaceCatalog(pack, {
+                isCurrent: isCurrentOperation,
+                canMutate: () => isStudioPasteScopeCurrent({
+                  mutationAllowed: canApplyStudioMutation(mutationTicket),
+                  reviewLocked: activeSurfaceReviewLockedRef.current,
+                  targetPageId, currentPageId: currentPageIdRef.current,
+                  targetMasterEditMode, currentMasterEditMode: masterEditModeRef.current,
+                }),
+                openTemplate: (id) => { setMenu("scene"); setSceneSimilarAnchorId(id); },
+                openBackground3d: openBackground3dFromMenu,
+                setInitialScene: setBg3dInitialScene,
+              }),
               projectAssets: (record) =>
                 projectCreatorMarketplaceRecordToAssets(
                   record,
                   compatibilityContext,
                 ),
-              insertAsset: (projectedAsset) => {
+              insertAsset: async (projectedAsset) => {
+                const asset = await createStudioCommunityMarketplaceAssetRecord(projectedAsset);
+                if (!isCurrentOperation()) return false;
                 if (!isStudioPasteScopeCurrent({
                   mutationAllowed: canApplyStudioMutation(mutationTicket),
                   reviewLocked: activeSurfaceReviewLockedRef.current,
@@ -15853,7 +15805,6 @@ const puppetWarpArmed =
                   targetMasterEditMode,
                   currentMasterEditMode: masterEditModeRef.current,
                 })) return false;
-                const asset = createStudioOriginalFreeAssetRecord(projectedAsset);
                 return addRenderedImage(asset.dataUrl, asset.width, asset.height);
               },
             };
@@ -15897,10 +15848,10 @@ const puppetWarpArmed =
     autosaveChecked,
     hasExistingContent: hasAutosave || elements.length > 0,
     primaryToolActivatedRef,
-    rememberedPrimaryTool,
+    rememberedPrimaryTool: uiDensityMode === "focus" ? "draw" : rememberedPrimaryTool,
     startDrawing: () => {
       activatePrimaryCanvasToolRef.current("draw");
-      if (!isMobile) openInspectorRoute({ primary: "properties" }, null);
+      if (!isMobile && uiDensityMode !== "focus") openInspectorRoute({ primary: "properties" }, null);
     },
     uiBooleanPreferencesReady,
     workHydrated,
@@ -26231,8 +26182,7 @@ function clearSelectionForEdit() {
     } | null;
     readonly recoveredMasterStroke?: DrawEl | null;
   } = {}): StudioProjectSnapshot {
-    // Immediate pointerup commits advance these refs before React renders, closing the same-task
-    // route/pagehide gap where this render's `pages` could still be one stroke behind.
+    // Ref-backed pointerup commits protect route/pagehide snapshots before React renders.
     const pendingBatch = options.pendingStrokeCommits === undefined
       ? pendingStrokeCommitsRef.current
       : options.pendingStrokeCommits;
@@ -29262,6 +29212,7 @@ function clearSelectionForEdit() {
       storyboardGridOpen={storyboardGridOpen}
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
+      saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}

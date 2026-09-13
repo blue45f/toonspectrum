@@ -1,0 +1,110 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wood_peeling_paint_weathered",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "rough",
+      "old",
+      "weathered",
+      "wood",
+      "planks",
+      "painted",
+      "chipped",
+      "flaked",
+      "paint",
+      "worn",
+      "faded",
+      "dry",
+      "damaged",
+      "peeling",
+      "discolored",
+      "cracked",
+      "stained",
+      "wall"
+    ],
+    "name": "Wood Peeling Paint Weathered",
+    "categories": [
+      "outdoor",
+      "man made",
+      "wall",
+      "wood",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "Processing",
+      "Dimitrios Savva": "Photography"
+    },
+    "date_published": 1649894400,
+    "dimensions": [
+      761.9999647140503,
+      762.0000243186951
+    ],
+    "sponsors": [
+      "540619",
+      "3237733"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "477efc13ced9f70916939064f880c9a610979f80",
+    "description": "Free 8K texture of weathered painted wood: rough, cracked planks with chipped, flaking dark paint exposing warm, stained wood grain.",
+    "category_id": "26eb2cbb-558a-5357-ae3f-9519f081f247",
+    "category": "Wood/Boards & Planks/Painted Planks",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "damaged",
+        "painted",
+        "worn",
+        "cracked"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "b08bff7c",
+    "download_count": 103050,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_peeling_paint_weathered.png?width=256&height=256&v=b08bff7c"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_peeling_paint_weathered/wood_peeling_paint_weathered_diff_2k.jpg",
+      "bytes": 3287908,
+      "sha256": "2f8930d993cee4f46d49513fb5434f8b01e4f5ba43f8b4db9e756b7f20dd370c",
+      "sourceMd5": "068bc6219393fa397ea419e8b399b310"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_peeling_paint_weathered/wood_peeling_paint_weathered_rough_2k.jpg",
+      "bytes": 1291885,
+      "sha256": "388be4af42ade4366312683c4443f2abb148069a6d71b25c13528a9f925e1ce2",
+      "sourceMd5": "ed178c55f0247322f4a97e44943bd311"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_peeling_paint_weathered/wood_peeling_paint_weathered_nor_gl_2k.jpg",
+      "bytes": 3817729,
+      "sha256": "4363dd4f92564c8714a78da333ccfa302bd23b1d63c2fb2ee82675a61365f774",
+      "sourceMd5": "ac0ac16338d9e4f362a7cb87bf24ef3d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_peeling_paint_weathered/wood_peeling_paint_weathered_ao_2k.jpg",
+      "bytes": 1485394,
+      "sha256": "1b3b47d54a435cbc435ea82abfb41370e75639c95698136f3dcf1a093c4fa4ab",
+      "sourceMd5": "7522edded443c95af62e56ed2b3a60ae"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_peeling_paint_weathered/wood_peeling_paint_weathered_disp_2k.jpg",
+      "bytes": 535744,
+      "sha256": "6af05942e9cd85985a8025a64cfdb6285ade17f484aef0552242ba67b95a90a7",
+      "sourceMd5": "4dc9848e411289c01a23d1fbdbd9b5f4"
+    }
+  ]
+}

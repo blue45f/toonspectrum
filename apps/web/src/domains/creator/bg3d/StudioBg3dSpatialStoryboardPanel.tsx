@@ -1,3 +1,4 @@
+import { SpatialWebtoonReaderLauncher } from "../spatial/SpatialWebtoonReaderLauncher";
 /**
  * Spatial editorial plan, not an immersive player. SVG is an explicitly labelled top-down map.
  * Selection is inert; only explicit commands use the canonical editor's undo/lock authority.
@@ -192,6 +193,8 @@ export default function StudioBg3dSpatialStoryboardPanel() {
       {!enabled ? <p role="status" className="text-xs text-fg-3">장면 연결 또는 편집 잠금 해제 후 사용할 수 있습니다.</p> : null}
       {message ? <p role="status" className="text-xs text-fg-2">{message}</p> : null}
       {error ? <p role="alert" className="text-xs text-bad">{error}</p> : null}
+      <p className="text-xs text-fg-3">완성된 컷 이미지는 아래 공간 리더에서 직접 열어 AR/VR로 읽을 수 있습니다. 위 3D 샷의 자동 캡처·연동은 아닙니다.</p>
+      <SpatialWebtoonReaderLauncher title="스튜디오 공간 원고 검토" workId="local:studio-spatial" />
     </div>
   );
 }

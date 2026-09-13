@@ -1,0 +1,124 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_lantern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Wooden Lantern 01",
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1646956800,
+    "sponsors": [
+      "26820710",
+      "11109006"
+    ],
+    "categories": [
+      "props",
+      "lighting",
+      "collection: smugglers_cove"
+    ],
+    "tags": [
+      "lantern",
+      "wooden",
+      "wood",
+      "old",
+      "worn",
+      "farmhouse",
+      "maritime",
+      "colonial",
+      "cove",
+      "prop",
+      "vintage",
+      "candle"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 8321,
+    "texel_density": 10954.95455495773,
+    "dimensions": [
+      221.04809433221817,
+      234.72441732883453,
+      530.1365610212088
+    ],
+    "files_hash": "3bbe436bb3d4b7c1a53e679a3ba3c509009996ac",
+    "description": "Free 8K wooden lantern model - worn colonial/maritime farmhouse style with glass panels, metal top and handle; candle prop. Vintage farmhouse/colonial maritime prop from the Smugglers Cove collection.",
+    "category_id": "96b36a4f-e094-52da-912e-e51ca9eb7aa0",
+    "category": "Lighting/Portable/Lanterns",
+    "collections": [
+      "smugglers_cove"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "glass",
+        "metal",
+        "wax"
+      ]
+    },
+    "img_version": "ddb2c1b6",
+    "download_count": 17160,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_lantern_01.png?width=256&height=256&v=ddb2c1b6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_lantern_01/wooden_lantern_01_2k.gltf",
+      "bytes": 9540,
+      "sha256": "6f92eae1fa0286ab2efa7a9ac39966fc7ae8ca71e27fdb01260c07bf9055656f",
+      "sourceMd5": "e3d9a2c5ed27fffd16b1ac399cd72971"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_arm_2k.jpg",
+      "bytes": 2150139,
+      "sha256": "be21ec21910483063763eb67ac5d64e9648297887c6ce65234f9f48afb1bb62c",
+      "sourceMd5": "ce281ac046731e51e6fd657ab985dff8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_diff_2k.jpg",
+      "bytes": 2755465,
+      "sha256": "52273b03dda90f3e703e2a524817cf7c46b726e7a2011c84e1c02cb94ef8f777",
+      "sourceMd5": "7dca46f5007c610deebf328f61ff3886"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_nor_gl_2k.jpg",
+      "bytes": 3047934,
+      "sha256": "375040c774f89483879b5790923c843749d30955be219109243bc031fa96cf65",
+      "sourceMd5": "d18c12a952a698528bee57bf9662517b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_arm_2k.jpg",
+      "bytes": 3113676,
+      "sha256": "91f36a21a9322d40aeb13b75d0d3e015f8c44b842b528369562c2dc1f7ddef68",
+      "sourceMd5": "aaf2b9c0c1b75f360d4680b21032e2b3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_nor_gl_2k.jpg",
+      "bytes": 1029036,
+      "sha256": "6940dcd22bc21d0410838e432e4f66430bdb90a79576a61d2385850fab928efa",
+      "sourceMd5": "6fb26883bdbdd7c543e2c3d7c062fd24"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_diff_2k.jpg",
+      "bytes": 1620643,
+      "sha256": "989446236405daa5251dca8126d68bbadb8d9aa17abf1dd3731e0abcccddd94a",
+      "sourceMd5": "1bb5f52db37aed590cfeba660dbb0ed6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_lantern_01/wooden_lantern_01.bin",
+      "bytes": 268136,
+      "sha256": "65c6b1a776c66d4170dab3657f0809b1a8a88219507589d6c9aad70ffbe687a3",
+      "sourceMd5": "3784667126369ce5c21db3c7436409cb"
+    }
+  ]
+}

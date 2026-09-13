@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/lemon",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-lemon",
+  "sourceModelSha256": "60080c0dfed4a5be3eb6a10cd0f18a6b7b412aaaea62c34e1a679526cf8959dc",
+  "render": {
+    "sourceId": "polyhaven-lemon",
+    "sourceSha256": "60080c0dfed4a5be3eb6a10cd0f18a6b7b412aaaea62c34e1a679526cf8959dc",
+    "path": "high-resolution-props/polyhaven-lemon.png",
+    "visiblePixels": 417591,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4012
+  },
+  "independentOriginal": false
+}

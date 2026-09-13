@@ -20,6 +20,7 @@ const PAGE_SIZE = 24;
 const CONTROL = "min-h-11 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50";
 const KINDS: readonly {id: "all" | StudioCc0AssetKind; label: string}[] = [
   {id: "all", label: "전체"}, {id: "model", label: "3D 소품"},
+  {id: "background", label: "2D 배경"}, {id: "prop-image", label: "2D 투명 소품"},
   {id: "effect-mask", label: "효과 마스크"}, {id: "surface-texture", label: "표면 재질"},
 ];
 function categoryLabel(asset: StudioCc0Asset): string {
@@ -134,11 +135,11 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
   }
   return (
     <details ref={rootRef} className="mb-3 rounded-xl border border-line bg-card/70 p-3" data-studio-cc0-library="true" onToggle={event => {setOpen(event.currentTarget.open); if (!event.currentTarget.open) dismissPreview();}}>
-      <summary className="min-h-11 cursor-pointer rounded-md text-sm font-bold text-fg-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">CC0 원본 에셋 라이브러리 {selectableCount === undefined ? "" : `· ${selectableCount}종`}</summary>
+      <summary className="min-h-11 cursor-pointer rounded-md text-sm font-bold text-fg-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">CC0 에셋 라이브러리 {selectableCount === undefined ? "" : `· ${selectableCount}종`}</summary>
       {open && <div className="mt-2 space-y-3">
-        <p className="text-xs leading-relaxed text-fg-3">질감이 있는 PBR 원본과 스타일라이즈 소품을 구분해서 찾습니다. 3D는 GLB를 받은 뒤 모델 가져오기를 사용하세요. 효과·재질 이미지는 캔버스에 바로 삽입합니다.</p>
+        <p className="text-xs leading-relaxed text-fg-3">배경·투명 소품·PBR 모델·재질을 종류별로 찾습니다. 2D 배경과 소품은 캔버스에 바로 삽입하고, 3D는 GLB를 받은 뒤 모델 가져오기를 사용하세요. 실사 배경은 사진 레퍼런스이며, 투명 소품은 표시된 3D 원본에서 렌더한 파생 소재입니다.</p>
         <label htmlFor={searchId} className="block text-xs font-semibold text-fg-2">에셋 검색</label>
-        <input id={searchId} type="search" value={query} placeholder="가구, 음식, 나무, chair, tree…" className={`${CONTROL} w-full`} onChange={event => {setQuery(event.target.value); setPage(0);}} />
+        <input id={searchId} type="search" value={query} placeholder="골목, 정원, 실내, 의자, 조명, chair…" className={`${CONTROL} w-full`} onChange={event => {setQuery(event.target.value); setPage(0);}} />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="에셋 종류">{KINDS.map(item => <button key={item.id} type="button" className={`${CONTROL} ${kind === item.id ? "border-accent font-bold text-accent" : ""}`} aria-pressed={kind === item.id} onClick={() => {setKind(item.id); setPage(0);}}>{item.label}</button>)}</div>
         <label className="block text-xs font-semibold text-fg-2">표현 스타일<select aria-label="에셋 표현 스타일" className={`${CONTROL} mt-1 w-full`} value={style} onChange={event => {setStyle(event.target.value as StudioCc0StyleFilter); setPage(0);}}><option value="all">전체 · 디테일 원본 우선</option><option value="detailed">디테일 PBR 모델 · 재질</option><option value="stylized">스타일라이즈 · 로우폴리 모델</option></select></label>
         <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs text-fg-2"><input type="checkbox" checked={includeComponents} onChange={event => {setIncludeComponents(event.target.checked); setPage(0);}} />조립부품 포함 · 벽/도로/지형 타일</label>
@@ -158,7 +159,7 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
       </div>}
       {preview && <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-3"><div ref={previewRef} role="dialog" aria-modal="true" aria-labelledby={previewTitleId} tabIndex={-1} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-xl border border-line bg-panel p-4 shadow-xl">
         <div className="flex items-center justify-between gap-3"><h3 id={previewTitleId} className="text-sm font-bold text-fg-1">{preview.name}</h3><button type="button" data-autofocus="true" className={CONTROL} onClick={dismissPreview}>닫기</button></div>
-        <img src={studioCc0AssetUrl(preview.previewPath ?? preview.path)} alt={`${preview.name} 실제 파일 미리보기`} className={`mt-3 max-h-[60dvh] w-full rounded-lg object-contain ${imageClass(preview)}`} />
+        <img src={studioCc0AssetUrl(preview.kind === "model" ? preview.previewPath ?? preview.path : preview.path)} alt={`${preview.name} 실제 파일 미리보기`} className={`mt-3 max-h-[60dvh] w-full rounded-lg object-contain ${imageClass(preview)}`} />
         <p className="mt-2 text-xs leading-relaxed text-fg-2">{studioCc0StyleLabel(preview)} · {categoryLabel(preview)} · {preview.provider} · CC0<br />{preview.kind === "model" ? `${studioCc0ReviewLabel(preview)} · 이 이미지는 해당 GLB의 렌더입니다. 실제 모델은 회전·확대하여 사용할 수 있습니다.` : `원본 ${preview.width}×${preview.height}px. 표시 크기는 화면에 맞춰 축소됩니다.`}</p>{renderUseButton(preview)}
         <p role="status" aria-live="polite" className="mt-2 text-xs leading-relaxed text-fg-2">{notice}</p>
       </div></div>}

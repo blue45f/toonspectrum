@@ -42,14 +42,15 @@ const root = fileURLToPath(new URL("../../../../../", import.meta.url));
 const publicPack = path.join(root, "apps/web/public/assets/studio/cc0-20260906");
 const evidencePack = path.join(root, "artifacts/studio-asset-expansion/pbr-20260908");
 const publicationReportPath = path.join(evidencePack, "publication-report.json");
-const originalVariantsReportPath = path.join(
-  evidencePack,
-  "original-variants-publication-report.json",
-);
-const hasPublicationEvidence =
-  existsSync(publicationReportPath) && existsSync(originalVariantsReportPath);
+const originalVariantsReportPath = path.join(evidencePack, "original-variants-publication-report.json");
+const hasPublicationEvidence = existsSync(publicationReportPath) && existsSync(originalVariantsReportPath);
 const manifestBytes = readFileSync(path.join(publicPack, "manifest.json"));
 const manifest = JSON.parse(manifestBytes.toString("utf8")) as RawManifest;
+// The September 8 digest belongs to its historical release, not a future expanded catalog.
+// Every historical entry is still compared deeply against the current shipped entry below.
+const priorCatalogPath = path.join(root, "artifacts/studio-premium-20260913/catalog-before-expansion.json");
+const priorCatalogBytes = existsSync(priorCatalogPath) ? readFileSync(priorCatalogPath) : manifestBytes;
+const priorCatalog = JSON.parse(priorCatalogBytes.toString("utf8")) as RawManifest;
 const originals = [
   {
     id: "polyhaven-cassette-player",
@@ -71,20 +72,14 @@ const originals = [
   },
 ] as const;
 const cassette = manifest.assets.find(({ id }) => id === originals[0].id)!;
-const digest = (bytes: Uint8Array | string) =>
-  createHash("sha256").update(bytes).digest("hex");
+const digest = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 
 function readPublicationReport() {
-  return JSON.parse(
-    readFileSync(publicationReportPath, "utf8"),
-  ) as PublicationReport;
+  return JSON.parse(readFileSync(publicationReportPath, "utf8")) as PublicationReport;
 }
 
 function parseOriginal(original: unknown, patch: Record<string, unknown> = {}) {
-  return parseStudioCc0Catalog({
-    ...manifest,
-    assets: [{ ...cassette, ...patch, original }],
-  })[0]!;
+  return parseStudioCc0Catalog({ ...manifest, assets: [{ ...cassette, ...patch, original }] })[0]!;
 }
 
 describe("CC0 optional original delivery", () => {
@@ -93,14 +88,8 @@ describe("CC0 optional original delivery", () => {
     expect(asset.original).toEqual(cassette.original);
     expect(Object.isFrozen(asset.original)).toBe(true);
     expect(asset.original).not.toBe(cassette.original);
-    expect(asset).toMatchObject({
-      path: cassette.path,
-      bytes: cassette.bytes,
-      sha256: cassette.sha256,
-    });
-    expect(studioCc0AssetUrl(asset.original!.path)).toBe(
-      `/assets/studio/cc0-20260906/${asset.original!.path}`,
-    );
+    expect(asset).toMatchObject({ path: cassette.path, bytes: cassette.bytes, sha256: cassette.sha256 });
+    expect(studioCc0AssetUrl(asset.original!.path)).toBe(`/assets/studio/cc0-20260906/${asset.original!.path}`);
   });
 
   it("keeps older entries without an original variant unchanged", () => {
@@ -110,84 +99,38 @@ describe("CC0 optional original delivery", () => {
     expect(asset.sha256).toBe(cassette.sha256);
   });
 
-  it.each([null, "original.glb", 3, true])(
-    "rejects a non-object variant: %s",
-    (original) => {
-      expect(() => parseOriginal(original)).toThrow(TypeError);
-    },
-  );
+  it.each([null, "original.glb", 3, true])("rejects a non-object variant: %s", (original) => {
+    expect(() => parseOriginal(original)).toThrow(TypeError);
+  });
 
   it.each([
-    {
-      label: "external URL",
-      patch: { path: "https://example.test/original.glb" },
-    },
-    {
-      label: "absolute path",
-      patch: { path: "/assets/polyhaven-cassette-player/original.glb" },
-    },
-    {
-      label: "parent traversal",
-      patch: {
-        path: "assets/polyhaven-cassette-player/../original.glb",
-      },
-    },
-    {
-      label: "encoded traversal",
-      patch: { path: "assets/polyhaven-cassette-player/%2e%2e.glb" },
-    },
-    {
-      label: "cross-asset path",
-      patch: { path: "assets/polyhaven-brass-goblets/original.glb" },
-    },
+    { label: "external URL", patch: { path: "https://example.test/original.glb" } },
+    { label: "absolute path", patch: { path: "/assets/polyhaven-cassette-player/original.glb" } },
+    { label: "parent traversal", patch: { path: "assets/polyhaven-cassette-player/../original.glb" } },
+    { label: "encoded traversal", patch: { path: "assets/polyhaven-cassette-player/%2e%2e.glb" } },
+    { label: "cross-asset path", patch: { path: "assets/polyhaven-brass-goblets/original.glb" } },
     { label: "same primary path", patch: { path: cassette.path } },
-    {
-      label: "non-GLB file",
-      patch: { path: "assets/polyhaven-cassette-player/original.png" },
-    },
+    { label: "non-GLB file", patch: { path: "assets/polyhaven-cassette-player/original.png" } },
     { label: "empty size", patch: { bytes: 0 } },
     { label: "negative size", patch: { bytes: -1 } },
     { label: "fractional size", patch: { bytes: 1.5 } },
-    {
-      label: "unsafe size",
-      patch: { bytes: Number.MAX_SAFE_INTEGER + 1 },
-    },
+    { label: "unsafe size", patch: { bytes: Number.MAX_SAFE_INTEGER + 1 } },
     { label: "non-number size", patch: { bytes: "3958756" } },
     { label: "short hash", patch: { sha256: "a".repeat(63) } },
     { label: "non-hex hash", patch: { sha256: "z".repeat(64) } },
     { label: "empty decoded memory", patch: { estimatedDecodedImageBytes: 0 } },
-    {
-      label: "infinite decoded memory",
-      patch: { estimatedDecodedImageBytes: Infinity },
-    },
+    { label: "infinite decoded memory", patch: { estimatedDecodedImageBytes: Infinity } },
     { label: "non-CC0 license", patch: { licenseId: "CC-BY-4.0" } },
-    {
-      label: "different source",
-      patch: { sourceUrl: "https://example.test/cassette_player" },
-    },
-    {
-      label: "non-HTTPS source",
-      patch: { sourceUrl: "http://polyhaven.com/a/cassette_player" },
-    },
-    {
-      label: "truthy string",
-      patch: { visuallyEquivalentToDefault: "true" },
-    },
+    { label: "different source", patch: { sourceUrl: "https://example.test/cassette_player" } },
+    { label: "non-HTTPS source", patch: { sourceUrl: "http://polyhaven.com/a/cassette_player" } },
+    { label: "truthy string", patch: { visuallyEquivalentToDefault: "true" } },
   ])("rejects $label", ({ patch }) => {
-    expect(() => parseOriginal({ ...cassette.original, ...patch })).toThrow(
-      TypeError,
-    );
+    expect(() => parseOriginal({ ...cassette.original, ...patch })).toThrow(TypeError);
   });
 
   it("rejects variants on 2D assets or without matching parent CC0 rights", () => {
-    expect(() =>
-      parseOriginal(cassette.original, { kind: "surface-texture" }),
-    ).toThrow(TypeError);
-    expect(() =>
-      parseOriginal(cassette.original, {
-        license: { ...cassette.license, id: "CC-BY-4.0" },
-      }),
-    ).toThrow(TypeError);
+    expect(() => parseOriginal(cassette.original, { kind: "surface-texture" })).toThrow(TypeError);
+    expect(() => parseOriginal(cassette.original, { license: { ...cassette.license, id: "CC-BY-4.0" } })).toThrow(TypeError);
   });
 
   it("does not turn original provenance into a visual quality approval", () => {
@@ -203,49 +146,49 @@ describe("CC0 optional original delivery", () => {
 });
 
 describe("published CC0 original bytes and provenance", () => {
-  it.each(originals)(
-    "$id is an exact published CC0 original with its recorded source hash",
-    (expected) => {
-      const asset = manifest.assets.find(({ id }) => id === expected.id)!;
-      const original = asset.original!;
-      const publicBytes = readFileSync(path.join(publicPack, original.path));
-      expect(publicBytes.byteLength).toBe(expected.bytes);
-      expect(digest(publicBytes)).toBe(expected.sha256);
-      expect(original).toMatchObject({
-        bytes: expected.bytes,
-        sha256: expected.sha256,
-        licenseId: "CC0-1.0",
-        sourceUrl: asset.license.sourceUrl,
-        estimatedDecodedImageBytes: 144 * 1024 * 1024,
-        visuallyEquivalentToDefault: expected.equivalent,
-      });
-      expect(asset.license).toMatchObject({
-        id: "CC0-1.0",
-        url: "https://creativecommons.org/publicdomain/zero/1.0/",
-        commercialUse: true,
-        redistributionAllowed: true,
-      });
-      expect(original.path).not.toBe(asset.path);
-    },
-  );
+  it.each(originals)("$id is an exact published CC0 original with its recorded source hash", (expected) => {
+    const asset = manifest.assets.find(({ id }) => id === expected.id)!;
+    const original = asset.original!;
+    const publicBytes = readFileSync(path.join(publicPack, original.path));
+    expect(publicBytes.byteLength).toBe(expected.bytes);
+    expect(digest(publicBytes)).toBe(expected.sha256);
+    expect(original).toMatchObject({
+      bytes: expected.bytes,
+      sha256: expected.sha256,
+      licenseId: "CC0-1.0",
+      sourceUrl: asset.license.sourceUrl,
+      estimatedDecodedImageBytes: 144 * 1024 * 1024,
+      visuallyEquivalentToDefault: expected.equivalent,
+    });
+    expect(asset.license).toMatchObject({
+      id: "CC0-1.0",
+      url: "https://creativecommons.org/publicdomain/zero/1.0/",
+      commercialUse: true,
+      redistributionAllowed: true,
+    });
+    expect(original.path).not.toBe(asset.path);
+  });
 });
 
 describe.skipIf(!hasPublicationEvidence)("CC0 local publication evidence", () => {
-  it("preserves all 1212 primary entries and the prior publication digest after removing only three variants", () => {
+  it("preserves all 1212 historical entries and their publication digest while allowing new reviewed entries", () => {
     const publication = readPublicationReport();
-    expect(manifest.assets).toHaveLength(1212);
-    expect(manifest.assets).toHaveLength(publication.catalogCount);
-    expect(manifest.assets.filter(({ original }) => original)).toHaveLength(3);
+    expect(priorCatalog.assets).toHaveLength(1212);
+    expect(priorCatalog.assets).toHaveLength(publication.catalogCount);
+    expect(priorCatalog.assets.filter(({ original }) => original)).toHaveLength(3);
+    expect(manifest.assets.length).toBeGreaterThanOrEqual(priorCatalog.assets.length);
+    const currentById = new Map(manifest.assets.map(asset => [asset.id, asset]));
+    for (const asset of priorCatalog.assets) {
+      expect(currentById.get(asset.id), asset.id).toEqual(asset);
+    }
     const beforeOriginals = {
-      ...manifest,
-      assets: manifest.assets.map((asset) => {
+      ...priorCatalog,
+      assets: priorCatalog.assets.map((asset) => {
         const { original: _original, ...primary } = asset;
         return primary;
       }),
     };
-    expect(digest(`${JSON.stringify(beforeOriginals, null, 2)}\n`)).toBe(
-      publication.afterManifestSha256,
-    );
+    expect(digest(`${JSON.stringify(beforeOriginals, null, 2)}\n`)).toBe(publication.afterManifestSha256);
   });
 
   it("preserves every approved expansion primary ID, URL, size, hash and actual file", () => {
@@ -261,14 +204,12 @@ describe.skipIf(!hasPublicationEvidence)("CC0 local publication evidence", () =>
     }
   });
 
-  it("records the optional-variant manifest change in a separate publication report", () => {
+  it("keeps the historical optional-variant report tied to its original release snapshot", () => {
     const publication = readPublicationReport();
-    const report = JSON.parse(
-      readFileSync(originalVariantsReportPath, "utf8"),
-    ) as Record<string, unknown>;
+    const report = JSON.parse(readFileSync(originalVariantsReportPath, "utf8")) as Record<string, unknown>;
     expect(report).toMatchObject({
       beforeManifestSha256: publication.afterManifestSha256,
-      afterManifestSha256: digest(manifestBytes),
+      afterManifestSha256: digest(priorCatalogBytes),
       catalogCount: 1212,
       addedCatalogItems: 0,
       addedOriginalVariants: 3,

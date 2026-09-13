@@ -12,6 +12,9 @@ on:
       - 'tests/creator-flagship-contracts.test.ts'
       - 'tools/verify-creator-flagship.mjs'
       - 'e2e/creator-flagship.spec.ts'
+      - 'e2e/open-creation.spec.ts'
+      - 'e2e/helpers/capture-page-evidence.ts'
+      - 'playwright.non-studio.config.ts'
       - '.github/workflows/creator-flagship-quality.yml'
   workflow_dispatch:
 
@@ -41,6 +44,7 @@ jobs:
         run: >-
           pnpm exec vitest run
           tests/creator-flagship-contracts.test.ts
+          apps/web/src/domains/creator-resources/open-creation.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
           apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
@@ -52,7 +56,7 @@ jobs:
       - name: Actual application browser regression
         env:
           PLAYWRIGHT_CHANNEL: ''
-        run: pnpm exec playwright test e2e/creator-flagship.spec.ts --project=chromium
+        run: pnpm exec playwright test e2e/creator-flagship.spec.ts e2e/open-creation.spec.ts --config playwright.non-studio.config.ts
       - name: Preserve browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,5 +65,5 @@ jobs:
           path: test-results/
           if-no-files-found: warn
 
-# This gate runs real checks and does not replace or relax any existing protected check.
-# Production reachability remains a separate release condition; READY is not HTTP success.
+# Exercise the built public bundle; leave the independent Studio GPU harness unchanged.
+# This gate does not replace or relax any existing protected check.

@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/side_table_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1623767596,
+    "sponsors": [
+      "20953239"
+    ],
+    "name": "Side Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ],
+    "type": 2,
+    "tags": [
+      "table",
+      "wood",
+      "minimalist",
+      "modern",
+      "decor",
+      "living room",
+      "bedroom",
+      "shelf",
+      "contemporary",
+      "interior",
+      "home",
+      "wooden"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2756,
+    "texel_density": 4411.670684276883,
+    "dimensions": [
+      550.0000715255737,
+      450.00001788139343,
+      550.6622816901654
+    ],
+    "files_hash": "c48d34c9a62887ad0c1175877ac69ffdd97e52b6",
+    "description": "Free 8K model of a minimalist wooden side table with two shelves, clean lines and warm oak finish - perfect for modern living room or bedroom interiors.",
+    "category_id": "7d0d2d4a-62ed-5630-b9aa-a300ea86c609",
+    "category": "Furniture/Tables/Side & End Tables",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "9269bde4",
+    "download_count": 21004,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/side_table_01.png?width=256&height=256&v=9269bde4"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/side_table_01/side_table_01_2k.gltf",
+      "bytes": 2700,
+      "sha256": "9ba10e46bb29f1739fc8cd22063a72bb321b30f0551a81db0eeda1da14b8c580",
+      "sourceMd5": "2a756d4b66fde82d47128447a974e721"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/side_table_01/side_table_01.bin",
+      "bytes": 117784,
+      "sha256": "b1f2a0519fc61cded1fdeac8169ac5b077836052671cd39a35cb56576c9aa11e",
+      "sourceMd5": "344e55dbf8dc39b1bca0ca66b956a8dc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/side_table_01/side_table_01_nor_gl_2k.jpg",
+      "bytes": 236052,
+      "sha256": "bc368d03f7b16194560919669e6e671c627d91c98068a562395469f950203b2b",
+      "sourceMd5": "fe2d84f8f1a6f6e0826fae4896645c35"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/side_table_01/side_table_01_arm_2k.jpg",
+      "bytes": 494152,
+      "sha256": "135641036b9b436467f757510112362ddd7bf82b79bc6750345fde4be2d4bf81",
+      "sourceMd5": "ec509e737ed1eca5479a87e9b90f2ff1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/side_table_01/side_table_01_diff_2k.jpg",
+      "bytes": 703996,
+      "sha256": "a7db54db8c6a08629136d7422cf8029912b75cad56fb26173bd20c77027a4e1a",
+      "sourceMd5": "6b089b2549278cde518e1c22d9a5c54e"
+    }
+  ]
+}

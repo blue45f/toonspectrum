@@ -1,0 +1,83 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/urban_courtyard_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 23,
+    "type": 0,
+    "whitebalance": 5550,
+    "date_published": 1603144800,
+    "name": "Urban Courtyard 02",
+    "categories": [
+      "outdoor",
+      "urban",
+      "morning-afternoon",
+      "overcast",
+      "low contrast",
+      "natural light"
+    ],
+    "date_taken": 1597243800,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "backplates": true,
+    "tags": [
+      "city",
+      "street",
+      "building",
+      "asphalt",
+      "fence",
+      "apartments",
+      "backplates"
+    ],
+    "sponsors": [
+      {
+        "url": "http://samuelcote.com/",
+        "name": "Samuel Côté"
+      },
+      "11167855"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "ee81148357fbbff809f9f82d3d9e67cff148b2e1",
+    "description": "Free 16K unclipped HDRI: overcast urban courtyard with soft, diffused morning/afternoon natural light, low contrast, muted sun and cool neutral tones.",
+    "category_id": "530d8407-898c-5819-a7a8-85fe9a55b5a1",
+    "category": "Streets & Town/Squares & Plazas/Courtyards & Quads",
+    "attributes": {
+      "time_of_day": "afternoon",
+      "weather": "overcast",
+      "light_type": "natural",
+      "contrast": "low",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "757dd576",
+    "download_count": 121309,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/urban_courtyard_02.png?width=256&height=256&v=757dd576"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/urban_courtyard_02.jpg",
+      "bytes": 6207119,
+      "sha256": "c742ed6c488b75d6df0416ccbdebcb83ddf572f4eaff659f043e24899f5cc216",
+      "sourceMd5": "5fc2105fa343121236b114be4ac08e1a"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

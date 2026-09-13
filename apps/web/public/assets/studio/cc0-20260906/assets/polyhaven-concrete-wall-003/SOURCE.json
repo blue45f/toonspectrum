@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_wall_003",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "worn",
+      "painted",
+      "discolored",
+      "dirty",
+      "yellow",
+      "white",
+      "weathered",
+      "cracked",
+      "scratched",
+      "chipped",
+      "rough"
+    ],
+    "date_published": 1629763200,
+    "name": "Concrete Wall 003",
+    "categories": [
+      "man made",
+      "wall",
+      "concrete",
+      "plaster",
+      "outdoor",
+      "dirty",
+      "plaster-concrete"
+    ],
+    "dimensions": [
+      3000,
+      3000.000238418579
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "3ed549016391b1c6c6ffc9ec8a250ed3eff69097",
+    "description": "Free 16K texture of a worn painted concrete wall: rough plaster surface with yellow-white discoloration, cracks, chips, scratches and weathered dirt.",
+    "category_id": "9d3c7da3-4959-5d42-8abc-5c31017a2fd4",
+    "category": "Concrete/Plaster & Stucco/Painted Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "painted",
+        "weathered",
+        "cracked",
+        "worn",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "11b4a929",
+    "download_count": 106818,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_wall_003.png?width=256&height=256&v=11b4a929"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_003/concrete_wall_003_diff_2k.jpg",
+      "bytes": 1083378,
+      "sha256": "751ac658d1335d0903f198176253a2cbd06457bbb1f549dc2fa04e4b96f915c3",
+      "sourceMd5": "e7d678d14c74d55105077093b545d31e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_003/concrete_wall_003_rough_2k.jpg",
+      "bytes": 1043780,
+      "sha256": "54221ff7528b2060745fe62643daa75d32db4064fe99a4c94b5f2e65140bae43",
+      "sourceMd5": "2ad9d4b53e81f7a643bc27c604f20549"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_003/concrete_wall_003_nor_gl_2k.jpg",
+      "bytes": 978992,
+      "sha256": "89c0d14f348510bcf6c33b13dda78e403ff5169c44dda48f8d38589b319c1f11",
+      "sourceMd5": "447ffa2eafd213070ec62323abac654d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_003/concrete_wall_003_ao_2k.jpg",
+      "bytes": 515090,
+      "sha256": "2f62329e093dd9416f9727298bf8bff1f58e25c277200d73850bcb0586613d3e",
+      "sourceMd5": "44407bff5c6679e831b607248d790934"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_003/concrete_wall_003_disp_2k.jpg",
+      "bytes": 165652,
+      "sha256": "3216087234493719092b700438d7d93b4440edd331e4c34c1c5dd49bb67be149",
+      "sourceMd5": "56ccbcb8ddab2bffcf9ca7ac2797053b"
+    }
+  ]
+}

@@ -23,12 +23,18 @@ import {
   STUDIO_GENERATED_GUIDE_ITEMS_V2,
   STUDIO_GENERATED_PROP_ITEMS_V2,
 } from "./studio-generated-2d-wave-2";
+import {
+  STUDIO_GENERATED_2D_PACK_V3_INFO,
+  STUDIO_GENERATED_BG_SCENES_V3,
+  STUDIO_GENERATED_ENVIRONMENT_KEYWORDS,
+} from "./studio-generated-2d-wave-3";
 
 import type { BgScene } from "./studio-bg-scenes";
 import type { StudioElementItem } from "./studio-elements-catalog";
 import type { StudioUnifiedAssetItem } from "./studio-unified-asset-catalog";
 
 export const STUDIO_GENERATED_BG_SCENES: readonly BgScene[] = Object.freeze([
+  ...STUDIO_GENERATED_BG_SCENES_V3,
   ...STUDIO_GENERATED_BG_SCENES_V2,
   ...STUDIO_GENERATED_BG_SCENES_V1,
 ]);
@@ -48,8 +54,8 @@ export const STUDIO_GENERATED_ELEMENT_ITEMS: readonly StudioElementItem[] =
 
 export const STUDIO_GENERATED_2D_PACK_INFO = Object.freeze({
   id: "toonstudio-generated-2d-library",
-  version: 2,
-  generatedAt: "2026-09-09",
+  version: 3,
+  generatedAt: "2026-09-13",
   sourceKind: "ai-assisted-native-vector",
   rightsStatus: "generated-in-project",
   externalResourceCount: 0,
@@ -57,6 +63,7 @@ export const STUDIO_GENERATED_2D_PACK_INFO = Object.freeze({
     STUDIO_GENERATED_BG_SCENES_V1.length +
     STUDIO_GENERATED_ELEMENT_ITEMS_V1.length,
   wave2AssetCount: STUDIO_GENERATED_2D_PACK_V2_INFO.assetCount,
+  wave3AssetCount: STUDIO_GENERATED_2D_PACK_V3_INFO.assetCount,
   backgroundCount: STUDIO_GENERATED_BG_SCENES.length,
   propCount:
     STUDIO_GENERATED_PROP_ITEMS.length +
@@ -96,6 +103,7 @@ export function decorateStudioGenerated2dAsset(
   if (!isStudioGenerated2dAssetId(item.id)) return item;
   return {
     ...item,
+    keywords: Object.freeze([...item.keywords, ...(STUDIO_GENERATED_ENVIRONMENT_KEYWORDS.get(studioGeneratedSourceId(item.id)) ?? [])]),
     description: `${item.description} · ToonStudio 생성형 네이티브 벡터`,
     categoryLabel: generatedCategoryLabel(item.id, item.categoryLabel),
     badges: Object.freeze([

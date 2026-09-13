@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/sandstone_blocks_05",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "blocks",
+      "old",
+      "rough",
+      "uneven",
+      "large",
+      "sandstone"
+    ],
+    "date_published": 1542935874,
+    "name": "Sandstone Blocks 05",
+    "categories": [
+      "wall",
+      "man made",
+      "outdoor",
+      "brick"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "sponsors": [
+      "59361351"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "b163839c0b009d5faf11ee21603873c4bff5ef7b",
+    "description": "Free 8K texture - weathered sandstone block wall with large, uneven, rough-hewn stones in warm beige tones, pronounced surface relief and porous, eroded edges.",
+    "category_id": "711f00d1-14a5-537f-addc-52bc3da7cd0e",
+    "category": "Brick & Block/Stone Block & Paver/Sandstone Brick & Block",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "519ac374",
+    "download_count": 101252,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/sandstone_blocks_05.png?width=256&height=256&v=519ac374"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sandstone_blocks_05/sandstone_blocks_05_diff_2k.jpg",
+      "bytes": 2302231,
+      "sha256": "46c0be03ddf94e2eee4cc4ce3aa5526dedfcb85f41e78ea95017640164596602",
+      "sourceMd5": "486e2b51beffc6c050d1e2b25fa47cbd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sandstone_blocks_05/sandstone_blocks_05_rough_2k.jpg",
+      "bytes": 803972,
+      "sha256": "b610b74693219169f970fba609376ab8a449c2e3b515d5ec3d2269fe080bcf33",
+      "sourceMd5": "ccd4bb18858f34cb2ea988dd758a3376"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sandstone_blocks_05/sandstone_blocks_05_nor_gl_2k.jpg",
+      "bytes": 4187323,
+      "sha256": "df63ca75c87476f8ba0c6a3fab3fb841d590da2e5877a753815f20e1f091da1e",
+      "sourceMd5": "d4d54c89dce5e682e12e38f71db3820d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sandstone_blocks_05/sandstone_blocks_05_ao_2k.jpg",
+      "bytes": 1622587,
+      "sha256": "6d58e713080249d82c4bc82839c08bb221ecf7e89e900c9571ba9d1aac26bef5",
+      "sourceMd5": "e6b1d3ce596916b75fc898505761a942"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sandstone_blocks_05/sandstone_blocks_05_disp_2k.jpg",
+      "bytes": 475957,
+      "sha256": "c4e60d253d9a9c6a0b164636728cabb4b53baabde5ea3de850c4d9a8eb70ec14",
+      "sourceMd5": "c66bdd127124d05c655c9c5a0789acb1"
+    }
+  ]
+}

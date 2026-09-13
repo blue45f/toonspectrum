@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/large_square_pattern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1575108926,
+    "name": "Large Square Pattern 01",
+    "categories": [
+      "floor",
+      "man made",
+      "outdoor",
+      "clean"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "07a7f3033688eedafd7c86b6917afa7b2c8ef187",
+    "tags": [
+      "tiles",
+      "concrete",
+      "large",
+      "even",
+      "concrete pavers",
+      "concrete blocks",
+      "urban",
+      "urban design",
+      "grid pattern",
+      "grid",
+      "moss"
+    ],
+    "description": "Free 8K concrete texture of large square pavers, even gray blocks with subtle surface roughness, narrow moss-filled joints and a clean urban grid pattern.",
+    "category_id": "ce26ba57-ef4b-54d4-a954-9a85bb053b9e",
+    "category": "Brick & Block/Concrete Block & Paver/Interlocking Pavers",
+    "attributes": {
+      "surface_use": "paving",
+      "condition": [
+        "mossy"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "e4035840",
+    "download_count": 117728,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/large_square_pattern_01.png?width=256&height=256&v=e4035840"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_square_pattern_01/large_square_pattern_01_diff_2k.jpg",
+      "bytes": 2434074,
+      "sha256": "c5a8ba7f4b0ddbb1400300ebe7af1e3010243e6d5d246caa285efc1e73023eef",
+      "sourceMd5": "2394ad71171d9835338fa6373bc6d5fe"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_square_pattern_01/large_square_pattern_01_rough_2k.jpg",
+      "bytes": 1342592,
+      "sha256": "acca3a82a062b8c28409c1ba3fcb26ce185ac8800749e5f9ed524f184cd068b5",
+      "sourceMd5": "e4fad4b6c44ccfaf5d17f3625fe7cba5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_square_pattern_01/large_square_pattern_01_nor_gl_2k.jpg",
+      "bytes": 4179150,
+      "sha256": "930d3b625e458818752811c469d1ccc8dcb2aa895c162db73a000eabc9eb648d",
+      "sourceMd5": "e048d3c5e9c0ae7a314e333bb16598eb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_square_pattern_01/large_square_pattern_01_ao_2k.jpg",
+      "bytes": 2157733,
+      "sha256": "3e7f038d0d44f6ab2002c901b9d682249c8ade2d8053b98fdb9c40f5f293c2d6",
+      "sourceMd5": "8bb8d6bb409047ea7e580e1484bbdac3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/large_square_pattern_01/large_square_pattern_01_disp_2k.jpg",
+      "bytes": 518932,
+      "sha256": "bca0f40817fb656a3aadfa21694e578eddf65f16f97fea34fee32794efd73f72",
+      "sourceMd5": "c4924cd03f090a5c7cacd2a6cfb34d69"
+    }
+  ]
+}

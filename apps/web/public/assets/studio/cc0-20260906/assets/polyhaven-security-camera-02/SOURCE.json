@@ -1,0 +1,104 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/security_camera_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Security Camera 02",
+    "type": 2,
+    "info": null,
+    "date_published": 1693353600,
+    "categories": [
+      "industrial",
+      "electronics",
+      "appliances",
+      "rigged",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "camera",
+      "surveillance",
+      "monitoring",
+      "cctv",
+      "police",
+      "security",
+      "utility",
+      "infrastructure"
+    ],
+    "authors": {
+      "Garrison Gager": "Modeling & Texturing",
+      "Yann Kervran": "Rigging"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 12477,
+    "texel_density": 11749.061886175377,
+    "dimensions": [
+      140.66611975431442,
+      393.7917649745941,
+      208.5888683795929
+    ],
+    "sponsors": [
+      "146648879"
+    ],
+    "files_hash": "141ee900f27b02e86f21ef1c1b5a5500a7e22b40",
+    "description": "Free 8K model: rigged CCTV camera with weathered metal casing, protective hood and mounting bracket - perfect for industrial or urban surveillance scenes.",
+    "category_id": "e64298e4-a9df-5b16-bb7e-1fc3fc124d25",
+    "category": "Industrial & Infrastructure/Utility Equipment/Surveillance Cameras",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "metal"
+      ],
+      "rigged": true
+    },
+    "img_version": "fca43927",
+    "download_count": 13034,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/security_camera_02.png?width=256&height=256&v=fca43927"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/security_camera_02/security_camera_02_2k.gltf",
+      "bytes": 6299,
+      "sha256": "0ca204d355fbc865045217b219a4efcfb7e0a0afbc557c5cc016a111ad2f554a",
+      "sourceMd5": "8bff5087093e3e3287b8ee3631c51012"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/security_camera_02/security_camera_02_diff_2k.jpg",
+      "bytes": 1475390,
+      "sha256": "cee7add026ac8435e6229cc96e8898114859f4a77d139e9151864e123b958004",
+      "sourceMd5": "593fb4dc461d5035fc51408f21e7975d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/security_camera_02/security_camera_02_arm_2k.jpg",
+      "bytes": 1738160,
+      "sha256": "5123eea1d25d07e05c7dcda7ff3d561bf672ad71cb43d6341ecf71780e4f8bcc",
+      "sourceMd5": "2c87cf3b9eea0736bb1d1606ca11b239"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/security_camera_02/security_camera_02.bin",
+      "bytes": 407088,
+      "sha256": "15512a4c0add24cd6ec38386e7707b02587f6bb873d9a0620ca6bbc548f1dc7b",
+      "sourceMd5": "2aa032b969a0e164e12705a7149bb20e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/security_camera_02/security_camera_02_nor_gl_2k.jpg",
+      "bytes": 1780652,
+      "sha256": "47e10d8cd1b49b16fec0dc5ff03f03df7630bf239ee535352056de5a014a9772",
+      "sourceMd5": "41dd4a243fbf175190e86801443c49bc"
+    }
+  ]
+}

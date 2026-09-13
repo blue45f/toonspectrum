@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/GothicBed_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-gothicbed-01",
+  "sourceModelSha256": "f56eef6da6b462fe0aa793f477a3c1cd923b8c2f273a3e8d4cf1a7e29a67f7e3",
+  "render": {
+    "sourceId": "polyhaven-gothicbed-01",
+    "sourceSha256": "f56eef6da6b462fe0aa793f477a3c1cd923b8c2f273a3e8d4cf1a7e29a67f7e3",
+    "path": "high-resolution-props/polyhaven-gothicbed-01.png",
+    "visiblePixels": 473834,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 18745
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,344 @@
+{
+  "backend": "real-browser-canvas2d",
+  "cases": [
+    {
+      "id": "elastic-filaments",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0005424554012753816,
+      "pressureMassRatio": 5.21463961720511,
+      "visiblePixels": 14620,
+      "markCount": 2660,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 19956
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 19815
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 19489
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 20107
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 21329
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0005447871480891411
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0013748632580043217
+        }
+      ]
+    },
+    {
+      "id": "vortex-flow",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0013977676578374085,
+      "pressureMassRatio": 4.9160018961197265,
+      "visiblePixels": 11407,
+      "markCount": 2660,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 14195
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 12574
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 12077
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 15559
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 20952
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0013928983096331508
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0015935615436793726
+        }
+      ]
+    },
+    {
+      "id": "gravity-fountain",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0007389274343069431,
+      "pressureMassRatio": 5.099257387321393,
+      "visiblePixels": 19996,
+      "markCount": 5316,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 33084
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 29064
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 27783
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 36457
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 51363
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0006357843371987768
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.000896177218507915
+        }
+      ]
+    },
+    {
+      "id": "woven-ribbon",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0007829710563093953,
+      "pressureMassRatio": 8.282267058306108,
+      "visiblePixels": 13443,
+      "markCount": 2046,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 20392
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 19933
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 19151
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 20735
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 24880
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0007566416537519777
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0005742506062746445
+        }
+      ]
+    },
+    {
+      "id": "branching-veins",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0016775898366079816,
+      "pressureMassRatio": 3.8266000377483977,
+      "visiblePixels": 9983,
+      "markCount": 2263,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 14962
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 13771
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 13080
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 16042
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 23925
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.001558442846661721
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0013187460985569818
+        }
+      ]
+    },
+    {
+      "id": "orbital-lace",
+      "liveDifferences": [
+        0,
+        0,
+        0
+      ],
+      "jsonDifference": 0,
+      "svgAlphaDistance": 0.0007206351884021158,
+      "pressureMassRatio": 12.313759843941911,
+      "visiblePixels": 9909,
+      "markCount": 3147,
+      "hybridCases": [
+        {
+          "deposition": "deposit-ink",
+          "replayDifference": 0,
+          "visiblePixels": 16028
+        },
+        {
+          "deposition": "deposit-marker",
+          "replayDifference": 0,
+          "visiblePixels": 15295
+        },
+        {
+          "deposition": "deposit-dry",
+          "replayDifference": 0,
+          "visiblePixels": 14588
+        },
+        {
+          "deposition": "deposit-wet",
+          "replayDifference": 0,
+          "visiblePixels": 16535
+        },
+        {
+          "deposition": "deposit-oil",
+          "replayDifference": 0,
+          "visiblePixels": 21524
+        }
+      ],
+      "symmetryCases": [
+        {
+          "type": "vertical",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0007090442838831063
+        },
+        {
+          "type": "kaleidoscope",
+          "liveDifference": 0,
+          "svgAlphaDistance": 0.0008170577695995271
+        }
+      ]
+    }
+  ],
+  "distinctness": {
+    "pairs": 15,
+    "minimumDistance": 0.5553407215618761,
+    "closestPair": [
+      "woven-ribbon",
+      "elastic-filaments"
+    ],
+    "opacityNormalized": true
+  },
+  "performance": {
+    "planningP95": 2.699999988079071,
+    "submissionP95": 4.300000011920929,
+    "trials": 30,
+    "excludesReadback": true
+  },
+  "failures": [],
+  "scope": "Synthetic input only; no physical pen, fluid-grid or WebGPU latency claim",
+  "diagnostics": [],
+  "environment": {
+    "recordedAt": "2026-09-13T09:33:58.745Z",
+    "browser": "151.0.7922.34",
+    "node": "v24.16.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M2 Max",
+    "memoryBytes": 34359738368
+  }
+}

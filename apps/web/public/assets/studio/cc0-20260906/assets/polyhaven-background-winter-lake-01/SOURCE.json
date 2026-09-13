@@ -1,0 +1,81 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/winter_lake_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 9,
+    "type": 0,
+    "whitebalance": 6400,
+    "tags": [
+      "field",
+      "lake",
+      "snow",
+      "winter",
+      "frozen"
+    ],
+    "date_published": 1549926000,
+    "name": "Winter Lake 01",
+    "categories": [
+      "outdoor",
+      "skies",
+      "nature",
+      "sunrise-sunset",
+      "partly cloudy",
+      "low contrast",
+      "natural light"
+    ],
+    "date_taken": 1546955820,
+    "coords": [
+      50.9034383,
+      34.8265526
+    ],
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "3267566"
+    ],
+    "files_hash": "8dbcf29ca601f688f0ebd079858e3a76d64f065d",
+    "max_resolution": [
+      16500,
+      8250
+    ],
+    "description": "Free 16K unclipped HDRI of a frozen winter lake at sunrise, soft low-contrast natural light with cool blue snow and a warm glow in partly cloudy skies.",
+    "category_id": "a5683ecd-127f-5e85-bfe2-8b434f7ae8b9",
+    "category": "Coast & Water/Rivers & Lakes/Lakeshores",
+    "attributes": {
+      "time_of_day": "sunset",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "low",
+      "season": "winter",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "21850642",
+    "download_count": 110066,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/winter_lake_01.png?width=256&height=256&v=21850642"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/winter_lake_01.jpg",
+      "bytes": 2049120,
+      "sha256": "cce8e095187350e49346ed07ad679f3eda61e1b990dc11236ad3beee9f0d9fc2",
+      "sourceMd5": "d151775dc8c8b43eacb96e5b4e93ec7f"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

@@ -70,6 +70,7 @@ function loadHeaderRules(): Array<{ pattern: RegExp; rule: VercelHeaderRule }> {
 function startStaticServer(
   port: number,
   swOverride: () => string | null,
+  navigationOverride: () => number | "timeout" | null = () => null,
 ): Server {
   const rules = loadHeaderRules();
   const server = createServer((request, response) => {
@@ -79,6 +80,22 @@ function startStaticServer(
     for (const { pattern, rule } of rules) {
       if (!pattern.test(pathname)) continue;
       for (const header of rule.headers) response.setHeader(header.key, header.value);
+    }
+
+    const navigationFailure = pathname === "/studio" ? navigationOverride() : null;
+    if (navigationFailure !== null) {
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      if (navigationFailure === "timeout") {
+        const timer = setTimeout(() => {
+          if (!response.destroyed) response.end("delayed origin");
+        }, 15_000);
+        timer.unref();
+        response.once("close", () => clearTimeout(timer));
+      } else {
+        response.statusCode = navigationFailure;
+        response.end(`simulated origin ${navigationFailure}`);
+      }
+      return;
     }
 
     if (pathname === "/sw.js") {
@@ -197,7 +214,8 @@ async function main(): Promise<void> {
 
   const port = await findFreePort({ unavailableMessage: "sw verify port" });
   const origin = `http://127.0.0.1:${port}`;
-  const server = startStaticServer(port, () => (serveNextSw ? nextSw : null));
+  let navigationFailure: number | "timeout" | null = null;
+  const server = startStaticServer(port, () => (serveNextSw ? nextSw : null), () => navigationFailure);
 
   let browser: Browser | null = null;
   const report: Record<string, unknown> = { origin };
@@ -279,6 +297,22 @@ async function main(): Promise<void> {
       `warmUpStarted=${String(warmState?.warmUpStarted)} data entries=${warmEntries.data ?? 0}`,
     );
 
+    // Preparing the full editor is explicit. An unprepared client intentionally
+    // uses the small independent rescue instead; test that path in local-first-browser.
+    const prepared = await page.evaluate(async () => {
+      const controller = navigator.serviceWorker.controller;
+      if (!controller) return false;
+      return new Promise<boolean>((resolve) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 45_000);
+        channel.port1.onmessage = (event) => {
+          clearTimeout(timer); channel.port1.close(); resolve(event.data?.complete === true);
+        };
+        controller.postMessage({ type: "toonspectrum-sw:prepare-offline", urls: [] }, [channel.port2]);
+      });
+    });
+    check("complete editor pack is prepared before checking full Studio offline boot", prepared);
+
     // ---- 5. Offline -------------------------------------------------------
     await context.setOffline(true);
     await page.reload({ waitUntil: "load", timeout: 120_000 });
@@ -301,6 +335,27 @@ async function main(): Promise<void> {
       `transferBytes=${offline.transferBytes}`,
     );
     await context.setOffline(false);
+
+    // Real origin failures (not page.route mocks): navigation preload must pass
+    // through the shipped worker, preserving both isolation and permission failures.
+    for (const failure of [500, 503, "timeout", 403, 404] as const) {
+      navigationFailure = failure;
+      const started = Date.now();
+      const response = await page.reload({ waitUntil: "load", timeout: 20_000 });
+      const recovered = failure === "timeout" || failure >= 500;
+      const status = response?.status();
+      check(`origin ${failure} ${recovered ? "recovers cached shell" : "is not hidden"}`,
+        status === (recovered ? 200 : failure), `status=${status}`);
+      if (recovered) {
+        check(`origin ${failure} reports cached-shell provenance`,
+          /toonstudio-offline/u.test(response?.headers()["server-timing"] ?? ""));
+        check(`origin ${failure} preserves isolation`, await page.evaluate(() => globalThis.crossOriginIsolated));
+      }
+      if (failure === "timeout") check("stalled origin recovery has a bounded deadline", Date.now() - started < 12_000);
+      navigationFailure = null;
+      await page.reload({ waitUntil: "load", timeout: 20_000 });
+      await waitForController(page);
+    }
 
     // ---- 6. Update flow: a new worker must park, not take over ------------
     serveNextSw = true;

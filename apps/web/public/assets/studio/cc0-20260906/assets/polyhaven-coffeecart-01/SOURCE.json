@@ -1,0 +1,121 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/CoffeeCart_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "name": "Coffee Cart 01",
+    "categories": [
+      "appliances",
+      "props",
+      "furniture",
+      "office"
+    ],
+    "type": 2,
+    "tags": [
+      "table",
+      "metal",
+      "shelf",
+      "plastic",
+      "cart",
+      "coffee",
+      "portable",
+      "wheels",
+      "tea",
+      "coffee maker",
+      "mobile",
+      "catering"
+    ],
+    "authors": {
+      "Joe Seabuhr": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 27659,
+    "texel_density": 1759.6964739422806,
+    "dimensions": [
+      2167.636811733246,
+      1073.2900500297546,
+      1717.6724136807024
+    ],
+    "files_hash": "9a4acb5ef57be1f96cd1af66af66d2a798139a24",
+    "sponsors": [
+      "297038",
+      "84390067"
+    ],
+    "description": "Free 4K model - industrial metal coffee cart with commercial brewer, glass carafes, storage cabinet, lower shelf bin, power cord and red caster wheels.",
+    "category_id": "42ae5c98-8e4b-5162-a481-57a1eff29af3",
+    "category": "Furniture/Storage Furniture/Carts & Trolleys",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "metal",
+        "glass",
+        "plastic"
+      ]
+    },
+    "img_version": "fd89d2cb",
+    "download_count": 44416,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/CoffeeCart_01.png?width=256&height=256&v=fd89d2cb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/CoffeeCart_01/CoffeeCart_01_2k.gltf",
+      "bytes": 6637,
+      "sha256": "40297334141f062db2b3b1921572c4b147ebd306eb708e87f0621e2bc450ea0c",
+      "sourceMd5": "a205007985fd3cd02e47512e1361dbc1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_cart_diff_2k.jpg",
+      "bytes": 401955,
+      "sha256": "d41aab7a31063452abf70678d29b198be1cdcb3b011bc42325b9882f6177b78d",
+      "sourceMd5": "76b8b5238122ea9ebacf85952d199a98"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_props_nor_gl_2k.jpg",
+      "bytes": 439426,
+      "sha256": "84b10d206a9967fb7fc2d7658f704f304cf341ffaef02eaab1a98eddb4259f45",
+      "sourceMd5": "71d49edcb4bb8b4de8020806203f225f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/CoffeeCart_01/CoffeeCart_01.bin",
+      "bytes": 865700,
+      "sha256": "0c0f9ed417ba85208c7f42b674ee3ce99a7e6fb63e67c7ea8d312304c470db50",
+      "sourceMd5": "ef3a282d8fbf3ab6c5d91219be61e69a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_cart_nor_gl_2k.jpg",
+      "bytes": 496228,
+      "sha256": "887bd8df2c6993e7d9ee75b25fdc06ec5bc5c1042faa40d1537f32095f3b8611",
+      "sourceMd5": "44d85503aae0de59b0c4f23732e187ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_cart_arm_2k.jpg",
+      "bytes": 511101,
+      "sha256": "ecfc46f9e4cb6beb919f9ed2227f0d7c3780d0461f6ab7c735bf90ef464c36c1",
+      "sourceMd5": "f2b709afd52e2371a8e0556d058180a0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_props_arm_2k.jpg",
+      "bytes": 620502,
+      "sha256": "c9d14e8e95c57f4c509b210e1e12055b688b7685e3c5e66fe0cea194e1c154ef",
+      "sourceMd5": "74256cafc7d978f3f0a8891d6b9a2192"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CoffeeCart_01/CoffeeCart_01_props_diff_2k.jpg",
+      "bytes": 492206,
+      "sha256": "aca06e7bb4aeb994deef7a93a6e8f29733ca2b5ab64467974d6d02ea434f3646",
+      "sourceMd5": "72f9a9a7e9e4f10442d8b559df980ce5"
+    }
+  ]
+}

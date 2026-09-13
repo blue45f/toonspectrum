@@ -1,3 +1,7 @@
+import { BrushStudioV6MaterialPaletteCache } from "./brush-studio-v6-material-palette-cache";
+import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
+import { createBrushStudioV6TopologyStroke } from "./brush-studio-v6-topology-engine";
+import { brushStudioV6TopologyActiveTuning, brushStudioV6TopologyStep, paintBrushStudioV6TopologyPrimitive } from "./brush-studio-v6-topology-material";
 import { normalizeStudioBrushMaterialProgramContract } from "../../../shared/lib/studio-brush-material-program-contract";
 import { mixStudioSpectralWgm } from "../studio-spectral-wgm-mix-v1";
 import type { BrushStudioV6InputPolicy, BrushStudioV6Program, BrushStudioV6Tuning } from "./brush-studio-v6-engine";
@@ -30,6 +34,8 @@ function contactMode(program: BrushStudioV6MaterialProgram): "bristle" | "partic
 
 /** Workbench controls use the same branch decision as the contact solver. */
 export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6MaterialProgram): ReadonlySet<keyof BrushStudioV6Tuning> {
+  const topologyKeys = brushStudioV6TopologyActiveTuning(program);
+  if (topologyKeys) return topologyKeys;
   const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor"]);
   const mode = contactMode(program);
   const bristlePickup = program.slots.pickup === "pickup-pigment-reservoir";
@@ -135,6 +141,7 @@ export function sampleBrushStudioV6PaperContact(surface: string, x: number, y: n
 
 /** Selections with an observable implementation in this portable kernel. */
 export function isBrushStudioV6MaterialNodeImplemented(id: string): boolean {
+  if (brushStudioV6Topology(id)) return true;
   return ["input-pointer-v3", "motion-direct", "carrier-webgpu-centerline", "carrier-perfect-outline", "carrier-webgpu-particles", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous", "deposit-ink", "deposit-marker", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "pickup-none", "pickup-pigment-reservoir", "pigment-rgb", "pigment-spectral", "pigment-inkwash-density", "physics-dry-contact", "physics-inkwash", "physics-thin-film", "physics-bristle", "physics-reaction", "physics-height", "pattern-none", "pattern-dot-tone", "pattern-cross-hatch", "pattern-weave", "pattern-brick", "pattern-foliage", "pattern-stitch", "pattern-kaleido", "finish-neon", "output-contact-canvas-svg"].includes(id);
 }
 
@@ -163,6 +170,8 @@ export function mixBrushStudioV6MaterialColors(first: string, second: string, we
   return hexColor(mixStudioSpectralWgm(a, b, 1 - ratio, spectral ? 1 : 0));
 }
 
+const materialPaletteCache = new BrushStudioV6MaterialPaletteCache(mixBrushStudioV6MaterialColors);
+
 /** Fixed work per append, fixed memory per stroke, and no event-count RNG. */
 export function createBrushStudioV6MaterialStroke(
   program: BrushStudioV6MaterialProgram,
@@ -174,7 +183,7 @@ export function createBrushStudioV6MaterialStroke(
   const size = bounded(t.size, 1, 240);
   const mode = contactMode(program);
   const spacing = mode === "relief" && t.spacing <= 0.3 ? Math.min(t.spacing, 0.035) : t.spacing;
-  const step = bounded(size * spacing, 0.35, 96);
+  const step = brushStudioV6TopologyStep(program, bounded(size * spacing, 0.35, 96));
   const markBudget = Math.round(bounded(options.maxMarksPerPush ?? 8192, 64, 32768));
   const seed = finite(program.seed) | 0;
   const physics = new Set(program.slots.physics);
@@ -186,12 +195,13 @@ export function createBrushStudioV6MaterialStroke(
   const patternId = program.slots.pattern;
   const laneCount = Math.round(bounded(t.bristleStrands, 8, 128));
   const maxPatternMarks = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(patternId) ? 169 : patternId === "pattern-weave" ? 338 : patternId === "pattern-stitch" ? 1 : 6;
-  const marksPerDab = (patternId !== "pattern-none" ? maxPatternMarks + (particles ? 36 : 0) : bristle ? laneCount : mode === "grain" ? 36 : particles ? 36 : 6) + 4;
-  const palette = Array.from({ length: 33 }, (_, index) => mixBrushStudioV6MaterialColors(t.primaryColor, t.secondaryColor, index / 32, program.slots.pigment !== "pigment-rgb"));
-  const laneX = new Float64Array(laneCount);
-  const laneY = new Float64Array(laneCount);
-  const reservoir = new Float64Array(laneCount);
-  const wetEdges = new Float64Array(4);
+  const topology = createBrushStudioV6TopologyStroke(program, step);
+  const marksPerDab = topology ? topology.maxPrimitivesPerDab * 3 : (patternId !== "pattern-none" ? maxPatternMarks + (particles ? 36 : 0) : bristle ? laneCount : mode === "grain" ? 36 : particles ? 36 : 6) + 4;
+  const palette = materialPaletteCache.get(t.primaryColor, t.secondaryColor, program.slots.pigment !== "pigment-rgb");
+  const laneX = new Float64Array(topology ? 0 : laneCount);
+  const laneY = new Float64Array(topology ? 0 : laneCount);
+  const reservoir = new Float64Array(topology ? 0 : laneCount);
+  const wetEdges = new Float64Array(topology ? 0 : 4);
   let previous: BrushStudioV6MaterialPoint | null = null;
   let remaining = step;
   let pathLength = 0;
@@ -204,7 +214,7 @@ export function createBrushStudioV6MaterialStroke(
   function deposit(point: BrushStudioV6MaterialPoint, direction: number, marks: BrushStudioV6MaterialMark[], densityMultiplier = 1, directional = true): void {
     const index = dabIndex++;
     const pressure = unit(point.pressure);
-    if (pressure === 0 || t.flow <= 0 || t.opacity <= 0) return;
+    if (pressure === 0 || t.flow <= 0 || t.opacity <= 0) { topology?.reset(); return; }
     const tilt = program.input.tiltEnabled ? unit(point.tilt ?? 0) : 0;
     const angle = chisel || knife ? (finite(point.twist ?? 0) * Math.PI / 180 + Math.PI / 4) : direction;
     const widthPressure = program.slots.carrier === "carrier-perfect-outline" ? pressure * pressure : pressure;
@@ -217,6 +227,15 @@ export function createBrushStudioV6MaterialStroke(
       const secondaryMix = unit(mix);
       marks.push({ kind, shape, x, y, radiusX: Math.max(0.12, rx), radiusY: Math.max(0.12, ry), angle: rotation, opacity: unit(opacity), color: palette[Math.round(secondaryMix * 32)]!, secondaryMix, height: unit(height) });
     };
+
+    if (topology) {
+      topology.deposit({ x: point.x, y: point.y, radius, pressure, direction, index, directional,
+        discontinuity: densityMultiplier > 1 }, (mark) => {
+        const paper = sampleBrushStudioV6PaperContact(program.slots.surface, mark.x, mark.y, seed);
+        paintBrushStudioV6TopologyPrimitive(program, mark, pressure, paper, finite(point.twist ?? 0), emit);
+      });
+      return;
+    }
 
     if (program.slots.finish.includes("finish-neon")) {
       emit("ink", point.x, point.y, radius * 1.7, radius * 1.7, angle, alpha * 0.09, 1);
@@ -417,7 +436,7 @@ export function createBrushStudioV6MaterialStroke(
       emittedMarks += marks.length;
       return marks;
     },
-    reset(): void { previous = null; remaining = step; pathLength = 0; emittedMarks = 0; dabIndex = 0; clippedDabs = 0; initializedBristles = false; initializedWetEdges = false; },
+    reset(): void { topology?.reset(); previous = null; remaining = step; pathLength = 0; emittedMarks = 0; dabIndex = 0; clippedDabs = 0; initializedBristles = false; initializedWetEdges = false; },
     statistics: () => ({ pathLength, emittedMarks, resampledDabs: dabIndex, clippedDabs }),
   };
 }

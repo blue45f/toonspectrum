@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/mantel_clock_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1631836800,
+    "sponsors": [
+      "9716107"
+    ],
+    "name": "Mantel Clock 01",
+    "categories": [
+      "decorative",
+      "appliances",
+      "rigged"
+    ],
+    "type": 2,
+    "tags": [
+      "vintage",
+      "antique",
+      "old",
+      "clock",
+      "time",
+      "wooden",
+      "shelf",
+      "mantel",
+      "fireplace",
+      "ornate"
+    ],
+    "authors": {
+      "Yann Kervran": "Rigging",
+      "Rico Cilliers": "Modeling & Texturing"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 29742,
+    "texel_density": 17950.808021309545,
+    "dimensions": [
+      483.6633503437042,
+      250.80496072769165,
+      160.9499454498291
+    ],
+    "files_hash": "de687045899d468bf7dad80f71f6c47992d5d63c",
+    "description": "Free 8K mantel clock model - ornate vintage wooden shelf clock with carved floral details, brass bezel and aged face; decorative, rigged for animation.",
+    "category_id": "dae1f0d4-1903-5922-a657-a048b67700cd",
+    "category": "Electronics & Appliances/Clocks & Timepieces/Mantel Clocks",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "brass",
+        "metal"
+      ],
+      "rigged": true
+    },
+    "img_version": "63262511",
+    "download_count": 20604,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/mantel_clock_01.png?width=256&height=256&v=63262511"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/mantel_clock_01/mantel_clock_01_2k.gltf",
+      "bytes": 5628,
+      "sha256": "e817cf5e3c9e0c8bb161431c1be7f0e66a7ec364b04a9647143fa96091a8f228",
+      "sourceMd5": "fbaa413aa76ce09f60fb939e9d936e0b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/mantel_clock_01/mantel_clock_01_nor_gl_2k.jpg",
+      "bytes": 1962601,
+      "sha256": "4934cfc7ae8d65270336b542a7129c9e98a4f8e3f3969dbbea13065cdcfd299a",
+      "sourceMd5": "b4e18656156891c1750a5cd52f375fc0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/mantel_clock_01/mantel_clock_01_arm_2k.jpg",
+      "bytes": 2424945,
+      "sha256": "8dc8b4ac0af1f2005255638782c759035f4e21853e59682ae039e2d00a6b95d9",
+      "sourceMd5": "d899112c43726237f548bc53e5555a46"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/mantel_clock_01/mantel_clock_01_diff_2k.jpg",
+      "bytes": 1918545,
+      "sha256": "2004f57093b768e4c2868b5ab697c41456b46a5d640100f17d81f6afccca7e49",
+      "sourceMd5": "46ef16af0abbf676a9c1cdea9346cbc5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/mantel_clock_01/mantel_clock_01.bin",
+      "bytes": 641880,
+      "sha256": "95e2b4820daaea592aa3e354bb06aa78c2e747fb89939b54eaf51140294d40c7",
+      "sourceMd5": "200740e20c08d0c370b608af6a17e9f9"
+    }
+  ]
+}

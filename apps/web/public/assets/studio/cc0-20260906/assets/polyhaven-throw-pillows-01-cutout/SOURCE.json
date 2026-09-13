@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/throw_pillows_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-throw-pillows-01",
+  "sourceModelSha256": "7b262f73a66b527ad360e1334df0b6b71b7af8b49a16aa4346fce443d69af3c2",
+  "render": {
+    "sourceId": "polyhaven-throw-pillows-01",
+    "sourceSha256": "7b262f73a66b527ad360e1334df0b6b71b7af8b49a16aa4346fce443d69af3c2",
+    "path": "high-resolution-props/polyhaven-throw-pillows-01.png",
+    "visiblePixels": 260483,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 6362
+  },
+  "independentOriginal": false
+}

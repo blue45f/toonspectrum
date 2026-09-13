@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_pears_asian_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1666569600,
+    "name": "Pears Asian 01",
+    "categories": [
+      "food",
+      "nature"
+    ],
+    "type": 2,
+    "info": null,
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "sponsors": [
+      "3267566"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 12572,
+    "texel_density": 42987.7644604986,
+    "dimensions": [
+      155.81603348255157,
+      177.93630063533783,
+      109.60551351308823
+    ],
+    "files_hash": "7b8953bf76ea6fdac29f364d3f3f553240856491",
+    "tags": [
+      "fruit",
+      "fruitbowl",
+      "tropical",
+      "food",
+      "pears",
+      "organic",
+      "asian pears",
+      "produce",
+      "fresh fruit",
+      "greenhouse",
+      "ripe",
+      "stem",
+      "raw"
+    ],
+    "description": "Free 8K model of Asian pears with realistic green-yellow skin, subtle blemishes, natural stems, and high-detail surface textures.",
+    "category_id": "482e0c49-27e5-54ed-8039-54f7c4560e2d",
+    "category": "Food & Kitchen/Produce/Fruit",
+    "attributes": {
+      "material": [
+        "food"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "b6215164",
+    "download_count": 17767,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/food_pears_asian_01.png?width=256&height=256&v=b6215164"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/food_pears_asian_01/food_pears_asian_01_2k.gltf",
+      "bytes": 9955,
+      "sha256": "cedccc24aa382d648ae1144399beeabdafd537cfbf1dce2b1c5c507c60f4873c",
+      "sourceMd5": "62d3050270aceffd4fb570d454037d8b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pears_asian_01/food_pears_asian_01_nor_gl_2k.jpg",
+      "bytes": 714873,
+      "sha256": "b24fb979d04ac47ad86fd8f2d08476f9619a6358e718d02a220667a710bd9192",
+      "sourceMd5": "acdfda34304d7fcf56c6c583d5b70def"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/food_pears_asian_01/food_pears_asian_01.bin",
+      "bytes": 300136,
+      "sha256": "a647edc202dbdeec6e4eb3c4d721f0acb91ddf5a82f26a3a751ec709cebdd77e",
+      "sourceMd5": "77ae4efe197087f8441a8c98fe719f93"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pears_asian_01/food_pears_asian_01_arm_2k.jpg",
+      "bytes": 2362610,
+      "sha256": "bd497aa7d9a7c82f3a04a1e650802a3ba75ab6bbd8256d0a0e73521ddfe4fecc",
+      "sourceMd5": "94f89c17ed30b093e9fa7b096424437a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pears_asian_01/food_pears_asian_01_diff_2k.jpg",
+      "bytes": 1840965,
+      "sha256": "1a1bac8a9289f8515c3b1e9821d74f06daf6588c2a605160437d7c42796c4ea0",
+      "sourceMd5": "d6c8df83e147a634fc66f0de3f9961b3"
+    }
+  ]
+}

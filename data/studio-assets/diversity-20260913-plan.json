@@ -1,0 +1,453 @@
+{
+  "schema": "toonspectrum.asset-acquisition-plan.v1",
+  "assets": [
+    {
+      "sourceId": "CoffeeCart_01",
+      "name": "카페 커피 카트 이동식 매대 · Coffee Cart 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "coffeecart_01"
+    },
+    {
+      "sourceId": "CashRegister_01",
+      "name": "상점 계산대 금전 등록기 · Cash Register 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "cashregister_01"
+    },
+    {
+      "sourceId": "SchoolDesk_01",
+      "name": "교실 학생 책상 · School Desk 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "schooldesk_01"
+    },
+    {
+      "sourceId": "SchoolChair_01",
+      "name": "교실 학생 의자 · School Chair 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "schoolchair_01"
+    },
+    {
+      "sourceId": "BarberShopChair_01",
+      "name": "이발소 바버샵 의자 · Barber Shop Chair 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "barbershopchair_01"
+    },
+    {
+      "sourceId": "Camera_01",
+      "name": "클래식 사진 카메라 · Camera 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "camera_01"
+    },
+    {
+      "sourceId": "Television_01",
+      "name": "클래식 브라운관 텔레비전 TV · Television 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "television_01"
+    },
+    {
+      "sourceId": "Lantern_01",
+      "name": "캠핑 랜턴 휴대용 조명 · Lantern 01",
+      "category": "outdoor-prop",
+      "kind": "model",
+      "selectionTerm": "lantern_01"
+    },
+    {
+      "sourceId": "WetFloorSign_01",
+      "name": "청소 중 미끄럼 주의 표지판 · Wet Floor Sign 01",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "wetfloorsign_01"
+    },
+    {
+      "sourceId": "Ukulele_01",
+      "name": "우쿨렐레 악기 · Ukulele 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "ukulele_01"
+    },
+    {
+      "sourceId": "Drill_01",
+      "name": "공구 전동 드릴 · Drill 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "drill_01"
+    },
+    {
+      "sourceId": "Megaphone_01",
+      "name": "행사 확성기 메가폰 · Megaphone 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "megaphone_01"
+    },
+    {
+      "sourceId": "power_box_01",
+      "name": "거리 전기 배전함 · Power Box 01",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "power_box_01"
+    },
+    {
+      "sourceId": "utility_box_02",
+      "name": "건물 설비 전기함 · Utility Box 02",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "utility_box_02"
+    },
+    {
+      "sourceId": "exterior_aircon_unit",
+      "name": "건물 에어컨 실외기 · Exterior Aircon Unit",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "exterior_aircon_unit"
+    },
+    {
+      "sourceId": "metal_trash_can",
+      "name": "거리 금속 쓰레기통 · Metal Trash Can",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "metal_trash_can"
+    },
+    {
+      "sourceId": "concrete_road_barrier",
+      "name": "도로 콘크리트 방호벽 · Concrete Road Barrier",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "concrete_road_barrier"
+    },
+    {
+      "sourceId": "covered_car",
+      "name": "덮개를 씌운 주차 자동차 · Covered Car",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "covered_car"
+    },
+    {
+      "sourceId": "rollershutter_window_01",
+      "name": "상점 롤러 셔터 창문 · Rollershutter Window 01",
+      "category": "architecture",
+      "kind": "model",
+      "selectionTerm": "rollershutter_window_01"
+    },
+    {
+      "sourceId": "old_tyre",
+      "name": "정비소 자동차 타이어 · Old Tyre",
+      "category": "outdoor-prop",
+      "kind": "model",
+      "selectionTerm": "old_tyre"
+    },
+    {
+      "sourceId": "metal_tool_chest",
+      "name": "작업실 금속 공구함 · Metal Tool Chest",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "metal_tool_chest"
+    },
+    {
+      "sourceId": "wooden_bucket_02",
+      "name": "나무 양동이 물통 · Wooden Bucket 02",
+      "category": "outdoor-prop",
+      "kind": "model",
+      "selectionTerm": "wooden_bucket_02"
+    },
+    {
+      "sourceId": "wicker_basket_01",
+      "name": "라탄 손잡이 바구니 · Wicker Basket 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "wicker_basket_01"
+    },
+    {
+      "sourceId": "standing_picture_frame_01",
+      "name": "탁상 사진 액자 · Standing Picture Frame 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "standing_picture_frame_01"
+    },
+    {
+      "sourceId": "throw_pillows_01",
+      "name": "소파 장식 쿠션 세트 · Throw Pillows 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "throw_pillows_01"
+    },
+    {
+      "sourceId": "coffee_table_round_01",
+      "name": "거실 원형 커피 테이블 · Coffee Table Round 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "coffee_table_round_01"
+    },
+    {
+      "sourceId": "side_table_01",
+      "name": "침실 원목 사이드 테이블 · Side Table 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "side_table_01"
+    },
+    {
+      "sourceId": "Rockingchair_01",
+      "name": "원목 흔들의자 · Rockingchair 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "rockingchair_01"
+    },
+    {
+      "sourceId": "Ottoman_01",
+      "name": "거실 패브릭 오토만 소파 스툴 · Ottoman 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "ottoman_01"
+    },
+    {
+      "sourceId": "GothicBed_01",
+      "name": "고딕 장식 침대 · Gothic Bed 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "gothicbed_01"
+    },
+    {
+      "sourceId": "ClassicNightstand_01",
+      "name": "클래식 침대 옆 협탁 · Classic Nightstand 01",
+      "category": "furniture",
+      "kind": "model",
+      "selectionTerm": "classicnightstand_01"
+    },
+    {
+      "sourceId": "Chandelier_03",
+      "name": "실내 장식 샹들리에 · Chandelier 03",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "chandelier_03"
+    },
+    {
+      "sourceId": "brass_candleholders",
+      "name": "황동 촛대 장식 세트 · Brass Candleholders",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "brass_candleholders"
+    },
+    {
+      "sourceId": "chess_set",
+      "name": "체스 보드와 말 게임 세트 · Chess Set",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "chess_set"
+    },
+    {
+      "sourceId": "rubber_duck_toy",
+      "name": "욕실 고무 오리 장난감 · Rubber Duck Toy",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "rubber_duck_toy"
+    },
+    {
+      "sourceId": "baseball_01",
+      "name": "야구공 스포츠 소품 · Baseball 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "baseball_01"
+    },
+    {
+      "sourceId": "football",
+      "name": "축구공 스포츠 소품 · Football",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "football"
+    },
+    {
+      "sourceId": "croissant",
+      "name": "카페 크루아상 빵 · Croissant",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "croissant"
+    },
+    {
+      "sourceId": "food_pomegranate_01",
+      "name": "석류 과일 · Food Pomegranate 01",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "food_pomegranate_01"
+    },
+    {
+      "sourceId": "food_pears_asian_01",
+      "name": "배 과일 세트 · Pears Asian 01",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "food_pears_asian_01"
+    },
+    {
+      "sourceId": "lemon",
+      "name": "레몬 과일 · Lemon",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "lemon"
+    },
+    {
+      "sourceId": "carrot_cake",
+      "name": "카페 당근 케이크 · Carrot Cake",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "carrot_cake"
+    },
+    {
+      "sourceId": "jug_01",
+      "name": "주방 물병 저그 · Jug 01",
+      "category": "food",
+      "kind": "model",
+      "selectionTerm": "jug_01"
+    },
+    {
+      "sourceId": "anthurium_botany_01",
+      "name": "실내 안스리움 화초 · Anthurium Botany 01",
+      "category": "nature",
+      "kind": "model",
+      "selectionTerm": "anthurium_botany_01"
+    },
+    {
+      "sourceId": "calathea_orbifolia_01",
+      "name": "넓은 잎 칼라테아 화초 · Calathea Orbifolia 01",
+      "category": "nature",
+      "kind": "model",
+      "selectionTerm": "calathea_orbifolia_01"
+    },
+    {
+      "sourceId": "concrete_cat_statue",
+      "name": "정원 고양이 조각상 · Concrete Cat Statue",
+      "category": "nature",
+      "kind": "model",
+      "selectionTerm": "concrete_cat_statue"
+    },
+    {
+      "sourceId": "horse_statue_01",
+      "name": "장식 말 조각상 · Horse Statue 01",
+      "category": "pbr-detailed-prop",
+      "kind": "model",
+      "selectionTerm": "horse_statue_01"
+    },
+    {
+      "sourceId": "wooden_lantern_01",
+      "name": "원목 랜턴 장식 조명 · Wooden Lantern 01",
+      "category": "outdoor-prop",
+      "kind": "model",
+      "selectionTerm": "wooden_lantern_01"
+    },
+    {
+      "sourceId": "asphalt_pit_lane",
+      "kind": "surface-texture",
+      "name": "아스팔트 도로 · Asphalt Pit Lane",
+      "category": "surface-material",
+      "selectionTerm": "asphalt"
+    },
+    {
+      "sourceId": "pavement_02",
+      "kind": "surface-texture",
+      "name": "보도 포장 · Pavement 02",
+      "category": "surface-material",
+      "selectionTerm": "pavement"
+    },
+    {
+      "sourceId": "cobblestone_floor_04",
+      "kind": "surface-texture",
+      "name": "돌 포장 거리 · Cobblestone Floor 04",
+      "category": "surface-material",
+      "selectionTerm": "cobblestone"
+    },
+    {
+      "sourceId": "roof_09",
+      "kind": "surface-texture",
+      "name": "지붕 · Roof 09",
+      "category": "surface-material",
+      "selectionTerm": "roof"
+    },
+    {
+      "sourceId": "gravel_embedded_concrete",
+      "kind": "surface-texture",
+      "name": "콘크리트 · Gravel Embedded Concrete",
+      "category": "surface-material",
+      "selectionTerm": "concrete"
+    },
+    {
+      "sourceId": "brick_wall_001",
+      "kind": "surface-texture",
+      "name": "벽돌 벽 · Brick Wall 001",
+      "category": "surface-material",
+      "selectionTerm": "brick"
+    },
+    {
+      "sourceId": "white_rough_plaster",
+      "kind": "surface-texture",
+      "name": "실내 회벽 · White Rough Plaster",
+      "category": "surface-material",
+      "selectionTerm": "plaster"
+    },
+    {
+      "sourceId": "marble_cliff_03",
+      "kind": "surface-texture",
+      "name": "대리석 · Marble Cliff 03",
+      "category": "surface-material",
+      "selectionTerm": "marble"
+    },
+    {
+      "sourceId": "stone_tiles_02",
+      "kind": "surface-texture",
+      "name": "바닥 타일 · Stone Tiles 02",
+      "category": "surface-material",
+      "selectionTerm": "tiles"
+    },
+    {
+      "sourceId": "rough_wood",
+      "kind": "surface-texture",
+      "name": "원목 · Rough Wood",
+      "category": "surface-material",
+      "selectionTerm": "wood"
+    },
+    {
+      "sourceId": "fabric_pattern_07",
+      "kind": "surface-texture",
+      "name": "직물 천 · Fabric Pattern 07",
+      "category": "surface-material",
+      "selectionTerm": "fabric"
+    },
+    {
+      "sourceId": "leather_red_02",
+      "kind": "surface-texture",
+      "name": "가죽 · Leather Red 02",
+      "category": "surface-material",
+      "selectionTerm": "leather"
+    },
+    {
+      "sourceId": "blue_metal_plate",
+      "kind": "surface-texture",
+      "name": "금속 · Blue Metal Plate",
+      "category": "surface-material",
+      "selectionTerm": "metal"
+    },
+    {
+      "sourceId": "gravel_concrete_03",
+      "kind": "surface-texture",
+      "name": "자갈 · Gravel Concrete 03",
+      "category": "surface-material",
+      "selectionTerm": "gravel"
+    },
+    {
+      "sourceId": "snow_02",
+      "kind": "surface-texture",
+      "name": "눈 · Snow 02",
+      "category": "surface-material",
+      "selectionTerm": "snow"
+    },
+    {
+      "sourceId": "red_laterite_soil_stones",
+      "kind": "surface-texture",
+      "name": "흙 바닥 · Red Laterite Soil Stones",
+      "category": "surface-material",
+      "selectionTerm": "soil"
+    }
+  ]
+}

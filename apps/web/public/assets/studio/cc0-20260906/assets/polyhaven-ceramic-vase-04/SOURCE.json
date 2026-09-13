@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ceramic_vase_04",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Ceramic Vase 04",
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "categories": [
+      "containers",
+      "decorative",
+      "vases"
+    ],
+    "date_published": 1623767607,
+    "tags": [
+      "fancy",
+      "modern",
+      "vase",
+      "decor",
+      "painted",
+      "jug",
+      "clay",
+      "pot"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2224,
+    "texel_density": 11806.112169560967,
+    "dimensions": [
+      183.31684917211533,
+      181.98027461767197,
+      342.3411250114441
+    ],
+    "files_hash": "2f4fd4e62ce5609ec0b712f7f97a8f1cd7796c7f",
+    "description": "Free 8K model: painted clay vase with modern, elegant jug silhouette, single-handle and subtle rough texture - fancy decorative pot for interiors and props.",
+    "category_id": "bda68bac-fe45-5d4f-aab6-ea0162d45774",
+    "category": "Decor & Art/Vases & Vessels/Ceramic Vases",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "ceramic"
+      ]
+    },
+    "img_version": "9243a193",
+    "download_count": 10882,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/ceramic_vase_04.png?width=256&height=256&v=9243a193"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/ceramic_vase_04/ceramic_vase_04_2k.gltf",
+      "bytes": 2716,
+      "sha256": "6f49dd22e89a4b2a64f18d1bd08cfd59e70f5e60ac1ee35484aefe5122fcbbd1",
+      "sourceMd5": "b2ec79e28f2b5f2ac46ad2bc48a3026a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/ceramic_vase_04/ceramic_vase_04.bin",
+      "bytes": 239728,
+      "sha256": "00d6b5743358cba4bc78d25010b1bfc262d6cb313de8cbeffa570bb95387dfc7",
+      "sourceMd5": "1abf7cc9d6a6b5db009320dda7738235"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_04/ceramic_vase_04_diff_2k.jpg",
+      "bytes": 327838,
+      "sha256": "26587afe56343ca633f846807b7475b3c11f240b748eeba7bdcaf2ba93cdfa47",
+      "sourceMd5": "8a84f250f8042664b2451082b06c6bc9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_04/ceramic_vase_04_rough_2k.jpg",
+      "bytes": 460441,
+      "sha256": "2c2cc15a501841d387e753b3f40f86d453abd11b3d8de9be2489fe2726b90447",
+      "sourceMd5": "549ab3aa69ebf2e4e9427da67577ccf6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_04/ceramic_vase_04_nor_gl_2k.jpg",
+      "bytes": 568869,
+      "sha256": "134af4ceadffa009abd75f5ad8faed7f18501d93b3008f37956b64aec4a89274",
+      "sourceMd5": "948891cd423acf0f8ec8b10c56aa7c8e"
+    }
+  ]
+}

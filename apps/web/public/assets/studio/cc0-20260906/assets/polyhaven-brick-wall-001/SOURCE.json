@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brick_wall_001",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "red",
+      "rough",
+      "industrial",
+      "plain",
+      "baked"
+    ],
+    "date_published": 1615640913,
+    "name": "Brick Wall 001",
+    "categories": [
+      "brick",
+      "man made",
+      "outdoor",
+      "indoor",
+      "clean",
+      "wall"
+    ],
+    "authors": {
+      "Rob Tuytel": "Processing",
+      "Dimitrios Savva": "Photography"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "sponsors": [
+      "4714267",
+      "25436656",
+      "11167855"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "fd60577b22b011e4f5ae6ac5b2ffddd8dacf9b3d",
+    "description": "Free 8K texture of a red, rough industrial brick wall with baked-in grime, chipped edges, varied mortar tones and pronounced surface relief.",
+    "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+    "category": "Brick & Block/Clay Brick/Running-Bond",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "worn",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "img_version": "99965586",
+    "download_count": 114323,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brick_wall_001.png?width=256&height=256&v=99965586"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_001/brick_wall_001_diffuse_2k.jpg",
+      "bytes": 2043756,
+      "sha256": "aefa7f3743282de2c7df4e4282c868de204239ac3c94e818b1ef74f2a2d74f1a",
+      "sourceMd5": "0f478f67d252a1fa7b351460a19965bd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_001/brick_wall_001_rough_2k.jpg",
+      "bytes": 788257,
+      "sha256": "96a124344ee8ace616cf4397324b7b2e47c4f07b6961d12bc19a7b90d2bf61a0",
+      "sourceMd5": "3218b14608165fb4903dcca0e127c005"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_001/brick_wall_001_nor_gl_2k.jpg",
+      "bytes": 1160617,
+      "sha256": "62cc36d391b2f73c3855fd745a5815686db59d73bf3ef9db2ad96ca27eb97e32",
+      "sourceMd5": "b3c77c1e0dbbe0788d11b993296bb822"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_001/brick_wall_001_ao_2k.jpg",
+      "bytes": 1052369,
+      "sha256": "2bb16e9aaa1a48f5779e31126117665756670553b4e25aca35ed817183c891e3",
+      "sourceMd5": "bde8859a1e9febee40b6316bf641181b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_001/brick_wall_001_displacement_2k.jpg",
+      "bytes": 478534,
+      "sha256": "b698bb19f52ff02dc227729a9b99562b84ce7dc75d008b9528ce1f90fb06bcdd",
+      "sourceMd5": "6bbd556def5da04f21ae3a6246d635db"
+    }
+  ]
+}

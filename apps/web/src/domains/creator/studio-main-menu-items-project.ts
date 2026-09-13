@@ -46,7 +46,7 @@ export function buildStudioProjectMenuItems({
     {
       id: "checkpoints",
       commandId: "file.checkpoints",
-      label: "버전 체크포인트…",
+      label: "저장 기록…",
       icon: History,
       separatorAfter: true,
       onSelect: () => {
