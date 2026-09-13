@@ -50,6 +50,12 @@ export type StudioAdjustmentLayerBlendMode =
   | "hard-light"
   | "darken"
   | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "difference"
+  | "exclusion"
+  | "hue"
+  | "saturation"
   | "color"
   | "luminosity";
 
@@ -183,6 +189,12 @@ const BLEND_MODES = new Set<StudioAdjustmentLayerBlendMode>([
   "hard-light",
   "darken",
   "lighten",
+  "color-dodge",
+  "color-burn",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
   "color",
   "luminosity",
 ]);

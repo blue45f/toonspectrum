@@ -54,6 +54,20 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
+      - name: Recovered worktree regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/color/studio-color-proof.test.ts \
+            apps/web/src/domains/creator/studio-live-adjustment.test.ts \
+            apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx \
+            apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx \
+            apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts \
+            apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx \
+            apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts \
+            apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts \
+            apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
       - name: Studio home and production route regressions
         run: |
           set -euo pipefail
@@ -63,6 +77,7 @@ jobs:
             apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
             apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts \
             apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioHomeEntryRoute.test.tsx \
             apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
             apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
@@ -185,10 +200,14 @@ jobs:
             apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx \
             apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx \
             apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.progress.test.tsx \
             apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts \
             apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts \
             apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-cooperative-raster.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-mask-scope.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-cooperative-capture.test.ts \
             apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx \
             apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts \
