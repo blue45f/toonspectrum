@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StudioOfflinePanel } from "./StudioOfflinePanel";
 
 const runtime = vi.hoisted(() => ({ inspect: vi.fn(), prepare: vi.fn(), persist: vi.fn() }));
 vi.mock("./studio-offline-client", () => ({
@@ -8,9 +9,8 @@ vi.mock("./studio-offline-client", () => ({
   prepareLoadedStudioOfflineResources: runtime.prepare,
   requestStudioPersistentStorage: runtime.persist,
 }));
-import { StudioOfflinePanel } from "./StudioOfflinePanel";
 
-const device = { online: true, supported: true, controlled: true, persisted: false, usage: 10, quota: 100 };
+const device = { online: true, navigationFallback: false, supported: true, controlled: true, persisted: false, usage: 10, quota: 100 };
 beforeEach(() => {
   vi.clearAllMocks(); runtime.inspect.mockResolvedValue(device);
   runtime.prepare.mockResolvedValue({ schema: 1, buildId: "test", checked: 5, cached: 5, downloadedBytes: 20, missing: [], complete: true });
@@ -24,6 +24,12 @@ function openPanel() {
   return view;
 }
 describe("offline preparation UI", () => {
+  it("distinguishes cached-shell recovery from an internet connection indicator", async () => {
+    runtime.inspect.mockResolvedValue({ ...device, navigationFallback: true }); openPanel();
+    await screen.findByText("저장된 화면 · 로컬 작업 안내");
+    expect(screen.getByText(/인터넷 연결 표시와 서버 상태는 다를 수 있습니다/u)).toBeTruthy();
+    expect(runtime.prepare).not.toHaveBeenCalled();
+  });
   it("does not download assets or request persistent storage without a user action", async () => {
     openPanel(); await waitFor(() => expect(runtime.inspect).toHaveBeenCalled());
     expect(runtime.prepare).not.toHaveBeenCalled(); expect(runtime.persist).not.toHaveBeenCalled();

@@ -7,6 +7,8 @@ import {
 
 export interface StudioOfflineDeviceState {
   readonly online: boolean;
+  /** A cached navigation is evidence of fallback, not an API health check. */
+  readonly navigationFallback: boolean;
   readonly supported: boolean;
   readonly controlled: boolean;
   readonly persisted: boolean | null;
@@ -33,6 +35,13 @@ export function collectLoadedStudioResources(entries: readonly PerformanceEntry[
     .filter((url): url is string => url !== null))].sort((a, b) => a.localeCompare(b));
 }
 
+export function studioNavigationUsedOfflineShell(entries: readonly PerformanceEntry[]): boolean {
+  return entries.some((entry) => entry.entryType === "navigation"
+    && (entry as PerformanceNavigationTiming).serverTiming?.some(
+      (timing) => timing.name === "toonstudio-offline",
+    ) === true);
+}
+
 export async function inspectStudioOfflineDevice(): Promise<StudioOfflineDeviceState> {
   const [persisted, estimate] = await Promise.all([
     bounded<boolean | null>(async () => navigator.storage?.persisted?.() ?? null, null),
@@ -42,7 +51,10 @@ export async function inspectStudioOfflineDevice(): Promise<StudioOfflineDeviceS
   try { supported = window.isSecureContext && "serviceWorker" in navigator && "caches" in window; } catch { /* Restricted frame. */ }
   const bytes = (value: number | undefined): number | null =>
     value !== undefined && Number.isFinite(value) && value >= 0 ? value : null;
-  return { online: navigator.onLine, supported, controlled: studioOfflineController() !== null,
+  let navigationFallback = false;
+  try { navigationFallback = studioNavigationUsedOfflineShell(performance.getEntriesByType("navigation")); }
+  catch { /* Navigation timing may be unavailable in restricted browsers. */ }
+  return { online: navigator.onLine, navigationFallback, supported, controlled: studioOfflineController() !== null,
     persisted, usage: bytes(estimate?.usage), quota: bytes(estimate?.quota) };
 }
 
@@ -63,10 +75,23 @@ export function isStudioOfflinePreparationReport(value: unknown): value is Studi
     && (!report.complete || (report.cached === report.checked && report.missing.length === 0));
 }
 
+function loadedResourceSnapshot(): string[] {
+  // ResourceTiming has a bounded buffer. Vite's actual preload graph retains
+  // later modules that timing alone can silently omit from readiness checks.
+  const urls = collectLoadedStudioResources(performance.getEntriesByType("resource"), location.origin);
+  for (const node of document.querySelectorAll<HTMLLinkElement | HTMLScriptElement>(
+    'link[rel="modulepreload"],link[rel="stylesheet"],script[src]',
+  )) {
+    const url = normalizeStudioOfflineAssetUrl("href" in node ? node.href : node.src, location.origin);
+    if (url) urls.push(url);
+  }
+  return [...new Set(urls)].sort((left, right) => left.localeCompare(right));
+}
+
 export async function prepareLoadedStudioOfflineResources(): Promise<StudioOfflinePreparationReport> {
   const worker = studioOfflineController();
   if (!worker) throw new Error("오프라인 실행 모듈이 아직 준비되지 않았습니다. 온라인에서 편집기를 다시 열고 확인해 주세요.");
-  const resources = collectLoadedStudioResources(performance.getEntriesByType("resource"), location.origin);
+  const resources = loadedResourceSnapshot();
   if (resources.length === 0) throw new Error("편집기가 열리고 기본 도구를 사용한 뒤 다시 준비해 주세요.");
   if (resources.length > STUDIO_OFFLINE_MAX_RESOURCES) throw new Error("열린 리소스가 준비 한도를 넘었습니다. 프로젝트를 백업한 뒤 기본 드로잉 화면에서 다시 준비해 주세요.");
   const result = await new Promise<unknown>((resolve, reject) => {
@@ -80,7 +105,7 @@ export async function prepareLoadedStudioOfflineResources(): Promise<StudioOffli
   });
   if (studioOfflineController() !== worker) throw new Error("앱 버전이 바뀌었습니다. 현재 버전에서 오프라인 준비를 다시 확인해 주세요.");
   if (!isStudioOfflinePreparationReport(result)) throw new Error("오프라인 준비를 확인하지 못했습니다. 다른 준비 작업이 끝나거나 앱 업데이트를 적용한 뒤 다시 시도해 주세요.");
-  const after = collectLoadedStudioResources(performance.getEntriesByType("resource"), location.origin);
+  const after = loadedResourceSnapshot();
   if (after.some((url) => !resources.includes(url))) {
     return { ...result, complete: false, missing: [...result.missing, "editor-resources-changed"] };
   }

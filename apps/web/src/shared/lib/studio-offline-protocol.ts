@@ -1,5 +1,5 @@
 export const STUDIO_OFFLINE_PREPARE_MESSAGE = "toonspectrum-sw:prepare-offline";
-export const STUDIO_OFFLINE_MAX_RESOURCES = 400;
+export const STUDIO_OFFLINE_MAX_RESOURCES = 1024;
 
 export interface StudioOfflinePreparationReport {
   readonly schema: 1;

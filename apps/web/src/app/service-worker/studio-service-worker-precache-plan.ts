@@ -213,4 +213,5 @@ export interface StudioServiceWorkerManifest {
   readonly shellUrls: readonly string[];
   readonly criticalUrls: readonly string[];
   readonly warmUrls: readonly string[];
+  readonly offlineUrls?: readonly string[];
 }

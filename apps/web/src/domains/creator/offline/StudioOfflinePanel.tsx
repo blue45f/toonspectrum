@@ -83,10 +83,11 @@ export function StudioOfflinePanel() {
     <aside className="fixed bottom-24 right-3 z-40 max-w-[min(24rem,calc(100vw-1.5rem))]" aria-label="오프라인 작업 안내">
       <details className="rounded-xl border border-line bg-panel p-3 text-xs text-fg shadow-lg" data-studio-offline-panel="true">
         <summary className="min-h-9 cursor-pointer content-center font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          {device?.online === false ? "오프라인 · 작업 안내" : "오프라인 사용 준비"}
+          {device?.online === false ? "오프라인 · 작업 안내" : device?.navigationFallback ? "저장된 화면 · 로컬 작업 안내" : "오프라인 사용 준비"}
         </summary>
         <div className="mt-2 max-h-[60dvh] space-y-3 overflow-y-auto overscroll-contain leading-relaxed">
           <p>준비된 도구는 연결 없이 편집할 수 있습니다. 서버 원고 불러오기·클라우드 저장·협업·게시·서버 AI는 연결이 필요합니다.</p>
+          {device?.navigationFallback ? <p>서버 응답 대신 기기에 저장된 화면으로 열었습니다. 인터넷 연결 표시와 서버 상태는 다를 수 있습니다. 원고의 로컬 저장 완료 여부를 저장센터에서 확인해 주세요.</p> : null}
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
           <p className="text-fg-2">{device?.persisted === true ? "지속 저장 허용" : "프로젝트 파일 백업 권장"}{storagePercent !== null ? ` · 저장 공간 약 ${storagePercent}% 사용` : ""}</p>
           {storagePercent !== null && storagePercent >= 90 ? <p role="alert">저장 공간이 부족합니다. 원고를 파일로 백업하고 저장센터 상태를 확인해 주세요.</p> : null}
