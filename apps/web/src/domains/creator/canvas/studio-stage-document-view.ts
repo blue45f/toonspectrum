@@ -27,6 +27,8 @@
  * not.
  */
 
+import { prepareStudioRasterCapture } from "../render/studio-raster-presentation-cache";
+
 import { planStudioCanvasStageLayout, type StudioCanvasStageLayout } from "../studio-view-controls";
 
 /** Unscaled document size plus the display scale the Stage is currently rendered at. */
@@ -37,6 +39,8 @@ export interface StudioStageDocumentGeometry {
   readonly documentHeight: number;
   /** `fit scale * user zoom` — the same `effScale` every caller divides its `pixelRatio` by. */
   readonly effectiveScale: number;
+  /** Logical output density for callers using an additional toCanvas pixelRatio. */
+  readonly capturePixelRatio?: number;
 }
 
 /**
@@ -100,12 +104,14 @@ export function readStudioStageInDocumentView<Result>(
     scaleY: stage.scaleY(),
   };
   const documentView = planStudioStageDocumentViewBox(geometry);
+  let restoreCaches: (() => void) | undefined;
 
   try {
     stage.size({ width: documentView.width, height: documentView.height });
     stage.position({ x: documentView.x, y: documentView.y });
     stage.rotation(documentView.rotation);
     stage.scale({ x: documentView.scaleX, y: documentView.scaleY });
+    restoreCaches = prepareStudioRasterCapture(stage, Math.max(1, geometry.capturePixelRatio ?? geometry.effectiveScale));
     stage.draw();
     return read();
   } finally {
@@ -113,6 +119,6 @@ export function readStudioStageInDocumentView<Result>(
     stage.position({ x: previous.x, y: previous.y });
     stage.rotation(previous.rotation);
     stage.scale({ x: previous.scaleX, y: previous.scaleY });
-    stage.draw();
+    try { restoreCaches?.(); } finally { stage.draw(); }
   }
 }

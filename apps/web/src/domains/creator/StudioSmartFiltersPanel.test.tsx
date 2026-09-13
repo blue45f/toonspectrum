@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { StudioSmartFiltersPanel } from "./StudioSmartFiltersPanel";
+import { studioSmartFilterMutationError } from "./studio-smart-filter-mutation";
 
 describe("StudioSmartFiltersPanel", () => {
   // Catalogue titles are the #771 (c9ef0ff7) vocabulary; the former names remain search keywords.
@@ -299,5 +300,23 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("CMYK 컬러 망점");
     expect(html).toContain("망점 크기");
     expect(html.match(/type="range"/g)?.length).toBe(5);
+  });
+});
+
+
+describe("live adjustment mutation admission", () => {
+  const stack = (count: number) => ({ version: 1 as const, entries: Array.from({ length: count }, (_, index) => ({ id: `filter-${index}`, engine: "invert" as const, enabled: true, params: {} })) });
+  it("applies the count guard to duplicate and recipe replacements, not only catalog additions", () => {
+    expect(studioSmartFilterMutationError(stack(24), 24)).toBeNull();
+    expect(studioSmartFilterMutationError(stack(25), 24)).toMatch(/24/);
+    expect(studioSmartFilterMutationError(stack(28), 24)).toMatch(/24/);
+    expect(studioSmartFilterMutationError(stack(101))).toBeNull();
+  });
+  it("applies the descriptor validator to every admitted count without modifying the proposal", () => {
+    const proposal = stack(3); const previous = structuredClone(proposal);
+    const validate = vi.fn(() => "descriptor too large");
+    expect(studioSmartFilterMutationError(proposal, 24, validate)).toBe("descriptor too large");
+    expect(validate).toHaveBeenCalledWith(proposal);
+    expect(proposal).toEqual(previous);
   });
 });
