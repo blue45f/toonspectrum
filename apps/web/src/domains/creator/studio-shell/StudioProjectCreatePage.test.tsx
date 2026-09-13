@@ -37,7 +37,7 @@ describe("StudioProjectCreatePage", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("location").textContent).toMatch(
-        /^\/studio\/p\/[^/]+\/d\/[^?]+\?workspace=comic$/u,
+        /^\/studio\/p\/[^/]+\/d\/[^?]+\?workspace=comic&uiMode=standard$/u,
       );
     });
 
