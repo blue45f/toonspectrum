@@ -14,6 +14,12 @@ describe("explicit offline drawing pack", () => {
   it("includes the complete static drawing and storage closure without unrelated lazy tools", () => {
     const urls = collectStudioOfflineDrawingUrls(manifest, files);
     expect(urls).toContain("/assets/shared-hash.css");
+    expect(urls).toContain("/assets/studio-checkpoints-hash.js");
+    expect(urls).toContain("/assets/studio-crdt-room-binding-hash.js");
+    expect(urls).toContain("/assets/studio-autosave-opfs-session-hash.js");
+    expect(urls).toContain("/assets/StudioEnhancedExportMenuPanel-hash.js");
+    expect(urls).toContain("/assets/studio-capture-readiness-hash.js");
+    expect(urls).toContain("/assets/studio-project-file-hash.js");
     expect(urls).toContain("/assets/studio-pages-history-durable-runtime-hash.js");
     expect(urls).toContain("/assets/studio-local-database.worker-hash.js");
     expect(urls).toContain("/assets/sqlite3-hash.wasm");

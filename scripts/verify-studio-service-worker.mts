@@ -297,6 +297,22 @@ async function main(): Promise<void> {
       `warmUpStarted=${String(warmState?.warmUpStarted)} data entries=${warmEntries.data ?? 0}`,
     );
 
+    // Preparing the full editor is explicit. An unprepared client intentionally
+    // uses the small independent rescue instead; test that path in local-first-browser.
+    const prepared = await page.evaluate(async () => {
+      const controller = navigator.serviceWorker.controller;
+      if (!controller) return false;
+      return new Promise<boolean>((resolve) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 45_000);
+        channel.port1.onmessage = (event) => {
+          clearTimeout(timer); channel.port1.close(); resolve(event.data?.complete === true);
+        };
+        controller.postMessage({ type: "toonspectrum-sw:prepare-offline", urls: [] }, [channel.port2]);
+      });
+    });
+    check("complete editor pack is prepared before checking full Studio offline boot", prepared);
+
     // ---- 5. Offline -------------------------------------------------------
     await context.setOffline(true);
     await page.reload({ waitUntil: "load", timeout: 120_000 });

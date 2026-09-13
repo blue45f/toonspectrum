@@ -4,7 +4,7 @@
  * only GET assets are cached. Manuscripts and writes remain owned by the app.
  */
 import { resolveStudioNavigation } from "./studio-service-worker-navigation";
-import { prepareStudioOfflineResources } from "./studio-service-worker-offline";
+import { hasPreparedStudioDrawingResources, prepareStudioOfflineResources } from "./studio-service-worker-offline";
 import {
   STUDIO_SERVICE_WORKER_MESSAGE,
   STUDIO_SERVICE_WORKER_RUNTIME_LIMITS,
@@ -166,15 +166,33 @@ function shellRequest(url: string): Request {
 async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWorkerRouteClass): Promise<Response> {
   if (routeClass === "studio-navigation") event.waitUntil(warmStudioPayload());
   const pathname = new URL(event.request.url).pathname;
+  const readShell = async (): Promise<Response | undefined> => {
+    const cache = await caches.open(cacheNames.precache);
+    return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
+  };
   return resolveStudioNavigation({
     request: event.request, preloadResponse: event.preloadResponse,
     isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
+    readPreparedShell: routeClass === "studio-navigation" ? async () => {
+      const ready = await hasPreparedStudioDrawingResources({
+        ...manifest, drawingUrls: manifest.offlineUrls,
+        read: async (url) => {
+          const request = manifest.shellUrls.includes(url) ? shellRequest(url) : new Request(url);
+          const kind = classifyStudioServiceWorkerRequest({
+            url: request.url, origin: scope.location.origin, method: "GET",
+            mode: manifest.shellUrls.includes(url) ? "navigate" : undefined,
+          });
+          const pinned = await readCached("precache", request, kind);
+          if (pinned) return pinned;
+          const bucket = studioServiceWorkerCacheBucket(kind);
+          return bucket ? readCached(bucket, request, kind) : undefined;
+        },
+      });
+      return ready ? readShell() : undefined;
+    } : undefined,
     readRescue: routeClass === "studio-navigation" ? async () =>
       await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined : undefined,
-    readShell: async () => {
-      const cache = await caches.open(cacheNames.precache);
-      return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
-    },
+    readShell,
     refreshShell: (response) => persist("precache", shellRequest(pathname), response),
     waitUntil: (promise) => event.waitUntil(promise),
   });
