@@ -22,6 +22,14 @@ import {
   type StudioServiceWorkerCacheBucket,
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
+import {
+  cachedLocalDrawingRescue,
+  clearLocalDrawingCaches,
+  installLocalDrawingRescue,
+  isLocalDrawingRequest,
+  localDrawingResponse,
+  localDrawingRescueReady,
+} from "./studio-local-drawing-rescue";
 
 import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
 
@@ -164,6 +172,8 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
     const response = await resolveStudioNavigation({
       request: event.request, preloadResponse: event.preloadResponse,
       isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
+      readRescue: routeClass === "studio-navigation" ? async () =>
+        await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined : undefined,
       readShell: async () => {
         const cache = await caches.open(cacheNames.precache);
         return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
@@ -171,7 +181,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
       refreshShell: (response) => persist("precache", shellRequest(pathname), response),
       waitUntil: (promise) => event.waitUntil(promise),
     });
-    // Prefer the validated full Studio shell. The independent drawing shell is
+    // Retain the validated primary rescue/full shell. The legacy drawing shell is
     // a last resort for outages, never a replacement for 401/403/404 responses.
     if (routeClass === "studio-navigation" && (response.status === 408 || response.status >= 500)) {
       return (await readEmergencyDrawing()) ?? response;
@@ -188,6 +198,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
 
 scope.addEventListener("install", (event) => {
   event.waitUntil((async () => {
+    await installLocalDrawingRescue();
     const cache = await caches.open(cacheNames.precache);
     // addAll is atomic: a broken deploy cannot replace a working critical cache.
     await cache.addAll(manifest.criticalUrls.map((url) => new Request(url)));
@@ -213,6 +224,10 @@ scope.addEventListener("fetch", (event) => {
     return;
   }
   const { request } = event;
+  if (isLocalDrawingRequest(request, scope.location.origin)) {
+    event.respondWith(localDrawingResponse(request));
+    return;
+  }
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url, origin: scope.location.origin, method: request.method,
     mode: request.mode, destination: request.destination, rangeHeader: request.headers.get("range"),
@@ -231,6 +246,7 @@ async function killStudioServiceWorker(): Promise<void> {
   const doomed = [...staleStudioServiceWorkerCacheNames(existing, "__none__"),
     ...legacyStudioServiceWorkerCacheNames(existing), ...Object.values(cacheNames)];
   await Promise.all([...new Set(doomed)].map((name) => caches.delete(name)));
+  await clearLocalDrawingCaches();
   await scope.registration.unregister();
 }
 
@@ -290,6 +306,13 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
 scope.addEventListener("message", (event) => {
   const data: unknown = event.data;
   const reply = (payload: unknown): void => { event.ports[0]?.postMessage(payload); };
+  if (data && typeof data === "object" && "type" in data && data.type === "toonstudio-local-drawing:inspect") {
+    event.waitUntil(localDrawingRescueReady().then(
+      (ready) => reply({ type: "toonstudio-local-drawing:ready", ready }),
+      () => reply({ type: "toonstudio-local-drawing:ready", ready: false }),
+    ));
+    return;
+  }
   if (isStudioOfflinePreparationMessage(data)) {
     // Only a same-origin Studio client may request explicit preparation. Never
     // accept URLs from arbitrary frames, the public catalogue, or worker peers.
