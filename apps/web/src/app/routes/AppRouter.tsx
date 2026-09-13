@@ -1,3 +1,4 @@
+import { legacyStudioEditorHref, readInitialDocumentPathname } from "./studio-entry-redirect";
 import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
@@ -10,46 +11,11 @@ import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { useUi } from "@/shared/lib/ui-store";
 import { ErrorBoundary } from "@/components/error-boundary";
 import {
-  STUDIO_DRAFT_CANVAS_PATHNAME,
-  STUDIO_HOME_PATHNAME,
   isStudioWorkspaceLocation,
   isStudioWorkspaceRoutePathname,
 } from "@/domains/creator/studio-workspace-route";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "toonspectrum:command-palette:open" as const;
-
-const LEGACY_STUDIO_EDITOR_QUERY_KEYS = new Set([
-  "id",
-  "remix",
-  "mode",
-  "preset",
-  "room",
-  "page",
-  "tool",
-  "surface",
-  "document",
-  "demo",
-]);
-
-function readInitialDocumentPathname(): string | null {
-  try {
-    return typeof globalThis.location?.pathname === "string"
-      ? globalThis.location.pathname
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Redirect a legacy `/studio` editor query to the canonical draft-canvas route. */
-function legacyStudioEditorHref(pathname: string, search: string): string | null {
-  if (pathname !== STUDIO_HOME_PATHNAME || search.length === 0) return null;
-  const params = new URLSearchParams(search);
-  const hasLegacyEditorState = [...params.keys()].some((key) =>
-    LEGACY_STUDIO_EDITOR_QUERY_KEYS.has(key)
-  );
-  return hasLegacyEditorState ? `${STUDIO_DRAFT_CANVAS_PATHNAME}${search}` : null;
-}
 
 /** Bridge route-level command-palette events into the shared UI store. */
 function CommandPaletteEventBridge() {
