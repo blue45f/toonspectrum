@@ -60,7 +60,16 @@ jobs:
             apps/web/src/domains/creator/studio-project-library \
             apps/web/src/domains/creator/studio-project-document \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
+      - name: Reconciled branch follow-up regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/app/studio-immersive-shell.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-client.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-codec-lazy-boundary.test.ts \
+            apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-cc0-provenance.test.ts
       - name: Studio quick start and task workspace regressions
         run: |
           pnpm exec vitest run \

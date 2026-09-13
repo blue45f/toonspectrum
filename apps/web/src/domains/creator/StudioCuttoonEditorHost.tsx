@@ -1267,7 +1267,7 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
-import { buildStudioWriterRoomCanvasPages } from "./writer-room/buildStudioWriterRoomCanvasPages";
+import { buildStudioWriterRoomCanvasPages, insertStudioWriterRoomCanvasPages } from "./writer-room/buildStudioWriterRoomCanvasPages";
 import { shouldSuppressStudioQuickStartAutoOpen } from "./studio-quick-start-auto-open";
 import type {
   StudioCanvasViewportHandlers,
@@ -15183,12 +15183,7 @@ const puppetWarpArmed =
 
     try {
       const createdPages = buildStudioWriterRoomCanvasPages({ plan, writerRoom });
-      const currentIndex = Math.max(0, pages.findIndex((page) => page.id === activePage.id));
-      const nextPages = [
-        ...pages.slice(0, currentIndex + 1),
-        ...createdPages,
-        ...pages.slice(currentIndex + 1),
-      ];
+      const nextPages = insertStudioWriterRoomCanvasPages(pages, activePage.id, createdPages);
       if (!commitPages(nextPages)) return;
       const firstCreatedPage = createdPages[0];
       if (!firstCreatedPage) return;

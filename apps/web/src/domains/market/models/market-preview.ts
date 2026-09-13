@@ -1,3 +1,5 @@
+import { studioMarketplaceCc0EntrySourceMatches } from "@/domains/creator/studio-marketplace-cc0-provenance";
+
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
@@ -152,6 +154,7 @@ export function recipePreviewData(
   if (record.kind !== "asset" && record.kind !== "3d-preset" && record.kind !== "3d-asset") return null;
   const items: RecipePreviewData[] = [];
   for (const entry of record.entries) {
+    if (!studioMarketplaceCc0EntrySourceMatches(record, entry)) continue;
     if (entry.delivery.mode === "procedural-recipe") {
       const definition = entry.delivery.payload.definition as {
         recipeId?: unknown;

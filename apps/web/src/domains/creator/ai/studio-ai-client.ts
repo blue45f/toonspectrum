@@ -45,11 +45,7 @@ import {
   type StudioServerAiTask,
   type StudioServerAiProviderPreference,
 } from "../studio-server-ai-client";
-import {
-  buildStudioWriterRoomAiPrompt,
-  parseStudioWriterRoomAiDraft,
-  type StudioWriterRoomAiDraft,
-} from "../studio-writer-room-ai";
+import type { StudioWriterRoomAiDraft } from "../studio-writer-room-ai";
 
 import { normalizeStudioAiCompositionSuggestion } from "./studio-ai-composition-suggestion";
 import {
@@ -315,6 +311,33 @@ function createStudioAiAbortError(): Error {
  * second import; parse/evaluation failures still fail closed. Validation and configuration checks
  * stay at each callsite, while an already-aborted request does not start a chunk load.
  */
+function importOptionalStudioAiCodec<T>(importCodec: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) return Promise.reject(createStudioAiAbortError());
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => {
+      globalThis.clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    };
+    const abort = () => { cleanup(); reject(createStudioAiAbortError()); };
+    const timer = globalThis.setTimeout(() => {
+      cleanup();
+      const error = new Error("스토리 편집 도구를 불러오는 시간이 초과됐어요. 다시 시도해 주세요.");
+      error.name = "TimeoutError";
+      reject(error);
+    }, 30_000);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) { abort(); return; }
+    try {
+      // Both handlers remain attached after cancellation so a late chunk failure
+      // cannot become an unhandled rejection or start a provider request.
+      importCodec().then(
+        (codec) => { cleanup(); resolve(codec); },
+        (error: unknown) => { cleanup(); reject(error); },
+      );
+    } catch (error) { cleanup(); reject(error); }
+  });
+}
+
 async function loadOptionalStudioAiCodec<T>(
   importCodec: () => Promise<T>,
   signal?: AbortSignal
@@ -323,11 +346,12 @@ async function loadOptionalStudioAiCodec<T>(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (signal?.aborted) throw createStudioAiAbortError();
     try {
-      const codec = await importCodec();
+      const codec = await importOptionalStudioAiCodec(importCodec, signal);
       if (signal?.aborted) throw createStudioAiAbortError();
       return codec;
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) throw createStudioAiAbortError();
+      if (error instanceof Error && error.name === "TimeoutError") throw error;
       lastError = error;
     }
   }
@@ -1402,7 +1426,9 @@ export async function generateStudioWriterRoomDraft(
     direction?: string;
     signal?: AbortSignal;
   },
-  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT,
+  importWriterRoomCodec: () => Promise<typeof import("../studio-writer-room-ai")> = () =>
+    import("../studio-writer-room-ai")
 ): Promise<StudioAiResult<StudioTextAiData<StudioWriterRoomAiDraft>>> {
   if (!isStudioTextAiConfigured(settings, transport)) {
     return {
@@ -1411,6 +1437,14 @@ export async function generateStudioWriterRoomDraft(
       error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요.",
     };
   }
+  const signal = input.signal ?? transport.signal;
+  let writerRoomCodec: typeof import("../studio-writer-room-ai");
+  try {
+    writerRoomCodec = await loadOptionalStudioAiCodec(importWriterRoomCodec, signal);
+  } catch (error) {
+    return { ok: false, code: "network_error", error: networkErrorMessage(error) };
+  }
+  const { buildStudioWriterRoomAiPrompt, parseStudioWriterRoomAiDraft } = writerRoomCodec;
   const prompt = buildStudioWriterRoomAiPrompt(input);
   const result = await postTextCompletion(settings, {
     task: "scenario",
@@ -1419,7 +1453,7 @@ export async function generateStudioWriterRoomDraft(
     temperature: 0.55,
     maxTokens: 2_400,
     responseFormat: "json",
-  }, { ...transport, signal: input.signal ?? transport.signal });
+  }, { ...transport, signal });
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) {
