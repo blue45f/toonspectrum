@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
@@ -23,12 +22,12 @@ import {
   StudioNewPage,
   StudioProjectShellPage,
   StudioPromoPage,
+  StudioGenerativePage,
+  StudioSpatialReaderPage,
   StudioTemplatesPage,
   StudioRouter,
 } from "./creator-route-pages";
 
-const StudioGenerativePage = lazy(() => import("@/domains/creator/generative/StudioGenerativePage").then((module) => ({ default: module.StudioGenerativePage })));
-const StudioSpatialReaderPage = lazy(() => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })));
 
 export const creatorRoutes = defineAppRoutes([
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.

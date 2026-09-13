@@ -13,7 +13,7 @@ import {
   SquareSplitHorizontal,
   WandSparkles,
 } from "lucide-react";
-import { memo, Suspense, type ComponentProps } from "react";
+import { memo, Suspense, useId, useState, type ComponentProps } from "react";
 
 import {
   StudioFloatingToolPopover,
@@ -39,12 +39,18 @@ import {
   preloadStudioSceneToolPopoverBody,
   preloadStudioStyleToolPopoverBody,
 } from "./studio-tool-belt-lazy-ui";
-import { studioUiDensityAllows } from "./studio-ui-density";
+import {
+  studioToolbarDisclosureAllows,
+  studioToolbarIsExpanded,
+  type StudioGettingStartedAction,
+} from "./studio-toolbar-disclosure";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioToolBeltCreateModeInsertTools } from "./StudioToolBeltCreateModeInsertTools";
 import { StudioToolBeltCreateModeUtilityButtons } from "./StudioToolBeltCreateModeUtilityButtons";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import { StudioWorkflowAccess } from "./StudioWorkflowAccess";
 
+import type { StudioUiChromeRegion } from "./studio-ui-density";
 import type { StudioToolBeltContentProps, StudioToolBeltHintMap } from "./StudioToolBeltContent";
 
 import { cn } from "@/shared/lib/utils";
@@ -101,16 +107,53 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     toggleSelectedFrameDiagonal,
   } = stableHandlers;
 
+  const [expanded, setExpanded] = useState(false);
+  const advancedToolsId = useId();
+  const showAdvanced = studioToolbarIsExpanded(uiDensityMode, expanded);
+  const allows = (region: StudioUiChromeRegion) =>
+    studioToolbarDisclosureAllows(uiDensityMode, expanded, region);
+  const documentLocked = toolBelt.collaborationDocumentLocked || activeSurfaceReviewLocked;
+  const lockedReason = toolBelt.collaborationDocumentLocked
+    ? toolBelt.collaborationLockMessage() || "이 문서는 지금 편집할 수 없어요."
+    : activeSurfaceReviewLocked ? "검토 중인 페이지의 편집 잠금을 먼저 해제해 주세요." : undefined;
+
+  const activatePen = () => {
+    activatePrimaryCanvasTool("draw", "pen");
+    setMenu(null);
+  };
+
+  const startTask = (action: StudioGettingStartedAction) => {
+    // Keep the same handlers used by the normal tools: no direct document writes.
+    if (documentLocked && action !== "preview" && action !== "help") return;
+    switch (action) {
+      case "frame": addFrame(); break;
+      case "draw": activatePen(); break;
+      case "bubble": setMenu("bubble"); break;
+      case "background": setMenu("bgFill"); break;
+      case "preview": toolBelt.setScrollPreviewOpen(true); break;
+      case "help": stableHandlers.openFeatureTutorial(); break;
+    }
+  };
+
   const studioToolIconClass = (nextProps?: Parameters<typeof studioChromeIconClass>[0]) =>
     studioChromeIconClass(nextProps ?? {});
   const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
 
   return (
     <>
-      {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
+      <StudioWorkflowAccess
+        expanded={showAdvanced}
+        canCollapse={uiDensityMode !== "full"}
+        controlsId={advancedToolsId}
+        onToggleExpanded={() => { setMenu(null); setExpanded((value) => !value); }}
+        lockedReason={lockedReason}
+        onTask={startTask}
+        onBeforeOpen={() => setMenu(null)}
+      />
+      {(allows("toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
         <StudioToolbarCluster
           label="에셋 라이브러리"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
+          className={cn(!allows("toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
         >
           <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
             <StudioToolBeltHintTarget hint={hints.assets}>
@@ -134,7 +177,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 aria-expanded={activeToolbarGroup === "assetGroup"}
                 className={cn(
                   toolBtn(activeToolbarGroup === "assetGroup"),
-                  !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
+                  !allows("toolbar-assets") && "sr-only"
                 )}
               >
                 <Folder
@@ -168,7 +211,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </StudioToolbarCluster>
       ) : null}
 
-      {studioUiDensityAllows(uiDensityMode, "toolbar-cut") ? (
+      {allows("toolbar-cut") ? (
         <>
           <StudioToolbarDivider label="컷" />
           <StudioToolbarCluster label="컷 배치">
@@ -187,16 +230,18 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 /> 컷 추가
               </button>
             </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={hints.panelSplit}>
-              <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)}>
-                <SquareSplitHorizontal
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass()}
-                /> 사선 컷
-              </button>
-            </StudioToolBeltHintTarget>
+            {showAdvanced ? (
+              <StudioToolBeltHintTarget hint={hints.panelSplit}>
+                <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)}>
+                  <SquareSplitHorizontal
+                    size={STUDIO_ICON_SIZE.toolCompact}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioToolIconClass()}
+                  /> 사선 컷
+                </button>
+              </StudioToolBeltHintTarget>
+            ) : null}
             {selected?.type === "frame" && (
               <StudioToolBeltHintTarget
                 hint={selected.points ? hints.panelStraighten : hints.panelDiagonalize}
@@ -220,7 +265,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </>
       ) : null}
 
-      {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
+      {allows("toolbar-draw") ? (
         <>
           <StudioToolbarDivider label="도구" className="lg:hidden" />
           <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
@@ -251,10 +296,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               <button
                 type="button"
                 disabled={activeSurfaceReviewLocked}
-                onClick={() => {
-                  activatePrimaryCanvasTool("draw", "pen");
-                  setMenu(null);
-                }}
+                onClick={activatePen}
                 className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
                 aria-pressed={tool === "draw" && drawMode === "pen"}
               >
@@ -314,31 +356,33 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 채우기
               </button>
             </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget
-              hint={hints.frameAnimation}
-              disabled={selected?.type !== "image"}
-              unavailableReason={selected?.type !== "image" ? "애니메이션으로 만들 이미지를 먼저 선택하세요." : undefined}
-            >
-              <button
-                type="button"
-                onClick={openFrameAnimationForSelected}
+            {showAdvanced || selected?.type === "image" ? (
+              <StudioToolBeltHintTarget
+                hint={hints.frameAnimation}
                 disabled={selected?.type !== "image"}
-                className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
+                unavailableReason={selected?.type !== "image" ? "애니메이션으로 만들 이미지를 먼저 선택하세요." : undefined}
               >
-                <Film
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ disabled: selected?.type !== "image" })}
-                />
-                프레임
-              </button>
-            </StudioToolBeltHintTarget>
+                <button
+                  type="button"
+                  onClick={openFrameAnimationForSelected}
+                  disabled={selected?.type !== "image"}
+                  className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
+                >
+                  <Film
+                    size={STUDIO_ICON_SIZE.toolCompact}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioToolIconClass({ disabled: selected?.type !== "image" })}
+                  />
+                  프레임
+                </button>
+              </StudioToolBeltHintTarget>
+            ) : null}
           </StudioToolbarCluster>
         </>
       ) : null}
 
-      {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
+      {allows("toolbar-insert") ? (
         <StudioToolBeltCreateModeInsertTools
           hints={hints}
           studioCanvasImageAccept={studioCanvasImageAccept}
@@ -346,7 +390,8 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         />
       ) : null}
 
-      {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+      <div id={advancedToolsId} className="contents" data-studio-advanced-tools={showAdvanced ? "expanded" : "contextual"}>
+      {allows("toolbar-reference") || referencePanelOpen ? (
       <>
         <StudioToolbarDivider label="참조" />
         <StudioToolbarCluster label="참고 이미지">
@@ -372,12 +417,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
       </>
     ) : null}
 
-      {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
+      {(allows("toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
         <>
-          {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="3D" /> : null}
+          {allows("toolbar-scene") ? <StudioToolbarDivider label="3D" /> : null}
           <StudioToolbarCluster
             label="3D 제작·배경"
-            className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
+            className={cn(!allows("toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
           >
             <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
               <StudioToolBeltHintTarget hint={hints.background}>
@@ -391,7 +436,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-expanded={activeToolbarGroup === "bgGroup"}
                   className={cn(
                     toolBtn(activeToolbarGroup === "bgGroup"),
-                    !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
+                    !allows("toolbar-scene") && "sr-only"
                   )}
                 >
                   <Mountain
@@ -426,10 +471,10 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </>
       ) : null}
 
-      {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
+      {(allows("toolbar-style") || activeToolbarGroup === "styleGroup") ? (
         <StudioToolbarCluster
           label="스타일"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
+          className={cn(!allows("toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
         >
           <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
             <StudioToolBeltHintTarget hint={hints.style}>
@@ -452,7 +497,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 aria-expanded={activeToolbarGroup === "styleGroup"}
                 className={cn(
                   toolBtn(activeToolbarGroup === "styleGroup"),
-                  !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
+                  !allows("toolbar-style") && "sr-only"
                 )}
               >
                 <Palette
@@ -485,12 +530,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </StudioToolbarCluster>
       ) : null}
 
-      {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
+      {(allows("toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
         <>
-          {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
+          {allows("toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
           <StudioToolbarCluster
             label="AI 연동"
-            className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
+            className={cn(!allows("toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
           >
             <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
               <StudioToolBeltHintTarget hint={hints.ai}>
@@ -504,7 +549,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-expanded={activeToolbarGroup === "aiGroup"}
                   className={cn(
                     toolBtn(activeToolbarGroup === "aiGroup"),
-                    !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
+                    !allows("toolbar-ai") && "sr-only"
                   )}
                 >
                   <WandSparkles
@@ -542,12 +587,13 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </>
       ) : null}
 
-
-
-      <StudioToolBeltCreateModeUtilityButtons
-        hints={hints}
-        toolBelt={toolBelt}
-      />
+      {showAdvanced ? (
+        <StudioToolBeltCreateModeUtilityButtons
+          hints={hints}
+          toolBelt={toolBelt}
+        />
+      ) : null}
+      </div>
     </>
   );
 });

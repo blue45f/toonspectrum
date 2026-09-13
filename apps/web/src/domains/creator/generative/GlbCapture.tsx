@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { disposeModel, loadLocalGlb } from "./local-glb";
+
 export function GlbCapture({ file, onCapture, onError }: { file: File; onCapture: (image: string) => void; onError: (message: string) => void }) {
   const host = useRef<HTMLDivElement>(null); const capture = useRef<(() => string) | null>(null);
   const callbacks = useRef({ onCapture, onError }); callbacks.current = { onCapture, onError };

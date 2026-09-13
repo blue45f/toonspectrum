@@ -6,6 +6,7 @@ import { GlbCapture } from "./GlbCapture";
 import { cancelInferenceJob, createInferenceJob, getInferenceJob, inferenceArtifact, inferenceStatus, isInferenceTerminal, listInferenceJobs, type InferenceJob, type InferenceKind, type InferenceRequest, type InferenceStatus } from "./media-inference-client";
 import { exportGeneratedClips, type GeneratedClip } from "./generated-video-export";
 import "./advanced-studio.css";
+
 const LABELS:Record<InferenceKind,string>={"image-to-video":"만화 → 생성형 애니메이션","image-to-3d":"2D 캐릭터 → 3D 모델","render-to-2d":"3D 캐릭터 → 2D 일러스트"};
 const STATES:Record<string,string>={submitting:"입력 전달 중",queued:"GPU 작업 대기",running:"모델 추론 중","submission-unknown":"접수 여부 확인 중 · 자동 재제출 안 함","cancel-requested":"취소 확인 중",succeeded:"생성 완료",failed:"생성 실패",cancelled:"취소 완료"};
 function download(blob:Blob,name:string){const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download=name;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
@@ -21,14 +22,15 @@ export function StudioGenerativePage(){
   useEffect(()=>()=>{if(result){URL.revokeObjectURL(result.url);urls.current.delete(result.url);}},[result]);
   async function chooseImage(file:File){const sequence=++imageSequence.current;try{const source=await localSpatialImage(file,1024);if(sequence===imageSequence.current&&!lifetime.current.signal.aborted)setImage(source);}catch(cause){if(sequence===imageSequence.current)setError(String(cause));}}
   useEffect(()=>{
-    const controller=new AbortController();lifetime.current=controller;
+    const controller=new AbortController();lifetime.current=controller;const ownedUrls=urls.current;
     void inferenceStatus(controller.signal).then(setStatus).catch(async cause=>{if(!controller.signal.aborted)setError(await getApiErrorMessage(cause,"추론 서버 준비 상태를 확인하지 못했어요."));});
-    return()=>{controller.abort();exportAbort.current?.abort();for(const url of urls.current)URL.revokeObjectURL(url);urls.current.clear();};
+    return()=>{controller.abort();exportAbort.current?.abort();for(const url of ownedUrls)URL.revokeObjectURL(url);ownedUrls.clear();};
   },[]);
+  const jobId=job?.id;const jobState=job?.state;
   useEffect(()=>{
-    if(!job||isInferenceTerminal(job.state))return;
+    if(!jobId||!jobState||isInferenceTerminal(jobState))return;
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;let failures=0;
-    const id=job.id;const started=Date.now();
+    const id=jobId;const started=Date.now();
     const poll=async()=>{
       if(controller.signal.aborted)return;
       if(Date.now()-started>30*60*1000){setError("상태 자동 확인을 멈췄어요. 작업은 자동 재생성하지 않습니다. 내 작업 목록에서 이어서 확인하세요.");return;}
@@ -37,7 +39,7 @@ export function StudioGenerativePage(){
       timer=setTimeout(()=>void poll(),Math.min(15000,3000*2**Math.min(3,failures)));
     };timer=setTimeout(()=>void poll(),2000);
     return()=>{controller.abort();clearTimeout(timer);};
-  },[job?.id,job?.state]);
+  },[jobId,jobState]);
   const available=status?.configured&&status.capabilities.some(capability=>capability.kind===kind&&capability.ready);
   const active=job&&!isInferenceTerminal(job.state);
   async function run(){
@@ -76,7 +78,7 @@ export function StudioGenerativePage(){
     </section><section className="advanced-card"><h2>2. 결과 확인</h2>
       {job?<><p role="status"><strong>{STATES[job.state]??job.state}</strong></p><code>{job.id}</code>{job.error&&<p className="advanced-error">{job.error}</p>}
       <div className="advanced-row">{!isInferenceTerminal(job.state)&&<button onClick={()=>void cancelInferenceJob(job.id).then(setJob).catch(async cause=>setError(await getApiErrorMessage(cause,"취소를 확인하지 못했어요.")))}>서버 작업 취소</button>}{job.state==="succeeded"&&<button disabled={busy} onClick={()=>void loadResult()}>검증된 결과 불러오기</button>}</div></>:<p className="muted">접수·대기·추론·완료 상태를 구분합니다. 결과가 없으면 완료로 표시하지 않습니다.</p>}
-      {result&&<><div className="advanced-result">{result.blob.type.startsWith("video/")?<video controls playsInline src={result.url}/>:result.blob.type.startsWith("image/")?<img src={result.url} alt="AI 생성 결과"/>:<p>3D 모델 생성 완료 · {Math.round(result.blob.size/1024)}KB</p>}</div><div className="advanced-row"><button onClick={()=>download(result.blob,result.job.artifacts[0].name)}>원본 결과 다운로드</button>
+      {result&&<><div className="advanced-result">{result.blob.type.startsWith("video/")?<video controls muted playsInline src={result.url}/>:result.blob.type.startsWith("image/")?<img src={result.url} alt="AI 생성 결과"/>:<p>3D 모델 생성 완료 · {Math.round(result.blob.size/1024)}KB</p>}</div><div className="advanced-row"><button onClick={()=>download(result.blob,result.job.artifacts[0].name)}>원본 결과 다운로드</button>
       {result.blob.type.startsWith("video/")&&<button disabled={clips.length>=8} onClick={()=>setClips(current=>[...current,{blob:result.blob,caption:""}])}>홍보 영상 목록에 추가</button>}
       {result.blob.type==="model/gltf-binary"&&<button onClick={()=>{setGlb(new File([result.blob],`${result.job.id}.glb`,{type:result.blob.type}));setKind("render-to-2d");setImage("");}}>3D 미리보기 / 2D 재변환</button>}</div></>}
       <hr/><h3>작업 이어서 확인</h3><button onClick={()=>void loadHistory()}>내 작업 목록 불러오기</button><div className="advanced-history">{history.map(item=><button key={item.id} disabled={busy} onClick={()=>{setJob(item);setResult(null);}}>{LABELS[item.kind]} · {STATES[item.state]} · {item.id.slice(0,8)}</button>)}</div>

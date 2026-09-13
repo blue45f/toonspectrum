@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import type { MediaInferenceKind } from "./studio-media-inference-graph";
+
 export interface MediaArtifact { filename: string; subfolder: string; type: "output"; mime: string }
 export interface MediaJob {
   id: string; owner_id: string; idempotency_key: string; request_hash: string; kind: MediaInferenceKind;

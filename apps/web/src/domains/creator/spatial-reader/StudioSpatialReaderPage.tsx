@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { localSpatialImage, nextSpatialPanel, parseSpatialBook, type SpatialBook, type SpatialPanel } from "./spatial-book";
+import { spatialBookVtt } from "./spatial-book-captions";
 import type { SpatialReaderRuntime } from "./spatial-reader-runtime";
 import "../generative/advanced-studio.css";
+
 function savedIndex(book:SpatialBook):number{try{return nextSpatialPanel(Number(localStorage.getItem(`toonstudio-spatial-progress:${book.id}`))||0,0,book.panels.length);}catch{return 0;}}
 function downloadBook(book:SpatialBook){const url=URL.createObjectURL(new Blob([JSON.stringify(parseSpatialBook(book))],{type:"application/json"}));const link=document.createElement("a");link.href=url;link.download="toonstudio-spatial-book.json";link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 export function StudioSpatialReaderPage(){
@@ -13,6 +15,12 @@ export function StudioSpatialReaderPage(){
   const scaleRef=useRef(scale);scaleRef.current=scale;
   const bookRef=useRef(book);bookRef.current=book;
   const panel=book?.panels[index];
+  const [captionUrl,setCaptionUrl]=useState("");
+  useEffect(()=>{
+    if(!book?.audio){setCaptionUrl("");return;}
+    const url=URL.createObjectURL(new Blob([spatialBookVtt(book)],{type:"text/vtt"}));setCaptionUrl(url);
+    return()=>URL.revokeObjectURL(url);
+  },[book]);
   useEffect(()=>{
     if(!book||view!=="spatial"||!host.current)return;
     let disposed=false;let current:SpatialReaderRuntime|null=null;const element=host.current;
@@ -55,7 +63,7 @@ export function StudioSpatialReaderPage(){
       <div className="spatial-caption" aria-live="polite"><strong>{index+1} / {book.panels.length} · {panel.title}</strong><p>{panel.caption}</p></div>
       <div className="advanced-row"><button disabled={index===0} onClick={()=>focus(index-1)}>이전 컷</button><button aria-pressed={auto} onClick={()=>{setAuto(value=>!value);if(auto)audio.current?.pause();else if(audio.current)void audio.current.play().catch(()=>setStatus("음악은 재생 버튼을 눌러 시작해 주세요."));}}>{auto?"자동 넘김 멈춤":"자동 넘김 시작"}</button><button disabled={index===book.panels.length-1} onClick={()=>focus(index+1)}>다음 컷</button><span className="muted">← → / Home / End</span></div>
       <div className="spatial-cuts" aria-label="전체 컷 탐색">{book.panels.map((item,i)=><button key={item.id} aria-current={i===index} aria-label={`${i+1}번째 컷 ${item.title}`} onClick={()=>focus(i)}><img loading="lazy" src={item.src} alt=""/>{i+1}</button>)}</div>
-      {book.audio&&<audio ref={audio} controls src={book.audio} aria-label="작품 음악 또는 내레이션"/>}
+      {book.audio&&<audio ref={audio} controls src={book.audio} aria-label="작품 음악 또는 내레이션"><track kind="captions" src={captionUrl || undefined} srcLang="ko" label="작가가 입력한 컷 대사" default /></audio>}
       <details className="advanced-card"><summary>작품 정보 · 자막 · 깊이 레이어 편집</summary><p className="muted">깊이 레이어는 별도로 준비한 투명 PNG를 사용합니다. 자동으로 추론한 3D라고 표시하지 않습니다. 편집하면 열린 AR/VR 세션을 종료하고 화면을 다시 구성합니다.</p>
         <label>작품 제목<input value={book.title} maxLength={160} onChange={event=>setBook({...book,title:event.target.value})}/></label><label>현재 컷 제목<input value={panel.title} maxLength={120} onChange={event=>updatePanel({title:event.target.value})}/></label>
         <label>대사 / 자막<textarea rows={3} value={panel.caption} maxLength={2000} onChange={event=>updatePanel({caption:event.target.value})}/></label><label>화면 설명 · 스크린리더용<textarea rows={2} value={panel.alt} maxLength={2000} onChange={event=>updatePanel({alt:event.target.value})}/></label>

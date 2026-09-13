@@ -10,7 +10,7 @@ export async function exportGeneratedClips(clips:GeneratedClip[],signal:AbortSig
   try{
     for(const clip of clips){
       signal.throwIfAborted();const url=URL.createObjectURL(clip.blob);urls.push(url);const video=document.createElement("video");video.muted=true;video.playsInline=true;video.preload="auto";videos.push(video);
-      await new Promise<void>((resolve,reject)=>{const timeout=setTimeout(()=>finish(new Error("영상을 읽는 시간이 초과됐어요.")),10000);const abort=()=>finish(new DOMException("Aborted","AbortError"));const finish=(error?:Error)=>{clearTimeout(timeout);signal.removeEventListener("abort",abort);video.onloadeddata=null;video.onerror=null;error?reject(error):resolve();};video.onloadeddata=()=>finish();video.onerror=()=>finish(new Error("생성 영상을 읽지 못했어요."));signal.addEventListener("abort",abort,{once:true});video.src=url;});
+      await new Promise<void>((resolve,reject)=>{const timeout=setTimeout(()=>finish(new Error("영상을 읽는 시간이 초과됐어요.")),10000);const abort=()=>finish(new DOMException("Aborted","AbortError"));const finish=(error?:Error)=>{clearTimeout(timeout);signal.removeEventListener("abort",abort);video.onloadeddata=null;video.onerror=null;if(error)reject(error);else resolve();};video.onloadeddata=()=>finish();video.onerror=()=>finish(new Error("생성 영상을 읽지 못했어요."));signal.addEventListener("abort",abort,{once:true});video.src=url;});
       if(!Number.isFinite(video.duration)||video.duration<=0||video.duration>30)throw new Error("개별 영상 길이는 최대 30초여야 해요.");
     }
     stream=canvas.captureStream(24);recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6_000_000});

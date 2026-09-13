@@ -1,4 +1,5 @@
 import { api, apiPath } from "@/infrastructure/api";
+
 export type InferenceKind = "image-to-video" | "image-to-3d" | "render-to-2d";
 export interface InferenceJob { id: string; kind: InferenceKind; state: string; error: string|null; createdAt: string; updatedAt: string; artifacts: Array<{index:number;mime:string;name:string}> }
 export interface InferenceStatus { configured:boolean; capabilities:Array<{kind:InferenceKind;ready:boolean;missing:string[]}> }

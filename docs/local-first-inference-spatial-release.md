@@ -4,7 +4,11 @@ Implementation branch: `feat/local-first-inference-spatial-20260913` · PR #1373
 
 ## Release status
 
-This is an implementation and verification candidate, not a declaration of production readiness. The authoring container passed 68 deterministic contract checks using pure functions and explicit HTTP/ledger/IndexedDB protocol doubles, including 13 TypeScript transpile syntax checks. These are not full TypeScript types or browser/GPU/PostgreSQL/XR tests. Browser navigation was denied by the execution environment's administrator policy; the remote development terminal later stopped responding. No successful browser run, GPU inference, migration, deployment or main merge is claimed.
+The merge follow-up on 2026-09-13 resolved the service-worker conflict against current main while preserving its explicit offline preparation and protected manuscript behavior. It also repaired the route fast-refresh boundary, effect dependencies and media accessibility.
+
+Validation now executed on the authorized development machine with Node 24.16.0 and the repository toolchain: full web and API typechecking, changed-source strict lint, production Vite build, architecture validation, CSP validation and bundle ratchet all passed. The 72 existing local-first/caption contracts and 31 main offline resilience regressions passed. The actual built service worker passed **9 real Chromium checks**: cache readiness, ink/autosave, offline reload, undo/redo, origin 503 rescue, real IndexedDB stale-revision forks, malformed-import preservation, standalone HTML reopening, and zero API requests/no page errors.
+
+The earlier authoring-environment browser restriction remains a historical result, not evidence of a browser failure on this machine. No permission restriction was disabled. GPU model inference, live database migration and AR/VR hardware tests have not been performed; generation stays unavailable until an operator configures the self-hosted GPU and ledger. Merge/deployment status is recorded on PR #1373 rather than asserted by this runbook.
 
 ## User entry points
 
@@ -18,7 +22,7 @@ The Studio home exposes these entry points. The existing manuscript/collaboratio
 
 The independent editor has pen/eraser, pressure, undo/redo, up to eight layers, reference images, local document reopening, PNG/document exports and self-contained HTML backups. Its separate database is `toonstudio-emergency-drawing-v1`; it does not read/write existing Studio/cloud stores. Atomic revision comparison creates a conflict copy rather than overwriting another tab's work. Storage failures keep the drawing available in memory and request a file backup; a successful download request is not represented as verified disk persistence.
 
-The service worker caches four small rescue files. Navigation connection errors, HTTP 5xx/408/429 and a four-second preload/fetch deadline route Studio navigation to the rescue editor. API mutations are not cached, replayed or queued. A waiting worker is not automatically activated while artists are drawing. The ready indicator requires both cached files and a response from the active controlling worker.
+The service worker caches four small rescue files. Navigation connection errors, HTTP 5xx/408 and a four-second preload/fetch deadline route Studio navigation to the rescue editor. API mutations are not cached, replayed or queued. A waiting worker is not automatically activated while artists are drawing. The ready indicator requires both cached files and a response from the active controlling worker.
 
 A browser must prepare the application while online before an offline website navigation can work. Alternatively, a previously downloaded self-contained HTML can be opened without reaching the site. First-ever offline access to an uncached site cannot install the application. Browser eviction, clearing site data and private-mode termination can remove local storage: file backups remain necessary. Server-only documents never downloaded to this browser cannot be recovered from an outage by creating an empty replacement. The local drawing JSON is a separate format; PNG is the bridge back into the existing Studio. No automatic conflict-prone cloud upload was added.
 
@@ -83,6 +87,6 @@ pnpm exec playwright install chromium
 node scripts/verify-local-first-browser.mjs
 ```
 
-The browser runner uses the actual built service worker and a local fixture origin. It disables all API responses, injects a 503 origin failure and verifies network-offline reload, ink pixels, undo/redo, real IndexedDB revision races, invalid imports and a self-contained HTML reopening. A navigation-policy block must remain a failed/unexecuted gate, not be bypassed or described as passing.
+The browser runner uses the actual built service worker and a local fixture origin. It disables all API responses, injects a 503 origin failure and verifies network-offline reload, ink pixels, undo/redo, real IndexedDB revision races, invalid imports and a self-contained HTML reopening. A navigation-policy block must remain a failed/unexecuted gate; the authorized-machine Chromium run is independent evidence, not a change to that policy.
 
-Before merge/release: resolve concurrent main conflicts, pass normal CI/full types/build/security checks, run the browser gate on supported Chrome/Safari/Edge as appropriate, validate saving when storage is denied/full, verify cross-account boundaries with real sessions/Postgres, execute and inspect all three real GPU outputs and targeted cancellation, and test AR/VR entry/selection/end on target devices. No fee-incurring GPU smoke test or deployment is started by the contract suite.
+Before deployment/enablement: pass normal repository CI and run the browser gate on any additional supported Safari/Edge versions as appropriate, validate saving when storage is denied/full, verify cross-account boundaries with real sessions/Postgres, execute and inspect all three real GPU outputs and targeted cancellation, and test AR/VR entry/selection/end on target devices. No fee-incurring GPU smoke test or deployment is started by the contract suite.

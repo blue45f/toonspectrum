@@ -1,6 +1,7 @@
 import { CanvasTexture, Color, DoubleSide, Group, LinearFilter, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Raycaster, RingGeometry, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer, type Texture } from "three";
 import { spatialCaptionPages as captionPages } from "./spatial-caption-pages";
 import { nextSpatialPanel, visibleSpatialPanels, type SpatialBook } from "./spatial-book";
+
 export interface SpatialReaderRuntime {
   focus(index: number): void;
   enter(mode: "immersive-vr" | "immersive-ar"): Promise<void>;

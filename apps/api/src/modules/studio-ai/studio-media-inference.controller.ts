@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Header, Headers, HttpCode, Inject, Param, Post, Res, StreamableFile, UnauthorizedException } from "@nestjs/common";
 import type { Response } from "express";
 import { StudioMediaInferenceService } from "./studio-media-inference.service";
+
 function owner(value: string | undefined): string {
   if (!value?.trim()) throw new UnauthorizedException("생성형 변환은 로그인이 필요해요.");
   return value.trim();

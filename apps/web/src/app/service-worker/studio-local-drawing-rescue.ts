@@ -51,7 +51,7 @@ export async function boundedNavigationResponse(request: Request, preload: Promi
     ]);
   } finally { clearTimeout(timer); }
 }
-export function isNavigationOutage(status: number): boolean { return status >= 500 || status === 408 || status === 429; }
+export function isNavigationOutage(status: number): boolean { return status >= 500 || status === 408; }
 export async function cachedLocalDrawingRescue(storage: CacheStorage = caches): Promise<Response | undefined> {
   const cache = await storage.open(LOCAL_DRAWING_CACHE);
   const cached = await cache.match(LOCAL_DRAWING_URL);
