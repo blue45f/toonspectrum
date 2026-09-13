@@ -1,6 +1,7 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
 
+import { artworkSourcesForPath } from "./site-experience/site-art-direction";
 import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { isPublicCreativeRoute } from "./site-public-routes";
@@ -30,7 +31,7 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
       <div className="public-site-next__grid">
         {destinations.map((destination) => (
           <Link key={destination.href} href={destination.href} className="public-site-next__card" data-phase={destination.phase}>
-            <div className="public-site-next__art" aria-hidden="true"><img src={destination.image} alt="" width={1536} height={1024} loading="lazy" decoding="async" /></div>
+            <div className="public-site-next__art" aria-hidden="true"><img src={destination.image} srcSet={artworkSourcesForPath(destination.image)} sizes="(max-width: 767px) 90vw, 380px" alt="" width={1536} height={1024} loading="lazy" decoding="async" /></div>
             <div className="public-site-next__copy">
               <span className="public-site-next__tag">{destination.tag}</span>
               <h3>{korean ? destination.ko : destination.en}</h3>
