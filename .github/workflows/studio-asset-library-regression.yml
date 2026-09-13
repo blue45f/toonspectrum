@@ -65,6 +65,14 @@ jobs:
             apps/web/src/domains/creator/studio-generated-2d-catalog.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-catalog.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-intelligence.test.ts \
+            apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-product-boundary.test.ts \
+            apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-repository.test.ts \
+            apps/web/src/domains/creator/studio-asset-library.test.ts \
+            apps/web/src/domains/creator/StudioAssetMenuPanel.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetSmartLibrary.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.boundary.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dAssetLibraryPanel.test.tsx \
             apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx
       - name: Changed library module lint
         run: |
