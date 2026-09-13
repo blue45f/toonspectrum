@@ -155,7 +155,13 @@ describe("Studio left tool rail module boundary", () => {
     );
     expect(rail.source).toContain("top: railMorePosition.top");
     expect(rail.source).toContain("maxHeight: railMorePosition.maxHeight");
-    expect(rail.source).toContain('globalThis.visualViewport?.addEventListener("resize", updatePosition)');
+    // Viewport events are frame-coalesced, but still reposition the dialog and clean up.
+    expect(rail.source).toContain('globalThis.visualViewport?.addEventListener("resize", schedulePosition)');
+    expect(rail.source).toContain('globalThis.visualViewport?.addEventListener("scroll", schedulePosition)');
+    expect(rail.source).toContain('globalThis.visualViewport?.removeEventListener("resize", schedulePosition)');
+    expect(rail.source).toContain('globalThis.visualViewport?.removeEventListener("scroll", schedulePosition)');
+    expect(rail.source).toContain("positionFrame = globalThis.requestAnimationFrame(");
+    expect(rail.source).toContain("updatePosition();");
     expect(rail.source).toContain('document.addEventListener("pointerdown", handlePointerDown, true)');
     expect(rail.source).toContain('setAppSettingsInitialTab("toolbar")');
     expect(rail.source).toContain("?.focus({ preventScroll: true })");
