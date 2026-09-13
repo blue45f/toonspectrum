@@ -36,10 +36,20 @@ describe("public shell integration", () => {
     expect(app).not.toContain("sessionStorage.setItem");
   });
 
+  it("keeps the alternate onward chapter out of the initial application bundle", () => {
+    expect(shell).toContain("const SiteNextSteps = lazy(");
+    expect(shell).not.toContain('from "@/shared/components/site-experience/site-experience-model"');
+    expect(shell).not.toContain('import { SiteNextSteps }');
+    expect(shell).toContain("enhancedSite && !publicCreativeRoute");
+    expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{null\}><SiteNextSteps \/><\/Suspense>/u);
+  });
+
   it("loads onward artwork UI only on eligible public pages, behind its own failure boundary", () => {
     expect(shell).toContain("const PublicSiteNextSteps = lazy(");
     expect(shell).not.toContain('import { PublicSiteNextSteps }');
+    expect(shell).toContain("const PublicSiteWayfinder = lazy(");
+    expect(shell).not.toContain('import { PublicSiteWayfinder }');
     expect(shell).toContain('publicCreativeRoute && pathname !== "/"');
-    expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{<PublicSiteWayfinder \/>\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
+    expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{<Suspense fallback=\{null\}><PublicSiteWayfinder \/><\/Suspense>\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
   });
 });

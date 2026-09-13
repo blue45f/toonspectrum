@@ -15,7 +15,7 @@ test("curriculum, all lessons, glossary and invalid addresses render", async ({ 
   for (const lesson of LESSONS) {
     await page.goto(`/learn/lessons/${lesson.id}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(lesson.title);
-    await expect(page.getByRole("slider")).toHaveCount(2);
+    await expect(page.locator(".learn-page").getByRole("slider")).toHaveCount(2);
     await expect(page.getByRole("button", { name: "이 강좌 학습 완료", exact: true })).toBeDisabled();
   }
   await page.goto("/learn/glossary");
@@ -65,9 +65,9 @@ test("reduced motion remains step-readable and mobile has no document overflow",
   await expect(page.getByRole("button", { name: "설명 재생", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "3단계", exact: true }).click();
   await expect(page.locator(".learn-caption").first()).toContainText("눈높이");
-  await page.getByRole("slider").first().focus();
+  await page.locator(".learn-page").getByRole("slider").first().focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("slider").first()).toHaveValue("131");
+  await expect(page.locator(".learn-page").getByRole("slider").first()).toHaveValue("131");
   for (const path of ["/learn", "/learn/glossary", "/learn/studio", "/learn/lessons/lettering"]) {
     await page.goto(path);
     await expect(page.locator(".learn-page")).toBeVisible();

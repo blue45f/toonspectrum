@@ -23,7 +23,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
 
     expect(html).toContain('data-studio-original-marketplace="local-phase-1"');
     expect(html).toContain("독자 무료 스타터 마켓");
-    expect(html).toContain("72 FREE");
+    expect(html).toContain("96 FREE");
     expect(html).toContain("LOCAL PHASE 1");
     expect(html).toContain("결제·클라우드 동기화 없이");
     expect(html).toContain("결제 기능도 비활성");
@@ -46,6 +46,8 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("음식·카페 소품 키트");
     expect(html).toContain("판타지 모험 소품 키트");
     expect(html).toContain("자연·계절 장식 키트");
+    expect(html).toContain("아키텍처 장면 컬렉션");
+    expect(html).toContain("거리와 생활 디테일 소품");
     expect(html).toContain("ToonSpectrum Lab");
     expect(html).toContain("original-procedural · CC0");
     expect(html).toContain("Canvas 2D · SVG · 모든 기기");
@@ -53,11 +55,13 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("메타데이터 전용 로컬 명세 내보내기");
   });
 
-  it("renders all 72 selectable, draggable starter assets with real placement actions", () => {
+  it("renders all 96 selectable, draggable starter assets with real placement actions", () => {
     const html = renderPanel();
 
-    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(72);
+    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(96);
     expect(html).not.toContain('data-studio-original-asset="original-compact-studio-room"');
+    expect(html).toContain('data-studio-original-asset="original-quality-20260913-cafe-street"');
+    expect(html).toContain('data-studio-original-asset="original-quality-20260913-bus-shelter"');
     expect(html).toContain('data-studio-original-asset="original-city-bicycle"');
     expect(html).toContain('data-studio-original-asset="original-city-commuter-bike"');
     expect(html).toContain('data-studio-original-asset="original-night-bokeh"');
@@ -77,7 +81,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain('aria-controls="studio-original-marketplace-filters"');
     expect(html).toContain("카테고리 · 복수 선택");
     expect(html).toContain("<option");
-    expect(html).toContain("무료 (9)");
+    expect(html).toContain("무료 (11)");
     expect(html).toContain("유료 (0)");
     expect(html).toContain("구독 (0)");
     expect(html).toContain("내 라이브러리");

@@ -16,18 +16,27 @@ export function LibraryBackupImport({ onRestore, locale, ownerId }: {
   const trigger = useRef<HTMLButtonElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
+  const returnFocus = useRef(false);
   const [pending, setPending] = useState<{ data: HydratePayload; fileName: string; ownerId: string | null } | null>(null);
   const [reading, setReading] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     generation.current += 1;
+    returnFocus.current = false;
     setPending(null);
     setReading(false);
     setMessage("");
     return () => { generation.current += 1; };
   }, [ownerId]);
-  useEffect(() => { if (pending) preview.current?.focus(); }, [pending]);
+  // Restore focus after React removes the preview and re-enables the trigger.
+  useEffect(() => {
+    if (pending) preview.current?.focus();
+    else if (!reading && returnFocus.current) {
+      returnFocus.current = false;
+      trigger.current?.focus({ preventScroll: true });
+    }
+  }, [pending, reading]);
 
   async function selectFile(file: File) {
     const ticket = ++generation.current;
@@ -63,13 +72,12 @@ export function LibraryBackupImport({ onRestore, locale, ownerId }: {
           : `${Object.keys(pending.data.ratings).length} ratings · ${Object.keys(pending.data.reads).length} reading records · ${Object.keys(pending.data.reviews).length} reviews · ${pending.data.collections.length} collections`}</p>
         <p className="mt-2 text-xs leading-6 text-fg">{korean ? "확인하면 현재 브라우저의 서재 기록을 이 백업으로 교체합니다. 필요한 현재 기록은 먼저 내보내세요." : "Confirming replaces this browser’s library with this backup. Export any current records you need first."}</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="min-h-11 rounded-lg border border-line bg-panel px-3 py-2 text-fg" onClick={() => { generation.current += 1; setPending(null); trigger.current?.focus(); }}>{korean ? "취소" : "Cancel"}</button>
+          <button type="button" className="min-h-11 rounded-lg border border-line bg-panel px-3 py-2 text-fg" onClick={() => { generation.current += 1; returnFocus.current = true; setReading(false); setPending(null); }}>{korean ? "취소" : "Cancel"}</button>
           <button type="button" className="min-h-11 rounded-lg bg-accent px-3 py-2 font-semibold text-on-accent" onClick={() => {
             if (pending.ownerId !== ownerId) { setPending(null); return; }
             try {
-              onRestore(pending.data); setPending(null); setFailed(false);
+              onRestore(pending.data); returnFocus.current = true; setReading(false); setPending(null); setFailed(false);
               setMessage(korean ? "서재 백업을 복원했습니다." : "Library backup restored.");
-              trigger.current?.focus();
             } catch {
               setFailed(true);
               setMessage(korean ? "브라우저 저장소에 기록하지 못했습니다. 저장 공간과 접근 권한을 확인해 주세요." : "Could not persist the library. Check browser storage space and permissions.");

@@ -30,6 +30,7 @@ describe("deliberate library restore", () => {
     expect(restore).toHaveBeenCalledOnce();
     expect(restore.mock.calls[0][0].ratings).toEqual({ work: 4.5 });
     expect(screen.getByRole("status").textContent).toContain("복원했습니다");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "백업 가져오기" }));
   });
   it("rejects unrelated JSON without treating it as an empty library", async () => {
     const restore = vi.fn();

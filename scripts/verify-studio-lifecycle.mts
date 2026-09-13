@@ -694,10 +694,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
-    const recoveryMessage = page.getByText(
-      "이전에 작성 중이던 임시저장 데이터가 있습니다.",
-      { exact: false },
-    );
+    const recoveryMessage = page.locator("[data-studio-recovery-notice]");
     await recoveryMessage.waitFor({ state: "visible", timeout: 8_000 });
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
@@ -705,7 +702,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "복구하기", exact: true }).click();
+    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
     await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
 
     const restoredStage = page.locator(".konvajs-content").first();

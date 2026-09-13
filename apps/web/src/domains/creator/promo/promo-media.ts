@@ -1,5 +1,9 @@
-import { drawPromoFrame, loadPromoImages } from "./promo-canvas";
-import { PROMO_FPS, promoAudioGain, promoDataUrl, promoFrameCount, promoSize } from "./promo-model";
+import { finalizeStudioAnimaticRecordedWebm } from "../animatic/studio-animatic-recorded-webm";
+
+import { drawPromoFrame, loadPromoImages, releasePromoTextCache } from "./promo-canvas";
+import { PROMO_FPS, promoDataUrl, promoFrameCount, promoSize } from "./promo-model";
+
+import { schedulePromoRecordingGains } from "./promo-recording-audio";
 
 import type { PromoPanel, PromoProject } from "./promo-model";
 
@@ -58,9 +62,11 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
   let audioContext: AudioContext | null = null;
   let audioSource: AudioBufferSourceNode | null = null;
   let audioGain: GainNode | null = null;
+  let voiceSource: AudioBufferSourceNode | null = null;
+  let voiceGain: GainNode | null = null;
   let recorder: MediaRecorder | null = null;
   try {
-    if (project.audio) {
+    if (project.audio || project.voiceover) {
       audioContext = new AudioContext();
       await audioContext.resume();
       if (audioContext.state !== "running") throw new Error("오디오 권한을 허용한 후 다시 저장해 주세요.");
@@ -68,28 +74,42 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     const images = await loadPromoImages(project, signal);
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     drawPromoFrame(ctx, project, images, 0, size.width, size.height);
-    stream = canvas.captureStream(Math.min(PROMO_FPS, 5));
+    stream = canvas.captureStream(PROMO_FPS);
     const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
     if (!videoTrack) throw new Error("영상 캡처 트랙을 만들지 못했어요.");
-    if (project.audio && audioContext) {
-      const response = await fetch(project.audio.src, { signal });
-      const audio = await audioContext.decodeAudioData(await response.arrayBuffer());
-      if (audio.duration > 180 || !Number.isFinite(audio.duration) || audio.duration <= 0) throw new Error("BGM은 3분 이하의 오디오를 사용해 주세요.");
-      audioSource = audioContext.createBufferSource();
-      audioSource.buffer = audio;
-      audioSource.loop = true;
-      audioGain = audioContext.createGain();
-      audioGain.gain.value = 0;
+    if (audioContext && (project.audio || project.voiceover)) {
       const destination = audioContext.createMediaStreamDestination();
-      audioSource.connect(audioGain);
-      audioGain.connect(destination);
+      const decode = async (src: string) => {
+        const response = await fetch(src, { signal });
+        const audio = await audioContext!.decodeAudioData(await response.arrayBuffer());
+        if (audio.duration > 180 || !Number.isFinite(audio.duration) || audio.duration <= 0) throw new Error("음원은 3분 이하의 오디오를 사용해 주세요.");
+        return audio;
+      };
+      if (project.audio) {
+        audioSource = audioContext.createBufferSource();
+        audioSource.buffer = await decode(project.audio.src);
+        audioSource.loop = true;
+        audioGain = audioContext.createGain();
+        audioGain.gain.value = 0;
+        audioSource.connect(audioGain);
+        audioGain.connect(destination);
+      }
+      if (project.voiceover) {
+        voiceSource = audioContext.createBufferSource();
+        voiceSource.buffer = await decode(project.voiceover.src);
+        if (Math.abs(voiceSource.buffer.duration - project.voiceover.durationSec) > 0.1) throw new Error("내레이션 길이 정보가 일치하지 않아요. 음원을 다시 추가해 주세요.");
+        voiceGain = audioContext.createGain();
+        voiceGain.gain.value = 0;
+        voiceSource.connect(voiceGain);
+        voiceGain.connect(destination);
+      }
       for (const track of destination.stream.getAudioTracks()) stream.addTrack(track);
     }
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: shortSide === 1080 ? 10_000_000 : 5_000_000 });
     const activeRecorder = recorder;
     const total = promoFrameCount(project);
-    return await new Promise<Blob>((resolve, reject) => {
+    const recorded = await new Promise<Blob>((resolve, reject) => {
       const chunks: Blob[] = [];
       let raf = 0;
       let finishTimer: ReturnType<typeof setTimeout> | undefined;
@@ -97,7 +117,9 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       let settled = false;
       let finished = false;
       let failure: Error | null = null;
-      const started = performance.now();
+      let started = 0;
+      let lastFrame = -1;
+      let lastProgressAt = Number.NEGATIVE_INFINITY;
       const cleanup = () => {
         cancelAnimationFrame(raf);
         clearTimeout(watchdog);
@@ -143,10 +165,17 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       const tick = () => {
         if (finished) return;
         try {
-          const frame = Math.floor((performance.now() - started) * PROMO_FPS / 1000);
-          drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
-          if (audioGain && audioContext) audioGain.gain.setValueAtTime(promoAudioGain(Math.min(total - 1, frame), total, project.audio?.volume ?? 0), audioContext.currentTime);
-          onProgress(Math.min(0.99, frame / total));
+          const now = performance.now();
+          const frame = Math.floor((now - started) * PROMO_FPS / 1000);
+          if (frame !== lastFrame) {
+            drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
+            lastFrame = frame;
+          }
+          // Rendering every frame must not rerender the entire React editor at 30Hz.
+          if (now - lastProgressAt >= 200 || frame >= total) {
+            lastProgressAt = now;
+            onProgress(Math.min(0.99, frame / total));
+          }
           if (frame >= total) {
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
@@ -180,19 +209,36 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       activeRecorder.onstop = settle;
       activeRecorder.onerror = () => finish(new Error("브라우저 영상 인코딩에 실패했어요."));
       try {
+        const audioStart = audioContext?.currentTime ?? 0;
+        schedulePromoRecordingGains(project, audioGain?.gain ?? null, voiceGain?.gain ?? null, audioStart);
+        started = performance.now();
         activeRecorder.start(250);
-        audioSource?.start();
+        if (audioSource) { audioSource.start(audioStart); audioSource.stop(audioStart + project.seconds); }
+        if (voiceSource && project.voiceover && project.voiceover.startSec < project.seconds) {
+          voiceSource.start(audioStart + project.voiceover.startSec);
+          voiceSource.stop(audioStart + project.seconds);
+        }
         if (signal.aborted || document.hidden) { abort(); return; }
         tick();
       } catch { finish(new Error("영상 녹화를 시작하지 못했어요.")); }
     });
+    // MediaRecorder emits a streaming WebM: add duration, seek head and keyframe cues
+    // without transcoding either track so downloaded files can be scrubbed reliably.
+    const output = recorded.type.includes("webm")
+      ? await finalizeStudioAnimaticRecordedWebm(recorded, project.seconds * 1000)
+      : recorded;
+    if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
+    return output;
   } finally {
     try { if (recorder && recorder.state !== "inactive") recorder.stop(); }
     catch { /* Still release the underlying media tracks when the encoder cannot stop. */ }
     stream?.getTracks().forEach((track) => track.stop());
     if (audioSource) { try { audioSource.stop(); } catch { /* A cancelled setup may not have started it. */ } audioSource.disconnect(); }
+    if (voiceSource) { try { voiceSource.stop(); } catch { /* Not started or already ended. */ } voiceSource.disconnect(); }
+    voiceGain?.disconnect();
     audioGain?.disconnect();
     if (audioContext && audioContext.state !== "closed") await audioContext.close();
+    releasePromoTextCache(ctx);
     canvas.width = 0;
     canvas.height = 0;
   }

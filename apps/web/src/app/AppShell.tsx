@@ -9,19 +9,23 @@ import { AuthSessionProvider } from "@/domains/auth/components/session-provider"
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
-import { PublicSiteWayfinder } from "@/shared/components/public-site-wayfinder";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
-import { SiteNextSteps } from "@/shared/components/site-experience/SiteNextSteps";
-import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-model";
+import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { pingVisit } from "@/shared/lib/visits-api";
 
 import "@toonspectrum/core/fx/fx.css";
 
+const PublicSiteWayfinder = lazy(() =>
+  import("@/shared/components/public-site-wayfinder").then((mod) => ({ default: mod.PublicSiteWayfinder })),
+);
+const SiteNextSteps = lazy(() =>
+  import("@/shared/components/site-experience/SiteNextSteps").then((mod) => ({ default: mod.SiteNextSteps })),
+);
 const PublicSiteNextSteps = lazy(() =>
   import("@/shared/components/public-site-next-steps").then((mod) => ({
-    default: mod.PublicSiteNextSteps,
+    default: mod.PublicSiteAtelierJourney,
   })),
 );
 const AgeGateHost = lazy(() =>
@@ -118,13 +122,17 @@ export function AppShell({
           <AppRouter />
           {publicCreativeRoute && pathname !== "/" ? (
             <ErrorBoundary resetKey={pathname}>
-              <Suspense fallback={<PublicSiteWayfinder />}>
+              <Suspense fallback={<Suspense fallback={null}><PublicSiteWayfinder /></Suspense>}>
                 <PublicSiteNextSteps pathname={pathname} />
               </Suspense>
             </ErrorBoundary>
           ) : null}
         </main>
-        {enhancedSite && !publicCreativeRoute ? <SiteNextSteps /> : null}
+        {enhancedSite && !publicCreativeRoute ? (
+          <ErrorBoundary resetKey={pathname}>
+            <Suspense fallback={null}><SiteNextSteps /></Suspense>
+          </ErrorBoundary>
+        ) : null}
         {footer}
         {showCommandPalette ? <CommandPaletteHost /> : null}
         {showGlobalOverlays ? <DeferredGlobalOverlays /> : null}

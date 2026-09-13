@@ -1,4 +1,3 @@
-import { Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 import { createStudioRecoveryNewDrawingHref } from "./studio-recovery-notice-model";
@@ -22,7 +21,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState<"restore" | "delete" | "backup" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [newDrawingHref, setNewDrawingHref] = useState(createStudioRecoveryNewDrawingHref);
+  const [newDrawingHref] = useState(createStudioRecoveryNewDrawingHref);
   const busyRef = useRef(false);
   const safeActionRef = useRef<HTMLButtonElement>(null);
 
@@ -74,7 +73,6 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
             onClick={() => void run(blockedReason ? "backup" : "restore")}
             className={cn(actionClass, "bg-accent text-on-accent hover:bg-accent-hover")}
           >
-            {busy === "restore" ? <Loader2 size={15} className="animate-spin motion-reduce:animate-none" aria-hidden /> : blockedReason ? <Download size={15} aria-hidden /> : <RotateCcw size={15} aria-hidden />}
             {busy === "restore" ? "그림 여는 중…" : blockedReason ? "백업 파일 받기" : "이어서 그리기"}
           </button>
           <a
@@ -86,9 +84,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
             onClick={(event) => {
               if (busyRef.current) { event.preventDefault(); return; }
               // Native navigation avoids popup APIs and preserves this tab and its recovery.
-              const href = createStudioRecoveryNewDrawingHref();
-              event.currentTarget.href = href;
-              setNewDrawingHref(href);
+              event.currentTarget.href = createStudioRecoveryNewDrawingHref();
             }}
             className={cn(actionClass, "border border-line bg-card text-fg-2 hover:bg-raised", busy && "pointer-events-none opacity-50")}
           >
@@ -117,11 +113,11 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
           <div className="mt-2 flex flex-wrap gap-2">
             {!blockedReason && (
               <button type="button" disabled={busy !== null} onClick={() => void run("backup")} className={cn(actionClass, "border border-line hover:bg-raised")}>
-                <Download size={14} aria-hidden /> 백업 파일 받기
+                백업 파일 받기
               </button>
             )}
             <button type="button" disabled={busy !== null} onClick={() => void run("delete")} className={cn(actionClass, "text-bad hover:bg-bad/10")}>
-              <Trash2 size={14} aria-hidden /> {busy === "delete" ? "삭제 확인 중…" : "이전 그림 삭제…"}
+              {busy === "delete" ? "삭제 확인 중…" : "이전 그림 삭제…"}
             </button>
           </div>
           <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업에는 이전 그림이 담겨요. 삭제는 현재 캔버스가 아닌 이전 그림에 적용되며, 확인 후 되돌릴 수 없어요.</p>

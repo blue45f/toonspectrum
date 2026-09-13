@@ -136,7 +136,7 @@ function createProps(
 }
 
 describe("StudioCanvasStatusRail", () => {
-  it("offers a backup instead of an unsafe autosave restore", () => {
+  it("offers a backup instead of an unsafe autosave restore", async () => {
     const props = createProps({
       hasAutosave: true,
       autosaveRestoreBlockedReason: "revision-mismatch",
@@ -144,7 +144,7 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByText(/저장된 작품과 내용이 달라/)).toBeTruthy();
+    expect(await screen.findByText(/저장된 작품과 내용이 달라/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "이어서 그리기" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "백업 파일 받기" }));
     fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
@@ -185,7 +185,7 @@ describe("StudioCanvasStatusRail", () => {
     expect(document.querySelector("[data-studio-autosave-live-jam='true']")).toBeTruthy();
   });
 
-  it("keeps the recovery banner for the leading tab", () => {
+  it("keeps the recovery banner for the leading tab", async () => {
     const props = createProps({
       hasAutosave: true,
       autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
@@ -193,7 +193,7 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByRole("button", { name: "이어서 그리기" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "이어서 그리기" })).toBeTruthy();
     expect(screen.queryByText(/다른 탭에서 편집 중/u)).toBeNull();
   });
 
@@ -210,7 +210,7 @@ describe("StudioCanvasStatusRail", () => {
     });
 
     render(<StudioCanvasStatusRail {...props} />);
-    const restore = screen.getByRole("button", { name: "이어서 그리기" });
+    const restore = await screen.findByRole("button", { name: "이어서 그리기" });
     fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
     fireEvent.click(screen.getByRole("button", { name: "이전 그림 삭제…" }));
 
@@ -223,11 +223,11 @@ describe("StudioCanvasStatusRail", () => {
     });
   });
 
-  it("restores a compatible autosave through the semantic callback", () => {
+  it("restores a compatible autosave through the semantic callback", async () => {
     const props = createProps({ hasAutosave: true });
 
     render(<StudioCanvasStatusRail {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "이어서 그리기" }));
+    fireEvent.click(await screen.findByRole("button", { name: "이어서 그리기" }));
 
     expect(props.onRestoreAutosave).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "백업 파일 받기" })).toBeNull();
@@ -671,5 +671,71 @@ describe("StudioCanvasStatusRail", () => {
         "[data-studio-reliability-overlay-anchor]"
       ) as HTMLElement | null)?.style.getPropertyValue("--studio-reliability-rail-bottom")
     ).toBe("calc(5.5rem + env(safe-area-inset-bottom))");
+  });
+});
+
+
+describe("shared selection command render paths", () => {
+  it.each([
+    ["선택 요소 맨 앞으로", "reorder", "front", null],
+    ["선택 요소 맨 뒤로", "reorder", "back", null],
+    ["선택 좌우 반전", "flip", "horizontal", "Shift+H"],
+    ["선택 상하 반전", "flip", "vertical", "Shift+V"],
+  ] as const)("dispatches %s once and retains the edit lock", (label, family, mode, shortcut) => {
+    const reorder = vi.fn();
+    const flip = vi.fn();
+    const props = createProps({
+      selectionCount: 2, onReorderSelection: reorder, onFlipSelection: flip,
+    });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    const button = screen.getByRole("button", { name: label });
+    if (shortcut) expect(button.getAttribute("aria-keyshortcuts")).toBe(shortcut);
+    fireEvent.click(button);
+    const selected = family === "reorder" ? reorder : flip;
+    const other = family === "reorder" ? flip : reorder;
+    expect(selected).toHaveBeenCalledExactlyOnceWith(mode);
+    expect(other).not.toHaveBeenCalled();
+    view.rerender(<StudioCanvasStatusRail {...props}
+      layoutSelectionDisabledReason="편집 잠금"
+      alignmentSelectionDisabledReason="편집 잠금"
+    />);
+    const locked = screen.getByRole("button", { name: label });
+    expect(locked.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(locked);
+    expect(selected).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("shared alignment group render path", () => {
+  it.each([
+    ["left", "선택 요소 왼쪽 정렬"],
+    ["hcenter", "선택 요소 가로 가운데 정렬"],
+    ["right", "선택 요소 오른쪽 정렬"],
+    ["top", "선택 요소 위쪽 정렬"],
+    ["vcenter", "선택 요소 세로 가운데 정렬"],
+    ["bottom", "선택 요소 아래쪽 정렬"],
+    ["distributeH", "선택 요소 가로 균등 분배"],
+    ["distributeV", "선택 요소 세로 균등 분배"],
+  ] as const)("preserves %s and its lock", (mode, label) => {
+    const props = createProps({ selectionCount: 3 });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(props.onAlignSelection).toHaveBeenCalledExactlyOnceWith(mode);
+    view.rerender(<StudioCanvasStatusRail {...props} alignmentSelectionDisabledReason="편집 잠금" />);
+    const locked = screen.getByRole("button", { name: label });
+    expect(locked.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(locked);
+    expect(props.onAlignSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps distribution unavailable below three independent elements", () => {
+    const props = createProps({ selectionCount: 2 });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    expect(screen.queryByRole("group", { name: "균등 분배" })).toBeNull();
+    view.rerender(<StudioCanvasStatusRail {...props} selectionCount={3} selectionGroupName="선택 그룹" />);
+    expect(screen.queryByRole("group", { name: "균등 분배" })).toBeNull();
+    expect(screen.getByRole("button", { name: "선택 그룹 왼쪽 정렬" })).toBeTruthy();
   });
 });
