@@ -2232,7 +2232,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     }),
     defineCommand({
       id: "file.checkpoints",
-      labels: [ko("버전 체크포인트", "이름 있는 복구 지점을 만들고 이전 시점과 비교·복원합니다."), en("Version checkpoints")],
+      labels: [ko("저장 기록", "이름 있는 복구 지점을 만들고 이전 시점과 비교·복원합니다."), en("Version checkpoints")],
       aliases: [csp("작품 이력"), ps("History Snapshot"), krita("Save Incremental Version"), ours("버전")],
       origins: [menu("file/checkpoints")],
     }),
