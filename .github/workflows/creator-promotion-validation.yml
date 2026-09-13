@@ -1,0 +1,94 @@
+name: Creator hub validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/core/src/promotion.ts'
+      - 'packages/core/src/collaboration*'
+      - 'apps/api/src/modules/collaboration/**'
+      - 'apps/api/src/db/schema/collaboration.schema.ts'
+      - 'apps/api/src/db/migrations/0047_creator_collaboration_board.sql'
+      - 'apps/web/src/domains/collaboration/**'
+      - 'apps/web/src/infrastructure/collaboration-client.ts'
+      - 'e2e/creator-hub.spec.ts'
+      - 'playwright.creator-hub.config.ts'
+      - 'apps/api/src/modules/promotion/**'
+      - 'apps/api/src/db/schema/promotion.schema.ts'
+      - 'apps/api/src/db/migrations/0046_creator_promotion_community.sql'
+      - 'apps/web/src/domains/promotion/**'
+      - 'apps/web/src/infrastructure/promotion-client.ts'
+      - 'scripts/verify-promotion-contract.mjs'
+      - '.github/workflows/creator-promotion-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: creator-promotion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  contract:
+    name: Promotion contract and integration guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            packages/core/src/promotion.ts
+            scripts/verify-promotion-contract.mjs
+            scripts/production-database-migrations.manifest
+            apps/web/src/app/routes/groups/community.routes.tsx
+            apps/api/src/db/migrations/0046_creator_promotion_community.sql
+            vercel.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Validate inputs, responses, routes and additive migration
+        run: node --experimental-strip-types --test scripts/verify-promotion-contract.mjs
+  types-and-components:
+    name: Creator hub types and regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: creator_hub_test
+          POSTGRES_PASSWORD: creator_hub_test
+          POSTGRES_DB: toonspectrum_creator_hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U creator_hub_test -d toonspectrum_creator_hub_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Web typecheck
+        run: pnpm exec tsc --noEmit --pretty false
+      - name: API typecheck
+        run: pnpm exec tsc -p apps/api/tsconfig.json --noEmit --pretty false
+      - name: Recruitment, privacy and video regressions
+        run: pnpm exec vitest run packages/core/src/collaboration.test.ts apps/api/src/modules/collaboration/collaboration.repository.test.ts apps/web/src/domains/promotion/PromotionVideo.test.tsx apps/web/src/domains/promotion/promotion-draft.test.ts apps/web/src/domains/promotion/PromotionEditorPage.test.tsx apps/api/src/session-middleware.test.ts apps/api/src/csrf-middleware.test.ts
+      - name: Real PostgreSQL migrations, privacy and concurrency
+        env:
+          NODE_ENV: test
+          CREATOR_HUB_POSTGRES_INTEGRATION: '1'
+          TEST_DATABASE_URL: postgresql://creator_hub_test:creator_hub_test@127.0.0.1:5432/toonspectrum_creator_hub_test
+        run: pnpm exec vitest run --no-file-parallelism apps/api/src/modules/collaboration/creator-hub.postgres.integration.test.ts
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Desktop and mobile checks with explicit API fixtures
+        run: pnpm exec playwright test --config playwright.creator-hub.config.ts

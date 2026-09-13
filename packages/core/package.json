@@ -38,6 +38,8 @@
       "import": "./src/carousel/index.ts",
       "default": "./src/carousel/index.ts"
     },
-    "./fortune": "./src/fortune/index.ts"
+    "./fortune": "./src/fortune/index.ts",
+    "./collaboration": "./src/collaboration.ts",
+    "./promotion": "./src/promotion.ts"
   }
 }
