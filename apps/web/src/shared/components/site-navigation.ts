@@ -235,6 +235,7 @@ export const SITE_NAVIGATION_ITEMS = {
     "작품을 깊게 읽고 기록하기",
     "Read and write thoughtful reviews",
   ),
+  collaborate: item("collaborate", "/collaborate", MessageCircle, "구인·의뢰", "Collaborate", "웹툰 팀원 모집·작업 의뢰·작업자 홍보", "Find teammates, commission work and share your skills"),
   community: item(
     "community",
     "/community",
@@ -335,7 +336,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "에셋을 찾고 결과를 세상과 연결",
       en: "Find assets and connect finished work to people",
     },
-    items: [I.market, I.gallery, I.opportunities, I.insights],
+    items: [I.market, I.gallery, I.collaborate, I.opportunities, I.insights],
   },
 ];
 
@@ -365,7 +366,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "작품과 생각을 사람들과",
       en: "Share stories and ideas with people",
     },
-    items: [I.gallery, I.reviews, I.community, I.play],
+    items: [I.gallery, I.reviews, I.community, I.collaborate, I.play],
   },
   {
     id: "personal",
