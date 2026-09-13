@@ -91,7 +91,8 @@ function numberArray(value: unknown, label: string): readonly number[] {
 
 function safeRelativePath(value: unknown, label: string): string {
   const path = text(value, label, 300).replaceAll("\\", "/");
-  if (path.startsWith("/") || /^[a-z]:\//iu.test(path)) {
+  if (path.startsWith("/") || /^[a-z]:\//iu.test(path) || /[<>:"|?*]/u.test(path)
+    || [...path].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) {
     throw new Error(`${label} must be relative`);
   }
   const parts = path.split("/");
@@ -140,6 +141,11 @@ export function parseStudioVrmBlenderCharacterPackage(
   );
   if (!files.vrm && !files.glb) {
     throw new Error("package.files must contain a VRM or GLB runtime asset");
+  }
+  for (const role of ["vrm", "glb"] as const) {
+    if (files[role] && !files[role].path.toLowerCase().endsWith(`.${role}`)) {
+      throw new Error(`package.files.${role}.path must end with .${role}`);
+    }
   }
   const provenance = Object.freeze(Object.fromEntries(
     Object.entries(record(source.provenance ?? {}, "package.provenance")).map(([key, entry]) => [
@@ -194,7 +200,8 @@ export function selectStudioVrmBlenderRuntimeAsset(
   packageValue: StudioVrmBlenderCharacterPackage,
   options: Readonly<{ requirePassed?: boolean; prefer?: "vrm" | "glb" }> = {},
 ): StudioVrmBlenderRuntimeAsset {
-  if (options.requirePassed !== false && !packageValue.quality.passed) {
+  if (options.requirePassed !== false && (!packageValue.quality.passed
+    || packageValue.quality.score < packageValue.quality.minimumScore)) {
     throw new Error(`character package ${packageValue.characterId} did not pass its quality gate`);
   }
   const order = options.prefer === "glb" ? (["glb", "vrm"] as const) : (["vrm", "glb"] as const);
