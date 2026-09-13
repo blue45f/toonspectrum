@@ -38,13 +38,17 @@ describe("production engine verifier entry", () => {
     expect(job).not.toContain("continue-on-error");
     expect(job).not.toContain("|| true");
   });
-  it("executes the regression in the mandatory CI static job", () => {
+  it("executes each engine regression exactly once in the mandatory CI static job", () => {
     const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
     const staticJob = workflow.split("  static:")[1]?.split("  serial:")[0] ?? "";
-    expect(staticJob).toContain("scripts/verify-studio-engine-editor-entry.test.ts");
-    expect(staticJob).toContain("scripts/verify-studio-hokusai-live-integration.test.ts");
-    expect(staticJob).toContain("scripts/verify-studio-living-ink-integration.test.ts");
-    expect(staticJob).toContain("scripts/verify-studio-hybrid-dcc-integration.test.ts");
+    for (const target of [
+      "scripts/verify-studio-engine-editor-entry.test.ts",
+      "scripts/verify-studio-hokusai-live-integration.test.ts",
+      "scripts/verify-studio-living-ink-integration.test.ts",
+      "scripts/verify-studio-hybrid-dcc-integration.test.ts",
+      "scripts/verify-studio-hybrid-dcc-opfs-race.test.ts",
+    ]) {
+      expect(staticJob.split(target), `${target} must remain mandatory without duplicate execution`).toHaveLength(2);
+    }
   });
-
 });
