@@ -144,3 +144,33 @@ export async function prepareStudioOfflineResources(
   return { schema: 1, buildId: options.buildId, checked: urls.length, cached,
     downloadedBytes, missing, complete: missing.length === 0 && cached === urls.length };
 }
+
+/** Re-check this build's complete core pack; a past receipt or HTML alone is insufficient.
+ * Cache-only, bounded concurrency/deadline, no database access or network probe.
+ */
+export async function hasPreparedStudioDrawingResources(
+  options: Pick<StudioOfflinePreparationOptions, "shellUrls" | "criticalUrls" | "warmUrls" | "drawingUrls" | "read">,
+  timeoutMs = 2_000,
+): Promise<boolean> {
+  if (!options.drawingUrls?.length) return false;
+  const queue = [...new Set([...options.shellUrls, ...options.criticalUrls, ...options.warmUrls, ...options.drawingUrls])];
+  if (queue.length > STUDIO_OFFLINE_MAX_RESOURCES) return false;
+  let valid = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const inspect = async (): Promise<void> => {
+    while (valid) {
+      const url = queue.shift();
+      if (url === undefined) return;
+      try {
+        const response = await options.read(url);
+        if (!response || !usable(url, response, options.shellUrls)) valid = false;
+      } catch { valid = false; }
+    }
+  };
+  try {
+    return await Promise.race([
+      Promise.all(Array.from({ length: 8 }, inspect)).then(() => valid),
+      new Promise<boolean>((resolve) => { timer = setTimeout(() => { valid = false; resolve(false); }, timeoutMs); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}

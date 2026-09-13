@@ -3,7 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { StudioAnimaticWorkspaceDocument } from "../animatic/studio-animatic-workspace";
 
+import type { StudioSaveIntentScope } from "../studio-durable-save-intent";
+
 export type StudioCuttoonEditorViewSessionRest = {
+  saveIntentScope?: StudioSaveIntentScope | null;
   animaticWorkspace: StudioAnimaticWorkspaceDocument | null;
   animaticPersistenceBusy: boolean;
   animaticPersistenceError: string | null;

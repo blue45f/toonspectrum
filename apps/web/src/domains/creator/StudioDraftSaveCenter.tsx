@@ -13,6 +13,8 @@ import {
   type StudioDraftSaveOutboxStorage,
 } from "./studio-draft-save-outbox";
 
+import { studioSaveAcknowledgementVersion, studioSaveIntentScopeKey } from "./studio-durable-save-intent";
+
 export type { StudioDraftSaveCenterProps } from "./StudioDraftSaveCenterImpl";
 
 function outboxStorage(): StudioDraftSaveOutboxStorage | null {
@@ -25,6 +27,7 @@ function outboxStorage(): StudioDraftSaveOutboxStorage | null {
 }
 
 function resolveOutboxWorkId(props: StudioDraftSaveCenterProps): string | null {
+  if (props.saveIntentScope) return studioSaveIntentScopeKey(props.saveIntentScope);
   for (const value of [props.workId, props.loadedWork?.id, props.sharedDocument?.workId]) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
@@ -74,9 +77,13 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
       });
     }
 
+    const acknowledgementBefore = props.saveIntentScope ? studioSaveAcknowledgementVersion(props.saveIntentScope) : null;
     const save = Promise.resolve()
       .then(() => saveDraft())
       .then((result) => {
+        if (props.saveIntentScope && studioSaveAcknowledgementVersion(props.saveIntentScope) === acknowledgementBefore) {
+          throw new Error("서버 저장 완료를 확인하지 못해 대기 기록을 유지합니다. 작품 정보·연결·권한을 확인해 주세요.");
+        }
         if (retainedReceipt !== null && workId !== null) {
           clearStudioDraftSaveOutbox({ storage: outboxStorage(), workId });
         }
@@ -96,7 +103,7 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
       });
     saveInFlightRef.current = save;
     return save;
-  }, [saveDraft, workId]);
+  }, [props.saveIntentScope, saveDraft, workId]);
 
   const effectiveCollaborationSyncPending = useMemo(() => (
     props.collaborationOperationSyncPending === true

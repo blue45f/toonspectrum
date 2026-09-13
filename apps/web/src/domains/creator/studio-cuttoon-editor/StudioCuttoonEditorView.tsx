@@ -132,7 +132,8 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       >
         <StudioCuttoonEditorChrome {...s} />
         <StudioDraftSaveCenter
-          key={s.effectiveWorkId ?? s.workId ?? "new-work"}
+          key={JSON.stringify([s.saveIntentScope, s.effectiveWorkId ?? s.workId ?? "new-work"])}
+          saveIntentScope={s.saveIntentScope}
           saving={s.saving}
           workId={s.workId}
           workHydrated={s.workHydrated}

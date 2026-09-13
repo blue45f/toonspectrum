@@ -2,7 +2,7 @@ import { collectStudioManifestClosure, type StudioViteManifest } from "./studio-
 
 // Explicit-click resources: NEVER install or automatic-warm downloads.
 export const DRAWING_ROOTS = ["StudioRouter", "StudioInspectorAside", "StudioToolHintBubble", "StudioColorVisionHintPreview", "studio-legacy-editor-adapter", "studio-pages-history-durable-runtime",
-  "studio-release-schedule", "studio-publication-analytics", "studio-autosave-sqlite-store", "studio-local-database-worker-client"];
+  "studio-durable-save-intent-sqlite", "studio-watermark-preferences-sqlite", "StudioEnhancedExportMenuPanel", "studio-export", "studio-capture-readiness", "studio-project-file", "studio-release-schedule", "studio-publication-analytics", "studio-autosave-sqlite-store", "studio-local-database-worker-client"];
 
 /** Build-authoritative closure: resource timing may drop entries after its buffer fills. */
 export function collectStudioOfflineDrawingUrls(manifest: StudioViteManifest, emittedFiles: readonly string[]): string[] {

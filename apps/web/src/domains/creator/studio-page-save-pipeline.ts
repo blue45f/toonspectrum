@@ -5,6 +5,7 @@ import {
   StudioApiPayloadSafetyError,
   assertStudioApiJsonPayloadSize,
 } from "./studio-api-payload-safety";
+import { acknowledgeStudioDurableSaveIntent, boundStudioSaveIntentOperation, studioDurableSaveIntentRepository, type StudioDurableSaveIntent } from "./studio-durable-save-intent";
 import { CANVAS_W } from "./studio-assets";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
@@ -388,7 +389,15 @@ export async function runStudioPageSavePipeline(
     typeof import("./studio-linked-3d-pass-cloud-project").ensureStudioLinked3dPassCloudProject
   >> = [];
   let linkedCloudSaveCommitted = false;
+  const durableIntentScope = { ownerId: saveAuthScopeKey, documentKey: autosaveKey };
+  let capturedDurableIntent: StudioDurableSaveIntent | null = null;
   try {
+    try {
+      capturedDurableIntent = await boundStudioSaveIntentOperation(studioDurableSaveIntentRepository.load(durableIntentScope));
+    } catch {
+      // A blocked/corrupt local receipt must not prevent a real server save or be erased.
+    }
+    if (!saveScopeStillCurrent()) return;
     if (collaborationOperationSyncRequired) {
       const authoritativeSaveBarrier = studioCrdtAuthoritativeSaveBarrierRef.current;
       if (!authoritativeSaveBarrier) {
@@ -778,6 +787,15 @@ export async function runStudioPageSavePipeline(
       return;
     }
 
+    // This is the exact acknowledged-save path: never metadata, permission failure, a stale
+    // snapshot, or recovered-existing without a matching payload. Preserve newer queued intents.
+    try {
+      await acknowledgeStudioDurableSaveIntent(durableIntentScope, capturedDurableIntent);
+    } catch {
+      setSharedDocumentNotice("서버 저장은 완료했지만 기기의 저장 대기 기록을 정리하지 못했습니다.");
+    }
+    if (!saveScopeStillCurrent()) return;
+    if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) return;
     clearAutosaveDurableAuthority();
     try {
       localStorage.removeItem(autosaveKey);

@@ -40,6 +40,8 @@ import {
   writeStudioDraftSaveOutbox,
   type StudioDraftSaveOutboxStorage,
 } from "./studio-draft-save-outbox";
+import { studioSaveIntentScopeKey, type StudioSaveIntentScope } from "./studio-durable-save-intent";
+import { useStudioDurableSaveIntent } from "./use-studio-durable-save-intent";
 import { STUDIO_SERVER_AUTOSAVE_IDLE_MS } from "./studio-page-editor-runtime-contracts";
 import { useStudioReliabilityStatus } from "./use-studio-reliability-status";
 
@@ -67,6 +69,7 @@ interface StudioDraftSaveLeadershipView {
 }
 
 export interface StudioDraftSaveCenterProps {
+  readonly saveIntentScope?: StudioSaveIntentScope | null;
   readonly saving: boolean;
   readonly workId?: string | null;
   readonly workHydrated?: boolean;
@@ -194,6 +197,7 @@ function SaveStatusCard({
 }
 
 export function StudioDraftSaveCenter({
+  saveIntentScope = null,
   saving,
   workId = null,
   workHydrated = true,
@@ -218,6 +222,9 @@ export function StudioDraftSaveCenter({
   onExportBackup,
 }: StudioDraftSaveCenterProps) {
   const reliability = useStudioReliabilityStatus();
+  const durableSaveIntent = useStudioDurableSaveIntent(saveIntentScope);
+  const rememberDurableIntent = durableSaveIntent.remember;
+  const cancelDurableIntent = durableSaveIntent.cancel;
   const [open, setOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(readOnlineStatus);
   const [deferredSave, setDeferredSave] = useState(false);
@@ -235,7 +242,8 @@ export function StudioDraftSaveCenter({
   });
   const dialogId = useId();
   const checkpointCount = safeCount(localCheckpointCount);
-  const outboxWorkId = stableWorkId([workId, loadedWork?.id, sharedDocument?.workId]);
+  const serverWorkId = stableWorkId([workId, loadedWork?.id, sharedDocument?.workId]);
+  const outboxWorkId = saveIntentScope ? studioSaveIntentScopeKey(saveIntentScope) : serverWorkId;
 
   const serverRevision = resolveStudioDraftServerRevision([
     serverCurrentRevision,
@@ -243,7 +251,7 @@ export function StudioDraftSaveCenter({
     loadedWork?.revision,
     ...serverRevisions.map((entry) => entry.revision),
   ]);
-  const hasServerDocument = Boolean(outboxWorkId);
+  const hasServerDocument = Boolean(serverWorkId);
   const explicitServerSaveAt = resolveStudioDraftServerSavedAt({
     sharedUpdatedAt: sharedDocument?.updatedAt,
     revisions: [{ createdAt: newestRevisionCreatedAt(serverRevisions) }],
@@ -261,6 +269,7 @@ export function StudioDraftSaveCenter({
     metadataRequired: pendingSaveIntent === "draft",
     saving,
     deferredSave,
+    durableSaveIntentPending: durableSaveIntent.entry !== null,
     collaborationLocked: collaborationDocumentLocked,
     collaborationSyncPending: collaborationOperationSyncPending,
     localRole: autosaveDocumentLeadership?.role ?? null,
@@ -282,6 +291,7 @@ export function StudioDraftSaveCenter({
     collaborationDocumentLocked,
     collaborationOperationSyncPending,
     deferredSave,
+    durableSaveIntent.entry,
     hasServerDocument,
     isOnline,
     lastServerSaveAt,
@@ -303,6 +313,7 @@ export function StudioDraftSaveCenter({
   const promoteBackup = model.shouldPromoteBackup && backupAvailable;
 
   const queueDeferredSave = useCallback(() => {
+    void rememberDurableIntent(serverRevision);
     const queuedAt = Date.now();
     let durable = false;
     if (outboxWorkId) {
@@ -323,7 +334,7 @@ export function StudioDraftSaveCenter({
     setOutboxWarning(durable
       ? null
       : "저장 예약을 새로고침 복구 영역에 기록하지 못했습니다. 이 탭을 유지하고 연결 후 다시 저장해 주세요.");
-  }, [hasServerDocument, outboxWorkId, serverRevision]);
+  }, [hasServerDocument, outboxWorkId, rememberDurableIntent, serverRevision]);
 
   const clearDeferredSave = useCallback((surfaceFailure = false): boolean => {
     const cleared = outboxWorkId === null
@@ -365,6 +376,7 @@ export function StudioDraftSaveCenter({
       setOpen(true);
       return;
     }
+    void rememberDurableIntent(serverRevision);
     const restoreDeferredOnFailure = deferredSave;
     clearDeferredSave(false);
     void invokeSave(restoreDeferredOnFailure).then((success) => {
@@ -377,6 +389,8 @@ export function StudioDraftSaveCenter({
     invokeSave,
     isOnline,
     queueDeferredSave,
+    rememberDurableIntent,
+    serverRevision,
     saving,
     workHydrated,
     workHydrationFailed,
@@ -412,8 +426,9 @@ export function StudioDraftSaveCenter({
 
   const cancelDeferredSave = useCallback(() => {
     if (!clearDeferredSave(true)) return;
+    void cancelDurableIntent();
     setOpen(true);
-  }, [clearDeferredSave]);
+  }, [cancelDurableIntent, clearDeferredSave]);
 
   useEffect(() => {
     if (!outboxWorkId) return;
@@ -671,6 +686,24 @@ export function StudioDraftSaveCenter({
             </div>
           ) : null}
 
+          {durableSaveIntent.enabled && (durableSaveIntent.entry || durableSaveIntent.phase === "writing" || durableSaveIntent.error) ? (
+            <section aria-label="재실행 후 저장 대기" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/20 p-3 text-xs text-warning">
+              <p role="status" className="font-bold">
+                {durableSaveIntent.phase === "writing" ? "기기에 저장 대기 기록 중" : durableSaveIntent.entry ? "다시 켜도 저장 대기를 기억해요" : "저장 대기 기록 확인 필요"}
+              </p>
+              <p className="mt-1 leading-relaxed">
+                원고 내용과 별개로 이 계정·문서의 저장 대기만 기기에 기록합니다. 재실행 후에는 복구할 원고를 확인하고 직접 서버에 저장해 주세요. 자동으로 덮어쓰지 않습니다.
+              </p>
+              {durableSaveIntent.error ? <p role="status" className="mt-2 font-semibold">{durableSaveIntent.error} 프로젝트 백업도 보관해 주세요.</p> : null}
+              {!deferredSave ? (
+                <button type="button" onClick={() => void cancelDurableIntent()} disabled={saving}
+                  className="mt-2 min-h-9 rounded-lg border border-current/30 px-2.5 py-1.5 font-bold hover:bg-warning-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
+                  대기 기록 지우기
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
           {outboxWarning ? (
             <p role="status" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/25 p-2.5 text-xs font-semibold leading-relaxed text-warning">
               {outboxWarning}
@@ -733,7 +766,7 @@ export function StudioDraftSaveCenter({
           </div>
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            오프라인 저장 예약은 현재 문서의 이 탭에서만 실행되며 새로고침 후에도 복구됩니다. 탭을 닫아 예약이 사라져도 원고 내용은 기존 기기 복구 저장소에 남습니다. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
+            같은 탭의 저장 예약과 재실행 후 확인할 기기 기록은 구분됩니다. 저장 대기 기록은 원고 저장 완료를 뜻하지 않습니다. 원고 복구·기기 저장 상태를 확인하고 프로젝트 백업을 보관해 주세요. 충돌 시 원본을 자동으로 덮어쓰지 않습니다.
           </p>
         </div>
       ) : null}
