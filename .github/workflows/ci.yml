@@ -183,6 +183,9 @@ jobs:
             apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts \
             apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts \
             apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints.test.ts \
+            apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
             apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
             apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
             apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
