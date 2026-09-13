@@ -2,7 +2,7 @@ name: Studio collaboration document sync
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
@@ -16,6 +16,7 @@ on:
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
 
   push:
+    branches: ["main"]
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"

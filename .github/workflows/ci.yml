@@ -35,7 +35,9 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
+      - name: Verify deduplicated PR workflow policy
+        run: python3 scripts/verify-pr-workflow-fanout.py
 
   static:
     needs: preflight
@@ -52,6 +54,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Strict lint
+        run: pnpm run lint:strict
+      - name: Typecheck application, API and realtime worker
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm run typecheck:cloudflare-realtime
       - name: P2P browser verification cache regression
         run: node --test scripts/verify-studio-p2p-huddle.test.mjs
       - name: P2P merge source-reader and recovery regressions
@@ -133,13 +142,6 @@ jobs:
           pnpm run verify:toolchain-coverage
       - name: Production menu verifier entry execution
         run: node --test scripts/verify-studio-menus-ci.test.mjs
-      - name: Strict lint
-        run: pnpm run lint:strict
-      - name: Typecheck application, API and realtime worker
-        run: |
-          set -euo pipefail
-          pnpm run typecheck
-          pnpm run typecheck:cloudflare-realtime
       - name: API CPU budget regressions
         run: |
           set -euo pipefail
@@ -194,6 +196,7 @@ jobs:
           set -euo pipefail
           pnpm exec vitest run \
             apps/web/src/infrastructure/creator-work-read-options.test.ts \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
             apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts \
             apps/web/src/domains/creator/studio-shared-document-client.test.ts \
             apps/web/src/domains/creator/studio-release-schedule-loader.test.ts \

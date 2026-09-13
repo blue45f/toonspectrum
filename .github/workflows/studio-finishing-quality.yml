@@ -2,7 +2,7 @@ name: Studio finishing quality regression
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'vitest.setup.ts'
@@ -27,6 +27,7 @@ on:
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'vitest.setup.ts'
       - 'scripts/check-studio-bundle.mjs'
