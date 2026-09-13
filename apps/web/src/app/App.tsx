@@ -14,6 +14,7 @@ import { installStudioDocumentNavigationBridge } from "./studio-document-navigat
 import { FloatingControls } from "@/shared/components/FloatingControls";
 import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
+import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/browser-preferences";
 import { useUi } from "@/shared/lib/ui-store";
 
 const BackToTop = lazy(() =>
@@ -229,13 +230,13 @@ function AppRuntime() {
   useEffect(() => {
     const result = checkBrowserCompatibility();
     setCompatResult(result);
-    const dismissed = sessionStorage.getItem("toonspectrum-compat-dismissed");
+    const dismissed = readBrowserPreference(() => globalThis.sessionStorage, "toonspectrum-compat-dismissed");
     if (result.recommendUpdate && !dismissed) setShowCompatModal(true);
   }, []);
 
   const handleCloseCompatModal = () => {
     setShowCompatModal(false);
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    writeBrowserPreference(() => globalThis.sessionStorage, "toonspectrum-compat-dismissed", "true");
   };
 
   return (
