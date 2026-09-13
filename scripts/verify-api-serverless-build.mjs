@@ -234,6 +234,14 @@ function probeOgArtifact() {
   run().catch((error) => { console.error(error); process.exit(1); });
 }
 
+/** Keep fixture-process diagnostics in the CI log instead of only an ephemeral /tmp file. */
+export function assertArtifactProbeSucceeded(child, name, logPath) {
+  const diagnostics = [child.error?.message, child.signal, child.stdout, child.stderr]
+    .filter(Boolean).join("\n").slice(-16_000);
+  assert.equal(child.status, 0,
+    `Lambda ${name} bootstrap failed; see ${logPath}\n${diagnostics}`);
+}
+
 /** Run after API and web builds; never pulls Vercel environment secrets. */
 export async function verifyApiServerlessBuild() {
   const require = createRequire(resolve(ROOT, "package.json"));
@@ -313,7 +321,7 @@ export async function verifyApiServerlessBuild() {
         },
       });
       await writeFile(resolve(output, `${prefix}bootstrap.log`), child.stdout + child.stderr);
-      assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
+      assertArtifactProbeSucceeded(child, name, resolve(output, `${prefix}bootstrap.log`));
     }
   }
   console.log(`Vercel HTTP/native/OG packaging, isolated API reads, partition/CSRF and fail-closed gateway probes passed: ${output}`);
