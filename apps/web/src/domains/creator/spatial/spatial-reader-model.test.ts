@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SPATIAL_READER_DEFAULTS, SPATIAL_READER_STORAGE_KEY,
   isSpatialReaderImageSource, loadSpatialReaderPreferences, moveSpatialReaderCursor,
-  normalizeSpatialReaderSettings, resolveSpatialReaderCursor, saveSpatialReaderPreferences,
+  normalizeSpatialReaderSettings, resolveSpatialReaderCursor, resolveSpatialReaderImageSource, saveSpatialReaderPreferences,
   spatialReaderCrops, spatialReaderKeyCommand, spatialReaderStickStep,
   spatialReaderTextureSize, validateSpatialReaderFiles,
 } from "./spatial-reader-model";
@@ -100,5 +100,28 @@ describe("spatial reading contracts", () => {
     expect(spatialReaderStickStep(0, true)).toEqual({ command: null, latched: false });
     expect(spatialReaderStickStep(-1, false)).toEqual({ command: "previous", latched: true });
     expect(spatialReaderStickStep(NaN, true)).toEqual({ command: null, latched: false });
+  });
+});
+
+describe("spatial image URL boundary", () => {
+  const base = "https://toonstudio.cloud/work/chapter/";
+  it("returns a canonical URL while preserving signed query parameters", () => {
+    expect(resolveSpatialReaderImageSource("../page one.png?sig=a%2Fb&part=1", base))
+      .toBe("https://toonstudio.cloud/work/page%20one.png?sig=a%2Fb&part=1");
+  });
+  it.each([undefined, "", "javascript:alert(1)", "java\tscript:alert(1)",
+    "data:text/html;base64,PHN2Zz4=", "data:image/svg+xml;base64,PHN2Zz4=",
+    "file:///tmp/page.png", "https://user:password@cdn.example/page.png",
+    "http://cdn.example/page.png", "blob:https://other.test/id", "https://[invalid",
+  ])("returns no renderable URL for rejected input %j", (source) => {
+    expect(resolveSpatialReaderImageSource(source, base)).toBeNull();
+  });
+  it.each(["https://cdn.example/page.png", "data:image/png;base64,aGVsbG8=", "blob:https://toonstudio.cloud/local-id"])
+    ("preserves an allowed image source %s", (source) => {
+      expect(resolveSpatialReaderImageSource(source, base)).toBe(source);
+    });
+  it("supports same-origin development HTTP without opening mixed-origin HTTP", () => {
+    expect(resolveSpatialReaderImageSource("/page.png", "http://localhost:5173/reader")).toBe("http://localhost:5173/page.png");
+    expect(resolveSpatialReaderImageSource("http://localhost:5174/page.png", "http://localhost:5173/reader")).toBeNull();
   });
 });

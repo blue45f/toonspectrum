@@ -35,7 +35,7 @@ function preview({ hidden = false, hasAudio = true, playing = true } = {}) {
     removeEventListener: (type, listener) => { assert.equal(type, "visibilitychange"); listeners.delete(listener); },
   };
   const react = {
-    useRef: () => refs[refIndex++],
+    useRef: (initial) => refs[refIndex++] ?? { current: initial },
     useState: () => {
       const index = stateIndex++;
       return [values[index], (next) => { values[index] = typeof next === "function" ? next(values[index]) : next; }];
@@ -51,8 +51,9 @@ function preview({ hidden = false, hasAudio = true, playing = true } = {}) {
   const dependencies = {
     react,
     "react/jsx-runtime": { jsx, jsxs: jsx },
+    "./promo-audio": { preparePromoVoicePreview: async () => null },
     "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
-    "./promo-model": { PROMO_FPS: 30, promoAudioGain: () => 0.25, promoFrameCount: () => 450, promoSize: () => ({ width: 480, height: 854 }) },
+    "./promo-model": { PROMO_FPS: 30, promoMusicGain: () => 0.25, promoTimeline: () => [], promoFrameCount: () => 450, promoSize: () => ({ width: 480, height: 854 }) },
   };
   runInNewContext(outputText, {
     exports, document, AbortController, encodeURIComponent,

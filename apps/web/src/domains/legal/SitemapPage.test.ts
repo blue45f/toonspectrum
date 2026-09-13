@@ -26,6 +26,13 @@ const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
   "/studio/brush-lab",
 ]);
 
+// Legacy URLs render the same public pages; the directory must link to canonical URLs.
+const LEGACY_PUBLIC_ALIASES = new Map([
+  ["/create", "/showcase"],
+  ["/create/challenges", "/showcase/challenges"],
+  ["/create/promo", "/showcase/promo"],
+]);
+
 const NESTED_USER_FACING_DESTINATIONS = [
   "/learn",
   "/learn/glossary",
@@ -86,12 +93,24 @@ describe("site directory experience contracts", () => {
 
   it("keeps every standalone user-facing route reachable from the directory", () => {
     const expectedDestinations = new Set([
-      ...staticUserFacingRoutes(),
+      ...staticUserFacingRoutes().map((href) => LEGACY_PUBLIC_ALIASES.get(href) ?? href),
       ...NESTED_USER_FACING_DESTINATIONS,
     ]);
 
     for (const href of expectedDestinations) {
       expect(directorySource, `missing public directory destination: ${href}`).toContain(`"${href}"`);
+    }
+  });
+
+  it("keeps canonical directory links equivalent to their compatible legacy pages", () => {
+    const routes = readFileSync("apps/web/src/app/routes/groups/creator.routes.tsx", "utf8");
+    const pageByPath = new Map([...routes.matchAll(/path: "([^"]+)", element: <(\w+) \/>/gu)]
+      .map((match) => [match[1], match[2]]));
+    for (const [legacy, canonical] of LEGACY_PUBLIC_ALIASES) {
+      expect(pageByPath.get(legacy)).toBeTruthy();
+      expect(pageByPath.get(legacy)).toBe(pageByPath.get(canonical));
+      expect(directorySource).toContain(`"${canonical}"`);
+      expect(extendedDestinationHrefs()).not.toContain(legacy);
     }
   });
 

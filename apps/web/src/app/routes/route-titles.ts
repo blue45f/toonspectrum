@@ -4,8 +4,8 @@ import "./reference-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
-import { safeDecodeRouteText } from "@/shared/lib/safe-route-text";
 import { useT } from "@/shared/lib/i18n";
+import { decodePathSegment } from "@/shared/lib/decode-path-segment";
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
 
@@ -72,9 +72,9 @@ export function useRouteTitle(pathname: string, search: string) {
       const titleKey = STATIC_TITLES[pathname];
       title = titleKey ? t(titleKey) : "";
     } else if (pathname.startsWith("/author/")) {
-      title = safeDecodeRouteText(pathname.slice(8));
+      title = decodePathSegment(pathname.slice(8));
     } else if (pathname.startsWith("/pencafe/")) {
-      title = `${safeDecodeRouteText(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
+      title = `${decodePathSegment(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
     } else if (pathname.startsWith("/community/")) {
       title = t("route.community");
     } else if (pathname.startsWith("/market/resource/")) {

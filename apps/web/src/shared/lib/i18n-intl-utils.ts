@@ -109,6 +109,21 @@ export function detectBrowserLocale(): string {
 }
 
 /**
+ * Korean-first public shell: prefer the static/SSR `html lang` (apps/web/index.html uses `ko`)
+ * over navigator.language so an English capture browser does not flip the document to en-us on
+ * hydration. Explicit user choices still win through persisted zustand state.
+ */
+export function detectDocumentPreferredLocale(): string {
+  if (typeof document !== "undefined") {
+    const documentLang = document.documentElement?.lang;
+    if (documentLang && documentLang.trim()) {
+      return resolveSelectableLocale(documentLang);
+    }
+  }
+  return FALLBACK_LANG;
+}
+
+/**
  * Maps a browser/persisted locale to a value that the application's language
  * controls can actually select. Browsers commonly report region variants such
  * as `ko-KR` even when the published locale catalog intentionally exposes the

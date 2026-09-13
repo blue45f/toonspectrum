@@ -1,19 +1,23 @@
 import { expect, test } from "@playwright/test";
 
+import { capturePageEvidence } from "./helpers/capture-page-evidence";
+
 // Exercise the actual application route; do not replace the component under test.
 for (const width of [320, 390, 820, 1440]) {
   test(`flagship route layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
+    // Separate behavior coverage below still exercises running and user-paused motion.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const media: string[] = [];
     const pageErrors: string[] = [];
     page.on("request", (request) => { if (/\/brand\/.*\.mp4(?:\?|$)/u.test(request.url())) media.push(request.url()); });
     page.on("pageerror", (error) => pageErrors.push(error.message));
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="v4"]');
     await expect(home).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    const comparison = home.getByRole("slider");
+    const comparison = home.getByRole("slider", { name: "일러스트의 명암과 컬러 비교" });
     // Read native layout dimensions; offscreen CDP quads round a 44px box to 43.999px.
     const comparisonBounds = await comparison.evaluate((element) => ({ width: element.clientWidth, height: element.clientHeight }));
     expect(comparisonBounds.height).toBeGreaterThanOrEqual(44);
@@ -31,10 +35,10 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page.locator("#creator-offline-title")).toBeFocused();
     expect(media).toHaveLength(0);
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: testInfo.outputPath(`flagship-${width}.png`), fullPage: true });
+    await capturePageEvidence(page, testInfo, `flagship-${width}`);
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`flagship-dark-${width}.png`), fullPage: true });
+    await capturePageEvidence(page, testInfo, `flagship-dark-${width}`);
     expect(pageErrors).toEqual([]);
   });
 }
@@ -57,7 +61,6 @@ test("professional webtoon entry leads with simple mode and projects available",
   await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
   await expect(page.locator('.creator-flagship form')).toHaveCount(1);
 });
-
 
 test("artwork values can be compared by keyboard and reduced motion stops the artwork", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
