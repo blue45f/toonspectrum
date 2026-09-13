@@ -698,7 +698,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       context = await chromium.launchPersistentContext(profile, {
         ...contextOptions, headless: true, args: ["--no-sandbox"], offline: true,
       });
-      page = await context.newPage();
+      log(`RESTART PAGES: ${JSON.stringify(context.pages().map((tab) => tab.url()))}`);
+      page = context.pages()[0] ?? await context.newPage();
+      for (const other of context.pages()) { if (other !== page) await other.close(); }
       collectBrowserErrors(page, studioUrl, browserErrors);
       // Reuse only persisted browser storage, not storageState or injected artwork.
       await page.goto(reopenUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -722,7 +724,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
     const recoveryMessage = page.locator("[data-studio-recovery-notice]");
-    await recoveryMessage.waitFor({ state: "visible", timeout: 8_000 });
+    await recoveryMessage.waitFor({ state: "visible", timeout: profile ? 30_000 : 8_000 });
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
     invariant(
@@ -844,6 +846,22 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     return result;
   } catch (error) {
     // Preserve diagnostics without changing the gate's failure result.
+    const liveDiagnostics = await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-editor]");
+      if (!root) return null;
+      const key = Object.keys(root).find((name) => name.startsWith("__reactFiber"));
+      let fiber = key ? (root as unknown as Record<string, unknown>)[key] as { return?: unknown; memoizedProps?: { value?: { sync?: unknown; syncSnapshot?: unknown; error?: unknown; availability?: unknown } } } : null;
+      const observations = [];
+      for (let i = 0; fiber && i < 100; i++) {
+        const value = fiber.memoizedProps?.value;
+        if (value && value.availability !== undefined) observations.push({ error: value.error, availability: value.availability, sync: value.sync ?? value.syncSnapshot });
+        fiber = fiber.return as typeof fiber;
+      }
+      return observations;
+    }).catch(() => null);
+    writeFileSync(join(SCRATCH, "studio-lifecycle-live-diagnostic.json"), JSON.stringify(liveDiagnostics, null, 2));
+    const riskDetails = page.getByRole("button", { name: /저장 보호 필요/u });
+    if (await riskDetails.count() === 1) await riskDetails.click({ timeout: 1000 }).catch(() => undefined);
     await page.screenshot({ path: join(SCRATCH, "studio-lifecycle-failure.png"), timeout: 5_000 }).catch(() => undefined);
     await page.locator("body").innerText({ timeout: 5_000 }).then((text) =>
       writeFileSync(join(SCRATCH, "studio-lifecycle-failure.txt"), text), () => undefined);
