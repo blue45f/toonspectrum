@@ -19,6 +19,7 @@ export function shouldAppRouterOwnDocumentTitle({
   if (pathname.startsWith("/u/")) return false;
   if (pathname.startsWith("/community/cafes/")) return false;
   if (pathname.startsWith("/community/post/")) return false;
+  if (pathname === "/community/promote" || pathname.startsWith("/community/promote/")) return false;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
   if (pathname === "/studio/manual" || pathname.startsWith("/studio/manual/")) return false;
   if (pathname === "/studio" || pathname.startsWith("/studio/")) {

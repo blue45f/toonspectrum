@@ -1,0 +1,66 @@
+name: Creator promotion validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/core/src/promotion.ts'
+      - 'apps/api/src/modules/promotion/**'
+      - 'apps/api/src/db/schema/promotion.schema.ts'
+      - 'apps/api/src/db/migrations/0046_creator_promotion_community.sql'
+      - 'apps/web/src/domains/promotion/**'
+      - 'apps/web/src/infrastructure/promotion-client.ts'
+      - 'scripts/verify-promotion-contract.mjs'
+      - '.github/workflows/creator-promotion-validation.yml'
+  push:
+    branches: [feat/creator-promotion-community-20260913]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: creator-promotion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  contract:
+    name: Promotion contract and integration guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            packages/core/src/promotion.ts
+            scripts/verify-promotion-contract.mjs
+            scripts/production-database-migrations.manifest
+            apps/web/src/app/routes/groups/community.routes.tsx
+            apps/api/src/db/migrations/0046_creator_promotion_community.sql
+            vercel.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Validate inputs, responses, routes and additive migration
+        run: node --experimental-strip-types --test scripts/verify-promotion-contract.mjs
+  types-and-components:
+    name: Promotion types and video interaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Web typecheck
+        run: pnpm exec tsc --noEmit --pretty false
+      - name: API typecheck
+        run: pnpm exec tsc -p apps/api/tsconfig.json --noEmit --pretty false
+      - name: Video interaction regressions
+        run: pnpm exec vitest run apps/web/src/domains/promotion/PromotionVideo.test.tsx
