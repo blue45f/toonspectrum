@@ -1,6 +1,6 @@
-import { readStudioProjectDocuments } from "./studio-project-document-store";
+import { readStudioProjectDocuments } from "./studio-project-document-reader";
 
-import type { StudioProjectDocumentStorage } from "./studio-project-document-store";
+import type { StudioProjectDocumentStorage } from "./studio-project-document-reader";
 import type { StudioWorkspaceRoute } from "./studio-workspace-route";
 
 /**

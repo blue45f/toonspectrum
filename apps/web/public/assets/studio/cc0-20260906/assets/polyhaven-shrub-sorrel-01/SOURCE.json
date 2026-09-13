@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1649376000,
+    "name": "Shrub Sorrel 01",
+    "type": 2,
+    "authors": {
+      "Rico Cilliers": "All"
+    },
+    "categories": [
+      "plants",
+      "flowers",
+      "nature",
+      "collection: smugglers_cove"
+    ],
+    "tags": [
+      "nature",
+      "sorrel",
+      "potplant",
+      "bush",
+      "shrub",
+      "leaf",
+      "leaves",
+      "green",
+      "small",
+      "forest",
+      "field",
+      "floral",
+      "flower"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 3319,
+    "texel_density": 168223.46231941675,
+    "dimensions": [
+      352.09934413433075,
+      146.4103851467371,
+      58.00368043128401
+    ],
+    "files_hash": "65530d7157644eab84ae2b32da08acd26efa07f6",
+    "description": "Free 8K model of small sorrel shrubs: clusters of round scalloped green leaves on thin stems, subtle edge wear and delicate pink five-petaled flowers.",
+    "category_id": "f85fb5e2-abfd-5de4-9860-c9c3d04f12df",
+    "category": "Nature/Plants/Shrubs & Bushes",
+    "collections": [
+      "smugglers_cove"
+    ],
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "plant"
+      ]
+    },
+    "img_version": "079989cc",
+    "download_count": 46408,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/shrub_sorrel_01.png?width=256&height=256&v=079989cc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/shrub_sorrel_01/shrub_sorrel_01_2k.gltf",
+      "bytes": 17428,
+      "sha256": "803e54269cd9cd787eef44a797b399e6d7c433e897013602dd3569bf45ceb164",
+      "sourceMd5": "ac909c509e20613f8f1fdab2db3b49e7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_diff_2k.jpg",
+      "bytes": 1208902,
+      "sha256": "956ea2f96f3d8a1156233b773293fdef8d255ff0e076e69ddb05ff66695e7d4c",
+      "sourceMd5": "8fd8dac54992e90fb4d6548cc24ac627"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/shrub_sorrel_01/shrub_sorrel_01.bin",
+      "bytes": 110936,
+      "sha256": "725f46bf6d330486bf22d4b897fa1d8ef01cdc77a72f1400a3939f86740b4e5d",
+      "sourceMd5": "5b6481fc43f4dc36ab4e80d79a19119f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_arm_2k.jpg",
+      "bytes": 613088,
+      "sha256": "376e8d768a156b6f498df7d639df83056607b5c4c0334b2079a6a8838d52dd2f",
+      "sourceMd5": "b157675c3fba855286cba25b5e01a84a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_nor_gl_2k.jpg",
+      "bytes": 1751781,
+      "sha256": "de0374dcb0c346d1fc9ac4a9babb60b9aa70fc8f55db991f89683dbc949e98a1",
+      "sourceMd5": "c78a33b5d4c11f007fbd43aef8daca98"
+    }
+  ]
+}

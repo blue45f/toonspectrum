@@ -1,16 +1,7 @@
-export type ExperienceMode = "vivid" | "calm";
-export type ExperienceLocale = "ko" | "en";
-export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";
+import { supportsSiteExperience } from "./site-experience-policy";
 
-export function parseExperienceMode(value: string | null): ExperienceMode {
-  return value === "calm" ? "calm" : "vivid";
-}
-
-/** Editors and administrative tools never inherit promotional chrome or effects. */
-export function supportsSiteExperience(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/u, "").toLowerCase() || "/";
-  return !/^\/(?:studio|shaper|brush-lab|music|admin)(?:\/|$)/u.test(path);
-}
+// Retain the existing public model contract while keeping shell policy lightweight.
+export { EXPERIENCE_MODE_KEY, parseExperienceMode, supportsSiteExperience, type ExperienceMode, type ExperienceLocale } from "./site-experience-policy";
 
 export const EXPERIENCE_DESTINATIONS = {
   discover: { href: "/discover", icon: "discover", ko: ["영감 찾기", "취향에 맞는 작품에서 다음 장면의 힌트를 찾으세요."], en: ["Find inspiration", "Discover a story that sparks your next scene."] },
@@ -41,11 +32,11 @@ export function nextExperienceDestinations(pathname: string): ExperienceDestinat
     || /^\/(?:terms|privacy|copyright)(?:\/|$)/u.test(path)) return [];
   let ids: ExperienceDestinationId[];
   if (/^\/(?:learn|help|guide)(?:\/|$)/u.test(path)) ids = ["research", "market", "showcase"];
-  else if (/^\/(?:research|references|market)(?:\/|$)/u.test(path)) ids = ["learn", "showcase", "community"];
+  else if (/^\/(?:research|references|insights|now|opportunities|market)(?:\/|$)/u.test(path)) ids = ["learn", "showcase", "community"];
   else if (/^\/(?:showcase|create|community|reviews|pencafe)(?:\/|$)/u.test(path)) ids = ["discover", "learn", "market"];
   else if (path === "/library") ids = ["calendar", "discover", "showcase"];
   else if (/^\/(?:discover|search|ranking|calendar|explore|recommend|random|tags|authors|author|title|compare)(?:\/|$)/u.test(path)) ids = ["research", "library", "learn"];
-  else if (["/", "/about", "/contact", "/support", "/sitemap", "/news", "/now", "/insights", "/opportunities"].includes(path)) ids = ["discover", "learn", "showcase"];
+  else if (["/", "/make", "/about", "/about/data", "/contact", "/support", "/sitemap", "/news", "/now", "/insights", "/opportunities"].includes(path)) ids = ["discover", "learn", "showcase"];
   else return [];
   return ids.filter((id) => EXPERIENCE_DESTINATIONS[id].href !== path);
 }

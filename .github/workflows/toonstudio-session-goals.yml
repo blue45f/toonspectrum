@@ -64,7 +64,10 @@ jobs:
           base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
           git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- '*.ts' '*.tsx' '*.mjs' '*.mts' > "$RUNNER_TEMP/changed-files"
           mapfile -d '' -t files < "$RUNNER_TEMP/changed-files"
-          if ((${#files[@]})); then pnpm exec eslint --max-warnings=0 "${files[@]}"; fi
+          # Honor the repository's existing config ignores without treating an
+          # explicitly passed ignored path as a source-code warning. Real warnings
+          # and errors still fail; no files or lint rules are newly excluded here.
+          if ((${#files[@]})); then pnpm exec eslint --no-warn-ignored --max-warnings=0 "${files[@]}"; fi
 
   tests:
     name: tests

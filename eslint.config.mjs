@@ -19,6 +19,8 @@ export default defineConfig(
     '**/*.d.ts',
     '**/*.tsbuildinfo',
     '**/*.config.{js,mjs,cjs,ts}',
+    // Workspace browser coverage is changed-file linted in CI; check its config too.
+    '!playwright.workspace.config.ts',
     // wasm-bindgen가 재현 가능 빌드로 생성하고 별도 SHA-256 release gate가 검증하는 배포물.
     // 생성 JS를 직접 고치면 다음 pinned rebuild에서 덮어써지므로 호스트 ESLint 대상에서 제외한다.
     'packages/studio-hokusai-wasm/pkg/**',

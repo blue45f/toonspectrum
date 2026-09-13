@@ -1,5 +1,6 @@
 import {
   parseStudioDocumentLocation,
+  studioDocumentHref,
   studioDocumentWorkspaceToLegacySurface,
   type StudioDocumentWorkspaceId,
 } from "./studio-document-workspace";
@@ -335,6 +336,47 @@ export function studioCanvasHref({
   workId,
 }: StudioWorkspaceHrefInput): string {
   return studio2dHref({ remixSourceWorkId, search, surface: "canvas", workId });
+}
+
+/** Closing a document panel must return to its own canvas, not the shared new-draft slot. */
+export function studioCanvasReturnHref(
+  route: StudioWorkspaceRoute,
+  search?: string | URLSearchParams,
+): string {
+  if (route.documentWorkspace !== null) {
+    const params = queryParams(search);
+    return studioDocumentHref({
+      focus: params.get("focus"),
+      language: params.get("language"),
+      version: params.get("version"),
+      projectId: route.projectId,
+      documentId: route.documentId,
+      draftId: route.draftId,
+      workspace: route.surface === "canvas" ? route.documentWorkspace : "draw",
+      search,
+    });
+  }
+  return studioCanvasHref({
+    workId: route.workId,
+    remixSourceWorkId: route.remixSourceWorkId,
+    search,
+  });
+}
+
+/** Resolve 2D navigation outside the editor host while preserving document canvas identity. */
+export function studio2dSurfaceNavigationHref(
+  route: StudioWorkspaceRoute,
+  surface: Studio2dWorkspaceSurface,
+  search?: string | URLSearchParams,
+): string {
+  return surface === "canvas"
+    ? studioCanvasReturnHref(route, search)
+    : studio2dHref({
+        remixSourceWorkId: route.remixSourceWorkId,
+        search,
+        surface,
+        workId: route.workId,
+      });
 }
 
 export function studioDccHref({

@@ -75,7 +75,14 @@ export function FloatingControls({
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
-  const langOptions = getLanguageOptions(lang);
+  // Floating chrome only lists locales with real translations. The full Google Play list stays on Settings.
+  // Keep the active value so a persisted region variant (en-us) does not visually snap to the first option.
+  // Region variants can inherit a translated ratio via fallback; only expose the curated roots here.
+  const langOptions = getLanguageOptions(lang).filter((option) => {
+    if (option.code === lang) return true;
+    if (!option.fullyTranslated) return false;
+    return option.code === "zh-hant" || !option.code.includes("-");
+  });
   const fx = useFx();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
@@ -176,28 +183,11 @@ export function FloatingControls({
             onChange={(event) => setLang(event.target.value)}
             className="max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
           >
-            {/*
-              대부분의 로케일은 실측 번역률이 3% 미만이라 사실상 영어로 렌더된다.
-              한 목록에 섞어 두면 "번역 있음"으로 위장되므로 실측값 기준으로 그룹을 나눈다.
-            */}
-            <optgroup label={t("control.language.group.translated")}>
-              {langOptions
-                .filter((o) => o.fullyTranslated)
-                .map((o) => (
-                  <option key={o.code} value={o.code}>
-                    {o.label}
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label={t("control.language.group.englishBase")}>
-              {langOptions
-                .filter((o) => !o.fullyTranslated)
-                .map((o) => (
-                  <option key={o.code} value={o.code}>
-                    {o.label}
-                  </option>
-                ))}
-            </optgroup>
+            {langOptions.map((o) => (
+              <option key={o.code} value={o.code}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </div>
       )}
@@ -222,7 +212,7 @@ export function FloatingControls({
           "items-center gap-2 transition-[opacity,transform] duration-500 ease-out",
           collapsible ? "hidden md:flex" : "flex",
           "motion-reduce:opacity-100 hover:opacity-100 focus-within:opacity-100",
-          visible ? "opacity-100" : "translate-y-1 opacity-40"
+          visible ? "opacity-100" : "pointer-events-none translate-y-1 opacity-0"
         )}
       >
         {controls}

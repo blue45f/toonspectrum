@@ -305,11 +305,17 @@ async function dismissTransientChrome(page: Page): Promise<void> {
   }
   await page.keyboard.press("Escape");
   if (
-    await page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false })
+    await page.locator("[data-studio-recovery-notice]")
       .isVisible({ timeout: 250 })
       .catch(() => false)
   ) {
-    await page.getByRole("button", { name: "비우기", exact: true }).click();
+    const recovery = page.locator("[data-studio-recovery-notice]");
+    const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
+    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+    await recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true }).click();
+    const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
+    await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
+    await recovery.waitFor({ state: "hidden" });
   }
 }
 

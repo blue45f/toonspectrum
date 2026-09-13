@@ -13,7 +13,10 @@ export interface MarketCuratedTheme {
   readonly title: string;
   readonly subtitle: string;
   readonly description: string;
+  /** Primary discovery tag when `browseHref` is omitted. */
   readonly tag: string;
+  /** Concrete browse destination verified against the public catalog shape. */
+  readonly browseHref: string;
   readonly badge: string;
   readonly icon: LucideIcon;
   readonly gradient: string;
@@ -21,14 +24,20 @@ export interface MarketCuratedTheme {
   readonly image: string;
 }
 
+/**
+ * Homepage collection cards must deep-link into non-empty public destinations.
+ * Live catalog (2026-09-13) is CC0 seed-heavy: tags like 로판/무기/인체/회차 resolve empty,
+ * while 소품·학교·배경·3D and kind=3d-asset return rows.
+ */
 export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
   {
     id: "rofan-royal",
-    title: "로맨스 판타지의 세계관",
-    subtitle: "황실 티룸 배경부터 레이스 브러시까지",
-    description: "로맨스 판타지 귀족 영애 드레스 프릴, 앤틱 티세트 소품, 3D 황실 티룸 배경으로 한 화를 화려하게 채워보세요.",
-    tag: "로판",
-    badge: "배경·복식·장식",
+    title: "장면을 채우는 소품",
+    subtitle: "소파·원탁·화병·선반 등 바로 놓는 가구",
+    description: "공개 카탈로그에 있는 CC0 소품으로 실내 컷의 소도구를 빠르게 채우세요. 장르 전용 로판 팩이 추가되면 이 자리에서 이어집니다.",
+    tag: "소품",
+    browseHref: "/market/browse?tag=%EC%86%8C%ED%92%88",
+    badge: "소품·가구",
     image: "/brand/atelier-world.webp",
     icon: Crown,
     gradient: "from-pink-500/20 via-purple-500/10 to-amber-500/20",
@@ -37,10 +46,11 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
   {
     id: "school-youth",
     title: "청춘이 머무는 교실",
-    subtitle: "햇살 비치는 오후 교실과 목재 책걸상",
-    description: "한국형 고등학교 교실 3D 배경, 일상 소품 세트, 청량한 아침 햇살 팔레트로 학원물 웹툰의 현장감을 더하세요.",
+    subtitle: "학교·교실 태그의 공개 리소스",
+    description: "학원물 장면에 맞는 학교·교실 태그 리소스를 모았습니다. 공개된 항목부터 바로 살펴보세요.",
     tag: "학교",
-    badge: "학교·일상 소품",
+    browseHref: "/market/browse?tag=%ED%95%99%EA%B5%90",
+    badge: "학교·일상",
     image: "/assets/studio/backgrounds/webtoon_classroom.jpg",
     icon: GraduationCap,
     gradient: "from-sky-500/20 via-blue-500/10 to-emerald-500/20",
@@ -48,11 +58,12 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
   },
   {
     id: "action-fantasy",
-    title: "한 컷에 담는 액션",
-    subtitle: "다이내믹 속도선과 기사단 롱소드",
-    description: "타격감을 극대화하는 집중선 브러시, 3D 기사단 검·방패, 젖은 사이버 네온 골목으로 몰입감 넘치는 액션을 연출하세요.",
-    tag: "무기",
-    badge: "무기·긴장·연출",
+    title: "한 컷에 담는 3D",
+    subtitle: "카메라를 돌릴 수 있는 3D 에셋",
+    description: "공개 중인 3D 에셋으로 구도와 소품 배치를 먼저 잡으세요. 무기·액션 전용 팩은 카탈로그에 추가되는 대로 연결됩니다.",
+    tag: "3D",
+    browseHref: "/market/browse?kind=3d-asset",
+    badge: "3D·구도",
     image: "/assets/studio/backgrounds/webtoon_action_ruined_city.jpg",
     icon: Swords,
     gradient: "from-amber-500/20 via-red-500/10 to-orange-500/20",
@@ -60,11 +71,12 @@ export const MARKET_CURATED_THEMES: readonly MarketCuratedTheme[] = [
   },
   {
     id: "pose-guide-3d",
-    title: "인체와 포즈의 설득력",
-    subtitle: "남성·여성 표준 소체와 자유로운 앵글",
-    description: "투시와 동세를 확인할 수 있는 인체 소재를 찾아보고, 내 장면에 맞는 각도와 포즈를 검토하세요.",
-    tag: "인체",
-    badge: "인체·포즈 연구",
+    title: "배경으로 잡는 공간감",
+    subtitle: "실내·공원 등 공개 배경 리소스",
+    description: "투시와 공간감을 확인할 수 있는 공개 배경 리소스부터 살펴보세요. 인체·포즈 전용 팩이 생기면 이 카드가 그 목록으로 이어집니다.",
+    tag: "배경",
+    browseHref: "/market/browse?tag=%EB%B0%B0%EA%B2%BD",
+    badge: "배경·공간",
     image: "/brand/atelier-materials.webp",
     icon: Cuboid,
     gradient: "from-teal-500/20 via-cyan-500/10 to-emerald-500/20",

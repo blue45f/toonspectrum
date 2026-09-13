@@ -88,6 +88,7 @@ describe("studio bundle ratchet gate", () => {
   describe.skipIf(!hasProductionBuild)("against the current production build", () => {
     it("passes its own recorded baseline", () => {
       const result = runGate(baselineFile);
+      expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("within baseline");
       expect(result.stdout).not.toContain("REGRESSED");
       expect(result.stderr).not.toContain("regressed to");
@@ -106,6 +107,18 @@ describe("studio bundle ratchet gate", () => {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("Studio route raw regressed to");
       expect(result.stderr).toContain("UPDATE_BUNDLE_BASELINE=1");
+    }, 120_000);
+
+    it("does not carry temporary gzip headroom into a different accepted baseline", () => {
+      const baseline = JSON.parse(readFileSync(baselineFile, "utf8"));
+      baseline.static["Studio route gzip"] = Math.floor(baseline.static["Studio route gzip"] / 2);
+      const directory = mkdtempSync(path.join(tmpdir(), "studio-gzip-exception-"));
+      const tightened = path.join(directory, "bundle-baseline.json");
+      writeFileSync(tightened, JSON.stringify(baseline));
+      const result = runGate(tightened);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("Studio route gzip regressed to");
+      expect(result.stderr).not.toContain("temporary bundle allowance:");
     }, 120_000);
 
     it("refuses to run without a baseline instead of silently passing", () => {

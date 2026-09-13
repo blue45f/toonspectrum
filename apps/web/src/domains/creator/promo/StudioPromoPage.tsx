@@ -2,9 +2,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { completeStudioServerText, getStudioServerAiStatus } from "../studio-server-ai-client";
 
+import { usePromoDraft } from "./promo-draft";
+import { importPromoAudio, importPromoPanels } from "./promo-import";
+import { createPromoPoster } from "./promo-poster";
+import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
+import { PromoDirectorControls } from "./PromoDirectorControls";
 import { downloadPromoRemotion } from "./promo-downloads";
-import { downloadPromoBlob, importPromoPanel, promoRecorderMime, readPromoFile, recordPromoVideo } from "./promo-media";
-import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoDataUrl, promoSrt, promoTimeline } from "./promo-model";
+import { downloadPromoBlob, importPromoPanel, promoRecorderMime, recordPromoVideo } from "./promo-media";
+import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoShotList, promoSrt, promoTimeline, promoVtt } from "./promo-model";
 import { PromoPanelEditor } from "./PromoPanelEditor";
 import { PromoPreview } from "./PromoPreview";
 
@@ -14,8 +19,12 @@ import "./promo-studio.css";
 
 export function StudioPromoPage() {
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
-  const [undo, setUndo] = useState<PromoProject | null>(null);
-  const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record">("idle");
+  const [undo, setUndo] = useState<PromoProject[]>([]);
+  const [redo, setRedo] = useState<PromoProject[]>([]);
+  const [splitParts, setSplitParts] = useState(1);
+  const [seekRequest, setSeekRequest] = useState<{ frame: number; token: number }>();
+  const draft = usePromoDraft(project, setProject);
+  const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record" | "poster">("idle");
   const [message, setMessage] = useState("컷을 추가하고 원하는 분위기를 골라보세요.");
   const [error, setError] = useState("");
   const [configured, setConfigured] = useState(false);
@@ -24,7 +33,7 @@ export function StudioPromoPage() {
   const [quality, setQuality] = useState<720 | 1080>(720);
   const operation = useRef<AbortController | null>(null);
   const mounted = useRef(true);
-  const busy = phase !== "idle";
+  const busy = phase !== "idle" || !draft.ready;
   const mime = promoRecorderMime();
   useEffect(() => {
     mounted.current = true;
@@ -42,7 +51,15 @@ export function StudioPromoPage() {
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [project.panels.length]);
-  const apply = (next: PromoProject) => { setUndo(project); setProject(next); };
+  const apply = (next: PromoProject) => { setUndo((history) => [...history.slice(-29), project]); setRedo([]); setProject(next); };
+  const stepHistory = (direction: "undo" | "redo") => {
+    const history = direction === "undo" ? undo : redo;
+    const previous = history.at(-1);
+    if (!previous) return;
+    if (direction === "undo") { setUndo(history.slice(0, -1)); setRedo((items) => [...items.slice(-29), project]); }
+    else { setRedo(history.slice(0, -1)); setUndo((items) => [...items.slice(-29), project]); }
+    setProject(previous); setMessage(direction === "undo" ? "이전 구성을 복원했어요." : "편집을 다시 적용했어요.");
+  };
   const patch = (value: Partial<PromoProject>) => apply({ ...project, ...value });
   const start = (next: typeof phase): AbortController | null => {
     if (operation.current) return null;
@@ -65,9 +82,9 @@ export function StudioPromoPage() {
     const controller = start("import");
     if (!controller) return;
     try {
-      if (project.panels.length + files.length > PROMO_MAX_PANELS) throw new Error(`최대 ${PROMO_MAX_PANELS}컷까지 추가할 수 있어요.`);
+      if (project.panels.length + files.length * splitParts > PROMO_MAX_PANELS) throw new Error(`최대 ${PROMO_MAX_PANELS}컷까지 추가할 수 있어요.`);
       const panels: PromoPanel[] = [];
-      for (const file of Array.from(files)) panels.push(await importPromoPanel(file, project.panels.length + panels.length, controller.signal));
+      for (const file of Array.from(files).sort((a, b) => a.name.localeCompare(b.name, "ko", { numeric: true }))) panels.push(...await importPromoPanels(file, project.panels.length + panels.length, splitParts, controller.signal));
       if (!controller.signal.aborted) { patch({ panels: [...project.panels, ...panels] }); setMessage(`${panels.length}컷을 추가했어요. 컷 설명을 입력하면 AI가 더 정확하게 구성할 수 있어요.`); }
     } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
   };
@@ -86,10 +103,35 @@ export function StudioPromoPage() {
     const controller = start("import");
     if (!controller) return;
     try {
-      if (file.size > 20_000_000 || !file.type.startsWith("audio/")) throw new Error("BGM은 20MB 이하 오디오 파일이어야 해요.");
-      const src = promoDataUrl(await readPromoFile(file, controller.signal), "audio");
+      const { src } = await importPromoAudio(file, controller.signal);
       if (!controller.signal.aborted) { patch({ audio: { src, volume: 0.25 } }); setMessage("BGM을 추가했어요. 영상 길이에 맞춰 반복하고 시작과 끝에 페이드를 적용해요."); }
     } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
+  };
+  const uploadVoice = async (file: File | undefined) => {
+    if (!file) return;
+    const controller = start("import"); if (!controller) return;
+    try {
+      const voice = await importPromoAudio(file, controller.signal);
+      if (!controller.signal.aborted) { patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } }); setMessage("내레이션을 추가했어요. 음성 구간에는 BGM을 자동으로 낮춥니다."); }
+    } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
+  };
+  const uploadForeground = async (id: string, file: File) => {
+    const controller = start("import"); if (!controller) return;
+    try {
+      const foreground = await importPromoPanel(file, 0, controller.signal);
+      if (!controller.signal.aborted) { patch({ panels: project.panels.map((panel) => panel.id === id ? { ...panel, foregroundSrc: foreground.src } : panel) }); setMessage("전경을 추가했어요. 배경과 다른 속도의 2.5D 움직임을 미리보기에서 확인하세요."); }
+    } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
+  };
+  const exportPoster = async (contactSheet: boolean) => {
+    const controller = start("poster"); if (!controller) return;
+    try {
+      const blob = await createPromoPoster(project, contactSheet, controller.signal);
+      if (!controller.signal.aborted) { downloadPromoBlob(blob, contactSheet ? "toonstudio-storyboard.png" : "toonstudio-poster.png"); setMessage(contactSheet ? "전체 장면 콘티 시트를 저장했어요." : "첫 장면의 홍보 썸네일을 저장했어요."); }
+    } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
+  };
+  const addSoundtrack = (style: PromoSoundtrack) => {
+    try { const data = createPromoSoundtrack(project.seconds, style); void uploadAudio(new File([data], `toonstudio-${style}.wav`, { type: "audio/wav" })); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "사운드트랙을 만들지 못했어요."); }
   };
   const generate = async () => {
     const controller = start("ai");
@@ -130,9 +172,11 @@ export function StudioPromoPage() {
   return (
     <main className="promo-studio" aria-labelledby="promo-title">
       <header className="promo-header">
-        <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>컷을 올리고 이야기를 더하면, 홍보영상과 짧은 모션툰이 됩니다.</p></div>
+        <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>애니 오프닝 스타일 · 모션툰 · 예고편 · 쇼츠를 브라우저에서 직접 만드세요.</p></div>
         <span className="promo-badge">15 / 30 / 60초</span>
       </header>
+      <p className="promo-draft-status" role="status">{draft.status}</p>
+      <nav className="promo-button-row" aria-label="확장 제작실"><a href="/studio/ai-lab">실제 프레임을 생성하는 AI 애니메이션 제작실 →</a><a href="/read/spatial">공간형 웹툰 감상 →</a></nav>
       <div className="promo-workspace">
         <div className="promo-editing">
           <fieldset className="promo-card" disabled={busy}>
@@ -146,28 +190,44 @@ export function StudioPromoPage() {
               <label htmlFor="promo-style">연출 분위기<select id="promo-style" value={project.style} onChange={(event) => patch({ style: event.target.value as PromoProject["style"] })}>{PROMO_STYLES.map((style) => <option key={style} value={style}>{PROMO_STYLE_LABELS[style]}</option>)}</select></label>
             </div>
           </fieldset>
+          <PromoDirectorControls project={project} disabled={busy} onApply={(next) => { apply(next); setError(""); setMessage("연출 프리셋을 적용했어요. 컷별 카메라·자막·효과를 추가로 조절할 수 있어요."); }} onPatch={patch} />
           <section className="promo-card" aria-labelledby="promo-cuts-title">
             <div className="promo-section-head"><h2 id="promo-cuts-title">02 · 컷과 장면 구성</h2><span>{project.panels.length} / {PROMO_MAX_PANELS}컷</span></div>
+            <label htmlFor="promo-split">세로 원고 분할<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(Number(event.target.value))}>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? "파일 1개 = 컷 1개" : `파일마다 세로 ${parts}등분`}</option>)}</select></label>
             <label htmlFor="promo-panels" className="promo-upload-label">웹툰 컷 추가 · PNG, JPEG, WebP · 컷당 10MB 이하</label>
             <input id="promo-panels" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onChange={(event) => { void uploadPanels(event.target.files); event.target.value = ""; }} />
-            <p className="promo-muted">긴 원고는 컷 단위로 잘라서 추가하세요. 이미지는 최대 2048px로 정리하며 원본 파일은 수정하지 않습니다.</p>
+            <p className="promo-muted">긴 원고는 선택한 개수로 균등 분할한 다음 컷별 최대 2048px로 정리합니다. 자동 칸 검출은 아니므로 말풍선 경계를 확인하세요. 파일명 숫자 순으로 추가하며 원본 파일은 수정하지 않습니다.</p>
             <div className="promo-button-row">
               <button type="button" className="promo-primary" disabled={busy || !configured || !project.panels.length} onClick={() => void generate()}>AI로 홍보 콘티 구성</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => { patch({ panels: localPromoPlan(project) }); setMessage("로컬 연출 템플릿을 적용했어요. AI 생성 결과가 아니며 네트워크 요청 없이 동작해요."); }}>로컬 연출 템플릿</button>
-              <button type="button" disabled={busy || !undo} onClick={() => { if (undo) { setProject(undo); setUndo(null); setMessage("이전 구성을 복원했어요."); } }}>실행 취소</button>
+              <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
+              <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
             <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 서버의 기존 사용량 제한이 적용됩니다.</p>
             {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
-            <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
+            <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
+              if (project.panels.length >= PROMO_MAX_PANELS) return;
+              const panels = [...project.panels]; panels.splice(index + 1, 0, { ...scene.panel, id: crypto.randomUUID() }); patch({ panels });
+            }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
           </section>
           <fieldset className="promo-card" disabled={busy}>
-            <legend>03 · 배경음악</legend>
+            <legend>03 · 배경음악과 내레이션</legend>
+            <p className="promo-muted">외부 음원 없이 만드는 로컬 합성 BGM · 기존 BGM을 교체하며 실행 취소할 수 있어요.</p>
+            <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
             <label htmlFor="promo-audio">BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
-            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">BGM 없이도 영상을 만들 수 있어요. 음원 생성·음성 합성 기능은 포함하지 않습니다.</p>}
+            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
+            <label htmlFor="promo-voice">내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
+            {project.voiceover ? <>
+              <p className="promo-muted">음성 {project.voiceover.durationSec.toFixed(1)}초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠</p>
+              <label htmlFor="promo-voice-start">내레이션 시작 {project.voiceover.startSec.toFixed(1)}초<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }); }} /></label>
+              <label htmlFor="promo-voice-volume">음성 음량 {Math.round(project.voiceover.volume * 100)}%<input id="promo-voice-volume" type="range" min={0} max={1} step={0.05} value={project.voiceover.volume} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, volume: Number(event.target.value) } }); }} /></label>
+              {project.voiceover.startSec >= project.seconds ? <p className="promo-error">음성 시작점이 영상 밖에 있어요. 시작 시간을 줄여 주세요.</p> : null}
+              <button type="button" onClick={() => patch({ voiceover: null })}>내레이션 제거</button>
+            </> : null}
           </fieldset>
         </div>
         <aside className="promo-output">
-          <PromoPreview project={project} disabled={busy} />
+          <PromoPreview project={project} disabled={busy} seekRequest={seekRequest} />
           <section className="promo-card" aria-labelledby="promo-export-title">
             <h2 id="promo-export-title">04 · 내보내기</h2>
             <label htmlFor="promo-quality">브라우저 영상 해상도<select id="promo-quality" value={quality} disabled={busy} onChange={(event) => setQuality(Number(event.target.value) as 720 | 1080)}><option value={720}>720p · 빠른 저장</option><option value={1080}>1080p · 높은 해상도</option></select></label>
@@ -177,13 +237,18 @@ export function StudioPromoPage() {
             <p className="promo-muted">원본 컷·BGM·자막·렌더 코드가 포함됩니다. 별도 Node.js 환경에서 MP4로 렌더링하며, 클라우드 서버나 유료 라이선스 구매는 자동 실행하지 않습니다.</p>
             <div className="promo-button-row">
               <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoSrt(project)], { type: "text/plain;charset=utf-8" }), "toonstudio-captions.srt")}>자막 SRT</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoVtt(project)], { type: "text/vtt;charset=utf-8" }), "toonstudio-captions.vtt")}>자막 VTT</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoShotList(project)], { type: "application/json" }), "toonstudio-shot-list.json")}>장면 타임코드 JSON</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(false)}>홍보 썸네일 PNG</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(true)}>콘티 시트 PNG</button>
               <button type="button" disabled={busy} onClick={() => downloadPromoBlob(new Blob([JSON.stringify(project)], { type: "application/json" }), "toonstudio-promo.json")}>프로젝트 JSON 저장</button>
             </div>
             <label htmlFor="promo-import">프로젝트 JSON 불러오기 (현재 구성 교체)</label><input id="promo-import" type="file" accept="application/json,.json" disabled={busy} onChange={(event) => { void importProject(event.target.files?.[0]); event.target.value = ""; }} />
-            <p className="promo-muted">작업은 현재 탭 메모리에만 있습니다. 닫기 전에 프로젝트 JSON을 저장하세요. 미디어가 포함되므로 공유 대상을 확인하세요.</p>
+            <p className="promo-muted">초안은 이 브라우저에 자동 저장합니다. 브라우저 데이터 삭제·저장 공간 부족에 대비해 프로젝트 JSON도 백업하세요. 미디어가 포함되므로 공유 대상을 확인하세요.</p>
           </section>
           <div className="promo-feedback" aria-live="polite" aria-atomic="true">
             {phase === "ai" ? <p>AI가 홍보 문구와 컷 순서를 구성하고 있어요.</p> : null}
+            {phase === "poster" ? <p>썸네일과 콘티를 렌더링하고 있어요.</p> : null}
             {phase === "import" ? <p>파일을 검사하고 불러오는 중이에요.</p> : null}
             {phase === "record" ? <><p>영상 저장 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="영상 저장 진행률" /></> : null}
             {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button>}

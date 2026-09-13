@@ -673,3 +673,69 @@ describe("StudioCanvasStatusRail", () => {
     ).toBe("calc(5.5rem + env(safe-area-inset-bottom))");
   });
 });
+
+
+describe("shared selection command render paths", () => {
+  it.each([
+    ["선택 요소 맨 앞으로", "reorder", "front", null],
+    ["선택 요소 맨 뒤로", "reorder", "back", null],
+    ["선택 좌우 반전", "flip", "horizontal", "Shift+H"],
+    ["선택 상하 반전", "flip", "vertical", "Shift+V"],
+  ] as const)("dispatches %s once and retains the edit lock", (label, family, mode, shortcut) => {
+    const reorder = vi.fn();
+    const flip = vi.fn();
+    const props = createProps({
+      selectionCount: 2, onReorderSelection: reorder, onFlipSelection: flip,
+    });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    const button = screen.getByRole("button", { name: label });
+    if (shortcut) expect(button.getAttribute("aria-keyshortcuts")).toBe(shortcut);
+    fireEvent.click(button);
+    const selected = family === "reorder" ? reorder : flip;
+    const other = family === "reorder" ? flip : reorder;
+    expect(selected).toHaveBeenCalledExactlyOnceWith(mode);
+    expect(other).not.toHaveBeenCalled();
+    view.rerender(<StudioCanvasStatusRail {...props}
+      layoutSelectionDisabledReason="편집 잠금"
+      alignmentSelectionDisabledReason="편집 잠금"
+    />);
+    const locked = screen.getByRole("button", { name: label });
+    expect(locked.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(locked);
+    expect(selected).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("shared alignment group render path", () => {
+  it.each([
+    ["left", "선택 요소 왼쪽 정렬"],
+    ["hcenter", "선택 요소 가로 가운데 정렬"],
+    ["right", "선택 요소 오른쪽 정렬"],
+    ["top", "선택 요소 위쪽 정렬"],
+    ["vcenter", "선택 요소 세로 가운데 정렬"],
+    ["bottom", "선택 요소 아래쪽 정렬"],
+    ["distributeH", "선택 요소 가로 균등 분배"],
+    ["distributeV", "선택 요소 세로 균등 분배"],
+  ] as const)("preserves %s and its lock", (mode, label) => {
+    const props = createProps({ selectionCount: 3 });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(props.onAlignSelection).toHaveBeenCalledExactlyOnceWith(mode);
+    view.rerender(<StudioCanvasStatusRail {...props} alignmentSelectionDisabledReason="편집 잠금" />);
+    const locked = screen.getByRole("button", { name: label });
+    expect(locked.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(locked);
+    expect(props.onAlignSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps distribution unavailable below three independent elements", () => {
+    const props = createProps({ selectionCount: 2 });
+    const view = render(<StudioCanvasStatusRail {...props} />);
+    expect(screen.queryByRole("group", { name: "균등 분배" })).toBeNull();
+    view.rerender(<StudioCanvasStatusRail {...props} selectionCount={3} selectionGroupName="선택 그룹" />);
+    expect(screen.queryByRole("group", { name: "균등 분배" })).toBeNull();
+    expect(screen.getByRole("button", { name: "선택 그룹 왼쪽 정렬" })).toBeTruthy();
+  });
+});
