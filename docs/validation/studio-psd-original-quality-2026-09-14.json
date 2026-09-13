@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "scenarios": [
+    {
+      "width": 2560,
+      "height": 128,
+      "withMask": true,
+      "differentChannels": 0,
+      "maskDifferentPixels": 0,
+      "encodedBytes": 1343704,
+      "originalStored": true,
+      "placementWidth": 720,
+      "elapsedMs": 34
+    },
+    {
+      "width": 96,
+      "height": 2560,
+      "withMask": true,
+      "differentChannels": 0,
+      "maskDifferentPixels": 0,
+      "encodedBytes": 1054936,
+      "originalStored": true,
+      "placementWidth": 96,
+      "elapsedMs": 27
+    },
+    {
+      "width": 128,
+      "height": 64,
+      "withMask": false,
+      "differentChannels": 0,
+      "maskDifferentPixels": 0,
+      "encodedBytes": 26364,
+      "originalStored": true,
+      "placementWidth": 128,
+      "elapsedMs": 6
+    }
+  ],
+  "cancelledEncoding": true,
+  "boundary": "Real browser codec/pixel verification; not full Studio UI, pen latency, or production deployment verification.",
+  "failures": [],
+  "browser": "152.0.7977.83",
+  "hashes": {
+    "apps/web/src/domains/creator/studio-psd-import.ts": "1131b67189977063ab391b247ab7d7ee7a03d086afde2deb880a0b1f448fe4ef",
+    "apps/web/src/domains/creator/studio-lossless-canvas-source.ts": "1a2b930683d17507108996c2a83a210741b2dea505b8abb825dd383a020ed93b",
+    "apps/web/tools/browser-harnesses/studio-psd-original-quality.ts": "0cf025328e42a54ad624523fa1d7482d5b7ac088c481e1ff7477ef13c7d00bd2"
+  }
+}

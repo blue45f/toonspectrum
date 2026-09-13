@@ -1055,3 +1055,30 @@ describe("StudioMenubarContent", () => {
     }
   });
 });
+
+
+describe("PSD original-quality import controls", () => {
+  afterEach(cleanup);
+  it("keeps cancellation available even if document editing permission changes", () => {
+    const stableHandlers = createHandlers();
+    render(<StudioMenubarContent {...createProps({
+      projectActionsOpen: true, psdImportBusy: true,
+      collaborationDocumentLocked: true, stableHandlers,
+    })} />);
+    const cancel = screen.getAllByRole("button", { name: "PSD 검사 취소" })[0];
+    expect(cancel).toHaveProperty("disabled", false);
+    fireEvent.click(cancel);
+    expect(stableHandlers.cancelInterchangeImport).toHaveBeenCalledOnce();
+  });
+  it("announces original-quality progress in a wrapping status region", () => {
+    const text = "원본 화질로 레이어 준비 중 · 4 / 100";
+    render(<StudioMenubarContent {...createProps({
+      projectActionsOpen: true, psdImportBusy: true,
+      psdImportStatus: { tone: "warn", text },
+    })} />);
+    const status = screen.getByText(text);
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.className).not.toContain("whitespace-nowrap");
+    expect(status.className).not.toContain("text-[10px]");
+  });
+});

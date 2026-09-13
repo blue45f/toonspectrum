@@ -1,5 +1,6 @@
 import { CANVAS_W } from "../studio-assets";
 import { uid } from "../studio-id";
+import { studioPsdImportProgressMessage } from "../studio-psd-import-progress";
 import { createBlankPage } from "../studio-pages";
 import { STUDIO_PROJECT_MAX_PAGES } from "../studio-project-file";
 
@@ -124,13 +125,18 @@ export function createStudioInterchangeImportOrchestration(
   function cancelInterchangeImport() {
     documentImportEpochRef.current += 1;
     const activeOperation = documentImportOperationRef.current;
-    if (activeOperation?.kind === "archive-inspect" || activeOperation?.kind === "archive-apply") {
+    if (activeOperation) {
       documentImportOperationRef.current = null;
     }
     interchangeImportAbortRef.current?.abort();
     interchangeImportAbortRef.current = null;
     setInterchangeImportBusy(false);
-    setInterchangeImportStatus({ tone: "warn", text: "문서 안전 검사를 취소했어요." });
+    if (activeOperation?.kind === "psd-inspect") {
+      setPsdImportBusy(false);
+      setPsdImportStatus({ tone: "warn", text: "PSD 가져오기를 취소했어요. 현재 문서는 변경하지 않았어요." });
+    } else {
+      setInterchangeImportStatus({ tone: "warn", text: "문서 안전 검사를 취소했어요." });
+    }
   }
 
   async function handleImportInterchangeArchive(e: ChangeEvent<HTMLInputElement>) {
@@ -259,7 +265,8 @@ export function createStudioInterchangeImportOrchestration(
       documentImportOperationRef.current !== null
     ) return;
     interchangeImportAbortRef.current?.abort();
-    interchangeImportAbortRef.current = null;
+    const controller = new AbortController();
+    interchangeImportAbortRef.current = controller;
     const importEpoch = documentImportEpochRef.current + 1;
     documentImportEpochRef.current = importEpoch;
     documentImportOperationRef.current = { epoch: importEpoch, kind: "psd-inspect" };
@@ -277,8 +284,17 @@ export function createStudioInterchangeImportOrchestration(
         import("../studio-document-import-device-profile"),
       ]);
       const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
-      const result = await importPsdFile(file, CANVAS_W);
-      if (documentImportEpochRef.current !== importEpoch) return;
+      if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
+      const result = await importPsdFile(file, CANVAS_W, {}, {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (!controller.signal.aborted && documentImportEpochRef.current === importEpoch
+            && canApplyStudioMutation(mutationTicket)) {
+            setPsdImportStatus({ tone: "warn", text: studioPsdImportProgressMessage(progress) });
+          }
+        },
+      });
+      if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (result.elements.length === 0) {
         setPsdImportStatus({ tone: "warn", text: psdImportResultMessage(result) });
@@ -299,24 +315,26 @@ export function createStudioInterchangeImportOrchestration(
         text: `${psdImportResultMessage(result)} · 적용 전 편집성 손실과 배치 방식을 확인해 주세요.`,
       });
     } catch (err) {
-      if (documentImportEpochRef.current !== importEpoch) return;
+      if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
       setPsdImportStatus({
         tone: "warn",
         text: err instanceof Error ? err.message : "PSD 파일을 읽지 못했어요.",
       });
     } finally {
       if (
+        interchangeImportAbortRef.current === controller &&
         documentImportOperationRef.current?.kind === "psd-inspect" &&
         documentImportOperationRef.current.epoch === importEpoch
       ) {
         documentImportOperationRef.current = null;
+        interchangeImportAbortRef.current = null;
         setPsdImportBusy(false);
       }
     }
   }
 
   function dismissPendingInterchangeImport() {
-    if (interchangeImportBusy) {
+    if (interchangeImportBusy || psdImportBusy) {
       cancelInterchangeImport();
       return;
     }

@@ -2026,22 +2026,27 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <button
             type="button"
             data-project-keep-open
-            onClick={() => psdImportInputRef.current?.click()}
-            disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
+            onClick={() => {
+              if (psdImportBusy) { cancelInterchangeImport(); return; }
+              psdImportInputRef.current?.click();
+            }}
+            disabled={interchangeImportBusy || (collaborationDocumentLocked && !psdImportBusy)}
             className={cn(
               buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5" }),
-              (psdImportBusy || interchangeImportBusy) && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
+              interchangeImportBusy && "cursor-wait opacity-60",
+              psdImportBusy && "border-warn/30 bg-warn/10 text-warn",
+              collaborationDocumentLocked && !psdImportBusy && "cursor-not-allowed opacity-50"
             )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
+            title={psdImportBusy ? "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다." : collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
           >
-            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            PSD 가져오기
+            {psdImportBusy ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+            {psdImportBusy ? "PSD 검사 취소" : "PSD 가져오기"}
           </button>
           {psdImportStatus && (
             <span
+              role="status"
               className={cn(
-                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
+                "min-w-0 max-w-80 rounded-md border px-2 py-1 text-xs leading-relaxed wrap-anywhere",
                 psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
                 psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
               )}
