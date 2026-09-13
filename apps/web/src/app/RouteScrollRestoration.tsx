@@ -33,6 +33,7 @@ export function RouteScrollRestoration() {
     const preserveFilterPosition = previous?.pathname === pathname && !saved && !anchorId;
     let restoring = !preserveFilterPosition;
     let observer: ResizeObserver | undefined;
+    let mutation: MutationObserver | undefined;
     let timer = 0;
     const remember = () => {
       if (!restoring) memory.set(key, { x: window.scrollX, y: window.scrollY });
@@ -40,6 +41,7 @@ export function RouteScrollRestoration() {
     const stop = () => {
       restoring = false;
       observer?.disconnect();
+      mutation?.disconnect();
       window.clearTimeout(timer);
       window.removeEventListener("wheel", stop);
       window.removeEventListener("touchstart", stop);
@@ -53,6 +55,10 @@ export function RouteScrollRestoration() {
         const anchor = document.getElementById(anchorId);
         if (!anchor) return;
         anchor.scrollIntoView({ block: "start", behavior: "instant" });
+        const hadTabIndex = anchor.hasAttribute("tabindex");
+        if (!hadTabIndex) anchor.setAttribute("tabindex", "-1");
+        anchor.focus({ preventScroll: true });
+        if (!hadTabIndex) anchor.removeAttribute("tabindex");
         stop();
         return;
       }
@@ -73,6 +79,11 @@ export function RouteScrollRestoration() {
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(restore);
         observer.observe(document.body);
+      }
+      // A lazy fragment can appear without changing page height. Keep one restoration owner.
+      if (anchorId && typeof MutationObserver !== "undefined") {
+        mutation = new MutationObserver(restore);
+        mutation.observe(document.getElementById("main-content") ?? document.body, { childList: true, subtree: true });
       }
       timer = window.setTimeout(stop, 5000);
       restore();

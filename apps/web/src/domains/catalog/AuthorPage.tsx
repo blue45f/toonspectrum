@@ -29,7 +29,8 @@ interface AuthorResponse {
 export function AuthorPage() {
   const { name } = useParams();
   const authorParam = name ?? "";
-  const decodedAuthor = decodeURIComponent(authorParam);
+  // useParams already decodes the segment; decoding again corrupts literal % names.
+  const decodedAuthor = authorParam;
   const { data, loading, error, notFound, reload } = useApiResource<AuthorResponse>(
     authorParam ? `/api/authors/${encodeURIComponent(decodedAuthor)}` : null,
     "작가 데이터를 불러오지 못했습니다."

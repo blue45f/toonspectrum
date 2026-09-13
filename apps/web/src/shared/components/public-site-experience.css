@@ -1,0 +1,131 @@
+/* Non-Studio surfaces only. No global theme mutation, canvas effects or extra assets. */
+main[data-public-experience] {
+  --public-coral: oklch(0.72 0.185 42);
+  --public-violet: oklch(0.69 0.18 302);
+  --public-sky: oklch(0.76 0.13 222);
+  background:
+    radial-gradient(ellipse 65rem 32rem at 5% 0, color-mix(in oklch, var(--public-coral) 9%, transparent), transparent 75%),
+    radial-gradient(ellipse 55rem 40rem at 100% 12rem, color-mix(in oklch, var(--public-violet) 8%, transparent), transparent 75%);
+}
+main[data-public-experience] :is(h1, h2[id], section[id]) {
+  scroll-margin-top: var(--site-header-sticky-offset, 8rem);
+}
+/* A framed editorial surface gives the public hubs a common visual identity. */
+main[data-public-experience] .public-story-hero {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid color-mix(in oklch, var(--color-accent) 28%, var(--color-line));
+  border-radius: 28px;
+  background: linear-gradient(135deg, color-mix(in oklch, var(--public-coral) 7%, var(--color-panel)), var(--color-panel) 55%);
+  box-shadow: 0 18px 60px -38px color-mix(in oklch, var(--public-violet) 38%, transparent);
+}
+main[data-public-experience] .public-story-hero__copy {
+  padding: clamp(24px, 4vw, 52px);
+}
+main[data-public-experience] .public-story-hero::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0 15% auto;
+  height: 2px;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--public-coral), var(--public-violet), transparent);
+}
+main[data-public-experience] .public-story-hero__figure figcaption {
+  padding: 12px 16px;
+  border: 1px solid oklch(0.95 0.01 85 / 0.2);
+  border-radius: 12px;
+  background: oklch(0.18 0.02 290 / 0.82);
+}
+main[data-public-experience] .public-story-route {
+  padding-inline: 16px;
+  border-radius: 16px;
+  transition: background 180ms ease-out, border-color 180ms ease-out;
+}
+main[data-public-experience] .public-story-route:hover {
+  background: color-mix(in oklch, var(--color-accent) 6%, var(--color-panel));
+}
+/* Keep account and utility pages functional, with restrained shared surface depth. */
+main[data-public-experience] .purpose-experience-stage {
+  box-shadow: 0 18px 60px -42px color-mix(in oklch, var(--public-violet) 40%, transparent);
+}
+header[data-public-site] {
+  background: color-mix(in oklch, var(--color-canvas) 94%, transparent);
+  box-shadow: 0 8px 28px -24px color-mix(in oklch, var(--color-accent) 40%, transparent);
+}
+header[data-public-site] .public-site-journey {
+  background: linear-gradient(100deg, color-mix(in oklch, var(--color-accent) 5%, var(--color-panel)), var(--color-panel) 60%);
+}
+header[data-public-site] .public-site-journey__routes { scroll-padding-inline: 8px; }
+header[data-public-site] .public-site-journey__routes a {
+  border-radius: 10px 10px 0 0;
+  transition: background 180ms ease-out, color 180ms ease-out;
+}
+header[data-public-site] .public-site-journey__routes a[aria-current="step"] {
+  background: color-mix(in oklch, var(--color-accent) 10%, transparent);
+}
+.public-wayfinder {
+  position: relative;
+  max-width: 1280px;
+  width: calc(100% - 48px);
+  margin: 48px auto 72px;
+  padding: clamp(22px, 4vw, 44px);
+  border: 1px solid var(--color-line);
+  border-radius: 28px;
+  background:
+    radial-gradient(ellipse at 100% 0, color-mix(in oklch, var(--public-violet) 12%, transparent), transparent 60%),
+    var(--color-panel);
+}
+.public-wayfinder__heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+.public-wayfinder__eyebrow { color: var(--color-accent); font-size: 10px; letter-spacing: 0.16em; font-weight: 700; }
+.public-wayfinder h2 { margin-top: 12px; font-size: clamp(1.5rem, 3vw, 2.3rem); line-height: 1.3; letter-spacing: -0.045em; color: var(--color-fg); text-wrap: balance; }
+.public-wayfinder__all { display: inline-flex; flex: none; align-items: center; gap: 8px; min-height: 44px; color: var(--color-fg-2); font-size: 12px; }
+.public-wayfinder__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.public-wayfinder__card {
+  --destination-color: var(--public-coral);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  color: var(--color-fg);
+  background: var(--color-card);
+  transition: border-color 180ms ease-out, transform 180ms ease-out, box-shadow 180ms ease-out;
+}
+.public-wayfinder__card[data-destination="learn"] { --destination-color: var(--public-violet); }
+.public-wayfinder__card[data-destination="market"] { --destination-color: var(--public-sky); }
+.public-wayfinder__card[data-destination="share"] { --destination-color: oklch(0.73 0.16 350); }
+.public-wayfinder__icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid color-mix(in oklch, var(--destination-color) 36%, var(--color-line)); border-radius: 15px; background: color-mix(in oklch, var(--destination-color) 12%, var(--color-card)); }
+.public-wayfinder__card strong { font-size: 18px; letter-spacing: -0.03em; }
+.public-wayfinder__card > span:not(.public-wayfinder__icon) { max-width: 32em; color: var(--color-fg-2); font-size: 12px; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
+.public-wayfinder__arrow { position: absolute; right: 22px; top: 25px; color: var(--color-fg-2); }
+.public-wayfinder a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 4px; border-radius: 12px; }
+@media (hover: hover) and (pointer: fine) {
+  .public-wayfinder__card:hover { transform: translateY(-4px); border-color: var(--destination-color); box-shadow: 0 12px 25px -18px var(--destination-color); }
+}
+@media (width < 768px) {
+  .public-wayfinder { width: calc(100% - 32px); margin-block: 24px 40px; border-radius: 22px; padding: 20px; }
+  .public-wayfinder__heading { align-items: start; flex-direction: column; gap: 8px; }
+  .public-wayfinder__grid { grid-template-columns: 1fr; gap: 10px; }
+  .public-wayfinder__card { padding: 18px 46px 18px 18px; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px 14px; }
+  .public-wayfinder__icon { width: 42px; height: 42px; grid-row: span 2; }
+  .public-wayfinder__card strong { font-size: 16px; }
+  .public-wayfinder__card > span:not(.public-wayfinder__icon) { grid-column: 2; }
+  .public-wayfinder__arrow { right: 15px; top: 22px; }
+  main[data-public-experience] .public-story-hero { border-radius: 22px; }
+  main[data-public-experience] .public-story-hero__figure figcaption { inset-inline: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-wayfinder__card,
+  header[data-public-site] .public-site-journey__routes a,
+  main[data-public-experience] .public-story-route { transition: none; }
+  .public-wayfinder__card:hover { transform: none; }
+}
+@media (forced-colors: active) {
+  .public-wayfinder, .public-wayfinder__card, .public-wayfinder__icon,
+  main[data-public-experience] .public-story-hero { border-color: CanvasText; background: Canvas; box-shadow: none; }
+  .public-wayfinder a:focus-visible { outline-color: Highlight; }
+}
