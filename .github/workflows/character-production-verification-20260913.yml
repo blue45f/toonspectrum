@@ -1,0 +1,84 @@
+name: Character production verification 20260913
+
+on:
+  push:
+    branches: [qa/character-production-20260913]
+    paths:
+      - .github/workflows/character-production-verification-20260913.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: character-production-verification-20260913
+  cancel-in-progress: false
+
+jobs:
+  production-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
+      TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR: artifacts/character-production
+      TOONSPECTRUM_CHARACTER_GPU_LANE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install Chromium for real browser execution
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Record public production HTTP responses
+        run: |
+          mkdir -p artifacts/character-production
+          git rev-parse HEAD > artifacts/character-production/verifier-commit.txt
+          printf '%s\n' fe0f3c207c6cbf5b6f5a5f42f515d622f768a0c6 > artifacts/character-production/expected-production-commit.txt
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          const responses = [];
+          for (const path of ['/', '/studio/character']) {
+            const response = await fetch(`https://www.toonstudio.cloud${path}`);
+            const body = await response.text();
+            const result = { path, url: response.url, status: response.status, time: new Date().toISOString(), headers: Object.fromEntries(response.headers), bytes: Buffer.byteLength(body) };
+            responses.push(result);
+            if (!response.ok) throw new Error(`Production HTTP failed: ${JSON.stringify(result)}`);
+          }
+          writeFileSync('artifacts/character-production/http.json', JSON.stringify(responses, null, 2));
+          console.log(JSON.stringify(responses, null, 2));
+          JS
+      - name: Verify live character rendering, edits, PNG, cancellation, PSD and mobile
+        run: pnpm exec tsx scripts/verify-studio-character-shaper.mts
+      - name: Print evidence summary
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import { existsSync, readFileSync, appendFileSync } from 'node:fs';
+          const path = 'artifacts/character-production/character-shaper-evidence.json';
+          if (!existsSync(path)) { console.log('No browser evidence was produced.'); process.exit(0); }
+          const e = JSON.parse(readFileSync(path, 'utf8'));
+          const summary = {status:e.status, origin:e.origin, capturedAt:e.capturedAt, browserVersion:e.browserVersion, renderer:e.renderer,
+            beforeStats:e.beforeStats, hairPeakTileDelta:e.hairPeakTileDelta, topPeakTileDelta:e.topPeakTileDelta,
+            transparentPng:e.transparentPng, transparentPng4k:e.transparentPng4k, pngRenderingCancellation:e.pngRenderingCancellation,
+            psdDimensions:e.psdDimensions, psdLayers:e.psdLayers, psdRasterLayers:e.psdRasterLayers,
+            psdPngComposition:e.psdPngComposition, psdWorkerUrls:e.psdWorkerUrls, psdFailure:e.psdFailure,
+            escOrder:e.escOrder, mobileWidths:e.mobileWidths,
+            mobileViolations:e.mobileControlBounds?.map(x=>({width:x.width,exportOpen:x.exportOpen,violations:x.violations})),
+            accessibleNameGaps:e.accessibleNameGaps, consoleErrors:e.consoleErrors};
+          console.log(JSON.stringify(summary, null, 2));
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Live production browser verification\n\nThis is Chromium WebGL2 via SwiftShader, not a native hardware GPU test. No deployment or production application source was modified by this verification.\n\n```json\n' + JSON.stringify(summary, null, 2) + '\n```\n');
+          JS
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: character-production-20260913
+          path: artifacts/character-production
+          retention-days: 7
+          if-no-files-found: warn
