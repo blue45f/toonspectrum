@@ -24,6 +24,8 @@ export const creatorResourceWorkflowCases: WorkflowCase[] = [
       { provider: "openbd", availability: "keyless" },
       { provider: "kakao", availability: "configured" },
       { provider: "bizinfo", availability: "not_configured" },
+      { provider: "aic", availability: "keyless" },
+      { provider: "cleveland", availability: "keyless" },
     ]);
     equal(JSON.stringify(api.describe()).includes("PRIVATE_SECRET"), false);
   } },

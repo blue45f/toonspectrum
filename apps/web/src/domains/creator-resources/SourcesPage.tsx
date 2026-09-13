@@ -34,6 +34,7 @@ export function SourcesPage() {
       <h2 className="text-xl font-bold">서로 다른 데이터는 서로 다른 의미로 읽습니다</h2>
       <p className="leading-8 text-fg-2">도서관 대출, 작품 조회수, 검색 관심도, 매출, 산업 종사자 수는 서로 다른 지표입니다. 조사연도·발표일·단위·집계 범위가 다르면 합산하거나 하나의 인기 점수로 표시하지 않습니다.</p>
       <div className="flex flex-wrap gap-3">
+        <Link className={`${RESOURCE_BUTTON} bg-accent-soft`} to="/research/packs">무료 자료로 콘텐츠 만들기</Link>
         <Link className={RESOURCE_BUTTON} to="/insights">기존 인사이트 보기</Link>
         <Link className={RESOURCE_BUTTON} to="/about/crawler">수집 정책 보기</Link>
         <Link className={RESOURCE_BUTTON} to="/copyright">저작권 안내</Link>
