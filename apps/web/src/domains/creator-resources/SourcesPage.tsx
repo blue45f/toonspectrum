@@ -22,6 +22,7 @@ export function SourcesPage() {
       .includes(normalized),
   );
   return <ResourceLayout title="데이터 출처·상업 이용 준비" intro="구현된 검색 어댑터, 신청 예정 API, 계약 검토 대상과 운영 제외 소스를 구분합니다. 연결 상태와 개별 자료 권리는 별도이며, 권리가 확인되지 않은 자료는 Studio 가져오기와 상업 활용을 차단합니다.">
+    <section className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft p-6" aria-labelledby="material-atlas-entry"><h2 id="material-atlas-entry" className="text-xl font-bold">무료 소재를 장면 제작으로 연결하세요</h2><p className="text-sm leading-7 text-fg-2">Poly Haven·ambientCG의 확인된 소재 목록, 한글 검색, 8개 제작 가이드와 출처 내보내기. 추가 가입·API 키·유료 생성 없이 브라우저에서 사용합니다.</p><Link className={RESOURCE_BUTTON} to="/research/materials">무료 배경·소품 소재 도감 열기</Link></section>
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-6">
       <h2 className="text-xl font-bold">서로 다른 데이터는 서로 다른 의미로 읽습니다</h2>
       <p className="leading-8 text-fg-2">도서관 대출, 작품 조회수, 검색 관심도, 매출, 산업 종사자 수는 서로 다른 지표입니다. 조사연도·발표일·단위·집계 범위가 다르면 합산하거나 하나의 인기 점수로 표시하지 않습니다.</p>
