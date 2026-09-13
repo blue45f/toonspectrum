@@ -1,0 +1,34 @@
+name: Studio quality assets 20260913
+on:
+  push:
+    branches: [codex/studio-quality-assets-20260913]
+  pull_request:
+    paths:
+      - scripts/studio-quality-assets-20260913/**
+      - apps/web/src/domains/creator/catalog/studio-quality-assets-20260913*
+      - .github/workflows/studio-quality-assets-20260913.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            .github/workflows
+            scripts
+            apps/web/src/domains/creator
+            apps/web/public/assets/studio/cc0-20260906/manifest.json
+          sparse-checkout-cone-mode: false
+      - name: Export source for isolated review
+        run: |
+          mkdir -p /tmp/studio-asset-review
+          tar -czf /tmp/studio-asset-review/source.tgz .github/workflows scripts apps/web/src/domains/creator package.json pnpm-lock.yaml tsconfig.json apps/web/public/assets/studio/cc0-20260906/manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-quality-assets-source
+          path: /tmp/studio-asset-review/source.tgz
+          retention-days: 3
