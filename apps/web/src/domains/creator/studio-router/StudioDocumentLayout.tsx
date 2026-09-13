@@ -15,6 +15,9 @@ import {
   type StudioDocumentLayoutRuntime,
 } from "./studio-document-layout-context";
 import { useStudioDocumentRuntime } from "./studio-document-runtime-context";
+import { useStudioLocalDraftOwner } from "./useStudioLocalDraftOwner";
+
+import { useSession } from "@/compat/auth-session-store";
 
 import type { StudioWorkspaceRoute } from "../studio-workspace-route";
 
@@ -58,12 +61,18 @@ export function StudioDocumentLayout({
   // Keep the owner room stable for this tab across reloads and boundary remounts. A companion tab
   // receives the room URL but not this tab's sessionStorage ownership receipt, so it still gets a
   // distinct instant id and remains fail-closed until CRDT convergence.
-  const [instantWorkId] = useState(() => resolveStudioLiveInstantWorkIdForTab({
+  const [initialInstantWorkId] = useState(() => resolveStudioLiveInstantWorkIdForTab({
     workId,
     remixId,
     roomId: liveRoomParam,
     storage: currentStudioSessionStorage(),
   }));
+  const { data: session } = useSession();
+  const instantWorkId = useStudioLocalDraftOwner({
+    initialInstantWorkId, roomId: liveRoomParam, workId, remixId,
+    ownerId: session?.user?.id ?? null,
+    projectId: studioRoute.projectId, documentId: studioRoute.documentId, draftId: studioRoute.draftId,
+  });
   useEffect(() => {
     if (!shouldPublishStudioLiveJamRoom({
       remixId,

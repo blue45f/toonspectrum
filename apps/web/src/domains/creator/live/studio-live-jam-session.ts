@@ -44,7 +44,7 @@ function readStudioLiveOwnedRoomId(
   }
 }
 
-function rememberStudioLiveOwnedRoomId(
+export function rememberStudioLiveOwnedRoomId(
   storage: StudioLiveOwnerRoomSessionStorage | null | undefined,
   roomId: string,
 ): void {
