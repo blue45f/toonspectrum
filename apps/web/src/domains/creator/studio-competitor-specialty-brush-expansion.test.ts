@@ -13,6 +13,7 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
 } from "./brush/studio-brush-dynamics";
+import { STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER } from "./brush/studio-brush-quality-portfolio";
 import { studioBrushIconId } from "./brush/studio-brush-icons";
 import {
   resolveStudioBrushRuntimeContract,
@@ -105,7 +106,7 @@ function pressureAxes(id: (typeof SPECIALTY_IDS)[number], pressure: number) {
 }
 
 describe("competitor specialty brush expansion", () => {
-  it("publishes four stable core ids with bilingual discovery aliases", () => {
+  it("retains four stable runtime ids while exposing only curated product aliases", () => {
     for (const id of SPECIALTY_IDS) {
       const expected = EXPECTED_PRESETS[id];
       expect(BRUSH_PRESETS.find((preset) => preset.id === id)).toMatchObject({
@@ -123,8 +124,6 @@ describe("competitor specialty brush expansion", () => {
 
     for (const [id, query] of [
       ["hard-airbrush", "hard round airbrush"],
-      ["erodible-pencil", "마모 촉"],
-      ["paint-tube", "3d tube brush"],
       ["tangent-normal-brush", "법선 페인트"],
     ] as const) {
       expect(
@@ -135,8 +134,23 @@ describe("competitor specialty brush expansion", () => {
     }
   });
 
-  it("keeps the catalogue exhaustive and assigns unique runtime variants", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS.pro).toBe(160);
+  it("never resurrects absorbed runtime profiles through search or favorites", () => {
+  for (const [id, query, owner] of [
+    ["erodible-pencil", "마모 촉", "pencil--side-shade"],
+    ["paint-tube", "3d tube brush", "oil--impasto-ribbon"],
+  ] as const) {
+    expect(STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER[id]).toBe(owner);
+    expect(studioBrushCatalogItemById(id)?.id).toBe(id);
+    expect(filterStudioBrushCatalogItems({ category: "all" }).some((item) => item.id === owner)).toBe(true);
+    for (const candidate of [query, id]) {
+      expect(filterStudioBrushCatalogItems({ category: "marker", query: candidate }).some((item) => item.id === id)).toBe(false);
+    }
+    expect(filterStudioBrushCatalogItems({ category: "favorites", favoriteIds: [id] }).some((item) => item.id === id)).toBe(false);
+  }
+});
+
+it("keeps the catalogue exhaustive and assigns unique runtime variants", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS.pro).toBe(192);
     expect(STUDIO_BRUSH_CATALOG_COUNTS.core).toBeGreaterThanOrEqual(99);
     expect(STUDIO_BRUSH_CATALOG_COUNTS.total).toBe(
       STUDIO_BRUSH_CATALOG_COUNTS.core + STUDIO_BRUSH_CATALOG_COUNTS.pro,

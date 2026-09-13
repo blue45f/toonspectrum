@@ -5,6 +5,7 @@ import {
   classifyStudioDryMediaCatalogIdV1,
   resolveStudioDryMediaAnisotropicPresetIdV1,
   STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1,
+  STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1,
   STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_IDS_V1,
 } from "./studio-dry-media-anisotropic-grain-v1";
 
@@ -20,11 +21,11 @@ describe("dry-media catalogue classification v1", () => {
   );
 
   it("classifies every shipped dry-media catalogue item exactly once", () => {
-    expect(dryDescriptors).toHaveLength(61);
+    expect(dryDescriptors).toHaveLength(72);
     expect([...anisotropicIds].filter((id) => discreteIds.has(id))).toEqual([]);
 
     const shippedIds = new Set(dryDescriptors.map(({ catalogId }) => catalogId));
-    expect(new Set([...anisotropicIds, ...discreteIds])).toEqual(shippedIds);
+    expect(new Set([...anisotropicIds, ...discreteIds, ...STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1])).toEqual(shippedIds);
 
     for (const descriptor of dryDescriptors) {
       const classification = classifyStudioDryMediaCatalogIdV1(
@@ -46,6 +47,16 @@ describe("dry-media catalogue classification v1", () => {
           descriptor.catalogId,
         )).toBeNull();
       }
+    }
+  });
+
+  it("preserves every new material footprint instead of substituting a generic fibre kernel", () => {
+    expect(STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1).toHaveLength(11);
+    for (const id of STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1) {
+      expect(anisotropicIds.has(id)).toBe(false);
+      expect(discreteIds.has(id)).toBe(false);
+      expect(classifyStudioDryMediaCatalogIdV1(id)).toEqual({ kind: "authored-morphology" });
+      expect(resolveStudioDryMediaAnisotropicPresetIdV1("dry-media", id)).toBeNull();
     }
   });
 

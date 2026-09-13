@@ -1,3 +1,5 @@
+import { STUDIO_MATERIAL_BRUSH_DEFINITIONS } from "./studio-material-brush-catalog";
+
 import {
   STUDIO_BRUSH_PACK_CATALOG_IDS,
   isStudioBrushPackCatalogId,
@@ -268,6 +270,10 @@ const DESCRIPTOR_ROWS: readonly DescriptorRow[] = [
   ["점증 망점 그라데이션", "점증 망점", "필압과 속도에 따라 점 크기와 간격이 함께 변해 부드러운 망점 농담을 만드는 촉", "tone", 28, 0.88, "ink-particle", "tone", 0.74],
   ["윤곽 추종 해칭", "윤곽 해칭", "진행 방향과 펜 기울기를 따라 평행선 각도가 자연스럽게 바뀌는 명암 갈퀴", "tone", 26, 0.82, "dry-media", "dashed", 0.7],
   ["집중 방사선", "집중선", "빠른 획에서 중심을 향한 가는 방사선과 잔선을 길게 뽑는 만화 효과 붓", "effect", 30, 0.94, "ink-particle", "wavy", 0.8],
+  ...STUDIO_MATERIAL_BRUSH_DEFINITIONS.map((row): DescriptorRow => [
+    row.name, row.shortName, row.hint, row.category, row.width, row.opacity,
+    row.runtime, row.preview, 0.84,
+  ]),
 ];
 
 if (DESCRIPTOR_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {

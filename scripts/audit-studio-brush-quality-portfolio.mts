@@ -34,9 +34,9 @@ const failures: string[] = [];
 const productIds = STUDIO_BRUSH_QUALITY_PORTFOLIO.map((entry) => entry.id);
 const productIdSet = new Set(productIds);
 
-if (productIds.length !== 48) failures.push(`product total is ${productIds.length}, expected 48`);
+if (productIds.length !== 80) failures.push(`product total is ${productIds.length}, expected 80`);
 if (new Set(productIds).size !== productIds.length) failures.push("duplicate product ids");
-if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint !== 46) failures.push("paint total is not 46");
+if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint !== 78) failures.push("paint total is not 78");
 if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.erase !== 2) failures.push("eraser total is not 2");
 
 for (const [label, inventory] of [
