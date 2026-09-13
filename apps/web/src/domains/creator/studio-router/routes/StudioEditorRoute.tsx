@@ -1,5 +1,6 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 
+import { resolveStudioEditorDocumentRoute } from "../../studio-editor-document-source";
 import { studioEditorInstanceKey } from "../../studio-editor-scope";
 import { studioWorkspaceDocumentIdentity } from "../../studio-workspace-route";
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -24,7 +25,10 @@ export function StudioEditorRoute({ resolution }: {
 }) {
   const { data: session } = useSession();
   const authScopeKey = session?.user?.id ?? null;
-  const route = resolution.workspaceRoute;
+  const route = useMemo(
+    () => resolveStudioEditorDocumentRoute(resolution.workspaceRoute),
+    [resolution.workspaceRoute],
+  );
   const identity = studioWorkspaceDocumentIdentity(route);
   const draftScope = useStudioDraftScope(identity, authScopeKey);
   const editorKey = studioEditorInstanceKey({
