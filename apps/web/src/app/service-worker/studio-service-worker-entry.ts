@@ -235,6 +235,7 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
   try {
     return await prepareStudioOfflineResources({
       origin: scope.location.origin, buildId: manifest.buildId, urls,
+      drawingUrls: manifest.offlineUrls ?? [],
       shellUrls: manifest.shellUrls, criticalUrls: manifest.criticalUrls, warmUrls: manifest.warmUrls,
       read: async (url) => {
         const routeClass = classify(url);
@@ -242,10 +243,22 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
         const critical = await readCached("precache", request, routeClass);
         if (critical) return critical;
         const bucket = studioServiceWorkerCacheBucket(routeClass);
-        return bucket ? readCached(bucket, request, routeClass) : undefined;
+        const cached = bucket ? await readCached(bucket, request, routeClass) : undefined;
+        if (cached && (manifest.offlineUrls ?? []).includes(url)) {
+          // Only the build-bounded core pack is pinned against runtime trimming.
+          await persist("precache", request, cached);
+          const pinned = await readCached("precache", request, routeClass);
+          if (pinned && bucket && bucket !== "precache") {
+            // Remove a redundant copy only after the protected copy is verified.
+            await caches.open(cacheNames[bucket]).then((cache) => cache.delete(request)).catch(() => undefined);
+          }
+          return pinned;
+        }
+        return cached;
       },
       write: async (url, response) => {
         const bucket = manifest.shellUrls.includes(url) || manifest.criticalUrls.includes(url)
+          || (manifest.offlineUrls ?? []).includes(url)
           ? "precache" : studioServiceWorkerCacheBucket(classify(url));
         if (bucket) await persist(bucket, new Request(url), response);
       },
