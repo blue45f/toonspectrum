@@ -39,6 +39,19 @@ describe("studio immersive shell", () => {
     );
   });
 
+  it("loads optional public settings outside the startup and immersive editor paths", () => {
+    const appSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
+      "utf8",
+    );
+    expect(appSource).not.toMatch(/import\s*\{[^}]*FloatingControls[^}]*\}\s*from/);
+    expect(appSource).toContain("const FloatingControls = lazy(");
+    expect(appSource).toContain('import("@/shared/components/FloatingControls")');
+    const controlsSource = appSource.slice(appSource.indexOf("function WebFloatingControls()"));
+    expect(controlsSource).toMatch(/<Suspense fallback=\{null\}>\s*<FloatingControls/);
+    expect(appSource).toContain("floatingControls={isolatedChrome ? null : <WebFloatingControls />}");
+  });
+
   it("keeps one retained 3D host in the AppShell chrome layer", () => {
     const appSource = readFileSync(
       path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
