@@ -57,7 +57,7 @@ describe("StudioWorkspaceRegion", () => {
     const view = render(<StudioWorkspaceRegion surfaceId="test" label="테스트 도구"><Child /></StudioWorkspaceRegion>);
     fireEvent.change(screen.getByRole("textbox", { name: "이름" }), { target: { value: "작업 중인 값" } });
     act(() => setStudioWorkspaceArranging(true));
-    fireEvent.keyDown(screen.getByRole("button", { name: "테스트 도구 이동" }), { key: "ArrowRight", altKey: true });
+    fireEvent.keyDown(await screen.findByRole("button", { name: "테스트 도구 이동" }), { key: "ArrowRight", altKey: true });
     expect(regionNode().dataset.studioRegionFloating).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "테스트 도구 원래 자리로 붙이기" }));
     expect(regionNode().dataset.studioRegionFloating).toBe("false");

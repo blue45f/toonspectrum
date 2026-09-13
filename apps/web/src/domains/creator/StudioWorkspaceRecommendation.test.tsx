@@ -20,11 +20,11 @@ describe("StudioWorkspaceRecommendation", () => {
     expect(html).toContain('data-testid="studio-workspace-recommendation"');
     expect(html).toContain('aria-labelledby=');
     expect(html).toContain('aria-describedby=');
-    expect(html).toContain("클립 스튜디오형");
-    expect(html).toContain("클립 스튜디오에서 익숙했던 레이어 중심 동선");
-    expect(html).toContain("왼쪽 페이지 · 오른쪽 레이어·속성 · 캔버스 우선 배치");
-    expect(html).toContain('aria-label="클립 스튜디오형 작업공간으로 전환"');
-    expect(html).toContain('data-workspace-id="csp-migration"');
+    expect(html).toContain("빠른 스케치");
+    expect(html).toContain("처음이라면 가장 단순한 화면으로 시작하세요.");
+    expect(html).toContain("캔버스 우선 · 되돌리기 · 펜 · 지우개 중심");
+    expect(html).toContain('aria-label="빠른 스케치 작업공간으로 전환"');
+    expect(html).toContain('data-workspace-id="quick-sketch"');
     expect(html).toContain("min-h-11");
   });
 });
