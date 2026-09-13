@@ -11,19 +11,28 @@ permissions:
 
 concurrency:
   group: character-production-verification-20260913
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   production-browser:
-    runs-on: ubuntu-24.04
+    name: production-browser (${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            lane: swiftshader
+          - os: macos-14
+            lane: native
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
       CI: '1'
       HUSKY: '0'
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=6144
       TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
       TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR: artifacts/character-production
-      TOONSPECTRUM_CHARACTER_GPU_LANE: swiftshader
+      TOONSPECTRUM_CHARACTER_GPU_LANE: ${{ matrix.lane }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -54,8 +63,75 @@ jobs:
           writeFileSync('artifacts/character-production/http.json', JSON.stringify(responses, null, 2));
           console.log(JSON.stringify(responses, null, 2));
           JS
+      - name: Prepare CSP-safe verifier and PSD cancellation coverage
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          source = Path('scripts/verify-studio-character-shaper.mts').read_text()
+          def replace(old, new, count=1):
+              global source
+              assert source.count(old) == count, f'Verifier drift: expected {count} occurrences of {old[:100]}'
+              source = source.replace(old, new)
+          # Production connect-src intentionally excludes data:. Decode the test's own PNG
+          # bytes directly; never disable CSP or alter response headers/application bundles.
+          replace('const response = await fetch(`data:image/png;base64,${encodedPng}`);\n    const bitmap = await createImageBitmap(await response.blob());',
+                  'const bytes = Uint8Array.from(atob(encodedPng), (value) => value.charCodeAt(0));\n    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));', 2)
+          replace('const png = await fetch(`data:image/png;base64,${encodedPng}`);\n    const bitmap = await createImageBitmap(await png.blob());',
+                  'const bytes = Uint8Array.from(atob(encodedPng), (value) => value.charCodeAt(0));\n    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));')
+          replace('const beauty = new Uint8Array(await (await fetch(`data:application/octet-stream;base64,${encodedBeauty}`)).arrayBuffer());',
+                  'const beauty = Uint8Array.from(atob(encodedBeauty), (value) => value.charCodeAt(0));')
+          replace('evidence.consoleErrors = consoleErrors;\n    page.on', '''evidence.consoleErrors = consoleErrors;
+              const httpErrors: { url: string; status: number }[] = [];
+              evidence.httpErrors = httpErrors;
+              page.on("response", (response) => {
+                if (response.status() >= 400 && httpErrors.length < 100) {
+                  const u = new URL(response.url());
+                  httpErrors.push({ url: u.origin + u.pathname, status: response.status() });
+                }
+              });
+              page.on''')
+          needle = '    const downloadPromise = page.waitForEvent("download", { timeout: 120_000 });\n    await psdButton.click();'
+          replace(needle, '''    const cancelledPsdDownloads: string[] = [];
+              const onCancelledPsdDownload = (download: Download) => cancelledPsdDownloads.push(download.suggestedFilename());
+              page.on("download", onCancelledPsdDownload);
+              await page.evaluate(() => {
+                const report = { progress: null as number | null, phase: "", requested: false, expired: false };
+                Object.assign(window, { __psdCancellation: report });
+                const observer = new MutationObserver(() => {
+                  const status = [...document.querySelectorAll('[data-character-shaper="true"] [role="status"]')]
+                    .map((element) => element.textContent ?? "").join(" ");
+                  const match = /PSD (.+) 계산 중 · (\\d+)%/u.exec(status);
+                  const percentage = match ? Number(match[2]) : 0;
+                  if (!match || percentage <= 0 || percentage >= 100) return;
+                  const cancel = [...document.querySelectorAll<HTMLButtonElement>('[data-character-shaper="true"] button')]
+                    .find((button) => button.textContent?.trim() === "내보내기 취소" && !button.disabled);
+                  if (!cancel) return;
+                  report.progress = percentage;
+                  report.phase = match[1];
+                  report.requested = true;
+                  observer.disconnect();
+                  clearTimeout(timeout);
+                  cancel.click();
+                });
+                const timeout = setTimeout(() => { observer.disconnect(); report.expired = true; }, 35000);
+                observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+              });
+              await psdButton.click();
+              try {
+                await page.getByRole("status").filter({ hasText: "내보내기를 취소했습니다." }).waitFor({ timeout: 40000 });
+                const cancelled = await page.evaluate(() => (window as unknown as { __psdCancellation: { progress: number | null; phase: string; requested: boolean; expired: boolean } }).__psdCancellation);
+                invariant(cancelled.requested && !cancelled.expired && cancelled.progress !== null && cancelled.progress > 0 && cancelled.progress < 100, "PSD computation did not expose cancellable progress");
+                invariant(cancelledPsdDownloads.length === 0, "Cancelled PSD downloaded a file");
+                invariant(await psdButton.isEnabled(), "PSD cancellation did not release capture authority");
+                evidence.psdComputationCancellation = { ...cancelled, downloads: cancelledPsdDownloads.length, lockReleased: true };
+              } finally { page.off("download", onCancelledPsdDownload); }
+              // Original full PSD decode, layer checks and exact PNG composition checks follow.
+              const downloadPromise = page.waitForEvent("download", { timeout: 120_000 });
+              await psdButton.click();''')
+          Path('scripts/verify-studio-character-shaper.production.mts').write_text(source)
+          PY
       - name: Verify live character rendering, edits, PNG, cancellation, PSD and mobile
-        run: pnpm exec tsx scripts/verify-studio-character-shaper.mts
+        run: pnpm exec tsx scripts/verify-studio-character-shaper.production.mts
       - name: Print evidence summary
         if: always()
         run: |
@@ -67,18 +143,19 @@ jobs:
           const summary = {status:e.status, origin:e.origin, capturedAt:e.capturedAt, browserVersion:e.browserVersion, renderer:e.renderer,
             beforeStats:e.beforeStats, hairPeakTileDelta:e.hairPeakTileDelta, topPeakTileDelta:e.topPeakTileDelta,
             transparentPng:e.transparentPng, transparentPng4k:e.transparentPng4k, pngRenderingCancellation:e.pngRenderingCancellation,
+            psdComputationCancellation:e.psdComputationCancellation,
             psdDimensions:e.psdDimensions, psdLayers:e.psdLayers, psdRasterLayers:e.psdRasterLayers,
             psdPngComposition:e.psdPngComposition, psdWorkerUrls:e.psdWorkerUrls, psdFailure:e.psdFailure,
             escOrder:e.escOrder, mobileWidths:e.mobileWidths,
             mobileViolations:e.mobileControlBounds?.map(x=>({width:x.width,exportOpen:x.exportOpen,violations:x.violations})),
-            accessibleNameGaps:e.accessibleNameGaps, consoleErrors:e.consoleErrors};
+            accessibleNameGaps:e.accessibleNameGaps, consoleErrors:e.consoleErrors, httpErrors:e.httpErrors};
           console.log(JSON.stringify(summary, null, 2));
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Live production browser verification\n\nThis is Chromium WebGL2 via SwiftShader, not a native hardware GPU test. No deployment or production application source was modified by this verification.\n\n```json\n' + JSON.stringify(summary, null, 2) + '\n```\n');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, '# Live production browser verification\n\nLane: ' + process.env.TOONSPECTRUM_CHARACTER_GPU_LANE + '. Check the actual renderer identity; a software renderer never proves native hardware behavior. No production application source, deployment settings or CSP were modified.\n\n```json\n' + JSON.stringify(summary, null, 2) + '\n```\n');
           JS
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: character-production-20260913
+          name: character-production-20260913-${{ matrix.lane }}
           path: artifacts/character-production
           retention-days: 7
           if-no-files-found: warn
