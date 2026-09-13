@@ -4,6 +4,8 @@ on:
     branches: ['feat/offline-inference-spatial-20260913']
     paths:
       - 'apps/web/public/offline-draw/**'
+      - 'apps/web/public/offline-drawing/**'
+      - 'apps/web/public/offline-drawing.html'
       - 'apps/web/public/spatial-reader/**'
       - 'apps/web/src/**'
       - 'apps/api/src/modules/studio-ai/**'
@@ -14,8 +16,11 @@ on:
     branches: [main]
     paths:
       - 'apps/web/public/offline-draw/**'
+      - 'apps/web/public/offline-drawing/**'
+      - 'apps/web/public/offline-drawing.html'
       - 'apps/web/public/spatial-reader/**'
       - 'apps/web/src/app/service-worker/**'
+      - 'apps/web/src/shared/lib/studio-offline-protocol.ts'
       - 'apps/web/src/domains/creator/ai/CreatorInference*'
       - 'apps/api/src/modules/studio-ai/**'
       - 'services/creator-inference/**'
@@ -37,8 +42,10 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             apps/web/public/offline-draw
+            apps/web/public/offline-drawing
             apps/web/public/spatial-reader
             apps/web/src/app/service-worker
+            apps/web/src/shared/lib
             services/creator-inference
             tools/creator-runtime
       - uses: actions/setup-node@v6
