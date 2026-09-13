@@ -116,7 +116,7 @@ export function CreatorInferencePage() {
         {job.artifacts.map((artifact) => <button key={artifact.name} type="button" disabled={busy} onClick={() => { void download(job, artifact); }}>{artifact.name} · {(artifact.bytes / 1048576).toFixed(1)}MB · 검증 후 받기</button>)}
         {TERMINAL.has(job.state) && <button type="button" onClick={() => { if (window.confirm("서버의 생성 결과를 삭제할까요? 필요한 파일을 먼저 보관하세요.")) void api.delete(`/studio-ai/inference/jobs/${job.id}`, { timeout: 15_000 }).then(() => refresh()).catch(notifyError); }}>서버 결과 삭제</button>}
       </article>)}
-      {preview && <figure><figcaption>{preview.name} · 무결성 검증된 파일</figcaption>{preview.mime === "video/mp4" ? <video key={preview.url} src={preview.url} controls playsInline preload="metadata" /> : preview.mime === "image/png" ? <img src={preview.url} alt="선택한 생성 작업의 결과 또는 참조 이미지" /> : <p>파일을 저장했습니다. GLB는 3D 스튜디오, PNG는 드로잉, MP4는 영상 편집에서 불러올 수 있습니다.</p>}</figure>}
+      {preview && <figure><figcaption>{preview.name} · 무결성 검증된 파일</figcaption>{preview.mime === "video/mp4" ? <video key={preview.url} src={preview.url} controls muted playsInline preload="metadata" aria-label={`${preview.name} · 소리 없이 재생되는 생성형 애니메이션 미리보기`} /> : preview.mime === "image/png" ? <img src={preview.url} alt="선택한 생성 작업의 결과 또는 참조 이미지" /> : <p>파일을 저장했습니다. GLB는 3D 스튜디오, PNG는 드로잉, MP4는 영상 편집에서 불러올 수 있습니다.</p>}</figure>}
     </section></div>
   </main>;
 }
