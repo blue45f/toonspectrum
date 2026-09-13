@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ClassicNightstand_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "wood",
+      "vintage",
+      "table",
+      "gothic",
+      "victorian",
+      "decorative"
+    ],
+    "date_published": 1585605600,
+    "name": "Classic Nightstand 01",
+    "categories": [
+      "furniture",
+      "table"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "sponsors": [
+      "44302755"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 2002,
+    "texel_density": 2187.8989666731377,
+    "dimensions": [
+      567.7522718906403,
+      424.192875623703,
+      699.9649838462041
+    ],
+    "files_hash": "7128adabb43129d3a868602cc864cb0c1222767e",
+    "description": "Free 4K model of a vintage Victorian Gothic wooden nightstand - ornate carved details, cabriole legs and open shelf; perfect decorative table/furniture prop.",
+    "category_id": "7d0d2d4a-62ed-5630-b9aa-a300ea86c609",
+    "category": "Furniture/Tables/Side & End Tables",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "bcf335f6",
+    "download_count": 20551,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/ClassicNightstand_01.png?width=256&height=256&v=bcf335f6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/ClassicNightstand_01/ClassicNightstand_01_2k.gltf",
+      "bytes": 2754,
+      "sha256": "3f6a42ee06170729fe2b6b2c634086e99c79840809c2efcfd638db458aaa2392",
+      "sourceMd5": "a5150fedfff4d8f038f84eba684fe69d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ClassicNightstand_01/ClassicNightstand_01_arm_2k.jpg",
+      "bytes": 420333,
+      "sha256": "c010760b3ac18c20819d8e2050ee6558cd609ad467cec5470dded17f8c3512d0",
+      "sourceMd5": "d4d97ebb35b98acc6e1ff3c648232bc8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/ClassicNightstand_01/ClassicNightstand_01.bin",
+      "bytes": 68684,
+      "sha256": "1ac0f3065df040e5a85c3807fa07947de7185ad40ed064f3399fa9fc93387a7f",
+      "sourceMd5": "a97360812af4796a6abf592b4f893b51"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ClassicNightstand_01/ClassicNightstand_01_diff_2k.jpg",
+      "bytes": 379963,
+      "sha256": "28098ebfce9c903d8887f9f5b6af01b7a1c14bb9e5dd18ad122597c3e674b17d",
+      "sourceMd5": "74fd48f2236b8aae5189f1c62df45ced"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ClassicNightstand_01/ClassicNightstand_01_nor_gl_2k.jpg",
+      "bytes": 544961,
+      "sha256": "6dacc7b985c4be4ac627ebfc289caf5084994374a9495dec8341c258be706c89",
+      "sourceMd5": "6ea052007433809cc5d30a62780fa3d9"
+    }
+  ]
+}

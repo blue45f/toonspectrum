@@ -1,0 +1,99 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/gravel_embedded_concrete",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Gravel Embedded Concrete",
+    "categories": [
+      "outdoor",
+      "man made",
+      "plaster-concrete",
+      "concrete",
+      "floor"
+    ],
+    "type": 1,
+    "tags": [
+      "pavement",
+      "rough",
+      "concrete",
+      "cement",
+      "gravel",
+      "coarse",
+      "stony",
+      "gravelly",
+      "cemented floor",
+      "floor",
+      "gravelly ground",
+      "gritty"
+    ],
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1686182400,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "sponsors": [
+      "26820710"
+    ],
+    "files_hash": "6d9294be6494fc3fd1f4d685a3c47ac61a888f5b",
+    "description": "Free 8K texture of gravel-embedded concrete: coarse, gritty cement with scattered small stones, neutral gray-brown tones and pronounced rough surface.",
+    "category_id": "70d3bf8f-46b0-5250-a419-61cbf068f448",
+    "category": "Concrete/Cast Walls & Floors/Exposed Aggregate",
+    "attributes": {
+      "surface_use": "paving",
+      "origin": "man_made",
+      "setting": "outdoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "caba892c",
+    "download_count": 108068,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/gravel_embedded_concrete.png?width=256&height=256&v=caba892c"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_embedded_concrete/gravel_embedded_concrete_diff_2k.jpg",
+      "bytes": 4494107,
+      "sha256": "9ca6676079e9131eb1da1e19985ed192b6e27dd2cb77c9a09c2028922e79103f",
+      "sourceMd5": "cae2defce1c9848592bfd7824f87cfb0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_embedded_concrete/gravel_embedded_concrete_rough_2k.jpg",
+      "bytes": 2359640,
+      "sha256": "d1d982e1b0fed13bd465546528be6d85d2b2682cf7e9a1b78897bc61a1dd1445",
+      "sourceMd5": "6a8fceaf050093ecb413dfd50a287379"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_embedded_concrete/gravel_embedded_concrete_nor_gl_2k.jpg",
+      "bytes": 5845760,
+      "sha256": "38a9d392a99f56d61912cbd46cad97ea5eef70caf5c2b30b03f0a9966eac5ec8",
+      "sourceMd5": "b53b6fd21cfcbde560bb4835d261a6c7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_embedded_concrete/gravel_embedded_concrete_ao_2k.jpg",
+      "bytes": 3901710,
+      "sha256": "94d8fee6fcf08ae5ca4699181790c0072ae1684d1f19383d795b33f2c69f96fd",
+      "sourceMd5": "aaf76210bddf91cc47ccb0a17b426441"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_embedded_concrete/gravel_embedded_concrete_disp_2k.jpg",
+      "bytes": 2730543,
+      "sha256": "b24f6f2620429adb897089688a19d1b9d6954a2bbe57ada3e001735f9fa0f5b3",
+      "sourceMd5": "12bb9d70137181dca7ff6a317e4498c4"
+    }
+  ]
+}

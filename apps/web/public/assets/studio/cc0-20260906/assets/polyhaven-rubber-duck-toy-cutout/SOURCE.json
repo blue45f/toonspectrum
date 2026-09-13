@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rubber_duck_toy",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-rubber-duck-toy",
+  "sourceModelSha256": "0d9dd0ce3d5404b68c60d83de4e550eaf0d3937a277e4dbc0df2a64db1b763dd",
+  "render": {
+    "sourceId": "polyhaven-rubber-duck-toy",
+    "sourceSha256": "0d9dd0ce3d5404b68c60d83de4e550eaf0d3937a277e4dbc0df2a64db1b763dd",
+    "path": "high-resolution-props/polyhaven-rubber-duck-toy.png",
+    "visiblePixels": 468905,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4288
+  },
+  "independentOriginal": false
+}

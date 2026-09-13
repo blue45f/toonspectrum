@@ -1,0 +1,94 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/stone_tiles_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1679788800,
+    "name": "Stone Tiles 02",
+    "categories": [
+      "floor",
+      "rock",
+      "outdoor",
+      "wall"
+    ],
+    "type": 1,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "info": null,
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "tags": [
+      "uneven",
+      "rock",
+      "stones",
+      "stone",
+      "floor",
+      "tiles",
+      "rocks",
+      "slates"
+    ],
+    "sponsors": [
+      "4714267"
+    ],
+    "files_hash": "746cd3c7d37b94201ed0cb4e9a407e0c7b013caf",
+    "description": "Free 8K stone tile texture featuring uneven slate slabs, rough chiseled surfaces, defined grout joints and subtle weathering, with natural color variation.",
+    "category_id": "0dc6c67b-4dfa-5355-ad12-9918fc376459",
+    "category": "Stone/Slabs & Tiles/Slate",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "fbbcd60a",
+    "download_count": 131648,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/stone_tiles_02.png?width=256&height=256&v=fbbcd60a"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stone_tiles_02/stone_tiles_02_diff_2k.jpg",
+      "bytes": 3487320,
+      "sha256": "02e056f5f5fbcbd90212bd4c7b8c1e979a10685a3291b6b25b19eeeb84f7d410",
+      "sourceMd5": "2e724b32ab8dd4db86f829cda244e567"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stone_tiles_02/stone_tiles_02_rough_2k.jpg",
+      "bytes": 2251026,
+      "sha256": "3b9e6650f97baa5e52fac3f5106666ee4c89c335440bc9255c2e1ab20b88de4c",
+      "sourceMd5": "2666b7d512c29e092c6fa7e125bd3445"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stone_tiles_02/stone_tiles_02_nor_gl_2k.jpg",
+      "bytes": 3482959,
+      "sha256": "badd9a55dbf1b53217408f49303286d8a93f5e7074c6869b6f53a9a547a6a6ce",
+      "sourceMd5": "d0de6ee2144cc77331623c1a0aae4e51"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stone_tiles_02/stone_tiles_02_ao_2k.jpg",
+      "bytes": 2053378,
+      "sha256": "601434863e2885565314160e62c311b1859c27aa761220455f018d086f87442c",
+      "sourceMd5": "925df8094077f8211a1f64c14bbe1d85"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stone_tiles_02/stone_tiles_02_disp_2k.jpg",
+      "bytes": 1240968,
+      "sha256": "5501abc25461e9920ae09aa61e6b6af015918b8c39588b4ab2355501472733f8",
+      "sourceMd5": "2e875007ce2806df249669afb8fbc8bc"
+    }
+  ]
+}
