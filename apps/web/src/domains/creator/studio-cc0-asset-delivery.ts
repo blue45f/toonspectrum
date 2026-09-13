@@ -5,7 +5,7 @@ const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
-export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture";
+export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture" | "background" | "prop-image";
 export interface StudioCc0OriginalDelivery {
   readonly path: string;
   readonly bytes: number;
@@ -51,6 +51,10 @@ export const STUDIO_CC0_CATEGORY_LABELS: Readonly<Record<string, string>> = Obje
   "pbr-detailed-prop": "디테일 가구 · 생활 소품",
   "effect-mask": "투명 효과 마스크",
   "surface-material": "표면 재질",
+  "background-street": "거리 · 골목 · 건축 배경",
+  "background-nature": "숲 · 정원 · 해안 배경",
+  "background-interior": "실내 · 홀 · 창고 배경",
+  "rendered-prop": "2D 투명 소품 · 3D 원본 렌더",
 });
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -157,7 +161,7 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
     const license = record(asset?.license);
     if (!asset || typeof asset.id !== "string" || !/^[a-z0-9-]{1,200}$/u.test(asset.id)
       || ids.has(asset.id) || typeof asset.name !== "string" || asset.name.length > 160
-      || !["model", "effect-mask", "surface-texture"].includes(String(asset.kind))
+      || !["model", "effect-mask", "surface-texture", "background", "prop-image"].includes(String(asset.kind))
       || typeof asset.category !== "string" || asset.category.length > 80
       || typeof asset.path !== "string" || typeof asset.sha256 !== "string" || !SHA256.test(asset.sha256)
       || !Number.isSafeInteger(asset.bytes) || Number(asset.bytes) <= 0 || Number(asset.bytes) > 64 * 1024 * 1024
@@ -169,6 +173,10 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
     if (source.protocol !== "https:" || !["kenney.nl", "ambientcg.com", "polyhaven.com"].includes(source.hostname)
       || source.username || source.password || source.port) throw new TypeError("확인되지 않은 에셋 공급처입니다.");
     studioCc0AssetUrl(asset.path);
+    if (asset.previewPath !== undefined) {
+      if (typeof asset.previewPath !== "string") throw new TypeError("에셋 미리보기 경로가 올바르지 않습니다.");
+      studioCc0AssetUrl(asset.previewPath);
+    }
     const kind = asset.kind as StudioCc0AssetKind;
     if ((kind === "model") !== asset.path.endsWith(".glb")) throw new TypeError("에셋 형식이 맞지 않습니다.");
     if (kind === "model") {

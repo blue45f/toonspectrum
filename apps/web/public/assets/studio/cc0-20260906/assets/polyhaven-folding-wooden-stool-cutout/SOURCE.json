@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-folding-wooden-stool",
+  "sourceModelSha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+  "render": {
+    "sourceId": "polyhaven-folding-wooden-stool",
+    "sourceSha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+    "path": "high-resolution-props/polyhaven-folding-wooden-stool.png",
+    "visiblePixels": 477057,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 6324
+  },
+  "independentOriginal": false
+}

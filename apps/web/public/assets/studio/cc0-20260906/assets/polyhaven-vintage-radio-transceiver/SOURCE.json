@@ -1,0 +1,118 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Vintage Radio Transceiver",
+    "tags": [
+      "military",
+      "army",
+      "communications",
+      "frequency dial",
+      "field radio",
+      "radio",
+      "ww2",
+      "telegraph",
+      "handset",
+      "microphone"
+    ],
+    "description": "Free 4K model of a vintage military radio transceiver with weathered olive-drab case, frequency dial, cables, whip antenna, desk mic and Morse key.",
+    "authors": {
+      "Mateusz Sadek": "All"
+    },
+    "donated": true,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 42350,
+    "files_hash": "f343f538ee1b638da93aeaf450e50e428a57a2f4",
+    "texel_density": 6164.614992279997,
+    "dimensions": [
+      618.1803643703461,
+      417.8741127252579,
+      434.39279100857675
+    ],
+    "date_published": 1776328733,
+    "social_post_pending": false,
+    "categories": [
+      "appliances",
+      "electronics",
+      "collection: project_lighthouse"
+    ],
+    "category_id": "b35ed6a9-9da0-5515-9373-e5bc17cca6b5",
+    "category": "Electronics & Appliances/Audio & Video/Radios & Portable Audio",
+    "collections": [
+      "project_lighthouse"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "metal",
+        "plastic"
+      ]
+    },
+    "img_version": "29482940",
+    "download_count": 2074,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/vintage_radio_transceiver.png?width=256&height=256&v=29482940"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/vintage_radio_transceiver/vintage_radio_transceiver_2k.gltf",
+      "bytes": 25848,
+      "sha256": "97a942911b68440da250ae0d829a5ae0075df121148c07bf941bef7c6da9f07d",
+      "sourceMd5": "af5ddd4c138c5df0f3b71dcc55f1cb78"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_nor_gl_2k.jpg",
+      "bytes": 1809010,
+      "sha256": "0847075bff7d68574dcf65986f6c441cfb46c4619878786b1beffe3ad853622a",
+      "sourceMd5": "ff82c5beffbb15b6b957068146bd29c2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_diff_2k.jpg",
+      "bytes": 2978698,
+      "sha256": "87f03f8ce4b48d78083609a91afc9172f09ffe572c622342c6352b04ab90356f",
+      "sourceMd5": "ca8ed94854fd44184fe4709bc191934b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_arm_2k.jpg",
+      "bytes": 3683828,
+      "sha256": "3b301d0a23ccc10711e88380af600e12b74c5e564b6bb3b94f002bfd86124bc1",
+      "sourceMd5": "8e4e2afe7b1169af11238411bd81e482"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_accessories_nor_gl_2k.jpg",
+      "bytes": 1927802,
+      "sha256": "fb0a8dc541d9b6337405354df580144c95804490f1ba0bc24a46ed7b79128979",
+      "sourceMd5": "13f79c9f8a46b0c4481f97876abf0226"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_accessories_diff_2k.jpg",
+      "bytes": 2759700,
+      "sha256": "67124a78e7de97188ddee5f43b5dc58068dacd679a03cfc15da3c768bd495991",
+      "sourceMd5": "6d8f410e64947c3c3b74cda91f33a1e6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_radio_transceiver/vintage_radio_transceiver_accessories_arm_2k.jpg",
+      "bytes": 3430814,
+      "sha256": "f9c03b0960f0e0723327ff9f73e9818a8c17fdbc28fa931c82b295647067397c",
+      "sourceMd5": "ad1bea0b52eddb104d95709f086e399e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/vintage_radio_transceiver/vintage_radio_transceiver.bin",
+      "bytes": 1740024,
+      "sha256": "392976de8f78517141a42c8a4685463c8db508d3ce4ac04e7235d6a5374c0de1",
+      "sourceMd5": "81b1c00a7fe0254f6d507bb80111368f"
+    }
+  ]
+}

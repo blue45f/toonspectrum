@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/chinese_commode",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Chinese Commode",
+    "categories": [
+      "furniture",
+      "shelves"
+    ],
+    "type": 2,
+    "tags": [
+      "vintage",
+      "antique",
+      "wooden",
+      "ornate",
+      "asian",
+      "traditional",
+      "cabinet"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 6775,
+    "texel_density": 961.4824067347025,
+    "dimensions": [
+      4490.48638343811,
+      1169.9001789093018,
+      2019.874095916748
+    ],
+    "date_published": 1720137600,
+    "files_hash": "2147126f22f7db5b928dc5e9911f766f50a89b58",
+    "description": "Free 8K model of a vintage Chinese wooden commode with ornate carvings, round brass hardware and warm aged patina - traditional cabinet.",
+    "category_id": "14debc4f-6ceb-597a-a824-8de173aa95a9",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "brass"
+      ]
+    },
+    "img_version": "9f1b845f",
+    "download_count": 5813,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/chinese_commode.png?width=256&height=256&v=9f1b845f"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/chinese_commode/chinese_commode_2k.gltf",
+      "bytes": 7067,
+      "sha256": "b89a10f24ab533a554abae1326f35bfbacefdfbaab4f332c3d3cdecc02ca66fe",
+      "sourceMd5": "35499b60d8ac07d9c58fafb9342d6a87"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_commode/chinese_commode_nor_gl_2k.jpg",
+      "bytes": 1702387,
+      "sha256": "35856527bb17337605387c78c7322ea885730754e3f03cee2e1ac50aeee1471b",
+      "sourceMd5": "e3a5b1d307c3102ecb8d808e619e21c7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_commode/chinese_commode_diff_2k.jpg",
+      "bytes": 2016367,
+      "sha256": "5ced3a43a9a814abc0e4b6f615cf81b1e32b307b5a01e0fbb8c06b57d7570bfc",
+      "sourceMd5": "ecf9ac263c15b0845fc5734e9dcd5e4a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/chinese_commode/chinese_commode.bin",
+      "bytes": 215792,
+      "sha256": "90d1bd352c559418fc070546d02dafeee9f14889bc7538abbfd517ab28b81b9a",
+      "sourceMd5": "f304e851e0c3e35a0e6fc135633c16a2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_commode/chinese_commode_arm_2k.jpg",
+      "bytes": 2388120,
+      "sha256": "fa947dfcf0d7e46338207314abc0c17ee89ab2125993df7cafd5d5794536a11e",
+      "sourceMd5": "13bf8c7fb732caedc68a1e12a39ecb5b"
+    }
+  ]
+}
