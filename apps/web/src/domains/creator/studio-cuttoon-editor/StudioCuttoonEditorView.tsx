@@ -12,6 +12,7 @@ import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
+import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
 import { Container } from "@/shared/components/container";
 import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorChrome } from "./StudioCuttoonEditorChrome";
@@ -22,6 +23,8 @@ import { StudioCuttoonEditorWorkspace } from "./StudioCuttoonEditorWorkspace";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 export type { StudioCuttoonEditorViewSession };
+
+const CHROME_LAYOUT = { version: 2, xRatio: 0.3, yRatio: 0.08, width: 980, height: 220, dock: "free", positionLocked: false, sizeLocked: false } as const;
 
 export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
   const {
@@ -130,7 +133,17 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           (isFullscreen || maximized) && "min-h-0"
         )}
       >
-        <StudioCuttoonEditorChrome {...s} />
+        <StudioWorkspaceRegion
+          surfaceId="top-chrome"
+          label="상단 메뉴·도구"
+          defaultLayout={CHROME_LAYOUT}
+          minWidth={560}
+          minHeight={160}
+          disabled={isMobile || canvasOnlyMode || mobileImmersive}
+          className="w-full"
+        >
+          <StudioCuttoonEditorChrome {...s} />
+        </StudioWorkspaceRegion>
         <StudioDraftSaveCenter
           key={s.effectiveWorkId ?? s.workId ?? "new-work"}
           saving={s.saving}
