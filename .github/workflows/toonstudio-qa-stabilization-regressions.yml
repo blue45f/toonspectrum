@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/toonstudio-qa-stabilization-regressions.yml
       - apps/api/src/modules/legal/**
+      - apps/web/src/domains/legal/**
+      - packages/core/src/legal-policy.ts
       - apps/web/src/domains/creator/studio-editor-document-source*
       - apps/web/src/domains/creator/studio-project-document-store.ts
       - apps/web/src/domains/creator/studio-workspace-route.ts
@@ -39,9 +41,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Run real policy and document-source regressions
+      - name: Run policy display and local document regressions
         run: |
           set -euo pipefail
           pnpm exec vitest run \
-            apps/api/src/modules/legal/legal.controller.json-body-regression.test.ts \
+            apps/web/src/domains/legal/policy-page.test.tsx \
+            apps/web/src/domains/legal/policy-recovery.test.tsx \
             apps/web/src/domains/creator/studio-editor-document-source.test.ts
