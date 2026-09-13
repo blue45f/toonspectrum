@@ -24,6 +24,7 @@ import {
   duplicateStudioEffectEntry,
   resetStudioEffectEntry,
 } from "./studio-effects-workspace";
+import { studioSmartFilterMutationError } from "./studio-smart-filter-mutation";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
@@ -624,18 +625,6 @@ function StudioSmartFilterControls({
       ) : null}
     </div>
   );
-}
-
-/** Used by every mutation, including duplicate and recipe append, not just catalog insertion. */
-export function studioSmartFilterMutationError(
-  next: StudioAdjustmentStack,
-  maxEntries?: number,
-  validateStack?: (next: StudioAdjustmentStack) => string | null,
-): string | null {
-  if (maxEntries !== undefined && next.entries.length > maxEntries) {
-    return `이 레이어에는 필터를 최대 ${maxEntries}개까지 저장할 수 있어요.`;
-  }
-  return validateStack?.(next) ?? null;
 }
 
 export function StudioSmartFiltersPanel({
