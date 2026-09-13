@@ -1,0 +1,97 @@
+name: Stage overlapping asset integration
+on:
+  push:
+    branches: [ops/merge-all-audit-20260913]
+    paths: [.github/workflows/stage-asset-integration.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Preserve verified asset identities and combine only new selections
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,copy,hashlib,json,os,pathlib,subprocess,tempfile,urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          main='8ed6c67e03660932c45916e26131e37533c5d30a';head='c5492f734f0663e80ea12bbe619f256908e4921b'
+          def call(path,payload=None):
+              req=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
+          def tree(commit):
+              sha=call('git/commits/'+commit)['tree']['sha'];data=call('git/trees/'+sha+'?recursive=1');assert not data.get('truncated')
+              return sha,{e['path']:{k:e[k] for k in ('sha','mode','type')} for e in data['tree'] if e['type']!='tree'}
+          def digest(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+          cache={}
+          def blob(sha):
+              if sha not in cache:
+                  data=call('git/blobs/'+sha);assert data['encoding']=='base64';raw=base64.b64decode(data['content']);assert digest(raw)==sha;cache[sha]=raw
+              return cache[sha]
+          main_tree,mt=tree(main);_,ht=tree(head);base=call('compare/'+main+'...'+head+'?per_page=1')['merge_base_commit']['sha'];_,bt=tree(base)
+          current=mt.copy();duplicates=[];source_duplicates=[]
+          manifest='apps/web/public/assets/studio/cc0-20260906/manifest.json'
+          for path in sorted(set(bt)|set(ht)):
+              if bt.get(path)==ht.get(path) or mt.get(path)==ht.get(path):continue
+              ours,old,new=mt.get(path),bt.get(path),ht.get(path)
+              if ours==old:
+                  assert new is not None,'Unexpected asset removal';current[path]=new;continue
+              if path.endswith('/SOURCE.json'):
+                  a,b=json.loads(blob(ours['sha'])),json.loads(blob(new['sha']))
+                  ac,bc=copy.deepcopy(a),copy.deepcopy(b)
+                  for item in (ac,bc):item['license'].pop('checkedOn',None);item['metadata'].pop('download_count',None)
+                  assert ac==bc,('Different asset provenance',path)
+                  source_duplicates.append(path);continue
+              if path==manifest:
+                  a,b=json.loads(blob(ours['sha'])),json.loads(blob(new['sha']));assert a['schema']==b['schema']
+                  by_id={e['id']:e for e in a['assets']};assert len(by_id)==len(a['assets'])
+                  added=[]
+                  for asset in b['assets']:
+                      previous=by_id.get(asset['id'])
+                      if previous is None:a['assets'].append(asset);by_id[asset['id']]=asset;added.append(asset['id']);continue
+                      if previous==asset:continue
+                      for key in ('path','sha256','bytes','kind'):assert previous.get(key)==asset.get(key),(asset['id'],key)
+                      for key in ('id','provider','sourceUrl','commercialUse','redistributionAllowed'):assert previous['license'].get(key)==asset['license'].get(key),(asset['id'],key)
+                      duplicates.append({'id':asset['id'],'sha256':asset['sha256'],'retained_name':previous['name'],'alternate_name':asset['name'],'retained_review':previous.get('visualReviewSource'),'alternate_review':asset.get('visualReviewSource')})
+                      # An empty picture frame is conservatively classified as a component.
+                      if previous.get('role')=='assembly-component' or asset.get('role')=='assembly-component':previous['role']='assembly-component'
+                  assert len(duplicates)==49 and len(added)==3,(len(duplicates),added)
+                  assert len(a['assets'])==1307
+                  raw=(json.dumps(a,ensure_ascii=False,indent=2)+'\n').encode();sha=digest(raw);cache[sha]=raw;current[path]={**ours,'sha':sha};continue
+              assert all(e and e['type']=='blob' for e in (ours,old,new)),('Unreviewed structural conflict',path)
+              with tempfile.TemporaryDirectory() as td:
+                  f=pathlib.Path(td)
+                  for label,e in [('main',ours),('base',old),('head',new)]:(f/label).write_bytes(blob(e['sha']))
+                  result=subprocess.run(['git','merge-file','-p',str(f/'main'),str(f/'base'),str(f/'head')],capture_output=True)
+              assert result.returncode==0,('Unreviewed text conflict',path)
+              sha=digest(result.stdout);cache[sha]=result.stdout;current[path]={**new,'sha':sha}
+          path='apps/web/src/domains/creator/studio-shared-asset-drag.test.ts'
+          text=blob(current[path]['sha']).decode();old='expect(allLegacyAndSelectableAssets).toHaveLength(80);'
+          assert text.count(old)==1
+          text=text.replace(old,'expect(allLegacyAndSelectableAssets).toHaveLength(104);')
+          raw=text.encode();sha=digest(raw);cache[sha]=raw;current[path]={**current[path],'sha':sha}
+          # Preserve the alternate review/name decisions as evidence without replacing validated
+          # canonical previews, geometry bytes, PBR maps or the existing library's selections.
+          evidence='docs/quality/studio-quality-assets-20260913/integration-provenance.json'
+          raw=(json.dumps({'base':main,'head':head,'unique_additions':added,'same_byte_duplicates':duplicates,'source_documents_retained':source_duplicates},ensure_ascii=False,indent=2)+'\n').encode();sha=digest(raw);cache[sha]=raw;current[evidence]={'sha':sha,'mode':'100644','type':'blob'}
+          entries=[];root=pathlib.Path('artifacts/asset-integration');root.mkdir(parents=True)
+          for path,e in sorted(current.items()):
+              if e==mt.get(path):continue
+              assert not path.startswith('.github/')
+              if e['sha'] in cache:
+                  raw=cache[e['sha']];assert call('git/blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})['sha']==e['sha']
+              entries.append({'path':path,**e})
+          sha=call('git/trees',{'base_tree':main_tree,'tree':entries})['sha']
+          report={'main':main,'head':head,'tree':sha,'changed_paths':[e['path'] for e in entries],'duplicate_originals':len(duplicates),'new_originals':added,'illustrations_added':24,'source_duplicates':len(source_duplicates),'refs_updated':False}
+          (root/'candidate.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: reconciled-asset-candidate
+          path: artifacts/asset-integration
+          if-no-files-found: error
+          retention-days: 3
