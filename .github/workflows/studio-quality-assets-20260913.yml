@@ -9,6 +9,9 @@ on:
       - .github/workflows/studio-quality-assets-20260913.yml
 permissions:
   contents: read
+concurrency:
+  group: studio-quality-assets-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   inspect:
     runs-on: ubuntu-latest
@@ -18,10 +21,13 @@ jobs:
         with:
           filter: blob:none
           sparse-checkout: |
-            .github/workflows
-            scripts
-            apps/web/src/domains/creator
-            apps/web/public/assets/studio/cc0-20260906/manifest.json
+            /.github/workflows/
+            /scripts/
+            /apps/web/src/domains/creator/
+            /apps/web/public/assets/studio/cc0-20260906/manifest.json
+            /package.json
+            /pnpm-lock.yaml
+            /tsconfig.json
           sparse-checkout-cone-mode: false
       - name: Export source for isolated review
         run: |
