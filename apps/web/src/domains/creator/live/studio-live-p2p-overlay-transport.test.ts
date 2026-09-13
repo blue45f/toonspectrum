@@ -237,6 +237,10 @@ class MemoryRtcHub {
     return channel;
   }
 
+  setReliable(): void {
+    for (const channel of this.channels) Object.assign(channel, { ordered: true, maxRetransmits: null, maxPacketLifeTime: null });
+  }
+
   setBufferedAmount(value: number): void {
     for (const channel of this.channels) channel.bufferedAmount = value;
   }
@@ -1198,5 +1202,47 @@ describe("Studio live P2P overlay binary ink lane (V18)", () => {
       expect(remote.sendInk?.(inkPredictionWire(REMOTE, "stroke-budget", sequence))).toBe(true);
     }
     expect(receivedInk).toHaveLength(STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS);
+  });
+});
+
+describe("strict direct huddle lane", () => {
+  it("binds sender identity and never emits message bodies to the primary", async () => {
+    const { hub, local, remote, localPrimary } = await connectedMesh(); hub.setReliable();
+    const received = vi.fn(); remote.direct!.subscribe(received);
+    const before = localPrimary.sent.length;
+    expect(local.direct!.getPeers()).toEqual([REMOTE]);
+    expect(local.direct!.send(REMOTE.sessionId, "private P2P message")).toBe(true);
+    expect(received).toHaveBeenCalledWith(LOCAL, "private P2P message");
+    expect(localPrimary.sent).toHaveLength(before);
+    local.close(); remote.close();
+  });
+  it("fails closed on backpressure and on a data channel send exception", async () => {
+    const { hub, local, remote, localPrimary } = await connectedMesh(); hub.setReliable();
+    const before = localPrimary.sent.length;
+    hub.setBufferedAmount(256 * 1024);
+    expect(local.direct!.send(REMOTE.sessionId, "never relay")).toBe(false);
+    hub.setBufferedAmount(0); hub.failOnNthSend(1);
+    expect(local.direct!.send(REMOTE.sessionId, "never relay either")).toBe(false);
+    expect(localPrimary.sent).toHaveLength(before);
+    local.close(); remote.close();
+  });
+  it("requires a reliable admitted channel and stops when admission disconnects", async () => {
+    const { hub, local, remote, localPrimary } = await connectedMesh();
+    expect(local.direct!.getPeers()).toEqual([]);
+    expect(local.direct!.send(REMOTE.sessionId, "unreliable")).toBe(false);
+    hub.setReliable(); expect(local.direct!.getPeers()).toHaveLength(1);
+    localPrimary.ready = false;
+    expect(local.direct!.getPeers()).toEqual([]);
+    expect(local.direct!.send(REMOTE.sessionId, "disconnected")).toBe(false);
+    local.close(); remote.close();
+  });
+  it("removes downgraded viewers and unknown recipients from direct delivery", async () => {
+    const { hub, local, remote, localPrimary } = await connectedMesh(); hub.setReliable();
+    expect(local.direct!.send("unknown", "private")).toBe(false);
+    localPrimary.emit(envelope({ sender: { ...REMOTE, role: "viewer" }, kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" }, sequence: 99 }));
+    expect(local.direct!.getPeers()).toEqual([]);
+    expect(local.direct!.send(REMOTE.sessionId, "denied")).toBe(false);
+    local.close(); remote.close();
   });
 });
