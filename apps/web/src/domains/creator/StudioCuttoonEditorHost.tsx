@@ -7727,28 +7727,25 @@ export function StudioCuttoonEditor({
     });
   }
 
-  function clearAutosaveRecord(canClearAutosave: () => boolean) {
-    return clearStudioAutosaveRecord({
-      canClearAutosave,
-      autosaveKey,
-      autosaveRecoveryCandidateRef,
-      clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
-        autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
-      }),
-      remixId,
-      setAutosaveRestoreBlockedReason,
-      setHasAutosave,
-      workId,
-    });
-  }
-
-  /** Clear recovery through the shared confirmation and durable-authority transaction. */
+  /** Confirm once, then recheck the same mutation ticket before and after durable deletion. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
+    const canClearAutosave = () => canApplyStudioMutation(ticket);
     await requestStudioAutosaveClear({
-      canClearAutosave: () => canApplyStudioMutation(ticket),
+      canClearAutosave,
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord: () => clearAutosaveRecord(() => canApplyStudioMutation(ticket)),
+      clearAutosaveRecord: () => clearStudioAutosaveRecord({
+        canClearAutosave,
+        autosaveKey,
+        autosaveRecoveryCandidateRef,
+        clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+          autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+        }),
+        remixId,
+        setAutosaveRestoreBlockedReason,
+        setHasAutosave,
+        workId,
+      }),
     });
   }
 
