@@ -829,7 +829,7 @@
       ],
       "previewFitScale": 2.660234427266727,
       "originalName": "액자 · Hanging Picture Frame 02",
-      "role": "finished-asset",
+      "role": "assembly-component",
       "visualReviewLevel": "contact-sheet-visual-triage",
       "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
@@ -4932,7 +4932,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.3209305703639984,
-          -0.00001953914761543274,
+          -1.953914761543274e-05,
           -0.335950642824173
         ],
         "max": [
@@ -5035,7 +5035,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.5043071508407593,
-          -5.651812884366336e-8,
+          -5.651812884366336e-08,
           -0.6613625288009644
         ],
         "max": [
@@ -5271,7 +5271,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.21267758309841156,
-          0.00003679741712403484,
+          3.679741712403484e-05,
           -0.22118140757083893
         ],
         "max": [
@@ -5691,7 +5691,7 @@
         "min": [
           -0.0649944543838501,
           -0.11076043857230826,
-          -6.450776016278167e-9
+          -6.450776016278167e-09
         ],
         "max": [
           0.06446599215269089,
@@ -5802,7 +5802,7 @@
       "sourceBoundsAabb": {
         "min": [
           -1.143192172050476,
-          -2.483498029448583e-8,
+          -2.483498029448583e-08,
           -0.4851073920726776
         ],
         "max": [
@@ -6767,7 +6767,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.9862761497497559,
-          -0.0000064620744524290785,
+          -6.4620744524290785e-06,
           -0.4694533050060272
         ],
         "max": [
@@ -6870,7 +6870,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.44760647416114807,
-          5.0353154534832356e-8,
+          5.0353154534832356e-08,
           -0.9984514713287354
         ],
         "max": [
@@ -7143,7 +7143,7 @@
         "min": [
           -0.19324660301208496,
           -0.394923597574234,
-          -2.31228973746056e-8
+          -2.31228973746056e-08
         ],
         "max": [
           0.19324655830860138,
@@ -7577,7 +7577,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.2500464802817314,
-          -0.00006496906280517578,
+          -6.496906280517578e-05,
           -0.25097261662777115
         ],
         "max": [
@@ -9028,7 +9028,7 @@
         "min": [
           -0.17600713670253754,
           -0.0735805481672287,
-          -3.725290298461914e-8
+          -3.725290298461914e-08
         ],
         "max": [
           0.16679838299751282,
@@ -9342,7 +9342,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.20170873403549194,
-          2.97835756057907e-9,
+          2.97835756057907e-09,
           -0.22829124331474304
         ],
         "max": [
@@ -10041,7 +10041,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.04838135838508606,
-          -0.000022622070900979452,
+          -2.2622070900979452e-05,
           -0.04581700265407562
         ],
         "max": [
@@ -10464,7 +10464,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.1399787813425064,
-          -3.978568940965488e-8,
+          -3.978568940965488e-08,
           -0.12324045598506927
         ],
         "max": [
@@ -10654,7 +10654,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.4417688846588135,
-          -0.0000887151836650446,
+          -8.87151836650446e-05,
           -0.12653666734695435
         ],
         "max": [
@@ -10781,7 +10781,7 @@
       "sourceBoundsAabb": {
         "min": [
           -1.220000147819519,
-          0.000016823410987854004,
+          1.6823410987854004e-05,
           -0.27000001072883606
         ],
         "max": [
@@ -12228,7 +12228,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.01598476432263851,
-          -0.0000026982656891050283,
+          -2.6982656891050283e-06,
           -0.10739462822675705
         ],
         "max": [
@@ -64735,6 +64735,54 @@
       "visualReviewLevel": "contact-sheet-visual-triage",
       "visualReviewSource": "artifact:9975049171#page=4",
       "role": "finished-asset"
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "name": "괭이밥 조립용 식생",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "plant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-shrub-sorrel-01/shrub_sorrel_01.glb",
+      "bytes": 3695048,
+      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "geometrySha256": "bd778328e1185d92996ac7bc48d1a58bdf7258fa841a9725523e26a9a45498a0",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-shrub-sorrel-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.3520993459969759,
+        0.05800367915071547,
+        0.14641038584522903
+      ],
+      "previewFitScale": 5.680215037994355,
+      "originalName": "Shrub Sorrel 01",
+      "role": "assembly-component",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
     }
   ]
 }
