@@ -131,6 +131,14 @@
       ]
     },
     {
+      "source": "/assets/studio/cc0-20260906/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "CDN-Cache-Control", "value": "no-cache" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
       "source": "/vrm/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },

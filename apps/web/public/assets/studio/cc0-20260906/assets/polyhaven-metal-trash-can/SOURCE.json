@@ -1,0 +1,116 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/metal_trash_can",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Metal Trash Can",
+    "type": 2,
+    "authors": {
+      "GurJas Studios": "All"
+    },
+    "info": null,
+    "date_published": 1695772800,
+    "categories": [
+      "industrial",
+      "containers",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "bin",
+      "rubbish",
+      "garbage",
+      "disposal",
+      "litter",
+      "dumpster",
+      "outdoor trash can",
+      " urban",
+      "utility"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 13960,
+    "texel_density": 3549.006764417269,
+    "dimensions": [
+      1846.9352722167969,
+      556.2898814678192,
+      906.1697272554738
+    ],
+    "files_hash": "3ecbee3adbcc53b4af3c8f010e76e10c5b7558a2",
+    "description": "Free 8K model of a weathered metal trash can with removable lid, ribbed cylindrical body, dents, heavy rust, grime and realistic industrial wear.",
+    "category_id": "9fa7d8d0-1c7b-567d-a382-9dac692c8bbd",
+    "category": "Containers & Storage/Cans, Tins & Bottles/Trash Cans",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "rusted"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "img_version": "8a394a6d",
+    "download_count": 25978,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/metal_trash_can.png?width=256&height=256&v=8a394a6d"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/metal_trash_can/metal_trash_can_2k.gltf",
+      "bytes": 15481,
+      "sha256": "6d1ebfbbd1fc4bfa59f5c9ab9138981200e67d9dcf30a405045f6e415153b633",
+      "sourceMd5": "f6089fb6e3a6e56c1671bc0a3a2da13b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_arm_2k.jpg",
+      "bytes": 2756651,
+      "sha256": "168c3143575152a64c4d5b205a53e0748d76eeb6ea8376e14914b41c9f6fd6a2",
+      "sourceMd5": "635558bf6d3c32ff8c81727cb5c83414"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_rust_diff_2k.jpg",
+      "bytes": 2716140,
+      "sha256": "b927a4eeb7be65eb8f0bb1fd8d4ae19647bf7a86759c09c0de43cdc8256a45d6",
+      "sourceMd5": "92ff88b0455c0d8d2e234727e2b494a7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_rust_arm_2k.jpg",
+      "bytes": 2270609,
+      "sha256": "410d2508ed6ef2525f2126979f5a55f0f3d273bcb4ab5231f1a624c47f300488",
+      "sourceMd5": "531274b720ddc1b7ef2e94d3c2acb2fe"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_diff_2k.jpg",
+      "bytes": 2073937,
+      "sha256": "2f2cec31a3d8cd2117eb0358e253e53f78181310975441b9e6e45b580d0079e7",
+      "sourceMd5": "9320eaea1cad31ba288ead643aa13a2a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/metal_trash_can/metal_trash_can.bin",
+      "bytes": 378288,
+      "sha256": "a9b9f526b655bef865933335f2cfc8c8f0bd1a35fda05b290a93e3061f2b6c8a",
+      "sourceMd5": "fbde1679a66ea644223b97ebc8336a77"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_rust_nor_gl_2k.jpg",
+      "bytes": 4229931,
+      "sha256": "48c901b6acd1fa161fc9d0de0f4b6945629315133819f2d5ad5957a67686722c",
+      "sourceMd5": "4c6cbca1e0d276f7206d94708ecec624"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/metal_trash_can/metal_trash_can_nor_gl_2k.jpg",
+      "bytes": 3034809,
+      "sha256": "7bb12839b501bdb605be02a8ba86c3f283197ec35bbcb5be5a85e8cdfdb7f953",
+      "sourceMd5": "a2a82099a9f7330a852047a24b1dcabe"
+    }
+  ]
+}

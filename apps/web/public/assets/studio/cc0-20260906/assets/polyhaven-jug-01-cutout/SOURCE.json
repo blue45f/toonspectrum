@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/jug_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-jug-01",
+  "sourceModelSha256": "ca2467e354dc995588b832f1ad6b0c472430730a4b94e43a552bb44142001832",
+  "render": {
+    "sourceId": "polyhaven-jug-01",
+    "sourceSha256": "ca2467e354dc995588b832f1ad6b0c472430730a4b94e43a552bb44142001832",
+    "path": "high-resolution-props/polyhaven-jug-01.png",
+    "visiblePixels": 375042,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 5770
+  },
+  "independentOriginal": false
+}

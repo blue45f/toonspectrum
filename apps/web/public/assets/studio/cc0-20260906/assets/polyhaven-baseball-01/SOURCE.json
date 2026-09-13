@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/baseball_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Baseball 01",
+    "categories": [
+      "props"
+    ],
+    "date_published": 1623767596,
+    "authors": {
+      "Rico Cilliers": "All"
+    },
+    "sponsors": [
+      "11167855"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2712,
+    "texel_density": 42488.31012291544,
+    "dimensions": [
+      73.97906854748726,
+      75.37996023893356,
+      75.57932659983635
+    ],
+    "files_hash": "2570badfc665299a65e2d65140a8e7f66b9ef413",
+    "tags": [
+      "ball",
+      "baseball",
+      "toy",
+      "kids",
+      "child",
+      "sport",
+      "stitches",
+      "round"
+    ],
+    "description": "Free 8K model: realistic baseball with red stitching, worn white leather, subtle scuffs and visible grain for a high-resolution prop.",
+    "category_id": "ba452b18-0442-5d9d-b0b6-2f001f956f6d",
+    "category": "Leisure/Sports/Balls",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "leather"
+      ]
+    },
+    "img_version": "6dc8191b",
+    "download_count": 27311,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/baseball_01.png?width=256&height=256&v=6dc8191b"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/baseball_01/baseball_01_2k.gltf",
+      "bytes": 2678,
+      "sha256": "e24148a3471e31fa220e9b82ea4e26f0a8aed8b8d0db32b2b30371bed62931b1",
+      "sourceMd5": "c29d04e3cef0c4257208be16aa577baf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/baseball_01/baseball_01.bin",
+      "bytes": 294880,
+      "sha256": "14967a62aabf57152ff58f9a3f56daa758e749e4ff8f4a75637265f162062c7c",
+      "sourceMd5": "cef635f66cb787d13c6d55cf5d1fb701"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/baseball_01/baseball_01_rough_2k.jpg",
+      "bytes": 811453,
+      "sha256": "2fc9fd014f69ce7a7628e6564634f01fbddb06fed116d7d14421562f7dc31a2c",
+      "sourceMd5": "23cf52072c8a9d63d9925edc85d1014f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/baseball_01/baseball_01_diff_2k.jpg",
+      "bytes": 687956,
+      "sha256": "cb30ef3734ef64be4775a33c7b3b99078e575d1fb351946b05d96d6c545a81fc",
+      "sourceMd5": "1f7f4ecb86b8f7b9d08acf29bd8514f0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/baseball_01/baseball_01_nor_gl_2k.jpg",
+      "bytes": 1184934,
+      "sha256": "c1cb97991c520e8672671ab255e76007a1484643a7d86310b6f5423f0a80ed53",
+      "sourceMd5": "649810bcc0ab8a08568f247a5333062a"
+    }
+  ]
+}

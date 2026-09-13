@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rollershutter_window_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-rollershutter-window-01",
+  "sourceModelSha256": "5cb622fd3dd2871511d69af9982c12e5f8420cb338c0203ec79a0733abe3a3fc",
+  "render": {
+    "sourceId": "polyhaven-rollershutter-window-01",
+    "sourceSha256": "5cb622fd3dd2871511d69af9982c12e5f8420cb338c0203ec79a0733abe3a3fc",
+    "path": "high-resolution-props/polyhaven-rollershutter-window-01.png",
+    "visiblePixels": 177284,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 1104
+  },
+  "independentOriginal": false
+}
