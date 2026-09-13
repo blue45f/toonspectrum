@@ -28,7 +28,7 @@ export class LegalController {
           HttpStatus.BAD_GATEWAY
         );
       }
-      return response.json();
+      return await response.json();
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException({ error: "policy_fetch_failed" }, HttpStatus.BAD_GATEWAY);
