@@ -1,4 +1,5 @@
 import { CanvasTexture, Color, DoubleSide, Group, LinearFilter, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Raycaster, RingGeometry, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer, type Texture } from "three";
+import { spatialCaptionPages as captionPages } from "./spatial-caption-pages";
 import { nextSpatialPanel, visibleSpatialPanels, type SpatialBook } from "./spatial-book";
 export interface SpatialReaderRuntime {
   focus(index: number): void;
@@ -16,7 +17,7 @@ function label(text: string): CanvasTexture {
   const context = canvas.getContext("2d"); if (!context) throw new Error("캔버스를 지원하지 않는 브라우저예요.");
   context.fillStyle = "#162435"; context.fillRect(0,0,1024,256); context.fillStyle = "#ffffff"; context.font = "32px system-ui";
   let line = "", y = 48;
-  for (const character of Array.from(text.slice(0,240))) { if (context.measureText(line+character).width > 960 || character === "\n") { context.fillText(line,32,y); line = ""; y += 43; if (y > 230) break; } if (character !== "\n") line += character; }
+  for (const character of Array.from(text)) { if (context.measureText(line+character).width > 960 || character === "\n") { context.fillText(line,32,y); line = ""; y += 43; if (y > 230) break; } if (character !== "\n") line += character; }
   if (y <= 230) context.fillText(line,32,y);
   const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace; texture.generateMipmaps = false; texture.minFilter = LinearFilter; return texture;
 }
@@ -43,7 +44,6 @@ export function createSpatialReader(element: HTMLElement, book: SpatialBook, ini
   let index=nextSpatialPanel(initialIndex,0,book.panels.length),generation=0,disposed=false,entering=false,ar=false,placing=false;
   let session: XRSession|null=null,hitSource: XRHitTestSource|null=null;
   let targets: Mesh[]=[];let scale=1;let captionPage=0;
-  const captionPages=(value:string)=>{const chars=Array.from(value);return Array.from({length:Math.max(1,Math.ceil(chars.length/120))},(_,i)=>chars.slice(i*120,(i+1)*120).join(""));};
   const ray=new Raycaster(),rotation=new Matrix4(),direction=new Vector3(),position=new Vector3();
   const mesh=(texture:Texture,width:number,height:number)=>new Mesh(new PlaneGeometry(width,height),new MeshBasicMaterial({map:texture,side:DoubleSide,transparent:true,depthWrite:false}));
   function navigation() {
@@ -55,7 +55,7 @@ export function createSpatialReader(element: HTMLElement, book: SpatialBook, ini
     for(const slot of visibleSpatialPanels(index,book.panels.length)){
       const panel=book.panels[slot],delta=slot-index;const group=new Group();group.position.set(delta*2.25,1.45,(ar?0:-3)-Math.abs(delta)*.4);group.rotation.y=-delta*.1;panels.add(group);
       const pages=captionPages(panel.caption);const page=delta===0?captionPage%pages.length:0;
-      const caption=mesh(label(`${slot+1}/${book.panels.length} · ${panel.title.slice(0,28)} · 대사 ${page+1}/${pages.length}\n${pages[page]}`),1.9,.48);caption.position.y=-1.06;caption.userData.index=slot;if(delta===0&&pages.length>1)caption.userData.captionStep=1;group.add(caption);targets.push(caption);
+      const caption=mesh(label(`${slot+1}/${book.panels.length} · ${panel.title.replace(/\s+/gu," ").slice(0,12)} · 대사 ${page+1}/${pages.length}\n${pages[page]}`),1.9,.48);caption.position.y=-1.06;caption.userData.index=slot;if(delta===0&&pages.length>1)caption.userData.captionStep=1;group.add(caption);targets.push(caption);
       const add=async(src:string,depth:number)=>{
         const {texture,aspect}=await rasterTexture(src);
         if(disposed||version!==generation){texture.dispose();return;}
