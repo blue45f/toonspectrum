@@ -4,6 +4,11 @@ import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
+const CatalogResearchPage = lazyRetry(
+  () => import("@/domains/creator-resources/CatalogResearchPage").then((module) => ({ default: module.CatalogResearchPage })),
+  "CatalogResearchPage",
+);
+
 const CreatorHubPage = lazyRetry(
   () => import("@/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })),
   "CreatorHubPage",
@@ -62,6 +67,8 @@ export const creatorResourcesRoutes = defineAppRoutes([
 
   // Research remains a public reference destination; project-bound references move into Story.
   { id: "resources-now", path: "/now", element: <NowPage /> },
+  { id: "research-catalog", path: "/research/catalog", element: <CatalogResearchPage /> },
+  { id: "research-catalog-notebook", path: "/research/catalog/notebook", element: <CatalogResearchPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
   { id: "research-materials", path: "/research/materials", element: <MaterialAtlasPage /> },
