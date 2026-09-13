@@ -9,11 +9,12 @@
  *  - **flat** — the same frame with MToon shading neutralised (`shadeColorFactor` := base colour,
  *    `shadingShiftFactor`/`shadingToonyFactor` := 1). The light rig is untouched, so the only
  *    difference between the two frames is the toon shading itself.
- *  - **shadow/highlight** — normalized Multiply/Screen factors that reconstruct opaque beauty
- *    from flat colour; translucent edges still require separate composite quality checks.
+ *  - **shadow/highlight** — opaque normalized Multiply/Screen factors inside an isolated colour
+ *    group; the group's raster mask applies the captured Beauty alpha exactly once.
  *  - **line** — Sobel over the flat pass (alpha edge ∪ luminance edge). Flat colour excludes toon
  *    shadow boundaries. A dark surface is not itself ink: only its boundaries contribute.
- *  - **surface-paint** — only when the paint runtime hands over its paint-only textures.
+ *  - **surface-paint** — only when the paint runtime hands over its paint-only textures. Like the
+ *    Sobel line, this is retained as a hidden extraction reference because flat already carries it.
  *  - **mask-**\* — one alpha silhouette per semantic group, rendered by hiding every other mesh.
  *
  * Honesty rules: a pass that cannot be produced is reported in `skipped` with a Korean reason and

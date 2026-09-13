@@ -5,6 +5,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import {
+  measureStudioVrmSkirtBodyProfile,
+  readStudioVrmSkirtBodyProfileSignature,
+  type StudioVrmSkirtBodyProfile,
+} from "./studio-vrm-skirt-body-profile";
+import {
   WARDROBE_FABRICS,
   sanitizeWardrobeMetrics,
   wardrobeFabricById,
@@ -153,6 +158,7 @@ export interface StudioVrmXpbdSkirtSurface {
   readonly retain: () => boolean;
   readonly release: () => void;
   readonly updateMaterial: (color: string, fabricId: WardrobeEquip["fabricId"]) => void;
+  readonly updateTopologyReceipt: (topology: StudioVrmXpbdSkirtTopology) => void;
 }
 
 export type StudioVrmXpbdSkirtAttachmentUnavailableCode =
@@ -190,6 +196,7 @@ export type StudioVrmXpbdSkirtAttachmentFrameResult =
 export type StudioVrmXpbdSkirtCaptureSync = () => StudioVrmXpbdSkirtAttachmentFrameResult;
 
 export interface StudioVrmXpbdSkirtAttachmentRuntime {
+  readonly bodyProfile: StudioVrmSkirtBodyProfile;
   readonly topologyGeneration: number;
   readonly topology: StudioVrmXpbdSkirtTopology;
   readonly surface: StudioVrmXpbdSkirtSurface;
@@ -335,16 +342,17 @@ function sampleRig(
   scene: THREE.Object3D,
   nodes: SkirtRigNodes,
   metrics: WardrobeMetrics,
+  readPosition: (node: THREE.Object3D) => THREE.Vector3 | null = (node) => sceneLocalPosition(scene, node),
 ): SampledSkirtRig | null {
   scene.updateMatrixWorld(true);
-  const hips = sceneLocalPosition(scene, nodes.hips);
-  const spine = sceneLocalPosition(scene, nodes.spine);
-  const leftUpperLeg = sceneLocalPosition(scene, nodes.leftUpperLeg);
-  const rightUpperLeg = sceneLocalPosition(scene, nodes.rightUpperLeg);
-  const leftLowerLeg = sceneLocalPosition(scene, nodes.leftLowerLeg);
-  const rightLowerLeg = sceneLocalPosition(scene, nodes.rightLowerLeg);
-  const leftFoot = nodes.leftFoot ? sceneLocalPosition(scene, nodes.leftFoot) : null;
-  const rightFoot = nodes.rightFoot ? sceneLocalPosition(scene, nodes.rightFoot) : null;
+  const hips = readPosition(nodes.hips);
+  const spine = readPosition(nodes.spine);
+  const leftUpperLeg = readPosition(nodes.leftUpperLeg);
+  const rightUpperLeg = readPosition(nodes.rightUpperLeg);
+  const leftLowerLeg = readPosition(nodes.leftLowerLeg);
+  const rightLowerLeg = readPosition(nodes.rightLowerLeg);
+  const leftFoot = nodes.leftFoot ? readPosition(nodes.leftFoot) : null;
+  const rightFoot = nodes.rightFoot ? readPosition(nodes.rightFoot) : null;
   if (
     !hips || !spine || !leftUpperLeg || !rightUpperLeg || !leftLowerLeg || !rightLowerLeg
     || (nodes.leftFoot && !leftFoot) || (nodes.rightFoot && !rightFoot)
@@ -377,6 +385,34 @@ function sampleRig(
   };
 }
 
+/** Reconstruct rest rotations in scratch matrices; equipping clothes never resets the user's pose. */
+function sampleCanonicalRestRig(vrm: VRM, nodes: SkirtRigNodes, metrics: WardrobeMetrics): SampledSkirtRig | null {
+  const restRotations = new Map<THREE.Object3D, THREE.Quaternion>();
+  for (const [name, pose] of Object.entries(vrm.humanoid.rawRestPose ?? {})) {
+    const node = vrm.humanoid.getRawBoneNode(name as VRMHumanBoneName);
+    if (node && pose?.rotation) restRotations.set(node, new THREE.Quaternion(...pose.rotation));
+  }
+  const matrices = new Map<THREE.Object3D, THREE.Matrix4>([[vrm.scene, new THREE.Matrix4()]]);
+  const matrixFor = (node: THREE.Object3D): THREE.Matrix4 | null => {
+    const cached = matrices.get(node);
+    if (cached) return cached;
+    if (!node.parent) return null;
+    const parent = matrixFor(node.parent);
+    if (!parent) return null;
+    // Bone positions/scales can encode edited proportions; rest rotation removes only pose.
+    const local = new THREE.Matrix4().compose(node.position, restRotations.get(node) ?? node.quaternion, node.scale);
+    const matrix = parent.clone().multiply(local);
+    matrices.set(node, matrix);
+    return matrix;
+  };
+  return sampleRig(vrm.scene, nodes, metrics, (node) => {
+    const matrix = matrixFor(node);
+    if (!matrix) return null;
+    const point = new THREE.Vector3().setFromMatrixPosition(matrix);
+    return finiteVector(point) ? point : null;
+  });
+}
+
 function capsule(
   restHead: StudioVrmXpbdSkirtVec3,
   restTail: StudioVrmXpbdSkirtVec3,
@@ -399,35 +435,35 @@ function bodyProxies(
   rest: SampledSkirtRig,
   current: SampledSkirtRig,
   metrics: WardrobeMetrics,
-  fit: number,
+  profile?: StudioVrmSkirtBodyProfile,
 ): StudioVrmXpbdSkirtBodyProxies | null {
   const thighRadius = Math.max(metrics.hipW * 0.28, (
     metrics.upperLeg.left.len + metrics.upperLeg.right.len
-  ) * 0.065) * fit;
+  ) * 0.065);
   const calfRadius = Math.max(metrics.hipW * 0.22, (
     metrics.lowerLeg.left.len + metrics.lowerLeg.right.len
-  ) * 0.05) * fit;
+  ) * 0.05);
   const result: StudioVrmXpbdSkirtBodyProxies = {
     hips: capsule(
       rest.points.rightUpperLeg,
       rest.points.leftUpperLeg,
       current.points.rightUpperLeg,
       current.points.leftUpperLeg,
-      Math.max(metrics.hipW * 0.38, metrics.shoulderW * 0.2) * fit,
+      profile?.capsules.hips?.radius ?? Math.max(metrics.hipW * 0.38, metrics.shoulderW * 0.2),
     ),
     leftThigh: capsule(
       rest.points.leftUpperLeg,
       rest.points.leftLowerLeg,
       current.points.leftUpperLeg,
       current.points.leftLowerLeg,
-      thighRadius,
+      profile?.capsules.leftThigh?.radius ?? thighRadius,
     ),
     rightThigh: capsule(
       rest.points.rightUpperLeg,
       rest.points.rightLowerLeg,
       current.points.rightUpperLeg,
       current.points.rightLowerLeg,
-      thighRadius,
+      profile?.capsules.rightThigh?.radius ?? thighRadius,
     ),
   };
   if (kind === "longskirt") {
@@ -442,14 +478,14 @@ function bodyProxies(
         rest.points.leftFoot,
         current.points.leftLowerLeg,
         current.points.leftFoot,
-        calfRadius,
+        profile?.capsules.leftCalf?.radius ?? calfRadius,
       ),
       rightCalf: capsule(
         rest.points.rightLowerLeg,
         rest.points.rightFoot,
         current.points.rightLowerLeg,
         current.points.rightFoot,
-        calfRadius,
+        profile?.capsules.rightCalf?.radius ?? calfRadius,
       ),
     };
   }
@@ -581,7 +617,7 @@ export function createStudioVrmXpbdSkirtSurface(
   const restToPoseSteps = topology.kind === "pleated"
     ? devicePlan.pleatedRestToPoseSteps
     : devicePlan.longSkirtRestToPoseSteps;
-  const receipt: StudioVrmXpbdSkirtSurfaceReceipt = Object.freeze({
+  let receipt: StudioVrmXpbdSkirtSurfaceReceipt = Object.freeze({
     kind: "studio-vrm-xpbd-skirt-surface-receipt",
     version: STUDIO_VRM_XPBD_SKIRT_VERSION,
     mode: "xpbd-skirt-v1",
@@ -613,7 +649,12 @@ export function createStudioVrmXpbdSkirtSurface(
     geometry,
     material,
     skeleton,
-    receipt,
+    get receipt() { return receipt; },
+    updateTopologyReceipt(nextTopology) {
+      if (disposed) return;
+      receipt = Object.freeze({ ...receipt, signature: `xpbd-skirt-v1:${nextTopology.topologySha256}` });
+      mesh.userData.studioVrmXpbdSkirtTopologySha256 = nextTopology.topologySha256;
+    },
     get disposed() {
       return disposed;
     },
@@ -664,32 +705,61 @@ export function createStudioVrmXpbdSkirtAttachmentRuntime({
   const resolvedNodes = resolveRigNodes(vrm, kind);
   if (!resolvedNodes.ok) return resolvedNodes;
   const metrics = sanitizeWardrobeMetrics(rawMetrics);
-  const restRig = sampleRig(vrm.scene, resolvedNodes.nodes, metrics);
+  const restRig = sampleCanonicalRestRig(vrm, resolvedNodes.nodes, metrics);
   if (!restRig) return unavailable("invalid-rig-frame", "The skirt rig frame is non-finite or degenerate.");
+  const restBody = bodyProxies(kind, restRig, restRig, metrics);
+  if (!restBody) return unavailable("missing-bone", "The skirt body proxy endpoints are unavailable.");
+  const bodyBones = {
+    hips: resolvedNodes.nodes.hips,
+    leftThigh: resolvedNodes.nodes.leftUpperLeg,
+    rightThigh: resolvedNodes.nodes.rightUpperLeg,
+    leftCalf: resolvedNodes.nodes.leftLowerLeg,
+    rightCalf: resolvedNodes.nodes.rightLowerLeg,
+  };
+  const measurementBones = Object.keys(restBody).map((id) => bodyBones[id as keyof typeof bodyBones]);
+  const measureBody = (proxies: StudioVrmXpbdSkirtBodyProxies) => measureStudioVrmSkirtBodyProfile(
+    vrm.scene, Object.entries(proxies).map(([id, proxy]) => ({
+      id,
+      bone: bodyBones[id as keyof typeof bodyBones],
+      head: proxy.currentHead,
+      tail: proxy.currentTail,
+      fallbackRadius: proxy.radius,
+    })),
+  );
+  const initialRig = sampleRig(vrm.scene, resolvedNodes.nodes, metrics);
+  const initialBody = initialRig && bodyProxies(kind, initialRig, initialRig, metrics);
+  if (!initialBody) return unavailable("invalid-rig-frame", "The current body measurement frame is unavailable.");
+  let bodyProfile = measureBody(initialBody);
+  let bodyProfileSignature = readStudioVrmSkirtBodyProfileSignature(vrm.scene, measurementBones);
   const fit = clamp(Number.isFinite(effectiveFit) ? effectiveFit : 1, 0.75, 1.35);
-  const topologyResult = createStudioVrmXpbdSkirtTopology({
+  const createTopology = (profile: StudioVrmSkirtBodyProfile) => createStudioVrmXpbdSkirtTopology({
     kind,
     metrics: deriveStudioVrmXpbdSkirtMetrics(metrics),
     restWaist: restRig.waist,
+    restBody: bodyProxies(kind, restRig, restRig, metrics, profile)!,
     fit,
     segmentCount: devicePlan.segmentCount,
     ringCount: kind === "pleated" ? devicePlan.pleatedRingCount : devicePlan.longSkirtRingCount,
     solverIterations: devicePlan.solverIterations,
     topologyEpoch: topologyGeneration + 1,
   });
+  const topologyResult = createTopology(bodyProfile);
   if (!topologyResult.ok) {
     return unavailable(
       "topology-unavailable",
       `XPBD skirt topology is unavailable (${topologyResult.code}): ${topologyResult.detail}`,
     );
   }
-  const topology = topologyResult.topology;
+  let topology = topologyResult.topology;
   const surface = createStudioVrmXpbdSkirtSurface(topology, color, fabricId, devicePlan);
   let lastPoseGeneration = -1;
   let solveCount = 0;
   const runtime: StudioVrmXpbdSkirtAttachmentRuntime = {
+    get bodyProfile() {
+      return bodyProfile;
+    },
     topologyGeneration,
-    topology,
+    get topology() { return topology; },
     surface,
     devicePlan,
     get lastPoseGeneration() {
@@ -700,7 +770,9 @@ export function createStudioVrmXpbdSkirtAttachmentRuntime({
     },
     readPoseSignature() {
       const currentRig = sampleRig(vrm.scene, resolvedNodes.nodes, metrics);
-      return currentRig ? sampledRigSignature(currentRig) : null;
+      return currentRig
+        ? `${sampledRigSignature(currentRig)}|body=${readStudioVrmSkirtBodyProfileSignature(vrm.scene, measurementBones)}`
+        : null;
     },
     step(expectedTopologyGeneration, poseGeneration) {
       if (surface.disposed) return unavailable("disposed", "The XPBD skirt surface was disposed.");
@@ -722,12 +794,23 @@ export function createStudioVrmXpbdSkirtAttachmentRuntime({
       }
       const currentRig = sampleRig(vrm.scene, resolvedNodes.nodes, metrics);
       if (!currentRig) return unavailable("invalid-rig-frame", "The current skirt rig frame is unavailable.");
-      const body = bodyProxies(kind, restRig, currentRig, metrics, fit);
+      const currentBodySignature = readStudioVrmSkirtBodyProfileSignature(vrm.scene, measurementBones);
+      let nextProfile = bodyProfile;
+      let nextTopology = topology;
+      if (currentBodySignature !== bodyProfileSignature) {
+        const currentBody = bodyProxies(kind, currentRig, currentRig, metrics);
+        if (!currentBody) return unavailable("missing-bone", "The current body surface endpoints are unavailable.");
+        nextProfile = measureBody(currentBody);
+        const rebuilt = createTopology(nextProfile);
+        if (!rebuilt.ok) return unavailable("topology-unavailable", `The changed body cannot fit the skirt: ${rebuilt.detail}`);
+        nextTopology = rebuilt.topology;
+      }
+      const body = bodyProxies(kind, restRig, currentRig, metrics, nextProfile);
       if (!body) return unavailable("missing-bone", "The current long-skirt calf proxies are unavailable.");
-      const solved = solveStudioVrmXpbdSkirtPose(topology, {
+      const solved = solveStudioVrmXpbdSkirtPose(nextTopology, {
         expectedPoseGeneration: poseGeneration,
         poseGeneration,
-        expectedTopologySha256: topology.topologySha256,
+        expectedTopologySha256: nextTopology.topologySha256,
         currentWaist: currentRig.waist,
         body,
         restToPoseSteps: kind === "pleated"
@@ -748,6 +831,12 @@ export function createStudioVrmXpbdSkirtAttachmentRuntime({
       ) {
         return unavailable("geometry-unavailable", "The skirt GPU position buffer no longer matches its topology.");
       }
+      // A shape edit changes rest constraints and pins atomically with a successful solve.
+      // Pose-only edits preserve the same topology, GPU arrays and fixed waistband shape.
+      topology = nextTopology;
+      bodyProfile = nextProfile;
+      bodyProfileSignature = currentBodySignature;
+      surface.updateTopologyReceipt(topology);
       position.array.set(solved.mesh.positions);
       position.needsUpdate = true;
       surface.geometry.computeVertexNormals();
@@ -883,6 +972,7 @@ export function StudioVrmXpbdSkirtAttachment({
     controller: null,
   });
   const reportedRuntimeRef = useRef<StudioVrmXpbdSkirtAttachmentRuntime | null>(null);
+  const reportedSurfaceSignatureRef = useRef<string | null>(null);
   const reportedUnavailableBindingRef = useRef<StudioVrmXpbdSkirtRuntimeBinding | null>(null);
   const onSurfaceReceiptRef = useRef(onSurfaceReceipt);
   const onAttachmentStatusRef = useRef(onAttachmentStatus);
@@ -932,8 +1022,9 @@ export function StudioVrmXpbdSkirtAttachment({
       return stepped;
     }
     cadenceRef.current.controller?.markSolved(poseSignature);
-    if (reportedRuntimeRef.current !== runtime) {
+    if (reportedRuntimeRef.current !== runtime || reportedSurfaceSignatureRef.current !== runtime.surface.receipt.signature) {
       reportedRuntimeRef.current = runtime;
+      reportedSurfaceSignatureRef.current = runtime.surface.receipt.signature;
       onSurfaceReceiptRef.current(slot, runtime.surface.receipt);
       onAttachmentStatusRef.current?.(slot, equip.itemId, "ready");
     }
@@ -1001,8 +1092,9 @@ export function StudioVrmXpbdSkirtAttachment({
       return;
     }
     cadenceRef.current.controller.markSolved(poseSignature);
-    if (reportedRuntimeRef.current === runtime) return;
+    if (reportedRuntimeRef.current === runtime && reportedSurfaceSignatureRef.current === runtime.surface.receipt.signature) return;
     reportedRuntimeRef.current = runtime;
+    reportedSurfaceSignatureRef.current = runtime.surface.receipt.signature;
     onSurfaceReceiptRef.current(slot, runtime.surface.receipt);
     onAttachmentStatusRef.current?.(slot, equip.itemId, "ready");
   }, VRM_FRAME_XPBD_SKIRT_PRIORITY);

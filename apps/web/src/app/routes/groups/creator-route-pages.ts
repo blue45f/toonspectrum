@@ -145,3 +145,10 @@ export const StudioSpatialReaderPage = lazyRetry(
   () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
   "StudioSpatialReaderPage",
 );
+
+export const StudioCharacterConversionPage = lazyRetry(
+  () => import("@/domains/creator/character-conversion/StudioCharacterConversionPage").then((module) => ({
+    default: module.StudioCharacterConversionPage,
+  })),
+  "StudioCharacterConversionPage",
+);

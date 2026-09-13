@@ -713,6 +713,25 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
     expect(admittedBytes?.[0]).toBe(0x67);
   });
 
+  it("admits authored perspective shift and large-scene cameras unchanged", async () => {
+    const shifted = normalizeStudioBg3dSceneDocument({
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      camera: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        projection: "perspective", lensShift: [0.25, -0.3],
+        position: [0, 0, 1000], target: [0, 0, 0], nearClip: 0.01 },
+    });
+    let received: StudioBg3dBabylonCapturePlan | undefined;
+    const execute = createStudioBg3dBabylonCaptureExecutor(async (_context, plan) => {
+      received = plan;
+      return { rgba: new Uint8Array(16) };
+    });
+    await expect(execute(context(
+      artifactRequest([{ kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE }]),
+      { document: shifted },
+    ))).resolves.toMatchObject({ kind: "studio-bg3d-artifact-capture" });
+    expect(received?.document.camera).toEqual(shifted.camera);
+  });
+
   it("fails closed before rendering unsupported artifacts and scene semantics", async () => {
     const render = vi.fn();
     const execute = createStudioBg3dBabylonCaptureExecutor(render);

@@ -5,11 +5,13 @@
 //
 // 카탈로그 읽기에 Neon/DB 를 전혀 쓰지 않는다(순수 함수만). 리뷰·북마크·인증은 런타임 /api 담당.
 // apps/web/public/data 는 빌드 산출물(.gitignore) — git 소스는 2.3MB gz 하나만 유지한다.
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
+import { buildResearchSnapshot } from "../apps/web/src/shared/lib/catalog-research";
 import {
   buildDetailExtra,
   detailShardBucket,
@@ -172,6 +174,10 @@ async function main(): Promise<void> {
   // 상세 전용 필드(시놉시스 원문·availability.url·ratingDist)는 detail/<bucket>.json 샤드로 분리.
   // 메모리 스토어(TITLES)는 풀 데이터를 유지 — insights(평점분포)·뉴스 매칭 등 빌드 계산은 원본 사용.
   writeJson("catalog.json", TITLES.map(toListTitle));
+  const sourceBytes = readFileSync(SRC_GZ);
+  const sourceMetadata: unknown = JSON.parse(gunzipSync(sourceBytes).toString("utf8"));
+  const sourceHash = createHash("sha256").update(sourceBytes).digest("hex").slice(0, 16);
+  writeJson("research-index.json", buildResearchSnapshot(titles, sourceMetadata, sourceHash));
   const { files: detailShards, entryCount: detailEntryCount } = buildDetailShards(TITLES);
   let detailBytes = 0;
   detailShards.forEach((shard, bucket) => {

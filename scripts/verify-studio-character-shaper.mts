@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { initializeCanvas, readPsd, type Layer } from "ag-psd";
 import { chromium, type Browser, type Download, type Page } from "playwright";
 
+import { compositeCharacterPsdLayers } from "./lib/character-psd-reference-compositor.mjs";
 import {
   findFreePort,
   spawnVitePreview,
@@ -571,6 +572,13 @@ async function main(): Promise<void> {
     invariant(composition.meanAlpha <= 0.1 && [composition.black, composition.white].every((background) =>
       background.meanComposite <= 0.25 && background.overFourShare <= 0.001),
     `PSD Beauty and 2048 PNG composition differ: ${JSON.stringify(composition)}`);
+    // Recompose the downloaded, editable stack independently. The helper ignores merged Beauty.
+    const recomposed = compositeCharacterPsdLayers(psd);
+    const stackComposition = await comparePngWithPsdBeauty(page, pngPath, recomposed, psd.width, psd.height);
+    evidence.psdEditableStackComposition = stackComposition;
+    invariant(stackComposition.meanAlpha <= 0.1 && [stackComposition.black, stackComposition.white].every((background) =>
+      background.meanComposite <= 0.5 && background.overFourShare <= 0.001),
+    `PSD editable layers do not recompose to the PNG: ${JSON.stringify(stackComposition)}`);
     invariant(layerNames.length >= 8, `PSD has too few layers: ${layerNames.join(", ")}`);
     invariant(rasterLayers.length >= 5 && rasterLayers.every((layer) => layer.visiblePixels > 0), "PSD contains missing or empty raster layers");
     invariant(psdWorkerUrls.length === 1, "PSD export did not execute exactly one dedicated assembly Worker");

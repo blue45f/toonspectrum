@@ -10,6 +10,8 @@ import {
 import { sha256HexPortable } from "../studio-sha256";
 
 import type { StudioVrmProportionMetrics } from "./studio-vrm-proportion-core";
+import { fitStudioVrmSkirtWaistClearance } from "./studio-vrm-skirt-waist-clearance";
+import { projectStudioVrmSkirtSurfaceContacts } from "./studio-vrm-skirt-surface-contact";
 
 /**
  * Deterministic procedural skirt authority for the VRM wardrobe.
@@ -82,6 +84,8 @@ export interface StudioVrmXpbdSkirtTopologyInput {
   readonly kind: StudioVrmXpbdSkirtKind;
   readonly metrics: StudioVrmXpbdSkirtMetrics;
   readonly restWaist: StudioVrmXpbdSkirtWaistFrame;
+  /** Measured physical body, independent of garment fit. */
+  readonly restBody?: StudioVrmXpbdSkirtBodyProxies;
   readonly fit?: number;
   readonly segmentCount?: number;
   readonly ringCount?: number;
@@ -92,6 +96,9 @@ export interface StudioVrmXpbdSkirtTopologyInput {
 export interface StudioVrmXpbdSkirtDimensions {
   readonly waistRadiusX: number;
   readonly waistRadiusZ: number;
+  readonly waistOffsetY: number;
+  readonly hemRadiusX: number;
+  readonly hemRadiusZ: number;
   readonly skirtLength: number;
   readonly hemFlare: number;
   readonly pleatCount: number;
@@ -131,6 +138,9 @@ export interface StudioVrmXpbdSkirtSolveInput {
 }
 
 export interface StudioVrmXpbdSkirtSolveDiagnostics {
+  readonly finalContactProjectionPasses: number;
+  readonly finalContactMaxDisplacementM: number;
+  readonly finalTrianglePenetrationM: number;
   readonly maxCapsulePenetration: number;
   readonly finalCapsulePenetrationById: Readonly<Record<string, number>>;
   readonly totalCapsuleContactCount: number;
@@ -167,6 +177,7 @@ export interface StudioVrmXpbdSkirtSolvedMesh {
 }
 
 export type StudioVrmXpbdSkirtUnavailableCode =
+  | "collision-unresolved"
   | "missing-input"
   | "invalid-input"
   | "budget-exceeded"
@@ -354,6 +365,9 @@ function deriveDimensions(
   return Object.freeze({
     waistRadiusX: f32(waistRadiusX),
     waistRadiusZ: f32(waistRadiusZ),
+    waistOffsetY: 0,
+    hemRadiusX: f32(waistRadiusX * hemFlare),
+    hemRadiusZ: f32(waistRadiusZ * hemFlare),
     skirtLength: f32(skirtLength),
     hemFlare: f32(hemFlare),
     pleatCount,
@@ -373,14 +387,15 @@ function ringPoint(
   const angle = (segment / segmentCount) * Math.PI * 2;
   const t = ring / (ringCount - 1);
   const easedT = t * t * (3 - 2 * t);
-  const flare = 1 + (dimensions.hemFlare - 1) * easedT;
   // The waistband remains nearly smooth; pleat relief grows continuously towards the hem.
   const pleatEnvelope = 0.08 + 0.92 * easedT;
   const pleatScale = 1 +
     dimensions.pleatAmplitudeRatio * pleatEnvelope * Math.cos(dimensions.pleatCount * angle);
-  const x = Math.cos(angle) * dimensions.waistRadiusX * flare * pleatScale;
-  const z = Math.sin(angle) * dimensions.waistRadiusZ * flare * pleatScale;
-  const y = -dimensions.skirtLength * t;
+  const radiusX = dimensions.waistRadiusX + (dimensions.hemRadiusX - dimensions.waistRadiusX) * easedT;
+  const radiusZ = dimensions.waistRadiusZ + (dimensions.hemRadiusZ - dimensions.waistRadiusZ) * easedT;
+  const x = Math.cos(angle) * radiusX * pleatScale;
+  const z = Math.sin(angle) * radiusZ * pleatScale;
+  const y = dimensions.waistOffsetY * (1 - easedT) - dimensions.skirtLength * t;
   return [
     f32(frame.center[0] + frame.right[0] * x + frame.forward[0] * z + frame.up[0] * y),
     f32(frame.center[1] + frame.right[1] * x + frame.forward[1] * z + frame.up[1] * y),
@@ -402,7 +417,7 @@ function topologyHash(
     `triangles=${topology.triangleCount}`,
     `iterations=${topology.solverIterations}`,
     `selfCollision=${topology.selfCollisionEnabled ? 1 : 0}`,
-    `dimensions=${d.waistRadiusX},${d.waistRadiusZ},${d.skirtLength},${d.hemFlare},${d.pleatCount},${d.pleatAmplitudeRatio},${d.particleRadius}`,
+    `dimensions=${d.waistRadiusX},${d.waistRadiusZ},${d.waistOffsetY},${d.hemRadiusX},${d.hemRadiusZ},${d.skirtLength},${d.hemFlare},${d.pleatCount},${d.pleatAmplitudeRatio},${d.particleRadius}`,
     `waist=${[...w.center, ...w.right, ...w.up, ...w.forward].join(",")}`,
     `rest=${hashTypedArray(topology.restPositions)}`,
     `uv=${hashTypedArray(topology.uvs)}`,
@@ -498,7 +513,22 @@ function createTopologyUnchecked(
     );
   }
 
-  const dimensions = deriveDimensions(input.kind, input.metrics, fit, segmentCount);
+  let dimensions = deriveDimensions(input.kind, input.metrics, fit, segmentCount);
+  if (input.restBody !== undefined) {
+    const normalizedBody = normalizeBodyProxies(input.kind, input.restBody);
+    if (!normalizedBody.ok) return normalizedBody;
+    const fitted = fitStudioVrmSkirtWaistClearance({
+      frame: normalizedRestWaist.frame,
+      capsules: Object.fromEntries(normalizedBody.capsules.map(({ id, proxy }) => [id, proxy])),
+      radiusX: dimensions.waistRadiusX, radiusZ: dimensions.waistRadiusZ,
+      segmentCount, pleatCount: dimensions.pleatCount,
+      pleatAmplitudeRatio: dimensions.pleatAmplitudeRatio, particleRadius: dimensions.particleRadius,
+      maxOffsetY: input.metrics.totalHeight * 0.18, maxRadius: 0.5,
+    });
+    if (!fitted) return unavailable("collision-unresolved", "The measured body cannot fit a bounded anatomical waistband.");
+    dimensions = Object.freeze({ ...dimensions, waistRadiusX: fitted.radiusX,
+      waistRadiusZ: fitted.radiusZ, waistOffsetY: fitted.offsetY });
+  }
   const restPositions = new Float32Array(particleCount * 3);
   const uvs = new Float32Array(particleCount * 2);
   const particleRadii = new Float32Array(particleCount).fill(dimensions.particleRadius);
@@ -713,7 +743,7 @@ function pointSegmentDistance(
   const sy = tail[1] - head[1];
   const sz = tail[2] - head[2];
   const lengthSquared = sx * sx + sy * sy + sz * sz;
-  const projection = lengthSquared > MIN_VECTOR_LENGTH
+  const projection = lengthSquared > MIN_VECTOR_LENGTH * MIN_VECTOR_LENGTH
     ? clamp(
       ((point[0] - head[0]) * sx + (point[1] - head[1]) * sy + (point[2] - head[2]) * sz) /
         lengthSquared,
@@ -780,6 +810,8 @@ function receiptHash(
     `penetration=${receipt.diagnostics.maxCapsulePenetration}`,
     `finalPenetration=${receipt.capsuleIds.map((id) => `${id}:${receipt.diagnostics.finalCapsulePenetrationById[id]}`).join(",")}`,
     `contacts=${receipt.diagnostics.totalCapsuleContactCount}`,
+    `contactProjection=${receipt.diagnostics.finalContactProjectionPasses},${receipt.diagnostics.finalContactMaxDisplacementM}`,
+    `trianglePenetration=${receipt.diagnostics.finalTrianglePenetrationM}`,
     `nonFinite=${receipt.diagnostics.nonFiniteCount}`,
   ].join("|"));
 }
@@ -871,12 +903,28 @@ function solveUnchecked(
   }
 
   const positions = new Float32Array(runtime.positions);
+  const contactProjection = projectStudioVrmSkirtSurfaceContacts(
+    positions, topology.triangleIndices, topology.segmentCount, topology.compiledModel.particleRadii,
+    normalizedBody.capsules.map(({ proxy }) => proxy),
+  );
+  if (!Number.isFinite(contactProjection.maxDisplacementM)
+    || !Number.isFinite(contactProjection.maxPenetrationM)
+    || !Number.isFinite(contactProjection.maxTrianglePenetrationM)
+    || Math.max(contactProjection.maxPenetrationM, contactProjection.maxTrianglePenetrationM) > 0.001) {
+    return unavailable("collision-unresolved", `The posed skirt still intersects a body capsule by more than 1mm (vertices ${contactProjection.maxPenetrationM}, triangles ${contactProjection.maxTrianglePenetrationM}, pinned faces ${contactProjection.maxPinnedTrianglePenetrationM}, free faces ${contactProjection.maxFreeTrianglePenetrationM}).`);
+  }
+  if (contactProjection.maxDisplacementM > contactProjection.maxDisplacementLimitM) {
+    return unavailable("collision-unresolved", "The contact repair would distort the skirt by more than one body-capsule diameter.");
+  }
   const outputPositionsSha256 = hashTypedArray(positions);
   const outputSha256 = hashText(
     `${topology.topologySha256}|${outputPositionsSha256}|pose=${input.poseGeneration}`,
   );
   const capsuleIds = Object.freeze(normalizedBody.capsules.map(({ id }) => id));
   const diagnostics: StudioVrmXpbdSkirtSolveDiagnostics = Object.freeze({
+    finalContactProjectionPasses: contactProjection.passes,
+    finalContactMaxDisplacementM: f32(contactProjection.maxDisplacementM),
+    finalTrianglePenetrationM: f32(contactProjection.maxTrianglePenetrationM),
     maxCapsulePenetration: f32(maxCapsulePenetration),
     finalCapsulePenetrationById: finalPenetrationByCapsule(
       topology,
