@@ -7,6 +7,8 @@ on:
     paths:
       - 'apps/web/src/domains/creator/*Asset*.tsx'
       - 'apps/web/src/domains/creator/studio-asset-*'
+      - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'scripts/verify-studio-vector-environments-v3.mjs'
       - 'apps/web/src/domains/creator/studio-unified-asset-*'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
       - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
@@ -16,6 +18,8 @@ on:
     paths:
       - 'apps/web/src/domains/creator/*Asset*.tsx'
       - 'apps/web/src/domains/creator/studio-asset-*'
+      - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'scripts/verify-studio-vector-environments-v3.mjs'
       - 'apps/web/src/domains/creator/studio-unified-asset-*'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
       - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
@@ -47,6 +51,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Native vector safety contract
+        run: node scripts/verify-studio-vector-environments-v3.mjs
       - name: Asset library regression tests
         run: |
           pnpm exec vitest run \
@@ -54,6 +60,9 @@ jobs:
             apps/web/src/domains/creator/studio-unified-asset-library-projection.test.ts \
             apps/web/src/domains/creator/studio-asset-library-management.test.ts \
             apps/web/src/domains/creator/StudioAssetLibraryCollections.test.tsx \
+            apps/web/src/domains/creator/StudioLocalAssetManager.interaction.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions.delete.test.ts \
+            apps/web/src/domains/creator/studio-generated-2d-catalog.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-catalog.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-intelligence.test.ts \
             apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx

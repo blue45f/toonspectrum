@@ -36,7 +36,7 @@ export function StudioSceneAssetLibrary({ items, onUseItem }: {
     try {
       const used = await onUseItem(item);
       setNotice(used === false ? "현재 캔버스에서는 이 에셋을 사용할 수 없습니다."
-        : item.useMode === "open" ? `${item.title} 제작 도구를 열었습니다.` : `${item.title}을(를) 배치했습니다.`);
+        : item.useMode === "open" ? `${item.title} 제작 도구를 열었습니다.` : used === true ? `${item.title}을(를) 배치했습니다.` : `${item.title} 배치를 요청했습니다. 캔버스와 오류 안내를 확인해 주세요.`);
     } catch (cause: unknown) {
       setNotice(cause instanceof Error ? cause.message : "에셋을 사용하지 못했습니다.");
     } finally { busyRef.current = false; setPending(null); }

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   selectStudioLocalAssetPage,
@@ -30,6 +30,11 @@ export function StudioLocalAssetManager({ assets, loading, onDeleteAsset, onUseA
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const result = selectStudioLocalAssetPage(assets, query, sort, page);
   const selectedIds = selected.filter((id) => assets.some((asset) => asset.id === id));
   const deletion = summarizeStudioAssetDeletion(lastRequested, assets);
@@ -49,15 +54,16 @@ export function StudioLocalAssetManager({ assets, loading, onDeleteAsset, onUseA
     setLastRequested(ids);
     try {
       for (const id of ids) {
+        if (!mountedRef.current) break;
         try { await onDeleteAsset(id); }
         catch (cause: unknown) {
-          setError(cause instanceof Error ? cause.message : "에셋 삭제에 실패했습니다. 남아 있는 항목을 다시 시도해 주세요.");
+          if (mountedRef.current) setError(cause instanceof Error ? cause.message : "에셋 삭제에 실패했습니다. 남아 있는 항목을 다시 시도해 주세요.");
         }
       }
-      setSelected([]);
+      if (mountedRef.current) setSelected([]);
     } finally {
       busyRef.current = false;
-      setPending(false);
+      if (mountedRef.current) setPending(false);
     }
   }
 

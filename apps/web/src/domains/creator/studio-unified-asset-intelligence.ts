@@ -129,25 +129,24 @@ function sanitizeIdList(value: unknown, limit: number): readonly string[] {
 
 function sanitizeRecents(value: unknown): readonly StudioUnifiedAssetRecentUse[] {
   if (!Array.isArray(value)) return Object.freeze([]);
-  // Keep only the newest bounded set while inspecting every persisted entry.
-  // Truncating the input first discarded newer uses stored later in the array.
-  const recents: StudioUnifiedAssetRecentUse[] = [];
+  const recents = new Map<string, StudioUnifiedAssetRecentUse>();
   for (const candidate of value) {
     if (!isRecord(candidate)) continue;
     const id = sanitizeId(candidate.id);
     const usedAt = candidate.usedAt;
     if (!id || typeof usedAt !== "number" || !Number.isFinite(usedAt) || usedAt < 0) continue;
-    const existing = recents.findIndex((entry) => entry.id === id);
-    if (existing >= 0) {
-      if (recents[existing]!.usedAt >= usedAt) continue;
-      recents.splice(existing, 1);
+    const previous = recents.get(id);
+    if (!previous || usedAt > previous.usedAt) recents.set(id, Object.freeze({ id, usedAt }));
+    // Keep memory bounded while still considering late, newer records.
+    if (recents.size > MAX_RECENTS) {
+      let oldest: StudioUnifiedAssetRecentUse | undefined;
+      for (const recent of recents.values()) {
+        if (!oldest || recent.usedAt < oldest.usedAt) oldest = recent;
+      }
+      if (oldest) recents.delete(oldest.id);
     }
-    const insertion = recents.findIndex((entry) => entry.usedAt < usedAt);
-    if (insertion >= 0) recents.splice(insertion, 0, Object.freeze({ id, usedAt }));
-    else if (recents.length < MAX_RECENTS) recents.push(Object.freeze({ id, usedAt }));
-    if (recents.length > MAX_RECENTS) recents.pop();
   }
-  return Object.freeze(recents);
+  return Object.freeze([...recents.values()].sort((left, right) => right.usedAt - left.usedAt));
 }
 
 function freezeState(
