@@ -9,9 +9,12 @@ permissions:
   contents: read
 
 jobs:
-  analyze:
+  repair:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/recovery-bundle-analysis-20260913'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    permissions:
+      contents: write
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       CI: '1'
@@ -26,61 +29,159 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Build unchanged product with read-only chunk attribution
+      - name: Apply only reviewed leaf import changes to exact source blobs
         run: |
           set -euo pipefail
-          mkdir -p artifacts/recovery-bundle
-          git rev-parse HEAD > artifacts/recovery-bundle/commit.txt
-          pnpm catalog:gen
-          pnpm exec tsc -p tsconfig.json
-          node --input-type=module <<'NODE' 2>&1 | tee artifacts/recovery-bundle/build.log
-          import { build } from 'vite';
-          import { mkdirSync, writeFileSync } from 'node:fs';
-          import { relative } from 'node:path';
-          import { gzipSync } from 'node:zlib';
-          const root = process.cwd();
-          const output = `${root}/artifacts/recovery-bundle`;
-          const clean = (id) => typeof id === 'string' && id.startsWith(root + '/') ? relative(root, id) : id;
-          const plugin = {
-            name: 'recovery-readonly-module-attribution',
-            apply: 'build',
-            enforce: 'post',
-            generateBundle(_options, bundle) {
-              const chunks = Object.values(bundle).filter((item) => item.type === 'chunk').map((chunk) => ({
-                fileName: chunk.fileName, name: chunk.name, facadeModuleId: clean(chunk.facadeModuleId),
-                isEntry: chunk.isEntry, isDynamicEntry: chunk.isDynamicEntry,
-                imports: chunk.imports, dynamicImports: chunk.dynamicImports,
-                rawBytes: Buffer.byteLength(chunk.code), gzipBytes: gzipSync(chunk.code).length,
-                modules: Object.entries(chunk.modules).map(([id, info]) => ({
-                  id: clean(id), renderedLength: info.renderedLength, originalLength: info.originalLength,
-                  renderedExports: info.renderedExports, removedExports: info.removedExports,
-                })),
-              }));
-              const modules = [...this.getModuleIds()].map((id) => {
-                const info = this.getModuleInfo(id);
-                return { id: clean(id), importers: (info?.importers ?? []).map(clean),
-                  dynamicImporters: (info?.dynamicImporters ?? []).map(clean),
-                  importedIds: (info?.importedIds ?? []).map(clean),
-                  dynamicallyImportedIds: (info?.dynamicallyImportedIds ?? []).map(clean),
-                };
-              });
-              mkdirSync(output, { recursive: true });
-              writeFileSync(`${output}/chunks.json`, JSON.stringify(chunks));
-              writeFileSync(`${output}/modules.json`, JSON.stringify(modules));
-            },
-          };
-          await build({ plugins: [plugin] });
-          NODE
-          cp dist/.vite/manifest.json artifacts/recovery-bundle/manifest.json
-          cp scripts/bundle-baseline.json artifacts/recovery-bundle/bundle-baseline.json
-      - name: Retain the actual unchanged ratchet outcome
+          mkdir -p artifacts/recovery-bundle-repair
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          def read_checked(name, expected):
+              data = pathlib.Path(name).read_bytes()
+              digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              if digest != expected:
+                  raise RuntimeError(f'{name}: source drift; refusing repair')
+              return data.decode('utf-8')
+          manifest_path = 'packages/studio-brush-platform/package.json'
+          source = read_checked(manifest_path, '00d8ddd143063cffb226d7822e0cfa59c87de831')
+          manifest = json.loads(source)
+          for entry in ['stroke-budget', 'compile']:
+              if './' + entry in manifest['exports']:
+                  raise RuntimeError('entry point already changed; inspect first')
+              manifest['exports']['./' + entry] = dict.fromkeys(['types', 'import', 'default'], './src/' + entry + '.ts')
+          pathlib.Path(manifest_path).write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n')
+          consumers = [
+              ('apps/web/src/domains/creator/brush/studio-brush-dynamics-types.ts', '1dba4e7e06b88a5d27ec73e52800870c8d7fae7a', 'stroke-budget'),
+              ('apps/web/src/domains/creator/studio-causal-watercolor-brush.ts', '038a2ec7a0245524ee331435818e871ba82269c6', 'stroke-budget'),
+              ('apps/web/src/domains/creator/studio-page-vector-ops.ts', '237e00cdb17407cacd6d8f1dca22b1f9c8e6019d', 'compile'),
+          ]
+          for name, digest, entry in consumers:
+              source = read_checked(name, digest)
+              old = 'from "@toonspectrum/studio-brush-platform";'
+              if source.count(old) != 1:
+                  raise RuntimeError('unexpected import context')
+              pathlib.Path(name).write_text(source.replace(old, 'from "@toonspectrum/studio-brush-platform/' + entry + '";', 1))
+          test_name = 'packages/studio-brush-platform/src/__tests__/public-entrypoints.test.ts'
+          target = pathlib.Path(test_name)
+          if target.exists():
+              raise RuntimeError('test path exists; do not overwrite')
+          target.write_text('''import { readFileSync } from "node:fs";
+          import * as root from "@toonspectrum/studio-brush-platform";
+          import * as budget from "@toonspectrum/studio-brush-platform/stroke-budget";
+          import * as compiler from "@toonspectrum/studio-brush-platform/compile";
+          import { describe, expect, it } from "vitest";
+
+          const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+
+          describe("brush platform public leaf entries", () => {
+            it("exports the existing budget and compiler modules without replacing the root API", () => {
+              const manifest = JSON.parse(read("../../package.json"));
+              expect(manifest.exports["."]).toEqual({ types: "./src/index.ts", import: "./src/index.ts", default: "./src/index.ts" });
+              for (const name of ["stroke-budget", "compile"]) {
+                expect(manifest.exports[`./${name}`]).toEqual({ types: `./src/${name}.ts`, import: `./src/${name}.ts`, default: `./src/${name}.ts` });
+              }
+            });
+            it("preserves every budget export's identity and the 32768-dab default", () => {
+              for (const [name, value] of Object.entries(budget)) {
+                expect((root as unknown as Record<string, unknown>)[name]).toBe(value);
+              }
+              expect(budget.resolveStrokeDabCapacity({ budget: budget.DEFAULT_STUDIO_STROKE_BUDGET, bytesPerDab: budget.STUDIO_DYNAMIC_BRUSH_DAB_RESIDENT_BYTES })).toBe(32768);
+              expect(budget.resolveStrokeDabCapacity({ budget: budget.DEFAULT_STUDIO_STROKE_BUDGET, bytesPerDab: budget.STUDIO_CAUSAL_WATERCOLOR_DAB_RESIDENT_BYTES })).toBe(32768);
+            });
+            it("preserves every compiler export's identity", () => {
+              for (const [name, value] of Object.entries(compiler)) {
+                expect((root as unknown as Record<string, unknown>)[name]).toBe(value);
+              }
+              expect(compiler.refitSettledCenterline).toBe(root.refitSettledCenterline);
+            });
+            it("keeps eager consumers off the full provider and format barrel", () => {
+              const consumers = [
+                ["../../../../apps/web/src/domains/creator/brush/studio-brush-dynamics-types.ts", "stroke-budget"],
+                ["../../../../apps/web/src/domains/creator/studio-causal-watercolor-brush.ts", "stroke-budget"],
+                ["../../../../apps/web/src/domains/creator/studio-page-vector-ops.ts", "compile"],
+              ];
+              for (const [path, entry] of consumers) {
+                const source = read("../" + path);
+                expect(source).toContain(`from "@toonspectrum/studio-brush-platform/${entry}";`);
+                expect(source).not.toContain('from "@toonspectrum/studio-brush-platform";');
+              }
+            });
+          });
+          '''.replace('\n          ', '\n'))
+          workflow = '.github/workflows/ci.yml'
+          source = read_checked(workflow, '3a880ab9f980113f47f03256f88a028518835205')
+          anchor = '            apps/web/src/domains/creator/color/studio-color-proof.test.ts \\\n'
+          if source.count(anchor) != 1:
+              raise RuntimeError('mandatory regression insertion context differs')
+          pathlib.Path(workflow).write_text(source.replace(anchor, '            ' + test_name + ' \\\n' + anchor, 1))
+          PY
+          git diff --check
+          git diff --stat
+      - name: Verify public identity and existing drawing behavior
         run: |
           set -euo pipefail
-          node scripts/check-studio-bundle.mjs --verbose 2>&1 | tee artifacts/recovery-bundle/bundle-check.log
+          node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
+          pnpm exec vitest run \
+            packages/studio-brush-platform/src/__tests__ \
+            apps/web/src/domains/creator/brush/studio-brush-dynamics \
+            apps/web/src/domains/creator/studio-causal-watercolor-brush \
+            apps/web/src/domains/creator/studio-page-vector-ops \
+            --reporter=default --reporter=json --outputFile=artifacts/recovery-bundle-repair/results.json
+          pnpm exec eslint packages/studio-brush-platform/src/__tests__/public-entrypoints.test.ts apps/web/src/domains/creator/brush/studio-brush-dynamics-types.ts apps/web/src/domains/creator/studio-causal-watercolor-brush.ts apps/web/src/domains/creator/studio-page-vector-ops.ts --max-warnings 0
+          pnpm run validate:architecture
+          pnpm --filter @webtoon-nest/api build
+      - name: Verify actual production build and unchanged bundle ratchet
+        run: |
+          set -euo pipefail
+          pnpm run build 2>&1 | tee artifacts/recovery-bundle-repair/build.log
+          node scripts/check-studio-bundle.mjs --verbose 2>&1 | tee artifacts/recovery-bundle-repair/bundle-check.log
+          pnpm run verify:api-serverless-build 2>&1 | tee artifacts/recovery-bundle-repair/serverless.log
+      - name: Publish only tested product files and remove this completed runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          repo = 'blue45f/toonspectrum'
+          branch = 'fix/recovery-bundle-analysis-20260913'
+          expected = os.environ['GITHUB_SHA']
+          files = [
+              'packages/studio-brush-platform/package.json',
+              'apps/web/src/domains/creator/brush/studio-brush-dynamics-types.ts',
+              'apps/web/src/domains/creator/studio-causal-watercolor-brush.ts',
+              'apps/web/src/domains/creator/studio-page-vector-ops.ts',
+              'packages/studio-brush-platform/src/__tests__/public-entrypoints.test.ts',
+              '.github/workflows/ci.yml',
+          ]
+          def api(path, body=None, method=None):
+              command = ['gh', 'api', path]
+              data = None
+              if body is not None:
+                  command += ['--method', method or 'POST', '--input', '-']
+                  data = json.dumps(body)
+              result = subprocess.run(command, input=data, text=True, capture_output=True, check=True)
+              return json.loads(result.stdout)
+          if api(f'repos/{repo}/git/ref/heads/{branch}')['object']['sha'] != expected:
+              raise RuntimeError('branch moved; refusing publication')
+          parent = api(f'repos/{repo}/git/commits/{expected}')
+          entries = []
+          for path in files:
+              blob = api(f'repos/{repo}/git/blobs', {'content': pathlib.Path(path).read_text(), 'encoding': 'utf-8'})
+              entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+          entries.append({'path': '.github/workflows/recovery-bundle-analysis-once.yml', 'mode': '100644', 'type': 'blob', 'sha': None})
+          tree = api(f'repos/{repo}/git/trees', {'base_tree': parent['tree']['sha'], 'tree': entries})
+          commit = api(f'repos/{repo}/git/commits', {'message': 'fix(studio): keep brush budget and vector consumers off the eager platform barrel', 'tree': tree['sha'], 'parents': [expected]})
+          if api(f'repos/{repo}/git/ref/heads/{branch}')['object']['sha'] != expected:
+              raise RuntimeError('concurrent branch update; leave tested commit unreferenced')
+          api(f'repos/{repo}/git/refs/heads/{branch}', {'sha': commit['sha'], 'force': False}, 'PATCH')
+          evidence = {'parentSha': expected, 'commitSha': commit['sha'], 'files': entries, 'productionDatabaseMutation': False}
+          pathlib.Path('artifacts/recovery-bundle-repair/commit.json').write_text(json.dumps(evidence, indent=2) + '\n')
+          print(json.dumps(evidence))
+          PY
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: recovery-bundle-analysis-${{ github.run_id }}
-          path: artifacts/recovery-bundle
+          name: recovery-bundle-repair-${{ github.run_id }}
+          path: artifacts/recovery-bundle-repair
           if-no-files-found: error
           retention-days: 3
