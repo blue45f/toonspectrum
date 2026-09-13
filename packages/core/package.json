@@ -16,6 +16,7 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./legal-policies": "./src/legal-policies.ts",
     "./feedback": "./src/feedback.ts",
     "./feedback-response": "./src/feedback-response.ts",
     "./studio-music": "./src/studio-music.ts",
