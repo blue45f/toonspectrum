@@ -590,6 +590,12 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_marketplace_resource_report_gate",
     "creator_work_asset_storage_reference",
     "creator_work_catalog_asset_binding",
+    "studio_ai_comic_director_approval",
+    "studio_ai_comic_director_artifact",
+    "studio_ai_comic_director_job",
+    "studio_ai_comic_director_job_event",
+    "studio_ai_comic_director_session",
+    "studio_ai_visual_bible_revision",
   ]);
   const readinessSource = readFileSync(
     new URL(
