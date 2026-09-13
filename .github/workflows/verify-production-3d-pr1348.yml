@@ -1,0 +1,130 @@
+name: Verify deployed 3D PR1348
+on:
+  push:
+    branches: [verification/production-3d-pr1348-20260913]
+    paths: [.github/workflows/verify-production-3d-pr1348.yml]
+permissions:
+  contents: read
+concurrency:
+  group: verify-production-3d-pr1348
+  cancel-in-progress: false
+jobs:
+  live-character-export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
+      TOONSPECTRUM_CHARACTER_GPU_LANE: swiftshader
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fe0f3c207c6cbf5b6f5a5f42f515d622f768a0c6
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Prepare isolated verification tools without changing app dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = fe0f3c207c6cbf5b6f5a5f42f515d622f768a0c6
+          mkdir -p "$RUNNER_TEMP/live-1348/scripts/lib" "$GITHUB_WORKSPACE/artifacts/live-1348"
+          cp scripts/verify-studio-character-shaper.mts "$RUNNER_TEMP/live-1348/scripts/"
+          cp scripts/lib/studio-verify-preview-harness.mts "$RUNNER_TEMP/live-1348/scripts/lib/"
+          cd "$RUNNER_TEMP/live-1348"
+          printf '%s\n' '{"private":true,"type":"module"}' > package.json
+          npm install --no-audit --no-fund --save-exact playwright@1.62.1 ag-psd@31.0.1 tsx@4.22.3
+          npx playwright install --with-deps chromium
+          echo "TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR=$GITHUB_WORKSPACE/artifacts/live-1348" >> "$GITHUB_ENV"
+      - name: Verify deployed routes and freeze observed entry fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const origin = process.env.TOONSPECTRUM_VERIFY_ORIGIN;
+          const output = process.env.TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR;
+          const report = { expectedCommit: 'fe0f3c207c6cbf5b6f5a5f42f515d622f768a0c6', checkedAt: new Date().toISOString(), checks: [] };
+          for (const path of ['/', '/studio/character', '/studio/bg3d']) {
+            const response = await fetch(origin + path, { signal: AbortSignal.timeout(30000), headers: { 'Cache-Control': 'no-cache' } });
+            const text = await response.text();
+            const entry = /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(text)?.[1];
+            report.checks.push({ path, status: response.status, contentType: response.headers.get('content-type'), entry,
+              coop: response.headers.get('cross-origin-opener-policy'), coep: response.headers.get('cross-origin-embedder-policy'),
+              etag: response.headers.get('etag'), server: response.headers.get('server') });
+            if (!response.ok || !entry) throw new Error('Deployed route is not a valid application document: ' + path);
+          }
+          const entries = new Set(report.checks.map(check => check.entry));
+          if (entries.size !== 1) throw new Error('Production routes expose inconsistent application versions');
+          report.entry = report.checks[0].entry;
+          if (report.entry !== '/assets/index-LYw4oe-4.js') throw new Error('Production has changed since the verified Vercel deployment; do not attribute this run to PR1348');
+          const asset = await fetch(new URL(report.entry, origin), { method: 'HEAD', signal: AbortSignal.timeout(30000) });
+          report.entryStatus = asset.status;
+          report.entryContentType = asset.headers.get('content-type');
+          writeFileSync(output + '/deployment-http.json', JSON.stringify(report, null, 2));
+          console.log(JSON.stringify(report, null, 2));
+          if (!asset.ok || !/javascript/.test(report.entryContentType ?? '')) throw new Error('Production entry script is unavailable');
+          NODE
+      - name: Exercise the unchanged production Character Shaper browser verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/live-1348"
+          # Add diagnostics only to the disposable copy. Do not change product source, assertions,
+          # GPU identity, budgets, success criteria, or the pinned repository verification script.
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'scripts/verify-studio-character-shaper.mts';
+          let source = readFileSync(path, 'utf8');
+          const target = 'const consoleErrors: string[] = [];';
+          if (!source.includes(target)) throw new Error('Pinned verifier diagnostic anchor changed');
+          source = source.replace(target, `const runtimeMessages: { type: string; text: string }[] = [];
+          const networkErrors: { status?: number; url: string; failure?: string | null }[] = [];
+          evidence.runtimeMessages = runtimeMessages;
+          evidence.networkErrors = networkErrors;
+          page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') runtimeMessages.push({ type: message.type(), text: message.text().slice(0, 2000) }); });
+          page.on('response', response => { if (response.status() >= 400) networkErrors.push({ status: response.status(), url: response.url().split('?')[0] }); });
+          page.on('requestfailed', request => networkErrors.push({ url: request.url().split('?')[0], failure: request.failure()?.errorText }));
+          page.on('framenavigated', frame => { if (frame === page.mainFrame()) console.log('LIVE_ROUTE', frame.url()); });
+          ${target}`);
+          const anchor = 'for (const context of browser.contexts()) {';
+          if (!source.includes(anchor)) throw new Error('Pinned verifier final diagnostics anchor changed');
+          source = source.replace(anchor, `for (const currentContext of browser.contexts()) {
+            for (const currentPage of currentContext.pages()) {
+              console.log('FINAL_URL', currentPage.url());
+              console.log('FINAL_DOM', (await currentPage.locator('body').innerText().catch(() => '')).slice(0, 16000));
+            }
+          }
+          ${anchor}`);
+          writeFileSync(path, source);
+          NODE
+          timeout 900 npx tsx scripts/verify-studio-character-shaper.mts 2>&1 | tee "$TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR/browser.log"
+      - name: Record final evidence and detect deployment changes during verification
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          const dir = process.env.TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR;
+          if (!dir) process.exit(0);
+          const evidence = dir + '/character-shaper-evidence.json';
+          if (existsSync(evidence)) console.log('BROWSER_EVIDENCE', readFileSync(evidence, 'utf8'));
+          const response = await fetch(process.env.TOONSPECTRUM_VERIFY_ORIGIN, { signal: AbortSignal.timeout(30000), headers: { 'Cache-Control': 'no-cache' } });
+          const html = await response.text();
+          const entry = /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(html)?.[1];
+          const stable = entry === '/assets/index-LYw4oe-4.js';
+          writeFileSync(dir + '/final-deployment.json', JSON.stringify({ checkedAt: new Date().toISOString(), status: response.status, entry, stable }, null, 2));
+          console.log('DEPLOYMENT_STABLE', stable, entry);
+          if (!stable || !response.ok) process.exitCode = 1;
+          NODE
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: production-3d-pr1348-${{ github.run_id }}
+          path: artifacts/live-1348
+          retention-days: 7
+          if-no-files-found: error
