@@ -69,23 +69,44 @@ jobs:
           console.log(JSON.stringify(report, null, 2));
           if (!asset.ok || !/javascript/.test(report.entryContentType ?? '')) throw new Error('Production entry script is unavailable');
           NODE
-      - name: Exercise the unchanged production Character Shaper browser verifier
+      - name: Run production verifier with CSP-compatible local evidence decoding
         shell: bash
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/live-1348"
-          # Add diagnostics only to the disposable copy. Do not change product source, assertions,
-          # GPU identity, budgets, success criteria, or the pinned repository verification script.
+          # Change only local image decoding in the disposable verifier copy and add diagnostics.
+          # Preserve every product operation, assertion, GPU identity and quality/memory budget.
+          # No bypassCSP, network response mock, route override or production policy change.
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs';
+          import { deepStrictEqual } from 'node:assert';
           const path = 'scripts/verify-studio-character-shaper.mts';
           let source = readFileSync(path, 'utf8');
+          const replacement = 'const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(encodedPng), character => character.charCodeAt(0))], { type: "image/png" }));';
+          const responsePattern = 'const response = await fetch(`data:image/png;base64,${encodedPng}`);\n    const bitmap = await createImageBitmap(await response.blob());';
+          const pngPattern = 'const png = await fetch(`data:image/png;base64,${encodedPng}`);\n    const bitmap = await createImageBitmap(await png.blob());';
+          const beautyPattern = 'const beauty = new Uint8Array(await (await fetch(`data:application/octet-stream;base64,${encodedBeauty}`)).arrayBuffer());';
+          const changes = [
+            [responsePattern, replacement, 2],
+            [pngPattern, replacement, 1],
+            [beautyPattern, 'const beauty = Uint8Array.from(atob(encodedBeauty), character => character.charCodeAt(0));', 1],
+          ];
+          for (const [before, after, count] of changes) {
+            if (source.split(before).length - 1 !== count) throw new Error('Pinned evidence decoder anchor changed');
+            source = source.split(before).join(after);
+          }
+          for (const length of [0, 1, 255, 256, 65537]) {
+            const bytes = Uint8Array.from({ length }, (_, index) => (index * 137 + 31) & 255);
+            const encoded = Buffer.from(bytes).toString('base64');
+            deepStrictEqual(Uint8Array.from(atob(encoded), character => character.charCodeAt(0)), bytes);
+          }
           const target = 'const consoleErrors: string[] = [];';
           if (!source.includes(target)) throw new Error('Pinned verifier diagnostic anchor changed');
           source = source.replace(target, `const runtimeMessages: { type: string; text: string }[] = [];
           const networkErrors: { status?: number; url: string; failure?: string | null }[] = [];
           evidence.runtimeMessages = runtimeMessages;
           evidence.networkErrors = networkErrors;
+          evidence.verifierAdaptation = 'Decode identical local base64 bytes directly, without data-URL fetch or CSP bypass; all assertions unchanged';
           page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') runtimeMessages.push({ type: message.type(), text: message.text().slice(0, 2000) }); });
           page.on('response', response => { if (response.status() >= 400) networkErrors.push({ status: response.status(), url: response.url().split('?')[0] }); });
           page.on('requestfailed', request => networkErrors.push({ url: request.url().split('?')[0], failure: request.failure()?.errorText }));
@@ -101,6 +122,8 @@ jobs:
           }
           ${anchor}`);
           writeFileSync(path, source);
+          writeFileSync(process.env.TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR + '/executed-verifier.mts', source);
+          console.log('LOCAL_BASE64_DECODER_VERIFIED; PRODUCT_AND_CSP_UNCHANGED');
           NODE
           timeout 900 npx tsx scripts/verify-studio-character-shaper.mts 2>&1 | tee "$TOONSPECTRUM_CHARACTER_SHAPER_VERIFY_DIR/browser.log"
       - name: Record final evidence and detect deployment changes during verification
