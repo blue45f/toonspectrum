@@ -75,7 +75,7 @@ function createHarness() {
       super(typeof input === "string" ? new URL(input, ORIGIN).href : input, init);
     }
   };
-  vi.stubGlobal("self", scope); vi.stubGlobal("caches", caches.api);
+  vi.stubGlobal("location", scope.location); vi.stubGlobal("self", scope); vi.stubGlobal("caches", caches.api);
   vi.stubGlobal("fetch", workerFetch); vi.stubGlobal("Request", ScopedRequest);
   vi.stubGlobal("__STUDIO_SERVICE_WORKER_MANIFEST__", MANIFEST);
   return {
@@ -98,26 +98,30 @@ function createHarness() {
 let harness: ReturnType<typeof createHarness>;
 async function loadWorker(): Promise<void> { vi.resetModules(); await import("./studio-service-worker-entry"); }
 function navigationEvent(path: string) {
-  return { request: { url: new URL(path, ORIGIN).href, method: "GET", mode: "navigate", destination: "document", headers: { get: () => null } },
+  return { request: { url: new URL(path, ORIGIN).href, method: "GET", mode: "navigate", destination: "document", headers: new Headers() },
     preloadResponse: Promise.resolve(undefined) };
 }
 function shell(body: string, isolated = false): Response {
   return new Response(body, { headers: { "content-type": "text/html",
     ...(isolated ? { "cross-origin-opener-policy": "same-origin", "cross-origin-embedder-policy": "credentialless" } : {}) } });
 }
+function assetResponse(url: string): Response {
+  const mime = url.endsWith(".js") ? "application/javascript" : url.endsWith(".css") ? "text/css" : "text/html";
+  return new Response(url.endsWith("/offline-drawing.html") ? "local rescue" : "body", { headers: { "content-type": mime } });
+}
 beforeEach(() => { harness = createHarness(); });
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("install", () => {
   it("precaches the critical set plus both shells and never skips waiting", async () => {
-    harness.setNetwork(async () => new Response("body", { status: 200 }));
+    harness.setNetwork(async (url) => assetResponse(url));
     await loadWorker(); await harness.dispatch("install");
     const precache = harness.caches.entries(PRECACHE);
     expect(precache).toHaveLength(4); expect(precache).toContain(`${ORIGIN}/studio`);
     expect(harness.counters.skipWaiting).toBe(0);
   });
   it("fails install atomically when a critical URL is missing", async () => {
-    harness.setNetwork(async (url) => url.endsWith("index-abc.css") ? new Response("gone", { status: 404 }) : new Response("body"));
+    harness.setNetwork(async (url) => url.endsWith("index-abc.css") ? new Response("gone", { status: 404 }) : assetResponse(url));
     await loadWorker();
     let captured: Promise<unknown> = Promise.resolve();
     harness.listeners.get("install")?.({ waitUntil: (value: Promise<unknown>) => { captured = value; } });
@@ -226,5 +230,20 @@ describe("messages", () => {
       await harness.dispatch("message", { source: { url }, data: { type: "toonspectrum-sw:prepare-offline", urls: ["/assets/a.js"] }, ports: [] });
     }
     expect(harness.fetchCalls).toEqual([]);
+  });
+});
+
+
+describe("local drawing rescue integration", () => {
+  it("serves a complete installed rescue on an origin outage and acknowledges readiness", async () => {
+    harness.setNetwork(async url => assetResponse(url)); await loadWorker();
+    const install = await harness.dispatch("install"); await install.waited;
+    harness.setNetwork(async () => new Response("server outage", { status: 503 }));
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio/work/offline"));
+    expect(await response?.text()).toBe("local rescue");
+    const replies: unknown[] = [];
+    await harness.dispatch("message", { data: { type: "toonstudio-local-drawing:inspect" }, ports: [{ postMessage: (value: unknown) => replies.push(value) }] });
+    expect(replies).toEqual([{ type: "toonstudio-local-drawing:ready", ready: true }]);
+    expect(harness.counters.skipWaiting).toBe(0);
   });
 });

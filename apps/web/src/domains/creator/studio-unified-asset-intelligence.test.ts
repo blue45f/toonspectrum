@@ -154,6 +154,22 @@ describe("studio-unified-asset-intelligence", () => {
     ).toEqual(parsed);
   });
 
+  it("retains the newest duplicate and bounds unsorted recent history without mutation", () => {
+    const recents = Array.from({ length: 160 }, (_, index) => ({ id: `asset:${index}`, usedAt: index }));
+    recents.push({ id: "asset:0", usedAt: 1000 }, { id: "asset:159", usedAt: 1 });
+    const before = structuredClone(recents);
+    const parsed = parseStudioUnifiedAssetLibraryState(JSON.stringify({ recents }));
+    expect(parsed.recents).toHaveLength(40);
+    expect(parsed.recents[0]).toEqual({ id: "asset:0", usedAt: 1000 });
+    expect(parsed.recents[1]).toEqual({ id: "asset:159", usedAt: 159 });
+    expect(new Set(parsed.recents.map((entry) => entry.id)).size).toBe(40);
+    expect(parsed.recents.map((entry) => entry.usedAt)).toEqual(
+      [1000, ...Array.from({ length: 39 }, (_, index) => 159 - index)],
+    );
+    expect(recents).toEqual(before);
+    expect(Object.isFrozen(parsed.recents)).toBe(true);
+  });
+
   it("updates favorites, recent uses, and the project tray immutably", () => {
     const empty = createStudioUnifiedAssetLibraryState();
     const favorite = toggleStudioUnifiedAssetFavorite(empty, school.id);

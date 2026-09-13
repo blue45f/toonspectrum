@@ -14,12 +14,13 @@ import {
 } from "./studio-marketplace-runtime-compatibility";
 import {
   findStudioOriginalFreeAsset,
-  type StudioOriginalFreeAsset,
 } from "./studio-original-free-asset-packs";
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
 import { sha256HexPortable } from "./studio-sha256";
+import { findStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-catalog";
+import type { StudioCommunityImageAsset } from "./studio-community-marketplace-asset";
 
 import type {
   StudioCreatorPackDefinition,
@@ -125,7 +126,7 @@ export type StudioCommunityPackProjection =
     }>;
 
 export interface StudioCommunityAssetProjection {
-  readonly assets: readonly StudioOriginalFreeAsset[];
+  readonly assets: readonly StudioCommunityImageAsset[];
   readonly unsupportedCount: number;
   readonly reason: string | null;
 }
@@ -486,12 +487,12 @@ export function projectCreatorMarketplaceRecordToAssets(
     };
   }
   // See the pack projection above: product calls never guess a missing runtime authority.
-  const assets: StudioOriginalFreeAsset[] = [];
+  const assets: StudioCommunityImageAsset[] = [];
   let unsupportedCount = 0;
   for (const entry of record.entries) {
     const assetId = originalAssetIdFromEntry(entry);
-    const asset = assetId ? findStudioOriginalFreeAsset(assetId) : null;
-    if (!asset) {
+    const asset = assetId ? (findStudioOriginalFreeAsset(assetId) ?? findStudioMarketplaceCc0Asset(assetId)) : null;
+    if (!asset || asset.kind === "model") {
       unsupportedCount += 1;
       continue;
     }

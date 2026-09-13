@@ -17,6 +17,7 @@ export interface StudioNavigationOptions {
   readonly preloadResponse?: Promise<Response | undefined>;
   readonly isolated: boolean;
   readonly shellUrls: readonly string[];
+  readonly readRescue?: () => Promise<Response | undefined>;
   readonly readShell: () => Promise<Response | undefined>;
   readonly refreshShell: (response: Response) => Promise<void>;
   readonly waitUntil: (promise: Promise<unknown>) => void;
@@ -33,6 +34,8 @@ function markedFallback(response: Response): Response {
 
 async function readSafeFallback(options: StudioNavigationOptions): Promise<Response | undefined> {
   try {
+    const rescue = await options.readRescue?.().catch(() => undefined);
+    if (rescue && isUsableStudioShell(rescue, false)) return markedFallback(rescue);
     const response = await options.readShell();
     return response && isUsableStudioShell(response, options.isolated)
       ? markedFallback(response) : undefined;

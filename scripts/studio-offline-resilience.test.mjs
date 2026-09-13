@@ -150,7 +150,7 @@ test('only bounded, same-origin static build URLs are admitted', () => {
     assert.equal(protocol.normalizeStudioOfflineAssetUrl(input, origin), null);
   }
   assert.equal(protocol.isStudioOfflinePreparationMessage({ type: protocol.STUDIO_OFFLINE_PREPARE_MESSAGE, urls: [] }), true);
-  assert.equal(protocol.isStudioOfflinePreparationMessage({ type: protocol.STUDIO_OFFLINE_PREPARE_MESSAGE, urls: Array(401).fill('/assets/a.js') }), false);
+  assert.equal(protocol.isStudioOfflinePreparationMessage({ type: protocol.STUDIO_OFFLINE_PREPARE_MESSAGE, urls: Array(protocol.STUDIO_OFFLINE_MAX_RESOURCES + 1).fill('/assets/a.js') }), false);
 });
 
 function preparation(overrides = {}) {
@@ -221,7 +221,7 @@ test('opaque/private/external URLs never enter the preparation download path', a
   assert.deepEqual(state.fetched, []);
 });
 test('oversized message lists are rejected before any storage or network access', async () => {
-  const state = preparation({ urls: Array(401).fill('/assets/a.js'), read: async () => { assert.fail('should not read'); } });
+  const state = preparation({ urls: Array(protocol.STUDIO_OFFLINE_MAX_RESOURCES + 1).fill('/assets/a.js'), read: async () => { assert.fail('should not read'); } });
   const result = await prepareStudioOfflineResources(state.options);
   assert.equal(result.complete, false);
   assert.equal(result.checked, 0);

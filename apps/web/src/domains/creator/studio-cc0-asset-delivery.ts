@@ -250,3 +250,17 @@ export async function createStudioCc0ImageRecord(asset: StudioCc0Asset, signal?:
       licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/", attributionRequired: false,
       attributionText: `${asset.provider} — ${asset.sourceUrl}`, rightsConfirmed: true}};
 }
+
+/** Fetch the exact catalogue model; the GLB importer performs structural and device admission. */
+export async function createStudioCc0ModelFile(asset: StudioCc0Asset, signal?: AbortSignal): Promise<File> {
+  if (asset.kind !== "model" || asset.browserRenderVerified !== true
+    || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 || asset.bytes > 64 * 1024 * 1024) {
+    throw new TypeError("검증된 3D 모델이 아닙니다.");
+  }
+  const bytes = await boundedBytes(studioCc0AssetUrl(asset.path), asset.bytes, signal);
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+    byte => byte.toString(16).padStart(2, "0")).join("");
+  signal?.throwIfAborted();
+  if (bytes.byteLength !== asset.bytes || hash !== asset.sha256) throw new Error("3D 에셋 무결성 검증에 실패했습니다.");
+  return new File([bytes], `${asset.name}.glb`, { type: "model/gltf-binary" });
+}

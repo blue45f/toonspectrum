@@ -22,6 +22,14 @@ import {
   type StudioServiceWorkerCacheBucket,
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
+import {
+  cachedLocalDrawingRescue,
+  clearLocalDrawingCaches,
+  installLocalDrawingRescue,
+  isLocalDrawingRequest,
+  localDrawingResponse,
+  localDrawingRescueReady,
+} from "./studio-local-drawing-rescue";
 
 import type { StudioServiceWorkerManifest } from "./studio-service-worker-precache-plan";
 
@@ -161,6 +169,8 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
   return resolveStudioNavigation({
     request: event.request, preloadResponse: event.preloadResponse,
     isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
+    readRescue: routeClass === "studio-navigation" ? async () =>
+      await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined : undefined,
     readShell: async () => {
       const cache = await caches.open(cacheNames.precache);
       return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
@@ -172,6 +182,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
 
 scope.addEventListener("install", (event) => {
   event.waitUntil((async () => {
+    await installLocalDrawingRescue();
     const cache = await caches.open(cacheNames.precache);
     // addAll is atomic: a broken deploy cannot replace a working critical cache.
     await cache.addAll(manifest.criticalUrls.map((url) => new Request(url)));
@@ -192,6 +203,10 @@ scope.addEventListener("activate", (event) => {
 
 scope.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (isLocalDrawingRequest(request, scope.location.origin)) {
+    event.respondWith(localDrawingResponse(request));
+    return;
+  }
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url, origin: scope.location.origin, method: request.method,
     mode: request.mode, destination: request.destination, rangeHeader: request.headers.get("range"),
@@ -210,6 +225,7 @@ async function killStudioServiceWorker(): Promise<void> {
   const doomed = [...staleStudioServiceWorkerCacheNames(existing, "__none__"),
     ...legacyStudioServiceWorkerCacheNames(existing), ...Object.values(cacheNames)];
   await Promise.all([...new Set(doomed)].map((name) => caches.delete(name)));
+  await clearLocalDrawingCaches();
   await scope.registration.unregister();
 }
 
@@ -235,6 +251,7 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
   try {
     return await prepareStudioOfflineResources({
       origin: scope.location.origin, buildId: manifest.buildId, urls,
+      drawingUrls: manifest.offlineUrls ?? [],
       shellUrls: manifest.shellUrls, criticalUrls: manifest.criticalUrls, warmUrls: manifest.warmUrls,
       read: async (url) => {
         const routeClass = classify(url);
@@ -242,10 +259,22 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
         const critical = await readCached("precache", request, routeClass);
         if (critical) return critical;
         const bucket = studioServiceWorkerCacheBucket(routeClass);
-        return bucket ? readCached(bucket, request, routeClass) : undefined;
+        const cached = bucket ? await readCached(bucket, request, routeClass) : undefined;
+        if (cached && (manifest.offlineUrls ?? []).includes(url)) {
+          // Only the build-bounded core pack is pinned against runtime trimming.
+          await persist("precache", request, cached);
+          const pinned = await readCached("precache", request, routeClass);
+          if (pinned && bucket && bucket !== "precache") {
+            // Remove a redundant copy only after the protected copy is verified.
+            await caches.open(cacheNames[bucket]).then((cache) => cache.delete(request)).catch(() => undefined);
+          }
+          return pinned;
+        }
+        return cached;
       },
       write: async (url, response) => {
         const bucket = manifest.shellUrls.includes(url) || manifest.criticalUrls.includes(url)
+          || (manifest.offlineUrls ?? []).includes(url)
           ? "precache" : studioServiceWorkerCacheBucket(classify(url));
         if (bucket) await persist(bucket, new Request(url), response);
       },
@@ -256,6 +285,13 @@ async function prepareOffline(urls: readonly string[]): Promise<unknown> {
 scope.addEventListener("message", (event) => {
   const data: unknown = event.data;
   const reply = (payload: unknown): void => { event.ports[0]?.postMessage(payload); };
+  if (data && typeof data === "object" && "type" in data && data.type === "toonstudio-local-drawing:inspect") {
+    event.waitUntil(localDrawingRescueReady().then(
+      (ready) => reply({ type: "toonstudio-local-drawing:ready", ready }),
+      () => reply({ type: "toonstudio-local-drawing:ready", ready: false }),
+    ));
+    return;
+  }
   if (isStudioOfflinePreparationMessage(data)) {
     // Only a same-origin Studio client may request explicit preparation. Never
     // accept URLs from arbitrary frames, the public catalogue, or worker peers.

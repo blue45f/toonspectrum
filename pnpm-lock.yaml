@@ -520,6 +520,12 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.8)
+      korean-lunar-calendar:
+        specifier: 0.4.0
+        version: 0.4.0
+      lunar-typescript:
+        specifier: 1.8.6
+        version: 1.8.6
 
   packages/play-core: {}
 
@@ -5615,6 +5621,10 @@ packages:
   konva@10.3.0:
     resolution: {integrity: sha512-gt19K2gzY4lHbnkvsku7eSmB+A9PTS2jG4F9coBMsdjM1UKfJNxJbDbXVpeCW1wjEGRwBD3nBamcHnqJhAeKlg==}
 
+  korean-lunar-calendar@0.4.0:
+    resolution: {integrity: sha512-kJXyH3sI/butJxCBtsLXlMJsl5qqNKNjduf1Na0s7XXwP+D/Wdlx0R0/S5ygxPVFSXf/JZ3bBKaCP6bGWhgZ0w==}
+    engines: {node: '>= 16.14.0'}
+
   ktx-parse@1.1.0:
     resolution: {integrity: sha512-mKp3y+FaYgR7mXWAbyyzpa/r1zDWeaunH+INJO4fou3hb45XuNSwar+7llrRyvpMWafxSIi99RNFJ05MHedaJQ==}
 
@@ -5768,6 +5778,9 @@ packages:
     resolution: {integrity: sha512-9FA9evdox/JQL5PT57fdA1x/yg8T7knJ98+zjTL3UfKza6pflQUUh3XtaQIHKvnsJw1lmsEyHVlt5jchYxOQ5w==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lunar-typescript@1.8.6:
+    resolution: {integrity: sha512-5Eo4T/cnuXfrgO4k5LCpOGHIUOuz5hCF/IfNv0T29WY2shR36Hiz+ecN9WjnUuxUKhql9gbOkPaQoqLFKtPRNA==}
 
   luxon@3.7.2:
     resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
@@ -12630,6 +12643,8 @@ snapshots:
 
   konva@10.3.0: {}
 
+  korean-lunar-calendar@0.4.0: {}
+
   ktx-parse@1.1.0: {}
 
   ky@2.0.2: {}
@@ -12769,6 +12784,8 @@ snapshots:
   lucide-react@1.17.0(react@19.2.7):
     dependencies:
       react: 19.2.7
+
+  lunar-typescript@1.8.6: {}
 
   luxon@3.7.2: {}
 
