@@ -21,7 +21,7 @@ import "@toonspectrum/core/fx/fx.css";
 
 const PublicSiteNextSteps = lazy(() =>
   import("@/shared/components/public-site-next-steps").then((mod) => ({
-    default: mod.PublicSiteNextSteps,
+    default: mod.PublicSiteAtelierJourney,
   })),
 );
 const AgeGateHost = lazy(() =>

@@ -1,6 +1,7 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
 
+import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { isPublicCreativeRoute } from "./site-public-routes";
 
@@ -41,4 +42,15 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
       </div>
     </section>
   );
+}
+
+/** New composition preserves the existing onward-card component contract. */
+export function PublicSiteAtelierJourney({ pathname }: { pathname: string }) {
+  const language = useI18n((state) => state.lang);
+  if (pathname === "/" || !isPublicCreativeRoute(pathname)) return null;
+  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return <>
+    <div className="public-site-atelier"><SiteAtelierChapter pathname={pathname} locale={locale} /></div>
+    <PublicSiteNextSteps pathname={pathname} />
+  </>;
 }
