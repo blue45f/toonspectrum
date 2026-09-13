@@ -1,0 +1,28 @@
+{
+  "purpose": "Responsive derivatives of existing original ToonStudio brand concept art. Not user submissions or editor captures.",
+  "sourceManifest": "/brand/atelier-manifest.json",
+  "encoder": "Pillow WebP, quality 78, method 6",
+  "assets": [
+    {
+      "source": "/brand/atelier-world.webp",
+      "derivatives": [
+        "/brand/atelier-world-640.webp",
+        "/brand/atelier-world-960.webp"
+      ]
+    },
+    {
+      "source": "/brand/atelier-process.webp",
+      "derivatives": [
+        "/brand/atelier-process-640.webp",
+        "/brand/atelier-process-960.webp"
+      ]
+    },
+    {
+      "source": "/brand/atelier-materials.webp",
+      "derivatives": [
+        "/brand/atelier-materials-640.webp",
+        "/brand/atelier-materials-960.webp"
+      ]
+    }
+  ]
+}

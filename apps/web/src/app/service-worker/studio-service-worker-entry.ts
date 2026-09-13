@@ -3,6 +3,7 @@
  * ToonSpectrum Service Worker runtime. Updates wait for explicit consent;
  * only GET assets are cached. Manuscripts and writes remain owned by the app.
  */
+import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
 import { resolveStudioNavigation } from "./studio-service-worker-navigation";
 import { hasPreparedStudioDrawingResources, prepareStudioOfflineResources } from "./studio-service-worker-offline";
 import {
@@ -190,8 +191,13 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
       });
       return ready ? readShell() : undefined;
     } : undefined,
-    readRescue: routeClass === "studio-navigation" ? async () =>
-      await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined : undefined,
+    readRescue: routeClass === "studio-navigation" ? async () => {
+      // A fully prepared Studio remains first. Otherwise prefer the prepared
+      // layered editor, keeping the small rescue for browsers without it.
+      const emergency = await readEmergencyDrawing();
+      if (emergency) return emergency;
+      return await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined;
+    } : undefined,
     readShell,
     refreshShell: (response) => persist("precache", shellRequest(pathname), response),
     waitUntil: (promise) => event.waitUntil(promise),
@@ -221,6 +227,11 @@ scope.addEventListener("activate", (event) => {
 
 scope.addEventListener("fetch", (event) => {
   const { request } = event;
+  const emergencyPath = emergencyDrawingPath(request, scope.location.origin);
+  if (emergencyPath) {
+    event.respondWith((async () => (await readEmergencyDrawing(emergencyPath)) ?? fetch(request))());
+    return;
+  }
   if (isLocalDrawingRequest(request, scope.location.origin)) {
     event.respondWith(localDrawingResponse(request));
     return;
