@@ -68,6 +68,26 @@ beforeEach(() => {
 });
 
 describe("MarketBrowsePage", () => {
+  it("clears relevance and pending input from the no-results reset action", () => {
+    vi.useFakeTimers();
+    render(
+      <MemoryRouter initialEntries={["/market/browse?q=missing&sort=relevance&kind=brush"]}>
+        <MarketBrowsePage />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+    const search = screen.getByRole("searchbox", { name: "마켓 리소스 검색" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "pending" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색어 초기화" }));
+    act(() => vi.advanceTimersByTime(350));
+    expect(search.value).toBe("");
+    expect(screen.getByLabelText("현재 검색 쿼리").textContent).toBe("?kind=brush");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(useResources).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: "brush", sort: "newest", search: undefined,
+    }));
+  });
+
   it("atomically clears the draft and URL without a pending debounce restoring filters", () => {
     vi.useFakeTimers();
     render(
