@@ -1,0 +1,84 @@
+name: Studio asset library regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/*Asset*.tsx'
+      - 'apps/web/src/domains/creator/studio-asset-*'
+      - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'scripts/verify-studio-vector-environments-v3.mjs'
+      - 'apps/web/src/domains/creator/studio-unified-asset-*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
+      - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
+      - '.github/workflows/studio-asset-library-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/*Asset*.tsx'
+      - 'apps/web/src/domains/creator/studio-asset-*'
+      - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'scripts/verify-studio-vector-environments-v3.mjs'
+      - 'apps/web/src/domains/creator/studio-unified-asset-*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
+      - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
+      - '.github/workflows/studio-asset-library-regression.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-assets-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: '1'
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  regression:
+    name: Asset library deletion and discovery regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Native vector safety contract
+        run: node scripts/verify-studio-vector-environments-v3.mjs
+      - name: Asset library regression tests
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations.test.ts \
+            apps/web/src/domains/creator/studio-unified-asset-library-projection.test.ts \
+            apps/web/src/domains/creator/studio-asset-library-management.test.ts \
+            apps/web/src/domains/creator/StudioAssetLibraryCollections.test.tsx \
+            apps/web/src/domains/creator/StudioLocalAssetManager.interaction.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions.delete.test.ts \
+            apps/web/src/domains/creator/studio-generated-2d-catalog.test.ts \
+            apps/web/src/domains/creator/studio-unified-asset-catalog.test.ts \
+            apps/web/src/domains/creator/studio-unified-asset-intelligence.test.ts \
+            apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-product-boundary.test.ts \
+            apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-repository.test.ts \
+            apps/web/src/domains/creator/studio-asset-library.test.ts \
+            apps/web/src/domains/creator/StudioAssetMenuPanel.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetSmartLibrary.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.boundary.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dAssetLibraryPanel.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx
+      - name: Changed library module lint
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioAssetLibraryCollections.tsx \
+            apps/web/src/domains/creator/StudioLocalAssetManager.tsx \
+            apps/web/src/domains/creator/StudioSceneAssetLibrary.tsx \
+            apps/web/src/domains/creator/studio-asset-library-management.ts \
+            apps/web/src/domains/creator/studio-unified-asset-library-projection.ts

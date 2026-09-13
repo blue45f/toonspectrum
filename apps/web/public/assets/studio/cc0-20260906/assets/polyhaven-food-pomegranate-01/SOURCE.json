@@ -1,0 +1,94 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_pomegranate_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1625619600,
+    "name": "Food Pomegranate 01",
+    "categories": [
+      "food",
+      "nature"
+    ],
+    "type": 2,
+    "authors": {
+      "Oliver Harries": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 8142,
+    "texel_density": 30749.927653617327,
+    "dimensions": [
+      114.2711341381073,
+      115.35424366593361,
+      114.9565652012825
+    ],
+    "files_hash": "3998876df4918643a59766ce2ca12bc609f8b057",
+    "tags": [
+      "fruit",
+      "fruitbowl",
+      "food",
+      "red",
+      "pomegranite",
+      "produce",
+      "fresh fruit",
+      "ripe",
+      "calyx",
+      "raw"
+    ],
+    "description": "Free 8K model of a ripe pomegranate - photorealistic red mottled skin, subtle blemishes, glossy highlights and dried calyx detail.",
+    "category_id": "482e0c49-27e5-54ed-8039-54f7c4560e2d",
+    "category": "Food & Kitchen/Produce/Fruit",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "food"
+      ]
+    },
+    "img_version": "35c27edf",
+    "download_count": 18405,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/food_pomegranate_01.png?width=256&height=256&v=35c27edf"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/food_pomegranate_01/food_pomegranate_01_2k.gltf",
+      "bytes": 2761,
+      "sha256": "7f8b3a1db78987fac099ddc193149dbd055b0741fd9fb1e8ce9de5e2b0b11b5d",
+      "sourceMd5": "849cacf9171c0356432126b899343417"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pomegranate_01/food_pomegranate_01_nor_gl_2k.jpg",
+      "bytes": 358473,
+      "sha256": "a12c46a477bce0790fecac6192fe65f5251dbb244aa0c308aed4114c9dc25b09",
+      "sourceMd5": "d6fa5c0e3ae56bdf31f11accfe414596"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pomegranate_01/food_pomegranate_01_diff_2k.jpg",
+      "bytes": 616726,
+      "sha256": "5c840aa6a4c0b6d5d3bb65ebc328d0e79738df2caadf84cdb3921690da88a5e1",
+      "sourceMd5": "6a1f649105b1dffa368eeeef39cdcf29"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/food_pomegranate_01/food_pomegranate_01.bin",
+      "bytes": 195828,
+      "sha256": "29df7ac780b968c82958f881dba50837811c6d0b428db5099ba3f418969a1951",
+      "sourceMd5": "9cada4f5f04b70cb224de5f027ce1c6b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_pomegranate_01/food_pomegranate_01_rough_2k.jpg",
+      "bytes": 493760,
+      "sha256": "d123e7d2f79a96bd46674abd7a65db927ee28d222211d3f6d27aedb3ca44702d",
+      "sourceMd5": "fe35ca9d0e94270f3bbc80090361fb65"
+    }
+  ]
+}

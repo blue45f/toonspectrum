@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/football",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-football",
+  "sourceModelSha256": "865f444b75a26ef30c898aefd27d661b95caf87aa54fce91e852e0c0a6634068",
+  "render": {
+    "sourceId": "polyhaven-football",
+    "sourceSha256": "865f444b75a26ef30c898aefd27d661b95caf87aa54fce91e852e0c0a6634068",
+    "path": "high-resolution-props/polyhaven-football.png",
+    "visiblePixels": 211092,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4296
+  },
+  "independentOriginal": false
+}

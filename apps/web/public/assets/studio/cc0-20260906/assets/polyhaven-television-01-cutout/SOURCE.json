@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Television_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-television-01",
+  "sourceModelSha256": "af538f9989a9e36d214b023a1c9cc589e4e6150b4df42dc42fa1f4c173406186",
+  "render": {
+    "sourceId": "polyhaven-television-01",
+    "sourceSha256": "af538f9989a9e36d214b023a1c9cc589e4e6150b4df42dc42fa1f4c173406186",
+    "path": "high-resolution-props/polyhaven-television-01.png",
+    "visiblePixels": 734948,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 1918
+  },
+  "independentOriginal": false
+}

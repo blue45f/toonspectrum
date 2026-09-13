@@ -28,6 +28,11 @@ import {
   STUDIO_LIVE_INK_CAPABILITY,
   type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
+import {
+  encodeStudioDirectPacket, parseStudioDirectPacket, STUDIO_DIRECT_WIRE,
+  STUDIO_DIRECT_MAX_BYTES, STUDIO_DIRECT_MAX_BUFFERED_BYTES,
+  type StudioLiveDirectPort,
+} from "./studio-live-direct-port";
 import { bindStudioLiveP2pChannelLifecycle } from "./studio-live-p2p-channel-lifecycle";
 
 import type {
@@ -180,6 +185,7 @@ interface StudioLiveP2pPeerLink {
   /** True once our own lane announcement reached this peer's channel. */
   announcedBinaryLanes: boolean;
   inkInboundWindow: StudioLiveP2pInkInboundWindow | null;
+  directInboundWindow?: { startedAt: number; count: number; bytes: number };
   closed: boolean;
 }
 
@@ -266,6 +272,8 @@ function decodeStudioLiveP2pInkFrame(data: ArrayBuffer): Record<string, unknown>
  * fully reliable RTC lane for exact actual samples; failure remains visible to the publisher.
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
+  readonly direct: StudioLiveDirectPort;
+  private readonly directListeners = new Set<(sender: StudioLiveParticipant, payload: string) => void>();
   readonly mode: StudioLiveTransport["mode"];
   readonly crdtFanout: NonNullable<StudioLiveTransport["crdtFanout"]>;
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
@@ -300,6 +308,25 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     now: () => number,
     maxPeers: number,
   ) {
+    this.direct = {
+      getPeers: () => !this.closed && this.ready
+        ? [...this.peers.values()].filter((peer) => this.directPeerReady(peer))
+          .map((peer) => ({ ...peer.participant })) : [],
+      send: (targetSessionId, payload) => {
+        if (this.closed || !this.ready || this.context.participant.role === "viewer") return false;
+        const peer = this.peers.get(targetSessionId);
+        const packet = encodeStudioDirectPacket(this.context.workId, payload);
+        if (!peer || !packet || !this.directPeerReady(peer)
+          || (peer.channel?.bufferedAmount ?? Infinity) > STUDIO_DIRECT_MAX_BUFFERED_BYTES) return false;
+        // This lane must never call primary.send, even under backpressure.
+        return this.sendSerializedToPeer(peer, packet);
+      },
+      subscribe: (listener) => {
+        if (this.closed) return () => undefined;
+        this.directListeners.add(listener);
+        return () => { this.directListeners.delete(listener); };
+      },
+    };
     this.context = context;
     this.primary = primary;
     this.mode = primary.mode;
@@ -500,6 +527,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.directListeners.clear();
     this.unsubscribePrimary?.();
     this.unsubscribePrimary = null;
     for (const pending of this.pendingCrdtSync.values()) {
@@ -1058,6 +1086,26 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     });
   }
 
+  private directPeerReady(peer: StudioLiveP2pPeerLink): boolean {
+    return this.knownPeerSessionIds.has(peer.sessionId) && peer.participant.role !== "viewer"
+      && this.isReliableMeshLink(peer);
+  }
+
+  private receiveDirect(link: StudioLiveP2pPeerLink, value: unknown, byteLength: number): void {
+    if (!this.ready || !this.directPeerReady(link) || byteLength > STUDIO_DIRECT_MAX_BYTES) return;
+    const payload = parseStudioDirectPacket(value, this.context.workId);
+    if (payload === null) return;
+    const now = this.now();
+    const budget = link.directInboundWindow;
+    const window = budget && now - budget.startedAt < 3_000
+      ? budget : { startedAt: now, count: 0, bytes: 0 };
+    link.directInboundWindow = window;
+    if (++window.count > 180 || (window.bytes += byteLength) > 512 * 1024) return;
+    for (const listener of this.directListeners) {
+      try { listener({ ...link.participant }, payload); } catch { /* Isolate observers. */ }
+    }
+  }
+
   private handleChannelMessage(link: StudioLiveP2pPeerLink, data: unknown): void {
     if (this.closed || link.closed || this.peers.get(link.sessionId) !== link) return;
     if (data instanceof ArrayBuffer) {
@@ -1069,6 +1117,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     try {
       parsed = JSON.parse(data) as unknown;
     } catch {
+      return;
+    }
+    if (isPlainRecord(parsed) && parsed.wire === STUDIO_DIRECT_WIRE) {
+      this.receiveDirect(link, parsed, studioLiveUtf8ByteLength(data));
       return;
     }
     const peerLanes = parseStudioLiveP2pCapsMessage(parsed);

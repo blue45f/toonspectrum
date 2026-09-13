@@ -1,0 +1,76 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/machine_shop_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 14,
+    "prepaid": true,
+    "type": 0,
+    "tags": [
+      "workshop",
+      "hall",
+      "warehouse",
+      "industrial",
+      "machine",
+      "metal"
+    ],
+    "date_published": 1536876000,
+    "name": "Machine Shop 02",
+    "categories": [
+      "indoor",
+      "urban",
+      "medium contrast",
+      "natural light"
+    ],
+    "date_taken": 1535666400,
+    "coords": [
+      50.929001,
+      34.811448
+    ],
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "16458298"
+    ],
+    "max_resolution": [
+      16500,
+      8250
+    ],
+    "files_hash": "b1d1786cddf7b9a83f8d77dd1e79ac577fde8998",
+    "description": "Free 16K unclipped HDRI of a machine shop - natural daylight from high windows and an open door, medium contrast, soft shadows, and warm metal highlights.",
+    "category_id": "9bea9c37-bde3-543a-95df-1952e71ad430",
+    "category": "Interiors/Workshops & Garages/Industrial Workshops",
+    "attributes": {
+      "light_type": "natural",
+      "contrast": "medium",
+      "environment": "indoor",
+      "weather": "overcast"
+    },
+    "img_version": "c950b689",
+    "download_count": 83770,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/machine_shop_02.png?width=256&height=256&v=c950b689"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/machine_shop_02.jpg",
+      "bytes": 5590767,
+      "sha256": "2884860c787993b3c78c617b698cb1f7cb3a41688cb46abedaa516470c973ad3",
+      "sourceMd5": "88f447dbf38c252db6435c78bd1b402c"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

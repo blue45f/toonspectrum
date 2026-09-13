@@ -5,7 +5,10 @@ import { formatMarketDate, marketKindMeta, marketLicenseMeta } from "../models/m
 import {
   brushPreviewData,
   palettePreviewColors,
+  recipePreviewData,
 } from "../models/market-preview";
+
+import { MarketVerifiedAssetPreview } from "./MarketVerifiedAssetPreview";
 
 import { MarketCompareToggle } from "./MarketCompareToggle";
 import { MarketProductionFitBadge } from "./MarketProductionFitBadge";
@@ -26,6 +29,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const KindIcon = kind.icon;
   const paletteColors = palettePreviewColors(record);
   const brushPreviews = brushPreviewData(record);
+  const recipe = recipePreviewData(record)?.[0];
   const { isWishlisted, toggleWishlist } = useMarketWishlist();
   const wishlisted = isWishlisted(record.id);
 
@@ -122,6 +126,8 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
             <line x1="130" y1="82" x2="130" y2="88" stroke={`oklch(0.7 0.08 ${kind.hue})`} strokeWidth="0.6" strokeOpacity="0.3" />
           </svg>
         ) : null}
+
+        {recipe ? <MarketVerifiedAssetPreview reference={recipe.recipeId} compact /> : null}
 
         <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1.5">
           <button

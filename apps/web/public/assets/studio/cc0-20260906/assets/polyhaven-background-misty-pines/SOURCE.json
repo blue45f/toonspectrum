@@ -1,0 +1,83 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/misty_pines",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 6,
+    "type": 0,
+    "tags": [
+      "tree",
+      "forest",
+      "bush",
+      "pine",
+      "mist"
+    ],
+    "date_published": 1506981600,
+    "name": "Misty Pines",
+    "categories": [
+      "outdoor",
+      "nature",
+      "overcast",
+      "morning-afternoon",
+      "low contrast",
+      "natural light"
+    ],
+    "date_taken": 1480064520,
+    "coords": [
+      -24.87383,
+      30.698818
+    ],
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "files_hash": "f7d877fc6c40366c320c870bd47085475e2c3aa0",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "sponsors": [
+      {
+        "url": "http://mdjustin.com/",
+        "name": "Justin Dolan"
+      },
+      "42579608",
+      "26820710"
+    ],
+    "description": "Free 16K unclipped HDRI of a misty pine forest - soft, low-contrast morning/afternoon natural light, overcast diffused illumination and haze.",
+    "category_id": "43dbb783-1b2e-521d-a21f-487248097504",
+    "category": "Forest & Woodland/Forest/Coniferous Forest",
+    "attributes": {
+      "time_of_day": "morning",
+      "weather": "fog",
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "db9e5e98",
+    "download_count": 120361,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/misty_pines.png?width=256&height=256&v=db9e5e98"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/misty_pines.jpg",
+      "bytes": 8695696,
+      "sha256": "be0d43081f077326779ff9de4921acf04b4373c7c12f4b0d8e3fa0163496a111",
+      "sourceMd5": "d2073546d2a8d0c7bf5e82d071fa2b29"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}
