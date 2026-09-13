@@ -1,0 +1,79 @@
+name: Studio premium asset quality
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/studio-premium-assets-quality.yml'
+      - 'apps/web/public/assets/studio/cc0-20260906/**'
+      - 'apps/web/src/domains/creator/studio-cc0-*'
+      - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
+      - 'scripts/*premium*'
+      - 'scripts/*diversity*'
+      - 'scripts/studio_asset_acquisition_plan.py'
+      - 'scripts/acquire_studio_pbr_assets.py'
+      - 'scripts/tests/test_studio_asset_acquisition_plan.py'
+      - 'data/studio-assets/diversity-20260913-*'
+      - 'scripts/tests/test_studio_premium_assets.py'
+      - 'data/studio-assets/premium-20260913-decisions.json'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/public/assets/studio/cc0-20260906/**'
+      - 'apps/web/src/domains/creator/studio-cc0-*'
+      - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
+permissions:
+  contents: read
+concurrency:
+  group: studio-premium-quality-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          package-manager-cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated verification tools with the repository package manager
+        run: |
+          set -euo pipefail
+          python -m pip install Pillow==11.3.0 numpy==2.2.6
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          mkdir -p /tmp/toon-asset-tools
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          fs.writeFileSync('/tmp/toon-asset-tools/package.json', JSON.stringify({name:'studio-asset-verification',private:true,packageManager:pkg.packageManager,dependencies:{three:pkg.dependencies.three,react:pkg.dependencies.react,'react-dom':pkg.dependencies['react-dom'],playwright:pkg.devDependencies.playwright,tsx:pkg.devDependencies.tsx,vitest:pkg.devDependencies.vitest,vite:pkg.devDependencies.vite}}));
+          fs.writeFileSync('/tmp/toon-asset-tools/vitest.config.mts', `import {defineConfig} from 'vitest/config'; export default defineConfig({resolve:{alias:{'@':process.cwd()+'/apps/web/src'}},test:{include:['apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts','apps/web/src/domains/creator/studio-cc0-original-delivery.test.ts','apps/web/src/domains/creator/studio-cc0-catalog-cache.test.ts','apps/web/src/domains/creator/studio-asset-expansion-20260908.test.ts'],environment:'node'}});`);
+          JS
+          pnpm --dir /tmp/toon-asset-tools install --ignore-scripts --config.node-linker=hoisted --no-frozen-lockfile
+          ln -s /tmp/toon-asset-tools/node_modules node_modules
+          /tmp/toon-asset-tools/node_modules/.bin/playwright install --with-deps chromium
+      - name: New and legacy regression tests
+        run: |
+          set -euo pipefail
+          /tmp/toon-asset-tools/node_modules/.bin/tsx --test scripts/studio-premium-catalog.test.mts
+          python -m unittest discover -s scripts/tests -p test_studio_premium_assets.py -v
+          python -m unittest discover -s scripts/tests -p test_studio_asset_acquisition_plan.py -v
+          /tmp/toon-asset-tools/node_modules/.bin/vitest run --config /tmp/toon-asset-tools/vitest.config.mts
+      - name: Shipped bytes and actual library component
+        run: |
+          set -euo pipefail
+          node scripts/verify-studio-premium-release.mjs /tmp/toon-asset-tools
+          node scripts/verify-studio-premium-release.mjs /tmp/toon-asset-tools diversity-20260913
+      - name: Upload read-only QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-premium-release-qa-${{ github.run_id }}
+          path: |
+            artifacts/studio-premium-release-qa/
+            artifacts/studio-diversity-release-qa/
+          retention-days: 7
+          if-no-files-found: warn

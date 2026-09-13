@@ -43,7 +43,7 @@ for (const width of [390, 1440]) {
         const errors: string[] = [];
         page.on("pageerror", (error) => errors.push(error.message));
         await page.goto(path, { waitUntil: "domcontentloaded" });
-        const main = page.locator('main[data-public-experience="true"]');
+        const main = page.locator('main[data-public-experience]');
         await expect(main).toBeVisible();
         await expect(main.locator("h1").first(), `${path}: page heading`).toBeVisible();
         const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
@@ -158,4 +158,27 @@ test("directory search supports real navigation, a shared query, Back and recove
   await expect(input).toHaveValue("");
   await expect(input).toBeFocused();
   await expect(page.locator("#sitemap-extended-title")).toBeVisible();
+});
+
+
+test("long-page evidence covers every vertical region without changing the viewport or losing scroll", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.setContent('<main style="height:5100px;background:linear-gradient(white,gray)"><h1>Complete page evidence</h1></main>');
+  await page.evaluate(() => scrollTo(0, 350));
+  const original = await page.evaluate(() => ({ y: scrollY, height: innerHeight, width: innerWidth }));
+  await capturePageEvidence(page, info, "long-page");
+  const attachment = info.attachments.find((item) => item.name === "long-page-coverage");
+  expect(attachment?.body).toBeTruthy();
+  const coverage = JSON.parse(attachment!.body!.toString()) as {
+    height: number; coveredHeight: number; tiles: { y: number; height: number; width: number }[];
+  };
+  expect(coverage.tiles.length).toBeGreaterThan(5);
+  expect(coverage.coveredHeight).toBe(coverage.height);
+  expect(coverage.tiles[0].y).toBe(0);
+  for (const [index, tile] of coverage.tiles.entries()) {
+    expect(tile.width).toBe(original.width);
+    expect(tile.height).toBe(original.height);
+    if (index) expect(tile.y).toBeLessThanOrEqual(coverage.tiles[index - 1].y + coverage.tiles[index - 1].height);
+  }
+  expect(await page.evaluate(() => ({ y: scrollY, height: innerHeight, width: innerWidth }))).toEqual(original);
 });

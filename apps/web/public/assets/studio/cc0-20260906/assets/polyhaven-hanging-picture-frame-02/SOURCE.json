@@ -1,0 +1,106 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "wood",
+      "painting",
+      "old",
+      "art",
+      "frame"
+    ],
+    "name": "Hanging Picture Frame 02",
+    "categories": [
+      "decorative",
+      "wall decoration"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1623767614,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 3678,
+    "texel_density": 8788.73899561775,
+    "dimensions": [
+      751.8134415149689,
+      33.07514381594956,
+      499.9999701976776
+    ],
+    "files_hash": "f03e795394b46309121f238f59e712801a0e6e90",
+    "description": "Free 8K model of a vintage wooden hanging picture frame with distressed white finish and faded painted artwork - perfect for decorative wall scenes and period interiors.",
+    "category_id": "120bc7c7-4121-53e5-848a-89f3cb7cbf51",
+    "category": "Decor & Art/Wall Decor/Picture Frames & Art",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "85c54925",
+    "download_count": 22970,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/hanging_picture_frame_02.png?width=256&height=256&v=85c54925"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/hanging_picture_frame_02/hanging_picture_frame_02_2k.gltf",
+      "bytes": 6433,
+      "sha256": "db73af9bc09a74c4ba873d8248422ed23bd1d0e054185fde3ff0a9559a5eb7f9",
+      "sourceMd5": "c218f5eed3aeaeeee91d36f4dc32740a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_diff_2k.jpg",
+      "bytes": 582791,
+      "sha256": "3007b7b902b60df23a182e97f960abe3c577f4063e45c270688cc5cc7613ba2b",
+      "sourceMd5": "9b35f516ce4eed2742acd2ddd5db0e60"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_artwork_diff_2k.jpg",
+      "bytes": 432108,
+      "sha256": "92a822e480473a92a481327de111cd00bae94eebb28228567a4c88569e36c918",
+      "sourceMd5": "cbfe02e5e7832942ebdfd081585c3015"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/hanging_picture_frame_02/hanging_picture_frame_02.bin",
+      "bytes": 115080,
+      "sha256": "0ed5813c8b30f63807ffac962e47135d3248b3804e07cb93862c13e29bed83d8",
+      "sourceMd5": "3e88b7525d7bf9b8f33660100c953cff"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_arm_2k.jpg",
+      "bytes": 419233,
+      "sha256": "16c1e2d401e78595bde03b001eec97fef5a7ff6d1de160e6bb0dfd744c1dc6a6",
+      "sourceMd5": "9c1a98481da304b94338646307ca9b90"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_nor_gl_2k.jpg",
+      "bytes": 245446,
+      "sha256": "07d7e14ee2cb81f78feb3a16a581795ffa352bf57bcef029e5edace01d039d0b",
+      "sourceMd5": "3ed235b57287e0c2770e1957778be4f1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_artwork_roughness_2k.jpg",
+      "bytes": 222104,
+      "sha256": "0551342319b57b44db8ca68408bd70555c065c2a4c29910bcad4e99c5233f5bb",
+      "sourceMd5": "b14d8b57b7f0cee0a335acc7f0b5c19e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hanging_picture_frame_02/hanging_picture_frame_02_artwork_nor_gl_2k.jpg",
+      "bytes": 214002,
+      "sha256": "d877cbc16df0f21b9f25027321ddf2d02d451824eafe2d5bf1d03f42d9bc90eb",
+      "sourceMd5": "c8510235ce8f37a838d05b60dc9843b4"
+    }
+  ]
+}

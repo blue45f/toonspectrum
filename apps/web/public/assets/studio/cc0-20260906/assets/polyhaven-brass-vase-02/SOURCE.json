@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_vase_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "brass",
+      "antique",
+      "metal",
+      "ancient",
+      "old",
+      "gold",
+      "container",
+      "vase",
+      "clean",
+      "ornate",
+      "decorative",
+      "pattern"
+    ],
+    "name": "Brass Vase 02",
+    "categories": [
+      "decorative",
+      "vases"
+    ],
+    "authors": {
+      "Rico Cilliers": "All"
+    },
+    "date_published": 1637107200,
+    "sponsors": [
+      "68131842"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 6890,
+    "texel_density": 14602.448914325169,
+    "dimensions": [
+      210.23856103420258,
+      210.2375626564026,
+      528.6410981789231
+    ],
+    "files_hash": "a75f2e5cfd6794017ac675dc5d10d0c17da3bcd9",
+    "description": "Free 8K ornate brass vase with elongated neck, flared base and slim handle, polished antique gold finish with engraved decorative patterns and light patina.",
+    "category_id": "86ab645d-670f-57c4-93ac-f2f50c1e1a73",
+    "category": "Decor & Art/Vases & Vessels/Metal Vases",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "brass"
+      ]
+    },
+    "img_version": "dcde2dcb",
+    "download_count": 11653,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brass_vase_02.png?width=256&height=256&v=dcde2dcb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_vase_02/brass_vase_02_2k.gltf",
+      "bytes": 2672,
+      "sha256": "89396aa8442dbc809d36e179c1492e7529f9c41fa0f175fc70c7d206bc2ebd86",
+      "sourceMd5": "187d7f7906f4f67c9fea0d94d84ea504"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/brass_vase_02/brass_vase_02.bin",
+      "bytes": 164508,
+      "sha256": "9b922c73a5bc3012f904f6236fecf99ac5e9c71e0645dab0fdad5943cdf2ae35",
+      "sourceMd5": "081d4638f8ee5538d790afa92a2c0a4f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_vase_02/brass_vase_02_diff_2k.jpg",
+      "bytes": 2252897,
+      "sha256": "3d0795cad3223f7e4a00dd4f564ff78eb24f90e292a9c8657ac0e09e9014e410",
+      "sourceMd5": "bb9d0ba296e944a24378b021d6eca1e4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_vase_02/brass_vase_02_arm_2k.jpg",
+      "bytes": 1920125,
+      "sha256": "868976c805a76126ccd0ab3a3a11eb32dd0fcbfab685b690f142ed834fa846cc",
+      "sourceMd5": "e41355ca4e66cdcfbe4618aa29588c05"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_vase_02/brass_vase_02_nor_gl_2k.jpg",
+      "bytes": 1565094,
+      "sha256": "ec870392e17851903c9a8f13845df884f5b1902e033ce5d26c7922be3d981dec",
+      "sourceMd5": "222a99535370a929cdd3f3a9a49a58a4"
+    }
+  ]
+}

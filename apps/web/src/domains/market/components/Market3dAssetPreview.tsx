@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { MarketVerifiedAssetPreview } from "./MarketVerifiedAssetPreview";
+import { findStudioMarketplaceCc0Asset } from "@/domains/creator/studio-marketplace-cc0-catalog";
+
 import type { RecipePreviewData } from "../models/market-preview";
 
 interface Market3dAssetPreviewProps {
@@ -25,6 +28,9 @@ type ViewMode = "wireframe" | "shaded" | "toon";
  */
 export function Market3dAssetPreview({ recipe, className }: Market3dAssetPreviewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("shaded");
+  if (findStudioMarketplaceCc0Asset(recipe.recipeId)?.kind === "model") {
+    return <MarketVerifiedAssetPreview reference={recipe.recipeId} />;
+  }
 
   return (
     <div

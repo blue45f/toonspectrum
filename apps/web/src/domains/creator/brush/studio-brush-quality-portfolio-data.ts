@@ -1,3 +1,4 @@
+import { STUDIO_MATERIAL_BRUSH_PORTFOLIO } from "./studio-material-brush-portfolio";
 import type { StudioBrushQualityPortfolioEntry } from "./studio-brush-quality-foundation";
 
 type Seed=readonly [string,string,StudioBrushQualityPortfolioEntry["source"],StudioBrushQualityPortfolioEntry["tier"],StudioBrushQualityPortfolioEntry["medium"],StudioBrushQualityPortfolioEntry["textureProfile"],StudioBrushQualityPortfolioEntry["handFeelProfile"],StudioBrushQualityPortfolioEntry["liveCommitGate"],StudioBrushQualityPortfolioEntry["enginePin"],string,string,readonly string[]];
@@ -51,4 +52,9 @@ const seeds:readonly Seed[]=[
 ["palette-knife-edge","팔레트 나이프","pro","specialist","oil","knife-edge","loaded-paint","same-geometry-settled-material","gpu-bristle-quality-tie","oil/palette-knife-edge","폭이 좁고 방향성이 강한 나이프 접촉",["oil--knife-edge"]],
 ["bristle-fan-dry","드라이 팬 브러시","pro","specialist","oil","fan-bristle","dry-drag","same-geometry-settled-material","gpu-bristle-quality-tie","bristle/fan-dry","펼쳐진 강모가 만드는 마른 갈라짐",["bristle-round-loaded"]],
 ];
-export const STUDIO_BRUSH_QUALITY_PORTFOLIO:readonly StudioBrushQualityPortfolioEntry[]=Object.freeze(seeds.map(([id,label,source,tier,medium,textureProfile,handFeelProfile,liveCommitGate,enginePin,signature,distinctness,absorbedIds])=>Object.freeze({id,label,source,tier,medium,textureProfile,handFeelProfile,liveCommitGate,enginePin,signature,distinctness,absorbedIds:Object.freeze([...absorbedIds])})));
+const originalPortfolio:readonly StudioBrushQualityPortfolioEntry[]=Object.freeze(seeds.map(([id,label,source,tier,medium,textureProfile,handFeelProfile,liveCommitGate,enginePin,signature,distinctness,absorbedIds])=>Object.freeze({id,label,source,tier,medium,textureProfile,handFeelProfile,liveCommitGate,enginePin,signature,distinctness,absorbedIds:Object.freeze([...absorbedIds])})));
+
+export const STUDIO_BRUSH_QUALITY_PORTFOLIO: readonly StudioBrushQualityPortfolioEntry[] = Object.freeze([
+  ...originalPortfolio,
+  ...STUDIO_MATERIAL_BRUSH_PORTFOLIO,
+]);

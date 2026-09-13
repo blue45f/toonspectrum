@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/corrugated_iron",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Corrugated Iron",
+    "categories": [
+      "man made",
+      "roofing",
+      "wall",
+      "metal"
+    ],
+    "type": 1,
+    "info": null,
+    "dimensions": [
+      1120.0000047683716,
+      1120.0000047683716
+    ],
+    "date_published": 1699488000,
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "authors": {
+      "Jenelle van Heerden": "Processing",
+      "Dimitrios Savva": "Photography"
+    },
+    "tags": [
+      "metal",
+      "corrugated",
+      "roof",
+      "roofing",
+      "steel",
+      "metallic",
+      "sheet",
+      "metal sheet",
+      "weathered",
+      "rusty",
+      "iron",
+      "galvanized",
+      "corrugation",
+      "steel sheeting",
+      "rust",
+      "corrugated iron"
+    ],
+    "files_hash": "32412884f4522418b4598d9631610b2331e8ca58",
+    "description": "Free 16K corrugated iron texture - weathered galvanized steel roofing with deep ridges, subtle rust, gritty surface, metallic sheen for roofs/walls.",
+    "category_id": "c10ee76b-cb81-546f-bba9-095bf5a18a6d",
+    "category": "Metal/Sheet & Corrugated/Corrugated Iron",
+    "attributes": {
+      "surface_use": "roof",
+      "condition": [
+        "weathered",
+        "rusted"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "99c60d8c",
+    "download_count": 98291,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/corrugated_iron.png?width=256&height=256&v=99c60d8c"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/corrugated_iron/corrugated_iron_diff_2k.jpg",
+      "bytes": 2605861,
+      "sha256": "d904c2f294c0c8f0f198e115517fcdd6fc3a314d28c10e69881eac2890f028df",
+      "sourceMd5": "fb7cfe9f978589b8e3d1155a859fed46"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/corrugated_iron/corrugated_iron_rough_2k.jpg",
+      "bytes": 1680186,
+      "sha256": "5da4c3d958657b404e1d5ab1284662fe2000fabc8025030c805a5e1906f2f2b2",
+      "sourceMd5": "6fcc1bf5e31dc809bdcfc0b933c11ade"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/corrugated_iron/corrugated_iron_nor_gl_2k.jpg",
+      "bytes": 3453777,
+      "sha256": "86a2c9e5111ef0354961c355f863868e9705f4ff2f5e3e46220ac1e1425fd892",
+      "sourceMd5": "ba7b8088897242f5df20ab6fb1fe4124"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/corrugated_iron/corrugated_iron_ao_2k.jpg",
+      "bytes": 884922,
+      "sha256": "5e9e3faff9db8d649da7782a86ca79ad5d3bf20c01d4c6c091601b495da9d5f7",
+      "sourceMd5": "27d515efec91d936c2c8a81483d00d2e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/corrugated_iron/corrugated_iron_disp_2k.jpg",
+      "bytes": 781870,
+      "sha256": "de66994f5c93e4c58f6904b318157a58edfc15488b5903d41dfc8aad853cfaca",
+      "sourceMd5": "6e7383c2a3512cc12fce8e98cfc197d4"
+    }
+  ]
+}

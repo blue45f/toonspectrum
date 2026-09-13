@@ -1,9 +1,10 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3 } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import { LibraryBackupImport } from "./LibraryBackupImport";
 
+import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
@@ -72,6 +73,7 @@ function Row({
 
 export function SettingsPage() {
   const hydrated = useHydrated();
+  const experience = useSiteExperience();
   const lang = useI18n((s) => s.lang);
   const userId = useApp((s) => s.userId);
   const setLang = useI18n((s) => s.setLang);
@@ -137,8 +139,10 @@ export function SettingsPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `toonspectrum-library-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // 클라이언트에서만 localStorage 기반 선호값 반영.
@@ -192,6 +196,14 @@ export function SettingsPage() {
             </select>
           </label>
         </Row>
+        {experience && <Row icon={Sparkles}
+          title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
+          desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
+          <Choice options={[
+            { id: "vivid", label: lang.startsWith("ko") ? "화려하게" : "Vivid" },
+            { id: "calm", label: lang.startsWith("ko") ? "차분하게" : "Calm" },
+          ]} value={experience.mode} onChange={experience.setMode} />
+        </Row>}
         <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
           <Choice options={scaleOptions} value={ratingScale} onChange={setRatingScale} />
         </Row>

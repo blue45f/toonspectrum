@@ -52,3 +52,19 @@
 .promo-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 900px) { .promo-workspace { grid-template-columns: 1fr; } .promo-output { grid-row: 1; } .promo-header { align-items: start; } .promo-badge { display: none; } .promo-canvas-wrap canvas { max-height: 420px; } }
 @media (max-width: 540px) { .promo-studio { padding: 16px 12px 48px; } .promo-card { padding: 16px; } .promo-inline-grid { grid-template-columns: 1fr; gap: 0; } .promo-shot { grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 10px; } .promo-shot-image { width: 64px; height: 100px; } .promo-button-row button { flex: 1; } .promo-playback { gap: 6px; } .promo-playback output { font-size: 10px; } }
+.promo-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.promo-template-grid button { display: grid; align-content: start; gap: 7px; text-align: left; min-height: 106px; padding: 15px; background: linear-gradient(135deg, #f9f7ff, #fff); }
+.promo-template-grid strong { font-size: 14px; color: #4c36ae; }
+.promo-template-grid span { font-size: 12px; font-weight: 400; line-height: 1.7; color: var(--promo-muted); }
+.promo-studio .promo-toggle { display: flex; align-items: center; gap: 10px; }
+.promo-studio .promo-toggle input[type=checkbox] { width: 18px; min-height: 18px; flex-shrink: 0; accent-color: #6446bd; }
+.promo-studio input[type=color] { padding: 4px; min-height: 44px; }
+.promo-shot-direction { margin-top: 12px; border-top: 1px solid var(--promo-border); padding-top: 12px; }
+.promo-shot-direction summary { font-size: 12px; cursor: pointer; min-height: 32px; }
+.promo-shot-direction summary:focus-visible { outline: 3px solid #987bec; outline-offset: 3px; }
+.promo-scene-strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 12px; }
+.promo-scene-strip button { min-width: 70px; padding: 8px; font-size: 11px; }
+.promo-draft-status { font-size: 12px; line-height: 1.7; padding: 12px 16px; border: 1px solid var(--promo-border); border-radius: 10px; background: #fff; color: var(--promo-muted); }
+@media (min-width: 1100px) { .promo-output { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; } }
+@media (max-width: 540px) { .promo-template-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .promo-studio *, .promo-studio *::before, .promo-studio *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

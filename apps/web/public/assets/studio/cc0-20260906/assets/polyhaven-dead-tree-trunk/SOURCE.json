@@ -1,0 +1,110 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "date_published": 1685664000,
+    "name": "Dead Tree Trunk",
+    "type": 2,
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "info": null,
+    "tags": [
+      "log",
+      "dead tree",
+      "tree",
+      "trunk",
+      "bark",
+      "natural",
+      "foliage",
+      "nature",
+      "forest",
+      "plant",
+      "dead",
+      "dry",
+      "woodland",
+      "decayed",
+      "rough texture",
+      "forest floor"
+    ],
+    "categories": [
+      "nature",
+      "plants",
+      "ground cover",
+      "collection: pine_forest",
+      "collection: verdant_trail"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 101802,
+    "texel_density": 5227.11070900053,
+    "dimensions": [
+      3051.015019416809,
+      277.52751111984253,
+      290.43155536055565
+    ],
+    "sponsors": [
+      "95481047"
+    ],
+    "files_hash": "1e56e4393417d157e43e26bd8b7b019189d313ed",
+    "description": "Free 8K dead tree trunk model, a long weathered log with cracked, decayed bark, pronounced wood grain, broken ends and subtle mossy-green patches.",
+    "category_id": "a690b075-9aa9-5ad2-a35e-3e247d1fce4b",
+    "category": "Nature/Logs, Branches & Roots/Fallen Logs & Stumps",
+    "collections": [
+      "pine_forest",
+      "verdant_trail"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "ed7326b9",
+    "download_count": 16846,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/dead_tree_trunk.png?width=256&height=256&v=ed7326b9"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/dead_tree_trunk/dead_tree_trunk_2k.gltf",
+      "bytes": 2812,
+      "sha256": "63133e2cd4c8c9d08114ef158284403ba4fad802b7f1162f73a8323b509a1b53",
+      "sourceMd5": "0101cc9b4167fee9872c4153602c1179"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dead_tree_trunk/dead_tree_trunk_diff_2k.jpg",
+      "bytes": 2580084,
+      "sha256": "57b3f04a2b9b1017abfefbbca1b5d4f5421960fefd964a0b9dd4036be4d58d0c",
+      "sourceMd5": "c75e5dc80be2e5d4bc873db388e2093c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dead_tree_trunk/dead_tree_trunk_arm_2k.jpg",
+      "bytes": 2608763,
+      "sha256": "f244cfbfab760d877980065593710f74947bb70eac9d47d9a189537d23ba1f6b",
+      "sourceMd5": "908ade4a274dd887658eb055415ad61b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dead_tree_trunk/dead_tree_trunk_nor_gl_2k.jpg",
+      "bytes": 3804907,
+      "sha256": "9447959386aa3ee0e3552bd095c3dbbcb13c58cc6a87cb4b51cc4517b695040c",
+      "sourceMd5": "c09438c886b3327dca4f61b758dbd570"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dead_tree_trunk/dead_tree_trunk.bin",
+      "bytes": 2293788,
+      "sha256": "c1ac6b3195246e8647a28eee2fbfdd4712a045c7cf2dcb4f5abcc2d40a446ca6",
+      "sourceMd5": "2a2b05e67a5c51fba5fc7591a7857957"
+    }
+  ]
+}

@@ -81,7 +81,7 @@ export function useRouteTitle(pathname: string, search: string) {
       title = t("route.market");
     } else if (pathname.startsWith("/admin/")) {
       title = t("route.admin");
-    } else if (pathname.startsWith("/me")) {
+    } else if (pathname === "/me" || pathname.startsWith("/me/")) {
       title = t("route.me");
     } else if (isStudioRoutePathname(pathname)) {
       title = t("route.studio");

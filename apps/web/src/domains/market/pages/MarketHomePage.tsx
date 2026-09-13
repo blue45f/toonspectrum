@@ -18,6 +18,7 @@ import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketHomeJsonLd } from "../models/market-jsonld";
 import { MARKET_LICENSES } from "../models/market-kind";
+import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
@@ -57,6 +58,7 @@ export function MarketHomePage() {
     }
   }
   const popularTags = [...tagCounts.entries()]
+    .filter(([tag]) => isMarketPublicKeywordTag(tag))
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .slice(0, 8)
     .map(([tag]) => tag);
@@ -154,7 +156,7 @@ export function MarketHomePage() {
               return (
                 <Link
                   key={theme.id}
-                  href={`/market/browse?tag=${encodeURIComponent(theme.tag)}`}
+                  href={theme.browseHref}
                   className="market-collection-card group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-card p-4 transition-colors duration-200 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   <img src={theme.image} alt="" loading="lazy" width={640} height={360} className="-mx-4 -mt-4 mb-4 aspect-[1.9] max-w-none object-cover transition-transform duration-200 motion-reduce:transition-none" style={{ width: "calc(100% + 2rem)", objectPosition: theme.id === "pose-guide-3d" ? "40% 45%" : "center" }} />
@@ -257,7 +259,7 @@ export function MarketHomePage() {
         {hasFatalLatestError ? null : (
           <>
             {latest.loading ? <p role="status" className="sr-only">최근 공유된 마켓 리소스를 불러오는 중입니다.</p> : null}
-            <ul aria-busy={latest.loading || undefined} className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            <ul aria-busy={latest.loading || undefined} className="mt-4 grid grid-cols-2 gap-2.5 pb-16 sm:grid-cols-3 lg:grid-cols-4 lg:pb-8">
               {latest.loading && latest.items.length === 0
                 ? Array.from({ length: 8 }, (_, index) => (
                     <li key={index} aria-hidden="true">

@@ -25,6 +25,8 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "./studio-brush-dynamics";
+import { studioMaterialBrushDefinition } from "./studio-material-brush-catalog";
+
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
@@ -158,6 +160,8 @@ function candidateUsesIntentionalDiscontinuity(
   candidate: StudioBrushContinuityAuditCandidate,
   renderFamily: StudioBrushRenderFamily,
 ): boolean {
+  const material = studioMaterialBrushDefinition(candidate.catalogId);
+  if (material) return material.mode === "stamp" || material.mode === "scatter";
   return INTENTIONALLY_DISCONTINUOUS_CATEGORIES.has(candidate.category ?? "")
     // An effect label alone does not make a carrier discrete. Smoke, cloud and cirrus presets use
     // a soft/wavy airbrush envelope and need the same continuity gates as paint. The one wavy
@@ -381,6 +385,8 @@ function behaviorFingerprint(
 export function studioBrushCatalogIdIsIntentionallyDiscontinuous(
   catalogId: string | null | undefined,
 ): boolean {
+  const material = studioMaterialBrushDefinition(catalogId);
+  if (material) return material.mode === "stamp" || material.mode === "scatter";
   return typeof catalogId === "string"
     && INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS.has(catalogId);
 }

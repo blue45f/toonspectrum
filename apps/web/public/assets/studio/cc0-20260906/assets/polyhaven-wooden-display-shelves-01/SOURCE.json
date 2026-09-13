@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "modern",
+      "wood",
+      "pine",
+      "square",
+      "display",
+      "shelf",
+      "bookshelf"
+    ],
+    "name": "Wooden Display Shelves 01",
+    "categories": [
+      "furniture",
+      "shelves"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1623767647,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 3174,
+    "texel_density": 2186.0030018841694,
+    "dimensions": [
+      1077.760934829712,
+      371.50970101356506,
+      1556.1838150024414
+    ],
+    "files_hash": "34b10f61944642400bd3d5686ea27350da9cbb66",
+    "description": "Free 8K model - modern pine display shelf with nine square cubbies and three lower bins; clean, minimalist bookshelf for home or retail displays.",
+    "category_id": "306ba141-9b10-54f2-8d06-09031cea8318",
+    "category": "Furniture/Storage Furniture/Shelving & Bookcases",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "sponsors": [
+      "146772882"
+    ],
+    "img_version": "9d083d6d",
+    "download_count": 22827,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_display_shelves_01.png?width=256&height=256&v=9d083d6d"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_display_shelves_01/wooden_display_shelves_01_2k.gltf",
+      "bytes": 6795,
+      "sha256": "b3a7633c2c341ee459d7235549671696b5466513ee1d26bfcc6fc0b05cb97b4d",
+      "sourceMd5": "cd57daf2a88b6e3f077c995ba69a2a95"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_display_shelves_01/wooden_display_shelves_01_diff_2k.jpg",
+      "bytes": 474742,
+      "sha256": "532b4fc7e9147cc35287cbc4796e789c3973f916b53019ff0fa10c068f96e056",
+      "sourceMd5": "5cc9c95761700c0118572247d8e530cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_display_shelves_01/wooden_display_shelves_01.bin",
+      "bytes": 105988,
+      "sha256": "e6c000a780626e618c1f1c0c1ec2ec29e1452e7824055ba53b40963d857edfbe",
+      "sourceMd5": "d26e27c0c3a7c6b247b220a49379298f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_display_shelves_01/wooden_display_shelves_01_arm_2k.jpg",
+      "bytes": 569358,
+      "sha256": "f2240882e5c67fac0a79843628633857375852f171c13bc02603c93686b6933f",
+      "sourceMd5": "8a972b9d1aaea1a7cf45246f6098a27d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_display_shelves_01/wooden_display_shelves_01_nor_gl_2k.jpg",
+      "bytes": 253878,
+      "sha256": "266eaa323e91dcf42e8c30bf9850da39fead76f589f1ff52c5a2f9a3b546e504",
+      "sourceMd5": "042d7da30a8750f9b24d4588fccd660e"
+    }
+  ]
+}

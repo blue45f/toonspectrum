@@ -1,0 +1,71 @@
+name: Non-studio merge regressions
+on:
+  push:
+    branches: [feat/nonstudio-luminous-journeys-20260913]
+  pull_request:
+    paths:
+      - apps/web/src/domains/creator/assistant/**
+      - scripts/*assistant*
+      - scripts/studio-material-atlas-boundary.test.ts
+      - scripts/verify-studio-collaboration-entry.test.ts
+      - .github/workflows/nonstudio-merge-regressions.yml
+permissions:
+  contents: read
+concurrency:
+  group: nonstudio-merge-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  assistant-and-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Preserve original assistant and all existing test expectations
+        run: |
+          test "$(git hash-object apps/web/src/domains/creator/assistant/StudioWebtoonAssistantContent.tsx)" = 675512f9781ef42103cbe2868e386695bf35a0b5
+          sed 's@from "./StudioWebtoonAssistantContent"@from "./StudioWebtoonAssistantModal"@' apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.test.tsx | git hash-object --stdin | grep -Fx b174c1ddff166bacf26af479c2773c9e938490d1
+      - name: Original assistant features, loading lifecycle and existing boundary tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/assistant
+          apps/web/src/domains/creator/studio-intent-lazy-loader.test.ts
+          scripts/studio-assistant-boundary.test.ts
+          scripts/studio-material-atlas-boundary.test.ts
+          scripts/verify-studio-collaboration-entry.test.ts
+      - name: Strict lint of follow-up changes
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.tsx
+          apps/web/src/domains/creator/assistant/StudioWebtoonAssistantContent.tsx
+          apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.test.tsx
+          apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.loading.test.tsx
+          apps/web/src/domains/creator/assistant/studio-webtoon-assistant-loader.ts
+          scripts/studio-assistant-boundary.test.ts
+          scripts/studio-material-atlas-boundary.test.ts
+          scripts/verify-studio-collaboration-entry.test.ts
+      - name: Build production graph and enforce unchanged bundle limits
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nonstudio-merge
+          git rev-parse HEAD > artifacts/nonstudio-merge/commit.txt
+          pnpm run build:bundle > artifacts/nonstudio-merge/build.log 2>&1
+          pnpm run check:studio-bundle 2>&1 | tee artifacts/nonstudio-merge/bundle.log
+          node scripts/verify-studio-assistant-boundary.mjs | tee artifacts/nonstudio-merge/assistant-boundary.json
+      - name: Upload production boundary evidence
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstudio-merge-evidence-${{ github.run_id }}
+          path: artifacts/nonstudio-merge
+          retention-days: 7

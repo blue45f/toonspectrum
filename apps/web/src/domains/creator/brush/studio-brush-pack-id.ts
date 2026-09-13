@@ -1,3 +1,5 @@
+import { STUDIO_MATERIAL_BRUSH_IDS } from "./studio-material-brush-catalog";
+
 /**
  * Stable catalogue ids for the optional procedural brush pack.
  *
@@ -169,6 +171,7 @@ export const STUDIO_BRUSH_PACK_CATALOG_IDS = [
   "halftone-gradient-dot",
   "hatching-contour-rake",
   "focus-ray-streak",
+  ...STUDIO_MATERIAL_BRUSH_IDS,
 ] as const;
 
 export type StudioBrushPackCatalogId = (typeof STUDIO_BRUSH_PACK_CATALOG_IDS)[number];

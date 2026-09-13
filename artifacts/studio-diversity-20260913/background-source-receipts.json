@@ -1,0 +1,240 @@
+[
+  {
+    "id": "polyhaven-background-canary-wharf",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/canary_wharf.jpg",
+    "bytes": 6175039,
+    "sha256": "62169f131300e52610930edb0d304e3e38a22f3a6b2762c0849ea8824610cf6a",
+    "sourceMd5": "8f657e36b6294be1da2031262dd85506"
+  },
+  {
+    "id": "polyhaven-background-hansaplatz",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hansaplatz.jpg",
+    "bytes": 5901947,
+    "sha256": "ec9a725bd30dca34056a157f4293120bbf939ae4d05e986386df419a9349f34a",
+    "sourceMd5": "04248ba16fb3e34a9ef07f86683e36df"
+  },
+  {
+    "id": "polyhaven-background-urban-street-01",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/urban_street_01.jpg",
+    "bytes": 10618444,
+    "sha256": "0f4845792c6c3836240ca310c3b1a10fd53827fce85f71333369617d0f7631a5",
+    "sourceMd5": "42eba20814329ee90dc78a4753c5142d"
+  },
+  {
+    "id": "polyhaven-background-urban-street-03",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/urban_street_03.jpg",
+    "bytes": 4730177,
+    "sha256": "117132f2f6ba7bde847b1fd8f0d278b911d96a639d8ece6256ca3e4d9ebc0de7",
+    "sourceMd5": "bab60039b9aa4806325b09e754f5e8dc"
+  },
+  {
+    "id": "polyhaven-background-crosswalk",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/crosswalk.jpg",
+    "bytes": 7664266,
+    "sha256": "cc84ef72a288ba10c9312c75771bb81f8f078a5ece8908be77f73ad0b1e9d8d0",
+    "sourceMd5": "f1f0402960e4e04494e5a654bb50d666"
+  },
+  {
+    "id": "polyhaven-background-modern-buildings-night",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/modern_buildings_night.jpg",
+    "bytes": 4369205,
+    "sha256": "f6f6a8b8d4c885c2124117c910ee109a105a1756561bf3b3ca5947098b7d0991",
+    "sourceMd5": "91e4166589c46bd2bee5fe60aefcfc79"
+  },
+  {
+    "id": "polyhaven-background-venetian-crossroads",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/venetian_crossroads.jpg",
+    "bytes": 4516831,
+    "sha256": "e0588913c07def9b4ee3c71900854ac4eb2144e752b75a4607dc8acbc190bc06",
+    "sourceMd5": "d5b575ac38d6822e6ff86d522c06c56d"
+  },
+  {
+    "id": "polyhaven-background-courtyard-night",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/courtyard_night.jpg",
+    "bytes": 6080923,
+    "sha256": "f0582e6dec01eb406b5299fbfcfb2847bc1335cf65611efd6950761182a75e33",
+    "sourceMd5": "68f9b2dde54813a788b650c22d631fea"
+  },
+  {
+    "id": "polyhaven-background-comfy-cafe",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/comfy_cafe.jpg",
+    "bytes": 3407886,
+    "sha256": "64e76bffd91e17c96c8f5211ff9f16f64f22c6ce95686304c07719410a8b45ef",
+    "sourceMd5": "9981ecb566d95af141af43f07910b008"
+  },
+  {
+    "id": "polyhaven-background-decor-shop",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/decor_shop.jpg",
+    "bytes": 4579922,
+    "sha256": "e89978b2e8dcc1304a425e3eaf350ed0a49a0c5bf1bf13231398ec3cb337fcb2",
+    "sourceMd5": "4cdd31d27cbb47e802afe0e119d63a94"
+  },
+  {
+    "id": "polyhaven-background-machine-shop-02",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/machine_shop_02.jpg",
+    "bytes": 5590767,
+    "sha256": "2884860c787993b3c78c617b698cb1f7cb3a41688cb46abedaa516470c973ad3",
+    "sourceMd5": "88f447dbf38c252db6435c78bd1b402c"
+  },
+  {
+    "id": "polyhaven-background-carpentry-shop-02",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/carpentry_shop_02.jpg",
+    "bytes": 5833753,
+    "sha256": "2d25db59ac92da22cfb17bf7bcbb31adde21d1b75798ee970fd5ab060a9ff829",
+    "sourceMd5": "99815bf3304396bb61c7ccbbcb1a67da"
+  },
+  {
+    "id": "polyhaven-background-freight-station",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/freight_station.jpg",
+    "bytes": 4188539,
+    "sha256": "381621ebbc2abe311cfbc1dad369005a5e8672765b3fdbc02251bd643259691f",
+    "sourceMd5": "d2659659db25c76faec99e4f8bcb6477"
+  },
+  {
+    "id": "polyhaven-background-dresden-station-night",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/dresden_station_night.jpg",
+    "bytes": 5603105,
+    "sha256": "8bbf9ece8a97a601f58f06d74db0faa12376c40c949e9b50bd585fd060ee3717",
+    "sourceMd5": "e698f3737dc1fb3ae1ed4984a11b8f8f"
+  },
+  {
+    "id": "polyhaven-background-hamburg-hbf",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hamburg_hbf.jpg",
+    "bytes": 5997200,
+    "sha256": "6afd0169d453832575800667c2d1d4834f56393b40ed54ebf926ef96ad00edc4",
+    "sourceMd5": "8a90e39a44c38876f80156f27422c0fc"
+  },
+  {
+    "id": "polyhaven-background-subway-entrance",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/subway_entrance.jpg",
+    "bytes": 7001286,
+    "sha256": "566cb6a7e6e9b56a15605578f95f9a6b4009670a931d564264d74d1ccd664df3",
+    "sourceMd5": "fb5fcd690fbe123a37d0332577effbed"
+  },
+  {
+    "id": "polyhaven-background-hotel-room",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hotel_room.jpg",
+    "bytes": 2989884,
+    "sha256": "361bbf703206f58255390e609c622cf45e9b373276a19b938f0ce04bc5208553",
+    "sourceMd5": "5675e838ff32b9ca8ac8ac4635d3adaf"
+  },
+  {
+    "id": "polyhaven-background-wooden-lounge",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/wooden_lounge.jpg",
+    "bytes": 4557177,
+    "sha256": "b0286664d1a0780561a551bf6f571640654db67e30ea75efc6f7b2fc24d37acf",
+    "sourceMd5": "ebcf0bdbabe9ec013091caa4c1535601"
+  },
+  {
+    "id": "polyhaven-background-ballroom",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/ballroom.jpg",
+    "bytes": 5086299,
+    "sha256": "5f84348e9493f1a6e9b36002ada8ea0caeecbd9b51d1aa3baf279dd11e0e3349",
+    "sourceMd5": "4c379e9bfbe70eee5d3e01cd865bfb78"
+  },
+  {
+    "id": "polyhaven-background-large-corridor",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/large_corridor.jpg",
+    "bytes": 5329410,
+    "sha256": "54f46bb011840dc6d876f8940bc65721f56799cd882b9b058b286cea6f7fd289",
+    "sourceMd5": "5a394a380d3fafc3844b1f257913d33e"
+  },
+  {
+    "id": "polyhaven-background-winter-lake-01",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/winter_lake_01.jpg",
+    "bytes": 2049120,
+    "sha256": "cce8e095187350e49346ed07ad679f3eda61e1b990dc11236ad3beee9f0d9fc2",
+    "sourceMd5": "d151775dc8c8b43eacb96e5b4e93ec7f"
+  },
+  {
+    "id": "polyhaven-background-winter-evening",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/winter_evening.jpg",
+    "bytes": 2760539,
+    "sha256": "5f90b70e79b46613d923cf10ebf10fc6bc73aed9333dbd6e8a360add8eafbd1f",
+    "sourceMd5": "ba20fbc78f327f0bf022a14e7f9700a8"
+  },
+  {
+    "id": "polyhaven-background-misty-pines",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/misty_pines.jpg",
+    "bytes": 8695696,
+    "sha256": "be0d43081f077326779ff9de4921acf04b4373c7c12f4b0d8e3fa0163496a111",
+    "sourceMd5": "d2073546d2a8d0c7bf5e82d071fa2b29"
+  },
+  {
+    "id": "polyhaven-background-mossy-forest",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/mossy_forest.jpg",
+    "bytes": 11070548,
+    "sha256": "6c932e0ac44aba2e5374afbc00ee8a1aa780d32ac1e0bfefd710edb1f7258445",
+    "sourceMd5": "3e11675120c96f7998c0a8d0cdadc739"
+  },
+  {
+    "id": "polyhaven-background-river-walk-1",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/river_walk_1.jpg",
+    "bytes": 12468624,
+    "sha256": "cffe8418d8e795514cff1a3400840828a5a3558498c72c895c5f2c8a1fc901bf",
+    "sourceMd5": "27e07785340524fe232b93d10de0de6a"
+  },
+  {
+    "id": "polyhaven-background-tiergarten",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/tiergarten.jpg",
+    "bytes": 8536860,
+    "sha256": "949b4cdad0bfbb73b8ce5699a4695044634b547cb75d8a0496d5bb78f02f7b87",
+    "sourceMd5": "d8bb5454950e943cb612e87cac806137"
+  },
+  {
+    "id": "polyhaven-background-pond-bridge-night",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/pond_bridge_night.jpg",
+    "bytes": 6854793,
+    "sha256": "9a1f58cbbed93b1b6199f8683c61935972daa54ffe65ba66a88ba196de2ac4b7",
+    "sourceMd5": "338f815b3413864d5ced8755cadcc84f"
+  },
+  {
+    "id": "polyhaven-background-small-harbor-01",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/small_harbor_01.jpg",
+    "bytes": 4201399,
+    "sha256": "5a8faf4e0e0c40ad0466ce5e0f44279ef99a65108e0f0edd54d5cf89149e9db6",
+    "sourceMd5": "d9c2bf3855240838ac689ee327a218a0"
+  },
+  {
+    "id": "polyhaven-background-venice-sunset",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/venice_sunset.jpg",
+    "bytes": 4822313,
+    "sha256": "1fde00d96f688a4a10cf76781d7e8f51295819d7ef242a74d85f029ddd9346be",
+    "sourceMd5": "a94465af83fd4c9c2be08cca0389e33a"
+  },
+  {
+    "id": "polyhaven-background-leadenhall-market",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/leadenhall_market.jpg",
+    "bytes": 7380874,
+    "sha256": "2c5b27521a68667d4f3a9cfdb0c93d1f7450e8496ad80e7d0210ad4e66f212e3",
+    "sourceMd5": "b2d502898c41e69c7613265f2a49b5d1"
+  },
+  {
+    "id": "polyhaven-background-mosaic-tunnel",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/mosaic_tunnel.jpg",
+    "bytes": 5405640,
+    "sha256": "df144cb02a315124ddcb5547eabbc3f9933256508d59997a4177f3e423df86f6",
+    "sourceMd5": "26a461c42f13eaca16d1852c0d4b81c9"
+  },
+  {
+    "id": "polyhaven-background-derelict-overpass",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/derelict_overpass.jpg",
+    "bytes": 4922643,
+    "sha256": "670878cdcec6d9d5bf40d68d42a6e3eacd026adccf816df8e36b70439cef5d1d",
+    "sourceMd5": "850524fd7dd1b1dce026db7daa962c2f"
+  },
+  {
+    "id": "polyhaven-background-rural-winter-roadside",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rural_winter_roadside.jpg",
+    "bytes": 5953963,
+    "sha256": "f25c0edcee104870651885a841273c1acc3a0ff394a697a71abb579f13d3c656",
+    "sourceMd5": "dcb7468cae7e1c22c45a36ba1109eb72"
+  },
+  {
+    "id": "polyhaven-background-royal-esplanade",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/royal_esplanade.jpg",
+    "bytes": 4956102,
+    "sha256": "d880b93e55eac16d1a58f3da8fd2328974cd8592364ea1bfbca9959d7e720b6f",
+    "sourceMd5": "f6a793c3acbf7e6368c936f45e474bd0"
+  }
+]

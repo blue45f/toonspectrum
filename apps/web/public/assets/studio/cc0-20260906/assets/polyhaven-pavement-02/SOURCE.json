@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/pavement_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1676332800,
+    "name": "Pavement 02",
+    "categories": [
+      "outdoor",
+      "man made",
+      "floor",
+      "plaster-concrete",
+      "plaster"
+    ],
+    "type": 1,
+    "info": null,
+    "authors": {
+      "Dario Barresi": "Processing",
+      "Charlotte Baglioni": "Photography"
+    },
+    "dimensions": [
+      2119.999647140503,
+      2119.999885559082
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "tags": [
+      "worn",
+      "floor",
+      "sidewalk",
+      "pavement",
+      "flat",
+      "dirty",
+      "city",
+      "textured",
+      "paving",
+      "ground"
+    ],
+    "files_hash": "118276f4f44c24ffcff3c88664b905160bf0c243",
+    "description": "Free 8K texture of worn concrete paving stones with coarse, weathered surfaces in warm gray and terracotta tones, defined grout lines and light dirt.",
+    "category_id": "095573e6-25a6-59a5-b88e-6911bbfbc472",
+    "category": "Brick & Block/Concrete Block & Paver/Cast-Stone Block",
+    "attributes": {
+      "surface_use": "paving",
+      "condition": [
+        "worn",
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "9247a600",
+    "download_count": 61373,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/pavement_02.png?width=256&height=256&v=9247a600"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/pavement_02/pavement_02_diff_2k.jpg",
+      "bytes": 5016531,
+      "sha256": "a524dd1d0a298f441719f1d28c3db45cc7a4e6eb6fcccb8407d0fe22ed927b6f",
+      "sourceMd5": "f56b5bf8bb8c45f61ef1c67efe216d5e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/pavement_02/pavement_02_rough_2k.jpg",
+      "bytes": 2560333,
+      "sha256": "cbcfbf9883e306d0645067242de4ae0fec083fe6a4b22ac45cdf271cf179e00e",
+      "sourceMd5": "15106381d265cfb95b830e639b937f6f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/pavement_02/pavement_02_nor_gl_2k.jpg",
+      "bytes": 3241087,
+      "sha256": "f3986ff819f6224caaf1e606978093868e4ac4a418cf261686f70f14234bc2b0",
+      "sourceMd5": "0eb8d9e1234a0dfbf03a818bc90b420d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/pavement_02/pavement_02_ao_2k.jpg",
+      "bytes": 4296958,
+      "sha256": "596a09da189921bcffb2c0e94f6d66c84dbb4a2f7387a99003adb32d777252e0",
+      "sourceMd5": "9653eaf7aa217968c14b056c18d4b2cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/pavement_02/pavement_02_disp_2k.jpg",
+      "bytes": 1441122,
+      "sha256": "b1e3d5f28adb88ac676b272fb7c85f1b9351f43fe3d5344a804a41bcd3ef6875",
+      "sourceMd5": "6079bdfac9fc3daaad76c525a60b84f2"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_bucket_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-wooden-bucket-02",
+  "sourceModelSha256": "d527fd7adc419c2947ed9fcaeafecbb5cad5603bf68e18c0ad52f34ec9cc9ed3",
+  "render": {
+    "sourceId": "polyhaven-wooden-bucket-02",
+    "sourceSha256": "d527fd7adc419c2947ed9fcaeafecbb5cad5603bf68e18c0ad52f34ec9cc9ed3",
+    "path": "high-resolution-props/polyhaven-wooden-bucket-02.png",
+    "visiblePixels": 536046,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 7252
+  },
+  "independentOriginal": false
+}

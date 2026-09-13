@@ -6,7 +6,7 @@
  * proves these numbers match the full manifest.
  */
 export const STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS = Object.freeze({
-  total: 48,
-  paint: 46,
+  total: 80,
+  paint: 78,
   erase: 2,
 });

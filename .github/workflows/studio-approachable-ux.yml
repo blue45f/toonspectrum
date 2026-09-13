@@ -1,0 +1,55 @@
+name: Studio approachable UX
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/StudioWorkflowAccess*'
+      - 'apps/web/src/domains/creator/StudioToolBelt*'
+      - 'apps/web/src/domains/creator/studio-toolbar-disclosure*'
+      - '.github/workflows/studio-approachable-ux.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-approachable-ux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  approachable-ux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Lint changed Studio UI and regression tests
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/StudioWorkflowAccess.tsx
+          apps/web/src/domains/creator/StudioWorkflowAccess.test.tsx
+          apps/web/src/domains/creator/studio-toolbar-disclosure.ts
+          apps/web/src/domains/creator/studio-toolbar-disclosure.test.ts
+          apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx
+          apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.disclosure.test.tsx
+      - name: Task-first workflow and existing Studio toolbar contracts
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-toolbar-disclosure.test.ts \
+            apps/web/src/domains/creator/StudioWorkflowAccess.test.tsx \
+            apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.disclosure.test.tsx \
+            apps/web/src/domains/creator/studio-ui-density.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-workflow-order.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-content-boundary.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts \
+            apps/web/src/domains/creator/StudioToolBeltContent.hints.test.ts \
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts

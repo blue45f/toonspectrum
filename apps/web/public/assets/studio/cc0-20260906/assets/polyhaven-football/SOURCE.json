@@ -1,0 +1,100 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/football",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Football",
+    "type": 2,
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "info": null,
+    "date_published": 1677196800,
+    "categories": [
+      "props",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "shed",
+      "toy",
+      "sport",
+      "soccer",
+      "ball",
+      "outdoor",
+      "garden",
+      "garage"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 4296,
+    "texel_density": 8226.439176669463,
+    "dimensions": [
+      508.87757539749146,
+      222.1573293209076,
+      221.88469767570496
+    ],
+    "files_hash": "ccfb473fa6dd628cc3aa9b934c706723730454b8",
+    "description": "Free 4K model of a battered, partially deflated football with scuffed panels, faded blue paint, dirt, grime and realistic shed/garden wear. Inflated and deflated versions.",
+    "category_id": "ba452b18-0442-5d9d-b0b6-2f001f956f6d",
+    "category": "Leisure/Sports/Balls",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "rubber",
+        "plastic"
+      ]
+    },
+    "sponsors": [
+      "26820710"
+    ],
+    "img_version": "c2235dcd",
+    "download_count": 14051,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/football.png?width=256&height=256&v=c2235dcd"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/football/football_2k.gltf",
+      "bytes": 4366,
+      "sha256": "26f8092363baa2bb00de5fa4fc08d68a086df5349800ad1e543b8861d6dd8b4e",
+      "sourceMd5": "6587693bb19c673f1a4aa8d4e1477303"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/football/football_nor_gl_2k.jpg",
+      "bytes": 3902424,
+      "sha256": "07113bc4e2f0a4e01e009a557ea8be334c3d0ba499a7eba67edb2b3a479967b9",
+      "sourceMd5": "0d2ec036367f8cd9e696237add3adcd6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/football/football_arm_2k.jpg",
+      "bytes": 3716080,
+      "sha256": "3b44bdcf215b91e5776b0a2b17e742da0f5b8e23390ebcdd8ac1465b4c5ce864",
+      "sourceMd5": "199db52c2f718cc35e86658fa6481bfb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/football/football.bin",
+      "bytes": 109648,
+      "sha256": "89e30e582fca1f33361d247e1bad6012c9e04d81191504327c64cbf64c80b4d1",
+      "sourceMd5": "20f38f11c0051a66b151f90d679ec53e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/football/football_diff_2k.jpg",
+      "bytes": 2813255,
+      "sha256": "a06dd95f4ca658d419c0c4b7642d750629815f3e09531dcdb3ba30b59e9318b1",
+      "sourceMd5": "61e3d2bcda45060ee26be74999c171bf"
+    }
+  ]
+}

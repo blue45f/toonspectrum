@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wood_floor",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Wood Floor",
+    "categories": [
+      "floor",
+      "wood",
+      "man made",
+      "clean"
+    ],
+    "type": 1,
+    "tags": [
+      "wood",
+      "floor",
+      "wooden",
+      "wooden flooring ",
+      "grain",
+      "wood grain",
+      "interior design",
+      "interior",
+      "flooring"
+    ],
+    "authors": {
+      "Dimitrios Savva": "All"
+    },
+    "info": null,
+    "dimensions": [
+      1699.9996900558472,
+      1699.9996900558472
+    ],
+    "date_published": 1698105600,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "description": "Free 8K material: warm medium-brown wood floor texture with narrow planks, visible oak grain, subtle seams and a smooth satin finish.",
+    "files_hash": "a44e6375a09ab98780b876e709f2629e7ed30409",
+    "category_id": "a7bb33c4-8575-586e-a502-7094517b10c5",
+    "category": "Wood/Boards & Planks/Finished & Varnished",
+    "attributes": {
+      "surface_use": "floor",
+      "origin": "man_made",
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "4c14fcdb",
+    "download_count": 291031,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_floor.png?width=256&height=256&v=4c14fcdb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_floor/wood_floor_diff_2k.jpg",
+      "bytes": 2983667,
+      "sha256": "7c3ff1164c8dd0758ef2c048e9a266d28174120de01052ec40e6ca486177345c",
+      "sourceMd5": "d209b7416b022ed06093aef068c7fe23"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_floor/wood_floor_rough_2k.jpg",
+      "bytes": 2267559,
+      "sha256": "297eda0d75f2020cc541dbf242e1f5fd058053249567f49a4506fc2c5b1a172b",
+      "sourceMd5": "325868b3352d71059753498b1c94385b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_floor/wood_floor_nor_gl_2k.jpg",
+      "bytes": 1863576,
+      "sha256": "eff2e4db46bab930dc05997faf5085157eec4fd652cdfc6cd01fa11edd56ef10",
+      "sourceMd5": "e1d8a588c1fc3d62cc60da1e4cd1a689"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_floor/wood_floor_ao_2k.jpg",
+      "bytes": 2826020,
+      "sha256": "9f9aa2da94211afcd08c56d6d74d9bb80b7792666b000297e3b3470739dd18e5",
+      "sourceMd5": "aa6a292f7a5dcc12ee33ff55ca3b8a70"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_floor/wood_floor_disp_2k.jpg",
+      "bytes": 2426717,
+      "sha256": "69ca2cc0a923fa6722a272b6939cc8455a0c2c5f10663e55284997b85a5cf878",
+      "sourceMd5": "c2e1c04bcffd61b2fb30d6ffdd3aa45c"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+.spatial-reader {
+  --sr-bg: #111b25; --sr-panel: #1b2936; --sr-ink: #f0f5f7;
+  --sr-muted: #b1c1cc; --sr-line: #3e5262; --sr-accent: #9deed8;
+  color: var(--sr-ink); background: var(--sr-bg); border: 1px solid var(--sr-line);
+  border-radius: 20px; width: min(1320px, calc(100vw - 24px)); max-height: 92dvh;
+  padding: 0; margin: auto; box-shadow: 0 30px 120px #0009; overflow: auto; color-scheme: dark;
+}
+.spatial-reader::backdrop { background: #050b14cf; backdrop-filter: blur(8px); }
+.spatial-reader[data-theme=paper] { --sr-bg: #f5f2ea; --sr-panel: #e9e4d8; --sr-ink: #162831; --sr-muted: #475a64; --sr-line: #b4b5aa; --sr-accent: #14564b; color-scheme: light; }
+.spatial-reader[data-theme=sepia] { --sr-bg: #2c241e; --sr-panel: #3e332b; --sr-ink: #fff2dc; --sr-muted: #d0bda3; --sr-line: #74604a; --sr-accent: #f2c58a; }
+.spatial-reader * { box-sizing: border-box; }
+.spatial-reader button, .spatial-reader select, .spatial-reader input { font: inherit; }
+.spatial-reader button { min-height: 44px; border: 1px solid var(--sr-line); border-radius: 9px; padding: 8px 12px; background: var(--sr-panel); color: var(--sr-ink); cursor: pointer; font-size: 13px; font-weight: 650; }
+.spatial-reader button:hover:not(:disabled) { border-color: var(--sr-accent); }
+.spatial-reader button:disabled { opacity: .42; cursor: not-allowed; }
+.spatial-reader :focus-visible { outline: 3px solid var(--sr-accent); outline-offset: 3px; }
+.spatial-reader-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 26px 12px; }
+.spatial-reader-eyebrow { font-size: 10px; letter-spacing: .18em; font-weight: 750; color: var(--sr-accent); margin: 0 0 6px; }
+.spatial-reader h2 { font-size: clamp(20px, 2.5vw, 30px); line-height: 1.2; margin: 0; overflow-wrap: anywhere; }
+.spatial-reader h3 { font-size: 16px; margin: 0 0 16px; }
+.spatial-reader-intro { font-size: 13px; line-height: 1.7; color: var(--sr-muted); margin: 0; padding: 0 26px 20px; }
+.spatial-reader-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; border-top: 1px solid var(--sr-line); }
+.spatial-reader-main { min-width: 0; padding: 20px; }
+.spatial-reader-preview { display: flex; align-items: flex-start; justify-content: center; min-height: 380px; max-height: 60dvh; overflow: auto; padding: 20px; border-radius: 12px; background: var(--sr-panel); border: 1px solid var(--sr-line); }
+.spatial-reader-crop { overflow: hidden; flex-shrink: 0; max-width: 100%; background: white; box-shadow: 0 12px 48px #0005; }
+.spatial-reader-crop img { width: 100%; height: auto; max-width: none; max-height: none; display: block; }
+.spatial-reader-empty { text-align: center; align-self: center; padding: 40px 20px; color: var(--sr-muted); font-size: 14px; line-height: 1.8; }
+.spatial-reader-empty > span { display: block; font-size: 54px; color: var(--sr-accent); margin-bottom: 12px; }
+.spatial-reader-xr-canvas { position: absolute; width: 2px; height: 2px; pointer-events: none; opacity: 0; }
+.spatial-reader-toolbar { padding: 14px 0 4px; }
+.spatial-reader-navigation { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.spatial-reader-navigation > span { font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.spatial-reader-mode-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.spatial-reader button.spatial-reader-primary { background: var(--sr-accent); border-color: var(--sr-accent); color: var(--sr-bg); }
+.spatial-reader-message { font-size: 12px; color: var(--sr-muted); line-height: 1.7; margin: 12px 0 0; }
+.spatial-reader-error { font-size: 13px; line-height: 1.6; padding: 12px; border: 1px solid #cf7365; border-radius: 8px; background: #9a2c1e20; color: var(--sr-ink); overflow-wrap: anywhere; }
+.spatial-reader-settings { padding: 22px 20px; background: var(--sr-panel); border-left: 1px solid var(--sr-line); display: flex; flex-direction: column; gap: 15px; font-size: 12px; }
+.spatial-reader-settings > h3 { margin: 0 0 2px; }
+.spatial-reader fieldset { padding: 0; border: 0; min-width: 0; margin: 0; }
+.spatial-reader legend { margin-bottom: 8px; font-weight: 650; }
+.spatial-reader-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.spatial-reader-presets button { padding: 9px 4px; min-height: 62px; }
+.spatial-reader-presets strong, .spatial-reader-presets small { display: block; }
+.spatial-reader-presets small { font-size: 10px; font-weight: 400; margin-top: 3px; color: var(--sr-muted); }
+.spatial-reader-presets button[aria-pressed=true] { border: 2px solid var(--sr-accent); }
+.spatial-reader label { display: block; font-weight: 600; line-height: 1.7; }
+.spatial-reader label > select { display: block; width: 100%; margin-top: 6px; border: 1px solid var(--sr-line); border-radius: 7px; min-height: 44px; padding: 7px; color: var(--sr-ink); background: var(--sr-bg); font-size: 12px; }
+.spatial-reader input[type=range] { display: block; width: 100%; margin: 8px 0 0; min-height: 32px; accent-color: var(--sr-accent); }
+.spatial-reader output { float: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--sr-accent); }
+.spatial-reader label.spatial-reader-check { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; }
+.spatial-reader input[type=checkbox] { width: 17px; height: 17px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--sr-accent); }
+.spatial-reader-quiet { font-size: 11px; color: var(--sr-muted); font-weight: 400; line-height: 1.7; margin: 0; }
+.spatial-reader-import { border-top: 1px solid var(--sr-line); padding-top: 15px; }
+.spatial-reader input[type=file] { width: 100%; font-size: 11px; padding: 8px 0; white-space: normal; }
+.spatial-reader details { font-size: 11px; color: var(--sr-muted); line-height: 1.8; }
+.spatial-reader summary { cursor: pointer; min-height: 44px; font-weight: 600; color: var(--sr-ink); }
+.spatial-reader details p { margin: 8px 0; }
+.spatial-reader-page-jump { font-size: 12px; padding-top: 14px; margin-top: 8px; border-top: 1px solid var(--sr-line); }
+/* Empty overlay space remains transparent to native AR selection. */
+.spatial-reader-overlay:xr-overlay { background: transparent; pointer-events: none; color: #fff; }
+.spatial-reader-overlay:xr-overlay .spatial-reader-toolbar { pointer-events: auto; position: absolute; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); padding: 12px; border-radius: 14px; background: #101923e8; max-height: 45vh; overflow: auto; }
+.spatial-reader-overlay:xr-overlay button { min-height: 44px; background: #203342; color: #fff; border: 1px solid #6c8597; border-radius: 9px; padding: 8px 12px; }
+.spatial-reader-overlay:xr-overlay .spatial-reader-message { color: #dae7ed; }
+.spatial-reader-overlay:xr-overlay .spatial-reader-navigation, .spatial-reader-overlay:xr-overlay .spatial-reader-mode-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.spatial-reader-overlay:xr-overlay .spatial-reader-mode-buttons { margin-top: 10px; }
+.spatial-reader-overlay:xr-overlay .spatial-reader-error { color: #fff; }
+@media (max-width: 760px) {
+  .spatial-reader { width: calc(100vw - 12px); max-height: 96dvh; border-radius: 14px; }
+  .spatial-reader-header { padding: 18px 16px 10px; gap: 10px; }
+  .spatial-reader-intro { padding: 0 16px 16px; }
+  .spatial-reader-layout { grid-template-columns: 1fr; }
+  .spatial-reader-main { padding: 12px; }
+  .spatial-reader-preview { min-height: 260px; max-height: 55dvh; padding: 12px; }
+  .spatial-reader-settings { border-left: 0; border-top: 1px solid var(--sr-line); padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .spatial-reader-navigation { gap: 6px; }
+  .spatial-reader-navigation button { padding: 8px; font-size: 12px; }
+  .spatial-reader-navigation > span { font-size: 11px; }
+  .spatial-reader-settings > h3, .spatial-reader-settings > fieldset, .spatial-reader-settings > .spatial-reader-check, .spatial-reader-settings > .spatial-reader-quiet, .spatial-reader-settings > .spatial-reader-import, .spatial-reader-settings > details { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spatial-reader * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}

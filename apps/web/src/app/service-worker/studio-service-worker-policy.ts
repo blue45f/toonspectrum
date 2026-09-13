@@ -143,6 +143,8 @@ export function classifyStudioServiceWorkerRequest(
       : "navigation";
   }
 
+  // The library manifest is mutable; keep an offline snapshot but revalidate it.
+  if (pathname === "/assets/studio/cc0-20260906/manifest.json") return "catalog-data";
   if (pathname.startsWith("/assets/")) return "immutable-asset";
   if (pathname === "/api/cover") return "cover-image";
   if (pathname.startsWith("/api/")) return "api";
