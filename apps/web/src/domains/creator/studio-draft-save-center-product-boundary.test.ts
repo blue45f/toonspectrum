@@ -86,7 +86,7 @@ describe("draft save center product boundary", () => {
     expect(model).toContain('phase = "loading"');
     expect(model).toContain('phase = "metadata-required"');
     expect(model).toContain('primaryAction: StudioDraftSavePrimaryAction');
-    expect(model).toContain("빈 문서로 덮어쓰지 않고");
+    expect(model).toContain("빈 그림으로 덮어쓰지 않았어요");
     expect(center).toContain('pendingSaveIntent === "draft"');
     expect(center).toContain('model.primaryAction === "metadata"');
   });

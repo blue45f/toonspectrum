@@ -230,3 +230,22 @@ describe("draft save helpers", () => {
     expect(diagnostics).not.toContain("document=");
   });
 });
+
+
+describe("plain-language save and recovery explanations", () => {
+  it.each([
+    { hydrated: false },
+    { hydrationFailed: true },
+    { localRole: "follower" as const },
+    { collaborationLocked: true },
+    { metadataRequired: true },
+    { saving: true },
+    { isOnline: false },
+    { collaborationSyncPending: true },
+  ])("keeps technical terms in diagnostics rather than the explanation: %j", (overrides) => {
+    const model = resolveStudioDraftSaveCenter(input(overrides));
+    expect(`${model.device.detail} ${model.server.detail}`).not.toMatch(/revision|체크포인트|하이드레이션|내구|권위|좌표/iu);
+    expect(model.device.detail.length).toBeGreaterThan(0);
+    expect(model.server.detail.length).toBeGreaterThan(0);
+  });
+});

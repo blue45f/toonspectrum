@@ -1,10 +1,11 @@
 import { useId, useRef, useState } from "react";
 
-import { createStudioRecoveryNewDrawingHref } from "./studio-recovery-notice-model";
+import { createStudioRecoveryNewDrawingHref, studioRecoveryDescription } from "./studio-recovery-notice-model";
+import type { StudioRecoveryBlockedReason } from "./studio-recovery-notice-model";
 
 import { cn } from "@/shared/lib/utils";
 
-export type StudioRecoveryBlockedReason = "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null;
+export type { StudioRecoveryBlockedReason } from "./studio-recovery-notice-model";
 
 export interface StudioRecoveryNoticeProps {
   readonly blockedReason: StudioRecoveryBlockedReason;
@@ -45,13 +46,6 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
     }
   }
 
-  const description = blockedReason === "revision-mismatch"
-    ? "저장된 작품과 내용이 달라요. 덮어쓰지 않고 백업 파일로 보관해 주세요."
-    : blockedReason === "work-mismatch"
-      ? "다른 작품의 그림이에요. 덮어쓰지 않고 백업 파일로 보관해 주세요."
-      : blockedReason
-        ? "안전하게 열 수 있는지 확인하지 못했어요. 먼저 백업 파일을 받아 주세요."
-        : "이 기기에 마지막으로 그리던 그림이 남아 있어요.";
 
   return (
     <section
@@ -62,8 +56,8 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1 basis-48" role="status" aria-live="polite">
-          <h2 id={titleId} className="font-bold">{blockedReason ? "남겨 둔 그림을 보관해 주세요" : "이어서 그릴까요?"}</h2>
-          <p className="mt-1 leading-relaxed text-fg-2">{description}</p>
+          <h2 id={titleId} className="font-bold">{blockedReason ? "이전 그림을 보관해 주세요" : "이어서 그릴까요?"}</h2>
+          <p className="mt-1 leading-relaxed text-fg-2">{studioRecoveryDescription(blockedReason)}</p>
         </div>
         <div className="flex max-w-full flex-wrap gap-2">
           <button
@@ -93,7 +87,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
         </div>
       </div>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-        새 탭에서 시작합니다. 현재 그림과 남겨 둔 작업은 유지돼요.
+        새 탭에서 열며, 기존 그림은 지우지 않아요.
       </p>
       <button
         type="button"
@@ -120,7 +114,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
               {busy === "delete" ? "삭제 확인 중…" : "이전 그림 삭제…"}
             </button>
           </div>
-          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업에는 이전 그림이 담겨요. 삭제는 현재 캔버스가 아닌 이전 그림에 적용되며, 확인 후 되돌릴 수 없어요.</p>
+          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업·삭제 대상은 이전 그림입니다. 현재 캔버스는 유지되며, 삭제는 되돌릴 수 없어요.</p>
         </div>
       )}
       {error && <p role="alert" className="mt-2 leading-relaxed text-bad">{error}</p>}
