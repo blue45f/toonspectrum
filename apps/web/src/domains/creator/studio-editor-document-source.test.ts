@@ -113,3 +113,18 @@ describe("existing document recovery key compatibility", () => {
     expect(studioEditorPersistenceWorkId(null, null, "document-qa")).toBeNull();
   });
 });
+
+
+describe("separate fresh drawing recovery", () => {
+  it("isolates explicit drafts from each other and preserves the legacy draft slot", () => {
+    const first = studioEditorPersistenceWorkId(null, null, null, "draft-a");
+    const second = studioEditorPersistenceWorkId(null, null, null, "draft-b");
+    expect(first).toBe("draft:draft-a");
+    expect(second).not.toBe(first);
+    expect(studioEditorPersistenceWorkId(null, null, null)).toBeNull();
+  });
+  it("never lets a draft identity replace an existing work or project identity", () => {
+    expect(studioEditorPersistenceWorkId("server", null, null, "draft")).toBe("server");
+    expect(studioEditorPersistenceWorkId(null, "project", "document", "draft")).toBe("document");
+  });
+});
