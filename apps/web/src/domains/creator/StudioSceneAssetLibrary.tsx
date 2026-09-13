@@ -28,7 +28,7 @@ export function StudioSceneAssetLibrary({ items, onUseItem }: {
   const busyRef = useRef(false);
   const result = selectStudioSceneLibraryPage(items, query, kind, page);
 
-  async function useItem(item: StudioUnifiedAssetItem): Promise<void> {
+  async function handleUseItem(item: StudioUnifiedAssetItem): Promise<void> {
     if (busyRef.current) return;
     busyRef.current = true;
     setPending(item.id);
@@ -36,7 +36,7 @@ export function StudioSceneAssetLibrary({ items, onUseItem }: {
     try {
       const used = await onUseItem(item);
       setNotice(used === false ? "현재 캔버스에서는 이 에셋을 사용할 수 없습니다."
-        : item.useMode === "open" ? `${item.title} 제작 도구를 열었습니다.` : `${item.title}을(를) 배치했습니다.`);
+        : item.useMode === "open" ? `${item.title} 제작 도구를 열었습니다.` : used === true ? `${item.title}을(를) 배치했습니다.` : `${item.title} 배치를 요청했습니다. 캔버스와 오류 안내를 확인해 주세요.`);
     } catch (cause: unknown) {
       setNotice(cause instanceof Error ? cause.message : "에셋을 사용하지 못했습니다.");
     } finally { busyRef.current = false; setPending(null); }
@@ -53,14 +53,14 @@ export function StudioSceneAssetLibrary({ items, onUseItem }: {
       <h4 className="text-sm font-bold text-fg">{preview.title}</h4>
       {previewSource(preview) && <img src={previewSource(preview)} alt={preview.title} className="max-h-64 w-full rounded-lg bg-raised object-contain" />}
       <p className="text-xs leading-relaxed text-fg-3">{preview.description}</p><p className="text-xs text-fg-3">{preview.badges.join(" · ")}</p>
-      <div className="flex gap-2"><button type="button" className={CONTROL} disabled={pending !== null} onClick={() => void useItem(preview)}>{preview.useLabel}</button><button type="button" className={CONTROL} onClick={() => setPreview(null)}>미리보기 닫기</button></div>
+      <div className="flex gap-2"><button type="button" className={CONTROL} disabled={pending !== null} onClick={() => void handleUseItem(preview)}>{preview.useLabel}</button><button type="button" className={CONTROL} onClick={() => setPreview(null)}>미리보기 닫기</button></div>
     </div>}
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{result.items.map((item) => <article key={item.id} className="min-w-0 rounded-xl border border-line bg-card p-2">
       <button type="button" aria-label={`${item.title} 미리보기`} className="block aspect-[4/3] w-full overflow-hidden rounded-lg bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setPreview(item)}>
         {previewSource(item) ? <img src={previewSource(item)} alt="" loading="lazy" decoding="async" className="size-full object-contain" /> : <span className="text-xs text-fg-3">장면 템플릿</span>}
       </button>
       <h4 className="mt-2 line-clamp-2 text-xs font-bold text-fg">{item.title}</h4><p className="my-1 line-clamp-2 text-[0.65rem] text-fg-3">{item.badges.join(" · ")}</p>
-      <button type="button" className={`${CONTROL} mt-1 w-full`} disabled={pending !== null} onClick={() => void useItem(item)} aria-label={`${item.title} ${item.useLabel}`}>{pending === item.id ? "처리 중…" : item.useLabel}</button>
+      <button type="button" className={`${CONTROL} mt-1 w-full`} disabled={pending !== null} onClick={() => void handleUseItem(item)} aria-label={`${item.title} ${item.useLabel}`}>{pending === item.id ? "처리 중…" : item.useLabel}</button>
     </article>)}</div>
     {result.total === 0 && <p className="py-4 text-center text-xs text-fg-3">검색 결과가 없습니다. 다른 테마를 선택하거나 고품질 공용 라이브러리를 확인해 주세요.</p>}
     {result.pages > 1 && <nav aria-label="템플릿과 배경 페이지" className="flex justify-between gap-2"><button type="button" className={CONTROL} disabled={result.page === 0} onClick={() => setPage(result.page - 1)}>이전</button><button type="button" className={CONTROL} disabled={result.page + 1 >= result.pages} onClick={() => setPage(result.page + 1)}>다음</button></nav>}

@@ -228,16 +228,20 @@ const SCENES = [
   ["bookshop", "햇살 드는 독립 서점", "서점 도서관 실내 일상 bookstore library interior", bookshop],
   ["hospital", "병원 진료실 복도", "병원 복도 현대 실내 hospital corridor medical", hospital],
   ["platform", "도심 기차역 승강장", "역 기차 승강장 도시 교통 station train platform city", platform],
-  ["neon-alley", "비 내리는 네온 골목", "밤 야간 비 골목 거리 도시 night rain alley street", neonAlley],
+  ["neon-alley", "네온 상점이 비치는 빗길 골목", "밤 야간 비 골목 거리 도시 night rain alley street", neonAlley],
   ["hanok", "한옥 툇마루와 안뜰", "한옥 전통 마당 정원 한국 hanok courtyard garden korea", hanok],
   ["rooftop", "노을빛 옥상 온실", "옥상 온실 정원 도시 노을 로맨스 rooftop greenhouse sunset romance", rooftop],
   ["laboratory", "연구실 실험 작업대", "연구실 과학 실험실 학교 실내 laboratory science school", laboratory],
   ["observatory", "판타지 천문 관측실", "판타지 천문 마법 별 실내 fantasy observatory magic stars", observatory],
 ] as const;
 
+export const STUDIO_GENERATED_ENVIRONMENT_KEYWORDS: ReadonlyMap<string, readonly string[]> = new Map(
+  SCENES.map(([id, , keywords]) => [`gen2d-bg-wave3-${id}`, Object.freeze(keywords.split(" "))]),
+);
+
 export const STUDIO_GENERATED_BG_SCENES_V3: readonly BgScene[] = Object.freeze(
-  SCENES.map(([id, label, genre, draw]) => Object.freeze({
-    id: `gen2d-bg-wave3-${id}`, label, genre, width: W, height: H,
+  SCENES.map(([id, label, , draw]) => Object.freeze({
+    id: `gen2d-bg-wave3-${id}`, label, genre: "내장 환경", width: W, height: H,
     svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${DEFINITIONS}</defs>${draw()}</svg>`,
   })),
 );

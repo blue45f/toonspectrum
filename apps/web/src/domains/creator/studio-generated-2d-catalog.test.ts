@@ -112,7 +112,10 @@ describe("generated 2D library", () => {
     const items = generatedCatalog();
     expect(searchStudioUnifiedAssets(items, { query: "배경", limit: 100 })).toHaveLength(25);
     expect(searchStudioUnifiedAssets(items, { query: "소품", limit: 100 })).toHaveLength(24);
-    expect(searchStudioUnifiedAssets(items, { query: "캐릭터", limit: 100 })).toHaveLength(14);
+    const characterResults = searchStudioUnifiedAssets(items, { query: "캐릭터", limit: 100 });
+    // Intent queries may legitimately include pose/expression guides. Keep exact inventory
+    // counts above and require every actual character to remain discoverable here.
+    expect(characterResults.filter((item) => item.id.startsWith("element:gen2d-character-"))).toHaveLength(14);
     expect(searchStudioUnifiedAssets(items, { query: "구조", limit: 100 })).toHaveLength(12);
 
     for (const query of ["전철", "루프탑", "도서관", "SF", "병원", "판타지", "카페", "투시", "표정", "조명", "한옥", "observatory", "greenhouse", "bookstore"]) {

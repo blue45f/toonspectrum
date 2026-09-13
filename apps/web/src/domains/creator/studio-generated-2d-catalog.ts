@@ -26,6 +26,7 @@ import {
 import {
   STUDIO_GENERATED_2D_PACK_V3_INFO,
   STUDIO_GENERATED_BG_SCENES_V3,
+  STUDIO_GENERATED_ENVIRONMENT_KEYWORDS,
 } from "./studio-generated-2d-wave-3";
 
 import type { BgScene } from "./studio-bg-scenes";
@@ -102,6 +103,7 @@ export function decorateStudioGenerated2dAsset(
   if (!isStudioGenerated2dAssetId(item.id)) return item;
   return {
     ...item,
+    keywords: Object.freeze([...item.keywords, ...(STUDIO_GENERATED_ENVIRONMENT_KEYWORDS.get(studioGeneratedSourceId(item.id)) ?? [])]),
     description: `${item.description} · ToonStudio 생성형 네이티브 벡터`,
     categoryLabel: generatedCategoryLabel(item.id, item.categoryLabel),
     badges: Object.freeze([
