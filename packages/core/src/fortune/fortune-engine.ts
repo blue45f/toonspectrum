@@ -703,11 +703,11 @@ export async function drawTarot<T extends CurateTitleLike>(
     const positions = ["과거", "현재", "미래"];
     const used = new Set<number>();
     const cards = positions.map((position, i) => {
-      let c = buildTarotCard(`${day}:tarot3:${i}`);
+      let c = buildTarotCard(`${day}:tarot3:${cardIdx}:${i}`);
       let salt = 0;
       while (used.has(c.id) && salt < 30) {
         salt += 1;
-        c = buildTarotCard(`${day}:tarot3:${i}:${salt}`);
+        c = buildTarotCard(`${day}:tarot3:${cardIdx}:${i}:${salt}`);
       }
       used.add(c.id);
       return { ...c, position };

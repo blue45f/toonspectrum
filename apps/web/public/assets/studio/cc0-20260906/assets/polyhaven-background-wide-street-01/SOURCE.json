@@ -1,0 +1,82 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wide_street_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 27,
+    "type": 0,
+    "whitebalance": 5500,
+    "date_published": 1601935200,
+    "name": "Wide Street 01",
+    "categories": [
+      "outdoor",
+      "urban",
+      "midday",
+      "clear",
+      "high contrast",
+      "natural light"
+    ],
+    "date_taken": 1596717900,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "37678923",
+      {
+        "name": "David Dahl"
+      },
+      "11164276"
+    ],
+    "backplates": true,
+    "tags": [
+      "sun",
+      "road",
+      "street",
+      "asphalt",
+      "city",
+      "backplates"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "c9737477e43b234961941ba9c08163f93717e78e",
+    "description": "Free, unclipped 16K HDRI of a sunlit wide city avenue at midday - clear sky, strong directional sunlight, high contrast and neutral asphalt tones.",
+    "category_id": "90534497-6965-5735-bfbc-37f6fda902b7",
+    "category": "Streets & Town/Streets & Alleys/City Streets",
+    "attributes": {
+      "time_of_day": "midday",
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "high",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "c127579b",
+    "download_count": 488277,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wide_street_01.png?width=256&height=256&v=c127579b"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/wide_street_01.jpg",
+      "bytes": 4827893,
+      "sha256": "6fc798b65a6ba62d45da328e58dd914adafd160084824a031d3af95785c33e7d",
+      "sourceMd5": "edf218167bc9c9a970044657e055b5d1"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

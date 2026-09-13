@@ -65,7 +65,7 @@ export interface SajuAnalysis {
 }
 
 function allElements(saju: SajuResult): Element[] {
-  const pillars = [saju.yearPillar, saju.monthPillar, saju.dayPillar, saju.hourPillar];
+  const pillars = [saju.yearPillar, saju.monthPillar, saju.dayPillar, ...(saju.birthTimeKnown === false ? [] : [saju.hourPillar])];
   const els: Element[] = [];
   for (const p of pillars) {
     els.push(p.elementKan as Element, p.elementJi as Element);
@@ -82,7 +82,7 @@ export function analyzeSaju(saju: SajuResult): SajuAnalysis {
   for (const el of allElements(saju)) counts[tenGod(dayEl, el)] += 1;
 
   // 신강/신약: 아군(비겁+인성) 비율
-  const ally = counts.비겁 + counts.인성; // 8글자 중
+  const ally = (counts.비겁 + counts.인성) * 8 / allElements(saju).length; // 8글자 중
   const strength: SajuAnalysis["strength"] = ally >= 5 ? "신강" : ally <= 3 ? "신약" : "중화";
 
   // 용신: 신강이면 기운을 빼는 식상, 신약이면 북돋는 인성, 중화면 가장 약한 오행
@@ -280,7 +280,7 @@ export interface CompatibilityAnalysis {
 function jiRelation(x: string, y: string, label: string): { delta: number; positive?: string; caution?: string } {
   if (x === y) return { delta: 2, positive: `${label} ${x}·${y} 동일 — 비슷한 결` };
   if (JI_LIUHE[x] === y) return { delta: 9, positive: `${label} ${x}·${y} 육합(六合) — 편안한 결합` };
-  if (inSameGroup(SANHE_GROUPS, x, y)) return { delta: 7, positive: `${label} 삼합(三合) — 뜻이 잘 맞는 인연` };
+  if (inSameGroup(SANHE_GROUPS, x, y)) return { delta: 7, positive: `${label} 삼합 그룹의 두 글자(반합 참고) — 뜻을 맞춰 보는 인연` };
   if (JI_CHUNG[x] === y) return { delta: -7, caution: `${label} 충(沖) — 변화·이동수, 속도 조율` };
   if (inSameGroup(XING_GROUPS, x, y)) return { delta: -4, caution: `${label} 형(刑) — 사소한 마찰, 배려 필요` };
   return { delta: 0 };

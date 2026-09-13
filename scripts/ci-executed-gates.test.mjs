@@ -100,6 +100,16 @@ const requiredRegressions = Object.freeze([
   "apps/web/src/app/studio-cross-origin-isolation.test.ts",
   "scripts/verify-studio-3d-console.test.ts",
   "scripts/verify-studio-menus.test.ts",
+  "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
+  "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
+  "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
+  "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
+  "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
+  "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
+  "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
+  "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
+  "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
+  "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
 ]);
 
 // Read the explicit file arguments of the Vitest commands used by this workflow.
@@ -282,7 +292,10 @@ test("non-3D Studio editing and export regressions execute in the required stati
 
 test("non-3D directory and file targets cannot be replaced with commented coverage", () => {
   for (const path of requiredNon3DTargets) {
-    const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
+    const source = job("static");
+    const step = source.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith("      - name: Non-3D Studio editing and export regressions\n"));
+    assert.ok(step, "missing non-3D Studio regression step");
+    const missing = source.replace(step, step.replace(path, "apps/web/src/unrelated-replacement.test.ts"));
     const decoy = `${missing}\n      # pnpm exec vitest run ${path}\n`;
     assert.throws(() => assertNon3DRegressions(decoy), /missing non-3D Studio regression/, path);
   }
@@ -322,4 +335,29 @@ for (const [name, command, expected] of shellCommentFixtures) {
 
 test("required core validates current production menu entry points", () => {
   assert.ok(job("static").includes("      - name: Production menu entry point regressions\n        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts\n"));
+});
+
+test("removal and inline comments cannot replace mandatory execution", () => {
+  for (const path of requiredRegressions) {
+    const missing = job("static").replace(path, "");
+    assert.throws(() => assertRequiredRegressions(missing), /missing mandatory regression/);
+    assert.throws(() => assertRequiredRegressions(missing + "\n          pnpm exec vitest run # " + path), /missing mandatory regression/);
+  }
+});
+
+
+test("focused integration checks cannot collide with the protected core status", () => {
+  const integration = readFileSync(new URL("../.github/workflows/toonstudio-integration.yml", import.meta.url), "utf8");
+  const start = integration.indexOf("\n  validate:\n");
+  assert.ok(start >= 0, "missing focused integration validation job");
+  const validation = integration.slice(start);
+  const displayName = validation.match(/^ {4}name: (.+)$/m)?.[1];
+  assert.ok(displayName, "integration checks must declare a namespaced display name");
+  const tracks = ["core", "ui", "editor"];
+  const checks = tracks.map((track) => displayName.replace("${{ matrix.track }}", track));
+  assert.deepEqual(checks, tracks.map((track) => `ToonStudio integration / ${track}`));
+  assert.equal(new Set(checks).size, tracks.length);
+  assert.ok(checks.every((name) => name !== "core" && name !== "verify"));
+  assert.match(job("core"), /^ {4}name: core$/m, "preserve the existing protected merge gate");
+  assert.match(validation, /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/);
 });

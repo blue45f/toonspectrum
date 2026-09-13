@@ -1,0 +1,105 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rubber_duck_toy",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1680048000,
+    "name": "Rubber Duck Toy",
+    "type": 2,
+    "authors": {
+      "Plat251": "All"
+    },
+    "info": null,
+    "sponsors": [
+      "78546118"
+    ],
+    "categories": [
+      "props",
+      "decorative",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "shed",
+      "toy",
+      "bathroom",
+      "child",
+      "home",
+      "fun",
+      "kids",
+      "play",
+      "float",
+      "plastic",
+      "cute",
+      "animal"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 4288,
+    "texel_density": 7289.496739617577,
+    "dimensions": [
+      213.5048285126686,
+      300.00218749046326,
+      285.52286326885223
+    ],
+    "files_hash": "00cce7478ed6c66264d09711f2ce55c1fc7b096c",
+    "description": "Free 4K model: cute yellow rubber duck with glossy plastic, bright red beak, simple cartoon eyes and light scuffs/grime for a slightly worn, playful look.",
+    "category_id": "4b07c553-3d92-564a-9755-95f6b6a4e9ea",
+    "category": "Leisure/Games & Toys/Toys",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "rubber",
+        "plastic"
+      ]
+    },
+    "img_version": "ba366507",
+    "download_count": 49227,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rubber_duck_toy.png?width=256&height=256&v=ba366507"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/rubber_duck_toy/rubber_duck_toy_2k.gltf",
+      "bytes": 3180,
+      "sha256": "d10f8a5f4d7416c62d67cb5d8cd480d93d5750c5cc911128729ae47c5ee05466",
+      "sourceMd5": "0422903fb9822f207257261858393c82"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rubber_duck_toy/rubber_duck_toy_arm_2k.jpg",
+      "bytes": 1098944,
+      "sha256": "87cd18f544e579fb9a5bb42076abf731a5dcd629486d2cdd34f3378716e1eeda",
+      "sourceMd5": "587baf41a375418f9cc841cb49405afb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/rubber_duck_toy/rubber_duck_toy.bin",
+      "bytes": 105376,
+      "sha256": "381e1373b99a4ff23d5ee02cb66bfb5e7d897eaa280581f19b652c38ffd83314",
+      "sourceMd5": "2ab5ea380067b76e3ba7e8db8ad0844a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rubber_duck_toy/rubber_duck_toy_nor_gl_2k.jpg",
+      "bytes": 170721,
+      "sha256": "2c2cdbaa3a46a1d3f577d510ba3bc999c4fbfd188985ee65e851b6c9b2bbd231",
+      "sourceMd5": "7947d883be44c7488a49f813b4be3c35"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rubber_duck_toy/rubber_duck_toy_diff_2k.jpg",
+      "bytes": 789401,
+      "sha256": "6abc199fd0249ff906ddb977510c6f6527887aadc976dbede2ec67bda64b0f92",
+      "sourceMd5": "8ab1c742d2a4543a7e4cd588cfb6fe28"
+    }
+  ]
+}

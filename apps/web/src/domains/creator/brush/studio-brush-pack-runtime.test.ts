@@ -64,9 +64,9 @@ function withoutSeedFields(value: unknown): unknown {
 }
 
 describe("procedural brush pack runtime", () => {
-  it("materializes all 160 descriptors into the shared selection contract", () => {
+  it("materializes all 192 descriptors into the shared selection contract", () => {
     const selections = materializeAllStudioBrushPackSelections();
-    expect(selections).toHaveLength(160);
+    expect(selections).toHaveLength(192);
     expect(selections.map((selection) => selection.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
@@ -77,7 +77,7 @@ describe("procedural brush pack runtime", () => {
     const dryMediaSelections = selections.filter(
       ({ runtimeBrushId }) => runtimeBrushId === "dry-media"
     );
-    expect(dryMediaSelections).toHaveLength(61);
+    expect(dryMediaSelections).toHaveLength(72);
     expect(dryMediaSelections.every(
       ({ brushDynamics }) => brushDynamics.depositPipeline
         === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
@@ -146,7 +146,7 @@ describe("procedural brush pack runtime", () => {
     )).toBe(true);
   });
 
-  it("gives all 160 catalogue brushes a distinct deterministic runtime fingerprint", () => {
+  it("gives all 192 catalogue brushes a distinct deterministic runtime fingerprint", () => {
     const first = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const second = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const physical = materializeAllStudioBrushPackSelections().map((selection) => JSON.stringify(withoutSeedFields({
@@ -155,9 +155,9 @@ describe("procedural brush pack runtime", () => {
     })));
     expect(first).toEqual(second);
     expect(first.every((signature) => typeof signature === "string" && signature.length > 100)).toBe(true);
-    expect(new Set(first).size).toBe(160);
+    expect(new Set(first).size).toBe(192);
     // Neither the stroke seed nor nested grain seeds may be the sole differentiator.
-    expect(new Set(physical).size).toBe(160);
+    expect(new Set(physical).size).toBe(192);
   });
 
   it("plans a finite, visible, deterministic engine stroke for every catalogue preset", () => {
@@ -569,17 +569,18 @@ describe("procedural brush pack runtime", () => {
     });
 
     expect(visualPlans).toEqual([
+      // Area-R8 v1 integrates 2x2 texels for the original procedural tips; dab locations remain fixed.
       // Values intentionally pin both custom tip rasterization and the dynamic dab planner.
       // Update only after a deliberate visual QA pass.
-      { id: "bristle-fan-dry", tip: "985d4700", dabs: "62a0855b", count: 18 },
-      { id: "palette-knife-edge", tip: "c344c2cf", dabs: "ae46755f", count: 70 },
-      { id: "watercolor-salt-bloom", tip: "206daca6", dabs: "c11da11a", count: 7 },
-      { id: "ribbon-satin-fold", tip: "30f1532a", dabs: "ac5ec2b4", count: 17 },
+      { id: "bristle-fan-dry", tip: "208effa4", dabs: "62a0855b", count: 18 },
+      { id: "palette-knife-edge", tip: "574618f3", dabs: "ae46755f", count: 70 },
+      { id: "watercolor-salt-bloom", tip: "aa9dca76", dabs: "c11da11a", count: 7 },
+      { id: "ribbon-satin-fold", tip: "81404148", dabs: "ac5ec2b4", count: 17 },
       // Denser soft wash carriers (continuous-carrier-quality-v3) add stations on layered smoke.
-      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "b9897050", count: 26 },
-      { id: "flower-petal-scatter", tip: "a7be40ba", dabs: "616763b3", count: 9 },
-      { id: "halftone-gradient-dot", tip: "ea3c1dbd", dabs: "96b49af2", count: 13 },
-      { id: "focus-ray-streak", tip: "194e1e56", dabs: "9d9ff412", count: 27 },
+      { id: "smoke-wisp-layered", tip: "ad04b04c", dabs: "b9897050", count: 26 },
+      { id: "flower-petal-scatter", tip: "fd53c39f", dabs: "616763b3", count: 9 },
+      { id: "halftone-gradient-dot", tip: "b5bbae69", dabs: "96b49af2", count: 13 },
+      { id: "focus-ray-streak", tip: "5d42b6dd", dabs: "9d9ff412", count: 27 },
     ]);
   });
 });

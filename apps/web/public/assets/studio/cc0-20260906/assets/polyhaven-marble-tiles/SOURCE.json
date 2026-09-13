@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/marble_tiles",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Marble Tiles",
+    "categories": [
+      "floor",
+      "man made",
+      "outdoor",
+      "dirty"
+    ],
+    "type": 1,
+    "tags": [
+      "floor",
+      "tiles",
+      "marble",
+      "dirty",
+      "ceramic",
+      "decorative",
+      "consistent",
+      "square",
+      "waterproof tiles"
+    ],
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1708992000,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "afe8821c16c3590d9767693b9dda47be410849bf",
+    "description": "Free 8K texture: beige square marble tiles in a consistent grid with dark grout, weathered dirt speckles and chips, waterproof ceramic-like finish with a subtle sheen.",
+    "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+    "category": "Stone/Slabs & Tiles/Marble",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "b1cfb966",
+    "download_count": 15104,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/marble_tiles.png?width=256&height=256&v=b1cfb966"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_diff_2k.jpg",
+      "bytes": 3246069,
+      "sha256": "9a73fe867cf0c4a14b903542106dee4e33a1de8abf942b1725ff679c00492668",
+      "sourceMd5": "0407b80b586989cd552ff718186fd3d1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_rough_2k.jpg",
+      "bytes": 2664466,
+      "sha256": "2692b2228443814fb762c39e5f829c3c4be07826264c7f6e19934e0f9b7c52b4",
+      "sourceMd5": "cdcabe4ae6f5bd15d13ce880e6059e4b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_nor_gl_2k.jpg",
+      "bytes": 2439351,
+      "sha256": "632eda29b682fb3757fc5d646e53577f80d1546985bf2adae04ec6c4c4c84df0",
+      "sourceMd5": "0afeb5b39140661f90cc85daa44e5fdc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_ao_2k.jpg",
+      "bytes": 2146628,
+      "sha256": "0b8841a786a8cab4401be43f19d8fe8a53bbae94824c61d7f74d48a7b85339a6",
+      "sourceMd5": "55e334c4f81590dd97d464f83122ef0c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_disp_2k.jpg",
+      "bytes": 1220367,
+      "sha256": "ff1e8bf2b5027b6ad67d5ab077e1af7419cafa03190895bf5653b8ab2d7941c2",
+      "sourceMd5": "e84682f7a32caf9bb26ec46000adce06"
+    }
+  ]
+}

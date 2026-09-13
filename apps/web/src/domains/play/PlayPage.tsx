@@ -1,107 +1,86 @@
-import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { Suspense, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, Clock3, Heart, Search, Shuffle, Sparkles, Trophy } from "lucide-react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { findGame, PLAY_GAMES } from "./game-registry";
+import { freshSeed, koreaDay, promptFor, randomFrom, safeSeed } from "./lab/creative-core";
+import { PlayArtwork } from "./lab/PlayArtwork";
+import { PlayGameBoundary } from "./lab/PlayGameBoundary";
+import { recordVisit, usePlayJournal } from "./lab/play-storage";
+import "./play-lab.css";
 
 import { Container } from "@/shared/components/section";
 import { SharePageButton } from "@/shared/components/share-page-button";
-import { cn } from "@/shared/lib/utils";
 
-
+const FILTERS = [["all", "전체"], ["draw", "드로잉"], ["story", "스토리"], ["sense", "색감"], ["arcade", "아케이드"], ["favorites", "즐겨찾기"]] as const;
 export function PlayPage() {
   const [params, setParams] = useSearchParams();
-  const activeId = params.get("game") ?? undefined;
-  const active = findGame(activeId);
+  const activeId = params.get("game") ?? undefined; const active = findGame(activeId);
   const headingRef = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    document.title = active ? `${active.label} · 놀이터 · 툰스펙트럼` : "놀이터 · 툰스펙트럼";
-  }, [active]);
-
-  // 라우트/게임 전환 시 제목으로 포커스 이동(스크린리더 안내).
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, [activeId]);
-
-  const openGame = (id: string) => setParams({ game: id }, { replace: false });
-  const exitGame = () => setParams({}, { replace: false });
-
+  const { journal, toggleFavorite, warning } = usePlayJournal();
+  const [today, setToday] = useState(koreaDay);
+  const query = (params.get("q") ?? "").slice(0, 80);
+  const tab = FILTERS.some(([id]) => id === params.get("tab")) ? params.get("tab")! : "all";
+  const daily = promptFor(today);
+  useEffect(() => { const id = window.setInterval(() => setToday(koreaDay()), 60000); return () => clearInterval(id); }, []);
+  useEffect(() => { document.title = active ? `${active.label} · 놀이터 · ToonStudio` : "창작 놀이터 · ToonStudio"; }, [active]);
+  useEffect(() => { headingRef.current?.focus(); if (activeId && findGame(activeId)) recordVisit(activeId); }, [activeId]);
+  const changeFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); setParams(next, { replace: true });
+  };
+  const openGame = (id: string, seed?: string) => {
+    const next = new URLSearchParams(params); next.set("game", id); next.delete("seed"); next.delete("idea");
+    if (seed) next.set("seed", seed); setParams(next);
+  };
+  const exitGame = () => { const next = new URLSearchParams(params); next.delete("game"); next.delete("seed"); next.delete("idea"); setParams(next); };
+  const filtered = PLAY_GAMES.filter((game) => {
+    const matchesTab = tab === "all" || (tab === "favorites" ? journal.favorites.includes(game.id) : (game.collection ?? "arcade") === tab);
+    return matchesTab && `${game.label} ${game.tagline} ${game.category}`.toLocaleLowerCase("ko-KR").includes(query.trim().toLocaleLowerCase("ko-KR"));
+  });
+  const todayResults = journal.results.filter((result) => result.day === today);
+  const dailyDone = todayResults.some((result) => result.game === "sketch-sprint" && result.label === daily[0]);
   if (active) {
-    const { Component } = active;
-    return (
-      <Container className="py-5">
-        <button
-          type="button"
-          onClick={exitGame}
-          className="mb-3 inline-flex items-center gap-1 text-sm text-fg-2 hover:text-fg"
-        >
-          <ArrowLeft className="h-4 w-4" /> 놀이터
-        </button>
-        <h1 ref={headingRef} tabIndex={-1} className="mb-1 flex items-center gap-2 text-lg font-bold outline-none">
-          <active.Icon className="h-5 w-5 text-accent" />
-          {active.label}
-        </h1>
-        <p className="mb-4 text-sm text-fg-2">{active.tagline}</p>
-        <div style={{ ["--char-hue" as string]: active.hue }}>
-          <Suspense fallback={<div className="grid min-h-[16rem] place-items-center text-sm text-fg-2">게임을 불러오는 중…</div>}>
-            <Component onExit={exitGame} />
-          </Suspense>
-        </div>
-      </Container>
-    );
-  }
-
-  return (
-    <Container className="py-6">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 ref={headingRef} tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold outline-none">
-            <Gamepad2 className="h-6 w-6 text-accent" /> 놀이터
-          </h1>
-          <p className="mt-1 text-sm text-fg-2">웹툰 캐릭터로 즐기는 미니게임 — 카드 배틀, 가위바위보, 퀴즈 등.</p>
-        </div>
-        {/* 놀이터 공유 — Web Share API → 클립보드 폴백 */}
-        <SharePageButton path="/play" text="툰스펙트럼 놀이터 — 웹툰 캐릭터 미니게임" label="놀이터 공유" />
+    const { Component: Game } = active;
+    return <Container className="play-page play-active">
+      <div className="play-active-navigation"><button type="button" className="play-back" onClick={exitGame}><ArrowLeft size={17} />놀이터</button><Link to="/studio" className="play-text-link">전문 작업실 ↗</Link></div>
+      <header className="play-game-heading"><div><span className="play-eyebrow">TOONSTUDIO PLAY / {active.localOnly ? "CREATIVE LAB" : "ARCADE"}</span><h1 ref={headingRef} tabIndex={-1}><active.Icon className="h-7 w-7" />{active.label}</h1><p>{active.tagline}</p></div>
+        <button type="button" className="play-button" aria-pressed={journal.favorites.includes(active.id)} onClick={() => toggleFavorite(active.id)}><Heart size={16} fill={journal.favorites.includes(active.id) ? "currentColor" : "none"} />즐겨찾기</button>
       </header>
-
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {PLAY_GAMES.map((g) => (
-          <li key={g.id}>
-            <button
-              type="button"
-              onClick={() => openGame(g.id)}
-              className={cn(
-                "group flex w-full items-start gap-3 rounded-2xl border border-line bg-card/50 p-4 text-left transition",
-                "hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-lg hover:shadow-accent/10",
-              )}
-            >
-              <span
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow"
-                style={{ background: `oklch(0.62 0.17 ${g.hue})` }}
-              >
-                <g.Icon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5">
-                  <span className="font-semibold text-fg">{g.label}</span>
-                  <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6rem] font-medium text-accent">{g.category}</span>
-                </span>
-                <span className="mt-0.5 block text-[0.78rem] leading-snug text-fg-2">{g.tagline}</span>
-                {g.usesCamera && <span className="mt-1 inline-block text-[0.62rem] text-fg-3">📷 웹캠 사용</span>}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <p className="mt-6 text-[0.68rem] leading-relaxed text-fg-3">
-        놀이터 게임은 공개 카탈로그의 메타데이터(제목·작가·장르·지표)를 사용합니다. 표지 썸네일은 사이트
-        전반과 동일한 표지 정책(출처 표기·성인 제외·운영자 비표시 전환)에 따라 표시되며, 비표시 시 작품별
-        색상으로 대체됩니다. 일부 지표는 추정값(≈)입니다.
-      </p>
-    </Container>
-  );
+      {warning && <p className="play-warning" role="status">{warning}</p>}
+      <PlayGameBoundary key={`${active.id}:${safeSeed(params.get("seed"))}:${(params.get("idea") ?? "").slice(0, 30)}`} onExit={exitGame}>
+        <Suspense fallback={<div className="play-loading" role="status"><div /><div /><p>창작 도구를 준비하고 있어요…</p></div>}><Game onExit={exitGame} seed={safeSeed(params.get("seed"))} /></Suspense>
+      </PlayGameBoundary>
+    </Container>;
+  }
+  return <Container className="play-page">
+    {activeId && <div className="play-warning" role="status">선택한 콘텐츠를 찾지 못했습니다. 아래에서 다른 창작 도구를 골라 주세요.</div>}
+    <section className="play-hero" aria-labelledby="play-title">
+      <div className="play-hero-copy"><span className="play-eyebrow"><Sparkles size={15} /> TOONSTUDIO / CREATIVE PLAYGROUND</span>
+        <h1 ref={headingRef} tabIndex={-1} id="play-title">놀다 보면,<br /><em>다음 컷</em>이 떠오른다.</h1>
+        <p>잘 그리려는 마음은 잠시 내려놓고.<br />선을 긋고, 색을 고르고, 이야기를 굴려 보세요.<br />작은 놀이가 나만의 작품으로 이어지는 창작 놀이터.</p>
+        <div className="play-actions"><button type="button" className="play-button primary large" onClick={() => openGame("sketch-sprint", today)}>오늘의 드로잉 시작 <ArrowRight size={18} /></button><a className="play-text-link" href="#play-library">모든 콘텐츠 둘러보기 ↓</a></div>
+        <div className="play-hero-notes"><span>로그인 없이 시작</span><span>새 창작 도구 6종</span><span>브라우저에서 직접 창작</span></div>
+      </div>
+      <div className="play-hero-art"><span className="play-art-label">LESS PRESSURE. MORE PLAY.</span><PlayArtwork kind="hero" /><span className="play-art-caption">한 번의 낙서가, 이야기의 시작.</span></div>
+    </section>
+    <section className="play-daily-row" aria-label="오늘의 창작과 내 기록">
+      <div className="play-daily"><div className="play-daily-label"><span className="play-eyebrow">DAILY CREATIVE PROMPT</span><time dateTime={today}>{today.replaceAll("-", ".") } · KST</time></div><div className="play-daily-body"><div><h2>{daily[0]}</h2><p>{daily[1]}</p></div><button className="play-button" type="button" onClick={() => openGame("sketch-sprint", today)}>{dailyDone ? <Check size={16} /> : <Clock3 size={16} />}{dailyDone ? "다시 그려 보기" : "60초 도전"}</button></div></div>
+      <div className="play-journal"><span className="play-eyebrow"><Trophy size={14} /> MY CREATIVE LOG</span><div className="play-journal-counts"><div><strong>{todayResults.length}</strong><span>오늘 완료</span></div><div><strong>{journal.results.length}</strong><span>완료 기록 · 최근 100개</span></div><div><strong>{journal.favorites.filter((id) => findGame(id)).length}</strong><span>즐겨찾기</span></div></div><p>이 브라우저에만 보관되는 나의 기록</p></div>
+    </section>
+    {journal.recent.some((id) => findGame(id)) && <nav className="play-recent" aria-label="최근 즐긴 콘텐츠"><span>다시 이어서</span>{journal.recent.filter((id) => findGame(id)).slice(0, 4).map((id) => <button type="button" key={id} onClick={() => openGame(id)}>{findGame(id)!.label}<ArrowRight size={13} /></button>)}</nav>}
+    <section id="play-library" className="play-library" aria-labelledby="play-library-heading">
+      <header className="play-library-heading"><div><span className="play-eyebrow">PICK YOUR PLAY</span><h2 id="play-library-heading">지금, 어떤 걸 해 볼까요?</h2><p>창작 근육을 깨우는 작은 실험부터, 가볍게 즐기는 웹툰 게임까지.</p></div><button className="play-button" type="button" disabled={!filtered.length} onClick={() => openGame(filtered[Math.floor(randomFrom(freshSeed())() * filtered.length)].id)}><Shuffle size={16} />하나 골라 주세요</button></header>
+      <div className="play-filter-row"><div className="play-filter-tabs" aria-label="콘텐츠 분류">{FILTERS.map(([id, label]) => <button className="play-chip" type="button" key={id} aria-pressed={tab === id} onClick={() => changeFilter("tab", id === "all" ? "" : id)}>{label}{id === "all" && <span>{PLAY_GAMES.length}</span>}</button>)}</div><label className="play-search"><Search size={16} /><span className="sr-only">놀이터 콘텐츠 검색</span><input type="search" value={query} maxLength={80} placeholder="드로잉, 콘티, 퀴즈 검색" onChange={(event) => changeFilter("q", event.target.value)} /></label></div>
+      {warning && <p className="play-warning" role="status">{warning}</p>}
+      <p className="sr-only" role="status">{filtered.length}개 콘텐츠</p>
+      <ul className="play-card-grid">{filtered.map((game, index) => <li key={game.id}><article className="play-content-card">
+        <button type="button" className="play-card-open" onClick={() => openGame(game.id)}><div className="play-card-art"><PlayArtwork kind={game.id} /><span className="play-card-index">{String(index + 1).padStart(2, "0")}</span>{game.localOnly && <span className="play-local-badge">LOCAL CREATIVE</span>}</div><div className="play-card-body"><div className="play-card-category"><span>{game.category}</span><span><Clock3 size={12} />{game.duration ?? "3–5분"}</span></div><h3>{game.label}<ArrowRight size={17} /></h3><p>{game.tagline}</p><span className="play-card-mode">{game.localOnly ? "서버 호출 없는 창작 · 결과물/기록 보관" : game.usesCamera ? "카메라·음성 선택 사용 · 버튼 지원" : "웹툰 카탈로그 기반 미니게임"}</span></div></button>
+        <button type="button" className="play-card-favorite" aria-label={`${game.label} 즐겨찾기`} aria-pressed={journal.favorites.includes(game.id)} onClick={() => toggleFavorite(game.id)}><Heart size={17} fill={journal.favorites.includes(game.id) ? "currentColor" : "none"} /></button>
+      </article></li>)}</ul>
+      {!filtered.length && <div className="play-empty"><Search size={28} /><h3>{tab === "favorites" ? "좋아하는 콘텐츠를 모아 보세요." : "검색한 콘텐츠가 없어요."}</h3><p>{tab === "favorites" ? "카드의 하트 버튼을 누르면 여기에 모입니다." : "다른 검색어나 분류로 새 놀이를 찾아 보세요."}</p><button type="button" className="play-button" onClick={() => { const next = new URLSearchParams(params); next.delete("tab"); next.delete("q"); next.delete("game"); setParams(next, { replace: true }); }}>전체 콘텐츠 보기</button></div>}
+    </section>
+    <section className="play-next-step"><div><span className="play-eyebrow">FROM PLAY TO YOUR NEXT PANEL</span><h2>마음에 드는 낙서 하나,<br />다음 작품의 첫 컷으로.</h2><p>스케치는 PNG·SVG, 팔레트는 CSS, 콘티는 수정 가능한 파일로.<br />놀이의 결과를 작업 자료로 남기고 전문 스튜디오로 이어가세요.</p></div><div className="play-actions"><Link to="/studio" className="play-button primary large">드로잉 스튜디오 열기 <ArrowRight size={17} /></Link><Link to="/learn" className="play-text-link">배우며 이어가기 ↗</Link></div></section>
+    <footer className="play-footer"><div><p>새 창작 콘텐츠는 로딩 후 서버·AI API 호출 없이 실행됩니다. 첫 방문과 아직 열지 않은 도구의 로딩에는 인터넷이 필요합니다. 브라우저 데이터 삭제 시 로컬 초안과 기록도 사라지므로 결과 파일을 보관해 주세요.</p><p>기존 웹툰 게임은 공개 카탈로그 메타데이터를 사용합니다. 표지는 출처·성인 제외·비표시 정책을 따르며 일부 인기 지표는 추정값(≈)입니다. 카드 그림은 오리지널 기능 안내 일러스트입니다.</p></div><SharePageButton path="/play" text="ToonStudio 창작 놀이터 — 드로잉·색감·스토리 실험" label="놀이터 공유" /></footer>
+  </Container>;
 }
-
 export default PlayPage;

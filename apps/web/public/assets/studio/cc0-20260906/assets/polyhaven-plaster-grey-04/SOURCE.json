@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/plaster_grey_04",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "rough",
+      "even",
+      "plastered"
+    ],
+    "date_published": 1565325187,
+    "name": "Plaster Grey 04",
+    "categories": [
+      "plaster-concrete",
+      "wall",
+      "man made",
+      "clean",
+      "outdoor",
+      "indoor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1500,
+      1500
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "48abfab22b2a678210fada496f7218c5333e7681",
+    "description": "Free 8K texture of even grey plaster with a rough, subtly mottled surface and faint weathering, clean man-made wall material.",
+    "sponsors": [
+      "101447488"
+    ],
+    "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+    "category": "Concrete/Plaster & Stucco/Bare Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "img_version": "e92c43aa",
+    "download_count": 119990,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/plaster_grey_04.png?width=256&height=256&v=e92c43aa"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plaster_grey_04/plaster_grey_04_diff_2k.jpg",
+      "bytes": 1987693,
+      "sha256": "f8fd4a4263dc257060f34021bd537d968cc04b38b332f29ddd516f1fdd5ec201",
+      "sourceMd5": "0cd020dc1e3bb4511d76176a7e2487ec"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plaster_grey_04/plaster_grey_04_rough_2k.jpg",
+      "bytes": 1616488,
+      "sha256": "8c7ecda523877e06f3f0e67cd7cefe4cf999972d9ef46d1ddc28cf3a16a8c35d",
+      "sourceMd5": "11caa54cca2926a8a1c87abf28dfc31a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plaster_grey_04/plaster_grey_04_nor_gl_2k.jpg",
+      "bytes": 3886433,
+      "sha256": "25a501bd78e1b55d62bebe2f9fd5ff77ed796a66e092b2efbd5339e4bee15f0a",
+      "sourceMd5": "462753965205d0a23f43eb971553b1bf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plaster_grey_04/plaster_grey_04_ao_2k.jpg",
+      "bytes": 1750625,
+      "sha256": "9fabc7288b5b62580828f79e4c6e73a1754b7fd45ff3a992c8d8214031bcd093",
+      "sourceMd5": "224ea65c5b058165f542a50f226c58e7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plaster_grey_04/plaster_grey_04_disp_2k.jpg",
+      "bytes": 674691,
+      "sha256": "52b39d855eb9d3323ba99ec43b466746c5f015f48ab22526663b6aca03e174ee",
+      "sourceMd5": "f5657740929cb3b044869103dcadca16"
+    }
+  ]
+}

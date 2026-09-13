@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "type": 2,
+    "tags": [
+      "chair",
+      "wood",
+      "painted",
+      "farmhouse",
+      "dining",
+      "diner",
+      "american",
+      "kitchen"
+    ],
+    "name": "Painted Wooden Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "date_published": 1632873600,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 724,
+    "texel_density": 6648.434265641634,
+    "dimensions": [
+      431.75144493579865,
+      539.8241728544235,
+      956.4821355743334
+    ],
+    "files_hash": "51ead6fbc1a60ea9098c37e18b1d5413223789e0",
+    "description": "Free 8K painted wooden chair, distressed white farmhouse piece with slatted seat, decorative back splat, square legs and simple stretchers.",
+    "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+    "category": "Furniture/Seating/Chairs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "d08f51dc",
+    "download_count": 18381,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/painted_wooden_chair_01.png?width=256&height=256&v=d08f51dc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/painted_wooden_chair_01/painted_wooden_chair_01_2k.gltf",
+      "bytes": 2785,
+      "sha256": "f079552d8564e9dfa247114dd1cb650c89b69d7c56dfc90fd26b1df5adbd8a2c",
+      "sourceMd5": "3ec4f92b791b4de1bc0d82a52b4a65ae"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_chair_01/painted_wooden_chair_01_nor_gl_2k.jpg",
+      "bytes": 499193,
+      "sha256": "70e4fbbe62831f7a93c0e821479ee463fef30ef43599589c46a6b5d23a359181",
+      "sourceMd5": "6fd3dc868e8c9ae838f3eaaaa09cc8c2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_chair_01/painted_wooden_chair_01_diff_2k.jpg",
+      "bytes": 540489,
+      "sha256": "7c2914843fd3e73c91c7a25058e20460195095a99b8d4ffd78ea61391f0966a9",
+      "sourceMd5": "bc227634cd2b6584f3f18bac808e25cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_chair_01/painted_wooden_chair_01_arm_2k.jpg",
+      "bytes": 452527,
+      "sha256": "65d0dface1fe516d43e6594d1c587692ce99a6ebc2e8e7027920c3d3e4711289",
+      "sourceMd5": "b1fad7186a62205394bd1bc5dd30b62d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/painted_wooden_chair_01/painted_wooden_chair_01.bin",
+      "bytes": 37112,
+      "sha256": "eaf952048db1e770c45898049b8abe28deb83d3dbbaad81d5e7e43e22a322295",
+      "sourceMd5": "7fd011acaef4730770108a7932191768"
+    }
+  ]
+}

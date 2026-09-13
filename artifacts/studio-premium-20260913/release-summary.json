@@ -1,0 +1,20 @@
+{
+  "schema": "toonspectrum.premium-release.v1",
+  "previousCatalogEntries": 1212,
+  "currentCatalogEntries": 1304,
+  "addedEntries": 92,
+  "independentOriginals": 61,
+  "renderedDerivatives": 31,
+  "byKind": {
+    "model": 31,
+    "surface-texture": 18,
+    "background": 12,
+    "prop-image": 31
+  },
+  "originalPayloadBytes": 261878848,
+  "visualReview": "contact-sheet-visual-triage",
+  "allAnglesArtisticallyApproved": false,
+  "fullStudioProjectRoundTripVerified": false,
+  "preservedExistingEntries": 1212,
+  "decisions": "data/studio-assets/premium-20260913-decisions.json"
+}

@@ -21,7 +21,11 @@ export function useStudioVectorNodeBubbleEdit({
   selectedId,
 }: UseStudioVectorNodeBubbleEditOptions) {
   // ── 벡터 노드 편집(자유선 점 이동·굵기) ──
-  const [nodeEditTool, setNodeEditToolState] = useState<NodeEditTool | null>(null);
+  const [nodeEditToolState, setNodeEditToolState] = useState<{
+    selectedId: string | null;
+    tool: NodeEditTool | null;
+  }>({ selectedId, tool: null });
+  const nodeEditTool = nodeEditToolState.selectedId === selectedId ? nodeEditToolState.tool : null;
   const nodeEditDragRef = useRef<StudioNodeEditPointerSession | null>(null);
   const nodeEditRafRef = useRef<number | null>(null);
   const pendingNodeEditDraftRef = useRef<{ elId: string; points: number[]; pressures: number[] } | null>(null);
@@ -40,11 +44,18 @@ export function useStudioVectorNodeBubbleEdit({
     nodeEditDragRef, pendingNodeEditDraftRef, nodeEditRafRef, setNodeEditDraft,
   }), []);
 
-  const setNodeEditTool = useCallback((next: SetStateAction<NodeEditTool | null>) => {
+  const setNodeEditTool = useCallback((
+    next: SetStateAction<NodeEditTool | null>,
+    targetId: string | null = selectedId,
+  ) => {
+    // Explicit targets survive a same-batch Smart Shape selection, without arming another node.
     // Escape/tool transitions must revoke ownership before a same-tick pointerup can commit.
     resetNodeEditSession();
-    setNodeEditToolState(next);
-  }, [resetNodeEditSession]);
+    setNodeEditToolState((current) => ({
+      selectedId: targetId,
+      tool: typeof next === "function" ? next(current.selectedId === targetId ? current.tool : null) : next,
+    }));
+  }, [resetNodeEditSession, selectedId]);
 
   useEffect(() => {
     const cancelOutsideStage = (event: PointerEvent) => {
@@ -64,9 +75,10 @@ export function useStudioVectorNodeBubbleEdit({
   }, [resetNodeEditSession]);
 
   useEffect(() => {
-    void selectedId;
     resetNodeEditSession();
-    setNodeEditToolState(null);
+    setNodeEditToolState((current) => current.selectedId === selectedId
+      ? current
+      : { selectedId, tool: null });
   }, [selectedId, resetNodeEditSession]);
 
   const [nodeSmoothStrength, setNodeSmoothStrength] = useState(NODE_SMOOTH_DEFAULT_STRENGTH);

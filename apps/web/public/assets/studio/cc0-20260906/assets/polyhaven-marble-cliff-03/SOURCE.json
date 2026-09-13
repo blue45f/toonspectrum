@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/marble_cliff_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "name": "Marble Cliff 03",
+    "tags": [
+      "rough",
+      "weathered",
+      "uneven",
+      "cliff",
+      "marble",
+      "rock",
+      "craggy",
+      "sedimentary",
+      "fractured",
+      "cracked",
+      "rock wall",
+      "strata",
+      "cracks",
+      "drone"
+    ],
+    "description": "Free 8k texture of a weathered marble cliff: craggy sedimentary rock with rough, fractured strata, deep cracks and uneven, warm beige-brown surfaces.",
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      5748.3086585998535,
+      5748.3086585998535
+    ],
+    "files_hash": "f0c671522a668a683a2197343fc804b9cbcd65c2",
+    "date_published": 1776902400,
+    "categories": [
+      "outdoor",
+      "rock",
+      "natural",
+      "aerial"
+    ],
+    "category_id": "19a0b774-8b0a-5853-a205-8f019fe00ae9",
+    "category": "Stone/Rock & Cliffs/Marble & Metamorphic",
+    "attributes": {
+      "condition": [
+        "weathered",
+        "cracked"
+      ],
+      "origin": "natural",
+      "setting": "outdoor",
+      "aerial": true
+    },
+    "img_version": "bd5b1a41",
+    "download_count": 11169,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/marble_cliff_03.png?width=256&height=256&v=bd5b1a41"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_diff_2k.jpg",
+      "bytes": 3068300,
+      "sha256": "bfd6d3c0ccb10bd9c8d0d6a2383c678a1741603fd28df1bbc710098bebb30a28",
+      "sourceMd5": "3cbe8619112065b98260c3507e77bf28"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_rough_2k.jpg",
+      "bytes": 1440023,
+      "sha256": "bba3c0183f4e63613d5c1de08be8c794b68c1e5a993ae1333292b8cf755f36df",
+      "sourceMd5": "0d66cf934cd7fd3dd1e71a8cd8472e43"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_nor_gl_2k.jpg",
+      "bytes": 2771168,
+      "sha256": "205321bb1e4c02b5aeed946354f49549d5731b04d6b04c90c88831c9ff20f5a1",
+      "sourceMd5": "e991fc38fdc039cf646da0846c781162"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_ao_2k.jpg",
+      "bytes": 1991130,
+      "sha256": "4e078b78748e1438cf09509ce65e724055113f3e1bc7a8b09da62ddddc465109",
+      "sourceMd5": "1829574c4f932007cb5ee60514e35d43"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_disp_2k.jpg",
+      "bytes": 619361,
+      "sha256": "d743e3d9d0472f3b1060b18f71f52e35f959588c7241b5bab690aa54387b1cfc",
+      "sourceMd5": "d4a6410d30b90db6f0a5f0b894131398"
+    }
+  ]
+}
