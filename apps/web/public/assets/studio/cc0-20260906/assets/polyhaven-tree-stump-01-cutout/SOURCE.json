@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/tree_stump_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-tree-stump-01",
+  "sourceModelSha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+  "render": {
+    "sourceId": "polyhaven-tree-stump-01",
+    "sourceSha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+    "path": "high-resolution-props/polyhaven-tree-stump-01.png",
+    "visiblePixels": 321703,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 41046
+  },
+  "independentOriginal": false
+}

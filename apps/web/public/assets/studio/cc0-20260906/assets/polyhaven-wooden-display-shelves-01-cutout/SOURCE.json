@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-wooden-display-shelves-01",
+  "sourceModelSha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+  "render": {
+    "sourceId": "polyhaven-wooden-display-shelves-01",
+    "sourceSha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+    "path": "high-resolution-props/polyhaven-wooden-display-shelves-01.png",
+    "visiblePixels": 476734,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 3174
+  },
+  "independentOriginal": false
+}

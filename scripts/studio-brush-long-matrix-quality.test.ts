@@ -143,7 +143,7 @@ describe("Studio exhaustive long-brush quality policy", () => {
     expect(policies.filter(({ source }) => source === "core")).toHaveLength(
       STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(({ source }) => source === "core").length,
     );
-    expect(policies.filter(({ source }) => source === "pro")).toHaveLength(160);
+    expect(policies.filter(({ source }) => source === "pro")).toHaveLength(192);
   });
 
   it("accepts a stable continuous carrier and reports exact transition metrics", () => {

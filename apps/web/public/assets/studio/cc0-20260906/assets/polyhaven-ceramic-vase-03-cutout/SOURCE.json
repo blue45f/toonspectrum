@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ceramic_vase_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-ceramic-vase-03",
+  "sourceModelSha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+  "render": {
+    "sourceId": "polyhaven-ceramic-vase-03",
+    "sourceSha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+    "path": "high-resolution-props/polyhaven-ceramic-vase-03.png",
+    "visiblePixels": 225856,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 11136
+  },
+  "independentOriginal": false
+}

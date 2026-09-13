@@ -6,7 +6,7 @@
     "sourceUrl": "https://polyhaven.com/a/boulder_01",
     "commercialUse": true,
     "redistributionAllowed": true,
-    "checkedOn": "2026-09-13"
+    "checkedOn": "2026-09-12"
   },
   "metadata": {
     "lods": true,
@@ -68,7 +68,7 @@
       "lods": true
     },
     "img_version": "b3b100e5",
-    "download_count": 44123,
+    "download_count": 44104,
     "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/boulder_01.png?width=256&height=256&v=b3b100e5"
   },
   "files": [

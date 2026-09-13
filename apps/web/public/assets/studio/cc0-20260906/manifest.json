@@ -3,9 +3,9 @@
   "assets": [
     {
       "id": "polyhaven-painted-wooden-chair-01",
-      "name": "화이트 페인티드 목재 의자",
+      "name": "화이트 페인트 원목 의자 · Painted Wooden Chair 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "chair",
       "license": {
@@ -15,7 +15,7 @@
         "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -33,7 +33,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-painted-wooden-chair-01.png",
       "browserRenderVerified": true,
@@ -43,17 +44,17 @@
         0.5398241728544235
       ],
       "previewFitScale": 2.0909956659034425,
-      "originalName": "Painted Wooden Chair 01",
+      "originalName": "의자 · Painted Wooden Chair 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-dining-chair-02",
-      "name": "브라운 다이닝 의자",
+      "name": "브라운 가죽 다이닝 의자 · Dining Chair 02",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "chair",
       "license": {
@@ -63,7 +64,7 @@
         "sourceUrl": "https://polyhaven.com/a/dining_chair_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -81,7 +82,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-dining-chair-02.png",
       "browserRenderVerified": true,
@@ -91,17 +93,17 @@
         0.5764201134443283
       ],
       "previewFitScale": 2.054700884480884,
-      "originalName": "Dining Chair 02",
+      "originalName": "의자 · Dining Chair 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-painted-wooden-stool",
-      "name": "빈티지 페인티드 스툴",
+      "name": "빈티지 사각 원목 스툴 · Painted Wooden Stool",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "stool",
       "license": {
@@ -111,7 +113,7 @@
         "sourceUrl": "https://polyhaven.com/a/painted_wooden_stool",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -129,7 +131,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-painted-wooden-stool.png",
       "browserRenderVerified": true,
@@ -139,17 +142,17 @@
         0.40607430040836334
       ],
       "previewFitScale": 3.4547380982267804,
-      "originalName": "Painted Wooden Stool",
+      "originalName": "스툴 · Painted Wooden Stool",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-folding-wooden-stool",
-      "name": "접이식 목재 스툴",
+      "name": "접이식 원목 스툴 · Folding Wooden Stool",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "stool",
       "license": {
@@ -159,7 +162,7 @@
         "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -177,7 +180,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-folding-wooden-stool.png",
       "browserRenderVerified": true,
@@ -187,17 +191,17 @@
         0.5470837950706482
       ],
       "previewFitScale": 3.655747104959905,
-      "originalName": "Folding Wooden Stool",
+      "originalName": "스툴 · Folding Wooden Stool",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wooden-picnic-table",
-      "name": "야외 피크닉 테이블",
+      "name": "공원 피크닉 테이블 벤치 · Wooden Picnic Table",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "table",
       "license": {
@@ -207,7 +211,7 @@
         "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -225,7 +229,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-wooden-picnic-table.png",
       "browserRenderVerified": true,
@@ -235,17 +240,17 @@
         3.022329568862915
       ],
       "previewFitScale": 0.6617412014244548,
-      "originalName": "Wooden Picnic Table",
+      "originalName": "테이블 · Wooden Picnic Table",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-chinese-cabinet",
-      "name": "중국풍 수납 장식장",
+      "name": "앤티크 원목 진열 수납장 · Chinese Cabinet",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "cabinet",
       "license": {
@@ -255,7 +260,7 @@
         "sourceUrl": "https://polyhaven.com/a/chinese_cabinet",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -273,7 +278,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-chinese-cabinet.png",
       "browserRenderVerified": true,
@@ -283,17 +289,17 @@
         0.5452098585665226
       ],
       "previewFitScale": 0.6963548802192869,
-      "originalName": "Chinese Cabinet",
+      "originalName": "수납장 · Chinese Cabinet",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-chinese-commode",
-      "name": "중국풍 콘솔 테이블",
+      "name": "앤티크 서랍 콘솔 테이블 · Chinese Commode",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "cabinet",
       "license": {
@@ -303,7 +309,7 @@
         "sourceUrl": "https://polyhaven.com/a/chinese_commode",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -321,7 +327,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-chinese-commode.png",
       "browserRenderVerified": true,
@@ -331,15 +338,15 @@
         1.1699001789093018
       ],
       "previewFitScale": 0.4453860515815023,
-      "originalName": "Chinese Commode",
+      "originalName": "수납장 · Chinese Commode",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-brass-diya-lantern",
-      "name": "황동 디야 랜턴",
+      "name": "체인 황동 랜턴 조명 · Brass Diya Lantern",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -351,7 +358,7 @@
         "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -369,7 +376,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-brass-diya-lantern.png",
       "browserRenderVerified": true,
@@ -379,15 +387,15 @@
         0.12300454080104828
       ],
       "previewFitScale": 5.25177050637272,
-      "originalName": "Brass Diya Lantern",
+      "originalName": "조명 · Brass Diya Lantern",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-industrial-wall-lamp",
-      "name": "인더스트리얼 벽등",
+      "name": "빈티지 산업용 벽 조명 · Industrial Wall Lamp",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -399,7 +407,7 @@
         "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -417,7 +425,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-industrial-wall-lamp.png",
       "browserRenderVerified": true,
@@ -427,15 +436,15 @@
         0.14037844325849136
       ],
       "previewFitScale": 4.652173213787581,
-      "originalName": "Industrial Wall Lamp",
+      "originalName": "조명 · Industrial Wall Lamp",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-mantel-clock-01",
-      "name": "우드 맨틀 시계",
+      "name": "앤티크 원목 탁상시계 · Mantel Clock 01",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -447,7 +456,7 @@
         "sourceUrl": "https://polyhaven.com/a/mantel_clock_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -465,7 +474,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-mantel-clock-01.png",
       "browserRenderVerified": true,
@@ -475,15 +485,15 @@
         0.12616859376430511
       ],
       "previewFitScale": 5.842144346151911,
-      "originalName": "Mantel Clock 01",
+      "originalName": "시계 · Mantel Clock 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wall-clock",
-      "name": "클래식 벽시계",
+      "name": "금속 테두리 아날로그 벽시계 · Wall Clock",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -495,7 +505,7 @@
         "sourceUrl": "https://polyhaven.com/a/wall_clock",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -513,7 +523,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-wall-clock.png",
       "browserRenderVerified": true,
@@ -523,17 +534,17 @@
         0.0472230945505423
       ],
       "previewFitScale": 6.240425118605885,
-      "originalName": "Wall Clock",
+      "originalName": "시계 · Wall Clock",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wooden-display-shelves-01",
-      "name": "원목 디스플레이 선반",
+      "name": "원목 책장 진열 선반 · Wooden Display Shelves 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "book",
       "license": {
@@ -543,7 +554,7 @@
         "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -561,7 +572,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-wooden-display-shelves-01.png",
       "browserRenderVerified": true,
@@ -571,15 +583,15 @@
         1.077760934829712
       ],
       "previewFitScale": 1.2851952196899454,
-      "originalName": "Wooden Display Shelves 01",
+      "originalName": "책 · Wooden Display Shelves 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-01.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-ceramic-vase-04",
-      "name": "화이트 핸들 도자기 화병",
+      "name": "손잡이 백색 도자기 화병 · Ceramic Vase 04",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -591,7 +603,7 @@
         "sourceUrl": "https://polyhaven.com/a/ceramic_vase_04",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -609,7 +621,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-ceramic-vase-04.png",
       "browserRenderVerified": true,
@@ -619,15 +632,15 @@
         0.1811198815703392
       ],
       "previewFitScale": 5.848907352735532,
-      "originalName": "Ceramic Vase 04",
+      "originalName": "도자기 · Ceramic Vase 04",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-ceramic-vase-03",
-      "name": "사각 도자기 화병",
+      "name": "사각 백색 도자기 화병 · Ceramic Vase 03",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -639,7 +652,7 @@
         "sourceUrl": "https://polyhaven.com/a/ceramic_vase_03",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -657,7 +670,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-ceramic-vase-03.png",
       "browserRenderVerified": true,
@@ -667,15 +681,15 @@
         0.11223961040377617
       ],
       "previewFitScale": 4.826583078398199,
-      "originalName": "Ceramic Vase 03",
+      "originalName": "도자기 · Ceramic Vase 03",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-brass-vase-02",
-      "name": "슬림 황동 화병",
+      "name": "슬림 황동 화병 · Brass Vase 02",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -687,7 +701,7 @@
         "sourceUrl": "https://polyhaven.com/a/brass_vase_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -705,7 +719,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-brass-vase-02.png",
       "browserRenderVerified": true,
@@ -715,15 +730,15 @@
         0.2102375626564026
       ],
       "previewFitScale": 3.7832851189392067,
-      "originalName": "Brass Vase 02",
+      "originalName": "꽃병 · Brass Vase 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-brass-vase-01",
-      "name": "라운드 황동 화병",
+      "name": "앤티크 황동 장식 화병 · Brass Vase 01",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -735,7 +750,7 @@
         "sourceUrl": "https://polyhaven.com/a/brass_vase_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -753,7 +768,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-brass-vase-01.png",
       "browserRenderVerified": true,
@@ -763,15 +779,15 @@
         0.22731918096542358
       ],
       "previewFitScale": 2.8882036194617977,
-      "originalName": "Brass Vase 01",
+      "originalName": "꽃병 · Brass Vase 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-hanging-picture-frame-02",
-      "name": "사진 삽입용 행잉 프레임",
+      "name": "화이트 벽걸이 빈 액자 · Hanging Picture Frame 02",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -783,7 +799,7 @@
         "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -801,7 +817,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-hanging-picture-frame-02.png",
       "browserRenderVerified": true,
@@ -811,17 +828,17 @@
         0.03307514381594956
       ],
       "previewFitScale": 2.660234427266727,
-      "originalName": "Hanging Picture Frame 02",
+      "originalName": "액자 · Hanging Picture Frame 02",
       "role": "assembly-component",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-security-camera-02",
-      "name": "박스형 감시 카메라",
+      "name": "건물 거리 CCTV 보안 카메라 · Security Camera 02",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "architecture",
       "style": "pbr-detailed",
       "selectionTerm": "camera",
       "license": {
@@ -831,7 +848,7 @@
         "sourceUrl": "https://polyhaven.com/a/security_camera_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -849,7 +866,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-security-camera-02.png",
       "browserRenderVerified": true,
@@ -859,15 +877,15 @@
         0.39378485083580017
       ],
       "previewFitScale": 5.078915544249713,
-      "originalName": "Security Camera 02",
+      "originalName": "카메라 · Security Camera 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-vintage-radio-transceiver",
-      "name": "빈티지 무선 송수신기",
+      "name": "빈티지 무전기 라디오 송수신기 · Vintage Radio Transceiver",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -879,7 +897,7 @@
         "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -897,7 +915,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-vintage-radio-transceiver.png",
       "browserRenderVerified": true,
@@ -907,17 +926,17 @@
         0.413083977664812
       ],
       "previewFitScale": 3.4846198054644173,
-      "originalName": "Vintage Radio Transceiver",
+      "originalName": "라디오 · Vintage Radio Transceiver",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-painted-wooden-cabinet-02",
-      "name": "페인티드 수납 선반",
+      "name": "블루 빈티지 원목 수납장 · Painted Wooden Cabinet 02",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "furniture",
       "style": "pbr-detailed",
       "selectionTerm": "cup",
       "license": {
@@ -927,7 +946,7 @@
         "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -945,7 +964,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-painted-wooden-cabinet-02.png",
       "browserRenderVerified": true,
@@ -955,17 +975,17 @@
         0.722343053062703
       ],
       "previewFitScale": 0.7786426003248276,
-      "originalName": "Painted Wooden Cabinet 02",
+      "originalName": "컵 · Painted Wooden Cabinet 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-brass-pan-01",
-      "name": "황동 프라이팬",
+      "name": "황동 조리 프라이팬 · Brass Pan 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "food",
       "style": "pbr-detailed",
       "selectionTerm": "pan",
       "license": {
@@ -975,7 +995,7 @@
         "sourceUrl": "https://polyhaven.com/a/brass_pan_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -993,7 +1013,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-brass-pan-01.png",
       "browserRenderVerified": true,
@@ -1003,17 +1024,17 @@
         0.4496646225452423
       ],
       "previewFitScale": 4.44775928486296,
-      "originalName": "Brass Pan 01",
+      "originalName": "팬 냄비 · Brass Pan 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-food-lime-01",
-      "name": "라임 과일",
+      "name": "라임 과일 소품 · Food Lime 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "food",
       "style": "pbr-detailed",
       "selectionTerm": "fruit",
       "license": {
@@ -1023,7 +1044,7 @@
         "sourceUrl": "https://polyhaven.com/a/food_lime_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1041,7 +1062,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-food-lime-01.png",
       "browserRenderVerified": true,
@@ -1051,17 +1073,17 @@
         0.06133793853223324
       ],
       "previewFitScale": 26.51072586729557,
-      "originalName": "Food Lime 01",
+      "originalName": "과일 · Food Lime 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-fire-alarm",
-      "name": "벽부형 화재 경보 장치",
+      "name": "벽 부착 화재 경보 발신기 · Fire Alarm",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "architecture",
       "style": "pbr-detailed",
       "selectionTerm": "hydrant",
       "license": {
@@ -1071,7 +1093,7 @@
         "sourceUrl": "https://polyhaven.com/a/fire_alarm",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1089,7 +1111,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-fire-alarm.png",
       "browserRenderVerified": true,
@@ -1099,17 +1122,17 @@
         0.026374715380370617
       ],
       "previewFitScale": 13.923451464404241,
-      "originalName": "Fire Alarm",
+      "originalName": "소화전 · Fire Alarm",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-water-manhole-cover",
-      "name": "주철 수도 맨홀 뚜껑",
+      "name": "거리 수도 맨홀 뚜껑 · Water Manhole Cover",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "architecture",
       "style": "pbr-detailed",
       "selectionTerm": "bin",
       "license": {
@@ -1119,7 +1142,7 @@
         "sourceUrl": "https://polyhaven.com/a/water_manhole_cover",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1137,7 +1160,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-water-manhole-cover.png",
       "browserRenderVerified": true,
@@ -1147,15 +1171,15 @@
         0.6907604932785034
       ],
       "previewFitScale": 2.8953595630629567,
-      "originalName": "Water Manhole Cover",
+      "originalName": "쓰레기통 · Water Manhole Cover",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-binder-notebook",
-      "name": "빈티지 바인더 노트 세트",
+      "name": "빈티지 바인더 노트 세트 · Binder Notebook",
       "kind": "model",
       "category": "pbr-detailed-prop",
       "style": "pbr-detailed",
@@ -1167,7 +1191,7 @@
         "sourceUrl": "https://polyhaven.com/a/binder_notebook",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1185,7 +1209,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-binder-notebook.png",
       "browserRenderVerified": true,
@@ -1195,17 +1220,17 @@
         0.19995832443237305
       ],
       "previewFitScale": 3.424488420430402,
-      "originalName": "Binder Notebook",
+      "originalName": "쓰레기통 · Binder Notebook",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wooden-crate-01",
-      "name": "목재 수납 상자",
+      "name": "사각 원목 보관 상자 · Wooden Crate 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "outdoor-prop",
       "style": "pbr-detailed",
       "selectionTerm": "crate",
       "license": {
@@ -1215,7 +1240,7 @@
         "sourceUrl": "https://polyhaven.com/a/wooden_crate_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1233,7 +1258,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-wooden-crate-01.png",
       "browserRenderVerified": true,
@@ -1243,17 +1269,17 @@
         0.4089537411928177
       ],
       "previewFitScale": 2.4234407272915317,
-      "originalName": "Wooden Crate 01",
+      "originalName": "상자 · Wooden Crate 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wooden-crate-02",
-      "name": "우드 트렁크 상자",
+      "name": "가로형 원목 보관 상자 · Wooden Crate 02",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "outdoor-prop",
       "style": "pbr-detailed",
       "selectionTerm": "crate",
       "license": {
@@ -1263,7 +1289,7 @@
         "sourceUrl": "https://polyhaven.com/a/wooden_crate_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1281,7 +1307,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-wooden-crate-02.png",
       "browserRenderVerified": true,
@@ -1291,17 +1318,17 @@
         1.1663258075714111
       ],
       "previewFitScale": 1.7147867148412945,
-      "originalName": "Wooden Crate 02",
+      "originalName": "상자 · Wooden Crate 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-boulder-01",
-      "name": "층리 바위 스캔",
+      "name": "거친 암석 바위 · Boulder 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "nature",
       "style": "pbr-detailed",
       "selectionTerm": "rock",
       "license": {
@@ -1311,7 +1338,7 @@
         "sourceUrl": "https://polyhaven.com/a/boulder_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1329,7 +1356,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-boulder-01.png",
       "browserRenderVerified": true,
@@ -1339,17 +1367,17 @@
         1.8303342461585999
       ],
       "previewFitScale": 1.092696595825317,
-      "originalName": "Boulder 01",
+      "originalName": "바위 · Boulder 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-namaqualand-boulder-02",
-      "name": "나마퀄랜드 바위 스캔",
+      "name": "풍화된 바위 군집 · Namaqualand Boulder 02",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "nature",
       "style": "pbr-detailed",
       "selectionTerm": "rock",
       "license": {
@@ -1359,7 +1387,7 @@
         "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1377,7 +1405,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-namaqualand-boulder-02.png",
       "browserRenderVerified": true,
@@ -1387,17 +1416,17 @@
         1.2342629432678223
       ],
       "previewFitScale": 0.7898450314528653,
-      "originalName": "Namaqualand Boulder 02",
+      "originalName": "바위 · Namaqualand Boulder 02",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-tree-stump-01",
-      "name": "나무 그루터기 스캔",
+      "name": "나무 그루터기와 뿌리 · Tree Stump 01",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "nature",
       "style": "pbr-detailed",
       "selectionTerm": "tree",
       "license": {
@@ -1407,7 +1436,7 @@
         "sourceUrl": "https://polyhaven.com/a/tree_stump_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1425,7 +1454,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-tree-stump-01.png",
       "browserRenderVerified": true,
@@ -1435,17 +1465,17 @@
         1.5903143286705017
       ],
       "previewFitScale": 1.2576130164607109,
-      "originalName": "Tree Stump 01",
+      "originalName": "나무 · Tree Stump 01",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-dead-tree-trunk",
-      "name": "고사목 줄기",
+      "name": "마른 나무 쓰러진 줄기 · Dead Tree Trunk",
       "kind": "model",
-      "category": "pbr-detailed-prop",
+      "category": "nature",
       "style": "pbr-detailed",
       "selectionTerm": "tree",
       "license": {
@@ -1455,7 +1485,7 @@
         "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1473,7 +1503,8 @@
         "native-2K-source",
         "Three.js-load",
         "three-angle-nonempty-render",
-        "GPU-resource-disposal"
+        "GPU-resource-disposal",
+        "production-GLB-admission-mobile-profile"
       ],
       "previewPath": "previews/polyhaven-dead-tree-trunk.png",
       "browserRenderVerified": true,
@@ -1483,111 +1514,15 @@
         0.27752751111984253
       ],
       "previewFitScale": 0.6555195524348133,
-      "originalName": "Dead Tree Trunk",
+      "originalName": "나무 · Dead Tree Trunk",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
-      "allAnglesArtisticallyApproved": false
-    },
-    {
-      "id": "polyhaven-dandelion-01",
-      "name": "민들레 조립용 식생",
-      "kind": "model",
-      "category": "pbr-detailed-prop",
-      "style": "pbr-detailed",
-      "selectionTerm": "plant",
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "provider": "Poly Haven",
-        "sourceUrl": "https://polyhaven.com/a/dandelion_01",
-        "commercialUse": true,
-        "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
-      },
-      "visualReviewed": true,
-      "studioRuntimeVerified": false,
-      "curationStatus": "selected-after-visual-triage",
-      "path": "assets/polyhaven-dandelion-01/dandelion_01.glb",
-      "bytes": 6332300,
-      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
-      "geometrySha256": "a5a8865a9d6515bc214f33ccc621b51c61218974106af37dfe70ebd6d50d088d",
-      "textureCount": 3,
-      "technicalChecks": [
-        "official-API-checksum",
-        "self-contained-GLB",
-        "finite-positions",
-        "accessor-bounds",
-        "native-2K-source",
-        "Three.js-load",
-        "three-angle-nonempty-render",
-        "GPU-resource-disposal"
-      ],
-      "previewPath": "previews/polyhaven-dandelion-01.png",
-      "browserRenderVerified": true,
-      "sourceBounds": [
-        4.214293710887432,
-        0.17017221543937922,
-        0.25765838474035263
-      ],
-      "previewFitScale": 0.4745753706802857,
-      "originalName": "Dandelion 01",
-      "role": "assembly-component",
-      "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
-      "allAnglesArtisticallyApproved": false
-    },
-    {
-      "id": "polyhaven-shrub-sorrel-01",
-      "name": "괭이밥 조립용 식생",
-      "kind": "model",
-      "category": "pbr-detailed-prop",
-      "style": "pbr-detailed",
-      "selectionTerm": "plant",
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "provider": "Poly Haven",
-        "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
-        "commercialUse": true,
-        "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
-      },
-      "visualReviewed": true,
-      "studioRuntimeVerified": false,
-      "curationStatus": "selected-after-visual-triage",
-      "path": "assets/polyhaven-shrub-sorrel-01/shrub_sorrel_01.glb",
-      "bytes": 3695048,
-      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
-      "geometrySha256": "bd778328e1185d92996ac7bc48d1a58bdf7258fa841a9725523e26a9a45498a0",
-      "textureCount": 3,
-      "technicalChecks": [
-        "official-API-checksum",
-        "self-contained-GLB",
-        "finite-positions",
-        "accessor-bounds",
-        "native-2K-source",
-        "Three.js-load",
-        "three-angle-nonempty-render",
-        "GPU-resource-disposal"
-      ],
-      "previewPath": "previews/polyhaven-shrub-sorrel-01.png",
-      "browserRenderVerified": true,
-      "sourceBounds": [
-        0.3520993459969759,
-        0.05800367915071547,
-        0.14641038584522903
-      ],
-      "previewFitScale": 5.680215037994355,
-      "originalName": "Shrub Sorrel 01",
-      "role": "assembly-component",
-      "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-marble-tiles",
-      "name": "앤티크 마블 타일",
+      "name": "빈티지 무늬 대리석 타일 · Marble Tiles",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1599,7 +1534,7 @@
         "sourceUrl": "https://polyhaven.com/a/marble_tiles",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1642,15 +1577,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Marble Tiles",
+      "originalName": "대리석 · Marble Tiles",
+      "previewPath": "assets/polyhaven-marble-tiles/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 60886,
+      "previewSha256": "ff06071a00e425c95eeb98088b53981e87269258784006fa263e6bb77723b68f",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-marble-cliff-05",
-      "name": "마블 절벽 표면",
+      "name": "자연 대리석 절벽 표면 · Marble Cliff 05",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1662,7 +1602,7 @@
         "sourceUrl": "https://polyhaven.com/a/marble_cliff_05",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1705,15 +1645,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Marble Cliff 05",
+      "originalName": "대리석 · Marble Cliff 05",
+      "previewPath": "assets/polyhaven-marble-cliff-05/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 49368,
+      "previewSha256": "b1c65a0e4798376658dec767b18032f498080719121823e9faa13b6eeb6203b8",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wood-floor",
-      "name": "원목 바닥",
+      "name": "원목 마루 바닥 · Wood Floor",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1725,7 +1670,7 @@
         "sourceUrl": "https://polyhaven.com/a/wood_floor",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1768,15 +1713,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Wood Floor",
+      "originalName": "나무 목재 · Wood Floor",
+      "previewPath": "assets/polyhaven-wood-floor/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 14740,
+      "previewSha256": "0a234533a99fa650f484d05e568e36a96986c56432030b7c118308332aaac35d",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-03.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wood-cabinet-worn-long",
-      "name": "마모된 캐비닛 목재",
+      "name": "마모된 긴 원목 판재 · Wood Cabinet Worn Long",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1788,7 +1738,7 @@
         "sourceUrl": "https://polyhaven.com/a/wood_cabinet_worn_long",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1831,15 +1781,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Wood Cabinet Worn Long",
+      "originalName": "나무 목재 · Wood Cabinet Worn Long",
+      "previewPath": "assets/polyhaven-wood-cabinet-worn-long/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 192,
+      "previewBytes": 13554,
+      "previewSha256": "d3166f951bdea592e837aa2c31c062495555269a3d681bfac35795613398513f",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-concrete-wall-003",
-      "name": "웨더드 콘크리트 벽",
+      "name": "풍화된 콘크리트 벽 · Concrete Wall 003",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1851,7 +1806,7 @@
         "sourceUrl": "https://polyhaven.com/a/concrete_wall_003",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1894,15 +1849,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Concrete Wall 003",
+      "originalName": "페인트 · Concrete Wall 003",
+      "previewPath": "assets/polyhaven-concrete-wall-003/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 35042,
+      "previewSha256": "f29c3b375828e53ca4ee3d6eb05b1a93c5f01800be2d706cd98d59321e510ac4",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-wood-peeling-paint-weathered",
-      "name": "벗겨진 목재 페인트",
+      "name": "페인트가 벗겨진 목재 · Wood Peeling Paint Weathered",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1914,7 +1874,7 @@
         "sourceUrl": "https://polyhaven.com/a/wood_peeling_paint_weathered",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -1957,15 +1917,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Wood Peeling Paint Weathered",
+      "originalName": "페인트 · Wood Peeling Paint Weathered",
+      "previewPath": "assets/polyhaven-wood-peeling-paint-weathered/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 40330,
+      "previewSha256": "20b57cbc991f0f33ede9df7a6602fd136cc1a5b1bfe6150f99b9e1c4b7d08641",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-plaster-grey-04",
-      "name": "그레이 플라스터",
+      "name": "거친 회색 회벽 · Plaster Grey 04",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -1977,7 +1942,7 @@
         "sourceUrl": "https://polyhaven.com/a/plaster_grey_04",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2020,15 +1985,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Plaster Grey 04",
+      "originalName": "회벽 · Plaster Grey 04",
+      "previewPath": "assets/polyhaven-plaster-grey-04/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 18442,
+      "previewSha256": "2764ed42cdcccac38f1c55c4e7b2e80de254b8b2f96fb715e0ae3a87e6d7c79b",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-plastered-wall",
-      "name": "플라스터 벽",
+      "name": "고운 미장 회벽 · Plastered Wall",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2040,7 +2010,7 @@
         "sourceUrl": "https://polyhaven.com/a/plastered_wall",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2083,15 +2053,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Plastered Wall",
+      "originalName": "회벽 · Plastered Wall",
+      "previewPath": "assets/polyhaven-plastered-wall/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 10624,
+      "previewSha256": "5babd809ad1386e84faf7b355145f36e981e0a4d8b10a9f223f065e5c2caa6be",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-denim-fabric",
-      "name": "스티치 데님 패브릭",
+      "name": "스티치가 있는 데님 청 원단 · Denim Fabric",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2103,7 +2078,7 @@
         "sourceUrl": "https://polyhaven.com/a/denim_fabric",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2146,15 +2121,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Denim Fabric",
+      "originalName": "직물 천 · Denim Fabric",
+      "previewPath": "assets/polyhaven-denim-fabric/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 36926,
+      "previewSha256": "60abfa2c6410968db1cc986e950ea8fa198033ef52756368c1e11701394bdddc",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-factory-wall",
-      "name": "그린 팩토리 패널",
+      "name": "녹색 산업용 철판 벽 · Factory Wall",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2166,7 +2146,7 @@
         "sourceUrl": "https://polyhaven.com/a/factory_wall",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2209,15 +2189,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Factory Wall",
+      "originalName": "금속 · Factory Wall",
+      "previewPath": "assets/polyhaven-factory-wall/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 10104,
+      "previewSha256": "845eddab33921019b2a5734b975d11cd54da777f9da2817a38bd9247b69072bc",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-corrugated-iron",
-      "name": "골판 아연 철판",
+      "name": "은색 골판 철판 · Corrugated Iron",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2229,7 +2214,7 @@
         "sourceUrl": "https://polyhaven.com/a/corrugated_iron",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2272,15 +2257,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Corrugated Iron",
+      "originalName": "금속 · Corrugated Iron",
+      "previewPath": "assets/polyhaven-corrugated-iron/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 29450,
+      "previewSha256": "dad67a8f70c98d2e33bb4fbc140932d8316c9b2f4152d6b2f2503ab6a75508b4",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-large-floor-tiles-02",
-      "name": "대형 석재 바닥 타일",
+      "name": "대형 석재 바닥 타일 · Large Floor Tiles 02",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2292,7 +2282,7 @@
         "sourceUrl": "https://polyhaven.com/a/large_floor_tiles_02",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2335,15 +2325,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Large Floor Tiles 02",
+      "originalName": "벽돌 · Large Floor Tiles 02",
+      "previewPath": "assets/polyhaven-large-floor-tiles-02/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 37786,
+      "previewSha256": "1247d03a495f8dc3a075da5e97f54a74c011ba273ab920879268f044b24b7cf1",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-large-square-pattern-01",
-      "name": "사각 포장 패턴",
+      "name": "광장 사각 포장 블록 · Large Square Pattern 01",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2355,7 +2350,7 @@
         "sourceUrl": "https://polyhaven.com/a/large_square_pattern_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2398,78 +2393,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Large Square Pattern 01",
+      "originalName": "벽돌 · Large Square Pattern 01",
+      "previewPath": "assets/polyhaven-large-square-pattern-01/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 34896,
+      "previewSha256": "085dcc459f9b31df937e153764689ce96645a36c15ec090ee052dd8d3b507b87",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
-      "allAnglesArtisticallyApproved": false
-    },
-    {
-      "id": "polyhaven-leafy-grass",
-      "name": "잎이 섞인 잔디",
-      "kind": "surface-texture",
-      "category": "surface-material",
-      "style": "pbr-detailed",
-      "selectionTerm": "grass",
-      "license": {
-        "id": "CC0-1.0",
-        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "provider": "Poly Haven",
-        "sourceUrl": "https://polyhaven.com/a/leafy_grass",
-        "commercialUse": true,
-        "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
-      },
-      "visualReviewed": true,
-      "studioRuntimeVerified": false,
-      "curationStatus": "selected-after-visual-triage",
-      "path": "assets/polyhaven-leafy-grass/leafy_grass.webp",
-      "bytes": 2443990,
-      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
-      "width": 2048,
-      "height": 2048,
-      "sourceSha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
-      "pbrMaps": [
-        {
-          "role": "rough",
-          "path": "assets/polyhaven-leafy-grass/leafy_grass_rough_2k.jpg",
-          "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
-          "bytes": 2274652
-        },
-        {
-          "role": "nor_gl",
-          "path": "assets/polyhaven-leafy-grass/leafy_grass_nor_gl_2k.jpg",
-          "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
-          "bytes": 6047262
-        },
-        {
-          "role": "ao",
-          "path": "assets/polyhaven-leafy-grass/leafy_grass_ao_2k.jpg",
-          "sha256": "bcce4368f6a1affe11b4a643e14cfed7dfb46abf6bb9e6a28a3b87c2de2ddb11",
-          "bytes": 4175463
-        },
-        {
-          "role": "disp",
-          "path": "assets/polyhaven-leafy-grass/leafy_grass_disp_2k.jpg",
-          "sha256": "de34be0f135a3c92fe6e55cca9501a4cc40e02e84de9cc4c7fefded1da5bd3f3",
-          "bytes": 2545281
-        }
-      ],
-      "technicalChecks": [
-        "official-API-checksum",
-        "native-2K-source",
-        "decoded-pixel-deduplication",
-        "PBR-map-dimensions"
-      ],
-      "originalName": "Leafy Grass",
-      "role": "finished-asset",
-      "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-grassy-cobblestone",
-      "name": "잔디 돌길",
+      "name": "풀이 자란 조약돌 보도 · Grassy Cobblestone",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2481,7 +2418,7 @@
         "sourceUrl": "https://polyhaven.com/a/grassy_cobblestone",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2524,15 +2461,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Grassy Cobblestone",
+      "originalName": "잔디 · Grassy Cobblestone",
+      "previewPath": "assets/polyhaven-grassy-cobblestone/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 20226,
+      "previewSha256": "b37c8c269cb0bef5cf1fa3ec1535e573159ac3c38a7f9c77ffc8a0511acbc40a",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-04.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-forest-leaves-04",
-      "name": "숲 낙엽 바닥",
+      "name": "숲 낙엽과 잔가지 바닥 · Forest Leaves 04",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2544,7 +2486,7 @@
         "sourceUrl": "https://polyhaven.com/a/forest_leaves_04",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2587,15 +2529,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Forest Leaves 04",
+      "originalName": "숲 바닥 · Forest Leaves 04",
+      "previewPath": "assets/polyhaven-forest-leaves-04/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 64704,
+      "previewSha256": "e27fc977633f423b4d9df2d3515afd780f87d181394ade46922a42bf9d4833b1",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-dirt-floor",
-      "name": "흙바닥",
+      "name": "야외 흙 바닥 · Dirt Floor",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2607,7 +2554,7 @@
         "sourceUrl": "https://polyhaven.com/a/dirt_floor",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2650,15 +2597,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Dirt Floor",
+      "originalName": "숲 바닥 · Dirt Floor",
+      "previewPath": "assets/polyhaven-dirt-floor/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 32564,
+      "previewSha256": "b6678ba819ea4aa3d31813fde63b886768a01eadd885cf41c8ea307374b8ae9e",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-sand-01",
-      "name": "자연 모래",
+      "name": "고운 모래 지면 · Sand 01",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2670,7 +2622,7 @@
         "sourceUrl": "https://polyhaven.com/a/sand_01",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2713,15 +2665,20 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Sand 01",
+      "originalName": "모래 · Sand 01",
+      "previewPath": "assets/polyhaven-sand-01/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 31972,
+      "previewSha256": "11e3c56dba24bd0a00ef35092a7441a31eca918c9976ea7f06d80b220f3501b4",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
       "id": "polyhaven-sandstone-blocks-05",
-      "name": "사암 벽돌",
+      "name": "사암 블록 돌담 · Sandstone Blocks 05",
       "kind": "surface-texture",
       "category": "surface-material",
       "style": "pbr-detailed",
@@ -2733,7 +2690,7 @@
         "sourceUrl": "https://polyhaven.com/a/sandstone_blocks_05",
         "commercialUse": true,
         "redistributionAllowed": true,
-        "checkedOn": "2026-09-13"
+        "checkedOn": "2026-09-12"
       },
       "visualReviewed": true,
       "studioRuntimeVerified": false,
@@ -2776,10 +2733,2115 @@
         "decoded-pixel-deduplication",
         "PBR-map-dimensions"
       ],
-      "originalName": "Sandstone Blocks 05",
+      "originalName": "모래 · Sandstone Blocks 05",
+      "previewPath": "assets/polyhaven-sandstone-blocks-05/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 48362,
+      "previewSha256": "58bd5e359e9ff2ef0a59c7a1e6b6812789fcfefbad86d39a464f33e6762299de",
       "role": "finished-asset",
       "visualReviewLevel": "contact-sheet-visual-triage",
-      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-wide-street-01",
+      "name": "가로수가 있는 넓은 도심 거리 · Wide Street 01",
+      "kind": "background",
+      "category": "background-street",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-wide-street-01/background.webp",
+      "bytes": 636614,
+      "sha256": "f0833abc600e49583d4fa8872e6815eb9a201c573e4afaea92ef83d85eba5b15",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wide_street_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "wide_street_01",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "6fc798b65a6ba62d45da328e58dd914adafd160084824a031d3af95785c33e7d",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-wide-street-01/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 15576,
+      "previewSha256": "c61e4434ba53f2fc11f1eb7b7e497ca9237eb80cfe69268a935e428775b2af1f",
+      "originalName": "골목 거리 · Wide Street 01",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-kiara-1-dawn",
+      "name": "새벽빛 바위 계곡 전망 · Kiara 1 Dawn",
+      "kind": "background",
+      "category": "background-nature",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-kiara-1-dawn/background.webp",
+      "bytes": 347638,
+      "sha256": "af64ba65fb5f1336b8cc12b96921edfc42f4a636af38bb2f05809eae064b413d",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/kiara_1_dawn",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "kiara_1_dawn",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "57b73d1e8e36c2d1e41cc2a0f8e790d57c8ce391fdd808601b160e2c53160226",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-kiara-1-dawn/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 10796,
+      "previewSha256": "7a0adc34a64da5c956e0ae012b7f866f92bb77455ceccca9c7d7daeab47e966a",
+      "originalName": "골목 거리 · Kiara 1 Dawn",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-wide-street-02",
+      "name": "햇빛과 나무 그림자가 있는 거리 · Wide Street 02",
+      "kind": "background",
+      "category": "background-street",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-wide-street-02/background.webp",
+      "bytes": 843546,
+      "sha256": "c1251fc09efe99cac0200e56a3de29583288a6cbb7719018b581252fc367a8ff",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wide_street_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "wide_street_02",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "5393414f0c7a2398cbb6a0ec886f3c01fbc537c95981cd5523961ef88106ec48",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-wide-street-02/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 20108,
+      "previewSha256": "a981753c8cb85ca8a1fb92d1c08191b64abfd1f1ae34fce5c47d2e06073ebf05",
+      "originalName": "도심 거리 · Wide Street 02",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-urban-courtyard-02",
+      "name": "주거 건물 중정과 정원 입구 · Urban Courtyard 02",
+      "kind": "background",
+      "category": "background-street",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-urban-courtyard-02/background.webp",
+      "bytes": 792608,
+      "sha256": "e7f87901f90a2637a286fe6bb383dca2b575e6ad3999057a09f9f082fcde4fbf",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/urban_courtyard_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "urban_courtyard_02",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "c742ed6c488b75d6df0416ccbdebcb83ddf572f4eaff659f043e24899f5cc216",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-urban-courtyard-02/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 21792,
+      "previewSha256": "aa82d3ace909bc1e2e9c32fd8ea83d0a54f0d931dc908ed393dbb9bd7b3ed000",
+      "originalName": "건축 중정 · Urban Courtyard 02",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-rooftop-night",
+      "name": "황혼 옥상 주차장과 조명 · Rooftop Night",
+      "kind": "background",
+      "category": "background-street",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-rooftop-night/background.webp",
+      "bytes": 332800,
+      "sha256": "740cf1eba221659ab7581b19ad79d060ce1e39b3eace3dfdef2376d8b4aab4c0",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rooftop_night",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "rooftop_night",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "a8deb0e6c74a923e776786eb1ee9258b83d8afc7980efbdee3af0f8e833c0f76",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-rooftop-night/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 8438,
+      "previewSha256": "8463daf3f4e14646b1cd8b3ad5be820b29e3625adf8740fa4dc1e1ac729a4abc",
+      "originalName": "옥상 전망 · Rooftop Night",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-portland-landing-pad",
+      "name": "공사 중인 건물과 옥상 · Portland Landing Pad",
+      "kind": "background",
+      "category": "background-street",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-portland-landing-pad/background.webp",
+      "bytes": 460652,
+      "sha256": "eff8b41fdb037cf81ad8121379d90630b1f97e72296f0cf905d49e335d1101c4",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/portland_landing_pad",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "portland_landing_pad",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "6a23aeb5f7e83e46755bde45d5bc974dc1775089ddb1adcbedb2a4b8946cad48",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-portland-landing-pad/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 14952,
+      "previewSha256": "c1bf87a93db4cbc79bdc70f7b996e4b3e3bf7ce09acffdd1d264d762971c9743",
+      "originalName": "옥상 전망 · Portland Landing pad",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-05.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-rooitou-park",
+      "name": "햇살이 비치는 잔디 공원 · Rooitou Park",
+      "kind": "background",
+      "category": "background-nature",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-rooitou-park/background.webp",
+      "bytes": 677910,
+      "sha256": "259a547ea8cc527eebf37c9c104001e85747073877c7baa8eb57d5595fdc5960",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rooitou_park",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "rooitou_park",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "6cbfeffb50c409c3a2ad6553c2e18eea38171c366893a80fc89f81f75bd1f266",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-rooitou-park/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 17098,
+      "previewSha256": "0b2de94ab132e59a962ed7d59d452c80c02bafb2ea6b64a17a19c8a891923b39",
+      "originalName": "정원 · Rooitou Park",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-autumn-park",
+      "name": "가을 나무와 잔디 공터 · Autumn Park",
+      "kind": "background",
+      "category": "background-nature",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-autumn-park/background.webp",
+      "bytes": 963472,
+      "sha256": "d09d81651a7b86c19dd7be5da853429db4557df0eefa260b6258f9bd7a8f6f7a",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/autumn_park",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "autumn_park",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "57fab029aa63df91853cac91381fbf300f26c1ceddebf82f194a9af1340b4de3",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-autumn-park/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 21218,
+      "previewSha256": "0b904c29e2e987f989bccc0f1326176dd9260f9a7b8d262e9d00d08c51f686a5",
+      "originalName": "정원 · Autumn Park",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-the-sky-is-on-fire",
+      "name": "노을 바다와 해안 산책로 · The Sky Is On Fire",
+      "kind": "background",
+      "category": "background-nature",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-the-sky-is-on-fire/background.webp",
+      "bytes": 312316,
+      "sha256": "0170ee54dfa7d490ff484e2b2e3f19e7748b6576d1b36b4d2cb71f30eca4ab8d",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/the_sky_is_on_fire",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "the_sky_is_on_fire",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "2fe96ef8fd648d8727ac972a7c9a07c61ac7b91b9745fa79986a6d4ec52f4690",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-the-sky-is-on-fire/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 13224,
+      "previewSha256": "4fd71841fdb33dc23331a3811c77ac9ac15b6bc801e6e16b64392b2498e375de",
+      "originalName": "해안 풍경 · The Sky Is On Fire",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-cayley-interior",
+      "name": "발코니 창문이 있는 실내 · Cayley Interior",
+      "kind": "background",
+      "category": "background-interior",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-cayley-interior/background.webp",
+      "bytes": 251566,
+      "sha256": "4afe9120595a14d6d37b55b372eb7c5cbbf141e77662db49b836b45c6e582547",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/cayley_interior",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "cayley_interior",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "abf4897f4c2f36226a1ffbb2dbc52e5777e04f2ab18a8b46d05f327b98c879cc",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-cayley-interior/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 10714,
+      "previewSha256": "acf1dddda6fc634bbc0b19b495167524c8eaaaa77f75ef19bc0c9c4c100314f1",
+      "originalName": "실내 공간 · Cayley Interior",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-empty-warehouse-01",
+      "name": "넓은 빈 창고 실내 · Empty Warehouse 01",
+      "kind": "background",
+      "category": "background-interior",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-empty-warehouse-01/background.webp",
+      "bytes": 396176,
+      "sha256": "994b5c82468c2ac096ff6a85a3730ebc8160088ebf52d687c296f87a8c55085e",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/empty_warehouse_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "empty_warehouse_01",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "c40091f113f33868fc966b3762749f48d8470da3a4267c09b152dff79e089511",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-empty-warehouse-01/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 14640,
+      "previewSha256": "c4b86ab8504961fa2e96563b279c69cdd69275c476f2d3c2a3bbe5fef674ddf3",
+      "originalName": "창고 공간 · Empty Warehouse 01",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-background-abandoned-slipway",
+      "name": "물가로 이어지는 낡은 선착장 · Abandoned Slipway",
+      "kind": "background",
+      "category": "background-nature",
+      "style": "photographic-reference",
+      "path": "assets/polyhaven-background-abandoned-slipway/background.webp",
+      "bytes": 407116,
+      "sha256": "f4f93ce987ca75d53acd74c17c28ae69bbb0284df79369065fd2351726107c14",
+      "width": 2048,
+      "height": 1152,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/abandoned_slipway",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "sourcePanoramaId": "abandoned_slipway",
+      "sourceDimensions": [
+        8192,
+        4096
+      ],
+      "sourceSha256": "1e7b7989b81226e8b13c5afbfe208f7e89db6aea4d7542fa63bdf0a45f574633",
+      "projection": {
+        "horizontalFov": 90,
+        "yaw": 0
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-angular-resolution",
+        "decoded-pixels",
+        "rectilinear-projection"
+      ],
+      "contentNotice": "실사 레퍼런스 배경입니다. 인물·간판·상표 유무는 사용 전 원본을 확인하세요.",
+      "previewPath": "assets/polyhaven-background-abandoned-slipway/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 216,
+      "previewBytes": 10576,
+      "previewSha256": "f06df5253c8ce99a078cf66efbcfd43126be45a352dc690ea32b8006d31ae441",
+      "originalName": "창고 공간 · Abandoned Slipway",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-painted-wooden-chair-01-cutout",
+      "name": "화이트 페인트 원목 의자 · Painted Wooden Chair 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-painted-wooden-chair-01-cutout/prop.webp",
+      "bytes": 35324,
+      "sha256": "48560676fb72d1a7cc126e9b51d40fa2f5e3a6bcba95a00cf3bfb5f192bb5071",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_wooden_chair_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-painted-wooden-chair-01",
+      "sourceModelSha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-painted-wooden-chair-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 12322,
+      "previewSha256": "e4cfcc6ee078a5136fbf7d2445cc090eec43ca28e16a6da99cf9bdb357663402",
+      "originalName": "의자 · Painted Wooden Chair 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-painted-wooden-stool-cutout",
+      "name": "빈티지 사각 원목 스툴 · Painted Wooden Stool · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-painted-wooden-stool-cutout/prop.webp",
+      "bytes": 89004,
+      "sha256": "5998b73f46f806221159df18e0d3debe88a2c0548941dbbc45fee9384c7c2860",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_wooden_stool",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-painted-wooden-stool",
+      "sourceModelSha256": "1438f7f6e571369d6d0b153f9517cfc212bc10c1336753d9d32d97091a23ea4c",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-painted-wooden-stool-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 14774,
+      "previewSha256": "abed8378bfbec18897bb625f66b814b74dc4d5fa90deb12b2e85327bc68798a9",
+      "originalName": "스툴 · Painted Wooden Stool · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-wooden-picnic-table-cutout",
+      "name": "공원 피크닉 테이블 벤치 · Wooden Picnic Table · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-wooden-picnic-table-cutout/prop.webp",
+      "bytes": 83012,
+      "sha256": "04f09a16e5bb99da1c5e5b1018bcc3eae51936612f8e76c41732c018a83d89af",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-wooden-picnic-table",
+      "sourceModelSha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-wooden-picnic-table-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 12588,
+      "previewSha256": "cdc62600a3dad79807b147c0392afd2cd8e42b4806be198a7b8ddcb328d3c0f2",
+      "originalName": "테이블 · Wooden Picnic Table · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-chinese-cabinet-cutout",
+      "name": "앤티크 원목 진열 수납장 · Chinese Cabinet · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-chinese-cabinet-cutout/prop.webp",
+      "bytes": 107636,
+      "sha256": "7b95679721eb7c0be13e29e46125c9bd6450bd1294a9341c71ffbdacf8fa8766",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/chinese_cabinet",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-chinese-cabinet",
+      "sourceModelSha256": "469f8ac72e1fb9afd22463985ad9130fdecd741cf7a0b59da69c8925b7005bb5",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-chinese-cabinet-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 14666,
+      "previewSha256": "c11ceb228691831a1e6d88f07d279dc784cea6af72d64754f941658250ad3897",
+      "originalName": "수납장 · Chinese Cabinet · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-06.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-brass-diya-lantern-cutout",
+      "name": "체인 황동 랜턴 조명 · Brass Diya Lantern · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-brass-diya-lantern-cutout/prop.webp",
+      "bytes": 31010,
+      "sha256": "465140eab18808d37ca8e247d24616b826c060d06c6ddc6ef8e05cdeb03ea79d",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-brass-diya-lantern",
+      "sourceModelSha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-brass-diya-lantern-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 5814,
+      "previewSha256": "1d887b9e7990d41a20be97f540374eb6d7e1a4dd99f0abb9a62db24ff4d6c92a",
+      "originalName": "조명 · Brass Diya Lantern · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-mantel-clock-01-cutout",
+      "name": "앤티크 원목 탁상시계 · Mantel Clock 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-mantel-clock-01-cutout/prop.webp",
+      "bytes": 84186,
+      "sha256": "7ed540f69ffa056d9b78729ec6e170e46a014e1036ce57947c43185249aa824e",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/mantel_clock_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-mantel-clock-01",
+      "sourceModelSha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-mantel-clock-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 8546,
+      "previewSha256": "3c5a631ce1411f670a0444ff50d5ab5de7a4f83753757727d90335c03099e766",
+      "originalName": "시계 · Mantel Clock 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-wooden-display-shelves-01-cutout",
+      "name": "원목 책장 진열 선반 · Wooden Display Shelves 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-wooden-display-shelves-01-cutout/prop.webp",
+      "bytes": 67012,
+      "sha256": "59abb0593d3b57218136f2e142b4beef5db0a326bcd5f0d603f279e622f5138d",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_display_shelves_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-wooden-display-shelves-01",
+      "sourceModelSha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-wooden-display-shelves-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 8812,
+      "previewSha256": "5a0901df7f4465de6947ce5ae59713f0d62ce2a90ab18d196d32c193a0ec6d50",
+      "originalName": "책 · Wooden Display Shelves 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-ceramic-vase-04-cutout",
+      "name": "손잡이 백색 도자기 화병 · Ceramic Vase 04 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-ceramic-vase-04-cutout/prop.webp",
+      "bytes": 25288,
+      "sha256": "7c0e056bb099885f1ea28107e34b25a2eefa9e0bf76161ca0dc6ecee16f42458",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/ceramic_vase_04",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-ceramic-vase-04",
+      "sourceModelSha256": "7729c02ae4a0d57e48ad05f81d8157f0d9ab7b0778816b50015b789362efd408",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-ceramic-vase-04-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 5992,
+      "previewSha256": "16854371b52d26f6b65769d0a558bb687d9a0d2317128191a85f3ce4214d94c6",
+      "originalName": "도자기 · Ceramic Vase 04 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-brass-vase-02-cutout",
+      "name": "슬림 황동 화병 · Brass Vase 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-brass-vase-02-cutout/prop.webp",
+      "bytes": 58538,
+      "sha256": "0706a3475c7e615d87b16fe4042c145dd2cbdcdd08fe6e386686615523bba544",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_vase_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-brass-vase-02",
+      "sourceModelSha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-brass-vase-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 8596,
+      "previewSha256": "d1f6851a2077d4ce98604a128d91b2e50d66e5c54774bed79765b890c75ba415",
+      "originalName": "꽃병 · Brass Vase 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-hanging-picture-frame-02-cutout",
+      "name": "화이트 벽걸이 빈 액자 · Hanging Picture Frame 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-hanging-picture-frame-02-cutout/prop.webp",
+      "bytes": 43326,
+      "sha256": "7d3842dfd45a0392640cdea10226ccb9ace861cf3eb6bbf3b43e6c3f798f24a5",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/hanging_picture_frame_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-hanging-picture-frame-02",
+      "sourceModelSha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-hanging-picture-frame-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 6350,
+      "previewSha256": "e4c64baac33956f836534bdbadd89fe41cf8fa7c63e72281af12a3b46c2ba7d5",
+      "originalName": "액자 · Hanging Picture Frame 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-security-camera-02-cutout",
+      "name": "건물 거리 CCTV 보안 카메라 · Security Camera 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-security-camera-02-cutout/prop.webp",
+      "bytes": 28406,
+      "sha256": "0cdc10bd60690b4f299611cc2bfefc48cf7c5622298efa3571c90a5075aa5418",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/security_camera_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-security-camera-02",
+      "sourceModelSha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-security-camera-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 5752,
+      "previewSha256": "ec0bc4f9f13a669f409f1764360cf3e5da013bb4f253bfda9fc03f60ecbfe1d9",
+      "originalName": "카메라 · Security Camera 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-vintage-radio-transceiver-cutout",
+      "name": "빈티지 무전기 라디오 송수신기 · Vintage Radio Transceiver · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-vintage-radio-transceiver-cutout/prop.webp",
+      "bytes": 92278,
+      "sha256": "187e8dc8af4d2f882acdd710be921501d675bc82e7d603cba1e2263c4737c214",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/vintage_radio_transceiver",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-vintage-radio-transceiver",
+      "sourceModelSha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-vintage-radio-transceiver-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 13670,
+      "previewSha256": "6eee83342de873a095b130fcad8531c422a3b70071e6642e6a1786d72ac27f6b",
+      "originalName": "라디오 · Vintage Radio Transceiver · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet-02-cutout",
+      "name": "블루 빈티지 원목 수납장 · Painted Wooden Cabinet 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-painted-wooden-cabinet-02-cutout/prop.webp",
+      "bytes": 68010,
+      "sha256": "5b606edcd6d6a63d2817b4fb5324de1e975e14c531b366d85307ff6fe8c926e0",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-painted-wooden-cabinet-02",
+      "sourceModelSha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-painted-wooden-cabinet-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 7722,
+      "previewSha256": "bb5865506bac39816fdd654f432707d283d6b9986d2609f20fd56277f9a70c69",
+      "originalName": "컵 · Painted Wooden Cabinet 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-brass-pan-01-cutout",
+      "name": "황동 조리 프라이팬 · Brass Pan 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-brass-pan-01-cutout/prop.webp",
+      "bytes": 35982,
+      "sha256": "7f370340aeb4b0fd0e6bbf581880b6fb86883ced5ecc163be31338eed1c8562c",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_pan_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-brass-pan-01",
+      "sourceModelSha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-brass-pan-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 5164,
+      "previewSha256": "d69d9d5e7a14f1fba413b82c9b86c17d74cc0d4f663c42ec37b59fd2ac78cf2d",
+      "originalName": "팬 냄비 · Brass Pan 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-food-lime-01-cutout",
+      "name": "라임 과일 소품 · Food Lime 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-food-lime-01-cutout/prop.webp",
+      "bytes": 201810,
+      "sha256": "41e3bbc9ac07bfb49173036583c59aa87290a893686c5427402fc1fc05bae80f",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/food_lime_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-food-lime-01",
+      "sourceModelSha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-food-lime-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 11604,
+      "previewSha256": "265c492c1c75b89081a45c8c2f2cdef9649c4eb46020ec7700568c182b583cee",
+      "originalName": "과일 · Food Lime 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-fire-alarm-cutout",
+      "name": "벽 부착 화재 경보 발신기 · Fire Alarm · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-fire-alarm-cutout/prop.webp",
+      "bytes": 92598,
+      "sha256": "365678183000796844c85f3370777fbc267846f3a9c8a3eaeac4e110df7c68f6",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/fire_alarm",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-fire-alarm",
+      "sourceModelSha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-fire-alarm-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 11440,
+      "previewSha256": "f723ae531a5c90814fcf53a95a1f93871005161e7cf9c098b1dc3a8b77af9ff4",
+      "originalName": "소화전 · Fire Alarm · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-07.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-water-manhole-cover-cutout",
+      "name": "거리 수도 맨홀 뚜껑 · Water Manhole Cover · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-water-manhole-cover-cutout/prop.webp",
+      "bytes": 88414,
+      "sha256": "a53397ac22b1d4b11ab4a51340acf2c01b78ed34215f709a4a7ae0eb9eb7318c",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/water_manhole_cover",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-water-manhole-cover",
+      "sourceModelSha256": "c1c692b0fb455d68ea54b6abb5614e7946b386f37d9dd7c8104bb971e0b791fe",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-water-manhole-cover-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 7964,
+      "previewSha256": "a6a5ed4e7dcbf2ef8c14d83e113d1ee59b41491cd4bc6704cc75c567e19d7b74",
+      "originalName": "쓰레기통 · Water Manhole Cover · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-wooden-crate-01-cutout",
+      "name": "사각 원목 보관 상자 · Wooden Crate 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-wooden-crate-01-cutout/prop.webp",
+      "bytes": 127682,
+      "sha256": "e5b75d4e1fcce601e7aed340150ca634390aa7dc62a60d4b07511f6e4e23b478",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_crate_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-wooden-crate-01",
+      "sourceModelSha256": "350649e8949a525434709f9f0e19a7c6ff998905bf9aac28dd476e299a19f767",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-wooden-crate-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 10580,
+      "previewSha256": "e17a88b77307b448c9b5cfd685c0eb691eed88dc3190f54e1a683c920d7de533",
+      "originalName": "상자 · Wooden Crate 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-boulder-01-cutout",
+      "name": "거친 암석 바위 · Boulder 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-boulder-01-cutout/prop.webp",
+      "bytes": 145288,
+      "sha256": "ac2fea6d22b3ed288cc152f3f0bf4e7e15b98805ea654d157db1cbcbc5f18658",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/boulder_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-boulder-01",
+      "sourceModelSha256": "272032bd07c7a98a47b8bbf7db9581e04b62951887514b25b776bc07635e293d",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-boulder-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 11746,
+      "previewSha256": "326beb5305d9e987f120f8e3902aa1d9cd0b1645e37d0e8dd89c738eee72e14c",
+      "originalName": "바위 · Boulder 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-tree-stump-01-cutout",
+      "name": "나무 그루터기와 뿌리 · Tree Stump 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-tree-stump-01-cutout/prop.webp",
+      "bytes": 160702,
+      "sha256": "f995dae143b4e99c796d178367dee1e5d3c28d880edc54ba2a246051a9caed7e",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/tree_stump_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-tree-stump-01",
+      "sourceModelSha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-tree-stump-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 11746,
+      "previewSha256": "7475551d0fb7b61854d007e5b775c4d5b418cc60eff9c832568940460f883878",
+      "originalName": "나무 · Tree Stump 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-dining-chair-02-cutout",
+      "name": "브라운 가죽 다이닝 의자 · Dining Chair 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-dining-chair-02-cutout/prop.webp",
+      "bytes": 53984,
+      "sha256": "0ab2f8ac5af76868efeec29a09ef88620a6455b74923fad61c094c55da33aa73",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/dining_chair_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-dining-chair-02",
+      "sourceModelSha256": "63f22f21a65010d3f3ac66eeef90a12e2ff98ea3f991f526b13159dc5a44daba",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-dining-chair-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 8266,
+      "previewSha256": "6274c455e26dc5a853d115cf4f2801b2b759f8e3d2905ce9bed56f674bcb4c74",
+      "originalName": "의자 · Dining Chair 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-folding-wooden-stool-cutout",
+      "name": "접이식 원목 스툴 · Folding Wooden Stool · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-folding-wooden-stool-cutout/prop.webp",
+      "bytes": 173916,
+      "sha256": "9eb27bf41fbe4c9b7ebfa5ff2d2a5b104b17602aa51026c55bd2112893ad21c5",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-folding-wooden-stool",
+      "sourceModelSha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-folding-wooden-stool-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 20666,
+      "previewSha256": "5503f6ac23d144b7dea1fb41601c1fc1ae691cb405b92839c48a70099abab34f",
+      "originalName": "스툴 · Folding Wooden Stool · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-chinese-commode-cutout",
+      "name": "앤티크 서랍 콘솔 테이블 · Chinese Commode · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-chinese-commode-cutout/prop.webp",
+      "bytes": 74434,
+      "sha256": "4b27cfa3af8c524a67be624118f244ee5547e643d6a1c7236bdfbafec34b450d",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/chinese_commode",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-chinese-commode",
+      "sourceModelSha256": "6f0b75409a88b045ff979c3709e07857cd104279f7ba3cc5e57cd7a87c05be1a",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-chinese-commode-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 9090,
+      "previewSha256": "1b34cd46a8b4e3c90f0fc7b2633e37a526602c834154ae6d3dc29cdf6307c516",
+      "originalName": "수납장 · Chinese Commode · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-industrial-wall-lamp-cutout",
+      "name": "빈티지 산업용 벽 조명 · Industrial Wall Lamp · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-industrial-wall-lamp-cutout/prop.webp",
+      "bytes": 95786,
+      "sha256": "477f58cf05eb9e642819f002bcb60a8edf2867c52b212b5f1d8330b85a7871c1",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/industrial_wall_lamp",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-industrial-wall-lamp",
+      "sourceModelSha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-industrial-wall-lamp-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 10242,
+      "previewSha256": "de8b99037e13088bf58d6b8bb55bb6b0c6130d8175e31d4e48f9fe2956573393",
+      "originalName": "조명 · Industrial Wall Lamp · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-wall-clock-cutout",
+      "name": "금속 테두리 아날로그 벽시계 · Wall Clock · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-wall-clock-cutout/prop.webp",
+      "bytes": 72866,
+      "sha256": "ccfa0d9c3fa2eaf0427fb6203b850e081ae21ada2fc3f8c5a09e9963162adfd6",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wall_clock",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-wall-clock",
+      "sourceModelSha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-wall-clock-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 11234,
+      "previewSha256": "fbd4f3ca89ecd7153f866b6b53ce7176543a92ee3fa0e51d55638ac0c78f1695",
+      "originalName": "시계 · Wall Clock · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-ceramic-vase-03-cutout",
+      "name": "사각 백색 도자기 화병 · Ceramic Vase 03 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-ceramic-vase-03-cutout/prop.webp",
+      "bytes": 22582,
+      "sha256": "6b250422d5d401030279a5ea3a398cdc020641b46305b6fb0b2d6c6a3be06d8c",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/ceramic_vase_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-ceramic-vase-03",
+      "sourceModelSha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-ceramic-vase-03-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 4372,
+      "previewSha256": "43a48a38c739b105ca4c745c3d6da7d6f1c93b220c8ece7a5e85849c437b5519",
+      "originalName": "도자기 · Ceramic Vase 03 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-brass-vase-01-cutout",
+      "name": "앤티크 황동 장식 화병 · Brass Vase 01 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-brass-vase-01-cutout/prop.webp",
+      "bytes": 53178,
+      "sha256": "ca4a3077f5cb89b70257dfe171eed457c04dec249e52f908fff3c88a0f9ee0dd",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_vase_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-brass-vase-01",
+      "sourceModelSha256": "e782304ae87f4b32b3f4b2d7f385c1bca74518ffde62682a308b7b3f72488031",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-brass-vase-01-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 7740,
+      "previewSha256": "25e8b8b9ed66379ddca65139573f40f458bca60910bd7e518c1c92110058139a",
+      "originalName": "꽃병 · Brass Vase 01 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-binder-notebook-cutout",
+      "name": "빈티지 바인더 노트 세트 · Binder Notebook · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-binder-notebook-cutout/prop.webp",
+      "bytes": 34272,
+      "sha256": "b1b096d3a6982c28e6f6f4c8200b5ad3bbe6d429b357c0bf1e76fead80fbfea9",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/binder_notebook",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-binder-notebook",
+      "sourceModelSha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-binder-notebook-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 5900,
+      "previewSha256": "a14ff375fe4e3e9c765fff6e23c21c9b83cba10bf64bbc285fa22be6df7b8b37",
+      "originalName": "쓰레기통 · Binder Notebook · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-08.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-wooden-crate-02-cutout",
+      "name": "가로형 원목 보관 상자 · Wooden Crate 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-wooden-crate-02-cutout/prop.webp",
+      "bytes": 107268,
+      "sha256": "b4cc7a7699e22a322aee5a5b06ee70bad55527e9d3b41b928f96c82b65f48832",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_crate_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-wooden-crate-02",
+      "sourceModelSha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-wooden-crate-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 9898,
+      "previewSha256": "714e02d533c3feda5428780322e150da8973e49d5ad8826a0e9564807dcdf98c",
+      "originalName": "상자 · Wooden Crate 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-09.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-namaqualand-boulder-02-cutout",
+      "name": "풍화된 바위 군집 · Namaqualand Boulder 02 · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-namaqualand-boulder-02-cutout/prop.webp",
+      "bytes": 118118,
+      "sha256": "4cd72acc212776baa93cb63e52b8a0e0b18c71860825d4786c4896613cd792ca",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-namaqualand-boulder-02",
+      "sourceModelSha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-namaqualand-boulder-02-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 9762,
+      "previewSha256": "41f52c9241c8c63b86e6ad867165a5e52898fefd55f63ef25bfe7232a85aa5ec",
+      "originalName": "바위 · Namaqualand Boulder 02 · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-09.jpg",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk-cutout",
+      "name": "마른 나무 쓰러진 줄기 · Dead Tree Trunk · 2D 소품",
+      "kind": "prop-image",
+      "category": "rendered-prop",
+      "style": "pbr-rendered-derivative",
+      "path": "assets/polyhaven-dead-tree-trunk-cutout/prop.webp",
+      "bytes": 28344,
+      "sha256": "618a01ba3ba1a1094e38fea05935fa513d08214f617c63d48ccead367e16ccb9",
+      "width": 1536,
+      "height": 1536,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-12"
+      },
+      "derivedFrom": "polyhaven-dead-tree-trunk",
+      "sourceModelSha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+      "independentOriginal": false,
+      "renderResolution": [
+        1536,
+        1536
+      ],
+      "visualReviewed": true,
+      "curationStatus": "selected-after-visual-triage",
+      "studioRuntimeVerified": false,
+      "technicalChecks": [
+        "source-GLB-checksum-bound",
+        "native-1536px-render",
+        "transparent-alpha",
+        "unclipped-silhouette"
+      ],
+      "contentNotice": "기존 3D 원본의 고해상도 투명 렌더입니다. 별도 3D 원본으로 집계하지 않습니다.",
+      "previewPath": "assets/polyhaven-dead-tree-trunk-cutout/thumbnail.webp",
+      "previewWidth": 384,
+      "previewHeight": 384,
+      "previewBytes": 4240,
+      "previewSha256": "ee5868eb67042c5e4fc792a6df3a311c363cdd9bf6fefbf3c7751c40d0c0c435",
+      "originalName": "나무 · Dead Tree Trunk · 2D 소품",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-09.jpg",
       "allAnglesArtisticallyApproved": false
     },
     {
@@ -2870,7 +4932,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.3209305703639984,
-          -0.00001953914761543274,
+          -1.953914761543274e-05,
           -0.335950642824173
         ],
         "max": [
@@ -2973,7 +5035,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.5043071508407593,
-          -5.651812884366336e-8,
+          -5.651812884366336e-08,
           -0.6613625288009644
         ],
         "max": [
@@ -3209,7 +5271,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.21267758309841156,
-          0.00003679741712403484,
+          3.679741712403484e-05,
           -0.22118140757083893
         ],
         "max": [
@@ -3629,7 +5691,7 @@
         "min": [
           -0.0649944543838501,
           -0.11076043857230826,
-          -6.450776016278167e-9
+          -6.450776016278167e-09
         ],
         "max": [
           0.06446599215269089,
@@ -3740,7 +5802,7 @@
       "sourceBoundsAabb": {
         "min": [
           -1.143192172050476,
-          -2.483498029448583e-8,
+          -2.483498029448583e-08,
           -0.4851073920726776
         ],
         "max": [
@@ -4705,7 +6767,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.9862761497497559,
-          -0.0000064620744524290785,
+          -6.4620744524290785e-06,
           -0.4694533050060272
         ],
         "max": [
@@ -4808,7 +6870,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.44760647416114807,
-          5.0353154534832356e-8,
+          5.0353154534832356e-08,
           -0.9984514713287354
         ],
         "max": [
@@ -5081,7 +7143,7 @@
         "min": [
           -0.19324660301208496,
           -0.394923597574234,
-          -2.31228973746056e-8
+          -2.31228973746056e-08
         ],
         "max": [
           0.19324655830860138,
@@ -5515,7 +7577,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.2500464802817314,
-          -0.00006496906280517578,
+          -6.496906280517578e-05,
           -0.25097261662777115
         ],
         "max": [
@@ -6966,7 +9028,7 @@
         "min": [
           -0.17600713670253754,
           -0.0735805481672287,
-          -3.725290298461914e-8
+          -3.725290298461914e-08
         ],
         "max": [
           0.16679838299751282,
@@ -7280,7 +9342,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.20170873403549194,
-          2.97835756057907e-9,
+          2.97835756057907e-09,
           -0.22829124331474304
         ],
         "max": [
@@ -7979,7 +10041,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.04838135838508606,
-          -0.000022622070900979452,
+          -2.2622070900979452e-05,
           -0.04581700265407562
         ],
         "max": [
@@ -8402,7 +10464,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.1399787813425064,
-          -3.978568940965488e-8,
+          -3.978568940965488e-08,
           -0.12324045598506927
         ],
         "max": [
@@ -8592,7 +10654,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.4417688846588135,
-          -0.0000887151836650446,
+          -8.87151836650446e-05,
           -0.12653666734695435
         ],
         "max": [
@@ -8719,7 +10781,7 @@
       "sourceBoundsAabb": {
         "min": [
           -1.220000147819519,
-          0.000016823410987854004,
+          1.6823410987854004e-05,
           -0.27000001072883606
         ],
         "max": [
@@ -10166,7 +12228,7 @@
       "sourceBoundsAabb": {
         "min": [
           -0.01598476432263851,
-          -0.0000026982656891050283,
+          -2.6982656891050283e-06,
           -0.10739462822675705
         ],
         "max": [
@@ -62673,6 +64735,165 @@
       "visualReviewLevel": "contact-sheet-visual-triage",
       "visualReviewSource": "artifact:9975049171#page=4",
       "role": "finished-asset"
+    },
+    {
+      "id": "polyhaven-dandelion-01",
+      "name": "민들레 조립용 식생",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "plant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/dandelion_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-dandelion-01/dandelion_01.glb",
+      "bytes": 6332300,
+      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
+      "geometrySha256": "a5a8865a9d6515bc214f33ccc621b51c61218974106af37dfe70ebd6d50d088d",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-dandelion-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        4.214293710887432,
+        0.17017221543937922,
+        0.25765838474035263
+      ],
+      "previewFitScale": 0.4745753706802857,
+      "originalName": "Dandelion 01",
+      "role": "assembly-component",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "name": "괭이밥 조립용 식생",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "plant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-shrub-sorrel-01/shrub_sorrel_01.glb",
+      "bytes": 3695048,
+      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "geometrySha256": "bd778328e1185d92996ac7bc48d1a58bdf7258fa841a9725523e26a9a45498a0",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-shrub-sorrel-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.3520993459969759,
+        0.05800367915071547,
+        0.14641038584522903
+      ],
+      "previewFitScale": 5.680215037994355,
+      "originalName": "Shrub Sorrel 01",
+      "role": "assembly-component",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
+    },
+    {
+      "id": "polyhaven-leafy-grass",
+      "name": "잎이 섞인 잔디",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "grass",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/leafy_grass",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-leafy-grass/leafy_grass.webp",
+      "bytes": 2443990,
+      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_rough_2k.jpg",
+          "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
+          "bytes": 2274652
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_nor_gl_2k.jpg",
+          "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
+          "bytes": 6047262
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_ao_2k.jpg",
+          "sha256": "bcce4368f6a1affe11b4a643e14cfed7dfb46abf6bb9e6a28a3b87c2de2ddb11",
+          "bytes": 4175463
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-leafy-grass/leafy_grass_disp_2k.jpg",
+          "sha256": "de34be0f135a3c92fe6e55cca9501a4cc40e02e84de9cc4c7fefded1da5bd3f3",
+          "bytes": 2545281
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ],
+      "originalName": "Leafy Grass",
+      "role": "finished-asset",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
     }
   ]
 }

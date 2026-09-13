@@ -140,7 +140,7 @@ describe("Studio brush semantic-claim audit", () => {
         previewStyle: item.previewStyle,
       });
     });
-    expect(results).toHaveLength(48);
+    expect(results).toHaveLength(80);
     expect(results.flatMap(({ issues }) => (
       issues.filter(({ severity }) => severity === "error")
     ))).toEqual([]);
