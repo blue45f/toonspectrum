@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { capturePageEvidence } from "./helpers/capture-page-evidence";
+
 const ROOT = process.cwd();
 const routeDirectory = resolve(ROOT, "apps/web/src/app/routes/groups");
 const EXCLUDED = /^\/(?:studio|admin|make|shaper|brush-lab|music|creator-hub|publishing|auth)(?:\/|$)/u;
@@ -48,7 +50,7 @@ for (const width of [390, 1440]) {
         await testInfo.attach("route-result", { body: JSON.stringify({ path, width, errors, horizontalOverflow, text: (await main.innerText()).slice(0, 2000) }), contentType: "application/json" });
         expect(errors, `${path}: uncaught errors`).toEqual([]);
         expect(horizontalOverflow, `${path}: horizontal overflow`).toBe(false);
-        await page.screenshot({ path: testInfo.outputPath(`${width}-${path.replace(/[^a-z0-9-]/giu, "_") || "home"}.jpg`), type: "jpeg", quality: 80, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
+        await capturePageEvidence(page, testInfo, `${width}-${path.replace(/[^a-z0-9-]/giu, "_") || "home"}`);
         expect(errors, `${path}: errors after full-page rendering`).toEqual([]);
       });
     }
@@ -132,7 +134,7 @@ test("artwork contrast controls, theme surfaces and reduced motion remain functi
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   for (const theme of ["light", "dark"]) {
     await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
-    await page.screenshot({ path: testInfo.outputPath(`home-320-${theme}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
+    await capturePageEvidence(page, testInfo, `home-320-${theme}`);
   }
 });
 

@@ -1,6 +1,8 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
+import "./search-page-layout.css";
+
 import type { PlatformId } from "@/shared/lib/types";
 
 import { SearchExplorer } from "@/shared/components/search-explorer";
@@ -66,7 +68,9 @@ export function SearchPage() {
       </header>
 
       <div id="toonspectrum-search-explorer-top" />
-      <SearchExplorer key={JSON.stringify([initialQuery, initialFree, initialPlatforms])} initialQuery={initialQuery} initialFree={initialFree} initialPlatforms={initialPlatforms} />
+      <div className="search-page-results">
+        <SearchExplorer key={JSON.stringify([initialQuery, initialFree, initialPlatforms])} initialQuery={initialQuery} initialFree={initialFree} initialPlatforms={initialPlatforms} />
+      </div>
     </Container>
   );
 }

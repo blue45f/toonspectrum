@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { capturePageEvidence } from "./helpers/capture-page-evidence";
+
 // Exercise the actual application route; do not replace the component under test.
 for (const width of [320, 390, 820, 1440]) {
   test(`flagship route layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
-    // Layout evidence is deterministic; the dedicated motion test below still
-    // exercises running, user-paused and reduced-motion artwork separately.
+    // Separate behavior coverage below still exercises running and user-paused motion.
     await page.emulateMedia({ reducedMotion: "reduce" });
     const media: string[] = [];
     const pageErrors: string[] = [];
@@ -34,10 +35,10 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page.locator("#creator-offline-title")).toBeFocused();
     expect(media).toHaveLength(0);
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: testInfo.outputPath(`flagship-${width}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
+    await capturePageEvidence(page, testInfo, `flagship-${width}`);
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`flagship-dark-${width}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
+    await capturePageEvidence(page, testInfo, `flagship-dark-${width}`);
     expect(pageErrors).toEqual([]);
   });
 }
