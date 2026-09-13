@@ -85,7 +85,7 @@ export function StudioOfflinePanel() {
         <summary className="min-h-9 cursor-pointer content-center font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           {device?.online === false ? "오프라인 · 작업 안내" : "오프라인 사용 준비"}
         </summary>
-        <div className="mt-2 space-y-3 leading-relaxed">
+        <div className="mt-2 max-h-[60dvh] space-y-3 overflow-y-auto overscroll-contain leading-relaxed">
           <p>준비된 도구는 연결 없이 편집할 수 있습니다. 서버 원고 불러오기·클라우드 저장·협업·게시·서버 AI는 연결이 필요합니다.</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
           <p className="text-fg-2">{device?.persisted === true ? "지속 저장 허용" : "프로젝트 파일 백업 권장"}{storagePercent !== null ? ` · 저장 공간 약 ${storagePercent}% 사용` : ""}</p>

@@ -33,4 +33,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: node --test scripts/studio-offline-resilience.test.mjs
-      - run: pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline/StudioOfflinePanel.test.tsx apps/web/src/domains/creator/studio-editor-document-source.test.ts
+      - run: pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline apps/web/src/domains/creator/studio-editor-document-source.test.ts
