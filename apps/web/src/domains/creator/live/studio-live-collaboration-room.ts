@@ -485,6 +485,11 @@ export class StudioLiveRoom {
     return this.transport?.mode ?? null;
   }
 
+  /** Exposed only after existing work-room admission succeeds. */
+  get direct(): import("./studio-live-direct-port").StudioLiveDirectPort | null {
+    return this.ready ? this.transport?.direct ?? null : null;
+  }
+
   get crdtFanout(): import( "./studio-live-collaboration-transport").StudioLiveCrdtFanout | undefined {
     return this.transport?.crdtFanout;
   }

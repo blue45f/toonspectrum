@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/forest_leaves_04",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "type": 1,
+    "name": "Forest Leaves 04",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "date_published": 1631750400,
+    "dimensions": [
+      1500,
+      1500.0001192092896
+    ],
+    "tags": [
+      "leaves",
+      "nature",
+      "ground",
+      "dirt",
+      "debris",
+      "dry",
+      "autumn",
+      "sticks",
+      "twigs",
+      "brown"
+    ],
+    "categories": [
+      "outdoor",
+      "terrain",
+      "natural",
+      "collection: pine_forest",
+      "collection: verdant_trail"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "0a489c440765f05a7630001e299873f20775ea35",
+    "description": "Free 8K texture of dry autumn forest floor: brown leaves, sticks and twigs over dirt with detailed surface relief, roughness and subtle mossy debris.",
+    "category_id": "b9a51c27-1499-5f4d-b28f-0d96ef8e0319",
+    "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+    "collections": [
+      "pine_forest",
+      "verdant_trail"
+    ],
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "dirty"
+      ]
+    },
+    "img_version": "462b57b0",
+    "download_count": 68897,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/forest_leaves_04.png?width=256&height=256&v=462b57b0"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forest_leaves_04/forest_leaves_04_diff_2k.jpg",
+      "bytes": 1539210,
+      "sha256": "a4f964eb32909ef9b41dbf4000bde142995711b7b755850f6523eb4d99c4a5d4",
+      "sourceMd5": "a6cfde9e6846f5aa27bcbe0a58fe9907"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forest_leaves_04/forest_leaves_04_rough_2k.jpg",
+      "bytes": 1227328,
+      "sha256": "80db3af88b964a24fbe3f9e2c1284c5d8426e51a0b776d8f1fca5a4e0fdd8b2f",
+      "sourceMd5": "af02739e88a39f8760df09f28c64fee6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forest_leaves_04/forest_leaves_04_nor_gl_2k.jpg",
+      "bytes": 2187173,
+      "sha256": "4870de640c043377b2f992337477cab9ff26f915b6cd5302cf2cb41d94b0c339",
+      "sourceMd5": "556be132fa21f23036afc33cd12cd4d8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forest_leaves_04/forest_leaves_04_ao_2k.jpg",
+      "bytes": 1343251,
+      "sha256": "231c36892fd6072ee6c6619d3877368ee3fa37304326d4282df2e68965ba9b11",
+      "sourceMd5": "cd50521f3040e8f61cba62ea4dac0ae9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forest_leaves_04/forest_leaves_04_disp_2k.jpg",
+      "bytes": 416672,
+      "sha256": "cfca13ba1645f66ef675592bfad553330845d96d0ebbf634b689459f111b8216",
+      "sourceMd5": "1777c60f9d0aa03c92929280b1bbee17"
+    }
+  ]
+}

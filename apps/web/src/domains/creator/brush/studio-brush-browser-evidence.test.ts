@@ -10,12 +10,12 @@ import {
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 
 describe("Studio brush product evidence contract", () => {
-  it("treats the live browser matrix as evidence for the 48-product catalogue", () => {
+  it("treats the live browser matrix as evidence for the 80-product catalogue", () => {
     expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toBe(
       STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
     );
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(48);
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(46);
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(80);
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(78);
     expect(
       STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id),
     ).toEqual(["standard-eraser", "kneaded-eraser"]);

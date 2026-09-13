@@ -25,12 +25,25 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(44);
+  expect(manifest).toHaveLength(45);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0044_creator_work_entitlement_authorization",
+    "0045_studio_media_inference_jobs",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(44);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(45);
+});
+
+test("inference jobs retain owner-scoped idempotency without rewriting manuscripts", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0045_studio_media_inference_jobs",
+  );
+  expect(migration).toBeDefined();
+  const sql = migration?.contents ?? "";
+  expect(sql).toContain("CREATE TABLE IF NOT EXISTS studio_media_inference_jobs");
+  expect(sql).toContain("owner_id text NOT NULL");
+  expect(sql).toContain("UNIQUE(owner_id, idempotency_key)");
+  expect(sql).toContain("ON studio_media_inference_jobs(owner_id, created_at DESC)");
+  expect(sql).not.toMatch(/\b(?:DROP|TRUNCATE|DELETE|UPDATE)\b/iu);
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -590,6 +603,12 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_marketplace_resource_report_gate",
     "creator_work_asset_storage_reference",
     "creator_work_catalog_asset_binding",
+    "studio_ai_comic_director_approval",
+    "studio_ai_comic_director_artifact",
+    "studio_ai_comic_director_job",
+    "studio_ai_comic_director_job_event",
+    "studio_ai_comic_director_session",
+    "studio_ai_visual_bible_revision",
   ]);
   const readinessSource = readFileSync(
     new URL(

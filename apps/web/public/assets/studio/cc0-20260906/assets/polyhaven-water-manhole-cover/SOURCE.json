@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/water_manhole_cover",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Water Manhole Cover",
+    "type": 2,
+    "authors": {
+      "Raunox": "All"
+    },
+    "info": null,
+    "date_published": 1699401600,
+    "categories": [
+      "industrial",
+      "structures",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "infrastructure",
+      "drainage",
+      "utility",
+      "manhole",
+      "underground",
+      "maintenance",
+      "access cover",
+      "sewer",
+      "city",
+      "drain",
+      "road",
+      "street"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 6301,
+    "texel_density": 2736.749898750052,
+    "dimensions": [
+      690.7604932785034,
+      690.7604932785034,
+      67.61780008673668
+    ],
+    "files_hash": "88b0825bb7daa072702c8238ed1f245321008fc5",
+    "description": "Free 4K model of a weathered cast-iron round manhole cover, embossed \"WATER\" with radial segmented pattern and a worn, rusted patina.",
+    "category_id": "9d0ff879-fbb5-5750-a102-699d2560d80d",
+    "category": "Industrial & Infrastructure/Plumbing & Drainage/Manhole Covers",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "img_version": "a47befd2",
+    "download_count": 8801,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/water_manhole_cover.png?width=256&height=256&v=a47befd2"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/water_manhole_cover/water_manhole_cover_2k.gltf",
+      "bytes": 4253,
+      "sha256": "43fefd4fedda1ce67f5571f4e02fb78852583daa43c5de92fd9cb56c870a2ad1",
+      "sourceMd5": "c399dbfad92d8c15a4b00af20c4cbbb8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/water_manhole_cover/water_manhole_cover_nor_gl_2k.jpg",
+      "bytes": 4062229,
+      "sha256": "abdfc1f149e31989b9a29dd7d812e4751ec7fe7593a71213db8774c12b65814b",
+      "sourceMd5": "43f2e6e27fa22ceaa5889491a80864bc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/water_manhole_cover/water_manhole_cover.bin",
+      "bytes": 202320,
+      "sha256": "ada713d1f6f879164d3475e2ee18d69b4c4ecc8f100126e3921b7b3ea42c9267",
+      "sourceMd5": "5262562d69ba05d21228aec9f5b0306d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/water_manhole_cover/water_manhole_cover_diff_2k.jpg",
+      "bytes": 1519932,
+      "sha256": "f3038b11493dd09626e7b1e34c8eb72a8f594d77d9084d06d67bef34a35a8371",
+      "sourceMd5": "d8ac01165bd42c4ab8b5f320286b1815"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/water_manhole_cover/water_manhole_cover_arm_2k.jpg",
+      "bytes": 2167214,
+      "sha256": "e58a4c473f0233d6c41c71d5a0b7b5d616160432d5fe299f071a1351b3640a15",
+      "sourceMd5": "5eec60f9588ad9343e629f7c33c57ded"
+    }
+  ]
+}

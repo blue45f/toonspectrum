@@ -6,6 +6,7 @@ import {
   StudioUnifiedAssetSmartLibraryHeader,
 } from "./studio-unified-asset-smart-library-chrome";
 import { StudioUnifiedAssetSmartManager } from "./StudioUnifiedAssetSmartManager";
+import { projectStudioUnifiedAssetLibrary } from "./studio-unified-asset-library-projection";
 import {
   createStudioUnifiedAssetLibraryState,
   discoverStudioUnifiedAssets,
@@ -116,13 +117,12 @@ export function StudioUnifiedAssetSmartLibrary({
     [items],
   );
   const visibleItems = useMemo(
-    () => discoverStudioUnifiedAssets(items, {
+    () => projectStudioUnifiedAssetLibrary(items, {
       libraryView,
       format,
       rights,
       editability,
       sort,
-      limit: 240,
       libraryState,
     }),
     [editability, format, items, libraryState, libraryView, rights, sort],

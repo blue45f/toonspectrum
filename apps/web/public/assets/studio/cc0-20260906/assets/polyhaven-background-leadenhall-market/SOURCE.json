@@ -1,0 +1,81 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/leadenhall_market",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "tags": [
+      "hall",
+      "mall",
+      "europe",
+      "architecture",
+      "london",
+      "cobblestone",
+      "street",
+      "road"
+    ],
+    "date_published": 1561413600,
+    "name": "Leadenhall Market",
+    "categories": [
+      "indoor",
+      "urban",
+      "morning-afternoon",
+      "medium contrast",
+      "natural light",
+      "artificial light"
+    ],
+    "date_taken": 1558277880,
+    "coords": [
+      51.512667,
+      -0.083528
+    ],
+    "authors": {
+      "Andreas Mischok": "All"
+    },
+    "sponsors": [
+      {
+        "name": "Rick Kay"
+      }
+    ],
+    "files_hash": "03916194a37bd15a1df6e0f9b0a2cca2575e86d3",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Unclipped, free 16K HDRI of Leadenhall Market - covered London arcade, daytime mix of skylight and warm shop lamps; medium contrast, cobblestones.",
+    "category_id": "95a4b744-1e94-55c3-9440-5d5a9b148b10",
+    "category": "Interiors/Retail & Commercial/Malls & Markets",
+    "attributes": {
+      "light_type": "mixed",
+      "contrast": "medium",
+      "environment": "indoor",
+      "weather": "overcast"
+    },
+    "img_version": "88d29230",
+    "download_count": 92253,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/leadenhall_market.png?width=256&height=256&v=88d29230"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/leadenhall_market.jpg",
+      "bytes": 7380874,
+      "sha256": "2c5b27521a68667d4f3a9cfdb0c93d1f7450e8496ad80e7d0210ad4e66f212e3",
+      "sourceMd5": "b2d502898c41e69c7613265f2a49b5d1"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

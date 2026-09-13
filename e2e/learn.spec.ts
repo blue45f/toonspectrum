@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { LESSONS, TERMS } from "../apps/web/src/domains/learn/learning-content";
 import { STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
 
-test.beforeEach(async ({ page }) => {
+ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
 });
 
@@ -15,7 +15,7 @@ test("curriculum, all lessons, glossary and invalid addresses render", async ({ 
   for (const lesson of LESSONS) {
     await page.goto(`/learn/lessons/${lesson.id}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(lesson.title);
-    await expect(page.getByRole("slider")).toHaveCount(2);
+    await expect(page.locator(".learn-page").getByRole("slider")).toHaveCount(2);
     await expect(page.getByRole("button", { name: "이 강좌 학습 완료", exact: true })).toBeDisabled();
   }
   await page.goto("/learn/glossary");
@@ -65,9 +65,9 @@ test("reduced motion remains step-readable and mobile has no document overflow",
   await expect(page.getByRole("button", { name: "설명 재생", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "3단계", exact: true }).click();
   await expect(page.locator(".learn-caption").first()).toContainText("눈높이");
-  await page.getByRole("slider").first().focus();
+  await page.locator(".learn-page").getByRole("slider").first().focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("slider").first()).toHaveValue("131");
+  await expect(page.locator(".learn-page").getByRole("slider").first()).toHaveValue("131");
   for (const path of ["/learn", "/learn/glossary", "/learn/studio", "/learn/lessons/lettering"]) {
     await page.goto(path);
     await expect(page.locator(".learn-page")).toBeVisible();
@@ -111,7 +111,6 @@ test("personal plan persists, opens its guided path, and combines library filter
   await page.locator("#learn-level").selectOption("advanced");
   await page.locator("#learn-session-minutes").selectOption("45");
   await expect(page.locator(".learn-plan-result").getByRole("heading", { level: 3 })).toHaveText("첫 회차 게시 준비");
-
   await page.reload();
   await expect(page.locator("#learn-goal")).toHaveValue("publish");
   await expect(page.locator("#learn-level")).toHaveValue("advanced");
@@ -120,11 +119,10 @@ test("personal plan persists, opens its guided path, and combines library filter
   await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");
   await expect(page.locator(".learn-path-course-list li")).toHaveCount(4);
-
   await page.goto("/learn");
-  await page.getByLabel("진행 상태", { exact: true }).selectOption("not-started");
+  await page.getByRole("combobox", { name: "진행 상태", exact: true }).selectOption("not-started");
   await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
-  await page.getByLabel("강좌 검색", { exact: true }).fill("클리핑");
+  await page.getByRole("searchbox", { name: "강좌 검색", exact: true }).fill("클리핑");
   await expect(page.locator(".learn-card")).toHaveCount(1);
   await expect(page.locator(".learn-card h3")).toHaveText("밑색·음영·클리핑을 분리해서 이해하기");
 });

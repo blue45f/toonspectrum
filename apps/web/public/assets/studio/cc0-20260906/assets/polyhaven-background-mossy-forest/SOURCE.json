@@ -1,0 +1,82 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/mossy_forest",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "tags": [
+      "path",
+      "rock",
+      "river",
+      "forest",
+      "tree",
+      "moss"
+    ],
+    "date_published": 1522879200,
+    "name": "Mossy Forest",
+    "categories": [
+      "outdoor",
+      "nature",
+      "morning-afternoon",
+      "low contrast",
+      "natural light"
+    ],
+    "coords": [
+      -29.00862,
+      29.41231
+    ],
+    "date_taken": 1460641740,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      {
+        "url": "http://mdjustin.com/",
+        "name": "Justin Dolan"
+      },
+      "33031620"
+    ],
+    "files_hash": "892d5ee2981cb6b09076a8823186e181edc10c08",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI. Soft morning/afternoon natural light in a mossy forest, low contrast with cool green tones, dappled sunlight, a subtle stream and wet rocks.",
+    "category_id": "15f21de6-631e-54a5-9330-f0e62867cc3e",
+    "category": "Forest & Woodland/Woodland Paths/Forest Trails",
+    "attributes": {
+      "time_of_day": "afternoon",
+      "weather": "overcast",
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "29924064",
+    "download_count": 83365,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/mossy_forest.png?width=256&height=256&v=29924064"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/mossy_forest.jpg",
+      "bytes": 11070548,
+      "sha256": "6c932e0ac44aba2e5374afbc00ee8a1aa780d32ac1e0bfefd710edb1f7258445",
+      "sourceMd5": "3e11675120c96f7998c0a8d0cdadc739"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/blue_metal_plate",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Blue Metal Plate",
+    "type": 1,
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "dimensions": [
+      2500,
+      2500
+    ],
+    "date_published": 1727308800,
+    "files_hash": "37d120553f33bcc1db86a58a32f9159f06dfe329",
+    "tags": [
+      "scratched",
+      "metal sheet",
+      "metal",
+      "painted",
+      "industrial",
+      "scratches",
+      "scuffed",
+      "steel panel",
+      "abrasion marks",
+      "blue",
+      "metal plate"
+    ],
+    "categories": [
+      "metal",
+      "industrial"
+    ],
+    "description": "Free 16K texture of painted blue steel plate with scuffs, fine scratches, abrasion marks and seam lines; semi-gloss, worn industrial surface.",
+    "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+    "category": "Metal/Sheet & Corrugated/Flat Sheet",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "painted",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "0e02b3a2",
+    "download_count": 93341,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/blue_metal_plate.png?width=256&height=256&v=0e02b3a2"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/blue_metal_plate/blue_metal_plate_diff_2k.jpg",
+      "bytes": 1518621,
+      "sha256": "82855f6297ad07ea7ea4d1c501e6b56ed4c9c758653ca126bda9fd0ebba63c59",
+      "sourceMd5": "6189f7c443f0b7767d3e046f021b5495"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/blue_metal_plate/blue_metal_plate_rough_2k.jpg",
+      "bytes": 1588770,
+      "sha256": "dd1726d8217fe4f6c3947cb20700d51774a0773e9abaeb4120769c8f6fce1d69",
+      "sourceMd5": "4be6436df5c7c5ecce9febb927051d52"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/blue_metal_plate/blue_metal_plate_nor_gl_2k.jpg",
+      "bytes": 948237,
+      "sha256": "4cd3069a918cf891295b369b26f47c0a0631c634d0fd1006b6b7412a8f2b3550",
+      "sourceMd5": "c460b1b25b5d418218982d8b100822b8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/blue_metal_plate/blue_metal_plate_ao_2k.jpg",
+      "bytes": 101861,
+      "sha256": "6e58210d25dadef4b6617a9b03f27a89e5a6013da71ebfc8651afba520e54183",
+      "sourceMd5": "3c496e1431121f0e4b48f94af9da332a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/blue_metal_plate/blue_metal_plate_disp_2k.jpg",
+      "bytes": 124881,
+      "sha256": "2dcd9487679b94bc273bfa0c0992dacfe72b81dd1e8c1e4b8711f6b26d7c99ce",
+      "sourceMd5": "5fbe4f41f0f82de7cdecf1d0d5e75075"
+    }
+  ]
+}

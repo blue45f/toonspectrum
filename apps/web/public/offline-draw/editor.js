@@ -220,7 +220,12 @@ $('clear-layer').addEventListener('click', () => {
 function download(blob, filename) {
   const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-function filename(extension) { return `${drawing.title.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 90)}.${extension}`; }
+function filename(extension) {
+  const title = Array.from(drawing.title, (character) =>
+    character.charCodeAt(0) < 32 || '\\/:*?"<>|'.includes(character) ? '_' : character,
+  ).join('').slice(0, 90);
+  return `${title}.${extension}`;
+}
 $('export-json').addEventListener('click', () => {
   try { finishStroke(); download(new Blob([JSON.stringify(validateDocument(drawing))], { type: 'application/json' }), filename('toonlocal')); } catch (error) { showError(error); }
 });

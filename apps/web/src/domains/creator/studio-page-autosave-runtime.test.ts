@@ -60,6 +60,7 @@ function recoveryFixture(options: {
     references: [{ id: "old-document-reference", role: "style", asset: { assetId: "old-asset" } }],
   });
   const context = {
+    preserveCurrentDocument: vi.fn(async () => true),
     autosaveRecoveryCandidateRef: { current: candidate },
     canApplyStudioMutation: vi.fn(() => true),
     captureStudioMutationTicket: () => ({ authScopeKey: null, workId: null, accessGeneration: 0, documentGeneration: 0 }),
@@ -173,5 +174,45 @@ describe("autosave recovery hydrates AI references with the selected durable doc
     expect(fixture.context.setScenarioImageReferenceDocumentState).not.toHaveBeenCalled();
     expect(fixture.context.setAutosaveRestoreBlockedReason).toHaveBeenCalledExactlyOnceWith("legacy-unversioned");
     expect(fixture.context.autosaveRecoveryCandidateRef.current).toBe(fixture.candidate);
+  });
+});
+
+
+describe("preserve the current drawing before continuing an older one", () => {
+  it("does not replace pages until the safety copy has been acknowledged", async () => {
+    const fixture = recoveryFixture({ elements: [STROKE] });
+    let complete!: (ok: boolean) => void;
+    fixture.context.preserveCurrentDocument.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    const restoring = restoreStudioAutosaveRecovery(fixture.context);
+    await vi.waitFor(() => expect(fixture.context.preserveCurrentDocument).toHaveBeenCalledOnce());
+    expect(fixture.context.setPagesHistory).not.toHaveBeenCalled();
+    expect(fixture.context.autosaveRecoveryCandidateRef.current).toBe(fixture.candidate);
+    complete(true);
+    await restoring;
+    expect(fixture.context.setPagesHistory).toHaveBeenCalledOnce();
+  });
+  it.each(["refused", "failed"])("keeps both drawings when the safety copy is %s", async (reason) => {
+    const fixture = recoveryFixture();
+    if (reason === "failed") fixture.context.preserveCurrentDocument.mockRejectedValue(new Error("quota"));
+    else fixture.context.preserveCurrentDocument.mockResolvedValue(false);
+    await restoreStudioAutosaveRecovery(fixture.context);
+    expect(fixture.context.setPagesHistory).not.toHaveBeenCalled();
+    expect(fixture.context.setTitle).not.toHaveBeenCalled();
+    expect(fixture.context.setMaster).not.toHaveBeenCalled();
+    expect(fixture.context.autosaveRecoveryCandidateRef.current).toBe(fixture.candidate);
+    expect(fixture.context.setError).toHaveBeenCalledOnce();
+  });
+  it.each(["candidate", "document", "stroke"])("does not apply an outdated restore when %s changes during the safety copy", async (reason) => {
+    const fixture = recoveryFixture();
+    fixture.context.preserveCurrentDocument.mockImplementation(async () => {
+      if (reason === "candidate") fixture.context.autosaveRecoveryCandidateRef.current = { ...fixture.candidate };
+      if (reason === "document") fixture.context.canApplyStudioMutation.mockReturnValue(false);
+      if (reason === "stroke") fixture.context.drawingRef.current = STROKE;
+      return true;
+    });
+    await restoreStudioAutosaveRecovery(fixture.context);
+    expect(fixture.context.setPagesHistory).not.toHaveBeenCalled();
+    expect(fixture.context.setHasAutosave).not.toHaveBeenCalled();
+    expect(fixture.context.setError).toHaveBeenCalledOnce();
   });
 });

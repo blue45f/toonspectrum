@@ -93,11 +93,13 @@ export function admitStudioLiveTransformDrawCompilation(
     return { admitted: false, reason: "scene-budget" };
   }
   const outlineContract = resolveStudioOutlineStrokeContract(element.outlineStroke);
-  const engine = outlineContract.status === "ready"
+  const engine = element.kind === "line" || element.kind === "arrow"
+    ? "geometric-path"
+    : outlineContract.status === "ready"
     ? outlineContract.contract.engine === STUDIO_OUTLINE_STROKE_ENGINE
       ? "perfect-outline"
       : "capsule-outline"
-    : resolveStudioBrushRuntimeContract(element.brush)?.engine;
+    : resolveStudioBrushRuntimeContract(element.brush ?? "pen")?.engine;
   const maxSamples = engine === "causal-ink"
     ? STUDIO_LIVE_TRANSFORM_EXACT_MAX_CAUSAL_SAMPLES
     : engine === "calligraphy-segments"
@@ -122,9 +124,11 @@ export function admitStudioLiveTransformDrawCompilation(
 export function compileStudioLiveTransformDrawSnapshot(
   element: DrawEl,
 ): StudioLiveTransformDrawSnapshot {
-  const runtimeContract = resolveStudioBrushRuntimeContract(element.brush);
+  const runtimeContract = resolveStudioBrushRuntimeContract(element.brush ?? "pen");
   const outlineContract = resolveStudioOutlineStrokeContract(element.outlineStroke);
-  const rendererEngine = outlineContract.status === "ready"
+  const rendererEngine = element.kind === "line" || element.kind === "arrow"
+    ? "geometric-path"
+    : outlineContract.status === "ready"
     ? outlineContract.contract.engine === STUDIO_OUTLINE_STROKE_ENGINE
       ? "perfect-outline"
       : "capsule-outline"
@@ -133,7 +137,8 @@ export function compileStudioLiveTransformDrawSnapshot(
     // Causal ink uses absolute dab-spacing and radius floors in both legacy and versioned pressure
     // models. Scaling an already-planned dab field therefore changes its topology differently from
     // replanning the committed points/width.
-    rendererEngine === "causal-ink"
+    rendererEngine === "geometric-path"
+    || rendererEngine === "causal-ink"
     // Calligraphy clamps base width/segment width and ribbon coordinates in absolute units.
     || rendererEngine === "calligraphy-segments"
     // Perfect-freehand's planner contains topology decisions and absolute epsilon/radius floors
@@ -231,6 +236,15 @@ export function compileStudioLiveTransformDrawSnapshot(
       sampleCount: renderRoute.pointCount,
       pathLength: renderRoute.pathLength ?? Number.POSITIVE_INFINITY,
       strokeWidth: element.strokeWidth,
+      ...(rendererEngine === "geometric-path"
+        ? {
+            // Arrowhead floors do not shrink with the model. Include the complete head envelope,
+            // not just half the shaft width, in the generic exact-draft raster budget.
+            rendererMaxPaintRadius: renderRoute.drawsArrowHead
+              ? Math.max(8, element.strokeWidth * 3)
+              : Math.max(1, element.strokeWidth),
+          }
+        : {}),
       ...(rendererEngine === "causal-ink"
         ? {
             // The causal renderer consumes alias-scaled diameter and its legacy pressure law can

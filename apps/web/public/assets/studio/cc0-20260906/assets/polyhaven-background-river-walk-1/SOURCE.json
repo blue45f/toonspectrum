@@ -1,0 +1,83 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/river_walk_1",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 10,
+    "type": 0,
+    "tags": [
+      "forest",
+      "tree",
+      "path",
+      "bush",
+      "leaves",
+      "canopy"
+    ],
+    "date_published": 1509663600,
+    "name": "River Walk 1",
+    "categories": [
+      "outdoor",
+      "nature",
+      "sunrise-sunset",
+      "medium contrast",
+      "natural light"
+    ],
+    "coords": [
+      -25.03313,
+      31.132754
+    ],
+    "date_taken": 1507822140,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      {
+        "url": "http://www.mdjustin.com/",
+        "name": "Justin Dolan"
+      },
+      "20953239"
+    ],
+    "files_hash": "2973ac3ba9e2f59cf0957808e986759b73c292a0",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI: warm golden-hour light filtering through a leafy forest canopy onto a dirt path, with soft natural highlights, medium contrast, and natural green tones.",
+    "category_id": "15f21de6-631e-54a5-9330-f0e62867cc3e",
+    "category": "Forest & Woodland/Woodland Paths/Forest Trails",
+    "attributes": {
+      "time_of_day": "sunset",
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "medium",
+      "season": "summer",
+      "environment": "outdoor",
+      "sky_view": "obstructed"
+    },
+    "img_version": "e5a3091a",
+    "download_count": 67253,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/river_walk_1.png?width=256&height=256&v=e5a3091a"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/river_walk_1.jpg",
+      "bytes": 12468624,
+      "sha256": "cffe8418d8e795514cff1a3400840828a5a3558498c72c895c5f2c8a1fc901bf",
+      "sourceMd5": "27e07785340524fe232b93d10de0de6a"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

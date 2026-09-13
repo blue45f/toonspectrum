@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/security_camera_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-security-camera-02",
+  "sourceModelSha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+  "render": {
+    "sourceId": "polyhaven-security-camera-02",
+    "sourceSha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+    "path": "high-resolution-props/polyhaven-security-camera-02.png",
+    "visiblePixels": 194415,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 12481
+  },
+  "independentOriginal": false
+}

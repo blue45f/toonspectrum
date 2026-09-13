@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Lantern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-lantern-01",
+  "sourceModelSha256": "f28125f90216376db04506f2787c1aef0f4bd6bc4360db0c8c954eed536a195e",
+  "render": {
+    "sourceId": "polyhaven-lantern-01",
+    "sourceSha256": "f28125f90216376db04506f2787c1aef0f4bd6bc4360db0c8c954eed536a195e",
+    "path": "high-resolution-props/polyhaven-lantern-01.png",
+    "visiblePixels": 155544,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 67804
+  },
+  "independentOriginal": false
+}

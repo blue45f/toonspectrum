@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/BarberShopChair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-barbershopchair-01",
+  "sourceModelSha256": "7e9da03732fc21df7f5b86a54ec40488bc5df958b926fbc64de9346b9638d6bf",
+  "render": {
+    "sourceId": "polyhaven-barbershopchair-01",
+    "sourceSha256": "7e9da03732fc21df7f5b86a54ec40488bc5df958b926fbc64de9346b9638d6bf",
+    "path": "high-resolution-props/polyhaven-barbershopchair-01.png",
+    "visiblePixels": 334191,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4280
+  },
+  "independentOriginal": false
+}

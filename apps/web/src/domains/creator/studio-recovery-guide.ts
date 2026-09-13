@@ -126,16 +126,16 @@ export function studioRecoveryActions(
   if (input.scan.autosaves.some((record) => record.hasContent)) {
     actions.push({
       id: "restore-autosave",
-      title: "임시저장 복구하기",
-      body: "캔버스 위 상태 표시줄의 ‘복구하기’를 누르면 마지막 임시저장을 되살립니다. 되살리기 전에 ‘JSON 백업’으로 현재 상태를 먼저 받아 두면 되돌릴 수 있습니다.",
+      title: "이전 그림 이어서 그리기",
+      body: "캔버스 위의 ‘이어서 그리기’를 누르세요. 지금 화면은 저장 기록에 먼저 보관합니다. ‘다른 방법 → 백업 파일 받기’는 이전 그림을 파일로 받는 기능입니다.",
       urgent: saveDegraded,
     });
   }
   if ((input.checkpointCount ?? 0) > 0) {
     actions.push({
       id: "open-checkpoints",
-      title: "체크포인트에서 되돌리기",
-      body: "파일 ▸ 프로젝트 도구의 체크포인트 목록에서 이름 붙인 지점으로 돌아갈 수 있습니다. 최대 10개까지 보관합니다.",
+      title: "저장 기록에서 이전 그림 열기",
+      body: "파일 → 저장 기록에서 보관한 그림을 다시 열 수 있습니다. 이 기기의 기록은 최근 10개까지 보관합니다.",
       urgent: false,
     });
   }

@@ -1,0 +1,94 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_stool",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "name": "Painted Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ],
+    "type": 2,
+    "tags": [
+      "painted",
+      "worn",
+      "old",
+      "antique",
+      "vintage",
+      "farmhouse",
+      "rustic",
+      "carpentry",
+      "aged",
+      "chair"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "info": null,
+    "date_published": 1707868800,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 676,
+    "texel_density": 3462.278760856598,
+    "dimensions": [
+      384.83743369579315,
+      406.07430040836334,
+      578.9150850614533
+    ],
+    "files_hash": "05124979aecd8b4eb15587a43eccae4bb0a5b7e4",
+    "description": "Free 4K model - painted wooden stool with chipped paint, worn edges and rustic farmhouse charm; simple antique carpentry.",
+    "category_id": "302a40f3-e544-5721-b63b-ca3574e9975a",
+    "category": "Furniture/Seating/Stools & Bar Seating",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "110f3adb",
+    "download_count": 12528,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/painted_wooden_stool.png?width=256&height=256&v=110f3adb"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/painted_wooden_stool/painted_wooden_stool_2k.gltf",
+      "bytes": 2848,
+      "sha256": "9c02706152c2daaa68be45c2aa04c14306c28465271ba21c1df94cd6999fabaf",
+      "sourceMd5": "e1a4758462bc9a42678ab2104837112b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_stool/painted_wooden_stool_arm_2k.jpg",
+      "bytes": 2889731,
+      "sha256": "d6266adc21741776d6be6e0569154e572593b9da8f173e5a350116fd538e2bb6",
+      "sourceMd5": "3f98074458913cfdef7243982473a85a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_stool/painted_wooden_stool_nor_gl_2k.jpg",
+      "bytes": 1553172,
+      "sha256": "db97057f51f216e234c4d6de9317a636ee655e67b3327c9fa813652b635609a9",
+      "sourceMd5": "cf3670f5b7aa66aaf16c23c4f7f6650d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_stool/painted_wooden_stool_diff_2k.jpg",
+      "bytes": 2235393,
+      "sha256": "62b59d5c3f4e016c44769d7c79ee1230ec9905f5ef5187eca90d88ee655da273",
+      "sourceMd5": "7cc0c2ba52b8af76ab09c34b01cac3a3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/painted_wooden_stool/painted_wooden_stool.bin",
+      "bytes": 23384,
+      "sha256": "d336c1eb8832e4441f69bb5618e2289703a7ca71d3884a9087d658051eee0b66",
+      "sourceMd5": "cf312e0df28055cbbf174584a01943c5"
+    }
+  ]
+}

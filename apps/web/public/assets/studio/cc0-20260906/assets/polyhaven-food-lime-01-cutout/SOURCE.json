@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_lime_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-food-lime-01",
+  "sourceModelSha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+  "render": {
+    "sourceId": "polyhaven-food-lime-01",
+    "sourceSha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+    "path": "high-resolution-props/polyhaven-food-lime-01.png",
+    "visiblePixels": 474506,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 8100
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,332 @@
+{
+  "rendered": [
+    {
+      "sourceId": "polyhaven-painted-wooden-chair-01",
+      "sourceSha256": "48fe596f0745a7d9e70055350af0e6dff50ee1f1c445034e3648657c00aeda22",
+      "path": "high-resolution-props/polyhaven-painted-wooden-chair-01.png",
+      "visiblePixels": 223317,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 724
+    },
+    {
+      "sourceId": "polyhaven-painted-wooden-stool",
+      "sourceSha256": "1438f7f6e571369d6d0b153f9517cfc212bc10c1336753d9d32d97091a23ea4c",
+      "path": "high-resolution-props/polyhaven-painted-wooden-stool.png",
+      "visiblePixels": 493644,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 676
+    },
+    {
+      "sourceId": "polyhaven-wooden-picnic-table",
+      "sourceSha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+      "path": "high-resolution-props/polyhaven-wooden-picnic-table.png",
+      "visiblePixels": 215283,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 10210
+    },
+    {
+      "sourceId": "polyhaven-chinese-cabinet",
+      "sourceSha256": "469f8ac72e1fb9afd22463985ad9130fdecd741cf7a0b59da69c8925b7005bb5",
+      "path": "high-resolution-props/polyhaven-chinese-cabinet.png",
+      "visiblePixels": 254871,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 15668
+    },
+    {
+      "sourceId": "polyhaven-brass-diya-lantern",
+      "sourceSha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+      "path": "high-resolution-props/polyhaven-brass-diya-lantern.png",
+      "visiblePixels": 76386,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 12982
+    },
+    {
+      "sourceId": "polyhaven-mantel-clock-01",
+      "sourceSha256": "e75e38ab3b0b87c7d418f941a961c51c171ca7a19bfbb2ab672c4222aaafc8cd",
+      "path": "high-resolution-props/polyhaven-mantel-clock-01.png",
+      "visiblePixels": 272370,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 26201
+    },
+    {
+      "sourceId": "polyhaven-wooden-display-shelves-01",
+      "sourceSha256": "43095b6f72f4500bb14598a094b4f19dc267e0515a165c7dcdea6580dd350c8d",
+      "path": "high-resolution-props/polyhaven-wooden-display-shelves-01.png",
+      "visiblePixels": 476734,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 3174
+    },
+    {
+      "sourceId": "polyhaven-ceramic-vase-04",
+      "sourceSha256": "7729c02ae4a0d57e48ad05f81d8157f0d9ab7b0778816b50015b789362efd408",
+      "path": "high-resolution-props/polyhaven-ceramic-vase-04.png",
+      "visiblePixels": 294693,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 9000
+    },
+    {
+      "sourceId": "polyhaven-brass-vase-02",
+      "sourceSha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+      "path": "high-resolution-props/polyhaven-brass-vase-02.png",
+      "visiblePixels": 114170,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6890
+    },
+    {
+      "sourceId": "polyhaven-hanging-picture-frame-02",
+      "sourceSha256": "8722b830280598c71f574a8aadc366077f9a671faced7312f4c96183d6ab9aee",
+      "path": "high-resolution-props/polyhaven-hanging-picture-frame-02.png",
+      "visiblePixels": 405074,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 3680
+    },
+    {
+      "sourceId": "polyhaven-security-camera-02",
+      "sourceSha256": "ec806dd074773a138f4cb8dd5e8495acffcd2e36b68b4f885797a5bf535b547a",
+      "path": "high-resolution-props/polyhaven-security-camera-02.png",
+      "visiblePixels": 194415,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 12481
+    },
+    {
+      "sourceId": "polyhaven-vintage-radio-transceiver",
+      "sourceSha256": "666ec674341ef78b03c9347370437f352431334766f9857dc51a6e0beef8af64",
+      "path": "high-resolution-props/polyhaven-vintage-radio-transceiver.png",
+      "visiblePixels": 203076,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 42350
+    },
+    {
+      "sourceId": "polyhaven-painted-wooden-cabinet-02",
+      "sourceSha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+      "path": "high-resolution-props/polyhaven-painted-wooden-cabinet-02.png",
+      "visiblePixels": 319729,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 966
+    },
+    {
+      "sourceId": "polyhaven-brass-pan-01",
+      "sourceSha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "path": "high-resolution-props/polyhaven-brass-pan-01.png",
+      "visiblePixels": 75977,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4340
+    },
+    {
+      "sourceId": "polyhaven-food-lime-01",
+      "sourceSha256": "9ec41e390267743398451eff9237457fd02ef10510f5468e891f7aec23af72ca",
+      "path": "high-resolution-props/polyhaven-food-lime-01.png",
+      "visiblePixels": 474506,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 8100
+    },
+    {
+      "sourceId": "polyhaven-fire-alarm",
+      "sourceSha256": "24dd892726d63226a19277aee499b8d176ff007f01d0228545a9c6851e298628",
+      "path": "high-resolution-props/polyhaven-fire-alarm.png",
+      "visiblePixels": 485881,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 2705
+    },
+    {
+      "sourceId": "polyhaven-water-manhole-cover",
+      "sourceSha256": "c1c692b0fb455d68ea54b6abb5614e7946b386f37d9dd7c8104bb971e0b791fe",
+      "path": "high-resolution-props/polyhaven-water-manhole-cover.png",
+      "visiblePixels": 298259,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6301
+    },
+    {
+      "sourceId": "polyhaven-wooden-crate-01",
+      "sourceSha256": "350649e8949a525434709f9f0e19a7c6ff998905bf9aac28dd476e299a19f767",
+      "path": "high-resolution-props/polyhaven-wooden-crate-01.png",
+      "visiblePixels": 388353,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6576
+    },
+    {
+      "sourceId": "polyhaven-boulder-01",
+      "sourceSha256": "272032bd07c7a98a47b8bbf7db9581e04b62951887514b25b776bc07635e293d",
+      "path": "high-resolution-props/polyhaven-boulder-01.png",
+      "visiblePixels": 265242,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 66122
+    },
+    {
+      "sourceId": "polyhaven-tree-stump-01",
+      "sourceSha256": "b98e8a8962e44fe0707278a6b66e523abc98b06ee744166a5ce7c46aee73d43c",
+      "path": "high-resolution-props/polyhaven-tree-stump-01.png",
+      "visiblePixels": 321703,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 41046
+    },
+    {
+      "sourceId": "polyhaven-dining-chair-02",
+      "sourceSha256": "63f22f21a65010d3f3ac66eeef90a12e2ff98ea3f991f526b13159dc5a44daba",
+      "path": "high-resolution-props/polyhaven-dining-chair-02.png",
+      "visiblePixels": 297956,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 22013
+    },
+    {
+      "sourceId": "polyhaven-folding-wooden-stool",
+      "sourceSha256": "51866a21c4d5fb4df0485e4152569ee55eb5435fa433896d791ae95281b3d0c2",
+      "path": "high-resolution-props/polyhaven-folding-wooden-stool.png",
+      "visiblePixels": 477057,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6324
+    },
+    {
+      "sourceId": "polyhaven-chinese-commode",
+      "sourceSha256": "6f0b75409a88b045ff979c3709e07857cd104279f7ba3cc5e57cd7a87c05be1a",
+      "path": "high-resolution-props/polyhaven-chinese-commode.png",
+      "visiblePixels": 234369,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6775
+    },
+    {
+      "sourceId": "polyhaven-industrial-wall-lamp",
+      "sourceSha256": "b2883ab086e7c34fb01944ef6a1564ec30f105ce77fff30a864f35bb68afa664",
+      "path": "high-resolution-props/polyhaven-industrial-wall-lamp.png",
+      "visiblePixels": 280105,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 9640
+    },
+    {
+      "sourceId": "polyhaven-wall-clock",
+      "sourceSha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+      "path": "high-resolution-props/polyhaven-wall-clock.png",
+      "visiblePixels": 494268,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 7844
+    },
+    {
+      "sourceId": "polyhaven-ceramic-vase-03",
+      "sourceSha256": "fe5381f8e7a05af8484922c0cd332573d5da028fc82a5018e0d40e107a336943",
+      "path": "high-resolution-props/polyhaven-ceramic-vase-03.png",
+      "visiblePixels": 225856,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 11136
+    },
+    {
+      "sourceId": "polyhaven-brass-vase-01",
+      "sourceSha256": "e782304ae87f4b32b3f4b2d7f385c1bca74518ffde62682a308b7b3f72488031",
+      "path": "high-resolution-props/polyhaven-brass-vase-01.png",
+      "visiblePixels": 125507,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 21440
+    },
+    {
+      "sourceId": "polyhaven-binder-notebook",
+      "sourceSha256": "04ce680d071803ca69624a67695334517524952b237500c799629d4652c21964",
+      "path": "high-resolution-props/polyhaven-binder-notebook.png",
+      "visiblePixels": 92137,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 18077
+    },
+    {
+      "sourceId": "polyhaven-wooden-crate-02",
+      "sourceSha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+      "path": "high-resolution-props/polyhaven-wooden-crate-02.png",
+      "visiblePixels": 346034,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 5176
+    },
+    {
+      "sourceId": "polyhaven-namaqualand-boulder-02",
+      "sourceSha256": "1a23f8eb51d37c82d79f8919ba07990631d86944678e748f221655b01a7d5bfb",
+      "path": "high-resolution-props/polyhaven-namaqualand-boulder-02.png",
+      "visiblePixels": 215059,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 97964
+    },
+    {
+      "sourceId": "polyhaven-dead-tree-trunk",
+      "sourceSha256": "aa7e5120d1afb6314838f64e93b8ea6a910fca6780b8e7dbe748b5f84420f4e3",
+      "path": "high-resolution-props/polyhaven-dead-tree-trunk.png",
+      "visiblePixels": 40066,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 101802
+    },
+    {
+      "sourceId": "polyhaven-shrub-sorrel-01",
+      "sourceSha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "path": "high-resolution-props/polyhaven-shrub-sorrel-01.png",
+      "visiblePixels": 25489,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 3319
+    }
+  ],
+  "rejected": [
+    {
+      "sourceId": "polyhaven-dandelion-01",
+      "reason": "Error: page.evaluate: Error: Empty or clipped prop render\n    at window.renderProp (http://127.0.0.1:43437/:33:35)\n    at async <anonymous>:337:30"
+    }
+  ],
+  "independentOriginals": 0,
+  "artisticApproval": false
+}

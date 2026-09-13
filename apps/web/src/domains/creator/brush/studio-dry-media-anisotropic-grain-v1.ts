@@ -10,6 +10,8 @@
  * planning is byte-for-byte equivalent to arbitrary streaming chunk boundaries.
  */
 
+import { STUDIO_MATERIAL_BRUSH_DEFINITIONS } from "./studio-material-brush-catalog";
+
 export const STUDIO_DRY_MEDIA_ANISOTROPIC_GRAIN_VERSION_V1 = 1 as const;
 
 export const STUDIO_DRY_MEDIA_ANISOTROPIC_GRAIN_LIMITS_V1 = Object.freeze({
@@ -305,6 +307,13 @@ export const STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_IDS_V1 =
 const STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_ID_SET_V1 =
   new Set<string>(STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_IDS_V1);
 
+/** These material fields own their R8 footprint; a generic fibre carrier must not replace it. */
+export const STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1: readonly string[] = Object.freeze(
+  STUDIO_MATERIAL_BRUSH_DEFINITIONS.filter((row) => row.runtime === "dry-media")
+    .map((row) => `material-${row.program}`),
+);
+const AUTHORED_MORPHOLOGY_IDS = new Set(STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1);
+
 export type StudioDryMediaCatalogClassificationV1 =
   | Readonly<{
       readonly kind: "anisotropic-continuous";
@@ -312,12 +321,16 @@ export type StudioDryMediaCatalogClassificationV1 =
     }>
   | Readonly<{
       readonly kind: "intentional-discrete";
-    }>;
+    }>
+  | Readonly<{ readonly kind: "authored-morphology" }>;
 
 export function classifyStudioDryMediaCatalogIdV1(
   catalogId: unknown,
 ): StudioDryMediaCatalogClassificationV1 | null {
   if (typeof catalogId !== "string") return null;
+  if (AUTHORED_MORPHOLOGY_IDS.has(catalogId)) {
+    return Object.freeze({ kind: "authored-morphology" });
+  }
   if (Object.hasOwn(STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1, catalogId)) {
     return Object.freeze({
       kind: "anisotropic-continuous",
@@ -342,7 +355,7 @@ export function isStudioDryMediaAnisotropicPresetIdV1(
  * Resolves core physical brush ids directly and every shipped `dry-media` catalogue id through the
  * explicit classification table above. Continuous pencil, chalk, charcoal, crayon, dry-ink,
  * roller and rake materials receive an anisotropic carrier; only entries explicitly classified as
- * intentional motif/stamp deposits keep their authored discrete renderer. A generic `dry-media`
+ * intentional motif/stamp deposits or authored morphologies keep their own footprint renderer. A generic `dry-media`
  * id without catalogue provenance remains unsupported rather than being guessed.
  *
  * This resolver is a stored-replay authority: persisted material identity is recomputed from it on

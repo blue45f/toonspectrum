@@ -1,0 +1,100 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/old_tyre",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Old Tyre",
+    "type": 2,
+    "authors": {
+      "MP": "All"
+    },
+    "info": null,
+    "date_published": 1698624000,
+    "categories": [
+      "industrial",
+      "props",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "wheels",
+      "wheel",
+      "trash",
+      "garbage",
+      "garage",
+      "scrapyard",
+      "junkyard",
+      "abandoned",
+      "automotive",
+      "car",
+      "vehicle"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 2880,
+    "texel_density": 3402.509610901198,
+    "dimensions": [
+      600.0000238418579,
+      164.99999910593033,
+      600.0000238418579
+    ],
+    "files_hash": "8b7362724dd9d54081fe99703e32f434f75d1f0e",
+    "description": "Free 4K model of an old tyre with worn tread, scuffs, dirt and realistic rubber sidewall detail, stamped markings and gritty, abandoned-junkyard character.",
+    "category_id": "78bb232f-513b-5e0f-b2dd-bd5f71a191b5",
+    "category": "Vehicles & Transport/Parts & Accessories/Wheels & Tyres",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "rubber"
+      ]
+    },
+    "img_version": "3d683bbf",
+    "download_count": 23097,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/old_tyre.png?width=256&height=256&v=3d683bbf"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/old_tyre/old_tyre_2k.gltf",
+      "bytes": 2734,
+      "sha256": "718887df6f9c3870e83c37a599204bb6b1503e659c5ba4964fffc72a8183927a",
+      "sourceMd5": "a32316312ea33bb85d668ea2e6872ef3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/old_tyre/old_tyre_nor_gl_2k.jpg",
+      "bytes": 2969610,
+      "sha256": "46b54580adcc86af76d80c1e524c268e36fa7a46dade269fafb1109bf56a6df1",
+      "sourceMd5": "7136939bf732cdbb192d7dd0f5470703"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/old_tyre/old_tyre.bin",
+      "bytes": 84160,
+      "sha256": "659e7982c2de92ca1d13194c97bf112b6dec22d91daecc88e3912d37ce1b7252",
+      "sourceMd5": "e29bd9703ad64da8883d8389b0cfb797"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/old_tyre/old_tyre_arm_2k.jpg",
+      "bytes": 3056768,
+      "sha256": "2a5bcb0b7a9f447de60bbf6f492dc01059dcbbfe94cf67eee8c5e1b2892ff5eb",
+      "sourceMd5": "a0a5c2bc4d35ff510c1a9f460651693c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/old_tyre/old_tyre_diff_2k.jpg",
+      "bytes": 2557591,
+      "sha256": "fc84489da73f20898deb28c85a6a392e1d752a6f57be0f45be55edfa088b48c9",
+      "sourceMd5": "d8ce2ae13fba7a55f9a7773ff3fc2b16"
+    }
+  ]
+}

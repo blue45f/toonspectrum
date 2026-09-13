@@ -29,6 +29,8 @@ import type {
 } from "./studio-live-collaboration-protocol";
 import type { StudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
 
+import type { StudioLiveDirectPort } from "./studio-live-direct-port";
+
 export type StudioLiveTransportMode = "local" | "server";
 
 /** Where live Yjs diffs are fanned out. Mesh is preferred to keep Socket.IO off the hot path. */
@@ -75,6 +77,8 @@ export type StudioLiveTransportControlEvent =
  * authenticated socket has received a successful work-room ACL acknowledgement.
  */
 export interface StudioLiveTransport {
+  /** Strict RTC-only messages. Absence never grants permission to relay. */
+  readonly direct?: StudioLiveDirectPort;
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
   /**

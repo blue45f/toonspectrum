@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/horse_statue_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "decorative",
+      "horse",
+      "statue",
+      "figurine",
+      "porcelain",
+      "animal",
+      "sculpture",
+      "white",
+      "fancy"
+    ],
+    "name": "Horse Statue 01",
+    "categories": [
+      "props",
+      "decorative"
+    ],
+    "authors": {
+      "Rico Cilliers": "All"
+    },
+    "date_published": 1634860800,
+    "sponsors": [
+      "3267566"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 22388,
+    "texel_density": 27349.899558550045,
+    "dimensions": [
+      163.80367428064346,
+      107.79086500406265,
+      219.97890953571186
+    ],
+    "files_hash": "1d826b7fbcaca3f5aaa48ea4b27a74b44e593971",
+    "description": "Free 8K model - glossy white porcelain horse figurine rearing on a round wooden base, with detailed mane, musculature and an elegant sculptural finish.",
+    "category_id": "7640f984-6f63-523f-8953-8ddc8f33d39a",
+    "category": "Decor & Art/Sculptures & Figurines/Animal Figures",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "ceramic",
+        "wood"
+      ]
+    },
+    "img_version": "f1b16d81",
+    "download_count": 53845,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/horse_statue_01.png?width=256&height=256&v=f1b16d81"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/horse_statue_01/horse_statue_01_2k.gltf",
+      "bytes": 5858,
+      "sha256": "15e7bc37722474df74ef0a442134332e626739b444fdaede134d4bbbf3a004d8",
+      "sourceMd5": "72028b29027bebb88c1d7cbb027c3b01"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/horse_statue_01/horse_statue_01_nor_gl_2k.jpg",
+      "bytes": 461768,
+      "sha256": "bc0c960fb7ea27e8fae35823e02a222c4849c8c9730fc7fef812971d9e6e6d55",
+      "sourceMd5": "b383580fd9db583d618b30e7069ae663"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/horse_statue_01/horse_statue_01_diff_2k.jpg",
+      "bytes": 511552,
+      "sha256": "efbc5a1994f3bcf5774c1674f12c33c6b8c9e41dc0770484bf4a3a9f6976ea37",
+      "sourceMd5": "048ad879841e6b0b8710e1d477b229c1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/horse_statue_01/horse_statue_01.bin",
+      "bytes": 839480,
+      "sha256": "5099dc5709aa5935031c1e9121e590ba3b0c09f58eef64bcbe390bb46c1aa8f4",
+      "sourceMd5": "f240dd187e04807481bc422b5a9596c3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/horse_statue_01/horse_statue_01_arm_2k.jpg",
+      "bytes": 549132,
+      "sha256": "7687d1ac37b703538c5803e1190e8d145f44938779a537f5edba0c4de2cdc920",
+      "sourceMd5": "c2b4c8cda6599b8639bb05f0068b638a"
+    }
+  ]
+}

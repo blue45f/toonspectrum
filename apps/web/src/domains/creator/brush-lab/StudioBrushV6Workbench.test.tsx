@@ -232,4 +232,17 @@ describe("V6 brush experiments in the workbench", () => {
     expect(stored()).toEqual(initial);
     expect(screen.queryByRole("link", { name: "원고에서 사용하기" })).toBeNull();
   });
+  it("selects a physical recipe, exposes its real controls and blocks unrelated engines", () => {
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: /^중력 분사/u }));
+    expect(stored().slots.carrier).toBe("carrier-cpu-ballistic-spray-v1");
+    fireEvent.change(screen.getByRole("slider", { name: /중력 방향·강도/u }), { target: { value: "-0.5" } });
+    expect(stored().tuning.gravity).toBe(-0.5);
+    const pattern = screen.getByLabelText("패턴") as HTMLSelectElement;
+    expect([...pattern.options].filter((option) => !option.disabled).map((option) => option.value)).toEqual(["pattern-none"]);
+    fireEvent.click(screen.getByRole("button", { name: "Physics" }));
+    const bristle = screen.getByRole("button", { name: /Bristle Dynamics/u }) as HTMLButtonElement;
+    expect(bristle.disabled).toBe(true);
+  });
+
 });

@@ -22,7 +22,7 @@ const GROUP_BY_MEDIUM: Readonly<Record<StudioBrushQualityMedium, string>> =
   });
 
 /**
- * The Brush Editor catalogue uses the same 48 product representatives as the normal picker.
+ * The Brush Editor catalogue uses the same curated product representatives as the normal picker.
  * No separate 72-design vocabulary or migration layer exists.
  */
 export const BRUSH_QUALITY_CATALOG: readonly BrushCatalogEntry[] =

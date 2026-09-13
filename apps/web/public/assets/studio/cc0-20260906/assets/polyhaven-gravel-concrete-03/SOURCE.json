@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/gravel_concrete_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Gravel Concrete 03",
+    "type": 1,
+    "tags": [
+      "rough",
+      "weathered",
+      "old",
+      "urban",
+      "sidewalk",
+      "gravel",
+      "concrete",
+      "coarse",
+      "rough  ",
+      "pavement",
+      "exterior",
+      "gritty"
+    ],
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2099.9999046325684,
+      2099.9999046325684
+    ],
+    "date_published": 1708560000,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "19b25602548875bf68347636407538922bcebef7",
+    "description": "Free 8K weathered gravel concrete texture - coarse, gritty grey pavement with visible aggregate, worn pores and subtle stains.",
+    "categories": [
+      "floor",
+      "man made",
+      "concrete",
+      "plaster-concrete"
+    ],
+    "category_id": "70d3bf8f-46b0-5250-a419-61cbf068f448",
+    "category": "Concrete/Cast Walls & Floors/Exposed Aggregate",
+    "attributes": {
+      "surface_use": "paving",
+      "condition": [
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "img_version": "819523ce",
+    "download_count": 97137,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/gravel_concrete_03.png?width=256&height=256&v=819523ce"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_concrete_03/gravel_concrete_03_diff_2k.jpg",
+      "bytes": 3495448,
+      "sha256": "371a6cbe1f03f1117eb46e2fa26e11f80ac1c7cc361b4807d3990b6eb2704501",
+      "sourceMd5": "90d7adae08e3fd8083b65b2581545076"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_concrete_03/gravel_concrete_03_rough_2k.jpg",
+      "bytes": 1537093,
+      "sha256": "2f1e61c34c46e6f32f5692214997d65afd938dfd2a26d8586bd3bb37d352d882",
+      "sourceMd5": "da8f8ddf504ec54d529a1cb4f0df57bb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_concrete_03/gravel_concrete_03_nor_gl_2k.jpg",
+      "bytes": 3365934,
+      "sha256": "804f336849f64fbe72351556de84348d396076b41a90eed2d0e16d49b0bc9ee7",
+      "sourceMd5": "a4f9f7830360c31893873dc4f5b18d65"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_concrete_03/gravel_concrete_03_ao_2k.jpg",
+      "bytes": 1823687,
+      "sha256": "a7421888468d1f0650224ac31ee73712044bcbababd045b627c3ef20201c536d",
+      "sourceMd5": "6703ca5f2b94e6b39452f496eabcb472"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_concrete_03/gravel_concrete_03_disp_2k.jpg",
+      "bytes": 1411219,
+      "sha256": "359b182bf31f44f2dd9213ed4ed87e2235e40fd56b813c033a49d4c045864b63",
+      "sourceMd5": "6d79fd515ec409153a91b4fdd7c2df50"
+    }
+  ]
+}

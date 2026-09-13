@@ -35,7 +35,7 @@ import {
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 
 describe("listed paint uniqueness and consolidated product portfolio", () => {
-  it("exposes exactly 46 distinct paint products", () => {
+  it("exposes exactly 78 distinct paint products", () => {
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBeLessThan(
       STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT,
     );
@@ -45,7 +45,7 @@ describe("listed paint uniqueness and consolidated product portfolio", () => {
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(
       STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint,
     );
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(46);
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(78);
     expect(
       STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.every(
         (item) => !isStudioBrushQuarantinedPresetId(item.id),

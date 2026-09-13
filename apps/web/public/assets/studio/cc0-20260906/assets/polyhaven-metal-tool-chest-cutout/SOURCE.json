@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/metal_tool_chest",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-metal-tool-chest",
+  "sourceModelSha256": "a10dc3e9f5a657056444906515162d14c240105c12cc6bd22ab388610db52fb2",
+  "render": {
+    "sourceId": "polyhaven-metal-tool-chest",
+    "sourceSha256": "a10dc3e9f5a657056444906515162d14c240105c12cc6bd22ab388610db52fb2",
+    "path": "high-resolution-props/polyhaven-metal-tool-chest.png",
+    "visiblePixels": 768835,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 13360
+  },
+  "independentOriginal": false
+}

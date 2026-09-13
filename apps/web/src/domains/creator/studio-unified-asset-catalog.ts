@@ -186,7 +186,12 @@ function queryMatches(
 ): boolean {
   if (groups.length === 0) return true;
   const haystack = itemHaystack(item);
-  return groups.every((group) => group.some((term) => haystack.includes(term)));
+  return groups.every(([literal, ...synonyms]) => {
+    if (literal && haystack.includes(literal)) return true;
+    return synonyms.some((term) => /^[a-z0-9 ]+$/u.test(term)
+      ? new RegExp(`(?:^|[^a-z0-9])${term}(?:$|[^a-z0-9])`, "u").test(haystack)
+      : haystack.includes(term));
+  });
 }
 
 function queryScore(

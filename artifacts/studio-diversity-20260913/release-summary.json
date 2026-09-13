@@ -1,0 +1,20 @@
+{
+  "schema": "toonspectrum.diversity-release.v1",
+  "previousCatalogEntries": 1304,
+  "currentCatalogEntries": 1426,
+  "addedEntries": 122,
+  "independentOriginals": 82,
+  "renderedDerivatives": 40,
+  "byKind": {
+    "model": 41,
+    "surface-texture": 14,
+    "background": 27,
+    "prop-image": 40
+  },
+  "payloadBytes": 260492260,
+  "preservedExistingEntries": 1304,
+  "visualReview": "contact-sheet-visual-triage",
+  "allAnglesArtisticallyApproved": false,
+  "fullStudioProjectRoundTripVerified": false,
+  "decisions": "data/studio-assets/diversity-20260913-decisions.json"
+}

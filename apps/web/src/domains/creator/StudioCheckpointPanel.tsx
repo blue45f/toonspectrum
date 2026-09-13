@@ -411,9 +411,9 @@ export function StudioCheckpointPanel({
             <History size={18} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 id={dialogTitleId} className="text-base font-bold tracking-tight text-fg">버전 및 복구</h2>
+            <h2 id={dialogTitleId} className="text-base font-bold tracking-tight text-fg">저장 기록</h2>
             <p id={dialogDescriptionId} className="mt-0.5 text-xs leading-relaxed text-fg-3">
-              브라우저에 이름 있는 지점을 남기고, 저장된 작품은 서버 자동 버전도 비교·복원할 수 있어요.
+              지금 그림을 남겨 두거나 이전 그림을 다시 열 수 있어요. 이 기기와 계정의 기록을 구분해 보여 드립니다.
             </p>
           </div>
           <button
@@ -423,7 +423,7 @@ export function StudioCheckpointPanel({
               if (!interactionLocked) onClose();
             }}
             disabled={interactionLocked}
-            aria-label="복구 지점 닫기"
+            aria-label="저장 기록 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={15} aria-hidden />
@@ -450,7 +450,7 @@ export function StudioCheckpointPanel({
               visibleTab === "local" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised"
             }`}
           >
-            <HardDrive size={15} aria-hidden /> 브라우저 지점 {checkpoints.length}
+            <HardDrive size={15} aria-hidden /> 이 기기에 저장 {checkpoints.length}
           </button>
           <button
             ref={serverTabRef}
@@ -467,7 +467,7 @@ export function StudioCheckpointPanel({
               visibleTab === "server" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised"
             }`}
           >
-            <Cloud size={15} aria-hidden /> 서버 자동 버전 {serverRevisions.length}
+            <Cloud size={15} aria-hidden /> 계정의 저장 기록 {serverRevisions.length}
           </button>
         </div>
 
@@ -506,21 +506,20 @@ export function StudioCheckpointPanel({
         <div
           id={`${tabListId}-${visibleTab}-panel`}
           role="tabpanel"
-          aria-label={visibleTab === "local" ? "브라우저 복구 지점" : "서버 자동 버전"}
+          aria-label={visibleTab === "local" ? "이 기기의 저장 기록" : "계정의 저장 기록"}
           className="flex min-h-0 flex-1 flex-col"
         >
         {visibleTab === "local" ? <form
           className="flex shrink-0 flex-wrap gap-2 border-b border-line bg-card/35 px-4 py-3"
           onSubmit={(event) => {
             event.preventDefault();
-            const normalized = name.trim();
-            if (!normalized) return;
+            const normalized = name.trim() || "이름 없는 저장 기록";
             onCreate(normalized);
             setName("");
           }}
         >
           <label className="min-w-[12rem] flex-1 text-xs font-semibold text-fg-2">
-            새 복구 지점 이름
+            기록 이름 (선택)
             <input
               value={name}
               onChange={(event) => setName(event.target.value.slice(0, 80))}
@@ -531,7 +530,6 @@ export function StudioCheckpointPanel({
           </label>
           <button
             type="submit"
-            disabled={!name.trim()}
             className="mt-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
           >
             <BookmarkPlus size={14} aria-hidden /> 지금 상태 저장
@@ -550,12 +548,12 @@ export function StudioCheckpointPanel({
             <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-line bg-card/30 px-4 text-center">
               <div>
                 <History size={24} className="mx-auto text-fg-3" aria-hidden />
-                <p className="mt-2 text-sm font-semibold text-fg-2">아직 저장한 복구 지점이 없어요</p>
+                <p className="mt-2 text-sm font-semibold text-fg-2">아직 저장한 기록이 없어요</p>
                 <p className="mt-1 text-xs text-fg-3">큰 편집이나 AI 적용 전에 하나 만들어 두면 안전합니다.</p>
               </div>
             </div>
           ) : (
-            <ol className="space-y-2" aria-label="저장된 복구 지점">
+            <ol className="space-y-2" aria-label="저장된 그림 기록">
               {checkpoints.map((checkpoint) => (
                 <li
                   key={checkpoint.id}
@@ -577,7 +575,7 @@ export function StudioCheckpointPanel({
                   <button
                     type="button"
                     onClick={() => onDelete(checkpoint)}
-                    aria-label={`${checkpoint.name} 복구 지점 삭제`}
+                    aria-label={`${checkpoint.name} 저장 기록 삭제`}
                     className="grid size-11 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad"
                   >
                     <Trash2 size={13} aria-hidden />
@@ -616,7 +614,7 @@ export function StudioCheckpointPanel({
                   </div>
                 </div>
               ) : (
-                <ol className="space-y-2" aria-label="서버 자동 버전">
+                <ol className="space-y-2" aria-label="계정의 저장 기록">
                   {serverRevisions.map((revision) => {
                     const current = revision.revision === serverCurrentRevision;
                     return (
@@ -657,7 +655,7 @@ export function StudioCheckpointPanel({
 
         <p className="shrink-0 border-t border-line px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3">
           {visibleTab === "local"
-            ? `브라우저 지점은 기기 변경에 유지되지 않으므로 JSON 또는 프로젝트 archive도 함께 보관하세요. 최신 ${STUDIO_CHECKPOINT_LIMIT}개까지 저장합니다.`
+            ? `이 기기에 저장은 기기 변경에 유지되지 않으므로 JSON 또는 프로젝트 archive도 함께 보관하세요. 최신 ${STUDIO_CHECKPOINT_LIMIT}개까지 저장합니다.`
             : "서버 복원은 기존 revision을 덮어쓰지 않고 새 revision으로 기록됩니다. 작품 소유자에게만 목록과 내용이 열립니다."}
         </p>
         </div>

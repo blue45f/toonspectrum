@@ -1,0 +1,80 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rooftop_night",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 16,
+    "files_hash": "0fa4744849c4bd4347944939a75ae3921fd205b9",
+    "type": 0,
+    "tags": [
+      "parking",
+      "moon",
+      "twilight",
+      "roof",
+      "concrete"
+    ],
+    "date_published": 1508536800,
+    "sponsors": [
+      "3567764"
+    ],
+    "name": "Rooftop Night",
+    "categories": [
+      "outdoor",
+      "skies",
+      "urban",
+      "sunrise-sunset",
+      "partly cloudy",
+      "high contrast",
+      "artificial light",
+      "night"
+    ],
+    "date_taken": 1450722420,
+    "coords": [
+      -26.138736,
+      28.009162
+    ],
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free, unclipped 16K HDRI. Twilight rooftop parking with moon and purple-pink sky, bright floodlights and high-contrast concrete reflections.",
+    "attributes": {
+      "time_of_day": "dusk",
+      "weather": "partly_cloudy",
+      "light_type": "mixed",
+      "contrast": "high",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "category_id": "93810959-0b89-5621-9c9c-d44bf97cfbe6",
+    "category": "Streets & Town/Parking/Rooftop Car Parks",
+    "img_version": "1524d801",
+    "download_count": 187731,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rooftop_night.png?width=256&height=256&v=1524d801"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rooftop_night.jpg",
+      "bytes": 4720008,
+      "sha256": "a8deb0e6c74a923e776786eb1ee9258b83d8afc7980efbdee3af0f8e833c0f76",
+      "sourceMd5": "e371f1d45d99040cba1ab9bec393715c"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

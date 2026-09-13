@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_crate_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-wooden-crate-02",
+  "sourceModelSha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+  "render": {
+    "sourceId": "polyhaven-wooden-crate-02",
+    "sourceSha256": "36bc26c5231fcbbe7a12ef62fb5b1623b945cb41946b3dea62255e63dc403dd1",
+    "path": "high-resolution-props/polyhaven-wooden-crate-02.png",
+    "visiblePixels": 346034,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 5176
+  },
+  "independentOriginal": false
+}

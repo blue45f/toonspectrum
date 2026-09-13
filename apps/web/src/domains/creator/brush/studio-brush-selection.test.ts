@@ -197,13 +197,13 @@ describe("studio brush catalogue selection", () => {
   });
 
   it("materializes all catalogue ids through one fail-closed selection source", async () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_BRUSH_CATALOG_COUNTS.total);
     expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
-      core: STUDIO_BRUSH_CATALOG_COUNTS.core,
-      pro: 160,
-      total: STUDIO_BRUSH_CATALOG_COUNTS.core + 160,
+      core: BRUSH_PRESETS.length,
+      pro: 192,
+      total: BRUSH_PRESETS.length + 192,
       erase: 2,
-      paint: STUDIO_BRUSH_CATALOG_COUNTS.core - 2 + 160,
+      paint: BRUSH_PRESETS.length - 2 + 192,
     });
     expect(STUDIO_BRUSH_CATALOG_COUNTS.core).toBeGreaterThanOrEqual(99);
 

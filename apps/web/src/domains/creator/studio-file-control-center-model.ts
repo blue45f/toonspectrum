@@ -37,8 +37,9 @@ export const STUDIO_FILE_CONTROL_ACTIONS: readonly StudioFileControlActionSpec[]
     Object.freeze({
       id: "named-version",
       label: "이름 붙인 버전",
-      description: "복원 가능한 체크포인트를 만들고 이전 버전을 비교합니다.",
+      description: "지금 그림을 남겨 두고, 나중에 이전 그림을 다시 엽니다.",
       buttonMatchers: Object.freeze([
+        Object.freeze(["저장 기록"]),
         Object.freeze(["버전 체크포인트"]),
         Object.freeze(["체크포인트"]),
       ]),
@@ -284,8 +285,9 @@ export function inspectStudioFileCandidate(
   const tier = compatibilityTier(capability, withinSizeBudget);
   const bridgeRecommendations = UNSUPPORTED_BRIDGES[extension] ?? [];
   const recommendations = [
-    ...(capability?.recommendedBridge ?? []),
+    // Lead with the actual conversion step before general preservation advice.
     ...bridgeRecommendations,
+    ...(capability?.recommendedBridge ?? []),
   ];
   const risks = capability?.lossModel ?? [];
   const actionId = tier === "blocked" || tier === "bridge" || tier === "unsupported"

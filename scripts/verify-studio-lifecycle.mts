@@ -201,6 +201,20 @@ function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollec
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
+    // These resources are intentionally outside offline preparation. Preserve
+    // their evidence separately; never ignore failed editor modules or page errors.
+    if (VERIFY_OFFLINE_DRAWING && entry.text().includes("net::ERR_INTERNET_DISCONNECTED")) {
+      const origin = new URL(studioUrl).origin;
+      const optionalUrls = [
+        `${origin}/bootstrap-compat.js`, `${origin}/bootstrap-theme.js`,
+        "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap",
+        "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css",
+      ];
+      if (optionalUrls.includes(location)) {
+        log(`EXPECTED OFFLINE OPTIONAL RESOURCE: ${location}`);
+        return;
+      }
+    }
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
     if (!isExpectedStaticPreviewError(message, studioUrl)) collector.messages.push(message);
   });
@@ -529,6 +543,18 @@ function cleanScratch(): void {
   });
 }
 
+const VERIFY_OFFLINE_DRAWING = process.env.TOONSPECTRUM_VERIFY_OFFLINE_DRAWING === "1";
+
+async function prepareOfflineLifecycle(page: Page): Promise<void> {
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), undefined, { timeout: 20_000 });
+  const panel = page.locator('[data-studio-offline-panel="true"]');
+  await panel.locator("summary").click();
+  await panel.getByRole("button", { name: /오프라인 리소스 준비|리소스 다시 확인/u }).click();
+  await panel.getByRole("status").filter({ hasText: /현재 불러온 리소스 \d+개를 확인했습니다/u })
+    .waitFor({ state: "visible", timeout: 50_000 });
+  await panel.locator("summary").click();
+}
+
 async function runLifecycle(browser: Browser, origin: string): Promise<LifecycleResult> {
   // /studio is the project home; draw/undo/reload/export exercise the explicit canvas route.
   const studioUrl = `${origin}studio/canvas`;
@@ -559,6 +585,13 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // Dismiss it through the shipped keyboard action before capturing the blank artwork.
     await page.keyboard.press("Escape");
     await page.locator('[data-studio-tool-hint="true"]:visible').waitFor({ state: "hidden" });
+    if (VERIFY_OFFLINE_DRAWING) {
+      await prepareOfflineLifecycle(page);
+      await context.setOffline(true);
+      log("OFFLINE: real pen/undo/redo and durable autosave run with the network disabled");
+      await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
+      await page.keyboard.press("Escape");
+    }
     const baseline = await captureStableStage(page, stage);
     writeFileSync(baselinePath, baseline);
     const surfaceDiagnostics = [await recordStageSurfaces(stage, "baseline")];
@@ -632,6 +665,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       "durable autosave left a browser compatibility record before reload",
     );
 
+    // Export is a separately lazy-loaded capability. Warm it online once, then
+    // verify the cached export and persisted artwork after a truly offline boot.
+    if (VERIFY_OFFLINE_DRAWING) await context.setOffline(false);
     const beforeDownload = await captureDownload(page, beforeExportPath);
     const beforePng = inspectPngIntegrity(beforeDownload.bytes);
     const beforeStats = await decodedPngStats(page, beforeDownload.bytes);
@@ -646,6 +682,10 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       `PNG dimensions are ${beforePng.width}x${beforePng.height}, expected ${expectedWidth}x${expectedHeight}`,
     );
 
+    if (VERIFY_OFFLINE_DRAWING) {
+      await prepareOfflineLifecycle(page);
+      await context.setOffline(true);
+    }
     const reloadStartedAt = performance.now();
     await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
@@ -654,10 +694,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
-    const recoveryMessage = page.getByText(
-      "이전에 작성 중이던 임시저장 데이터가 있습니다.",
-      { exact: false },
-    );
+    const recoveryMessage = page.locator("[data-studio-recovery-notice]");
     await recoveryMessage.waitFor({ state: "visible", timeout: 8_000 });
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
@@ -665,7 +702,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "복구하기", exact: true }).click();
+    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
     await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
 
     const restoredStage = page.locator(".konvajs-content").first();
@@ -767,6 +804,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       },
       browserErrors,
       limitations: [
+        VERIFY_OFFLINE_DRAWING
+          ? "Network disabled for pen/undo/redo/autosave and again for reload/recovery/PNG export; export is first warmed online. This is not a browser-restart or every-tool test."
+          : "Network remains online in this baseline lifecycle run.",
         "Persistence coverage is the shipped OPFS/SQLite autosave and reload/recovery UI path, not authenticated server/database save.",
         "historyReadyAfterPointerUpMs includes Playwright transport and DOM polling overhead; it is diagnostic, not input-latency p95.",
         "The gate covers Chromium production preview and one default opaque pen stroke, not every brush/backend/browser.",
@@ -775,6 +815,13 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     };
     writeFileSync(REPORT_PATH, `${JSON.stringify(result, null, 2)}\n`);
     return result;
+  } catch (error) {
+    // Preserve diagnostics without changing the gate's failure result.
+    await page.screenshot({ path: join(SCRATCH, "studio-lifecycle-failure.png"), timeout: 5_000 }).catch(() => undefined);
+    await page.locator("body").innerText({ timeout: 5_000 }).then((text) =>
+      writeFileSync(join(SCRATCH, "studio-lifecycle-failure.txt"), text), () => undefined);
+    writeFileSync(join(SCRATCH, "studio-lifecycle-failure-errors.json"), JSON.stringify(browserErrors, null, 2));
+    throw error;
   } finally {
     await context.close();
   }

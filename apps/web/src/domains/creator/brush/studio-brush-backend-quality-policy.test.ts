@@ -210,8 +210,8 @@ describe("studio brush backend quality classification", () => {
     }
   });
 
-  it("classifies all 160 pro brushes by their catalogue identity and runtime profile", () => {
-    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(160);
+  it("classifies all 192 pro brushes by their catalogue identity and runtime profile", () => {
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(192);
     for (const descriptor of STUDIO_BRUSH_PACK_DESCRIPTORS) {
       const classification = classifyStudioBrushBackendQuality({
         catalogId: descriptor.catalogId,

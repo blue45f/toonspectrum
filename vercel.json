@@ -74,7 +74,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)"
+          "value": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)"
         },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
       ]
@@ -134,6 +134,14 @@
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
         }
+      ]
+    },
+    {
+      "source": "/assets/studio/cc0-20260906/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "CDN-Cache-Control", "value": "no-cache" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "no-cache" }
       ]
     },
     {

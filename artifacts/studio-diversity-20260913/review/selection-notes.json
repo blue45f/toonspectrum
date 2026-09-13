@@ -1,0 +1,36 @@
+{
+  "excluded": {
+    "polyhaven-anthurium-botany-01": "잎과 식재 부품이 흩어진 구성 세트로, 완성된 단일 화초 소품으로 제공하기 부적합.",
+    "polyhaven-calathea-orbifolia-01": "작은 식재 구성 요소가 넓게 산재해 기본 소품의 가독성과 활용성이 낮음.",
+    "polyhaven-anthurium-botany-01-cutout": "흩어진 식재 부품 원본의 렌더로 단일 완성 소품 용도에 부적합.",
+    "polyhaven-calathea-orbifolia-01-cutout": "소품 실루엣이 작고 산재하여 2D 합성 소재로 사용하기 어려움.",
+    "polyhaven-background-comfy-cafe": "화면 중심의 큰 기둥이 실내 공간을 가려 배경 구도 활용성이 낮음.",
+    "polyhaven-background-hamburg-hbf": "중앙 광고와 자판기가 역 공간보다 지배적인 구도로 신규 추천 배경에서 제외.",
+    "polyhaven-background-hotel-room": "창문과 커튼 클로즈업으로 객실 구조가 거의 드러나지 않음.",
+    "polyhaven-background-pond-bridge-night": "대부분의 숲과 수면이 너무 어두워 디테일 판독성이 부족함.",
+    "polyhaven-background-mosaic-tunnel": "통로 대신 모자이크 벽화와 조명이 크게 잘려 공간 배경 활용성이 낮음.",
+    "polyhaven-horse-statue-01-cutout": "1536px 확대 확인에서 밝은 도자기 표면의 명암과 형태 디테일 대비가 약함. 3D 원본은 유지.",
+    "polyhaven-background-canary-wharf": "높은 울타리가 장면을 막아 배경 구도와 공간 활용성이 낮음.",
+    "polyhaven-background-winter-evening": "상점 간판이 장면의 주요 요소여서 범용 창작 배경 선정에서 제외."
+  },
+  "names": {
+    "polyhaven-wicker-basket-01": "라탄 직조 바구니",
+    "polyhaven-ottoman-01": "브라운 가죽 오토만 스툴",
+    "polyhaven-football": "낡은 축구공과 바람 빠진 공 세트",
+    "polyhaven-jug-01": "장미 무늬 도자기 저그",
+    "polyhaven-metal-trash-can": "원통 금속 쓰레기통 세트",
+    "polyhaven-rollershutter-window-01": "상점 롤러 셔터 창문 세트",
+    "polyhaven-background-canary-wharf": "고층 건물 앞 광장과 가림벽",
+    "polyhaven-background-crosswalk": "숲길 입구 도로와 횡단보도",
+    "polyhaven-background-modern-buildings-night": "야간 유리 건물 아트리움 입구",
+    "polyhaven-background-courtyard-night": "야간 주택 차고문과 중정",
+    "polyhaven-background-freight-station": "노을빛 옛 화물역 부지",
+    "polyhaven-background-large-corridor": "아치 창과 실내 발코니 문",
+    "polyhaven-background-winter-evening": "눈 쌓인 건물 안뜰과 야간 조명",
+    "polyhaven-background-river-walk-1": "강변 숲속 산책길",
+    "polyhaven-background-venice-sunset": "노을빛 바다와 수평선",
+    "polyhaven-background-derelict-overpass": "시골 고가도로 난간과 들판",
+    "polyhaven-marble-cliff-03": "갈색 대리암 절벽 암석 표면",
+    "polyhaven-gravel-concrete-03": "자갈이 박힌 콘크리트 표면"
+  }
+}

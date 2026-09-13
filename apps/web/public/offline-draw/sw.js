@@ -1,5 +1,5 @@
 /* Scoped to /offline-draw/. No API interception, automatic takeover or cache deletion. */
-importScripts('/offline-draw/cache.js');
+self.importScripts('/offline-draw/cache.js');
 self.addEventListener('install', (event) => { event.waitUntil(self.ToonLocalCache.prepare()); });
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);

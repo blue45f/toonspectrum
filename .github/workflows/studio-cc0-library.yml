@@ -2,7 +2,7 @@ name: Studio CC0 library regression
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
     paths:
       - '.github/workflows/studio-cc0-library.yml'
       - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
@@ -10,6 +10,7 @@ on:
       - 'apps/web/src/domains/creator/useStudioModalSheet.ts'
       - 'scripts/studio-cc0-lifecycle-checks.mjs'
       - 'scripts/verify-studio-cc0-curated-ui.mjs'
+      - 'scripts/*premium*.mts'
       - 'apps/web/public/assets/studio/cc0-20260906/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -21,6 +22,7 @@ on:
       - 'apps/web/src/domains/creator/useStudioModalSheet.ts'
       - 'scripts/studio-cc0-lifecycle-checks.mjs'
       - 'scripts/verify-studio-cc0-curated-ui.mjs'
+      - 'scripts/*premium*.mts'
       - 'apps/web/public/assets/studio/cc0-20260906/**'
       - 'package.json'
       - 'pnpm-lock.yaml'

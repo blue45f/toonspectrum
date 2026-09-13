@@ -1,0 +1,81 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/crosswalk",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 27,
+    "type": 0,
+    "whitebalance": 5300,
+    "date_published": 1608246000,
+    "name": "Crosswalk",
+    "categories": [
+      "outdoor",
+      "urban",
+      "morning-afternoon",
+      "clear",
+      "high contrast",
+      "natural light"
+    ],
+    "date_taken": 1600984800,
+    "coords": [
+      50.08049,
+      36.261773
+    ],
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "53439564"
+    ],
+    "backplates": true,
+    "tags": [
+      "road",
+      "sun",
+      "pedetrian",
+      "asphalt",
+      "backplates"
+    ],
+    "files_hash": "ff602f4004753f8730709553f9f84bd217de945c",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI with late-morning/early-afternoon clear sun, high-contrast natural light casting crisp tree shadows across asphalt under a bright blue sky.",
+    "category_id": "90534497-6965-5735-bfbc-37f6fda902b7",
+    "category": "Streets & Town/Streets & Alleys/City Streets",
+    "attributes": {
+      "time_of_day": "morning",
+      "weather": "clear",
+      "light_type": "natural",
+      "contrast": "high",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "e945579a",
+    "download_count": 79377,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/crosswalk.png?width=256&height=256&v=e945579a"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/crosswalk.jpg",
+      "bytes": 7664266,
+      "sha256": "cc84ef72a288ba10c9312c75771bb81f8f078a5ece8908be77f73ad0b1e9d8d0",
+      "sourceMd5": "f1f0402960e4e04494e5a654bb50d666"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

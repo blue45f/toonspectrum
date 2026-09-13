@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_vase_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-brass-vase-02",
+  "sourceModelSha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+  "render": {
+    "sourceId": "polyhaven-brass-vase-02",
+    "sourceSha256": "0694666d273981cbfb00251128c7dca6fd4a0ce06cd9779e8c71cb8ccc97b0c4",
+    "path": "high-resolution-props/polyhaven-brass-vase-02.png",
+    "visiblePixels": 114170,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 6890
+  },
+  "independentOriginal": false
+}

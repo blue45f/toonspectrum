@@ -1,0 +1,50 @@
+name: QA stabilization regressions
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/toonstudio-qa-stabilization-regressions.yml
+      - apps/api/src/modules/legal/**
+      - apps/web/src/domains/legal/**
+      - packages/core/src/legal-policy.ts
+      - apps/web/src/domains/creator/studio-editor-document-source*
+      - apps/web/src/domains/creator/studio-project-document-store.ts
+      - apps/web/src/domains/creator/studio-workspace-route.ts
+      - apps/web/src/domains/creator/studio-document-workspace.ts
+      - apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx
+      - apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-stabilization-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Policy and local document regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Run policy display and local document regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/legal/policy-page.test.tsx \
+            apps/web/src/domains/legal/policy-recovery.test.tsx \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts

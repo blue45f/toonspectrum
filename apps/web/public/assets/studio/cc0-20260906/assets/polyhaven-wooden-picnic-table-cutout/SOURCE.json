@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_picnic_table",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-wooden-picnic-table",
+  "sourceModelSha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+  "render": {
+    "sourceId": "polyhaven-wooden-picnic-table",
+    "sourceSha256": "ce295d6dc0bf50956ae433dafbdb5deb029e72bffcfba8f035fdda9e41450285",
+    "path": "high-resolution-props/polyhaven-wooden-picnic-table.png",
+    "visiblePixels": 215283,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 10210
+  },
+  "independentOriginal": false
+}

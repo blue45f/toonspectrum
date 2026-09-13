@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/folding_wooden_stool",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Folding Wooden Stool",
+    "categories": [
+      "seating",
+      "furniture"
+    ],
+    "type": 2,
+    "tags": [
+      "workshop",
+      "garage",
+      "woodwork",
+      "camping",
+      "folding stool",
+      "portable",
+      "compact",
+      "outdoor",
+      "garden"
+    ],
+    "authors": {
+      "Ulan Cabanilla": "All"
+    },
+    "info": null,
+    "date_published": 1713139200,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 6324,
+    "texel_density": 2534.0743853509653,
+    "dimensions": [
+      527.8338193893433,
+      547.0837950706482,
+      441.96850061416626
+    ],
+    "sponsors": [
+      "82322099"
+    ],
+    "files_hash": "3892e7a739a932db568f2493f78dabfd162416c3",
+    "description": "Free 4K model of a folding wooden stool with X-frame legs, slatted top, visible hardware and weathered, hand-finished wood textures; compact and portable.",
+    "category_id": "302a40f3-e544-5721-b63b-ca3574e9975a",
+    "category": "Furniture/Seating/Stools & Bar Seating",
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "1215f1ef",
+    "download_count": 12158,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/folding_wooden_stool.png?width=256&height=256&v=1215f1ef"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/folding_wooden_stool/folding_wooden_stool_2k.gltf",
+      "bytes": 2842,
+      "sha256": "9f638c4c265177339c52941ba24fbf6e4029eae8c8802133c7f3b6714b17859a",
+      "sourceMd5": "ded731a722ee4387d2bd781c87d20f41"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/folding_wooden_stool/folding_wooden_stool_nor_gl_2k.jpg",
+      "bytes": 3043203,
+      "sha256": "63bd128ebb79bc2e75fbc334a31086c7cda2257d7425f2ef8abfafc87521a815",
+      "sourceMd5": "bb309aa7e9fee5cfd5c749182ccdbd88"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/folding_wooden_stool/folding_wooden_stool_diff_2k.jpg",
+      "bytes": 2406740,
+      "sha256": "2f66fd97c9db562df16efc3f2f51e388a297d988c1b2737ce9880e96f127e98f",
+      "sourceMd5": "9202cf518785dfc72a047a02a4a7b863"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/folding_wooden_stool/folding_wooden_stool.bin",
+      "bytes": 193016,
+      "sha256": "84fcfeea3355ff011b9e821691fca04110705cfddba8b8617db868b4c33864fa",
+      "sourceMd5": "d80f2c158986ebd3f343e19156d691fb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/folding_wooden_stool/folding_wooden_stool_arm_2k.jpg",
+      "bytes": 2455054,
+      "sha256": "655151557db44c1fde811ebd17243ffd529de8b339d636ee681e19114a06a2a7",
+      "sourceMd5": "1e3529acb1b8ae19abc3c79a03c5a0ca"
+    }
+  ]
+}

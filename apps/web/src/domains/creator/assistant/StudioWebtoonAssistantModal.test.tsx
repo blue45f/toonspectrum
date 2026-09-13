@@ -9,7 +9,7 @@ import {
   defaultStudioWorkbenchPrefs,
 } from "../studio-workbench-prefs";
 
-import { StudioWebtoonAssistantModal } from "./StudioWebtoonAssistantModal";
+import { StudioWebtoonAssistantModal } from "./StudioWebtoonAssistantContent";
 import { WebtoonCroquisPoseGuide } from "./webtoon-croquis-pose-guide";
 import { WEBTOON_PLATFORM_SPECS } from "./webtoon-platform-spec-validator";
 

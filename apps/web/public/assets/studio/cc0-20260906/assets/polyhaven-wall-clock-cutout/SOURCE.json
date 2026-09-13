@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wall_clock",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-wall-clock",
+  "sourceModelSha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+  "render": {
+    "sourceId": "polyhaven-wall-clock",
+    "sourceSha256": "a74d361239b42fdcd95029055176ebdb05f7fe5bb77fd20c49026ce861a15e75",
+    "path": "high-resolution-props/polyhaven-wall-clock.png",
+    "visiblePixels": 494268,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 7844
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,76 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/subway_entrance",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 8,
+    "type": 0,
+    "tags": [
+      "tile",
+      "fluorescent",
+      "stair",
+      "map",
+      "tunnel",
+      "station",
+      "escalator"
+    ],
+    "date_published": 1508968800,
+    "name": "Subway Entrance",
+    "categories": [
+      "indoor",
+      "urban",
+      "midday",
+      "medium contrast",
+      "artificial light"
+    ],
+    "date_taken": 1479043320,
+    "coords": [
+      51.225926,
+      6.779277
+    ],
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "18031080"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "b100efd9b87558cbe738b692fd925caf89bf487b",
+    "description": "Free 16K HDRI, unclipped. Midday subway entrance lit by cool fluorescents and warm display lights, tiled floors, escalator and stairs, medium-contrast mood.",
+    "category_id": "40ca9dc7-814b-515b-8dec-c924ad3fb9cc",
+    "category": "Interiors/Halls & Venues/Transit Stations",
+    "attributes": {
+      "light_type": "artificial",
+      "contrast": "medium",
+      "environment": "indoor"
+    },
+    "img_version": "ba5b0282",
+    "download_count": 44567,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/subway_entrance.png?width=256&height=256&v=ba5b0282"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/subway_entrance.jpg",
+      "bytes": 7001286,
+      "sha256": "566cb6a7e6e9b56a15605578f95f9a6b4009670a931d564264d74d1ccd664df3",
+      "sourceMd5": "fb5fcd690fbe123a37d0332577effbed"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

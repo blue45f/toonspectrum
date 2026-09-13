@@ -1,0 +1,71 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/royal_esplanade",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 15,
+    "type": 0,
+    "whitebalance": 3700,
+    "tags": [
+      "mall",
+      "cruise",
+      "screen",
+      "balcony",
+      "stair",
+      "tile"
+    ],
+    "date_published": 1529013600,
+    "name": "Royal Esplanade",
+    "categories": [
+      "indoor",
+      "urban",
+      "high contrast",
+      "artificial light"
+    ],
+    "date_taken": 1524890820,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "7947474"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "f54517ed7912eecb4e59eec6e9b302f5200e3323",
+    "description": "Free 16K HDRI, unclipped - bright indoor mall with cool blue ceiling lighting, warm spotlights and strong, high-contrast reflections on tiled floors and metal railings.",
+    "category_id": "95a4b744-1e94-55c3-9440-5d5a9b148b10",
+    "category": "Interiors/Retail & Commercial/Malls & Markets",
+    "attributes": {
+      "light_type": "artificial",
+      "contrast": "high",
+      "environment": "indoor"
+    },
+    "img_version": "b3a0cec7",
+    "download_count": 124122,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/royal_esplanade.png?width=256&height=256&v=b3a0cec7"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/royal_esplanade.jpg",
+      "bytes": 4956102,
+      "sha256": "d880b93e55eac16d1a58f3da8fd2328974cd8592364ea1bfbca9959d7e720b6f",
+      "sourceMd5": "f6a793c3acbf7e6368c936f45e474bd0"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

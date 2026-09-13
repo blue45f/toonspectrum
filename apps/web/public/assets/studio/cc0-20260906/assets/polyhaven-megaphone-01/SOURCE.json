@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Megaphone_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "sponsors": [
+      "7934315",
+      "20953239"
+    ],
+    "name": "Megaphone 01",
+    "categories": [
+      "props",
+      "electronics",
+      "tools"
+    ],
+    "type": 2,
+    "tags": [
+      "plastic",
+      "megaphone",
+      "device",
+      "audio",
+      "amplifier",
+      "loudspeaker",
+      "announcement"
+    ],
+    "authors": {
+      "Ethan Simon-Law": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 15814,
+    "texel_density": 6425.842109205363,
+    "dimensions": [
+      370.6655204296112,
+      228.45355421304703,
+      300.07804185152054
+    ],
+    "files_hash": "699e4fe3504118c25b1bb26d5542015baff03e43",
+    "description": "Free 4K model of a handheld plastic megaphone - gray horn, red body, pistol grip, coiled mic cord, buttons, ports and realistic scuffs.",
+    "category_id": "923644b4-57d0-5e67-89ae-3b4671e52aed",
+    "category": "Electronics & Appliances/Devices & Instruments/Handheld Devices",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "plastic"
+      ]
+    },
+    "img_version": "c115547b",
+    "download_count": 20790,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Megaphone_01.png?width=256&height=256&v=c115547b"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Megaphone_01/Megaphone_01_2k.gltf",
+      "bytes": 2689,
+      "sha256": "c0f66203b041424a1a8f14d1d85264c5a52491242b75cbdb409a311bb2437b97",
+      "sourceMd5": "eb18bcdc8b6b90bb7826890973f27e2c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Megaphone_01/Megaphone_01_diff_2k.jpg",
+      "bytes": 230335,
+      "sha256": "8d137fc38029a0f2b7f20e37acf0bc0c9db94737574d6918a74c990ad7c76a8f",
+      "sourceMd5": "acaf43843166b3f5e185d13c6193db0d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Megaphone_01/Megaphone_01.bin",
+      "bytes": 430724,
+      "sha256": "439e5dd9bff194a916f5f6c03b39ac5899a5411b914980239b2417b9d5e6a658",
+      "sourceMd5": "cab9940da90fee551bd211ea6f26c2ad"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Megaphone_01/Megaphone_01_arm_2k.jpg",
+      "bytes": 548994,
+      "sha256": "e3f42c9970e548f86c9965bcc3f55cd166a186334c96c4b63a6c5695d696903c",
+      "sourceMd5": "c2a97e58d6ff683f617e9c8a787fb1a3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Megaphone_01/Megaphone_01_nor_gl_2k.jpg",
+      "bytes": 368550,
+      "sha256": "70e52694cb082fd6850ff4645789bb4807edfcd8f26dd2b906b9f27d50e94731",
+      "sourceMd5": "c6609ee03136a2344fa29272a0bc9e3c"
+    }
+  ]
+}

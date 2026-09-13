@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Ukulele_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "instrument",
+      "wood",
+      "prop",
+      "guitar",
+      "ukulele",
+      "music"
+    ],
+    "date_published": 1585605600,
+    "name": "Ukulele 01",
+    "categories": [
+      "props",
+      "instrument"
+    ],
+    "authors": {
+      "Joseph Burgan": "All"
+    },
+    "sponsors": [
+      "59361351"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 8912,
+    "texel_density": 7179.990819259687,
+    "dimensions": [
+      177.8610646724701,
+      50.76222866773605,
+      526.9626826047897
+    ],
+    "files_hash": "b4e3018d389e983dde250c867172db7ab1214945",
+    "description": "Free 4K model of a worn wooden ukulele with scuffed varnish, detailed fretboard, metal tuners and visible wood grain.",
+    "category_id": "1f71cdfe-bf24-57ff-b895-b835f1135f41",
+    "category": "Leisure/Musical Instruments/String Instruments",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "27647f38",
+    "download_count": 36520,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Ukulele_01.png?width=256&height=256&v=27647f38"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Ukulele_01/Ukulele_01_2k.gltf",
+      "bytes": 2665,
+      "sha256": "e22a56bc3e4f269efff3d2bcee9d184de1fe8d44546bb1f8c03da9c33f25bb8f",
+      "sourceMd5": "a632d27d9067462954efc8073c9ef2c7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Ukulele_01/Ukulele_01_diff_2k.jpg",
+      "bytes": 706080,
+      "sha256": "8cb31e5c9b6e9ff7e655ff92eb1a95daf1427cd96de9078fb2bd58508acc24e0",
+      "sourceMd5": "d55322f61333982df7c2108e6907cc9f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Ukulele_01/Ukulele_01_nor_gl_2k.jpg",
+      "bytes": 553837,
+      "sha256": "0c14ec928fdbccf9c63818537e539bb1cb5126a05c1e9dda83f803d08ff2bfc7",
+      "sourceMd5": "9aa7569164822816d8ba1fa91ff16113"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Ukulele_01/Ukulele_01_arm_2k.jpg",
+      "bytes": 483077,
+      "sha256": "94b9077f49fc7a5079a842b48c322bfc1b273148ed8ed105da8be94008eb7562",
+      "sourceMd5": "9615b561aa4f06753526da662879986c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Ukulele_01/Ukulele_01.bin",
+      "bytes": 316992,
+      "sha256": "438fc03ff1a454e0063dd8c377629572e429920d0e03aba99799c17bdc1c0a0b",
+      "sourceMd5": "93539b3ad50951be233526a9c1ba9e67"
+    }
+  ]
+}

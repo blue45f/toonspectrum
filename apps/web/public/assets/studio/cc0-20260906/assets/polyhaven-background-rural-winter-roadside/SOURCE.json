@@ -1,0 +1,76 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rural_winter_roadside",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 11,
+    "type": 0,
+    "tags": [
+      "road",
+      "grass",
+      "field",
+      "snow",
+      "winter"
+    ],
+    "date_published": 1559858400,
+    "name": "Rural Winter Roadside",
+    "categories": [
+      "outdoor",
+      "skies",
+      "nature",
+      "sunrise-sunset",
+      "partly cloudy",
+      "low contrast",
+      "natural light"
+    ],
+    "date_taken": 1553015700,
+    "authors": {
+      "Sergej Majboroda": "All"
+    },
+    "sponsors": [
+      "10485422"
+    ],
+    "files_hash": "0fd75a83df15c40ba5283a31e977df04495c2597",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K HDRI, unclipped. Soft, low-contrast winter sunrise light over a rural roadside - cool muted tones, partly cloudy sky, melting snow and bare fields.",
+    "category_id": "3aedc6f4-5b0f-5c3b-87e9-5fecd8c5baac",
+    "category": "Fields & Countryside/Grassland & Meadows/Open Fields & Meadows",
+    "attributes": {
+      "time_of_day": "sunset",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "low",
+      "season": "winter",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "e819629d",
+    "download_count": 39759,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rural_winter_roadside.png?width=256&height=256&v=e819629d"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rural_winter_roadside.jpg",
+      "bytes": 5953963,
+      "sha256": "f25c0edcee104870651885a841273c1acc3a0ff394a697a71abb579f13d3c656",
+      "sourceMd5": "dcb7468cae7e1c22c45a36ba1109eb72"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

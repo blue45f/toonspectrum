@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_diya_lantern",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-brass-diya-lantern",
+  "sourceModelSha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+  "render": {
+    "sourceId": "polyhaven-brass-diya-lantern",
+    "sourceSha256": "c4b4920fffeff91cbbd07e9ac0833acb5e482391d3f9a47274cea46b1fa1ca16",
+    "path": "high-resolution-props/polyhaven-brass-diya-lantern.png",
+    "visiblePixels": 76386,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 12982
+  },
+  "independentOriginal": false
+}

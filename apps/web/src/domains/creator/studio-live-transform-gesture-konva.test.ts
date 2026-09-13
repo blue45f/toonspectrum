@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import { beginStudioLiveCanvasGesture } from "./studio-live-canvas-gesture";
+import * as drawCompiler from "./studio-live-transform-draw-compiler";
 import { createStudioLiveTransformDraftStore } from "./studio-live-transform-draft-store";
 import { STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS } from "./studio-live-transform-exact-draft-admission";
 import {
   beginStudioKonvaDrawTransformGesture,
   studioKonvaDrawTransformIsBusy,
 } from "./studio-live-transform-gesture-konva";
+import { attachStudioLiveTransformSurface } from "./studio-live-transform-surface";
 import { STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR } from "./studio-selection-chrome-mirror";
 
 import type { DrawEl } from "./studio-element-model";
@@ -119,7 +121,24 @@ afterEach(() => {
   scene.stage.destroy();
   scene.container.remove();
   restoreCanvas();
+  vi.restoreAllMocks();
 });
+
+/**
+ * These adapter tests stage a plain Konva.Line, not StudioDrawNode's causal pen.
+ * Certify only that synthetic subtree as affine; production/default-pen tests keep
+ * the real compiler and must replan even uniform frames to match pointer-up.
+ */
+function useRetainedLineFixture(): void {
+  const compile = drawCompiler.compileStudioLiveTransformDrawSnapshot;
+  vi.spyOn(drawCompiler, "compileStudioLiveTransformDrawSnapshot").mockImplementation((element) => {
+    const snapshot = compile(element);
+    return {
+      ...snapshot,
+      renderRoute: { ...snapshot.renderRoute, retainedAffinePolicy: "route-checked" },
+    };
+  });
+}
 
 function createGesture(
   existingStore = createStudioLiveTransformDraftStore(),
@@ -366,6 +385,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   });
 
   it("replans non-uniform frames and switches back to the retained affine fast path", () => {
+    useRetainedLineFixture();
     const { gesture, store, clock } = beginGesture();
     expect(scene.draftRoot.zIndex()).toBe(0);
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
@@ -407,6 +427,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   });
 
   it("renders one isolated SceneCanvas receipt per steady affine frame", () => {
+    useRetainedLineFixture();
     const { gesture, store, clock } = beginGesture();
     const dragReceipt = vi.spyOn(scene.dragLayer, "drawScene");
 
@@ -477,6 +498,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   });
 
   it("rechecks identical geometry after DPR changes, then keeps rejected frames off the source Layer", () => {
+    useRetainedLineFixture();
     const { gesture, clock } = beginGesture();
     gesture.offer({
       targetBounds: { x: 30, y: 40, width: 200, height: 100 },
@@ -519,6 +541,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   });
 
   it("crosses the draft publication barrier before transferring source visibility", () => {
+    useRetainedLineFixture();
     const store = createStudioLiveTransformDraftStore();
     const drawScene = vi.spyOn(scene.dragLayer, "drawScene");
     const autoDrawEnabled = studioKonvaRuntime.autoDrawEnabled;
@@ -820,4 +843,50 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(scene.wrapper.visible()).toBe(true);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
   });
+});
+
+describe("Retina drawing live-transform regression", () => {
+  it.each(["legacy-pen", "pen", "gpen", "brush", "line", "arrow"] as const)(
+    "%s presents exact moving ink while the document stays full resolution",
+    (kind) => {
+      const originalDpr = studioKonvaRuntime.pixelRatio;
+      studioKonvaRuntime.pixelRatio = 2;
+      scene.stage.size({ width: 1800, height: 1200 });
+      scene.mainLayer.getCanvas().setPixelRatio(2);
+      scene.dragLayer.getCanvas().setPixelRatio(2);
+      const detach = attachStudioLiveTransformSurface(scene.dragLayer);
+      try {
+        const element: DrawEl = kind === "legacy-pen"
+          ? { ...sourceElement }
+          : kind === "line" || kind === "arrow"
+            ? { ...sourceElement, kind, brush: "calligraphy", tiltXs: [30, 30], tiltYs: [15, 15] }
+            : { ...sourceElement, brush: kind, sampleSpacing: 2 };
+        const originalPoints = [...element.points];
+        const { gesture, store, clock } = beginGesture(undefined, element);
+        for (const frame of [
+          { targetBounds: { x: 20, y: 30, width: 150, height: 75 }, rotationDeg: 25 },
+          { targetBounds: { x: 35, y: 45, width: 80, height: 25 }, rotationDeg: -35 },
+        ]) {
+          gesture.offer(frame);
+          clock.flush();
+          expect(store.getSnapshot()?.entries[0]?.element).toEqual(
+            planStudioDrawObjectTransform({ el: element, sourceBounds, ...frame }),
+          );
+          expect(scene.wrapper.visible()).toBe(false);
+          expect(element.points).toEqual(originalPoints);
+        }
+        expect(scene.mainLayer.getCanvas().getPixelRatio()).toBe(2);
+        expect(scene.dragLayer.getCanvas().getPixelRatio()).toBeLessThan(2);
+        const canvas = scene.dragLayer.getNativeCanvasElement();
+        expect(canvas.width * canvas.height)
+          .toBeLessThanOrEqual(STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS);
+        gesture.close({ kind: "cancel", reason: "escape" });
+        expect(scene.wrapper.visible()).toBe(true);
+        expect(store.getSnapshot()).toBeNull();
+      } finally {
+        detach();
+        studioKonvaRuntime.pixelRatio = originalDpr;
+      }
+    },
+  );
 });

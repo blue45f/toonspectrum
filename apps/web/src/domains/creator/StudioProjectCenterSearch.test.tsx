@@ -118,7 +118,9 @@ describe("StudioProjectCenterSearch", () => {
         'button[title="프로젝트를 안전하게 보관"]',
       );
       expect(hidden?.hidden).toBe(true);
-      expect(resultActionButtons()).toHaveLength(1);
+      // Section-level synonyms remain searchable, but the direct action must rank first.
+      expect(resultActionButtons()).toHaveLength(2);
+      expect(resultActionButtons()[0]).toBe(findResultAction("게시 사전검사"));
     });
 
     fireEvent.change(search, { target: { value: "체크포인트" } });

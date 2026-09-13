@@ -136,7 +136,7 @@ function studioDrawElementIsBlended(element: DrawEl): boolean {
  * worth a preview.
  */
 function studioBrushEngineIsExactDraftSafe(brushId: unknown, catalogId: unknown): boolean {
-  const runtimeEngine = resolveStudioBrushRuntimeContract(brushId)?.engine;
+  const runtimeEngine = resolveStudioBrushRuntimeContract(brushId ?? "pen")?.engine;
   if (runtimeEngine === undefined || !STUDIO_EXACT_DRAFT_SAFE_ENGINES.has(runtimeEngine)) {
     return false;
   }
@@ -177,6 +177,10 @@ export function studioLiveTransformPreviewBlockedForElement(
   if ((draw.kind ?? "freehand") !== "freehand" && studioSketchStyleOfElement(draw)?.enabled === true) {
     return true;
   }
+  // Line/arrow geometry is rendered before the freehand brush switch. Neither the selected
+  // brush nor legacy sampleSpacing participates in that route; exact drafts replan its heads,
+  // dashes and width with the same geometry as pointer-up.
+  if (draw.kind === "line" || draw.kind === "arrow") return false;
   // THE ALLOWLIST. Everything above is a property of the ELEMENT that disqualifies it whatever it
   // is drawn with; this is the renderer itself, and it must be positively known safe. A brush with
   // no runtime contract at all -- an unknown id, a persisted render mode like `pixel-grid-v1` that
@@ -185,11 +189,8 @@ export function studioLiveTransformPreviewBlockedForElement(
   if (!studioBrushEngineIsExactDraftSafe(draw.brush, draw.brushCatalogId)) {
     return true;
   }
-  // Legacy strokes with no `sampleSpacing`. `resolveStudioFreehandRenderPath` reprocesses those
-  // points against a FIXED 3px legacy distance, so enlarging a densely sampled stroke keeps points
-  // the source render discarded and the committed centerline is not the previewed one scaled. A
-  // stored `sampleSpacing` scales with the transform (the commit planner multiplies it by the same
-  // width factor), which is what makes the resampling agree.
-  if (draw.sampleSpacing === undefined) return true;
+  // Legacy spacing is safe in the model-draft lane: both preview and commit re-run the same
+  // fixed-distance resampler. The compiler forces these audited engines to model-draft-only;
+  // retaining an affine subtree would still be incorrect for these documents.
   return false;
 }

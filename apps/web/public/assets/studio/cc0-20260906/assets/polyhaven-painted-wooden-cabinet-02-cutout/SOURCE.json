@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "sourceId": "polyhaven-painted-wooden-cabinet-02",
+  "sourceModelSha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+  "render": {
+    "sourceId": "polyhaven-painted-wooden-cabinet-02",
+    "sourceSha256": "6802d3292dcc6242afcbd65958ace411e6e36ee31dd68cd212369a53d4113c5d",
+    "path": "high-resolution-props/polyhaven-painted-wooden-cabinet-02.png",
+    "visiblePixels": 319729,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 966
+  },
+  "independentOriginal": false
+}

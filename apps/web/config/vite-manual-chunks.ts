@@ -6,6 +6,12 @@ export function createStudioManualChunks(predicates: {
 }) {
   const { isInitialIconModule, isStudioCoreIconModule } = predicates;
   return (id: string): string | undefined => {
+    if (id.endsWith("/src/domains/creator/brush/studio-material-tip-atlas.generated.json")) {
+      // This is a dependency-free data leaf. Its sole runtime owner is the optional procedural
+      // selection module; a named leaf prevents shared-contract coloring from capturing 32 R8
+      // fields in an eager chunk. Never include the compiler, dynamics or catalogue module here.
+      return "studio-material-tip-atlas";
+    }
     if (
       id.includes("/node_modules/@babylonjs/")
       || id.includes("/node_modules/babylonjs-gltf2interface/")

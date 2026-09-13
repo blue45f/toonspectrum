@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/namaqualand_boulder_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "lods": true,
+    "name": "Namaqualand Boulder 02",
+    "type": 2,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 183681,
+    "texel_density": 2361.4387234162673,
+    "dimensions": [
+      2533.2456827163696,
+      1234.761118888855,
+      883.3709806203842
+    ],
+    "categories": [
+      "nature",
+      "rocks",
+      "collection: namaqualand"
+    ],
+    "sponsors": [
+      "121968951"
+    ],
+    "date_published": 1728345600,
+    "files_hash": "a8226fbda59ed50a4686c9354fdb3d4eea061706",
+    "tags": [
+      "karoo",
+      "desert",
+      "south africa",
+      "boulders",
+      "rocks",
+      "geological",
+      "rock",
+      "landscaping"
+    ],
+    "description": "Free 8K model of Namaqualand boulders - realistic Karoo sandstone rocks with layered, weathered surfaces, perfect for desert, geological, and landscaping scenes.",
+    "authors": {
+      "Greg Zaal": "Photography",
+      "Rico Cilliers": "modeling"
+    },
+    "category_id": "c6a45865-4d6c-5d8e-95fd-e5c3a03d3abf",
+    "category": "Nature/Rocks & Stone/Desert Boulders",
+    "collections": [
+      "namaqualand"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "stone"
+      ],
+      "lods": true
+    },
+    "img_version": "25de3813",
+    "download_count": 41004,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/namaqualand_boulder_02.png?width=256&height=256&v=25de3813"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_02/namaqualand_boulder_02_2k.gltf",
+      "bytes": 2818,
+      "sha256": "e181b722c8c8bd56f98ab8883b283b3cb3c437c372af3b831aec2f94c22fe0f2",
+      "sourceMd5": "9193646b820fdbc76cb9c3c77f0c5c38"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_02/namaqualand_boulder_02.bin",
+      "bytes": 2297768,
+      "sha256": "0f6daa7ec9b1a92207c0b09b737ff1eec904aebc1c1eada778afa6e5eacd55c0",
+      "sourceMd5": "aa8f2212633a07a7e9a805e90977f4fd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_diff_2k.jpg",
+      "bytes": 3867934,
+      "sha256": "0f81c51224deb025079f10dad21530e77e42baad541eb766922fe8fc6e46a88e",
+      "sourceMd5": "0f37f02ceb397383a0d0bddfaef4441d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_arm_2k.jpg",
+      "bytes": 2914937,
+      "sha256": "2314bc882e140adba4ee2eae2873f11458b359208b59240a04ae85f2e5766014",
+      "sourceMd5": "732a68f2aeb07223278987dfcafe83ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_nor_gl_2k.jpg",
+      "bytes": 3919158,
+      "sha256": "3067767374241dec6612ad60cc806cb9e30594f784d74f19a7cda4cdc2d28cc0",
+      "sourceMd5": "9591cab5cf9658a9eb23da834856a661"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wicker_basket_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1672963200,
+    "name": "Wicker Basket 01",
+    "type": 2,
+    "info": null,
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "categories": [
+      "containers",
+      "decorative",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "wood",
+      "wicker",
+      "twine",
+      "basket",
+      "picnic",
+      "outdoor",
+      "kitchen",
+      "dining",
+      "table",
+      "shed",
+      "farm"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 22276,
+    "texel_density": 7264.531424070384,
+    "dimensions": [
+      383.2242637872696,
+      295.01520097255707,
+      117.42293369024992
+    ],
+    "sponsors": [
+      "3237733"
+    ],
+    "files_hash": "49f624a285b5e5dc8fe4b75ad18cf5d18d8cdca1",
+    "description": "Free 8K wicker basket model with hand-woven twine, dark weathered wood tones, tight rectangular weave, braided rim and realistic grain with subtle wear.",
+    "category_id": "a7259375-6f0a-5f0d-99ff-ee1751ea792e",
+    "category": "Containers & Storage/Baskets & Buckets/Baskets",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "img_version": "a8ab4dd6",
+    "download_count": 16137,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wicker_basket_01.png?width=256&height=256&v=a8ab4dd6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wicker_basket_01/wicker_basket_01_2k.gltf",
+      "bytes": 2792,
+      "sha256": "bd02a364acb48039355642f69349f63d0fe9c635a33b4a57c44e6e24d672cb35",
+      "sourceMd5": "64ca4270124821310ee6c3cd89a08959"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wicker_basket_01/wicker_basket_01_arm_2k.jpg",
+      "bytes": 2893672,
+      "sha256": "b1932ee1cd909fde89d4cd73b69b33d9c62b9bebf10063a37133461164f9e672",
+      "sourceMd5": "2bb587bda456310426332b5c502f6921"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wicker_basket_01/wicker_basket_01.bin",
+      "bytes": 624920,
+      "sha256": "8e96025ffcdc64a7e75d1aa980f2491b1219912a4554272cd1e192a966c399f8",
+      "sourceMd5": "154e2cd9157175591e3585e706925fa9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wicker_basket_01/wicker_basket_01_nor_gl_2k.jpg",
+      "bytes": 2229761,
+      "sha256": "74eb1bd455ff66f6dd00abe26fa5ad9669a5b67217f394be981d9b04d3e9e774",
+      "sourceMd5": "113d914fb3f1ff9eba2e497860005af9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wicker_basket_01/wicker_basket_01_diff_2k.jpg",
+      "bytes": 2606521,
+      "sha256": "ffc48a6f829f36d6baf7461cbe8d0b71971893315840d93c0e50f3c8b95a9dce",
+      "sourceMd5": "b5fa48725aabd3ae05b4be3091e3ac40"
+    }
+  ]
+}

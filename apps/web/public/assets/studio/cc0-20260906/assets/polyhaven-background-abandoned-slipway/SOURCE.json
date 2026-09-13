@@ -1,0 +1,78 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/abandoned_slipway",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "whitebalance": 5400,
+    "tags": [
+      "ocean",
+      "bay",
+      "lake",
+      "industrial",
+      "abandoned"
+    ],
+    "date_published": 1541157990,
+    "name": "Abandoned Slipway",
+    "categories": [
+      "outdoor",
+      "urban",
+      "midday",
+      "overcast",
+      "low contrast",
+      "natural light"
+    ],
+    "date_taken": 1538316900,
+    "authors": {
+      "Philip Modin": "All"
+    },
+    "sponsors": [
+      "3267566",
+      "10485422",
+      "3237733",
+      "42579608"
+    ],
+    "files_hash": "3ddcc13c36366059a29a1c15748506c866ec10d0",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free, unclipped 16K HDRI: soft midday overcast bay light on abandoned industrial slipway - low-contrast natural diffuse illumination for outdoor urban scenes.",
+    "category_id": "d19b2a03-269d-5ac7-9932-6967869a7184",
+    "category": "Abandoned & Ruins/Industrial/Derelict Factories & Warehouses",
+    "attributes": {
+      "time_of_day": "midday",
+      "weather": "overcast",
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "9535f028",
+    "download_count": 113876,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/abandoned_slipway.png?width=256&height=256&v=9535f028"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/abandoned_slipway.jpg",
+      "bytes": 5160993,
+      "sha256": "1e7b7989b81226e8b13c5afbfe208f7e89db6aea4d7542fa63bdf0a45f574633",
+      "sourceMd5": "f94f23017b84809622c71fd18f849685"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

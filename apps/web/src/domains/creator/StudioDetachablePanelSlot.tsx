@@ -1,3 +1,4 @@
+import { isValidElement } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -5,6 +6,7 @@ import {
   type StudioFloatingSurfaceLayout,
 } from "./studio-floating-surface";
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
+import { StudioWorkspaceRegion } from "./StudioWorkspaceRegion";
 import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
 
 import type { ReactElement, ReactNode } from "react";
@@ -25,9 +27,9 @@ export interface StudioDetachablePanelSlotProps {
 }
 
 /**
- * Keeps an existing panel mounted in its authored dock, or portals the exact same panel body into
- * the shared movable-window chrome. This avoids duplicate panel state and preserves the mobile
- * sheet implementation while desktop artists gain free placement, docking, locks and resize.
+ * Existing explicit detach controls keep their original portal and close semantics. The authored
+ * panel additionally participates in workspace arrangement without remounting its content. While
+ * the original detached window is open, the arrangement wrapper is suspended to avoid two shells.
  */
 export function StudioDetachablePanelSlot({
   detached,
@@ -49,11 +51,11 @@ export function StudioDetachablePanelSlot({
     enabled: detached,
   });
 
-  if (!detached || typeof document === "undefined") {
-    return <>{children}</>;
-  }
-
-  return createPortal(
+  // The authored owner still controls visibility. A hidden sidebar must not leave an empty
+  // floating shell behind; keep its placement preference for the next explicit open.
+  const authoredHidden = isValidElement<{ className?: string }>(children)
+    && (children.props.className ?? "").split(/\s+/).includes("lg:hidden");
+  const body = !detached || typeof document === "undefined" ? <>{children}</> : createPortal(
     <StudioFloatingSurface
       surfaceId={surfaceId}
       label={label}
@@ -82,5 +84,22 @@ export function StudioDetachablePanelSlot({
       {children}
     </StudioFloatingSurface>,
     document.body,
+  );
+
+  return (
+    <StudioWorkspaceRegion
+      surfaceId={`panel-${surfaceId}`}
+      label={label}
+      disabled={detached || authoredHidden}
+      defaultLayout={defaultLayout}
+      minWidth={minWidth}
+      minHeight={minHeight}
+      maxWidth={maxWidth}
+      maxHeight={maxHeight}
+      insetTop={insetTop}
+      allowedDockEdges={allowedDockEdges}
+    >
+      {body}
+    </StudioWorkspaceRegion>
   );
 }

@@ -1,3 +1,7 @@
+import { STUDIO_MATERIAL_BRUSH_IDS, studioMaterialBrushDefinition } from "./studio-material-brush-catalog";
+import { materializeStudioMaterialBrushDynamics } from "./studio-material-morphology-runtime";
+import { studioProceduralTipCache } from "./studio-procedural-tip-rasterizer";
+
 import {
   renderStudioDualBrushTip,
   STUDIO_DUAL_TIP_CONTRACT_VERSION,
@@ -585,7 +589,7 @@ const COMPACT_PROFILE_ROWS: readonly CompactProfileRow[] = [
   ["focus-ray", 0.14, 0.04, 0.3, 0, FOLLOW_DIRECTION | TAPER | WIDTH_GRAIN | SPEED_SPACING],
 ];
 
-if (COMPACT_PROFILE_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {
+if (COMPACT_PROFILE_ROWS.length + STUDIO_MATERIAL_BRUSH_IDS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {
   throw new Error("Studio procedural brush runtime table is out of sync with its stable ids");
 }
 
@@ -1195,16 +1199,13 @@ function buildCustomTipBytes(
   variant: number,
   size = CUSTOM_TIP_SIZE
 ): Uint8Array {
-  const bytes = new Uint8Array(size * size);
-  const center = (size - 1) / 2;
-  for (let py = 0; py < size; py++) {
-    for (let px = 0; px < size; px++) {
-      const x = center === 0 ? 0 : (px - center) / center;
-      const y = center === 0 ? 0 : (py - center) / center;
-      bytes[py * size + px] = Math.round(clamp01(customTipAlpha(motif, x, y, variant)) * 255);
-    }
-  }
-  return bytes;
+  const seed = Number.isFinite(variant) ? Math.trunc(variant) : 0;
+  return studioProceduralTipCache.get(
+    `legacy-motif:${motif}:${seed}`,
+    size,
+    (x, y) => customTipAlpha(motif, x, y, seed),
+    2,
+  );
 }
 
 /** Materialize a deterministic procedural/custom alpha tip without any external image asset. */
@@ -1459,6 +1460,8 @@ export function materializeStudioBrushPackDynamics(
 ): NormalizedStudioBrushDynamicsSettings | null {
   const descriptor = studioBrushPackDescriptorById(value);
   if (!descriptor) return null;
+  const material = studioMaterialBrushDefinition(descriptor.catalogId);
+  if (material) return materializeStudioMaterialBrushDynamics(material);
   const index = STUDIO_BRUSH_PACK_CATALOG_IDS.indexOf(descriptor.catalogId);
   const profile = COMPACT_PROFILE_ROWS[index]!;
   const motif = profile[0];

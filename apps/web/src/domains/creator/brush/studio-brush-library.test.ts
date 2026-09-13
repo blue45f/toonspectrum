@@ -1186,8 +1186,8 @@ describe("내장 카탈로그 160종 저장 라이브러리 왕복", () => {
   }
 
   it("160개 전 프리셋이 sanitizeBrushSnapshot을 무보정 통과한다", () => {
-    expect(selections).toHaveLength(160);
-    expect(new Set(selections.map((selection) => selection.catalogId)).size).toBe(160);
+    expect(selections).toHaveLength(192);
+    expect(new Set(selections.map((selection) => selection.catalogId)).size).toBe(192);
     for (const selection of selections) {
       const { snapshot, adjustedFields } = sanitizeBrushSnapshot(catalogSnapshot(selection));
       expect(adjustedFields, `${selection.catalogId}: sanitized fields`).toEqual([]);

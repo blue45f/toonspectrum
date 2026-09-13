@@ -11,6 +11,7 @@ import {
 import {
   STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES,
 } from "./catalog/studio-original-2d-asset-expansion";
+import { STUDIO_QUALITY_2D_PACKAGES } from "./catalog/studio-quality-assets-20260913";
 
 export {
   STUDIO_ORIGINAL_FREE_ASSET_LICENSE,
@@ -47,7 +48,7 @@ function normalizeExpansionAsset(asset: StudioOriginalFreeAsset): StudioOriginal
 }
 
 const EXPANSION_PACKAGES: readonly StudioOriginalFreeAssetPackage[] = Object.freeze(
-  STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES.map((pkg) => {
+  [...STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES, ...STUDIO_QUALITY_2D_PACKAGES].map((pkg) => {
     const includedItems = Object.freeze(pkg.includedItems.map(normalizeExpansionAsset));
     return Object.freeze({
       ...pkg,

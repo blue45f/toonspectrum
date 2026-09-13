@@ -164,7 +164,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   validate:
-    name: ${{ matrix.track }}
+    # Keep focused tracks distinct from the protected CI aggregate named core.
+    name: ToonStudio integration / ${{ matrix.track }}
     needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 24

@@ -84,10 +84,10 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps the full registry internal and exposes one 48-brush product catalogue", () => {
+  it("keeps the full registry internal and exposes one 80-brush product catalogue", () => {
     const counts = STUDIO_BRUSH_CATALOG_COUNTS;
     expect(counts.core).toBe(BRUSH_PRESETS.length);
-    expect(counts.pro).toBe(160);
+    expect(counts.pro).toBe(192);
     expect(counts.total).toBe(counts.core + counts.pro);
     expect(counts.erase).toBe(2);
     expect(counts.paint).toBe(counts.total - counts.erase);
@@ -100,7 +100,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     const productIds = new Set(
       filterStudioBrushCatalogItems({ category: "all" }).map((item) => item.id),
     );
-    expect(productIds.size).toBe(48);
+    expect(productIds.size).toBe(80);
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);

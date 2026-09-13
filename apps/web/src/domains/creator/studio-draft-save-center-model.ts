@@ -154,7 +154,7 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "기존 복구 지점을 확인할 수 있음",
-      detail: "원고를 불러오지 못했으므로 새 체크포인트를 만들기 전에 버전·체크포인트에서 정상 상태를 복원해 주세요.",
+      detail: "원고를 열지 못했어요. ‘저장 기록’에서 이전 그림을 확인해 주세요.",
     };
   }
 
@@ -162,7 +162,7 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "progress",
       title: "복구 저장 시작 대기 중",
-      detail: "기존 원고를 모두 불러온 뒤 이 기기의 내구 저장 권위를 활성화합니다.",
+      detail: "원고를 모두 불러온 뒤 이 기기에 저장합니다.",
     };
   }
 
@@ -170,7 +170,7 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "success",
       title: "이 탭이 복구 저장 담당",
-      detail: "변경 내용을 브라우저의 내구 저장소에 체크포인트로 남기도록 이 탭이 조정합니다.",
+      detail: "이 탭이 변경 내용을 이 기기에 보관합니다.",
     };
   }
 
@@ -178,14 +178,14 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "다른 탭이 복구 저장 담당",
-      detail: "같은 문서를 먼저 연 탭이 로컬 체크포인트를 맡고 있습니다. 그 탭을 닫으면 이 탭이 이어받습니다.",
+      detail: "먼저 연 탭에서 저장합니다. 그 탭을 닫으면 이어받습니다.",
     };
   }
 
   return {
     tone: "neutral",
     title: "복구 저장 준비 중",
-    detail: "문서별 저장 담당 탭과 내구 저장소를 확인하고 있습니다.",
+    detail: "이 기기의 저장 준비를 확인하고 있어요.",
   };
 }
 
@@ -194,7 +194,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "danger",
       title: "원고를 불러오지 못함",
-      detail: "빈 상태를 새 revision으로 저장하지 않습니다. 기존 버전 또는 체크포인트를 먼저 확인해 주세요.",
+      detail: "빈 그림으로 덮어쓰지 않아요. ‘저장 기록’을 확인해 주세요.",
     };
   }
 
@@ -202,7 +202,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "progress",
       title: "원고 불러오는 중",
-      detail: "서버·기기 원고의 호환성과 revision 좌표를 확인한 뒤 저장을 활성화합니다.",
+      detail: "원고를 확인한 뒤 저장할 수 있어요.",
     };
   }
 
@@ -210,7 +210,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "서버 저장 권한 확인 필요",
-      detail: "현재 문서가 잠겨 있어 새 서버 revision을 만들 수 없습니다.",
+      detail: "잠금이 해제되면 서버에 저장할 수 있어요.",
     };
   }
 
@@ -218,7 +218,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "저장 전 작품 정보 필요",
-      detail: "제목 등 필수 작품 정보를 입력하면 중단된 초안 저장을 같은 의도로 이어갑니다.",
+      detail: "제목 등 필수 정보를 입력하면 저장을 이어갑니다.",
     };
   }
 
@@ -226,7 +226,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "progress",
       title: "서버 초안 저장 중",
-      detail: "페이지 캡처, 공동편집 동기화 확인, revision 커밋을 순서대로 처리하고 있습니다.",
+      detail: "그림과 공동 작업 내용을 확인해 서버에 저장합니다.",
     };
   }
 
@@ -244,7 +244,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "연결 후 서버 저장 예약됨",
-      detail: "네트워크가 돌아오면 한 번만 자동으로 초안 저장을 다시 시도합니다.",
+      detail: "연결되면 저장을 한 번 다시 시도합니다.",
     };
   }
 
@@ -252,7 +252,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "warning",
       title: "서버는 오프라인",
-      detail: "이 기기의 복구 저장은 계속되지만 새 서버 revision은 연결 후 만들 수 있습니다.",
+      detail: "이 기기에는 계속 보관하며, 서버 저장은 연결 후 가능합니다.",
     };
   }
 
@@ -260,7 +260,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "progress",
       title: "공동 변경 동기화 중",
-      detail: "팀 변경이 서버 순서에 반영된 뒤 같은 revision 좌표로 안전하게 저장합니다.",
+      detail: "팀원 변경 내용을 확인한 뒤 저장합니다.",
     };
   }
 
@@ -270,7 +270,7 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
       tone: "success",
       title: `서버 초안 revision #${revision}`,
       detail: input.lastServerSaveAt === null
-        ? "서버에 복원 가능한 revision이 있습니다."
+        ? "서버에 저장한 기록이 있어요."
         : `마지막으로 확인한 서버 저장: ${formatStudioDraftSaveTime(input.lastServerSaveAt)}`,
     };
   }
@@ -279,14 +279,14 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     return {
       tone: "neutral",
       title: "서버 초안 연결됨",
-      detail: "revision 번호를 확인하는 중입니다.",
+      detail: "서버 저장 기록을 확인하고 있어요.",
     };
   }
 
   return {
     tone: "neutral",
     title: "아직 서버 초안 없음",
-    detail: "지금 저장하면 계정에 첫 revision을 만들고 이후 버전 기록의 기준점이 됩니다.",
+    detail: "지금 저장하면 계정에 첫 기록을 남깁니다.",
   };
 }
 
@@ -313,7 +313,7 @@ export function resolveStudioDraftSaveCenter(
     tone = "danger";
     compactLabel = "원고 복구 확인";
     headline = "원고를 불러오지 못해 저장을 막았어요";
-    detail = "빈 문서로 덮어쓰지 않고 기존 서버 revision과 이 기기 체크포인트를 보존했습니다.";
+    detail = "서버와 이 기기의 기록은 유지하고, 빈 그림으로 덮어쓰지 않았어요.";
   } else if (localRisk) {
     phase = "local-risk";
     tone = "danger";
@@ -324,14 +324,14 @@ export function resolveStudioDraftSaveCenter(
     phase = "loading";
     tone = "progress";
     compactLabel = "원고 불러오는 중";
-    headline = "기존 원고와 저장 좌표를 확인하고 있어요";
-    detail = "하이드레이션이 끝나기 전에는 빈 상태를 저장하지 않습니다.";
+    headline = "기존 원고를 확인하고 있어요";
+    detail = "원고를 모두 불러오기 전에는 저장하지 않아요.";
   } else if (input.collaborationLocked) {
     phase = "blocked";
     tone = "warning";
     compactLabel = "저장 권한 확인";
     headline = "문서 잠금으로 서버 저장이 멈췄어요";
-    detail = "이 기기 복구 상태를 확인하고, 편집 권한 또는 문서 잠금을 해제한 뒤 다시 저장하세요.";
+    detail = "저장 기록과 편집 권한을 확인한 뒤 다시 저장해 주세요.";
   } else if (input.metadataRequired) {
     phase = "metadata-required";
     tone = "warning";
@@ -348,7 +348,7 @@ export function resolveStudioDraftSaveCenter(
     phase = "saving";
     tone = "progress";
     compactLabel = "초안 저장 중";
-    headline = "서버에 새 revision을 만드는 중이에요";
+    headline = "서버에 그림을 저장하고 있어요";
     detail = server.detail;
   } else if (input.deferredSave) {
     phase = "queued";
@@ -366,7 +366,7 @@ export function resolveStudioDraftSaveCenter(
     phase = "syncing";
     tone = "progress";
     compactLabel = "공동 변경 동기화 중";
-    headline = "팀 변경을 저장 좌표에 맞추고 있어요";
+    headline = "공동 작업 내용을 확인하고 있어요";
     detail = server.detail;
   } else if (input.hasServerDocument && serverRevision !== null) {
     phase = "saved";

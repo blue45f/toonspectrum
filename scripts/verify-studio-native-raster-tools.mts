@@ -3599,7 +3599,8 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  // /studio is the project home; pixel tools require the actual draft editor.
+  const studioUrl = `${origin}studio/canvas`;
   const preview: ChildProcess | null = externalOrigin
     ? null
     : spawn(

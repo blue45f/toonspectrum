@@ -1,0 +1,85 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/portland_landing_pad",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-12"
+  },
+  "metadata": {
+    "evs_cap": 24,
+    "type": 0,
+    "whitebalance": 5400,
+    "date_published": 1536012000,
+    "name": "Portland Landing pad",
+    "categories": [
+      "outdoor",
+      "urban",
+      "midday",
+      "partly cloudy",
+      "medium contrast",
+      "natural light"
+    ],
+    "date_taken": 1534409820,
+    "coords": [
+      45.5142,
+      -122.676
+    ],
+    "authors": {
+      "Philip Modin": "All"
+    },
+    "sponsors": [
+      "10004313",
+      "3237733",
+      "11164276"
+    ],
+    "backplates": true,
+    "tags": [
+      "sun",
+      "building",
+      "helipad",
+      "construction",
+      "crane",
+      "city",
+      "backplates"
+    ],
+    "files_hash": "22e272ad34dec2f424d4ef628442a1c477f725d7",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Unclipped, free 16K HDRI of an urban helipad at midday - soft sun through thin clouds, medium-contrast natural light, cool neutral mood with clear city reflections.",
+    "category_id": "15d91d1e-14ed-5109-9299-cc560b7fe486",
+    "category": "Streets & Town/Rooftops & Balconies/Helipads",
+    "attributes": {
+      "time_of_day": "midday",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "medium",
+      "backplates": true,
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "55945d72",
+    "download_count": 111504,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/portland_landing_pad.png?width=256&height=256&v=55945d72"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/portland_landing_pad.jpg",
+      "bytes": 4046983,
+      "sha256": "6a23aeb5f7e83e46755bde45d5bc974dc1775089ddb1adcbedb2a4b8946cad48",
+      "sourceMd5": "37b01e565f8eb7c981c4436eeb228457"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

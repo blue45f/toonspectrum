@@ -1,5 +1,7 @@
 import { Boxes, SlidersHorizontal } from "lucide-react";
 
+import { MarketVerifiedAssetPreview } from "./MarketVerifiedAssetPreview";
+
 import type { RecipePreviewData } from "../models/market-preview";
 
 interface MarketAssetRecipePreviewProps {
@@ -48,6 +50,7 @@ export function MarketAssetRecipePreview({
         </span>
       </div>
 
+      <MarketVerifiedAssetPreview reference={recipe.recipeId} />
       <dl className="divide-y divide-line px-4">
         <div className="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
           <dt className="text-xs text-fg-3">레시피 식별자</dt>
