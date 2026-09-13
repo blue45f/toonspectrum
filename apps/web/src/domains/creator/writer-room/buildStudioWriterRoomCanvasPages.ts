@@ -152,3 +152,13 @@ export function buildStudioWriterRoomCanvasPages({
     };
   });
 }
+
+/** Insert projected pages without mutating the source document or existing identities. */
+export function insertStudioWriterRoomCanvasPages(
+  pages: readonly PageState[],
+  activePageId: string,
+  createdPages: readonly PageState[],
+): PageState[] {
+  const index = Math.max(0, pages.findIndex((page) => page.id === activePageId));
+  return [...pages.slice(0, index + 1), ...createdPages, ...pages.slice(index + 1)];
+}
