@@ -33,6 +33,16 @@ import {
   type StudioServiceWorkerCacheBucket,
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
+import {
+  boundedNavigationResponse,
+  cachedLocalDrawingRescue,
+  clearLocalDrawingCaches,
+  installLocalDrawingRescue,
+  isLocalDrawingRequest,
+  isNavigationOutage,
+  localDrawingResponse,
+  localDrawingRescueReady,
+} from "./studio-local-drawing-rescue";
 
 import type { StudioServiceWorkerManifest } from "./studio-service-worker-precache-plan";
 
@@ -207,8 +217,11 @@ async function handleNavigation(
   if (routeClass === "studio-navigation") event.waitUntil(warmStudioPayload());
 
   try {
-    const preloaded = (await event.preloadResponse) as Response | undefined;
-    const response = preloaded ?? (await fetch(request));
+    const response = await boundedNavigationResponse(request, event.preloadResponse);
+    if (isNavigationOutage(response.status)) {
+      void response.body?.cancel().catch(() => {});
+      throw new Error("Navigation origin is unavailable");
+    }
     // Only the two shell URLs are refreshed. Caching every visited deep link
     // would grow the precache without bound and could shadow the isolated
     // `/studio` document with a non-isolated one.
@@ -218,6 +231,12 @@ async function handleNavigation(
     }
     return response;
   } catch {
+    if (routeClass === "studio-navigation") {
+      try {
+        const rescue = await cachedLocalDrawingRescue();
+        if (rescue) return rescue;
+      } catch { /* Retain the established shell fallback when storage is unavailable. */ }
+    }
     const pathname = new URL(request.url).pathname;
     const shellUrl = studioServiceWorkerOfflineShellUrl(pathname);
     const cache = await caches.open(cacheNames.precache);
@@ -232,6 +251,7 @@ async function handleNavigation(
 scope.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
+      await installLocalDrawingRescue();
       const cache = await caches.open(cacheNames.precache);
       // `addAll` is atomic on purpose: if one critical URL is missing, install
       // rejects, this worker never activates, and the previously installed one
@@ -266,6 +286,10 @@ scope.addEventListener("activate", (event) => {
 
 scope.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (isLocalDrawingRequest(request, scope.location.origin)) {
+    event.respondWith(localDrawingResponse(request));
+    return;
+  }
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url,
     origin: scope.location.origin,
@@ -307,6 +331,7 @@ async function killStudioServiceWorker(): Promise<void> {
     ...Object.values(cacheNames),
   ];
   await Promise.all([...new Set(doomed)].map((name) => caches.delete(name)));
+  await clearLocalDrawingCaches();
   await scope.registration.unregister();
 }
 
@@ -332,6 +357,13 @@ async function describeStudioServiceWorker(): Promise<Record<string, unknown>> {
 
 scope.addEventListener("message", (event) => {
   const data: unknown = event.data;
+  if (data && typeof data === "object" && "type" in data && data.type === "toonstudio-local-drawing:inspect") {
+    event.waitUntil(localDrawingRescueReady().then(
+      (ready) => event.ports[0]?.postMessage({ type: "toonstudio-local-drawing:ready", ready }),
+      () => event.ports[0]?.postMessage({ type: "toonstudio-local-drawing:ready", ready: false }),
+    ));
+    return;
+  }
   if (!isStudioServiceWorkerMessage(data)) return;
   const reply = (payload: unknown): void => {
     const port = event.ports[0];
