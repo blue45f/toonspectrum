@@ -36,6 +36,10 @@ const StoryLabPage = lazyRetry(
   () => import("@/domains/creator-resources/StoryLabPage").then((module) => ({ default: module.StoryLabPage })),
   "StoryLabPage",
 );
+const OpenCreationPage = lazyRetry(
+  () => import("@/domains/creator-resources/OpenCreationPage").then((module) => ({ default: module.OpenCreationPage })),
+  "OpenCreationPage",
+);
 const SourcesPage = lazyRetry(
   () => import("@/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })),
   "SourcesPage",
@@ -58,6 +62,7 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
   { id: "research-materials", path: "/research/materials", element: <MaterialAtlasPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
+  { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },
   { id: "resources-references", path: "/creator-hub/references", element: <Navigate to="/research/assets" replace /> },
   { id: "resources-opportunities", path: "/opportunities", element: <OpportunitiesPage /> },
   { id: "resources-recipes", path: "/learn/recipes", element: <RecipesPage /> },
