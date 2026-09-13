@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - apps/web/src/domains/creator/brush/**
+      - apps/web/src/domains/creator/brush-lab/**
       - apps/web/src/domains/creator/studio-dynamic-brush-*.ts
       - apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay*
       - apps/web/config/vite-manual-chunks.ts
@@ -13,13 +14,18 @@ on:
       - scripts/verify-studio-material-morphology.mjs
       - scripts/verify-studio-material-atlas-boundary.mjs
       - scripts/studio-material-atlas-boundary.test.ts
+      - scripts/studio-hybrid-topology-browser.ts
+      - scripts/verify-studio-hybrid-topology.mjs
       - .github/workflows/studio-material-morphology.yml
   push:
     branches: [main]
     paths:
       - apps/web/src/domains/creator/brush/**
+      - apps/web/src/domains/creator/brush-lab/**
       - apps/web/config/vite-manual-chunks.ts
       - scripts/*studio-material*
+      - scripts/studio-hybrid-topology-browser.ts
+      - scripts/verify-studio-hybrid-topology.mjs
       - .github/workflows/studio-material-morphology.yml
   workflow_dispatch:
 
@@ -81,6 +87,10 @@ jobs:
         env:
           TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
         run: node scripts/verify-studio-material-morphology.mjs
+      - name: Verify six hybrid topology engines, thirty materials and twelve symmetry combinations
+        env:
+          TOONSPECTRUM_HYBRID_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology/hybrid-topology
+        run: node scripts/verify-studio-hybrid-topology.mjs
       - name: Build and prove the atlas stays off the initial graph without relaxing any byte budget
         run: |
           pnpm run build:bundle 2>&1 | tee "$RUNNER_TEMP/studio-material-morphology/build.log"
