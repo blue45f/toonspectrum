@@ -136,7 +136,7 @@ function createProps(
 }
 
 describe("StudioCanvasStatusRail", () => {
-  it("offers a backup instead of an unsafe autosave restore", async () => {
+  it("offers a backup instead of an unsafe autosave restore", () => {
     const props = createProps({
       hasAutosave: true,
       autosaveRestoreBlockedReason: "revision-mismatch",
@@ -144,7 +144,7 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(await screen.findByText(/저장된 작품과 내용이 달라/)).toBeTruthy();
+    expect(screen.getByText(/저장된 작품과 내용이 달라/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "이어서 그리기" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "백업 파일 받기" }));
     fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
@@ -185,7 +185,7 @@ describe("StudioCanvasStatusRail", () => {
     expect(document.querySelector("[data-studio-autosave-live-jam='true']")).toBeTruthy();
   });
 
-  it("keeps the recovery banner for the leading tab", async () => {
+  it("keeps the recovery banner for the leading tab", () => {
     const props = createProps({
       hasAutosave: true,
       autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
@@ -193,7 +193,7 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(await screen.findByRole("button", { name: "이어서 그리기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "이어서 그리기" })).toBeTruthy();
     expect(screen.queryByText(/다른 탭에서 편집 중/u)).toBeNull();
   });
 
@@ -210,7 +210,7 @@ describe("StudioCanvasStatusRail", () => {
     });
 
     render(<StudioCanvasStatusRail {...props} />);
-    const restore = await screen.findByRole("button", { name: "이어서 그리기" });
+    const restore = screen.getByRole("button", { name: "이어서 그리기" });
     fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
     fireEvent.click(screen.getByRole("button", { name: "이전 그림 삭제…" }));
 
@@ -223,11 +223,11 @@ describe("StudioCanvasStatusRail", () => {
     });
   });
 
-  it("restores a compatible autosave through the semantic callback", async () => {
+  it("restores a compatible autosave through the semantic callback", () => {
     const props = createProps({ hasAutosave: true });
 
     render(<StudioCanvasStatusRail {...props} />);
-    fireEvent.click(await screen.findByRole("button", { name: "이어서 그리기" }));
+    fireEvent.click(screen.getByRole("button", { name: "이어서 그리기" }));
 
     expect(props.onRestoreAutosave).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "백업 파일 받기" })).toBeNull();

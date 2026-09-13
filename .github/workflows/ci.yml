@@ -35,7 +35,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs
 
   static:
     needs: preflight
@@ -183,6 +183,9 @@ jobs:
             apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts \
             apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts \
             apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
+            apps/web/src/domains/creator/studio-checkpoints.test.ts \
+            apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
             apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
             apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
             apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \

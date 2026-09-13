@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { projectStudioCheckpointJson } from "./checkpoint/studio-checkpoint-json";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
@@ -59,6 +60,8 @@ const StudioCheckpointDurableFallbackFileSchema = StudioCheckpointFileSchema.ext
 export type StudioCheckpoint = z.infer<typeof StudioCheckpointSchema>;
 
 export interface StudioCheckpointInput {
+  /** Canonical project optional fields are absent in JSON; array values remain strict. */
+  omitUndefinedObjectFields?: boolean;
   name: string;
   payload: unknown;
   now?: Date;
@@ -154,9 +157,10 @@ function serializeSqliteCheckpointList(checkpoints: readonly StudioCheckpoint[])
     version: 1,
     checkpoints: checkpoints.slice(0, STUDIO_CHECKPOINT_LIMIT),
   });
-  if (!isJsonCheckpointValue(file)) throw createDurableStorageError();
+  const jsonFile = projectStudioCheckpointJson(file);
+  if (!isJsonCheckpointValue(jsonFile)) throw createDurableStorageError();
   try {
-    return JSON.stringify(file);
+    return JSON.stringify(jsonFile);
   } catch {
     throw createDurableStorageError();
   }
@@ -252,11 +256,16 @@ function createCheckpointRecord(input: StudioCheckpointInput): StudioCheckpoint 
   const name = input.name.trim().slice(0, 80);
   if (!name) throw new Error("복구 지점 이름을 입력해 주세요.");
   const idFactory = input.idFactory ?? (() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`);
+  let payload = normalizeCheckpointPayload(input.payload);
+  if (input.omitUndefinedObjectFields) {
+    if (!isJsonCheckpointValue(payload, new Set(), true)) throw createDurableStorageError();
+    payload = JSON.parse(JSON.stringify(payload));
+  }
   return StudioCheckpointSchema.parse({
     id: idFactory(),
     name,
     createdAt: (input.now ?? new Date()).toISOString(),
-    payload: normalizeCheckpointPayload(input.payload),
+    payload,
   });
 }
 
@@ -330,7 +339,9 @@ function readDurableFallbackFile(
 }
 
 /** localStorage fallback must never silently erase Blob, undefined, or other structured-clone values. */
-function isJsonCheckpointValue(value: unknown, ancestors = new Set<object>()): boolean {
+function isJsonCheckpointValue(
+  value: unknown, ancestors = new Set<object>(), omitUndefinedObjectFields = false,
+): boolean {
   if (value === null || typeof value === "string" || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value) && !Object.is(value, -0);
   if (typeof value !== "object") return false;
@@ -361,7 +372,8 @@ function isJsonCheckpointValue(value: unknown, ancestors = new Set<object>()): b
     return Boolean(
       descriptor &&
       "value" in descriptor &&
-      isJsonCheckpointValue(descriptor.value, ancestors)
+      ((omitUndefinedObjectFields && !Array.isArray(value) && descriptor.value === undefined)
+        || isJsonCheckpointValue(descriptor.value, ancestors, omitUndefinedObjectFields))
     );
   });
   ancestors.delete(value);
