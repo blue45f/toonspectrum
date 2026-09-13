@@ -72,6 +72,7 @@ export function useStudioDocumentAccessRuntime({
     remixId,
     projectId: layout?.projectId,
     documentId: layout?.documentId,
+    draftId: layout?.draftId,
   });
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { studioAutosaveKey } from "../../studio-autosave";
 import { studioDocumentPersistenceWorkId } from "../../studio-document-persistence-scope";
+import { studioDocumentHref } from "../../studio-document-workspace";
 import { isStudioSourceHydrationPending } from "../../studio-editor-scope";
 import { createStudioProjectWithInitialDocument } from "../../studio-project-creation";
 import { useStudioDocumentLayout } from "../studio-document-layout-context";
@@ -110,6 +111,17 @@ describe("StudioEditorRoute local-source integration", () => {
     expect(editor.dataset.source).toBe("local");
     expect(observed.sources).not.toHaveLength(0);
     expect(observed.sources.every((source) => source === null)).toBe(true);
+  });
+
+  it.each(["drawing-a", "drawing-b"])("keeps explicit draft %s in its isolated recovery slot", async (draftId) => {
+    const key = studioAutosaveKey({ userId: "owner", workId: `draft:${draftId}` });
+    localStorage.setItem(key, "draft-specific ink");
+    open(studioDocumentHref({ draftId, workspace: "draw" }));
+    const editor = await screen.findByTestId("editor");
+    expect(editor.dataset.source).toBe("local");
+    expect(editor.dataset.pending).toBe("false");
+    expect(editor.dataset.recoveryKey).toBe(key);
+    expect(screen.getByLabelText("recovery").textContent).toBe("draft-specific ink");
   });
 
   it("still requires remote hydration for a real server work", async () => {

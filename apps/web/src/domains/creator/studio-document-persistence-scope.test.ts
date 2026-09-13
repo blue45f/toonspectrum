@@ -31,3 +31,29 @@ describe("local manuscript persistence identity", () => {
     expect(studioDocumentPersistenceWorkId({ ...local, projectId: null })).toBeNull();
   });
 });
+
+
+describe("explicit draft recovery isolation after source resolution", () => {
+  const draft = { workId: null, remixId: null, draftId: "drawing-a" };
+
+  it("keeps explicit drafts out of the shared unnamed-draft autosave and checkpoint slots", () => {
+    const workId = studioDocumentPersistenceWorkId(draft);
+    expect(workId).toBe("draft:drawing-a");
+    for (const key of [studioAutosaveKey, studioCheckpointKey]) {
+      expect(key({ userId: "owner", workId })).toBe(key({ userId: "owner", workId: "draft:drawing-a" }));
+      expect(key({ userId: "owner", workId })).not.toBe(key({ userId: "owner" }));
+      expect(key({ userId: "owner", workId })).not.toBe(key({
+        userId: "owner", workId: studioDocumentPersistenceWorkId({ ...draft, draftId: "drawing-b" }),
+      }));
+    }
+  });
+
+  it("preserves explicit server and project identities before a draft fallback", () => {
+    expect(studioDocumentPersistenceWorkId({ ...draft, workId: "server-a" })).toBe("server-a");
+    expect(studioDocumentPersistenceWorkId({ ...local, draftId: "drawing-a" })).toBe(local.documentId);
+  });
+
+  it("never replaces a remix recovery key with an explicit draft key", () => {
+    expect(studioDocumentPersistenceWorkId({ ...draft, remixId: "source-a" })).toBeNull();
+  });
+});

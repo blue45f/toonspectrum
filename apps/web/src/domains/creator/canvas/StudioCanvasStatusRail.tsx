@@ -18,6 +18,8 @@ import {
 import { useLayoutEffect, useRef } from "react";
 
 import { presentStudioAutosaveDocumentLeadership } from "../studio-autosave-document-leader";
+import { StudioRecoveryNotice } from "./StudioRecoveryNotice";
+
 import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail";
 import { StudioToolHintTarget } from "../StudioToolHint";
 
@@ -355,14 +357,6 @@ export function StudioCanvasStatusRail({
           liveJam: autosaveLiveJam,
         })
       : null;
-  // 복구 배너의 안전한 기본 행동은 "복구하기"(복구가 막혔으면 "JSON 백업")다. 영구 삭제
-  // 승인 창을 닫고 나면 포커스를 파괴 버튼이 아니라 이 안전한 쪽에 되돌려 준다.
-  const autosaveSafeActionRef = useRef<HTMLButtonElement | null>(null);
-  const requestClearAutosave = () => {
-    void Promise.resolve(onClearAutosave()).finally(() => {
-      autosaveSafeActionRef.current?.focus();
-    });
-  };
 
   /**
    * 모바일 몰입 모드의 고지 띠에 **지금 담긴 것이 있는지**.
@@ -481,43 +475,12 @@ export function StudioCanvasStatusRail({
       ) : null}
 
       {hasAutosave && !followerNotice && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
-          <span className="min-w-0 flex-1 font-medium leading-relaxed">
-            {autosaveRestoreBlockedReason
-              ? autosaveRestoreBlockedReason === "revision-mismatch"
-                ? "⚠️ 임시저장본이 현재 서버 revision과 달라 자동 복구를 차단했습니다. JSON으로 백업해 수동 병합해 주세요."
-                : "⚠️ 출처 revision을 확인할 수 없는 공동 임시저장본입니다. 자동 복구하지 않고 원본을 보존합니다."
-              : "⚠️ 이전에 작성 중이던 임시저장 데이터가 있습니다."}
-          </span>
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {autosaveRestoreBlockedReason ? (
-              <button
-                type="button"
-                ref={autosaveSafeActionRef}
-                onClick={onDownloadAutosaveBackup}
-                className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                JSON 백업
-              </button>
-            ) : (
-              <button
-                type="button"
-                ref={autosaveSafeActionRef}
-                onClick={() => void onRestoreAutosave()}
-                className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                복구하기
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={requestClearAutosave}
-              className="min-h-11 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              비우기
-            </button>
-          </div>
-        </div>
+        <StudioRecoveryNotice
+          blockedReason={autosaveRestoreBlockedReason}
+          onRestore={onRestoreAutosave}
+          onBackup={onDownloadAutosaveBackup}
+          onDelete={onClearAutosave}
+        />
       )}
 
       {normalizedActiveGroupName ? (

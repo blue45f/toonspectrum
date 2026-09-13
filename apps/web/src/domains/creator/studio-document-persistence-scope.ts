@@ -9,8 +9,12 @@ export function studioDocumentPersistenceWorkId(input: {
   readonly remixId: string | null;
   readonly projectId?: string | null;
   readonly documentId?: string | null;
+  readonly draftId?: string | null;
 }): string | null {
-  return input.workId ?? (
-    !input.remixId && input.projectId ? input.documentId ?? null : null
-  );
+  if (input.workId !== null) return input.workId;
+  if (input.remixId) return null;
+  // Preserve main's explicit-draft isolation alongside the legacy local-document keys.
+  return input.projectId && input.documentId
+    ? input.documentId
+    : input.draftId ? `draft:${input.draftId}` : null;
 }
