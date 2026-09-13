@@ -43,7 +43,7 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
-export const STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION = 2 as const;
+export const STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION = 3 as const;
 
 const SCRATCH =
   process.env.TOONSPECTRUM_HOKUSAI_LIVE_INTEGRATION_DIR
@@ -65,13 +65,13 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const SOURCE_REVISION_PATTERN = /^hokusai-source-v1:[a-f0-9]{16}$/u;
 
-const FAMILY_SCENARIOS = [
+export const STUDIO_HOKUSAI_SHELF_SCENARIOS = [
   { brushId: "pencil", brushName: "연필", presetId: "pencil" },
-  { brushId: "charcoal", brushName: "목탄", presetId: "charcoal" },
-  { brushId: "oil", brushName: "유화 붓", presetId: "oil" },
+  { brushId: "charcoal--compressed-edge", brushName: "단단한 목탄", presetId: "charcoal" },
+  { brushId: "oil--filbert-ribbon", brushName: "둥근 유화 붓", presetId: "oil" },
 ] as const;
 
-type HokusaiFamilyId = (typeof FAMILY_SCENARIOS)[number]["presetId"];
+type HokusaiFamilyId = (typeof STUDIO_HOKUSAI_SHELF_SCENARIOS)[number]["presetId"];
 
 interface BrowserDiagnostics {
   readonly consoleErrors: string[];
@@ -293,18 +293,18 @@ export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): 
   }
 
   const shelf = array(candidate.shelf) ? candidate.shelf : [];
-  const expectedPresetIds = FAMILY_SCENARIOS.map(({ presetId }) => presetId);
+  const expectedPresetIds = STUDIO_HOKUSAI_SHELF_SCENARIOS.map(({ presetId }) => presetId);
   const actualPresetIds = shelf.flatMap((entry) => (
     record(entry) && string(entry.presetId) ? [entry.presetId] : []
   ));
   if (
-    shelf.length !== FAMILY_SCENARIOS.length
+    shelf.length !== STUDIO_HOKUSAI_SHELF_SCENARIOS.length
     || JSON.stringify(actualPresetIds) !== JSON.stringify(expectedPresetIds)
   ) {
     issues.push("pencil, charcoal, and oil shelf policy was not each exercised exactly once");
   }
 
-  for (const expected of FAMILY_SCENARIOS) {
+  for (const expected of STUDIO_HOKUSAI_SHELF_SCENARIOS) {
     const entry = shelf.find((value) => record(value) && value.presetId === expected.presetId);
     if (!record(entry)) continue;
     const prefix = expected.presetId;
@@ -496,10 +496,10 @@ export function expectedStaticPreviewDiagnostic(message: string, studioUrl: stri
       if (
         expectedHeadlessGraphicsDiagnostic
         && sourceUrl.origin === previewUrl.origin
-        && (sourceUrl.pathname === "/studio"
+        && (sourceUrl.pathname === previewUrl.pathname
           || /^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(sourceUrl.pathname))
         && [...sourceUrl.searchParams].every(([key, value]) => (
-          sourceUrl.pathname === "/studio" && key === "room"
+          sourceUrl.pathname === previewUrl.pathname && key === "room"
           && /^work-instant-[a-z0-9]+-[a-z0-9]+$/u.test(value)
         ))
         && sourceUrl.hash === ""
@@ -990,7 +990,7 @@ async function selectBrush(
   await toolbar.locator('[data-studio-brush-active-pill="true"]').click();
   const catalogue = page.locator('[data-studio-brush-catalog-session="true"]');
   await catalogue.waitFor({ state: "visible" });
-  await catalogue.getByRole("searchbox", { name: "전체 브러시 검색" }).fill(brush.brushId);
+  await catalogue.getByRole("searchbox", { name: "전체 브러시 검색" }).fill(brush.brushName);
   await catalogue.getByRole("button", {
     name: `${brush.brushName} 선택`,
     exact: true,
@@ -1087,14 +1087,21 @@ async function restoreAutosaveAfterReload(page: Page): Promise<void> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
   const banner = page.locator("[data-studio-recovery-notice]");
   await banner.waitFor({ state: "visible", timeout: 10_000 });
-  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-  await banner.waitFor({ state: "detached", timeout: 10_000 });
+  await banner.getByRole("button", { name: "이어서 그리기", exact: true }).click();
+  try {
+    await banner.waitFor({ state: "detached", timeout: 10_000 });
+  } catch (cause) {
+    const detail = await page.locator('[data-studio-sheet-id="props"], [data-studio-recovery-notice], [role="alert"]').allTextContents();
+    await page.screenshot({ path: join(SCRATCH, "explicit-inspector-restore-failed.png"), animations: "disabled" });
+    writeFileSync(join(SCRATCH, "explicit-inspector-restore-failed.json"), JSON.stringify({ detail }, null, 2));
+    throw new Error(`Recovery UI did not complete: ${detail.join(" | ")}`, { cause });
+  }
 }
 
 async function runDefaultShelfScenario(
   browser: Browser,
   studioUrl: string,
-  scenario: (typeof FAMILY_SCENARIOS)[number],
+  scenario: (typeof STUDIO_HOKUSAI_SHELF_SCENARIOS)[number],
   aggregateDiagnostics: BrowserDiagnostics,
 ): Promise<StudioHokusaiDefaultShelfIntegrationEvidence> {
   const context = await browser.newContext({ viewport: { width: 1_440, height: 1_000 } });
@@ -1175,7 +1182,7 @@ async function runExplicitInspectorScenario(
     await installInstrumentedCleanStudioState(page);
     await prepareStudio(page, studioUrl);
     await activatePen(page);
-    await selectBrush(page, FAMILY_SCENARIOS[0]);
+    await selectBrush(page, STUDIO_HOKUSAI_SHELF_SCENARIOS[0]);
     await openLayerNavigator(page);
     const blankNativePageElementCount = await waitForLayerCount(page, 0);
     const route = await directPointerRoute(page);
@@ -1252,10 +1259,9 @@ async function runExplicitInspectorScenario(
     const shapeStyleSection = page.getByTestId("studio-inspector-context-selection").locator(
       '[data-inspector-section="element.shape-style"]',
     );
-    const shapeStyleDisclosure = shapeStyleSection.getByRole("button", {
-      name: "도형 스타일",
-      exact: true,
-    });
+    const shapeStyleDisclosure = shapeStyleSection.locator(
+      '[data-inspector-control-id="section.element.shape-style"]',
+    );
     if (await shapeStyleDisclosure.getAttribute("aria-expanded") !== "true") {
       await shapeStyleDisclosure.click();
     }
@@ -1422,7 +1428,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = `${origin}studio/canvas`;
   const preview: ChildProcess | null = externalOrigin
     ? null
     : spawn(
@@ -1455,7 +1461,7 @@ async function main(): Promise<void> {
     log(`production preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const shelf: StudioHokusaiDefaultShelfIntegrationEvidence[] = [];
-    for (const scenario of FAMILY_SCENARIOS) {
+    for (const scenario of STUDIO_HOKUSAI_SHELF_SCENARIOS) {
       log(`${scenario.presetId}: blocked-shelf direct-pointer scenario starting`);
       shelf.push(await runDefaultShelfScenario(browser, studioUrl, scenario, diagnostics));
       log(`${scenario.presetId}: exact vector fallback and zero Hokusai live traffic observed`);

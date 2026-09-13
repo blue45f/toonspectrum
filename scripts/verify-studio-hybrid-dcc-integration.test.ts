@@ -44,7 +44,7 @@ function successfulResult(): StudioHybridDccIntegrationResult {
     status: "ok",
     schemaVersion: STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION,
     execution: "vite-production-preview-shipped-studio-ui",
-    route: "/studio",
+    route: "/studio/canvas",
     blank: {
       studioEditorVisible: true,
       nativeLayerCount: 0,
@@ -465,13 +465,13 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     }, studioUrl, true).consoleWarnings).toEqual(unexpected);
   });
 
-  it("drives the real /studio UI and observes Worker/OPFS without importing product internals", () => {
+  it("drives the real /studio/canvas UI and observes Worker/OPFS without importing product internals", () => {
     const source = readFileSync(
       new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),
       "utf8",
     );
     expect(source).toContain("vite-production-preview-shipped-studio-ui");
-    expect(source).toContain("const studioUrl = `${origin}studio`");
+    expect(source).toContain("const studioUrl = `${origin}studio/canvas`");
     expect(source).toContain('name: "프로젝트 센터"');
     expect(source).toContain("[data-studio-project-actions-menu=\"true\"]");
     expect(source).toContain("[data-studio-hybrid-dcc-open=\"true\"]");
@@ -551,4 +551,21 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     expect(source).toContain("=== expectedHash");
     expect(source).not.toContain('[data-studio-hybrid-dcc-persistence="saving"]');
   });
+});
+
+it("rejects an old home-route report as canvas editor evidence", () => {
+  const candidate = { ...successfulResult(), route: "/studio" };
+  expect(validateStudioHybridDccIntegrationResult(candidate)).toContain(
+    "integration run did not exercise the real /studio/canvas editor route",
+  );
+});
+
+it("scopes the known no-adapter warning to the canvas actually exercised", () => {
+  const diagnostics = { consoleErrors: [], consoleWarnings: [
+    "No available adapters. @ http://127.0.0.1:5199/studio/canvas?room=work-instant-test",
+    "Unexpected failure @ http://127.0.0.1:5199/studio/canvas",
+    "No available adapters. @ http://127.0.0.1:5199/studio",
+  ], pageErrors: [], requestFailures: [], fiveHundredResponses: [] };
+  expect(normalizeStudioHybridDccHeadlessGpuDiagnostics(diagnostics, "http://127.0.0.1:5199/studio/canvas", true).consoleWarnings).toEqual(diagnostics.consoleWarnings.slice(1));
+  expect(normalizeStudioHybridDccHeadlessGpuDiagnostics(diagnostics, "http://127.0.0.1:5199/studio/canvas", false).consoleWarnings).toEqual(diagnostics.consoleWarnings);
 });

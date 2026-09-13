@@ -16,6 +16,15 @@ function job(name) {
 // This is a minimum protected set, not an exact total. Additional coverage is
 // welcome; deleting or moving a protected suite requires an explicit review.
 const requiredRegressions = Object.freeze([
+  "apps/web/src/app/app-floating-controls-startup.test.ts",
+  "scripts/verify-studio-engine-editor-entry.test.ts",
+  "scripts/verify-studio-hokusai-live-integration.test.ts",
+  "scripts/verify-studio-living-ink-integration.test.ts",
+  "scripts/verify-studio-hybrid-dcc-integration.test.ts",
+  "scripts/verify-studio-hybrid-dcc-opfs-race.test.ts",
+  "apps/web/src/domains/creator/studio-editor-document-source.test.ts",
+  "apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx",
+  "apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts",
   "apps/web/src/domains/creator/studio-workspace-route.test.ts",
   "apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts",
   "apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx",

@@ -59,10 +59,7 @@ jobs:
           pnpm exec vitest run \
             apps/web/src/domains/creator/studio-project-library \
             apps/web/src/domains/creator/studio-project-document \
-            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
-            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
-            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
       - name: Studio quick start and task workspace regressions
         run: |
@@ -112,6 +109,9 @@ jobs:
             apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts \
             apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts \
             apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
+      - name: Engine preview entry and evidence regressions
+        run: |
+          pnpm exec vitest run apps/web/src/app/app-floating-controls-startup.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
       - name: Studio home and production route regressions
         run: |
           set -euo pipefail
@@ -218,6 +218,8 @@ jobs:
             apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
             apps/web/src/domains/creator/studio-checkpoints.test.ts \
             apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
+            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
+            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
             apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \

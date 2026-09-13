@@ -2,8 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { studioBrushQualityPortfolioEntryById } from "../apps/web/src/domains/creator/brush/studio-brush-quality-portfolio";
+import { materializeStudioBrushCatalogSelection } from "../apps/web/src/domains/creator/brush/studio-brush-selection";
+
 import {
   STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION,
+  STUDIO_HOKUSAI_SHELF_SCENARIOS,
   expectedStaticPreviewDiagnostic,
   validateStudioHokusaiLiveIntegrationResult,
   type StudioHokusaiDefaultShelfIntegrationEvidence,
@@ -23,12 +27,20 @@ it("recognizes only the known headless graphics fallback on an instant Studio ro
   expect(expectedStaticPreviewDiagnostic(`No available adapters. @ ${origin}?unexpected=1`, origin)).toBe(false);
 });
 
+it("keeps headless graphics diagnostics scoped to the actual canvas entry", () => {
+  const url = "http://127.0.0.1:5199/studio/canvas";
+  expect(expectedStaticPreviewDiagnostic(`No available adapters. @ ${url}?room=work-instant-abc-123`, url)).toBe(true);
+  expect(expectedStaticPreviewDiagnostic("No available adapters. @ http://127.0.0.1:5199/studio", url)).toBe(false);
+  expect(expectedStaticPreviewDiagnostic(`No available adapters. @ ${url}?unexpected=1`, url)).toBe(false);
+  expect(expectedStaticPreviewDiagnostic(`Unexpected render failure @ ${url}`, url)).toBe(false);
+});
+
 function shelfEntry(
   presetId: "pencil" | "charcoal" | "oil",
-  brushName: "연필" | "목탄" | "유화 붓",
+  brushName: "연필" | "단단한 목탄" | "둥근 유화 붓",
 ): StudioHokusaiDefaultShelfIntegrationEvidence {
   return {
-    brushId: presetId,
+    brushId: STUDIO_HOKUSAI_SHELF_SCENARIOS.find((entry) => entry.presetId === presetId)!.brushId,
     brushName,
     presetId,
     blankNativePageElementCount: 0,
@@ -137,8 +149,8 @@ function successfulResult(): StudioHokusaiLiveIntegrationResult {
     execution: "vite-production-preview-shipped-studio-policy-and-explicit-inspector",
     shelf: [
       shelfEntry("pencil", "연필"),
-      shelfEntry("charcoal", "목탄"),
-      shelfEntry("oil", "유화 붓"),
+      shelfEntry("charcoal", "단단한 목탄"),
+      shelfEntry("oil", "둥근 유화 붓"),
     ],
     explicitInspector: explicitInspector(),
     diagnostics: {
@@ -348,4 +360,14 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).not.toMatch(/(?:pnpm|npm|yarn)[^\n]*\bbuild\b/u);
     expect(source).not.toContain("page.evaluate(() => import(");
   });
+});
+
+it("exercises the three current shelf representatives without reviving excluded brushes", async () => {
+  for (const scenario of STUDIO_HOKUSAI_SHELF_SCENARIOS) {
+    expect(studioBrushQualityPortfolioEntryById(scenario.brushId)).not.toBeNull();
+    expect((await materializeStudioBrushCatalogSelection(scenario.brushId))?.catalogName).toBe(scenario.brushName);
+  }
+  expect(STUDIO_HOKUSAI_SHELF_SCENARIOS.map((item) => item.presetId)).toEqual(["pencil", "charcoal", "oil"]);
+  expect(studioBrushQualityPortfolioEntryById("charcoal")).toBeNull();
+  expect(studioBrushQualityPortfolioEntryById("oil")).toBeNull();
 });

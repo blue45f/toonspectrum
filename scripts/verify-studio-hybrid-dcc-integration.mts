@@ -1,5 +1,5 @@
 /**
- * Production-preview vertical-slice gate for Hybrid DCC inside the shipped `/studio` UI.
+ * Production-preview vertical-slice gate for Hybrid DCC inside the shipped `/studio/canvas` editor UI.
  *
  * The verifier starts from a blank Studio document and uses only visible product controls:
  * Hybrid DCC entry -> primitive -> object/face selection -> numeric TRS -> Undo/Redo -> OPFS
@@ -39,7 +39,7 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
-export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 2 as const;
+export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 3 as const;
 
 const SCRATCH =
   process.env.TOONSPECTRUM_HYBRID_DCC_VERIFY_DIR
@@ -251,7 +251,7 @@ export interface StudioHybridDccIntegrationResult {
   readonly status: "ok" | "failed" | "blocked";
   readonly schemaVersion: typeof STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION;
   readonly execution: "vite-production-preview-shipped-studio-ui";
-  readonly route: "/studio";
+  readonly route: "/studio/canvas";
   readonly blank: StudioHybridDccBlankEvidence | null;
   readonly selection: StudioHybridDccSelectionEvidence | null;
   readonly trsHistory: StudioHybridDccTrsHistoryEvidence | null;
@@ -366,8 +366,8 @@ export function validateStudioHybridDccIntegrationResult(candidate: unknown): st
   if (candidate.execution !== "vite-production-preview-shipped-studio-ui") {
     issues.push("integration run did not use the shipped production-preview Studio UI");
   }
-  if (candidate.route !== "/studio") {
-    issues.push("integration run did not exercise the real /studio route");
+  if (candidate.route !== "/studio/canvas") {
+    issues.push("integration run did not exercise the real /studio/canvas editor route");
   }
   if (record(candidate.blocker)) {
     issues.push(`blocked UI boundary: ${String(candidate.blocker.boundary ?? "unknown")}`);
@@ -677,9 +677,10 @@ function expectedStudioHybridDccHeadlessGpuWarning(message: string, studioUrl: U
   if (
     sourceUrl.origin !== studioUrl.origin
     || sourceUrl.hash !== ""
-    || !/^\/studio(?:\/3d\/dcc\/(?:model|build|cad|sculpt|material|shot))?$/u.test(
-      sourceUrl.pathname,
-    )
+    || !(sourceUrl.pathname === studioUrl.pathname
+      || /^\/studio\/3d\/dcc\/(?:model|build|cad|sculpt|material|shot)$/u.test(
+        sourceUrl.pathname,
+      ))
   ) return false;
   const diagnostic = message.slice(0, sourceSeparator);
   if (diagnostic === "No available adapters.") return true;
@@ -1827,7 +1828,7 @@ function resultFrom(
     status,
     schemaVersion: STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION,
     execution: "vite-production-preview-shipped-studio-ui",
-    route: "/studio",
+    route: "/studio/canvas",
     blank: evidence.blank ?? null,
     selection: evidence.selection ?? null,
     trsHistory: evidence.trsHistory ?? null,
@@ -1854,7 +1855,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = `${origin}studio/canvas`;
   const preview: ChildProcess | null = externalOrigin
     ? null
     : spawn(
@@ -1946,7 +1947,7 @@ if (executedPath === import.meta.url) {
       status: "failed",
       schemaVersion: STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION,
       execution: "vite-production-preview-shipped-studio-ui",
-      route: "/studio",
+      route: "/studio/canvas",
       blocker: {
         boundary: "unhandled-main",
         message: cause instanceof Error ? cause.stack ?? cause.message : String(cause),

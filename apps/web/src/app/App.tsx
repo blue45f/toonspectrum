@@ -14,11 +14,15 @@ import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNa
 import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
 
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
-import { FloatingControls } from "@/shared/components/FloatingControls";
 import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { useUi } from "@/shared/lib/ui-store";
 
+const FloatingControls = lazy(() =>
+  import("@/shared/components/FloatingControls").then((mod) => ({
+    default: mod.FloatingControls,
+  })),
+);
 const BackToTop = lazy(() =>
   import("@/shared/components/back-to-top").then((mod) => ({
     default: mod.BackToTop,
@@ -167,12 +171,14 @@ function WebFloatingControls() {
   const hideOnMobile = isImmersiveMobileRoute(pathname);
 
   return (
-    <FloatingControls
-      placement="bottom-right"
-      showSound={false}
-      showBgm={false}
-      className={hideOnMobile ? "max-md:hidden" : undefined}
-    />
+    <Suspense fallback={null}>
+      <FloatingControls
+        placement="bottom-right"
+        showSound={false}
+        showBgm={false}
+        className={hideOnMobile ? "max-md:hidden" : undefined}
+      />
+    </Suspense>
   );
 }
 
