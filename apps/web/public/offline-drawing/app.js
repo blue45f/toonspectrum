@@ -141,7 +141,7 @@ canvas.addEventListener('pointerdown', event => {
 canvas.addEventListener('pointermove', event => {
   if (event.pointerId !== pointerId || !drawing) return;
   event.preventDefault();
-  for (const point of event.getCoalescedEvents?.() ?? [event]) if (drawing.points.length < 20000) drawing.points.push(position(point));
+  for (const point of (event.getCoalescedEvents?.().length ? event.getCoalescedEvents() : [event])) if (drawing.points.length < 20000) drawing.points.push(position(point));
   render();
 });
 function finishStroke(event) {
@@ -213,6 +213,16 @@ window.addEventListener('keydown', event => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { finishStroke(); void flush(); } });
 window.addEventListener('beforeunload', event => { if (dirty || drawing || saving) { event.preventDefault(); event.returnValue = ''; } });
+async function activeWorkerSupportsRescue() {
+  const worker = navigator.serviceWorker.controller;
+  if (!worker) return false;
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 1200);
+    channel.port1.onmessage = event => { clearTimeout(timer); channel.port1.close(); resolve(event.data?.type === 'toonstudio-local-drawing:ready' && event.data.ready === true); };
+    worker.postMessage({ type: 'toonstudio-local-drawing:inspect' }, [channel.port2]);
+  });
+}
 async function initialize() {
   renderLayers(); render(true); message('바로 그릴 수 있어요. 저장소 상태를 확인하고 있습니다.');
   try {
@@ -238,6 +248,7 @@ async function initialize() {
     let ready = false;
     do {
       ready = (await Promise.all(paths.map(async path => Boolean((await caches.match(path))?.ok)))).every(Boolean);
+      if (ready) ready = await activeWorkerSupportsRescue();
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 400));
     } while (Date.now() < deadline);
