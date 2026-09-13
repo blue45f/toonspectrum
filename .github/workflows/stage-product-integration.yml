@@ -5,95 +5,100 @@ on:
     paths: [.github/workflows/stage-product-integration.yml]
 permissions:
   contents: write
-  actions: read
   pull-requests: read
 jobs:
   stage:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Assemble exact source trees without moving any branch
+      - name: Assemble reviewed immutable source snapshots without moving refs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, concurrent.futures, hashlib, io, json, os, pathlib, re, subprocess, tempfile, urllib.error, urllib.request, zipfile
+          import base64,hashlib,json,os,pathlib,subprocess,tempfile,urllib.request
           api='https://api.github.com/repos/blue45f/toonspectrum/'
           main='8ed6c67e03660932c45916e26131e37533c5d30a'
-          heads={1350:'0d4991afda235674fe4f974a944734fe88f2abc9',1351:'c2a18bef7be518df19089a8d3a1584388c31e63f',1352:'3ff38c27b18d77f67b8a2defe5ad1072e6823b00',1359:'7e71ce8e844eb48934fd2b50ea799f1ba3ceae08',1361:'a3c032b8edcc13a55f0e69e3ca1db314b130dd07'}
-          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'}
+          heads={1350:'0d4991afda235674fe4f974a944734fe88f2abc9',1351:'c2a18bef7be518df19089a8d3a1584388c31e63f',1352:'3ff38c27b18d77f67b8a2defe5ad1072e6823b00',1359:'7e71ce8e844eb48934fd2b50ea799f1ba3ceae08'}
           def call(path,payload=None):
-              req=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers=headers)
-              try:
-                  with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
-              except urllib.error.HTTPError as e:
-                  print(path,e.code,e.read().decode(),flush=True);raise
-          def check():
-              assert call('branches/main')['commit']['sha']==main, 'Main moved; review again'
-              for number,head in heads.items():
-                  pr=call('pulls/'+str(number));assert pr['state']=='open' and pr['head']['sha']==head,(number,'source changed')
-          check()
+              req=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
+          def sha(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
           def tree(commit):
-              tree_sha=call('git/commits/'+commit)['tree']['sha']
-              data=call('git/trees/'+tree_sha+'?recursive=1');assert not data.get('truncated')
-              return tree_sha,{x['path']:{k:x[k] for k in ('sha','mode','type')} for x in data['tree'] if x['type']!='tree'}
-          main_tree,mt=tree(main);current=mt.copy();cache={};conflicts=[]
-          def object_sha(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
-          def blob(sha):
-              if sha not in cache:
-                  data=call('git/blobs/'+sha);assert data['encoding']=='base64';raw=base64.b64decode(data['content']);assert object_sha(raw)==sha;cache[sha]=raw
-              return cache[sha]
+              identifier=call('git/commits/'+commit)['tree']['sha'];data=call('git/trees/'+identifier+'?recursive=1');assert not data.get('truncated')
+              return identifier,{e['path']:{k:e[k] for k in ('sha','mode','type')} for e in data['tree'] if e['type']!='tree'}
+          cache={}
+          def blob(identifier):
+              if identifier not in cache:
+                  data=call('git/blobs/'+identifier);assert data['encoding']=='base64';raw=base64.b64decode(data['content']);assert sha(raw)==identifier;cache[identifier]=raw
+              return cache[identifier]
+          main_tree,mt=tree(main);current=mt.copy()
           for number,head in heads.items():
-              base=call('compare/'+main+'...'+head+'?per_page=1')['merge_base_commit']['sha']
-              _,bt=tree(base);_,ht=tree(head)
+              base=call('compare/'+main+'...'+head+'?per_page=1')['merge_base_commit']['sha'];_,bt=tree(base);_,ht=tree(head)
               for path in sorted(set(bt)|set(ht)):
-                  if bt.get(path)==ht.get(path):continue
+                  if bt.get(path)==ht.get(path) or current.get(path)==ht.get(path):continue
                   before,feature,ours=bt.get(path),ht.get(path),current.get(path)
-                  if ours==feature:continue
                   if ours==before:
                       if feature is None:current.pop(path,None)
                       else:current[path]=feature
-                      continue
-                  assert all(e and e['type']=='blob' for e in (before,feature,ours)),('unreviewed structural conflict',number,path)
-                  with tempfile.TemporaryDirectory() as td:
-                      folder=pathlib.Path(td)
-                      for label,entry in [('main',ours),('base',before),('branch',feature)]:(folder/label).write_bytes(blob(entry['sha']))
-                      result=subprocess.run(['git','merge-file','-p','-L','main','-L','base','-L','branch',str(folder/'main'),str(folder/'base'),str(folder/'branch')],capture_output=True)
-                  text=result.stdout.decode()
-                  if result.returncode:
-                      assert path=='apps/web/src/domains/legal/PolicyPage.tsx' and number==1361,(number,path)
-                      pattern=r'<<<<<<< main\n(.*?)=======\n(.*?)>>>>>>> branch\n'
-                      parts=list(re.finditer(pattern,text,re.S));assert len(parts)==2
-                      assert parts[0][1]=='    setLoading(true);\n'
-                      assert '(error || loading) && doc' in parts[1][1]
-                      text=re.sub(pattern,lambda m:('    setDoc(fallbackDoc);\n'+m[1]) if m[1]=='    setLoading(true);\n' else m[1],text,flags=re.S)
-                      conflicts.append({'path':path,'resolution':'Keep readable/loading retry from main, reset correct fallback per policy; retain accurate static-source provenance from recovery'})
-                  raw=text.encode();sha=object_sha(raw);cache[sha]=raw;current[path]={**feature,'sha':sha}
-          # Native dialog semantics are explicit so the existing keyboard/backdrop handlers
-          # remain accessible without suppressing lint or removing escape/focus behavior.
-          path='apps/web/src/domains/creator/StudioWorkflowAccess.tsx'
-          raw=blob(current[path]['sha']);text=raw.decode();needle='      <dialog\n        ref={dialogRef}'
-          assert text.count(needle)==1
-          raw=text.replace(needle,'      <dialog\n        role="dialog"\n        ref={dialogRef}').encode();sha=object_sha(raw);cache[sha]=raw;current[path]={**current[path],'sha':sha}
-          changes=[];workflow_entries=[];root=pathlib.Path('artifacts/product-integration');root.mkdir(parents=True)
+                  else:
+                      assert all(e and e['type']=='blob' for e in (before,feature,ours)),('structural conflict',number,path)
+                      with tempfile.TemporaryDirectory() as td:
+                          folder=pathlib.Path(td)
+                          for label,e in [('main',ours),('base',before),('head',feature)]:(folder/label).write_bytes(blob(e['sha']))
+                          result=subprocess.run(['git','merge-file','-p',str(folder/'main'),str(folder/'base'),str(folder/'head')],capture_output=True)
+                      assert result.returncode==0,('unreviewed conflict',number,path)
+                      identifier=sha(result.stdout);cache[identifier]=result.stdout;current[path]={**feature,'sha':identifier}
+          path='apps/web/src/domains/creator/StudioWorkflowAccess.tsx';text=blob(current[path]['sha']).decode()
+          old='import { useId, useRef, useState, type KeyboardEvent } from "react";'
+          assert text.count(old)==1;text=text.replace(old,'import { useCallback, useEffect, useId, useRef, useState } from "react";')
+          assert text.count('  const closeGuide = () => {')==1;text=text.replace('  const closeGuide = () => {','  const closeGuide = useCallback(() => {')
+          old='    triggerRef.current?.focus({ preventScroll: true });\n  };';assert text.count(old)==1;text=text.replace(old,'    triggerRef.current?.focus({ preventScroll: true });\n  }, []);')
+          start=text.index('  const handleGuideKeyDown = ');end=text.index('\n  return (',start)
+          replacement='''  // Listen on the native dialog for modal lifecycle and keyboard isolation. The
+            // dialog remains a dialog, not a fake interactive div; listeners are disposed.
+            useEffect(() => {
+              const dialog = dialogRef.current;
+              if (!dialog) return;
+              const keyDown = (event: KeyboardEvent) => {
+                event.stopPropagation();
+                if (event.key === "Escape") { event.preventDefault(); closeGuide(); }
+              };
+              const cancel = (event: Event) => { event.preventDefault(); closeGuide(); };
+              const click = (event: MouseEvent) => { if (event.target === dialog) closeGuide(); };
+              dialog.addEventListener("keydown", keyDown);
+              dialog.addEventListener("cancel", cancel);
+              dialog.addEventListener("click", click);
+              return () => {
+                dialog.removeEventListener("keydown", keyDown);
+                dialog.removeEventListener("cancel", cancel);
+                dialog.removeEventListener("click", click);
+              };
+            }, [closeGuide]);
+          '''
+          import textwrap
+          replacement='  '+textwrap.dedent(replacement).lstrip()
+          # Dedent the block uniformly from the embedded Python literal, then use TS formatting
+          # in the real repository's lint stage rather than changing any lint configuration.
+          replacement='  // Native dialog events preserve Escape, backdrop dismissal and canvas shortcut isolation.\n  useEffect(() => {\n    const dialog = dialogRef.current;\n    if (!dialog) return;\n    const keyDown = (event: KeyboardEvent) => {\n      event.stopPropagation();\n      if (event.key === "Escape") { event.preventDefault(); closeGuide(); }\n    };\n    const cancel = (event: Event) => { event.preventDefault(); closeGuide(); };\n    const click = (event: MouseEvent) => { if (event.target === dialog) closeGuide(); };\n    dialog.addEventListener("keydown", keyDown);\n    dialog.addEventListener("cancel", cancel);\n    dialog.addEventListener("click", click);\n    return () => {\n      dialog.removeEventListener("keydown", keyDown);\n      dialog.removeEventListener("cancel", cancel);\n      dialog.removeEventListener("click", click);\n    };\n  }, [closeGuide]);\n'
+          text=text[:start]+replacement+text[end:]
+          for line in ['        onKeyDown={handleGuideKeyDown}\n','        onClick={(event) => { if (event.target === event.currentTarget) closeGuide(); }}\n']:
+              assert text.count(line)==1;text=text.replace(line,'')
+          raw=text.encode();identifier=sha(raw);cache[identifier]=raw;current[path]={**current[path],'sha':identifier}
+          root=pathlib.Path('artifacts/product-integration');root.mkdir(parents=True);changes=[];workflows=[]
           for path in sorted(set(mt)|set(current)):
               if mt.get(path)==current.get(path):continue
-              e=current.get(path)
-              if e is None:entry={'path':path,'mode':mt[path]['mode'],'type':mt[path]['type'],'sha':None}
-              else:
-                  entry={'path':path,**e}
-                  if e['sha'] in cache:
-                      raw=cache[e['sha']];result=call('git/blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'});assert result['sha']==e['sha']
-                  if pathlib.PurePosixPath(path).suffix in ('.ts','.tsx','.mjs','.py','.yml','.json','.md'):
-                      target=root/'sources'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(blob(e['sha']))
-              (workflow_entries if path.startswith('.github/') else changes).append(entry)
-          assert len(changes)+len(workflow_entries)==85
-          check()
-          # Workflow path writes use the authorized connector separately. This runner stages
-          # only ordinary source objects and changes no branch/ref or check status.
+              entry={'path':path,**current[path]}
+              if entry['sha'] in cache:
+                  raw=cache[entry['sha']];assert call('git/blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})['sha']==entry['sha']
+              if pathlib.PurePosixPath(path).suffix in ('.ts','.tsx','.mjs','.py','.json','.yml','.md'):
+                  target=root/'sources'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(blob(entry['sha']))
+              (workflows if path.startswith('.github/') else changes).append(entry)
+          assert len(changes)+len(workflows)==75
           product_tree=call('git/trees',{'base_tree':main_tree,'tree':changes})['sha']
-          report={'main':main,'source_heads':heads,'product_tree':product_tree,'workflow_entries':workflow_entries,'changed_paths':[e['path'] for e in changes+workflow_entries],'resolutions':conflicts,'refs_updated':False}
+          latest={number:{k:p.get(k) for k in ('state','merged','mergeable')}|{'head':p['head']['sha']} for number in heads for p in [call('pulls/'+str(number))]}
+          report={'main':main,'source_heads':heads,'latest_source_state':latest,'latest_main':call('branches/main')['commit']['sha'],'product_tree':product_tree,'workflow_entries':workflows,'changed_paths':[e['path'] for e in changes+workflows],'refs_updated':False}
           (root/'candidate.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
           PY
       - uses: actions/upload-artifact@v6
