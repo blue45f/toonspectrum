@@ -497,6 +497,7 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
+import { finitePositiveGroupResizeBounds } from "./studio-group-resize-bounds";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import { planHealCloneDabs } from "./studio-heal-clone";
@@ -4248,18 +4249,6 @@ export function StudioCuttoonEditor({
     ) {
       announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
     }
-  }
-  function finitePositiveGroupResizeBounds(
-    bounds: StudioGroupUniformResizeBounds
-  ): boolean {
-    return (
-      Number.isFinite(bounds.x) &&
-      Number.isFinite(bounds.y) &&
-      Number.isFinite(bounds.width) &&
-      Number.isFinite(bounds.height) &&
-      bounds.width > 0 &&
-      bounds.height > 0
-    );
   }
   /**
    * Active resize target IDs: multi-marquee first, else single selected object.
