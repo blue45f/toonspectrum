@@ -29202,6 +29202,7 @@ function clearSelectionForEdit() {
       storyboardGridOpen={storyboardGridOpen}
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
+      saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
