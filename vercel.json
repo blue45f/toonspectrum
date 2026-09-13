@@ -39,6 +39,10 @@
     }
   ],
   "rewrites": [
+    { "source": "/offline-draw", "destination": "/offline-draw/index.html" },
+    { "source": "/offline-draw/", "destination": "/offline-draw/index.html" },
+    { "source": "/spatial-reader", "destination": "/spatial-reader/index.html" },
+    { "source": "/spatial-reader/", "destination": "/spatial-reader/index.html" },
     { "source": "/socket.io", "destination": "/api/studio-live" },
     { "source": "/socket.io/:path*", "destination": "/api/studio-live" },
     { "source": "/api/cover", "destination": "/api/index" },
@@ -56,6 +60,8 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
+    { "source": "/offline-draw/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/offline-draw/portable.html", "headers": [{ "key": "Content-Disposition", "value": "attachment; filename=ToonStudio-Offline-Drawing.html" }] },
     {
       "source": "/(.*)",
       "headers": [
