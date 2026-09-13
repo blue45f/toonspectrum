@@ -3,6 +3,9 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
+import * as drawCompiler from "./studio-live-transform-draw-compiler";
+import { createStudioLiveTransformDraftStore } from "./studio-live-transform-draft-store";
 import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
 
 import type { DrawEl, El } from "./studio-element-model";
@@ -747,8 +750,21 @@ describe("StudioGroupUniformResizeProxy", () => {
 
   describe("live transform preview (PPT-style real-time ink)", () => {
     function setupLivePreview(
-      options: { cached?: boolean; dragging?: boolean; parent?: unknown } = {},
+      options: { cached?: boolean; dragging?: boolean; parent?: unknown; exactDraft?: boolean } = {},
     ) {
+      // The legacy projection tests model a certified plain Line without a draft store.
+      // Explicitly opt that synthetic fixture into the affine lane instead of accidentally
+      // treating a missing brush id as affine-safe. Real/default pen tests use the compiler.
+      if (!options.exactDraft) {
+        const compile = drawCompiler.compileStudioLiveTransformDrawSnapshot;
+        vi.spyOn(drawCompiler, "compileStudioLiveTransformDrawSnapshot").mockImplementation((element) => {
+          const snapshot = compile(element);
+          return {
+            ...snapshot,
+            renderRoute: { ...snapshot.renderRoute, retainedAffinePolicy: "route-checked" },
+          };
+        });
+      }
       const wrapper = createWrapperNode("stroke-1", options);
       const indicator = createIndicatorNode();
       const stage = createStage(wrapper, [indicator]);
@@ -782,6 +798,40 @@ describe("StudioGroupUniformResizeProxy", () => {
       };
       return { wrapper, indicator, props };
     }
+
+    it("브러시 정보가 없는 기존 펜도 조작 중 정확한 잉크를 보여주고 취소 시 원복한다", () => {
+      const { wrapper, props } = setupLivePreview({ exactDraft: true });
+      const store = createStudioLiveTransformDraftStore();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy
+        {...props}
+        livePreview={{ ...props.livePreview, draftStore: store }}
+      />);
+      act(() => rectProps().onTransformStart());
+      for (const [scaleX, scaleY, rotationDeg] of [[2, 2, 45], [0.5, 0.8, -30]] as const) {
+        act(() => {
+          rect.position({ x: 30, y: 40 });
+          rect.scaleX(scaleX);
+          rect.scaleY(scaleY);
+          rect.rotation(rotationDeg);
+          rectProps().onTransform({ target: rect });
+        });
+        flushPreviewFrames();
+        expect(store.getSnapshot()?.entries[0]?.element).toEqual(planStudioDrawObjectTransform({
+          el: LIVE_DRAW,
+          sourceBounds: bounds,
+          targetBounds: { x: 30, y: 40, width: bounds.width * scaleX, height: bounds.height * scaleY },
+          rotationDeg: rotationDeg,
+        }));
+        expect(wrapper.visible()).toBe(false);
+        expect(props.onCommit).not.toHaveBeenCalled();
+      }
+      act(() => window.dispatchEvent(new Event("blur")));
+      expect(store.getSnapshot()).toBeNull();
+      expect(wrapper.visible()).toBe(true);
+      expect(props.onCommit).not.toHaveBeenCalled();
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+    });
 
     it("이미 드래그 중인 획에는 변형 세션을 시작하지 않는다", () => {
       // 드래그와 변형은 둘 다 래퍼 transform에 쓴다. 한 손가락이 획을 끄는 중에 다른 손가락이
