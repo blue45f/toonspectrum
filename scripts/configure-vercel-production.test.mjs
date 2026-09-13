@@ -219,16 +219,18 @@ describe("OAuth aliases use the same state-signing authority as the real API", (
 });
 
 describe("production readiness workflow", () => {
-  it("uses audit-only when deployment is disabled and requires the CLI project/org pair before mutation", () => {
+  it("is always audit-only and requires the project/org pair before reading configuration", () => {
     const workflow = parseYaml(readFileSync(new URL("../.github/workflows/production-readiness.yml", import.meta.url), "utf8"));
-    expect(workflow.on.workflow_dispatch.inputs.deploy.default).toBe(false);
+    expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
+    expect(workflow.on.workflow_dispatch?.inputs).toBeUndefined();
     const steps = workflow.jobs["reconcile-and-deploy"].steps;
     const validation = steps.find((step) => step.name === "Validate deployment credentials");
     expect(validation.run).toContain("VERCEL_PROJECT_ID");
     expect(validation.run).toContain("VERCEL_ORG_ID");
     const reconciliation = steps.find((step) => step.name?.startsWith("Reconcile production variables"));
     expect(reconciliation.run).toContain("--audit-only");
-    expect(reconciliation.env.DEPLOY).toBe("${{ inputs.deploy }}");
+    expect(reconciliation.env?.DEPLOY).toBeUndefined();
+    expect(steps.some((step) => /vercel\s+(?:deploy|build)/u.test(step.run ?? ""))).toBe(false);
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_SESSION_SECRET_VALUE).toBe("${{ secrets.AUTH_SESSION_SECRET }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_STATE_SECRET_VALUE).toBe("${{ secrets.AUTH_STATE_SECRET }}");
     expect(steps.findIndex((step) => step === validation)).toBeLessThan(steps.findIndex((step) => step === reconciliation));
@@ -245,7 +247,7 @@ describe("production readiness workflow", () => {
     expect(spawnSync("bash", ["-c", script], { env: { PATH: process.env.PATH, VERCEL_TOKEN: "fixture-token", VERCEL_PROJECT_ID: "fixture-project", VERCEL_ORG_ID: "fixture-team" } }).status).toBe(0);
   });
 
-  it("dispatches only the read-only script mode when deploy is false", () => {
+  it("uses read-only mode even when the retired DEPLOY variable is true", () => {
     const workflow = parseYaml(readFileSync(new URL("../.github/workflows/production-readiness.yml", import.meta.url), "utf8"));
     const script = workflow.jobs["reconcile-and-deploy"].steps.find((step) => step.name?.startsWith("Reconcile production variables")).run;
     const fixture = mkdtempSync(join(tmpdir(), "toonspectrum-env-mode-"));
@@ -255,7 +257,7 @@ describe("production readiness workflow", () => {
       for (const deploy of ["false", "true"]) {
         const result = spawnSync("bash", ["-c", script], { env: { PATH: `${fixture}:${process.env.PATH}`, DEPLOY: deploy, FIXTURE_ARGS: args }, encoding: "utf8" });
         expect(result.status).toBe(0);
-        expect(readFileSync(args, "utf8").includes("--audit-only")).toBe(deploy === "false");
+        expect(readFileSync(args, "utf8").includes("--audit-only")).toBe(true);
       }
     } finally {
       rmSync(fixture, { recursive: true, force: true });

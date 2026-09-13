@@ -16,7 +16,7 @@ name: catalog-update
 #
 # 선택 Secrets (미설정 시 안전하게 skip/notice):
 #   DISCORD_WEBHOOK_URL      신작·영상화 다이제스트 + 검증 실패 알림 대상
-# 성공한 main 푸시는 Vercel Git Integration이 자동 배포한다. 별도 hook/CLI를 호출하지
+# main 푸시는 배포하지 않는다(2026-09-14 최소 비용 정책). 별도 hook/CLI를 호출하지
 # 않아 중복 빌드와 러너 비용을 막는다.
 
 on:

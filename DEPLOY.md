@@ -1,5 +1,9 @@
 # ToonSpectrum 배포 가이드
 
+> **2026-09-14 사용자 정책:** 자동 빌드·배포 금지. PR 병합은 배포 승인이 아닙니다.
+> 승인한 main SHA를 외부에서 한 번 빌드하고 prebuilt로 한 번 업로드합니다.
+> [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)이 이전 자동 배포 지침을 대체합니다.
+
 현재 운영 환경은 작업 유형별로 권위를 분리합니다. Vercel은 정적 SPA와 제한된 NestJS HTTP API를, Neon/호환 PostgreSQL은 동적 데이터와 migration 원장을, Cloudflare Durable Objects는 Studio의 임시 실시간 상태를, Upstash는 분산 제한·조정을, Supabase 비공개 Storage는 원본·파생·내보내기 객체를 담당합니다.
 한 제공자가 다른 제공자의 전체 폴백이 되지는 않으며, 각 제공자가 같은 목적의 전체 계약을 충족하는지 반드시 증명해야 합니다.
 
@@ -45,8 +49,8 @@ pnpm run verify
 
 ## 2. Vercel 배포
 
-1. Vercel → Add New Project → 이 레포 선택.
-2. `vercel.json`의 설정을 그대로 사용합니다.
+1. 기존 Vercel 프로젝트를 유지하고 Git 연결을 해제한 상태로 둡니다. 새 프로젝트 생성·Git 재연결은 하지 않습니다.
+2. 사용자 승인 후 수동 prebuilt 배포에서 `vercel.json`을 사용합니다(`git.deploymentEnabled: false`).
    - `buildCommand`: `pnpm --filter @webtoon-nest/api build && pnpm run build`
    - `outputDirectory`: `dist`
    - `/api/:path*` → `/api/index`
@@ -240,53 +244,27 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
 `drizzle-kit push`를 실행하지 않습니다.
 
-Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). **2026-09-02부터
-`main`은 브랜치 보호로 PR 전용이며 CI의 `core` 체크(lint·typecheck·마이그레이션 채택·전체 Vitest·빌드 게이트)
-성공이 머지 조건**입니다. 2026-09-05부터 `core`는 그 검사들을 직접 돌리는 잡이 아니라 병렬 잡
-`lint`·`typecheck`·`build`·`test (1/3..3/3)`·`test (serial lane)`의 결과를 합치는 게이트 잡입니다 — 검사 항목은
-같고 배치만 바뀌었으며, 필수 체크 이름 `core`는 그대로입니다. 릴리스 체크 `verify`는 같은 다섯 잡과
-`studio-3d-runtime`(3D 런타임 오라클)을 직접 합칩니다 — 판정은 `core` + 3D 증명과 같고, `core` 잡의 러너
-배정을 한 번 더 기다리지 않습니다. 적색 커밋은 PR 경로로는 main에 들어가지 못하므로 배포되지 않습니다 — "적색 main도
-배포되는 구조"를 배포 경로가 아니라 머지 경로에서 막은 것입니다(Vercel CLI 배포 시크릿이 저장소에 없어
-`workflow_run` 게이트는 쓸 수 없었습니다). 정책은 저장소 표준과 같습니다: 승인 0명, `strict=false`(base 최신화
-강제 없음), `enforce_admins=false`, 강제 push·삭제 금지. **예외는 하나 — 관리자(소유자)는 PR·`core` 요구를 우회해
-직접 push하거나 `--admin` 머지할 수 있습니다.** 이는 게이트 자체가 깨졌을 때를 위한 잠금 사고 방지 탈출구이며,
-우회한 커밋은 그대로 배포되므로 반드시 PR이나 커밋 본문에 이유를 남기고 다음 PR에서 core를 다시 녹색으로 돌려야
-합니다.
-`studio-3d-visual`·`studio-inapp-browser`는 러너 환경 의존이 커서 필수 체크에 넣지 않았습니다. 이전에는
-`vercel.json`의 `ignoreCommand`가 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 커밋 SHA의 exact
-match를 요구해 릴리스마다 승인 SHA를 수동 회전해야 했습니다. 그 승인 단계는 제거했고, 대신
-**migration을 동반하는 release는 반드시 expand/contract 2회 merge로 나눠야 합니다.** 이유는 두 제약이
-서로 맞물려 있기 때문입니다. `production-database-migrations.yml`은 release SHA가 **이미
-`origin/main`의 ancestor일 것**을 요구하고(ancestor 아니면 즉시 실패), main merge는 곧 배포입니다.
-따라서 DDL은 언제나 **새 runtime이 이미 떠 있는 뒤에만** 실행할 수 있습니다. "merge 전에 migration을
-끝낸다"는 순서는 이 workflow로 실행이 불가능하므로, 새 runtime은 반드시 **구 schema에서도 동작해야**
-합니다.
+### 운영 배포 승인과 DB 변경 순서 — 2026-09-14 정책
 
-migration을 동반하는 release 순서는 다음과 같습니다. Render는 `autoDeployTrigger: off`를 유지합니다.
+`origin/main` push와 PR merge는 더 이상 Vercel 배포를 시작하지 않습니다. `[deploy]` 메시지도
+승인이 아닙니다. `AGENTS.md`와 최소 비용 배포 정책에 따라 사용자가 승인한 하나의 정확한
+40자리 SHA를 수동 prebuilt 경로로만 배포합니다. PR 전용 main과 기존 `core`, `verify`,
+보안·runtime 검증은 유지하며 관리자 우회나 테스트 약화로 배포를 진행하지 않습니다.
 
-1. reviewed release commit SHA를 확정합니다. 이 커밋의 runtime은 **구/신 schema 양쪽에서 동작하는
-   backward-compatible(expand) 단계**여야 합니다 — 새 컬럼·테이블은 optional로 읽고, 없으면 기존
-   경로로 동작해야 합니다. 이 조건을 만족하지 못하면 merge하지 않습니다.
-2. expand 커밋을 main에 merge합니다. 배포가 따라오지만 구 schema에서 정상 동작합니다.
-3. 기존 DB upgrade라면 현재 Studio writer를 모두 drain하고 이전 binary가 새 mutation을 받지
-   않는지 확인합니다. 특히 `0017` 최초 cutover와 최초 `adopt`에는 이 단계가 필수입니다.
-4. workflow를 **merge된 그 SHA로** 실행합니다(이제 ancestor 조건을 만족합니다).
-   `NO-STUDIO-WRITERS`를 입력하고, 최초 원장 채택은 `adopt`, 이후는 `apply`를 선택합니다.
-   base schema가 완전히 provision되지 않은 DB는 거부되며 이 workflow를 새 DB bootstrap 수단으로
-   사용하지 않습니다.
-5. migration과 full capability verification이 성공한 뒤 Cloudflare Worker·Render realtime canary를
-   같은 SHA 기준으로 완료합니다.
-6. 그 다음에 **contract 단계**(구 schema 호환 경로 제거, 필요하면 컬럼 drop migration)를 별도 커밋으로
-   merge합니다. 이 단계는 구 binary가 모두 사라진 뒤에만 안전합니다.
+migration workflow의 exact main ancestry, manifest/checksum, DDL 전용 role, required reviewer,
+writer drain, capability 검증은 그대로 유지합니다. merge가 더 이상 runtime 전환이 아니므로
+reviewed main SHA로 migration을 검토·승인한 후 새 runtime을 배포하는 순서를 선택할 수 있습니다.
+다만 현재 운영 중인 이전 runtime과의 호환성은 반드시 보존합니다.
 
-expand 단계로 나눌 수 없는 변경(같은 커밋에서 구 schema를 반드시 깨야 하는 경우)은 자동배포와 양립하지
-않습니다. 그 경우 Vercel 대시보드에서 production 배포를 일시 중지하고 수동 순서로 처리한 뒤 재개하십시오
-— 이제 그것을 대신 막아 주는 repository gate는 없습니다.
+1. expand 변경을 PR로 검증·병합합니다. 구 runtime과 새 schema가 함께 동작해야 합니다.
+2. 기존 DB upgrade의 승인·writer drain·NO-STUDIO-WRITERS 등 기존 migration 전제조건을 확인합니다.
+3. merge된 정확한 SHA로 수동 adoption/apply와 capability 검증을 수행합니다. 이는 별도 DB 변경 승인입니다.
+4. 사용자 배포 승인을 받은 같은 SHA를 한 번 빌드하고 prebuilt로 업로드합니다. realtime canary도 확인합니다.
+5. 구 binary가 모두 사라진 뒤에만 contract 변경을 별도 PR·승인·배포로 진행합니다.
 
-migration·realtime 계약을 건드리지 않는 순수 프론트엔드 release는 1~4단계에 해당 대상이 없으므로
-바로 merge하면 됩니다. 반대로 schema나 realtime 계약을 바꾸는 커밋을 canary 없이 main에 올리면
-새 runtime이 DB보다 먼저 뜰 수 있다는 위험은 그대로이며, 이제 그것을 막아 주는 자동 장치는 없습니다.
+expand가 불가능한 변경은 별도 유지보수/롤백 계획과 승인이 필요합니다. 순수 프론트엔드 변경도
+merge만으로 출시되지 않으며, 여러 변경을 모아 승인된 최종 SHA를 한 번 배포합니다.
+Render의 `autoDeployTrigger: off`와 외부 호스트의 기존 안전 경계를 유지합니다.
 
 PostgreSQL adapter는 listener와 publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler`
 호스트나 PgBouncer transaction endpoint는 사용할 수 없습니다. 원격/운영 URL은
