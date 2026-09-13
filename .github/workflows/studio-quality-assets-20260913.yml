@@ -2,20 +2,15 @@ name: Studio quality assets 20260913
 on:
   push:
     branches: [codex/studio-quality-assets-20260913]
-  pull_request:
-    paths:
-      - scripts/studio-quality-assets-20260913/**
-      - apps/web/src/domains/creator/catalog/studio-quality-assets-20260913*
-      - .github/workflows/studio-quality-assets-20260913.yml
 permissions:
   contents: read
 concurrency:
   group: studio-quality-assets-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  inspect:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,3 +33,35 @@ jobs:
           name: studio-quality-assets-source
           path: /tmp/studio-asset-review/source.tgz
           retention-days: 3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.16.0'
+      - name: Install isolated review tools
+        run: |
+          python -m pip install Pillow==11.3.0
+          mkdir -p /tmp/studio-asset-tools
+          cd /tmp/studio-asset-tools
+          npm init -y
+          npm install --save-exact three@0.184.0 playwright@1.62.1 gltf-validator@2.0.0-dev.3.10
+          npx playwright install --with-deps chromium
+      - name: Acquire distinct CC0 models and native 2K surfaces
+        run: |
+          python scripts/acquire_studio_pbr_assets.py --output artifacts/studio-quality-assets-20260913 --exclude-manifest apps/web/public/assets/studio/cc0-20260906/manifest.json --profile expansion --max-download-mib 1536
+      - name: Render every model from three actual browser viewpoints
+        run: node scripts/render_studio_asset_delivery.mjs artifacts/studio-quality-assets-20260913 /tmp/studio-asset-tools
+      - name: Package review candidates without upstream duplicates
+        if: always()
+        run: |
+          if test -d artifacts/studio-quality-assets-20260913; then
+            tar --exclude='_source' -czf /tmp/studio-asset-review/candidates.tgz -C artifacts studio-quality-assets-20260913
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-quality-assets-candidates
+          path: /tmp/studio-asset-review/candidates.tgz
+          retention-days: 7
+          if-no-files-found: warn
