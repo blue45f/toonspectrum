@@ -279,3 +279,42 @@ describe("prepared full editor and rescue coexistence", () => {
     expect(await response?.text()).toBe("local rescue");
   });
 });
+
+describe("prepared layered drawing integration", () => {
+  const cacheName = "toonstudio-emergency-drawing-shell-v1";
+  function prepareLayeredDrawing() {
+    harness.caches.seed(cacheName, "/offline-draw/ready-v1", new Response("ready"));
+    harness.caches.seed(cacheName, "/offline-draw/index.html", shell("layered drawing"));
+  }
+  it("prefers the prepared layered editor while preserving the installed small rescue", async () => {
+    harness.setNetwork(async url => assetResponse(url)); await loadWorker();
+    const install = await harness.dispatch("install"); await install.waited;
+    prepareLayeredDrawing();
+    harness.setNetwork(async () => new Response("outage", { status: 503 }));
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio"));
+    expect(await response?.text()).toBe("layered drawing");
+    expect([...harness.caches.stores.keys()]).toContain("toonstudio-local-drawing-20260913.1");
+  });
+  it("retains the installed small rescue when the layered editor is not prepared", async () => {
+    harness.setNetwork(async url => assetResponse(url)); await loadWorker();
+    const install = await harness.dispatch("install"); await install.waited;
+    harness.caches.seed(cacheName, "/offline-draw/index.html", shell("not ready"));
+    harness.setNetwork(async () => new Response("outage", { status: 503 }));
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio"));
+    expect(await response?.text()).toBe("local rescue");
+  });
+  it("serves prepared layered editor assets through the root worker without network access", async () => {
+    prepareLayeredDrawing();
+    harness.caches.seed(cacheName, "/offline-draw/editor.js", new Response("layered editor code"));
+    harness.setNetwork(async () => { throw new Error("offline"); }); await loadWorker();
+    const { response } = await harness.dispatch("fetch", { request: new Request(`${ORIGIN}/offline-draw/editor.js`) });
+    expect(await response?.text()).toBe("layered editor code");
+    expect(harness.fetchCalls).toEqual([]);
+  });
+  it.each([401, 403, 404])("does not mask HTTP %i with a prepared drawing", async status => {
+    prepareLayeredDrawing();
+    harness.setNetwork(async () => new Response("not an outage", { status })); await loadWorker();
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio"));
+    expect(response?.status).toBe(status);
+  });
+});

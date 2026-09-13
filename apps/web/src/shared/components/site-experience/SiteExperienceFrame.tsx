@@ -6,6 +6,7 @@ import { EXPERIENCE_MODE_KEY, parseExperienceMode, type ExperienceMode } from ".
 import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/browser-preferences";
 
 import "./site-experience.css";
+import "./site-art-direction.css";
 
 /** No root/body mutations: unmounting the web frame removes every visual effect. */
 function ActiveSiteExperienceFrame({ children }: { children: ReactNode }) {

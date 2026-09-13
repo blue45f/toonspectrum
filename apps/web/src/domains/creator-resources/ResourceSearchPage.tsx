@@ -30,11 +30,11 @@ function resourceUsageLabel(item: CreatorResource): string {
   return "정보·원문 링크";
 }
 function resourceUsageDescription(item: CreatorResource): string {
-  if (item.license === "CC0") return "Met 공개 데이터의 CC0 표시를 확인했습니다. 초상·상표 등 기타 권리는 별도 확인하세요.";
+  if (item.license === "CC0") return "공식 제공처의 공개 이용 표시를 확인했습니다. 초상·상표 등 기타 권리는 별도 확인하세요.";
   if (item.license === "book-promotion") return "도서 소개·홍보 목적의 서지정보입니다. 원본 데이터 재판매나 임의 변경은 허용 범위를 다시 확인하세요.";
   return "검색 메타데이터입니다. 이미지·본문 재배포 또는 각색 허락을 의미하지 않습니다.";
 }
-function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
+export function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !imageFailed && <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="h-52 w-full bg-raised object-contain p-3" />}
