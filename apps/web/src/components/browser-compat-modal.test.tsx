@@ -15,10 +15,10 @@ const classTokens = (element: HTMLElement) => element.className.split(/\s+/);
 describe("BrowserCompatModal touch targets", () => {
   afterEach(() => cleanup());
 
-  it("keeps every visible modal action at least 44px tall", () => {
+  it("keeps every visible modal action at least 44px tall", async () => {
     render(<BrowserCompatModal isOpen onClose={vi.fn()} />);
 
-    const closeButton = screen.getByRole("button", { name: "닫기" });
+    const closeButton = await screen.findByRole("button", { name: "닫기" });
     expect(classTokens(closeButton)).toContain("h-11");
     expect(classTokens(closeButton)).toContain("w-11");
 
