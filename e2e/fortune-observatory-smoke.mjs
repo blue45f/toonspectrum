@@ -30,7 +30,7 @@ try {
   await page.getByPlaceholder('1990-06-15').nth(0).fill('1990-06-15'); await page.getByPlaceholder('1990-06-15').nth(1).fill('1992-11-23');
   await page.getByRole('button',{name:'협업 궁합 열기',exact:true}).click(); await page.getByRole('heading',{name:'상대의 원국',exact:true}).waitFor();
   await page.goto(`${base}/fortune?content=tarot-three`); await page.getByRole('radio').nth(4).check();
-  await page.getByRole('button',{name:'3카드 타로 열기',exact:true}).click(); await page.locator('.fo-tarot-results figure').nth(2).waitFor();
+  await page.getByRole('button',{name:'3카드 타로 열기',exact:true}).click(); await page.getByRole('button',{name:'상세 리포트',exact:true}).click(); await page.locator('.fo-tarot-results figure').nth(2).waitFor();
   await page.setViewportSize({width:390,height:844}); await page.screenshot({path:`${output}/tarot-mobile.png`,fullPage:true});
   await page.goto(`${base}/fortune`); await page.getByRole('heading',{name:/운세 관측소/}).waitFor();
   await page.screenshot({path:`${output}/mobile.png`,fullPage:true});
