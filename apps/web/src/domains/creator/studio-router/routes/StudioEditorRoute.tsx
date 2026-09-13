@@ -1,5 +1,7 @@
-import { Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 
+import { StudioOfflinePanelBoundary } from "../../offline/StudioOfflinePanelBoundary";
+import { resolveStudioEditorDocumentRoute } from "../../studio-editor-document-source";
 import { studioEditorInstanceKey } from "../../studio-editor-scope";
 import { studioWorkspaceDocumentIdentity } from "../../studio-workspace-route";
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -19,12 +21,20 @@ const LegacyStudioEditorAdapter = lazyRetry(
   "LegacyStudioEditorAdapter",
 );
 
+// Optional offline guidance must not trigger the global chunk-reload recovery.
+const StudioOfflinePanel = lazy(
+  () => import("../../offline/StudioOfflinePanel").then((module) => ({ default: module.StudioOfflinePanel })),
+);
+
 export function StudioEditorRoute({ resolution }: {
   readonly resolution: StudioEditorRouteResolution;
 }) {
   const { data: session } = useSession();
   const authScopeKey = session?.user?.id ?? null;
-  const route = resolution.workspaceRoute;
+  const route = useMemo(
+    () => resolveStudioEditorDocumentRoute(resolution.workspaceRoute),
+    [resolution.workspaceRoute],
+  );
   const identity = studioWorkspaceDocumentIdentity(route);
   const draftScope = useStudioDraftScope(identity, authScopeKey);
   const editorKey = studioEditorInstanceKey({
@@ -57,6 +67,9 @@ export function StudioEditorRoute({ resolution }: {
         draftSessionEpoch={draftScope.epoch}
         studioRoute={route}
       >
+        <StudioOfflinePanelBoundary>
+          <Suspense fallback={null}><StudioOfflinePanel /></Suspense>
+        </StudioOfflinePanelBoundary>
         <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
           <LegacyStudioEditorAdapter
             remixId={route.remixSourceWorkId}

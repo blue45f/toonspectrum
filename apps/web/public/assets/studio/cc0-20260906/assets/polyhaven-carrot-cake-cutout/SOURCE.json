@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/carrot_cake",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-carrot-cake",
+  "sourceModelSha256": "5a6c9e3fe92ac091f5fdb574afc500b1f145ed42e6252b2c3684810ff3ceac28",
+  "render": {
+    "sourceId": "polyhaven-carrot-cake",
+    "sourceSha256": "5a6c9e3fe92ac091f5fdb574afc500b1f145ed42e6252b2c3684810ff3ceac28",
+    "path": "high-resolution-props/polyhaven-carrot-cake.png",
+    "visiblePixels": 427546,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 13790
+  },
+  "independentOriginal": false
+}

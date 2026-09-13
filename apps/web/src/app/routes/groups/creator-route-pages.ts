@@ -130,3 +130,13 @@ export const StudioRouter = lazyRetry(
   },
   "StudioRouter",
 );
+
+export const StudioGenerativePage = lazyRetry(
+  () => import("@/domains/creator/generative/StudioGenerativePage").then((module) => ({ default: module.StudioGenerativePage })),
+  "StudioGenerativePage",
+);
+
+export const StudioSpatialReaderPage = lazyRetry(
+  () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
+  "StudioSpatialReaderPage",
+);

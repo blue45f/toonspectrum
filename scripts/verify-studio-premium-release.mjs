@@ -11,14 +11,17 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 if (!process.argv[2]) throw new Error('Usage: verify-studio-premium-release.mjs ISOLATED_TOOLS_DIRECTORY');
+const release = process.argv[3] ?? 'premium-20260913';
+assert(['premium-20260913', 'diversity-20260913'].includes(release), 'Unknown reviewed release');
 const toolRoot = path.resolve(process.argv[2]);
 const tools = createRequire(path.join(toolRoot, 'package.json'));
 const { chromium } = tools('playwright');
-const { build } = tools('esbuild');
+// pnpm isolates transitive packages; resolve the bundler from its declared owner.
+const { build } = createRequire(tools.resolve('tsx'))('esbuild');
 const publicRoot = path.join(root, 'apps/web/public');
 const delivery = path.join(publicRoot, 'assets/studio/cc0-20260906');
 const manifest = JSON.parse(await readFile(path.join(delivery, 'manifest.json'), 'utf8'));
-const decisions = JSON.parse(await readFile(path.join(root, 'data/studio-assets/premium-20260913-decisions.json'), 'utf8'));
+const decisions = JSON.parse(await readFile(path.join(root, `data/studio-assets/${release}-decisions.json`), 'utf8'));
 const expected = decisions.assets.filter(row => row.decision === 'admit');
 assert(expected.length > 0, 'No reviewed assets have been delivered');
 const byId = new Map(manifest.assets.map(asset => [asset.id, asset]));
@@ -89,7 +92,7 @@ const server = createServer(async (request, response) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
-const reportRoot = path.join(root, 'artifacts/studio-premium-release-qa');
+const reportRoot = path.join(root, release === 'premium-20260913' ? 'artifacts/studio-premium-release-qa' : 'artifacts/studio-diversity-release-qa');
 await mkdir(reportRoot, { recursive: true });
 let browser;
 const imageChecks = [], errors = [];

@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/white_rough_plaster",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "broken",
+      "chipped",
+      "damaged",
+      "rough"
+    ],
+    "date_published": 1529806028,
+    "name": "White Rough Plaster",
+    "categories": [
+      "plaster-concrete",
+      "man made",
+      "wall",
+      "outdoor",
+      "indoor",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "160b7fd720a094bae0ce72222c9bbc8101fdbcdd",
+    "description": "Free 8K texture of white rough plaster with chipped, flaking surface, exposed backing and gritty, dirty weathering.",
+    "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+    "category": "Concrete/Plaster & Stucco/Bare Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "img_version": "509ac268",
+    "download_count": 83384,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/white_rough_plaster.png?width=256&height=256&v=509ac268"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_rough_plaster/white_rough_plaster_diff_2k.jpg",
+      "bytes": 2828405,
+      "sha256": "4fb1f54ac26b28b23c8f8efa708d3062684fe6122e3f001b18bcd268027fcb17",
+      "sourceMd5": "e58c989d3b5452588a31b1d249d4e7e9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_rough_plaster/white_rough_plaster_rough_2k.jpg",
+      "bytes": 1055407,
+      "sha256": "eb3983e5c8688efe58f311446e681fd27624fdd1bc5d0e60b617b408d6488125",
+      "sourceMd5": "12d208765696d1d8c7b2c0a9409ff22c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_rough_plaster/white_rough_plaster_nor_gl_2k.jpg",
+      "bytes": 2551147,
+      "sha256": "75668cb16a244c3647e78fd3dd4601616a15bf59e90bb090655b19a8095da71c",
+      "sourceMd5": "06e3caf5a222e7d0fa88917fe34a0575"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_rough_plaster/white_rough_plaster_ao_2k.jpg",
+      "bytes": 1545973,
+      "sha256": "d0f0a25d4b840bdbb84e97237577536b640e17310ae8d61bb6dd6ede4ca9c9a2",
+      "sourceMd5": "89486ae5d8a004d50ae94565dcffb5b6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_rough_plaster/white_rough_plaster_disp_2k.jpg",
+      "bytes": 486365,
+      "sha256": "595cbd455ccd493d9cf7425290b2134a71350a2fa4f1d6acb3c0555b810513c1",
+      "sourceMd5": "571ad72ffb65d2f3753840c9da1948f2"
+    }
+  ]
+}

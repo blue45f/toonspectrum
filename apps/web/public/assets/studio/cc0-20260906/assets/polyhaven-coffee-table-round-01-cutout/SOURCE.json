@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/coffee_table_round_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-coffee-table-round-01",
+  "sourceModelSha256": "e76d78cf83ec79e457fb1cb325a5b31837781e090ee1f50f1b17733b6985744a",
+  "render": {
+    "sourceId": "polyhaven-coffee-table-round-01",
+    "sourceSha256": "e76d78cf83ec79e457fb1cb325a5b31837781e090ee1f50f1b17733b6985744a",
+    "path": "high-resolution-props/polyhaven-coffee-table-round-01.png",
+    "visiblePixels": 252923,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 4044
+  },
+  "independentOriginal": false
+}

@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/SchoolChair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "prop",
+      "furniture",
+      "metal",
+      "plastic",
+      "chair",
+      "school"
+    ],
+    "date_published": 1585605600,
+    "name": "School Chair 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "authors": {
+      "Ethan Place": "All"
+    },
+    "sponsors": [
+      "26820710"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 5072,
+    "texel_density": 2914.068311021279,
+    "dimensions": [
+      565.8532977104187,
+      675.2548813819885,
+      1006.035539903678
+    ],
+    "files_hash": "f78668ddf3cabcf60afe57e8df1e1982a482617c",
+    "description": "Free 4K model of a classic navy plastic school chair with tubular black metal legs, three-slot molded back, visible scuffs, and realistic painted-metal wear.",
+    "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+    "category": "Furniture/Seating/Chairs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "plastic",
+        "metal"
+      ]
+    },
+    "img_version": "d3979386",
+    "download_count": 28282,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/SchoolChair_01.png?width=256&height=256&v=d3979386"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/SchoolChair_01/SchoolChair_01_2k.gltf",
+      "bytes": 2695,
+      "sha256": "f072f367f9282032bcc6fefb9ceb01cc2776166d9026a75583f2c8a7767e9693",
+      "sourceMd5": "016fdd2aba321eab4403cfd9dc3a8539"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolChair_01/SchoolChair_01_arm_2k.jpg",
+      "bytes": 325085,
+      "sha256": "270a10398ee3a5753dd4208f2eb3ee97edcb00ccf3ac3227d00b276403d00df4",
+      "sourceMd5": "af75fdea20a3b4243284819a8f6f40e2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolChair_01/SchoolChair_01_nor_gl_2k.jpg",
+      "bytes": 915279,
+      "sha256": "c7f018f35c03f3d42728da0e2aa032c0deea20210cd6b49328c56bde279e60ad",
+      "sourceMd5": "267db01c1df22cae446bd0e948ff9b29"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolChair_01/SchoolChair_01_diff_2k.jpg",
+      "bytes": 174857,
+      "sha256": "7fabb6303317102d68afd3ccc9de247c3ec16577133f45a2d0cd13e550728a89",
+      "sourceMd5": "f21246498e86dd86c79fdc8e24591def"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/SchoolChair_01/SchoolChair_01.bin",
+      "bytes": 134912,
+      "sha256": "7d64d556ba88d3962778085b9a190f1adb0d84e667bca8ef032c0ae34b31a9fe",
+      "sourceMd5": "d1f13f71f9f9979cde18c798e25dd9d3"
+    }
+  ]
+}

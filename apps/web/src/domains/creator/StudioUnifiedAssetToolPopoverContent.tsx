@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 
+import { StudioAssetLibraryCollections } from "./StudioAssetLibraryCollections";
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
 import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";
 import { StudioInsertBatchPreflight } from "./StudioInsertBatchPreflight";
@@ -319,51 +320,53 @@ export function StudioUnifiedAssetToolPopoverContent({
         items={ASSET_MENU_ITEMS}
       />
       <StudioInsertBatchPreflight toolBelt={toolBelt} />
-      <StudioUnifiedAssetSmartLibrary
+      <StudioAssetLibraryCollections
         items={items}
-        defaultCollapsed={initialView === "library"}
-        onUseItem={(item) => {
-          // The smart library owns successful-use intelligence while the insertion
-          // hub owns placement choice. The child sets the ref immediately before
-          // invoking this handler, so the mode is request-scoped and reset before
-          // any awaited mutation can interleave with a later action.
-          const placementMode = requestedPlacementModeRef.current;
-          requestedPlacementModeRef.current = "auto";
-          return routeUnifiedAsset(
-            item,
-            toolBelt,
-            placementMode,
-            selectionBounds,
-          );
+        assets={toolBelt.assets}
+        loading={toolBelt.assetsLoading}
+        onDeleteAsset={toolBelt.stableHandlers.onDeleteAsset}
+        onUseAsset={(asset) => {
+          assertInsertMutationAllowed(toolBelt);
+          return toolBelt.stableHandlers.addRenderedImage(asset.dataUrl, asset.width, asset.height);
         }}
+        onUseItem={(item) => routeUnifiedAsset(item, toolBelt, "auto", selectionBounds)}
+        onOpen3d={() => { routeInsertAction("background3d", toolBelt); }}
       >
-        {({ items: visibleItems, onUseItem }) => (
-          <StudioInsertHubWorkspace
-            initialView={initialView}
-            items={visibleItems}
-            legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-            selectionPlacementAvailable={selectionBounds !== null}
-            onUseItem={(item, placementMode) => {
-              requestedPlacementModeRef.current = placementMode;
-              return onUseItem(item);
-            }}
-            onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
-            onUploadImage={async (event) => {
-              assertInsertMutationAllowed(toolBelt);
-              await toolBelt.stableHandlers.onPickImage(event);
-            }}
-            onOpenAi={(prompt) => {
-              if (prompt) {
-                toolBelt.stableHandlers.applyAiAssistPresetPrompt(
-                  "background",
-                  prompt,
-                );
-              }
-              toolBelt.setMenu("aiAssist");
-            }}
-          />
-        )}
-      </StudioUnifiedAssetSmartLibrary>
+        <StudioUnifiedAssetSmartLibrary
+          items={items}
+          defaultCollapsed={initialView === "library"}
+          onUseItem={(item) => {
+            // Placement is request-scoped and reset before an awaited mutation can interleave.
+            const placementMode = requestedPlacementModeRef.current;
+            requestedPlacementModeRef.current = "auto";
+            return routeUnifiedAsset(item, toolBelt, placementMode, selectionBounds);
+          }}
+        >
+          {({ items: visibleItems, onUseItem }) => (
+            <StudioInsertHubWorkspace
+              initialView={initialView}
+              items={visibleItems}
+              legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+              selectionPlacementAvailable={selectionBounds !== null}
+              onUseItem={(item, placementMode) => {
+                requestedPlacementModeRef.current = placementMode;
+                return onUseItem(item);
+              }}
+              onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
+              onUploadImage={async (event) => {
+                assertInsertMutationAllowed(toolBelt);
+                await toolBelt.stableHandlers.onPickImage(event);
+              }}
+              onOpenAi={(prompt) => {
+                if (prompt) {
+                  toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
+                }
+                toolBelt.setMenu("aiAssist");
+              }}
+            />
+          )}
+        </StudioUnifiedAssetSmartLibrary>
+      </StudioAssetLibraryCollections>
     </>
   );
 }

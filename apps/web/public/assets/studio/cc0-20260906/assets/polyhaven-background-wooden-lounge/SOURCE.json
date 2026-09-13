@@ -1,0 +1,73 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_lounge",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 15,
+    "type": 0,
+    "tags": [
+      "couch",
+      "wood",
+      "lamp",
+      "table"
+    ],
+    "date_published": 1522879200,
+    "name": "Wooden Lounge",
+    "categories": [
+      "indoor",
+      "urban",
+      "high contrast",
+      "artificial light"
+    ],
+    "coords": [
+      -28.509263,
+      28.562972
+    ],
+    "date_taken": 1471939020,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "8571269"
+    ],
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "files_hash": "8e8f94e0bc67b5ad442d8f78cda7b6ae1480652d",
+    "description": "Free 16K, unclipped HDRI of a warm wooden lounge with brown sofas, pool table and lamps, high-contrast artificial yellow lighting with strong highlights, cozy mood.",
+    "category_id": "880d7a1b-ee54-53c0-bc6d-acff3588f024",
+    "category": "Interiors/Dining & Hospitality/Bars & Pubs",
+    "attributes": {
+      "weather": "clear",
+      "light_type": "artificial",
+      "contrast": "high",
+      "environment": "indoor"
+    },
+    "img_version": "d5688e12",
+    "download_count": 96281,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_lounge.png?width=256&height=256&v=d5688e12"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/wooden_lounge.jpg",
+      "bytes": 4557177,
+      "sha256": "b0286664d1a0780561a551bf6f571640654db67e30ea75efc6f7b2fc24d37acf",
+      "sourceMd5": "ebcf0bdbabe9ec013091caa4c1535601"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}
