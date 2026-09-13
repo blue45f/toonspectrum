@@ -1,0 +1,54 @@
+name: Preserve reviewed asset quarantine
+on:
+  push:
+    branches: [ops/merge-final-check-20260913]
+    paths: [.github/workflows/preserve-asset-quarantine.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Remove only historically rejected entries from active delivery without weakening tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,pathlib,urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/';head='28af0a0a7b59539bb2b807e581d53aa55c187d74'
+          def call(path,payload=None):
+              req=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=60) as r:return json.load(r)
+          assert call('pulls/1358')['head']['sha']==head, 'Source head changed; review before proceeding'
+          manifest='apps/web/public/assets/studio/cc0-20260906/manifest.json'
+          source=call('contents/'+manifest+'?ref='+head)
+          if source.get('encoding')=='base64' and source.get('content'):raw=base64.b64decode(source['content'])
+          else:
+              data=call('git/blobs/'+source['sha']);raw=base64.b64decode(data['content'])
+          document=json.loads(raw);assert len(document['assets'])==1307
+          rejected={'polyhaven-dandelion-01','polyhaven-leafy-grass'}
+          quarantined=[a for a in document['assets'] if a['id'] in rejected];assert len(quarantined)==2
+          document['assets']=[a for a in document['assets'] if a['id'] not in rejected]
+          assert len(document['assets'])==1305
+          assert any(a['id']=='polyhaven-shrub-sorrel-01' for a in document['assets'])
+          # Preserve candidate bytes and provenance in Git. Only active delivery is withheld;
+          # the existing regression that rejects these identities is deliberately unchanged.
+          evidence={'schema':'toonspectrum.asset-integration-quarantine.v1','sourceHead':head,'activeCatalogCount':1305,'uniqueActiveCc0Additions':['polyhaven-shrub-sorrel-01'],'originalIllustrationsAdded':24,'retainedDuplicateOriginals':49,'quarantinedCandidates':quarantined,'reason':'Existing September 8 regression explicitly rejects dandelion-01 framing and leafy-grass surface noise. Candidate import did not establish an accepted replacement for that rejection. Keep these out of active delivery until a separately reviewed repair.','originalFilesRetained':True,'existingTestsModified':False}
+          entries=[]
+          for path,text in [(manifest,json.dumps(document,ensure_ascii=False,indent=2)+'\n'),('docs/quality/studio-quality-assets-20260913/integration-quarantine.json',json.dumps(evidence,ensure_ascii=False,indent=2)+'\n')]:
+              blob=call('git/blobs',{'content':text,'encoding':'utf-8'})['sha'];entries.append({'path':path,'mode':'100644','type':'blob','sha':blob})
+          tree=call('git/commits/'+head)['tree']['sha']
+          candidate=call('git/trees',{'base_tree':tree,'tree':entries})['sha']
+          report={'head':head,'tree':candidate,'changes':entries,'quarantinedIds':sorted(rejected),'activeCatalogCount':1305,'refsModified':False}
+          root=pathlib.Path('artifacts/asset-quarantine');root.mkdir(parents=True)
+          (root/'candidate.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: asset-quarantine-candidate
+          path: artifacts/asset-quarantine/candidate.json
+          if-no-files-found: error
+          retention-days: 3
