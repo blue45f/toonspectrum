@@ -8,6 +8,7 @@ const MANIFEST = {
   buildId: BUILD_ID, shellUrls: ["/", "/studio"],
   criticalUrls: ["/assets/index-abc.js", "/assets/index-abc.css"],
   warmUrls: ["/i18n/studio/mainMenu/ko.json"],
+  offlineUrls: ["/assets/pen-def.js"],
 };
 interface Listener { (event: Record<string, unknown>): void }
 
@@ -245,6 +246,37 @@ describe("local drawing rescue integration", () => {
     await harness.dispatch("message", { data: { type: "toonstudio-local-drawing:inspect" }, ports: [{ postMessage: (value: unknown) => replies.push(value) }] });
     expect(replies).toEqual([{ type: "toonstudio-local-drawing:ready", ready: true }]);
     expect(harness.counters.skipWaiting).toBe(0);
+  });
+});
+
+
+describe("prepared full editor and rescue coexistence", () => {
+  async function preparedWorker(): Promise<void> {
+    harness.setNetwork(async (url) => assetResponse(url));
+    await loadWorker();
+    await (await harness.dispatch("install")).waited;
+    harness.caches.seed(PRECACHE, "/studio", shell("prepared editor", true));
+    harness.caches.seed(PRECACHE, "/assets/pen-def.js", assetResponse("pen.js"));
+    harness.caches.seed("toonspectrum-sw-data-v5", MANIFEST.warmUrls[0], new Response("{}", { headers: { "content-type": "application/json" } }));
+    harness.setNetwork(async () => new Response("origin unavailable", { status: 503 }));
+  }
+  it("serves the fully prepared isolated editor before the installed rescue", async () => {
+    await preparedWorker();
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas?document=local"));
+    expect(await response?.text()).toBe("prepared editor");
+    expect(response?.headers.get("cross-origin-embedder-policy")).toBe("credentialless");
+  });
+  it("uses rescue if a pinned drawing resource has been evicted", async () => {
+    await preparedWorker();
+    await (await harness.caches.api.open(PRECACHE)).delete("/assets/pen-def.js");
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas"));
+    expect(await response?.text()).toBe("local rescue");
+  });
+  it("uses rescue if the dictionary is HTML rather than JSON", async () => {
+    await preparedWorker();
+    harness.caches.seed("toonspectrum-sw-data-v5", MANIFEST.warmUrls[0], shell("error page"));
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas"));
+    expect(await response?.text()).toBe("local rescue");
   });
 });
 
