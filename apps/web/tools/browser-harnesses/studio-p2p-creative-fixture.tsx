@@ -1,10 +1,12 @@
 import { createRoot } from "react-dom/client";
-import { StudioLiveCollaborationContext, EMPTY_STUDIO_LIVE_CONTEXT } from "../../src/domains/creator/live/studio-live-collaboration-context";
-import { applyStudioLiveP2pOverlay } from "../../src/domains/creator/live/studio-live-p2p-overlay-transport";
-import { createStudioLiveEnvelope, type StudioLiveEnvelope } from "../../src/domains/creator/live/studio-live-collaboration-protocol";
-import type { StudioLiveTransport } from "../../src/domains/creator/live/studio-live-collaboration-transport";
-import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
+
 import StudioP2pHuddleLauncher from "../../src/domains/creator/live/huddle/StudioP2pHuddleLauncher";
+import { StudioLiveCollaborationContext, EMPTY_STUDIO_LIVE_CONTEXT } from "../../src/domains/creator/live/studio-live-collaboration-context";
+import { createStudioLiveEnvelope, type StudioLiveEnvelope } from "../../src/domains/creator/live/studio-live-collaboration-protocol";
+import { applyStudioLiveP2pOverlay } from "../../src/domains/creator/live/studio-live-p2p-overlay-transport";
+
+import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
+import type { StudioLiveTransport } from "../../src/domains/creator/live/studio-live-collaboration-transport";
 import "../../src/styles/globals.css";
 
 // Local fixture only: real RTC/SCTP/RTP and product UI, NOT production authentication/signaling.

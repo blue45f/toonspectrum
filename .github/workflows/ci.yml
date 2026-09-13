@@ -72,6 +72,18 @@ jobs:
             apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
             apps/web/src/domains/creator/studio-document-workspace.test.ts
+      - name: Recovered creator research and market regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator-resources/CatalogResearchPage.test.tsx \
+            apps/web/src/domains/creator-resources/catalog-research-data.test.ts \
+            apps/web/src/domains/creator/character-conversion/conversion.test.ts \
+            apps/web/src/domains/creator/live/huddle/StudioP2pMediaTile.test.tsx \
+            apps/web/src/domains/creator/live/huddle/studio-p2p-activities.test.ts \
+            apps/web/src/domains/market/models/market-custom-registry.test.ts \
+            apps/web/src/domains/market/models/market-storage-recovery.test.tsx \
+            apps/web/src/domains/market/pages/MarketBrowsePage.test.tsx \
+            apps/web/src/shared/lib/catalog-research.test.ts
       - name: Fortune observatory and calendar regressions
         run: |
           pnpm exec vitest run \
