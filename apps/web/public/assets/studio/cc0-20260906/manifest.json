@@ -6964,7 +6964,7 @@
       ],
       "previewFitScale": 2.660234427266727,
       "originalName": "액자 · Hanging Picture Frame 02",
-      "role": "finished-asset",
+      "role": "assembly-component",
       "visualReviewLevel": "contact-sheet-visual-triage",
       "visualReviewSource": "artifacts/studio-premium-20260913/review/sheet-02.jpg",
       "allAnglesArtisticallyApproved": false
@@ -70870,6 +70870,54 @@
       "visualReviewLevel": "contact-sheet-visual-triage",
       "visualReviewSource": "artifact:9975049171#page=4",
       "role": "finished-asset"
+    },
+    {
+      "id": "polyhaven-shrub-sorrel-01",
+      "name": "괭이밥 조립용 식생",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "plant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/shrub_sorrel_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-13"
+      },
+      "visualReviewed": true,
+      "studioRuntimeVerified": false,
+      "curationStatus": "selected-after-visual-triage",
+      "path": "assets/polyhaven-shrub-sorrel-01/shrub_sorrel_01.glb",
+      "bytes": 3695048,
+      "sha256": "e3960972315884d3e0236ef756af95f84e6543accaa7fc1ed6e205e7874f7673",
+      "geometrySha256": "bd778328e1185d92996ac7bc48d1a58bdf7258fa841a9725523e26a9a45498a0",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-shrub-sorrel-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.3520993459969759,
+        0.05800367915071547,
+        0.14641038584522903
+      ],
+      "previewFitScale": 5.680215037994355,
+      "originalName": "Shrub Sorrel 01",
+      "role": "assembly-component",
+      "visualReviewLevel": "contact-sheet-visual-triage",
+      "visualReviewSource": "artifacts/studio-quality-assets-20260913/visual-review.md",
+      "allAnglesArtisticallyApproved": false
     }
   ]
 }

@@ -6,7 +6,8 @@ import { Container } from "@/shared/components/section";
 
 export function PencafePage() {
   const { name } = useParams();
-  const targetLabel = decodeURIComponent(name ?? "");
+  // Router parameters are already decoded, including literal percent characters.
+  const targetLabel = name ?? "";
 
   return (
     <Container size="wide" className="relative py-6 sm:py-10">
@@ -27,3 +28,4 @@ export function PencafePage() {
     </Container>
   );
 }
+

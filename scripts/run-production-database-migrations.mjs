@@ -121,6 +121,12 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_marketplace_resource_report_gate",
   "creator_work_asset_storage_reference",
   "creator_work_catalog_asset_binding",
+  "studio_ai_comic_director_approval",
+  "studio_ai_comic_director_artifact",
+  "studio_ai_comic_director_job",
+  "studio_ai_comic_director_job_event",
+  "studio_ai_comic_director_session",
+  "studio_ai_visual_bible_revision",
 ]);
 
 const MODE_CONFIRMATIONS = Object.freeze({

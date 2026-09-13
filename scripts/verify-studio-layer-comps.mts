@@ -178,7 +178,7 @@ async function draw(offset = 0): Promise<number> {
 async function reloadWithPublicRecovery(): Promise<void> {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator('[data-studio-canvas-viewport="true"]').first().waitFor({ state: "visible", timeout: 30_000 });
-  const restore = page.getByRole("button", { name: "복구하기", exact: true });
+  const restore = page.getByRole("button", { name: "이어서 그리기", exact: true });
   await restore.waitFor({ state: "visible", timeout: 15_000 });
   await restore.click();
   await restore.waitFor({ state: "hidden" });
