@@ -5,43 +5,44 @@ on:
     paths: [.github/workflows/studio-hydration-diagnostic.yml]
 permissions:
   contents: read
+concurrency:
+  group: studio-hydration-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   inspect:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Inspect hydration boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          root = Path('apps/web/src')
-          host = root / 'domains/creator/StudioCuttoonEditorHost.tsx'
+          host = Path('apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx')
           lines = host.read_text().splitlines()
           print('HOST', len(lines), 'lines')
           shown = set()
-          for needle, before, after in [('const loadStudioWork', 25, 230), ('async function loadStudioWork', 20, 230), ('const studioWorkId', 15, 40), ('fetchStudioWorkById', 8, 12)]:
+          for needle, before, after in [('async function loadStudioWork', 35, 75), ('const workId =', 5, 10)]:
               for idx, line in enumerate(lines):
                   if needle in line:
-                      print('\n###', needle, 'at', idx + 1)
                       for j in range(max(0,idx-before), min(len(lines),idx+after)):
                           if j not in shown:
                               print(f'{j+1}: {lines[j]}')
                               shown.add(j)
-          print('\n### Relevant implementation paths')
-          for p in root.rglob('*.ts'):
-              text = p.read_text(errors='replace')
-              if re.search(r'(?:function|const)\s+(?:fetchStudioWorkById|buildStudioWorkPathForDocumentId|normalizeStudioWorkSourceSnapshot)', text):
-                  print(p)
           PY
-      - name: Package source for focused regression tests
+      - name: Package exact tracked sources
         run: |
-          git archive HEAD apps/web/src apps/web/package.json apps/web/tsconfig.json package.json pnpm-lock.yaml pnpm-workspace.yaml scripts > studio-source.tar
+          git rev-parse HEAD > commit.txt
+          git ls-tree -r HEAD > tree.txt
+          git archive HEAD apps/web/src apps/api/src packages scripts .github package.json pnpm-lock.yaml pnpm-workspace.yaml eslint.config.mjs tsconfig.json tsconfig.toonstudio-core.json tsconfig.toonstudio-ui.json vitest.config.ts vite.config.ts | gzip > studio-source.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: studio-hydration-source
-          path: studio-source.tar
+          path: |
+            studio-source.tar.gz
+            commit.txt
+            tree.txt
           retention-days: 1
+          if-no-files-found: error
