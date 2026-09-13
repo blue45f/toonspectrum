@@ -4,9 +4,9 @@ import { useLocation } from "react-router-dom";
 import { PublicSiteNavigationEffects } from "./PublicSiteNavigationEffects";
 import { AppRouter } from "./routes/AppRouter";
 
+import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
-import { PublicSiteNextSteps } from "@/shared/components/public-site-next-steps";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
@@ -18,6 +18,11 @@ import {
 
 import "@toonspectrum/core/fx/fx.css";
 
+const PublicSiteNextSteps = lazy(() =>
+  import("@/shared/components/public-site-next-steps").then((mod) => ({
+    default: mod.PublicSiteNextSteps,
+  })),
+);
 const AgeGateHost = lazy(() =>
   import("@/shared/components/age-gate-host").then((mod) => ({
     default: mod.AgeGateHost,
@@ -138,6 +143,7 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname } = useLocation();
+  const publicCreativeRoute = isPublicCreativeRoute(pathname);
   useVisitPing(trackVisit);
   return (
     <AuthSessionProvider>
@@ -157,9 +163,15 @@ export function AppShell({
       ) : null}
       {header}
       <PwaInstallNudge />
-      <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={isPublicCreativeRoute(pathname) ? "atelier" : undefined}>
+      <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={publicCreativeRoute ? "atelier" : undefined}>
         <AppRouter />
-        <PublicSiteNextSteps pathname={pathname} />
+        {publicCreativeRoute && pathname !== "/" ? (
+          <ErrorBoundary resetKey={pathname}>
+            <Suspense fallback={null}>
+              <PublicSiteNextSteps pathname={pathname} />
+            </Suspense>
+          </ErrorBoundary>
+        ) : null}
       </main>
       {footer}
       {showCommandPalette ? <CommandPaletteHost /> : null}

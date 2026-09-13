@@ -30,4 +30,11 @@ describe("public shell integration", () => {
     expect(app).not.toContain("sessionStorage.getItem");
     expect(app).not.toContain("sessionStorage.setItem");
   });
+
+  it("loads onward artwork UI only on eligible public pages, behind its own failure boundary", () => {
+    expect(shell).toContain("const PublicSiteNextSteps = lazy(");
+    expect(shell).not.toContain('import { PublicSiteNextSteps }');
+    expect(shell).toContain('publicCreativeRoute && pathname !== "/"');
+    expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{null\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
+  });
 });
