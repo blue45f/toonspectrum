@@ -13,7 +13,7 @@ test("valid creator post is normalized without accepting ownership fields", () =
   assert.equal(Object.hasOwn(result.value, "userId"), false); assert.equal(Object.hasOwn(result.value, "version"), false);
 });
 for (const kind of Object.keys(PROMOTION_KINDS)) test(`valid promotion kind: ${kind}`, () => {
-  assert.ok(validatePromotion({ ...input, kind, videoUrl: kind === "trailer" ? "https://youtu.be/dQw4w9WgXc" : "" }).value);
+  assert.ok(validatePromotion({ ...input, kind, videoUrl: kind === "trailer" ? "https://youtu.be/dQw4w9WgXcQ" : "" }).value);
 });
 for (const patch of [
   { kind: "__proto__" }, { stage: "constructor" }, { genre: "invalid" }, { title: "ab" }, { title: "a".repeat(101) },
@@ -23,11 +23,11 @@ for (const patch of [
 ]) test(`reject invalid field: ${JSON.stringify(patch).slice(0, 65)}`, () => assert.ok(validatePromotion({ ...input, ...patch }).error));
 for (const value of [null, [], true, 42, "text"]) test(`reject non-object payload: ${JSON.stringify(value)}`, () => assert.ok(validatePromotion(value).error));
 for (const value of ["javascript:alert(1)", "data:text/html,hi", "http://example.com", "https://user:pass@example.com", "https://127.0.0.1/a", "https://10.0.0.1/a", "https://192.168.1.1/a", "https://172.16.0.1/a", "https://localhost/a", "https://test.local/a", "https://[::1]/", "https://example.com:8443", "https://example.com/a\nb", "https://example.com/" + "x".repeat(1001)]) test(`reject unsafe URL: ${value.slice(0, 70)}`, () => assert.equal(safePromotionUrl(value), null));
-for (const url of ["https://youtu.be/dQw4w9WgXc", "https://www.youtube.com/watch?v=dQw4w9WgXc", "https://youtube.com/shorts/dQw4w9WgXc", "https://m.youtube.com/watch?v=dQw4w9WgXc", "https://www.youtube.com/embed/dQw4w9WgXc"]) test(`normalize YouTube: ${url}`, () => {
-  const media = promotionVideo(url); assert.equal(media.provider, "YouTube"); assert.equal(media.embedUrl, "https://www.youtube-nocookie.com/embed/dQw4w9WgXc");
+for (const url of ["https://youtu.be/dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtube.com/shorts/dQw4w9WgXcQ", "https://m.youtube.com/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/embed/dQw4w9WgXcQ"]) test(`normalize YouTube: ${url}`, () => {
+  const media = promotionVideo(url); assert.equal(media.provider, "YouTube"); assert.equal(media.embedUrl, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
 });
 test("normalize public Vimeo", () => assert.equal(promotionVideo("https://vimeo.com/123456789").embedUrl, "https://player.vimeo.com/video/123456789?dnt=1"));
-for (const url of ["https://youtube.com.evil.example/watch?v=dQw4w9WgXc", "https://youtube.com@evil.example/watch?v=dQw4w9WgXc", "https://youtu.be/dQw4w9WgXc/extra", "https://youtube.com/watch?v=short", "https://youtube.com/playlist?list=123", "https://vimeo.com/abc", "https://vimeo.com/123456789/private", "https://example.com/video.mp4", "<iframe src='https://youtube.com'></iframe>"]) test(`reject unsupported video: ${url}`, () => assert.equal(promotionVideo(url), null));
+for (const url of ["https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ", "https://youtube.com@evil.example/watch?v=dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ/extra", "https://youtube.com/watch?v=short", "https://youtube.com/playlist?list=123", "https://vimeo.com/abc", "https://vimeo.com/123456789/private", "https://example.com/video.mp4", "<iframe src='https://youtube.com'></iframe>"]) test(`reject unsupported video: ${url}`, () => assert.equal(promotionVideo(url), null));
 test("empty optional links remain empty", () => { assert.equal(safePromotionUrl(""), ""); assert.equal(promotionVideo(""), null); });
 test("only own enumeration keys are accepted", () => { assert.equal(promotionKey(PROMOTION_KINDS, "__proto__"), false); assert.equal(promotionKey(PROMOTION_KINDS, "constructor"), false); });
 test("cover rejects non-JPEG and malformed base64", () => {
