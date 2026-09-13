@@ -72,9 +72,19 @@ export function smokeCompiledCreatorResources(directory) {
   assert.equal(typeof loaded.CreatorResourcesController, "function");
 }
 
+export function smokeCompiledFortune(directory) {
+  const filename = resolve(directory, "packages/core/src/fortune/index.js");
+  const requireFromFile = createRequire(filename);
+  // Loading the relocated shared bundle must resolve every third-party runtime dependency.
+  const loaded = requireFromFile(filename);
+  assert.equal(typeof loaded.calculateSaju, "function");
+  assert.equal(typeof loaded.resolveFortuneBirth, "function");
+}
+
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   const directory = fileURLToPath(new URL("../apps/api/dist/", import.meta.url));
   const result = verifyCompiledApiImports(directory);
   smokeCompiledCreatorResources(directory);
-  console.log(`API runtime import guard passed: ${result.filesChecked} compiled files, ${result.importsChecked} local/workspace imports; native resource-module load passed.`);
+  smokeCompiledFortune(directory);
+  console.log(`API runtime import guard passed: ${result.filesChecked} compiled files, ${result.importsChecked} local/workspace imports; native resource and fortune module loads passed.`);
 }
