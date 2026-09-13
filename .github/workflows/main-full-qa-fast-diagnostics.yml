@@ -174,6 +174,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium for natural-media and integration probes
         run: pnpm exec playwright install --with-deps chromium
+      - name: Build exact production Studio bundle for extended browser probes
+        run: pnpm run build:bundle
       - name: Hokusai, living ink and hybrid DCC
         run: |
           pnpm run verify:studio-hokusai-wasm

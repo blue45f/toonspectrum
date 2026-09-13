@@ -8,7 +8,7 @@ import {
   type StudioOriginalFreeAsset,
   type StudioOriginalFreeAssetCategory,
   type StudioOriginalFreeAssetPackage,
-} from "../studio-original-free-asset-packs";
+} from "../studio-original-free-asset-packs-base";
 
 const INK = "#211914";
 const PAPER = "#f8f2e8";

@@ -426,7 +426,7 @@ describe("Studio Living Ink production-preview integration evidence", () => {
     expect(source).toContain("fixedAfterWaterPngSha256 === fixedAfterWaterPair.receipt.canonicalPngSha256");
     expect(source).toContain("verify-studio-living-ink-execution.mjs#fixedInvariant.exact-and-maximumRgbDifference-zero");
     expect(source).not.toContain("fixedAfterWaterPngSha256 === fixedPngSha256");
-    expect(source).toContain('name: "복구하기"');
+    expect(source).toContain('name: "이어서 그리기"');
     expect(source).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(source).toContain('data-studio-mobile-sheet") === "draw"');
     expect(source).toContain('[data-studio-open-brush-library="true"]');

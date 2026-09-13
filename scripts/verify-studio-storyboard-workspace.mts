@@ -140,7 +140,7 @@ try {
   await page.screenshot({ path: join(scratch, "desktop.png"), fullPage: true });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("[data-studio-canvas-viewport]").waitFor({ timeout: 30000 });
-  const recover = page.getByRole("button", { name: "복구하기", exact: true });
+  const recover = page.getByRole("button", { name: "이어서 그리기", exact: true });
   if (await recover.isVisible()) await recover.click();
   await openStoryboard();
   const recovered = await archive("cold-recovered.zip");

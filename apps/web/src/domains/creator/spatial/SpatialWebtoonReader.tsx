@@ -2,7 +2,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { StudioWebXrSessionError, studioWebXrSessionErrorMessage } from "../studio-webxr-session";
 import {
-  isSpatialReaderImageSource, loadSpatialReaderPreferences, moveSpatialReaderCursor,
+  resolveSpatialReaderImageSource, loadSpatialReaderPreferences, moveSpatialReaderCursor,
   normalizeSpatialReaderSettings, resolveSpatialReaderCursor, saveSpatialReaderPreferences,
   spatialReaderCrops, spatialReaderKeyCommand, validateSpatialReaderFiles, SPATIAL_READER_DEFAULTS,
 } from "./spatial-reader-model";
@@ -146,7 +146,7 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
     const action = spatialReaderKeyCommand(event.key, settings.direction);
     if (action && imageReady) { event.preventDefault(); command(action); }
   };
-  const validSource = pages[current.page] && isSpatialReaderImageSource(pages[current.page]!, document.baseURI);
+  const imageSource = resolveSpatialReaderImageSource(pages[current.page], document.baseURI);
   return (
     <dialog ref={dialogRef} className="spatial-reader" aria-labelledby={titleId} aria-describedby={helpId}
       data-theme={settings.theme} onCancel={(event) => { event.preventDefault(); void close(); }}>
@@ -159,9 +159,9 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
         <main className="spatial-reader-main">
           <section className="spatial-reader-preview" aria-label="공간 웹툰 2D 읽기">
             {pages.length === 0 ? <div className="spatial-reader-empty"><span aria-hidden>▤</span><h3>원고를 공간에 펼쳐 보세요</h3><p>이미지를 선택하면 바로 읽을 수 있습니다.<br />계정·API 키·유료 변환은 필요하지 않습니다.</p></div>
-              : !validSource ? <p role="alert">지원하지 않는 이미지 주소입니다. 원본 보기로 돌아가 주세요.</p>
+              : !imageSource ? <p role="alert">지원하지 않는 이미지 주소입니다. 원본 보기로 돌아가 주세요.</p>
               : <div className="spatial-reader-crop" style={{ aspectRatio: `${crop.width} / ${crop.height}`, width: `min(100%, ${480 * settings.scale}px)` }}>
-                <img key={`${current.page}:${pages[current.page]}`} src={pages[current.page]} referrerPolicy="no-referrer" alt={`${displayTitle} ${current.page + 1}페이지 · ${current.segment + 1}구간`}
+                <img key={`${current.page}:${pages[current.page]}`} src={imageSource} referrerPolicy="no-referrer" alt={`${displayTitle} ${current.page + 1}페이지 · ${current.segment + 1}구간`}
                   style={{ transform: `translateY(-${crop.y / (sizes[current.page]?.height ?? crop.height) * 100}%)` }}
                   onLoad={(event) => { const img = event.currentTarget; setSizes((old) => old[current.page]?.width === img.naturalWidth && old[current.page]?.height === img.naturalHeight ? old : { ...old, [current.page]: { width: img.naturalWidth, height: img.naturalHeight } }); }}
                   onError={() => setError("원본 이미지를 불러오지 못했습니다. 네트워크 또는 이미지 파일을 확인해 주세요.")} />

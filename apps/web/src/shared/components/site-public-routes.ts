@@ -1,14 +1,14 @@
 /** Shared discovery classification for the primary navigation and creative journey. */
 export const DISCOVER_PURPOSE_PREFIXES = [
   "/discover", "/search", "/explore", "/ranking", "/recommend", "/calendar",
-  "/compare", "/random", "/tags", "/authors", "/author", "/title",
+  "/compare", "/random", "/tags", "/authors", "/author", "/title", "/references",
 ] as const;
 
 const PUBLIC_PAGES = new Set([
-  "/", "/about", "/about/data", "/contact", "/support", "/help", "/sitemap",
+  "/", "/references", "/about", "/about/data", "/about/crawler", "/contact", "/support", "/help", "/sitemap",
   "/discover", "/discover/works", "/search", "/explore", "/ranking", "/recommend",
   "/calendar", "/compare", "/random", "/tags", "/authors", "/insights", "/insights/resources", "/news", "/guide",
-  "/research", "/research/assets", "/research/books", "/now", "/opportunities",
+  "/research", "/research/assets", "/research/books", "/references", "/now", "/opportunities", "/story-lab",
   "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio",
   "/market", "/market/browse", "/market/fit", "/market/compare",
   "/showcase", "/showcase/challenges", "/showcase/promo", "/create", "/create/challenges", "/create/promo",

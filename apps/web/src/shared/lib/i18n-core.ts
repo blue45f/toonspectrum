@@ -7,7 +7,7 @@ import { builtinAppDictionaries } from "./i18n-built-in-dictionaries";
 import {
   normalizeLocaleCode,
   getLocaleCandidates,
-  detectBrowserLocale,
+  detectDocumentPreferredLocale,
   resolveSelectableLocale,
 } from "./i18n-intl-utils";
 import {
@@ -130,7 +130,7 @@ function applyHtmlLang(lang: string) {
 export const useI18n = create<I18nState>()(
   persist(
     (set) => ({
-      lang: detectBrowserLocale(),
+      lang: detectDocumentPreferredLocale(),
       translationBundleRevision: 0,
       setLang: (lang) => {
         const normalized = resolveSelectableLocale(lang);

@@ -1,0 +1,94 @@
+name: Health recovery diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/api/src/modules/health/**
+      - .github/workflows/health-recovery-diagnostics.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/api/src/modules/health/**
+      - .github/workflows/health-recovery-diagnostics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify health boundaries and migration contracts
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/api/src/modules/health/health-readiness-diagnostic.test.ts \
+            apps/api/src/modules/health/health-readiness.repository.test.ts \
+            apps/api/src/modules/health/health-runtime-readiness.test.ts \
+            apps/api/src/modules/health/health.controller.test.ts \
+            apps/api/src/modules/health/health.dto.test.ts \
+            apps/api/src/modules/health/health.service.test.ts \
+            scripts/run-production-database-migrations.test.mjs \
+            scripts/validate-production-database-url.test.mjs \
+            scripts/verify-production-database-capabilities.test.mjs
+          pnpm exec eslint apps/api/src/modules/health/health-readiness-diagnostic.ts apps/api/src/modules/health/health-readiness-diagnostic.test.ts apps/api/src/modules/health/health.controller.ts --max-warnings 0
+          pnpm --filter @webtoon-nest/api build
+
+  production-inspect:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    environment: production-database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Read configured production identity and migration state without changing data
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
+          RUNTIME_DATABASE_ROLE: ${{ vars.PRODUCTION_RUNTIME_DATABASE_ROLE }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { createPsqlEnvironment, validateProductionDatabaseUrl } from './scripts/validate-production-database-url.mjs';
+          import { buildRuntimeDatabaseRoleBoundaryStateSql } from './scripts/run-production-database-migrations.mjs';
+          const raw = process.env.MIGRATION_DATABASE_URL;
+          const role = process.env.RUNTIME_DATABASE_ROLE;
+          if (!raw) throw new Error('PRODUCTION_DATABASE_DIRECT_URL is not configured; no database operation attempted');
+          if (!role || !/^[a-z_][a-z0-9_]{0,62}$/.test(role)) throw new Error('A dedicated PRODUCTION_RUNTIME_DATABASE_ROLE is required');
+          const target = validateProductionDatabaseUrl(raw);
+          if (target.hostname !== 'ep-jolly-smoke-aoixxix3.c-2.ap-southeast-1.aws.neon.tech' || target.databaseName !== 'neondb') throw new Error('Production target differs from the inspected recovery target; no database operation attempted');
+          const fingerprint = createHash('sha256').update(JSON.stringify([target.hostname, target.port, target.databaseName, role])).digest('hex');
+          console.log(JSON.stringify({event:'production_recovery_identity',releaseSha:process.env.GITHUB_SHA,runtimeTargetFingerprint:fingerprint}));
+          const env = {...createPsqlEnvironment(raw),PGCONNECT_TIMEOUT:'10',PGOPTIONS:'-c default_transaction_read_only=on -c statement_timeout=15000'};
+          const sql = `BEGIN READ ONLY;
+          SELECT ${buildRuntimeDatabaseRoleBoundaryStateSql(role)} AS role_boundary;
+          SELECT id, state, checksum FROM toonspectrum_ops.deployment_migration ORDER BY id;
+          SELECT count(*) AS migration_lock_count FROM toonspectrum_ops.deployment_migration_lock;
+          SELECT count(*) AS creator_work_count FROM public.creator_work;
+          COMMIT;`;
+          const result = spawnSync('psql',['-X','--no-psqlrc','--set=ON_ERROR_STOP=1','--no-align','--tuples-only','--file=-'],{env,input:sql,encoding:'utf8',timeout:60000});
+          if (result.error || result.status !== 0) throw new Error('Read-only production inspection failed; no migration or data change was attempted');
+          process.stdout.write(result.stdout);
+          NODE
