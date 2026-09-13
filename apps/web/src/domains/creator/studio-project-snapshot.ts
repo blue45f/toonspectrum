@@ -188,7 +188,7 @@ export function studioProjectSnapshotHasMeaningfulContent(
 ): boolean {
   const settings = snapshot.publishPack.packageSettings;
   return (
-    snapshot.pagesList.some((page) => page.elements.length > 0) ||
+    snapshot.pagesList.some((page) => page.elements.length > 0 || page.colorProof !== undefined) ||
     snapshot.pagesList.some((page) => (parseStudioLayerComps(page.layerComps)?.length ?? 0) > 0) ||
     snapshot.pagesList.some((page) =>
       studioDrawingAssistHasContent(page.drawingAssist, {

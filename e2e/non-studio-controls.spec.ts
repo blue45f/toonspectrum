@@ -62,7 +62,7 @@ test("settings preserve preferences and require explicit valid backup replacemen
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^toonspectrum-library-.*\.json$/u);
   await download.saveAs(testInfo.outputPath("isolated-library-backup.json"));
-  await page.screenshot({ path: testInfo.outputPath("settings-390.png"), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("settings-390.png"), fullPage: true, animations: "disabled", timeout: 30_000 });
 });
 
 test("search supports mobile filters, saved-only and list controls during an outage", async ({ page }) => {
@@ -78,7 +78,10 @@ test("search supports mobile filters, saved-only and list controls during an out
   const saved = page.getByRole("button", { name: "내 찜만", exact: true });
   await saved.click(); await expect(saved).toHaveAttribute("aria-pressed", "true");
   await saved.click(); await expect(saved).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("button", { name: "리스트 보기", exact: true }).click();
+  // Segmented exposes tabs, not buttons, to assistive technology.
+  const list = page.getByRole("tab", { name: "리스트 보기", exact: true });
+  await list.click();
+  await expect(list).toHaveAttribute("aria-selected", "true");
   await expect(field).toHaveValue("두번째 검색");
 });
 
@@ -117,7 +120,12 @@ test("reference search, detail, notebook persistence and actual export remain co
   await expect(dialog).toBeVisible();
   await page.locator("#ref-personal-note").fill("격리 브라우저 검증 메모");
   await dialog.getByRole("button", { name: "메모 저장", exact: true }).click();
+  // Saving is asynchronous and intentionally blocks closing to prevent data loss.
+  await expect(dialog.getByRole("status").filter({ hasText: "연구노트에 저장했습니다" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "메모 저장", exact: true })).toBeDisabled();
+  await expect(page.locator("#ref-personal-note")).toBeEnabled();
   await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
   await expect(page.locator(".ref-card-main")).toBeFocused();
   await page.locator(".ref-tabs").getByRole("button", { name: /내 연구노트/u }).click();
   await expect(page.locator(".ref-note-preview")).toHaveText("격리 브라우저 검증 메모");
@@ -129,5 +137,5 @@ test("reference search, detail, notebook persistence and actual export remain co
   expect(download.suggestedFilename()).toMatch(/\.md$/u);
   await download.saveAs(testInfo.outputPath("isolated-reference-note.md"));
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonstudio:kmas-reference-notes:v1") ?? "{}").notes[0].item.outline)).toBe("");
-  await page.screenshot({ path: testInfo.outputPath("reference-notebook-1440.png"), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("reference-notebook-1440.png"), fullPage: true, animations: "disabled", timeout: 30_000 });
 });

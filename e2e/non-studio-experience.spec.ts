@@ -29,31 +29,36 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+// Each URL receives a fresh browser context and its own finite timeout. A slow page
+// must not consume every subsequent route's budget or prevent their evidence upload.
 for (const width of [390, 1440]) {
-  test(`all non-studio static routes remain navigable at ${width}px during API outage`, async ({ page }, testInfo) => {
-    test.setTimeout(600_000);
-    await page.setViewportSize({ width, height: 900 });
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    const results: { path: string; errors: string[]; horizontalOverflow: boolean; text: string }[] = [];
+  test.describe(`${width}px public route inventory`, () => {
+    test.describe.configure({ mode: "parallel" });
     for (const path of routes) {
-      const errors: string[] = [];
-      const onError = (error: Error) => errors.push(error.message);
-      page.on("pageerror", onError);
-      await page.goto(path);
-      const main = page.locator('main[data-public-experience="true"]');
-      await expect.soft(main, path).toBeVisible();
-      await expect.soft(main.locator("h1").first(), `${path}: page heading`).toBeVisible();
-      const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
-      results.push({ path, errors, horizontalOverflow, text: (await main.innerText()).slice(0, 2000) });
-      expect.soft(errors, `${path}: uncaught errors`).toEqual([]);
-      expect.soft(horizontalOverflow, `${path}: horizontal overflow`).toBe(false);
-      await page.screenshot({ path: testInfo.outputPath(`${width}-${path.replace(/[^a-z0-9-]/giu, "_") || "home"}.png`), fullPage: true, animations: "disabled" });
-      page.off("pageerror", onError);
+      test(`${path} remains navigable during API outage`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        const errors: string[] = [];
+        page.on("pageerror", (error) => errors.push(error.message));
+        await page.goto(path, { waitUntil: "domcontentloaded" });
+        const main = page.locator('main[data-public-experience="true"]');
+        await expect(main).toBeVisible();
+        await expect(main.locator("h1").first(), `${path}: page heading`).toBeVisible();
+        const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
+        await testInfo.attach("route-result", { body: JSON.stringify({ path, width, errors, horizontalOverflow, text: (await main.innerText()).slice(0, 2000) }), contentType: "application/json" });
+        expect(errors, `${path}: uncaught errors`).toEqual([]);
+        expect(horizontalOverflow, `${path}: horizontal overflow`).toBe(false);
+        await page.screenshot({ path: testInfo.outputPath(`${width}-${path.replace(/[^a-z0-9-]/giu, "_") || "home"}.jpg`), type: "jpeg", quality: 80, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
+        expect(errors, `${path}: errors after full-page rendering`).toEqual([]);
+      });
     }
-    await testInfo.attach("route-results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
-    expect(routes.length).toBeGreaterThan(35);
   });
 }
+
+test("route inventory retains comprehensive coverage", () => {
+  expect(routes.length).toBeGreaterThanOrEqual(65);
+  expect(routes.some((path) => EXCLUDED.test(path))).toBe(false);
+});
 
 test("journey rail connects discovery, learning, materials and sharing by real clicks", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -93,8 +98,8 @@ test("literal percent names and malformed shared URLs cannot crash the app shell
     await expect(page.locator("h1").first()).toContainText(label);
     await expect(page).toHaveTitle(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   }
-  // Vite preview returns an empty HTTP 404 before malformed encoding reaches the app.
-  // Test the client router separately after a valid document has loaded.
+  // Vite preview rejects malformed encoding before the SPA. Exercise the real
+  // client router after loading a valid document, without masking HTTP behavior.
   await page.evaluate(() => {
     history.pushState({}, "", "/author/%E0%A4%A");
     dispatchEvent(new PopStateEvent("popstate"));
@@ -127,7 +132,7 @@ test("artwork contrast controls, theme surfaces and reduced motion remain functi
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   for (const theme of ["light", "dark"]) {
     await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
-    await page.screenshot({ path: testInfo.outputPath(`home-320-${theme}.png`), fullPage: true, animations: "disabled" });
+    await page.screenshot({ path: testInfo.outputPath(`home-320-${theme}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
   }
 });
 

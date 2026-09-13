@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   refreshStudioRasterPresentationCaches,
+  registerStudioRasterCapturePreparation,
+  prepareStudioRasterCapture,
   registerStudioRasterPresentationCache,
 } from "./studio-raster-presentation-cache";
 
@@ -63,5 +65,33 @@ describe("raster presentation cache owners", () => {
     });
     expect(refreshStudioRasterPresentationCaches(node(parent))).toBe(false);
     release();
+  });
+});
+
+
+describe("stage-scoped output density", () => {
+  it("rebuilds and restores nested caches inside-out, without touching another stage", () => {
+    const stage = {}; const calls: string[] = [];
+    const parent = { ...node(), getStage: () => stage, isVisible: () => true } as unknown as Konva.Node;
+    const child = { ...node(parent), getStage: () => stage, isVisible: () => true } as unknown as Konva.Node;
+    const releaseParent = registerStudioRasterCapturePreparation(parent, (density) => { calls.push(`parent:${density}`); return () => { calls.push("restore-parent"); }; });
+    const releaseChild = registerStudioRasterCapturePreparation(child, (density) => { calls.push(`child:${density}`); return () => { calls.push("restore-child"); }; });
+    prepareStudioRasterCapture({}, 2)();
+    expect(calls).toEqual([]);
+    const restore = prepareStudioRasterCapture(stage, 2); restore();
+    expect(calls).toEqual(["child:2", "parent:2", "restore-child", "restore-parent"]);
+    releaseChild(); releaseParent();
+    prepareStudioRasterCapture(stage, 3)();
+    expect(calls).toHaveLength(4);
+  });
+  it("rolls back prepared children before propagating a failed parent", () => {
+    const stage = {}; const rollback = vi.fn();
+    const parent = { ...node(), getStage: () => stage, isVisible: () => true } as unknown as Konva.Node;
+    const child = { ...node(parent), getStage: () => stage, isVisible: () => true } as unknown as Konva.Node;
+    const releaseParent = registerStudioRasterCapturePreparation(parent, () => { throw new Error("parent unavailable"); });
+    const releaseChild = registerStudioRasterCapturePreparation(child, () => rollback);
+    expect(() => prepareStudioRasterCapture(stage, 2)).toThrow("parent unavailable");
+    expect(rollback).toHaveBeenCalledOnce();
+    releaseChild(); releaseParent();
   });
 });

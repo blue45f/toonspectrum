@@ -1,3 +1,6 @@
+import { canonicalizeStudioLiveAdjustmentElement } from "./contracts/studio-live-adjustment-contract";
+import { buildStudioAdjustmentLayerCompositorPlan } from "./studio-adjustment-layer-plan";
+import type { StudioLiveAdjustmentElement } from "./studio-live-adjustment";
 import {
   applyGpuFilterChain,
 } from "./render/studio-gpu-filter-apply";
@@ -8,6 +11,7 @@ import {
   type KonvaLike,
 } from "./render/studio-konva-filters";
 import {
+  createEmptyStudioAdjustmentStack,
   studioAdjustmentOperationToFilterFields,
   type StudioAdjustmentFilterOperation,
 } from "./studio-adjustment-stack";
@@ -1031,7 +1035,7 @@ function setSaturation(
 }
 
 function blendChannel(
-  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity">,
+  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity" | "hue" | "saturation">,
   base: number,
   blend: number,
 ): number {
@@ -1065,6 +1069,14 @@ function blendChannel(
       return Math.min(base, blend);
     case "lighten":
       return Math.max(base, blend);
+    case "color-dodge":
+      return base === 0 ? 0 : blend === 255 ? 255 : Math.min(255, base * 255 / (255 - blend));
+    case "color-burn":
+      return base === 255 ? 255 : blend === 0 ? 0 : 255 - Math.min(255, (255 - base) * 255 / blend);
+    case "difference":
+      return Math.abs(base - blend);
+    case "exclusion":
+      return base + blend - 2 * base * blend / 255;
   }
 }
 
@@ -1073,9 +1085,18 @@ function blendRgb(
   base: readonly [number, number, number],
   filtered: readonly [number, number, number],
 ): [number, number, number] {
-  if (mode === "color") {
+  if (mode === "hue") {
     return setLuminance(
       setSaturation(filtered, saturation(base[0], base[1], base[2])),
+      luminance(base[0], base[1], base[2]),
+    );
+  }
+  if (mode === "color") {
+    return setLuminance(filtered, luminance(base[0], base[1], base[2]));
+  }
+  if (mode === "saturation") {
+    return setLuminance(
+      setSaturation(base, saturation(filtered[0], filtered[1], filtered[2])),
       luminance(base[0], base[1], base[2]),
     );
   }
@@ -1130,12 +1151,17 @@ function compositeFilteredPass(
         filtered.data[index + 2]!,
       ];
       const blended = blendRgb(pass.blendMode, base, candidate);
-      output.data[index] = base[0] + (blended[0] - base[0]) * coverage;
-      output.data[index + 1] = base[1] + (blended[1] - base[1]) * coverage;
-      output.data[index + 2] = base[2] + (blended[2] - base[2]) * coverage;
       const baseAlpha = before.data[index + 3]!;
       const filteredAlpha = filtered.data[index + 3]!;
-      output.data[index + 3] = baseAlpha + (filteredAlpha - baseAlpha) * coverage;
+      const alpha = baseAlpha + (filteredAlpha - baseAlpha) * coverage;
+      // A mask/opacity crossfade mixes premultiplied colours. Straight RGB interpolation
+      // darkens color-to-alpha edges; equal alpha retains the established exact byte arithmetic.
+      const weight = baseAlpha === filteredAlpha || alpha === 0
+        ? coverage : filteredAlpha * coverage / alpha;
+      output.data[index] = base[0] + (blended[0] - base[0]) * weight;
+      output.data[index + 1] = base[1] + (blended[1] - base[1]) * weight;
+      output.data[index + 2] = base[2] + (blended[2] - base[2]) * weight;
+      output.data[index + 3] = alpha;
     }
   }
   return output;
@@ -1220,11 +1246,11 @@ function validateRuntimeRecipe(
   }
 }
 
-export async function executeStudioAdjustmentLayerRuntime(
+function* studioAdjustmentLayerExecution(
   recipe: StudioAdjustmentLayerRuntimeRecipe,
   source: StudioAdjustmentLayerCompositeSource,
   options: ExecuteStudioAdjustmentLayerRuntimeOptions = {},
-): Promise<StudioAdjustmentLayerRuntimeResult> {
+): Generator<StudioAdjustmentLayerFilterAdapterInput, StudioAdjustmentLayerRuntimeResult, StudioAdjustmentLayerFilterAdapterResult> {
   validateRuntimeRecipe(recipe);
   const limits = normalizeLimits(options.limits);
   assertRecipeBudgets(recipe, limits);
@@ -1276,8 +1302,6 @@ export async function executeStudioAdjustmentLayerRuntime(
     });
   }
   let working = cropImageData(source.imageData, recipe.readRect);
-  const adapter = options.adapter ?? studioAdjustmentLayerCpuAdapter;
-  validateAdapter(adapter);
   for (const pass of recipe.passes) {
     throwIfAborted(options.signal);
     if (pass.status !== "active") {
@@ -1298,7 +1322,7 @@ export async function executeStudioAdjustmentLayerRuntime(
       operationsFingerprint: pass.operationsFingerprint,
       signal: options.signal,
     };
-    const result = await runAdapter(adapter, adapterInput);
+    const result = yield adapterInput;
     working = compositeFilteredPass(
       before,
       result.imageData,
@@ -1326,6 +1350,42 @@ export async function executeStudioAdjustmentLayerRuntime(
     sourceRenderKinds: recipe.source.renderKinds,
     trace: Object.freeze(trace),
   });
+}
+
+
+/** Same validated compositor as Worker/GPU execution, for an atomic Konva cache draw. */
+export function executeStudioAdjustmentLayerRuntimeSync(
+  recipe: StudioAdjustmentLayerRuntimeRecipe,
+  source: StudioAdjustmentLayerCompositeSource,
+  options: Omit<ExecuteStudioAdjustmentLayerRuntimeOptions, "adapter"> = {},
+): StudioAdjustmentLayerRuntimeResult {
+  const execution = studioAdjustmentLayerExecution(recipe, source, options);
+  let step = execution.next();
+  while (!step.done) {
+    const input = step.value;
+    throwIfAborted(input.signal);
+    const imageData = runCpuFilterOperations(input.imageData, input.operations);
+    throwIfAborted(input.signal);
+    step = execution.next({
+      contractVersion: STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
+      backend: "cpu", imageData, sourceRevision: input.sourceRevision,
+      operationsFingerprint: input.operationsFingerprint,
+    });
+  }
+  return step.value;
+}
+
+export async function executeStudioAdjustmentLayerRuntime(
+  recipe: StudioAdjustmentLayerRuntimeRecipe,
+  source: StudioAdjustmentLayerCompositeSource,
+  options: ExecuteStudioAdjustmentLayerRuntimeOptions = {},
+): Promise<StudioAdjustmentLayerRuntimeResult> {
+  const adapter = options.adapter ?? studioAdjustmentLayerCpuAdapter;
+  validateAdapter(adapter);
+  const execution = studioAdjustmentLayerExecution(recipe, source, options);
+  let step = execution.next();
+  while (!step.done) step = execution.next(await runAdapter(adapter, step.value));
+  return step.value;
 }
 
 export async function verifyStudioAdjustmentLayerAdapterParity(
@@ -1384,4 +1444,16 @@ export async function verifyStudioAdjustmentLayerAdapterParity(
     );
   }
   return report;
+}
+
+export function createStudioLiveAdjustmentPlan(element: StudioLiveAdjustmentElement, sourceIds: readonly string[], masked: boolean) {
+  canonicalizeStudioLiveAdjustmentElement(element);
+  return buildStudioAdjustmentLayerCompositorPlan({ version: 1, groups: [], layers: [
+    ...sourceIds.map((id, paintOrder) => ({ id, paintOrder, parentGroupId: null, visible: true,
+      kind: "content" as const, renderKind: "group" as const })),
+    { id: element.id, parentGroupId: null, paintOrder: sourceIds.length, visible: true,
+      kind: "adjustment", scope: "composite-below", opacity: element.opacity ?? 1,
+      blendMode: (element.blendMode === "source-over" || !element.blendMode ? "normal" : element.blendMode) as StudioAdjustmentLayerBlendMode,
+      ...(masked ? { maskId: element.id + ":mask" } : {}), stack: element.smartFilters ?? createEmptyStudioAdjustmentStack() },
+  ] });
 }

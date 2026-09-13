@@ -4,11 +4,14 @@ import { expect, test } from "@playwright/test";
 for (const width of [320, 390, 820, 1440]) {
   test(`flagship route layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
+    // Layout evidence is deterministic; the dedicated motion test below still
+    // exercises running, user-paused and reduced-motion artwork separately.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const media: string[] = [];
     const pageErrors: string[] = [];
     page.on("request", (request) => { if (/\/brand\/.*\.mp4(?:\?|$)/u.test(request.url())) media.push(request.url()); });
     page.on("pageerror", (error) => pageErrors.push(error.message));
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="v4"]');
     await expect(home).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
@@ -31,10 +34,10 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page.locator("#creator-offline-title")).toBeFocused();
     expect(media).toHaveLength(0);
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: testInfo.outputPath(`flagship-${width}.png`), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`flagship-${width}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`flagship-dark-${width}.png`), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`flagship-dark-${width}.jpg`), type: "jpeg", quality: 85, scale: "css", fullPage: true, animations: "disabled", timeout: 30_000 });
     expect(pageErrors).toEqual([]);
   });
 }
@@ -57,7 +60,6 @@ test("professional webtoon entry leads with simple mode and projects available",
   await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
   await expect(page.locator('.creator-flagship form')).toHaveCount(1);
 });
-
 
 test("artwork values can be compared by keyboard and reduced motion stops the artwork", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
