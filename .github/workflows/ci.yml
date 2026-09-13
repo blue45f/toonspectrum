@@ -54,6 +54,16 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: P2P browser verification cache regression
         run: node --test scripts/verify-studio-p2p-huddle.test.mjs
+      - name: P2P merge source-reader and recovery regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-project-library \
+            apps/web/src/domains/creator/studio-project-document \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
+            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
+            apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
       - name: Fortune observatory and calendar regressions
         run: |
           pnpm exec vitest run \
