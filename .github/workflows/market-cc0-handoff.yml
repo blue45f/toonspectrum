@@ -1,0 +1,61 @@
+name: Market CC0 handoff
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/studio-marketplace-*'
+      - 'apps/web/src/domains/creator/studio-community-*'
+      - 'apps/web/src/domains/creator/studio-creator-pack-runtime.ts'
+      - 'apps/web/src/domains/creator/StudioCommunityMarketplacePanel.tsx'
+      - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+      - 'apps/web/src/domains/market/components/**'
+      - 'apps/web/tools/browser-harnesses/market-cc0-*'
+      - 'scripts/verify-market-cc0*'
+      - 'scripts/seed/market-cc0*'
+      - '.github/workflows/market-cc0-handoff.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/creator/studio-marketplace-*'
+      - 'apps/web/src/domains/creator/studio-community-*'
+      - 'apps/web/src/domains/creator/studio-creator-pack-runtime.ts'
+      - 'apps/web/src/domains/creator/StudioCommunityMarketplacePanel.tsx'
+      - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+      - 'apps/web/src/domains/market/components/**'
+      - 'apps/web/tools/browser-harnesses/market-cc0-*'
+      - 'scripts/verify-market-cc0*'
+      - 'scripts/seed/market-cc0*'
+      - '.github/workflows/market-cc0-handoff.yml'
+permissions:
+  contents: read
+concurrency:
+  group: market-cc0-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  handoff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify source identities, legacy behavior and real browser persistence
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/market-cc0
+          node scripts/verify-market-cc0.mjs 2>&1 | tee artifacts/market-cc0/verification.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: market-cc0-${{ github.run_id }}
+          path: artifacts/market-cc0/
+          retention-days: 7
