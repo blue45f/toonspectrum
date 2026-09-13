@@ -33,7 +33,7 @@ describe("restart-safe save intent UI", () => {
     render(<StudioDraftSaveCenter {...props} />);
     await screen.findByRole("button", { name: "저장 상태: 저장 대기 기록 확인" });
     open();
-    expect(screen.getByText("다시 켜도 저장 대기를 기억해요")).toBeTruthy();
+    expect(await screen.findByText("다시 켜도 저장 대기를 기억해요")).toBeTruthy();
     act(() => window.dispatchEvent(new Event("online")));
     expect(props.onSaveDraft).not.toHaveBeenCalled();
     expect(await repository.load(scope)).not.toBeNull();
@@ -83,7 +83,7 @@ describe("restart-safe save intent UI", () => {
     await repository.remember(scope, 7);
     render(<StudioDraftSaveCenter {...props} />);
     await screen.findByRole("button", { name: "저장 상태: 저장 대기 기록 확인" });
-    open(); fireEvent.click(screen.getByRole("button", { name: "대기 기록 지우기" }));
+    open(); fireEvent.click(await screen.findByRole("button", { name: "대기 기록 지우기" }));
     await waitFor(async () => expect(await repository.load(scope)).toBeNull());
     expect(props.onSaveDraft).not.toHaveBeenCalled();
     expect(props.onExportBackup).not.toHaveBeenCalled();

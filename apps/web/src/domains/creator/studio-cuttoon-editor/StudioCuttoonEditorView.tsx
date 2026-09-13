@@ -8,7 +8,7 @@
 import { Maximize2 } from "lucide-react";
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
-import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter";
+import { lazy, Suspense } from "react";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
@@ -20,6 +20,8 @@ import { StudioCuttoonEditorDialogs } from "./StudioCuttoonEditorDialogs";
 import { StudioCuttoonEditorHosts } from "./StudioCuttoonEditorHosts";
 import { StudioCuttoonEditorWorkspace } from "./StudioCuttoonEditorWorkspace";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
+
+const StudioDraftSaveCenter = lazy(() => import("../StudioDraftSaveCenter").then((module) => ({ default: module.StudioDraftSaveCenter })));
 
 export type { StudioCuttoonEditorViewSession };
 
@@ -131,6 +133,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         )}
       >
         <StudioCuttoonEditorChrome {...s} />
+        <Suspense fallback={null}>
         <StudioDraftSaveCenter
           key={JSON.stringify([s.saveIntentScope, s.effectiveWorkId ?? s.workId ?? "new-work"])}
           saveIntentScope={s.saveIntentScope}
@@ -157,6 +160,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           onOpenVersions={() => s.setCheckpointPanelOpen(true)}
           onExportBackup={() => s.studioMenubarContentHandlers.handleExportProject()}
         />
+        </Suspense>
         <StudioCuttoonEditorWorkspace {...s} />
         <StudioCuttoonEditorContextMenu {...s} />
       </Container>
