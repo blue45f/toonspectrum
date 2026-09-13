@@ -74,7 +74,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)"
+          "value": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)"
         },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
       ]

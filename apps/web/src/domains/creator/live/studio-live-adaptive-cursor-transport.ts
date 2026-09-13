@@ -100,6 +100,7 @@ function compactCursorEnvelope(
  * durable CRDT updates, and binary ink preserve the original authority path and ordering.
  */
 class StudioAdaptiveCursorTransport implements StudioLiveTransport {
+  readonly direct?: StudioLiveTransport["direct"];
   readonly mode: StudioLiveTransport["mode"];
   readonly crdtFanout?: StudioLiveTransport["crdtFanout"];
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
@@ -147,6 +148,7 @@ class StudioAdaptiveCursorTransport implements StudioLiveTransport {
   ) {
     this.workId = context.workId;
     this.inner = inner;
+    this.direct = inner.direct;
     this.mode = inner.mode;
     this.crdtFanout = inner.crdtFanout;
     this.canonicalSessionId = inner.canonicalSessionId?.bind(inner);
