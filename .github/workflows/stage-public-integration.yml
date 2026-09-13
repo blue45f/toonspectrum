@@ -1,0 +1,64 @@
+name: Stage reviewed public integration
+on:
+  push:
+    branches: [ops/merge-final-check-20260913]
+    paths: [.github/workflows/stage-public-integration.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Reconstruct only reviewed hash-bound sources and stage immutable objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,pathlib,re,urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          specs_ref='a7afc78873c4e3df40e59e3563f0469aafd7c05c'
+          expected_main='0e3ea77161ea9bcf0a256e3fd24df484a5845bee'
+          expected_heads={'1349':'52fe8ba49858a0b095f83e8ce5ae1fd67f3f6fc8','1357':'b2196debf400f113ffa087105a412c1aff82205e'}
+          def call(path,payload=None):
+              req=urllib.request.Request(api+path,data=None if payload is None else json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=60) as r:return json.load(r)
+          def digest(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+          for number,sha in expected_heads.items():
+              pr=call('pulls/'+number);assert pr['head']['sha']==sha and pr['state']=='open', 'Source PR changed'
+          specs=[]
+          for part in (1,2):
+              data=call('contents/artifacts/ops/public-edits-'+str(part)+'.json?ref='+specs_ref)
+              value=json.loads(base64.b64decode(data['content']))
+              assert value['main']==expected_main and value['heads']==expected_heads
+              specs.extend(value['specs'])
+          assert len(specs)==17 and len({s['path'] for s in specs})==17
+          staged=[]
+          for spec in specs:
+              path=spec['path'];assert path.startswith(('apps/web/','e2e/')) or path=='.github/workflows/public-site-experience.yml'
+              text=''
+              if spec['base']:
+                  data=call('git/blobs/'+spec['base']);assert data['encoding']=='base64'
+                  raw=base64.b64decode(data['content']);assert digest(raw)==spec['base'];text=raw.decode()
+              previous=len(text)
+              for edit in reversed(spec['edits']):
+                  start,end=edit['start'],edit['end'];assert 0<=start<=end<=previous
+                  text=text[:start]+edit['new']+text[end:];previous=start
+              assert not re.search(r'^(<<<<<<<|=======|>>>>>>>)',text,re.M)
+              assert digest(text.encode())==spec['after'],path
+              result=call('git/blobs',{'content':text,'encoding':'utf-8'})
+              assert result['sha']==spec['after']
+              staged.append({'path':path,'sha':result['sha']})
+              print('Verified immutable source:',path,result['sha'],flush=True)
+          report={'base_main':expected_main,'current_main':call('branches/main')['commit']['sha'],'heads':expected_heads,'staged':staged,'branch_refs_modified':False}
+          root=pathlib.Path('artifacts/public-integration');root.mkdir(parents=True)
+          (root/'staged.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: public-integration-staged-objects
+          path: artifacts/public-integration/staged.json
+          if-no-files-found: error
+          retention-days: 3
