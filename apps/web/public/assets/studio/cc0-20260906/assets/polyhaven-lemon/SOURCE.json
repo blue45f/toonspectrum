@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/lemon",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Lemon",
+    "categories": [
+      "props",
+      "food"
+    ],
+    "type": 2,
+    "tags": [
+      "culinary",
+      "cooking",
+      "vegetable",
+      "vegetables",
+      "organic",
+      "ingredients",
+      "produce"
+    ],
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 4012,
+    "texel_density": 24767.7848312472,
+    "dimensions": [
+      68.68193298578262,
+      68.2600848376751,
+      95.36931291222572
+    ],
+    "date_published": 1721174400,
+    "files_hash": "904b95521dcddf41120ab1284c72413ba7cde3cf",
+    "description": "Free 4K model of a realistic lemon with detailed bumpy rind, natural blemishes, glossy waxy surface, organic irregular shape and a visible stem nub.",
+    "category_id": "482e0c49-27e5-54ed-8039-54f7c4560e2d",
+    "category": "Food & Kitchen/Produce/Fruit",
+    "attributes": {
+      "material": [
+        "food"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "634bef52",
+    "download_count": 17786,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/lemon.png?width=256&height=256&v=634bef52"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/lemon/lemon_2k.gltf",
+      "bytes": 3036,
+      "sha256": "d18b7a1fd5b6022d542063b9e5d860c5769fda7e1524e03b45e6eddbb628f579",
+      "sourceMd5": "0ae7bac10722e55be2072cc26d38c899"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/lemon/lemon.bin",
+      "bytes": 95464,
+      "sha256": "af5a040a7c14cf7d3537ed387ba2d2257feed2dbafb2f922ee566bf01abb859e",
+      "sourceMd5": "357973be23fd9b4bcf2a212ef30ecc31"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/lemon/lemon_diff_2k.jpg",
+      "bytes": 1319923,
+      "sha256": "76ab38e0e13853d57996af2d8c9bfb9f0de40c3d74c3de0b665345da6fe6aece",
+      "sourceMd5": "f5573d5bb845be01416538415e5594dc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/lemon/lemon_arm_2k.jpg",
+      "bytes": 1453549,
+      "sha256": "6b85c70070bd6dc4394e87fe8e701b19eb2af105beed913f1a99a7184ac1ffc7",
+      "sourceMd5": "b341359b4c4bfc5092d596aeab1a1aad"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/lemon/lemon_nor_gl_2k.jpg",
+      "bytes": 2857830,
+      "sha256": "c0b606474fd87f66525da5907538276ba45ba8a9ccd787d3328de1fdb21417ac",
+      "sourceMd5": "c6c156207f05e7cbda9a3b351700ee74"
+    }
+  ]
+}

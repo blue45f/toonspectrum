@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/old_tyre",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-old-tyre",
+  "sourceModelSha256": "4cf3afbd144f3b56cf09218928c35ea8146794f600f14d0c54e27c5b640af608",
+  "render": {
+    "sourceId": "polyhaven-old-tyre",
+    "sourceSha256": "4cf3afbd144f3b56cf09218928c35ea8146794f600f14d0c54e27c5b640af608",
+    "path": "high-resolution-props/polyhaven-old-tyre.png",
+    "visiblePixels": 445899,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 2880
+  },
+  "independentOriginal": false
+}

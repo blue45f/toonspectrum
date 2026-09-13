@@ -1,0 +1,82 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/small_harbor_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 12,
+    "type": 0,
+    "tags": [
+      "lake",
+      "water",
+      "dam",
+      "dock",
+      "harbour",
+      "harbor",
+      "jetty",
+      "boat"
+    ],
+    "date_published": 1557439200,
+    "name": "Small Harbor 01",
+    "categories": [
+      "outdoor",
+      "skies",
+      "nature",
+      "sunrise-sunset",
+      "partly cloudy",
+      "low contrast",
+      "natural light"
+    ],
+    "coords": [
+      -28.492189,
+      29.002458
+    ],
+    "date_taken": 1556811180,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      "10485422"
+    ],
+    "files_hash": "5e34cfbaecfb5bb065de091676a9259426fa7bf4",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K unclipped HDRI of a small harbor at sunrise - calm water, low-contrast natural light, partly cloudy sky and a soft warm horizon glow.",
+    "category_id": "2a0e645a-02e5-5395-b682-2917435c4f3e",
+    "category": "Coast & Water/Harbours & Piers/Piers & Jetties",
+    "attributes": {
+      "time_of_day": "sunset",
+      "weather": "partly_cloudy",
+      "light_type": "natural",
+      "contrast": "low",
+      "environment": "outdoor",
+      "sky_view": "open"
+    },
+    "img_version": "e2afb14f",
+    "download_count": 85026,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/small_harbor_01.png?width=256&height=256&v=e2afb14f"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/small_harbor_01.jpg",
+      "bytes": 4201399,
+      "sha256": "5a8faf4e0e0c40ad0466ce5e0f44279ef99a65108e0f0edd54d5cf89149e9db6",
+      "sourceMd5": "d9c2bf3855240838ac689ee327a218a0"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

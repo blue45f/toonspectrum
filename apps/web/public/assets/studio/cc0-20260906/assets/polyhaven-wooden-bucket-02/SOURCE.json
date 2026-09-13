@@ -1,0 +1,103 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_bucket_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Wooden Bucket 02",
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1649808000,
+    "sponsors": [
+      "7934315"
+    ],
+    "categories": [
+      "props",
+      "containers",
+      "collection: smugglers_cove"
+    ],
+    "tags": [
+      "old",
+      "wooden",
+      "bucket",
+      "vintage",
+      "wood",
+      "prop",
+      "worn",
+      "antique",
+      "farmhouse",
+      "colonial",
+      "maritime",
+      "container"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 7252,
+    "texel_density": 4358.73177821933,
+    "dimensions": [
+      615.3266429901123,
+      616.3034439086914,
+      350.42548179626465
+    ],
+    "files_hash": "a40353bab070ec4e81471ce7c16feabad6b2a163",
+    "description": "Free 8K model of a worn antique wooden bucket with metal bands and handles - vintage farmhouse/colonial maritime prop from the Smugglers Cove collection.",
+    "category_id": "1d2ebe30-8c69-5f58-bc61-fcf2e6a03cba",
+    "category": "Containers & Storage/Baskets & Buckets/Buckets",
+    "collections": [
+      "smugglers_cove"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "e14ccffa",
+    "download_count": 16917,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bucket_02.png?width=256&height=256&v=e14ccffa"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_bucket_02/wooden_bucket_02_2k.gltf",
+      "bytes": 5625,
+      "sha256": "2cd60c2ae8a2af103121780a119cc2eee3b02a5206c13a28035c1eafbbf2761e",
+      "sourceMd5": "24d58e3c6c2510e3de035f598e86ec5f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bucket_02/wooden_bucket_02_arm_2k.jpg",
+      "bytes": 3098279,
+      "sha256": "a8daccc76fcaa844f674c5c34a732bae0cb117218201bdd1a56d0a69b51127d8",
+      "sourceMd5": "190794f5b9943c4f3cae1896e9d55e52"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bucket_02/wooden_bucket_02_diff_2k.jpg",
+      "bytes": 2392805,
+      "sha256": "e7a30581f76571ee0db6c8a9af0a2445915f7e2328d2006545201063af909649",
+      "sourceMd5": "34d2b1b4544345fc21283999f0fd463b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_bucket_02/wooden_bucket_02.bin",
+      "bytes": 227128,
+      "sha256": "d733864312ab54d3d7908b930e858acde4eabe332ea742e0d1d15097c09aab93",
+      "sourceMd5": "1795ede198f19fe6b81c92690a90fd79"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bucket_02/wooden_bucket_02_nor_gl_2k.jpg",
+      "bytes": 2924878,
+      "sha256": "25f19114f050b6ead19725de0346877a50d38afaf76bcaa369287812bf2fab75",
+      "sourceMd5": "02fa74edb94077df4d2b120ca9469309"
+    }
+  ]
+}

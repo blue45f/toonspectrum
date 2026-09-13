@@ -49,7 +49,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ),
       gap("원본 파일 연결"),
       part(
-        "저장·다른 이름·버전 체크포인트",
+        "저장·다른 이름·저장 기록",
         "초안 저장·게시·명명 체크포인트. ‘다른 이름으로 저장’은 여전히 없다.",
         "file/save-draft",
         "file/publish",
@@ -564,7 +564,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ),
       part("Comment/Paint-over", "댓글 스레드까지. 덧그리기(paint-over)는 없다.", "collaboration/comments"),
       gap("Proposal Branch"),
-      gap("Version Compare", "리비전 비교는 체크포인트 패널 안에 있고, 그 문은 파일 ▸ 버전 체크포인트가 연다."),
+      gap("Version Compare", "리비전 비교는 체크포인트 패널 안에 있고, 그 문은 파일 ▸ 저장 기록가 연다."),
       has("Approval", "collaboration/page-review"),
       gap("Review Session", "Writer Room 의 검토 화면이 근사치이며 만화 ▸ Writer Room 이 연다."),
       gap("Audit Log", "팀 활동 피드가 근사치이고 감사 로그 규격은 없다."),

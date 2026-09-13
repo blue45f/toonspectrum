@@ -152,3 +152,22 @@ test("kit escaping prevents reference titles from injecting Markdown links", () 
   assert.ok(!kit.includes("[bad]")); assert.ok(!kit.includes("<script>"));
   assert.ok(kit.includes("\\[link\\]"));
 });
+
+
+test("malformed and nested markup never leaves HTML delimiters in metadata", () => {
+  for (const value of ["<scr<script>ipt>alert(1)</script>", "<img src=x onerror=alert(1)", "text > tail", "<<b>Armor</b>>"]) {
+    const [item] = parseOpenReferences("artic", { data: [{ id: 1, title: "Safe title", artist_display: value, credit_line: value, is_public_domain: true }] }, NOW);
+    assert.ok(!/[<>]/u.test(item.creator));
+    assert.ok(!/[<>]/u.test(item.credit));
+    const saved = parseSavedOpenReference({ ...artwork, creator: value, credit: value });
+    assert.ok(saved);
+    assert.ok(!/[<>]/u.test(saved.creator));
+    assert.ok(!/[<>]/u.test(saved.credit));
+    assert.ok(!buildCreationKit("comic", value, value, [artwork]).includes("<script"));
+  }
+});
+test("dictionary lookup does not translate inherited object properties", () => {
+  for (const word of ["constructor", "toString", "__proto__"]) {
+    assert.equal(openSearchQuery("artic", word), word);
+  }
+});

@@ -1,0 +1,79 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dresden_station_night",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "evs_cap": 10,
+    "type": 0,
+    "tags": [
+      "train",
+      "station",
+      "bench",
+      "hall",
+      "tracks",
+      "fluorescent"
+    ],
+    "date_published": 1506981600,
+    "name": "Dresden Station Night",
+    "categories": [
+      "indoor",
+      "urban",
+      "night",
+      "medium contrast",
+      "artificial light"
+    ],
+    "coords": [
+      51.040345,
+      13.731369
+    ],
+    "date_taken": 1478636940,
+    "authors": {
+      "Greg Zaal": "All"
+    },
+    "sponsors": [
+      {
+        "url": "http://www.mdjustin.com/",
+        "name": "Justin Dolan"
+      },
+      "11164276"
+    ],
+    "files_hash": "f5ce6ef5551030de7cff798e06f02e25ff0efb77",
+    "max_resolution": [
+      16384,
+      8192
+    ],
+    "description": "Free 16K, unclipped HDRI of a night urban train station: indoor hall lit by cool fluorescent lines, medium contrast, empty platforms, benches and tracks.",
+    "category_id": "40ca9dc7-814b-515b-8dec-c924ad3fb9cc",
+    "category": "Interiors/Halls & Venues/Transit Stations",
+    "attributes": {
+      "light_type": "artificial",
+      "contrast": "medium",
+      "environment": "indoor"
+    },
+    "img_version": "ef602359",
+    "download_count": 61905,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/dresden_station_night.png?width=256&height=256&v=ef602359"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/dresden_station_night.jpg",
+      "bytes": 5603105,
+      "sha256": "8bbf9ece8a97a601f58f06d74db0faa12376c40c949e9b50bd585fd060ee3717",
+      "sourceMd5": "e698f3737dc1fb3ae1ed4984a11b8f8f"
+    }
+  ],
+  "projection": {
+    "horizontalFov": 90,
+    "yaw": 0
+  },
+  "sourceDimensions": [
+    8192,
+    4096
+  ]
+}

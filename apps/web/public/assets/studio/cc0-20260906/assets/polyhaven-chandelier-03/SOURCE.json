@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Chandelier_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "name": "Chandelier 03",
+    "categories": [
+      "lighting",
+      "decorative"
+    ],
+    "type": 2,
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "tags": [
+      "lighting",
+      "ceiling",
+      "hanging",
+      "fixture",
+      "chandelier",
+      "ornate",
+      "decor",
+      "elegant"
+    ],
+    "sponsors": [
+      "20953239"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 29301,
+    "texel_density": 5381.751396880296,
+    "dimensions": [
+      780.4270684719086,
+      785.4602336883545,
+      1040.6459806239354
+    ],
+    "files_hash": "69e7cbdf2f16db6a22efd043f6d584a58ee9a5f8",
+    "description": "Free 4K model of an ornate hanging chandelier: elegant brass fixture with crystal dishes and multiple candle-style bulbs, perfect for classic interiors.",
+    "category_id": "f0e24a22-b694-5cc0-8624-dd68b862c9ef",
+    "category": "Lighting/Ceiling/Chandeliers",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "brass",
+        "glass"
+      ]
+    },
+    "img_version": "acd7de4e",
+    "download_count": 37127,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/Chandelier_03.png?width=256&height=256&v=acd7de4e"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Chandelier_03/Chandelier_03_2k.gltf",
+      "bytes": 4876,
+      "sha256": "e7ecba239abb263b016d2f8a297db905f903804de4a41801ec1cf6e49c07b823",
+      "sourceMd5": "b65a31f22a3a4834088746223e8857a7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Chandelier_03/Chandelier_03_arm_2k.jpg",
+      "bytes": 751098,
+      "sha256": "e5ee65cbcbee470d010a9c502f00dbcd04fddbf5c34cd4e47fc85a4f1f98505a",
+      "sourceMd5": "bed8a6cd949fe6d7eac7521fbbbc7b7b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Chandelier_03/Chandelier_03_opacity_2k.jpg",
+      "bytes": 72867,
+      "sha256": "4c523ff7ade337930b320e85ed15fa412332edba2eb836bba5c434dd9628a581",
+      "sourceMd5": "a3ec058f51a09d52d9b9e8b3d2aeca93"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Chandelier_03/Chandelier_03.bin",
+      "bytes": 817280,
+      "sha256": "b7085e20c530331e71a6934604f77ba90acef175e78b75a28ded775a28d1a26e",
+      "sourceMd5": "6515aaafa8f678ccd1fc56ae7a21420c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Chandelier_03/Chandelier_03_nor_gl_2k.jpg",
+      "bytes": 620259,
+      "sha256": "d3387a05afb75c61e18a415f0965d929ddbef89fd06553fa4ee268089c952161",
+      "sourceMd5": "ca11e713104349a6e0227d42d580fd4a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Chandelier_03/Chandelier_03_diff_2k.jpg",
+      "bytes": 408109,
+      "sha256": "694f9a7e2752a6586c1731e542eb3816702dd688cb8697814ed39cbee88ee1c2",
+      "sourceMd5": "39bda6d462985ce3a88601c468691619"
+    }
+  ]
+}

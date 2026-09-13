@@ -1,4 +1,3 @@
-
 import { createStudioAssetFavoriteId, type StudioAssetFavoriteId } from "../studio-asset-favorites";
 import { loadStudioCanvasImageFile } from "../studio-legacy-editor-runtime-helpers";
 
@@ -10,10 +9,7 @@ import type {
   SetStateAction,
 } from "react";
 
-/**
- * 에셋 보관함 표면 상태 — StudioPage 의 `useState` 리터럴 유니온 그대로다. SQLite/OPFS 권위와
- * 현재 탭 메모리 폴백을 구분하는 값이라, 문자열을 넓히면 폴백 고지가 흐려진다.
- */
+/** SQLite/OPFS authority and the explicitly disclosed current-tab fallback. */
 export type StudioAssetStorageState =
   | "idle"
   | "loading"
@@ -21,14 +17,6 @@ export type StudioAssetStorageState =
   | "memory"
   | "unavailable";
 
-/**
- * 커스텀 에셋 라이브러리 CRUD 배선 컨텍스트.
- *
- * 네 개의 세대·꼬리 ref(`assetHydrationGenerationRef` / `assetMemoryModeRef` /
- * `assetMutationGenerationRef` / `assetMutationTailRef`)는 값이 아니라 ref 로 주입한다 — 하이드레이션
- * 펜싱과 변이 직렬화가 렌더 사이에도 같은 셀을 읽어야 하기 때문이다. `setError` 는 StudioPage 에서
- * 이 배선보다 앞서 선언되므로 그대로 넘긴다(지연 클로저가 필요 없다).
- */
 export interface StudioAssetLibraryMutationsContext {
   readonly assetHydrationGenerationRef: MutableRefObject<number>;
   readonly assetMemoryModeRef: MutableRefObject<boolean>;
@@ -44,7 +32,6 @@ export interface StudioAssetLibraryMutationsContext {
   readonly setError: Dispatch<SetStateAction<string | null>>;
 }
 
-/** StudioPage 가 그대로 구조 분해해 쓰는 에셋 보관함 CRUD 표면. */
 export interface StudioAssetLibraryMutations {
   readonly loadAssetsList: () => Promise<void>;
   readonly createValidatedMemoryAsset: (
@@ -61,12 +48,7 @@ export interface StudioAssetLibraryMutations {
   readonly onDeleteAsset: (id: string) => Promise<void>;
 }
 
-/**
- * 렌더마다 StudioPage 본문에서 호출되는 순수 팩토리(훅 아님). 함수 본문들은 StudioPage 에서 그대로
- * 옮겨 왔고(ZERO behavior change), 경계 테스트가 소스 텍스트를 스캔하므로 본문 들여쓰기·주석·문장
- * 순서를 추출 전과 동일하게 유지한다. 유일한 텍스트 차이는 동적 import 경로가 한 단계 위(`../`)를
- * 가리키는 것뿐이다 — 이 모듈이 studio-cuttoon-editor/ 하위에 있기 때문이다.
- */
+/** Bind mutation serialization and hydration fencing to the editor's stable refs. */
 export function createStudioAssetLibraryMutations(
   context: StudioAssetLibraryMutationsContext,
 ): StudioAssetLibraryMutations {
@@ -85,7 +67,6 @@ export function createStudioAssetLibraryMutations(
     setError,
   } = context;
 
-  // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
     const generation = ++assetHydrationGenerationRef.current;
     if (assetMemoryModeRef.current) {
@@ -166,6 +147,7 @@ export function createStudioAssetLibraryMutations(
       if (assetMemoryModeRef.current) {
         const saved = await createValidatedMemoryAsset(input);
         if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          assetHydrationGenerationRef.current += 1;
           replaceStudioAssets([
             saved,
             ...assetsRef.current.filter(({ id }) => id !== saved.id),
@@ -224,16 +206,16 @@ export function createStudioAssetLibraryMutations(
             setAssetStorageState("sqlite-opfs");
           }
         } catch (cause) {
-          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
-          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
-          assetMemoryModeRef.current = true;
-          setAssetStorageState("memory");
-          setError(`SQLite/OPFS 삭제에 실패해 현재 탭 목록에서만 에셋을 숨깁니다. 새로고침하면 다시 나타날 수 있습니다: ${
+          // A failed persistent delete is not a successful memory-only delete. Retain both the
+          // row and storage authority, so retry remains possible and reload cannot resurrect it.
+          throw new Error(`에셋 원본을 삭제하지 못해 보관함에 유지했습니다. 다시 시도해 주세요: ${
             cause instanceof Error ? cause.message : String(cause)
-          }`);
+          }`, { cause });
         }
       }
       if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        // Also fence reads STARTED DURING the await, not only reads already pending at entry.
+        assetHydrationGenerationRef.current += 1;
         replaceStudioAssets(assetsRef.current.filter((asset) => asset.id !== id));
         setAssetsLoaded(true);
         setAssetsLoading(false);
@@ -264,6 +246,7 @@ export function createStudioAssetLibraryMutations(
         }
       }
       if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        assetHydrationGenerationRef.current += 1;
         replaceStudioAssets(assetsRef.current.map((asset) =>
           asset.id === id ? { ...asset, name: normalizedName } : asset));
         setAssetsLoaded(true);
@@ -290,6 +273,8 @@ export function createStudioAssetLibraryMutations(
       await deleteStudioAssetMutation(id);
       removeAssetFavorite(createStudioAssetFavoriteId("local", id));
     } catch (err) {
+      if (!editorMountedRef.current) return;
+      setAssetsLoading(false);
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
     }
   }

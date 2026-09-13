@@ -2,6 +2,8 @@ import { ArrowUpRight, BookOpen, CalendarDays, Compass, Images, Library, Message
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
 
+import { SiteAtelierChapter } from "./SiteAtelierChapter";
+import { DESTINATION_ART } from "./site-atelier-content";
 import { useSiteExperience } from "./site-experience-context";
 import { EXPERIENCE_DESTINATIONS, nextExperienceDestinations } from "./site-experience-model";
 
@@ -21,6 +23,7 @@ export function SiteNextSteps() {
   if (!settings || !destinations.length) return null;
   return (
     <section className="site-next-steps" aria-labelledby={headingId} data-testid="site-next-steps">
+      <SiteAtelierChapter pathname={pathname} locale={locale} />
       <div className="site-next-steps__heading">
         <div>
           <p className="site-next-steps__eyebrow"><Sparkles size={14} aria-hidden="true" /> YOUR NEXT CHAPTER</p>
@@ -41,6 +44,7 @@ export function SiteNextSteps() {
           const [title, description] = destination[locale];
           return (
             <Link href={destination.href} className="site-next-steps__card" key={id} data-tone={index}>
+              <span className="site-next-steps__art" aria-hidden="true"><img src={`/brand/atelier-${DESTINATION_ART[id]}.webp`} alt="" width={1536} height={1024} loading="lazy" decoding="async" /><span>0{index + 1} / {id.toUpperCase()}</span></span>
               <span className="site-next-steps__icon"><Icon size={21} aria-hidden="true" /></span>
               <span className="site-next-steps__copy"><strong>{title}</strong><span>{description}</span></span>
               <ArrowUpRight className="site-next-steps__arrow" size={19} aria-hidden="true" />

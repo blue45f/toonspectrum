@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/WetFloorSign_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "name": "Wet Floor Sign 01",
+    "categories": [
+      "props",
+      "industrial",
+      "office"
+    ],
+    "type": 2,
+    "authors": {
+      "Fran Calvente": "All"
+    },
+    "tags": [
+      "prop",
+      "plastic",
+      "sign",
+      "safety",
+      "caution",
+      "warning",
+      "yellow",
+      "hazard",
+      "slippery",
+      "slippery when wet",
+      "utility"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 228,
+    "texel_density": 3444.6741905680797,
+    "dimensions": [
+      300.0548481941223,
+      358.5093021392822,
+      629.5440040994436
+    ],
+    "files_hash": "79eb7de75bfe5924b67412f11e3e63c8abb82593",
+    "description": "Free 4K model of a yellow plastic A-frame wet floor sign with molded handle, bold \"CAUTION / WET FLOOR\" icon and worn scuffs and grime for realistic detail.",
+    "category_id": "3963d5ba-698d-5cd6-8072-77872c2388d8",
+    "category": "Industrial & Infrastructure/Traffic & Safety/Signs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "plastic"
+      ]
+    },
+    "img_version": "5e5e6332",
+    "download_count": 31887,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/WetFloorSign_01.png?width=256&height=256&v=5e5e6332"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/WetFloorSign_01/WetFloorSign_01_2k.gltf",
+      "bytes": 2688,
+      "sha256": "8bb1e1d7099e2592f0778b8eaa4d8a2cd5cb52137069db9d83f81dae6486c097",
+      "sourceMd5": "619ec550dec6370b9d06d4134e086dec"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/WetFloorSign_01/WetFloorSign_01_nor_gl_2k.jpg",
+      "bytes": 234546,
+      "sha256": "9f1d068237273aae2a76b4b1cfb9fc79269b0b8c265ce0859e8daff21e22440f",
+      "sourceMd5": "b38b4575c1e95e74a6a1fa9544ee57c0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/WetFloorSign_01/WetFloorSign_01_diff_2k.jpg",
+      "bytes": 115837,
+      "sha256": "f2cc0de3faa39fa922c878ecdb84935f444a0d9276afe7e993e7e59e28f75b49",
+      "sourceMd5": "cfe3f031a0ee80754338dfc41fd22912"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/WetFloorSign_01/WetFloorSign_01_arm_2k.jpg",
+      "bytes": 408113,
+      "sha256": "dfe8b7eaa199845ba5e0049d73407c5fae8567803c7c22bdd7cf6c16c05e750d",
+      "sourceMd5": "bf8c0ae45879a3d10c75b6473a55200a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/WetFloorSign_01/WetFloorSign_01.bin",
+      "bytes": 9496,
+      "sha256": "d23cdec8975ac452d64ae97b08f1eecd22e38f052bd5d588d352dbc0f0373af0",
+      "sourceMd5": "2a027a15ce3f42cbc2e9392361fd180b"
+    }
+  ]
+}

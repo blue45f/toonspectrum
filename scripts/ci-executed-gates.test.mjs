@@ -344,3 +344,20 @@ test("removal and inline comments cannot replace mandatory execution", () => {
     assert.throws(() => assertRequiredRegressions(missing + "\n          pnpm exec vitest run # " + path), /missing mandatory regression/);
   }
 });
+
+
+test("focused integration checks cannot collide with the protected core status", () => {
+  const integration = readFileSync(new URL("../.github/workflows/toonstudio-integration.yml", import.meta.url), "utf8");
+  const start = integration.indexOf("\n  validate:\n");
+  assert.ok(start >= 0, "missing focused integration validation job");
+  const validation = integration.slice(start);
+  const displayName = validation.match(/^ {4}name: (.+)$/m)?.[1];
+  assert.ok(displayName, "integration checks must declare a namespaced display name");
+  const tracks = ["core", "ui", "editor"];
+  const checks = tracks.map((track) => displayName.replace("${{ matrix.track }}", track));
+  assert.deepEqual(checks, tracks.map((track) => `ToonStudio integration / ${track}`));
+  assert.equal(new Set(checks).size, tracks.length);
+  assert.ok(checks.every((name) => name !== "core" && name !== "verify"));
+  assert.match(job("core"), /^ {4}name: core$/m, "preserve the existing protected merge gate");
+  assert.match(validation, /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/);
+});

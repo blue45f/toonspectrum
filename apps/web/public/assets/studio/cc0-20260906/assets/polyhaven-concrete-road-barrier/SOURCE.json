@@ -1,0 +1,104 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_road_barrier",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "lods": true,
+    "name": "Concrete Road Barrier",
+    "type": 2,
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "info": null,
+    "date_published": 1692316800,
+    "categories": [
+      "industrial",
+      "structures",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "road barrier",
+      "traffic barrier",
+      "safety barrier",
+      "wall",
+      "road",
+      "road block",
+      "blockade",
+      "partition",
+      "infrastructure"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 80776,
+    "texel_density": 3727.608964011354,
+    "dimensions": [
+      1545.3570485115051,
+      640.9457623958588,
+      835.279269143939
+    ],
+    "sponsors": [
+      "146648879"
+    ],
+    "files_hash": "bc3dfafc1abfc83dfa19710745d6f0beba9d2368",
+    "description": "Free 8K model, weathered concrete road barrier with chipped black-and-white checker paint, dirt streaks, eroded rough edges and rusted metal lifting loops.",
+    "category_id": "94693eae-944f-56f4-9456-e7315e67cf46",
+    "category": "Industrial & Infrastructure/Traffic & Safety/Road Barriers",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "concrete",
+        "metal"
+      ],
+      "lods": true
+    },
+    "img_version": "2d7473f3",
+    "download_count": 17258,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_road_barrier.png?width=256&height=256&v=2d7473f3"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/concrete_road_barrier/concrete_road_barrier_2k.gltf",
+      "bytes": 2868,
+      "sha256": "9189168735eaf2e91a7d8b9d250f4644f984bf5353a2cc844f8ccef270d743dd",
+      "sourceMd5": "2e769dcaa61d9bf95e655d49c4abeafb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_road_barrier/concrete_road_barrier_arm_2k.jpg",
+      "bytes": 2515448,
+      "sha256": "8c17f77897138a5ee0f80d0b5d194fd00554371e33b9f62f6d7b6a4e640094d6",
+      "sourceMd5": "ffad687f9d20a42036b6fbc61be26d82"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_road_barrier/concrete_road_barrier_diff_2k.jpg",
+      "bytes": 3189621,
+      "sha256": "51832691e0769a04246b61222e5df1ce7dc22e9c7162f786a314409ac76d643c",
+      "sourceMd5": "5d91066d8c6fc417a4090110839c282e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_road_barrier/concrete_road_barrier_nor_gl_2k.jpg",
+      "bytes": 3888469,
+      "sha256": "8e48a287ae58a53030635c585d57a2da72660531a907a8e6cd04836bc60bf3a3",
+      "sourceMd5": "e9837d7752eda58f46a01145538e3e22"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/concrete_road_barrier/concrete_road_barrier.bin",
+      "bytes": 1374016,
+      "sha256": "64a4f9bc6e4af64d714a252c3c13428c430a60569deba3d52ca6b7dd3aa70d8c",
+      "sourceMd5": "f256cb4d2bd9e5623b062502605dfcf2"
+    }
+  ]
+}

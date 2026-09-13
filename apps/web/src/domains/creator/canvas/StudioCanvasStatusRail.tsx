@@ -14,10 +14,13 @@ import {
   Loader2,
   PaintBucket,
   ScanSearch,
+  type LucideIcon,
 } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 
 import { presentStudioAutosaveDocumentLeadership } from "../studio-autosave-document-leader";
+import { StudioRecoveryNotice } from "./StudioRecoveryNotice";
+
 import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail";
 import { StudioToolHintTarget } from "../StudioToolHint";
 
@@ -172,6 +175,17 @@ export type StudioCanvasSelectionAlignment =
 type SelectionLayoutHint = (typeof SELECTION_LAYOUT_HINTS)[keyof typeof SELECTION_LAYOUT_HINTS];
 export type StudioCanvasSelectionLockState = "locked" | "unlocked" | "mixed";
 
+// Shared descriptors keep each command pair on one compiled render path.
+const REORDER_SELECTION_ACTIONS = [
+  ["front", "선택 요소 맨 앞으로", SELECTION_LAYOUT_HINTS.front, ArrowUpToLine],
+  ["back", "선택 요소 맨 뒤로", SELECTION_LAYOUT_HINTS.back, ArrowDownToLine],
+] as const;
+
+const FLIP_SELECTION_ACTIONS = [
+  ["horizontal", "선택 좌우 반전", SELECTION_LAYOUT_HINTS.flipH, FlipHorizontal2, "Shift+H"],
+  ["vertical", "선택 상하 반전", SELECTION_LAYOUT_HINTS.flipV, FlipVertical2, "Shift+V"],
+] as const;
+
 const HORIZONTAL_ALIGNMENT_ACTIONS = [
   ["left", "선택 요소 왼쪽 정렬", SELECTION_LAYOUT_HINTS.left, AlignLeft],
   ["hcenter", "선택 요소 가로 가운데 정렬", SELECTION_LAYOUT_HINTS.hcenter, AlignCenter],
@@ -189,6 +203,12 @@ const DISTRIBUTION_ACTIONS = [
   ["distributeV", "선택 요소 세로 균등 분배", SELECTION_LAYOUT_HINTS.distributeV, "세로 분배"],
 ] as const;
 
+const ALIGNMENT_ACTION_GROUPS = [
+  { label: "가로 정렬", actions: HORIZONTAL_ALIGNMENT_ACTIONS, distribution: false },
+  { label: "세로 정렬", actions: VERTICAL_ALIGNMENT_ACTIONS, distribution: false },
+  { label: "균등 분배", actions: DISTRIBUTION_ACTIONS, distribution: true },
+] as const;
+
 function SelectionLayoutAction({
   hint,
   label,
@@ -197,6 +217,7 @@ function SelectionLayoutAction({
   ariaKeyShortcuts,
   disabled = false,
   unavailableReason,
+  icon: Icon,
   children,
 }: {
   hint: SelectionLayoutHint;
@@ -206,7 +227,8 @@ function SelectionLayoutAction({
   ariaKeyShortcuts?: string;
   disabled?: boolean;
   unavailableReason?: string;
-  children: ReactNode;
+  icon?: LucideIcon;
+  children?: ReactNode;
 }) {
   return (
     <StudioToolHintTarget
@@ -228,6 +250,7 @@ function SelectionLayoutAction({
         aria-label={label}
         aria-keyshortcuts={ariaKeyShortcuts}
       >
+        {Icon ? <Icon size={13} aria-hidden /> : null}
         {children}
       </button>
     </StudioToolHintTarget>
@@ -355,14 +378,6 @@ export function StudioCanvasStatusRail({
           liveJam: autosaveLiveJam,
         })
       : null;
-  // 복구 배너의 안전한 기본 행동은 "복구하기"(복구가 막혔으면 "JSON 백업")다. 영구 삭제
-  // 승인 창을 닫고 나면 포커스를 파괴 버튼이 아니라 이 안전한 쪽에 되돌려 준다.
-  const autosaveSafeActionRef = useRef<HTMLButtonElement | null>(null);
-  const requestClearAutosave = () => {
-    void Promise.resolve(onClearAutosave()).finally(() => {
-      autosaveSafeActionRef.current?.focus();
-    });
-  };
 
   /**
    * 모바일 몰입 모드의 고지 띠에 **지금 담긴 것이 있는지**.
@@ -481,43 +496,12 @@ export function StudioCanvasStatusRail({
       ) : null}
 
       {hasAutosave && !followerNotice && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
-          <span className="min-w-0 flex-1 font-medium leading-relaxed">
-            {autosaveRestoreBlockedReason
-              ? autosaveRestoreBlockedReason === "revision-mismatch"
-                ? "⚠️ 임시저장본이 현재 서버 revision과 달라 자동 복구를 차단했습니다. JSON으로 백업해 수동 병합해 주세요."
-                : "⚠️ 출처 revision을 확인할 수 없는 공동 임시저장본입니다. 자동 복구하지 않고 원본을 보존합니다."
-              : "⚠️ 이전에 작성 중이던 임시저장 데이터가 있습니다."}
-          </span>
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {autosaveRestoreBlockedReason ? (
-              <button
-                type="button"
-                ref={autosaveSafeActionRef}
-                onClick={onDownloadAutosaveBackup}
-                className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                JSON 백업
-              </button>
-            ) : (
-              <button
-                type="button"
-                ref={autosaveSafeActionRef}
-                onClick={() => void onRestoreAutosave()}
-                className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                복구하기
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={requestClearAutosave}
-              className="min-h-11 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              비우기
-            </button>
-          </div>
-        </div>
+        <StudioRecoveryNotice
+          blockedReason={autosaveRestoreBlockedReason}
+          onRestore={onRestoreAutosave}
+          onBackup={onDownloadAutosaveBackup}
+          onDelete={onClearAutosave}
+        />
       )}
 
       {normalizedActiveGroupName ? (
@@ -666,26 +650,19 @@ export function StudioCanvasStatusRail({
                 role="group"
                 aria-label="앞뒤 순서"
               >
-                <SelectionLayoutAction
-                  hint={SELECTION_LAYOUT_HINTS.front}
-                  label="선택 요소 맨 앞으로"
-                  onClick={() => onReorderSelection("front")}
-                  disabled={layoutSelectionDisabledReason !== null}
-                  unavailableReason={layoutSelectionDisabledReason ?? undefined}
-                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                >
-                  <ArrowUpToLine size={13} aria-hidden />
-                </SelectionLayoutAction>
-                <SelectionLayoutAction
-                  hint={SELECTION_LAYOUT_HINTS.back}
-                  label="선택 요소 맨 뒤로"
-                  onClick={() => onReorderSelection("back")}
-                  disabled={layoutSelectionDisabledReason !== null}
-                  unavailableReason={layoutSelectionDisabledReason ?? undefined}
-                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                >
-                  <ArrowDownToLine size={13} aria-hidden />
-                </SelectionLayoutAction>
+                {REORDER_SELECTION_ACTIONS.map(([mode, label, hint, Icon]) => (
+                  <SelectionLayoutAction
+                    key={mode}
+                    hint={hint}
+                    label={label}
+                    icon={Icon}
+                    onClick={() => onReorderSelection(mode)}
+                    disabled={layoutSelectionDisabledReason !== null}
+                    unavailableReason={layoutSelectionDisabledReason ?? undefined}
+                    className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                  >
+                  </SelectionLayoutAction>
+                ))}
               </div>
             ) : null}
             {onZoomToSelection || onFlipSelection ? (
@@ -698,101 +675,57 @@ export function StudioCanvasStatusRail({
                   <SelectionLayoutAction
                     hint={SELECTION_LAYOUT_HINTS.zoomToSelection}
                     label="선택 영역으로 확대"
+                    icon={ScanSearch}
                     onClick={onZoomToSelection}
                     ariaKeyShortcuts="Shift+F"
                     className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
                   >
-                    <ScanSearch size={13} aria-hidden />
                   </SelectionLayoutAction>
                 ) : null}
-                {onFlipSelection ? (
-                  <>
-                    <SelectionLayoutAction
-                      hint={SELECTION_LAYOUT_HINTS.flipH}
-                      label="선택 좌우 반전"
-                      onClick={() => onFlipSelection("horizontal")}
-                      ariaKeyShortcuts="Shift+H"
-                      disabled={alignmentSelectionDisabledReason !== null}
-                      unavailableReason={alignmentSelectionDisabledReason ?? undefined}
-                      className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                    >
-                      <FlipHorizontal2 size={13} aria-hidden />
-                    </SelectionLayoutAction>
-                    <SelectionLayoutAction
-                      hint={SELECTION_LAYOUT_HINTS.flipV}
-                      label="선택 상하 반전"
-                      onClick={() => onFlipSelection("vertical")}
-                      ariaKeyShortcuts="Shift+V"
-                      disabled={alignmentSelectionDisabledReason !== null}
-                      unavailableReason={alignmentSelectionDisabledReason ?? undefined}
-                      className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                    >
-                      <FlipVertical2 size={13} aria-hidden />
-                    </SelectionLayoutAction>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
-            <div
-              className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
-              role="group"
-              aria-label="가로 정렬"
-            >
-              {HORIZONTAL_ALIGNMENT_ACTIONS.map(([mode, label, hint, Icon]) => (
-                <SelectionLayoutAction
-                  key={mode}
-                  hint={hint}
-                  label={selectionGroupName ? label.replace("선택 요소", "선택 그룹") : label}
-                  onClick={() => onAlignSelection(mode)}
-                  disabled={alignmentSelectionDisabledReason !== null}
-                  unavailableReason={alignmentSelectionDisabledReason ?? undefined}
-                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                >
-                  <Icon size={13} aria-hidden />
-                </SelectionLayoutAction>
-              ))}
-            </div>
-            <div
-              className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
-              role="group"
-              aria-label="세로 정렬"
-            >
-              {VERTICAL_ALIGNMENT_ACTIONS.map(([mode, label, hint, text]) => (
-                <SelectionLayoutAction
-                  key={mode}
-                  hint={hint}
-                  label={selectionGroupName ? label.replace("선택 요소", "선택 그룹") : label}
-                  onClick={() => onAlignSelection(mode)}
-                  disabled={alignmentSelectionDisabledReason !== null}
-                  unavailableReason={alignmentSelectionDisabledReason ?? undefined}
-                  className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                >
-                  {text}
-                </SelectionLayoutAction>
-              ))}
-            </div>
-            {selectionCount >= 3 && !selectionGroupName && (
-              <div
-                className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
-                role="group"
-                aria-label="균등 분배"
-              >
-                {DISTRIBUTION_ACTIONS.map(([mode, label, hint, text]) => (
+                {onFlipSelection ? FLIP_SELECTION_ACTIONS.map(([mode, label, hint, Icon, shortcut]) => (
                   <SelectionLayoutAction
                     key={mode}
                     hint={hint}
                     label={label}
+                    icon={Icon}
+                    onClick={() => onFlipSelection(mode)}
+                    ariaKeyShortcuts={shortcut}
+                    disabled={alignmentSelectionDisabledReason !== null}
+                    unavailableReason={alignmentSelectionDisabledReason ?? undefined}
+                    className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                  >
+                  </SelectionLayoutAction>
+                )) : null}
+              </div>
+            ) : null}
+            <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
+            {ALIGNMENT_ACTION_GROUPS.map((group) => (
+              !group.distribution || (selectionCount >= 3 && !selectionGroupName)
+            ) ? (
+              <div
+                key={group.label}
+                className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+                role="group"
+                aria-label={group.label}
+              >
+                {group.actions.map(([mode, label, hint, content]) => (
+                  <SelectionLayoutAction
+                    key={mode}
+                    hint={hint}
+                    label={selectionGroupName ? label.replace("선택 요소", "선택 그룹") : label}
                     onClick={() => onAlignSelection(mode)}
                     disabled={alignmentSelectionDisabledReason !== null}
                     unavailableReason={alignmentSelectionDisabledReason ?? undefined}
-                    className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                    icon={typeof content === "string" ? undefined : content}
+                    className={typeof content === "string"
+                      ? "cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                      : "cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"}
                   >
-                    {text}
+                    {typeof content === "string" ? content : null}
                   </SelectionLayoutAction>
                 ))}
               </div>
-            )}
+            ) : null)}
             <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
             <button
               type="button"

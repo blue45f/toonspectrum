@@ -15,6 +15,7 @@ import {
   type CreatorPublicationReaderPolicy,
 } from "./creator-publication-reader";
 import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
+import { SpatialWebtoonReaderLauncher } from "./spatial/SpatialWebtoonReaderLauncher";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -273,6 +274,7 @@ export function PublishedWorkReader({
           direction={policy.directive.readingDirection}
         />
       )}
+      {canRenderContent && <SpatialWebtoonReaderLauncher key={workId} workId={workId} pages={pages} title={title} direction={policy.directive.readingDirection} />}
     </section>
   );
 }

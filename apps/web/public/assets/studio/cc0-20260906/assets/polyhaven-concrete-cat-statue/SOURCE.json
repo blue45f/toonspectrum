@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_cat_statue",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Concrete Cat Statue",
+    "categories": [
+      "decorative"
+    ],
+    "type": 2,
+    "tags": [
+      "garden",
+      "outdoor",
+      "landscaping",
+      "gardening",
+      "statue",
+      "concrete",
+      "sculpture",
+      "cat",
+      "lawn decoration"
+    ],
+    "info": null,
+    "date_published": 1688947200,
+    "authors": {
+      "Rico Cilliers": "Guidance",
+      "Riley Queen": "All"
+    },
+    "sponsors": [
+      "11109006"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 11950,
+    "texel_density": 15580.856281057282,
+    "dimensions": [
+      152.97183394432068,
+      250.0000149011612,
+      283.0095653557052
+    ],
+    "files_hash": "5f3785e43dd475d06772cd5c57d202e22f978c22",
+    "description": "Free 8K concrete cat statue with a weathered, moss-speckled surface, serene expression and soft, rounded forms in a classic seated sculptural pose.",
+    "category_id": "7640f984-6f63-523f-8953-8ddc8f33d39a",
+    "category": "Decor & Art/Sculptures & Figurines/Animal Figures",
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "concrete"
+      ]
+    },
+    "img_version": "234d3056",
+    "download_count": 52489,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_cat_statue.png?width=256&height=256&v=234d3056"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/concrete_cat_statue/concrete_cat_statue_2k.gltf",
+      "bytes": 2853,
+      "sha256": "17f27de853bd887334c30dd408909c9d7fe96fa35b04661ae3aa1810e3712664",
+      "sourceMd5": "56f756fbdaa16c99bb70cb5b93296244"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_cat_statue/concrete_cat_statue_arm_2k.jpg",
+      "bytes": 2797145,
+      "sha256": "2ea5a454bbf1667e774b19c802ea4ca676b8337a08d76b815f34a45c477e5689",
+      "sourceMd5": "e0972bd40d8be28b1968b8239957de29"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/concrete_cat_statue/concrete_cat_statue.bin",
+      "bytes": 291316,
+      "sha256": "489d9c3b5d8c3b8a606865f7fef002ac8535f883393696b448c1bd78a5a6a612",
+      "sourceMd5": "100da2074e7461c81898146f0da2a821"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_cat_statue/concrete_cat_statue_diff_2k.jpg",
+      "bytes": 3368899,
+      "sha256": "b02aea8ff84f3e234507800c1e3c941a5672b451e857242093a939fe11a43a72",
+      "sourceMd5": "16846cacdb16861466ebe0349c821a27"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/concrete_cat_statue/concrete_cat_statue_nor_gl_2k.jpg",
+      "bytes": 4492782,
+      "sha256": "fc883c77dce3a98159dcc6e286b0191ae05ada0c0034c7851685975d9d976a3d",
+      "sourceMd5": "79dd0b21b9433d292db639fd1df6d6b4"
+    }
+  ]
+}

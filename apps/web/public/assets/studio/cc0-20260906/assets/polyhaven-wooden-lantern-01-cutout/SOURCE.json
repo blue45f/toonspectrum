@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_lantern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-wooden-lantern-01",
+  "sourceModelSha256": "e05089321749ad809effdfce35685c93161495588ac76de6ccb3d1df561b3930",
+  "render": {
+    "sourceId": "polyhaven-wooden-lantern-01",
+    "sourceSha256": "e05089321749ad809effdfce35685c93161495588ac76de6ccb3d1df561b3930",
+    "path": "high-resolution-props/polyhaven-wooden-lantern-01.png",
+    "visiblePixels": 283089,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 8369
+  },
+  "independentOriginal": false
+}

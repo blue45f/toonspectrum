@@ -39,6 +39,10 @@
     }
   ],
   "rewrites": [
+    { "source": "/offline-draw", "destination": "/offline-draw/index.html" },
+    { "source": "/offline-draw/", "destination": "/offline-draw/index.html" },
+    { "source": "/spatial-reader", "destination": "/spatial-reader/index.html" },
+    { "source": "/spatial-reader/", "destination": "/spatial-reader/index.html" },
     { "source": "/socket.io", "destination": "/api/studio-live" },
     { "source": "/socket.io/:path*", "destination": "/api/studio-live" },
     { "source": "/api/cover", "destination": "/api/index" },
@@ -56,6 +60,8 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
+    { "source": "/offline-draw/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/offline-draw/portable.html", "headers": [{ "key": "Content-Disposition", "value": "attachment; filename=ToonStudio-Offline-Drawing.html" }] },
     {
       "source": "/(.*)",
       "headers": [
@@ -68,7 +74,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)"
+          "value": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)"
         },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
       ]
@@ -128,6 +134,14 @@
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
         }
+      ]
+    },
+    {
+      "source": "/assets/studio/cc0-20260906/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "CDN-Cache-Control", "value": "no-cache" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "no-cache" }
       ]
     },
     {

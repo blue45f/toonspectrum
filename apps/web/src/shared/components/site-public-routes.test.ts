@@ -20,7 +20,7 @@ describe("public creative chrome route boundaries", () => {
     expect(isPublicCreativeRoute(pathname)).toBe(false);
   });
 
-  it.each(["/calendar", "/compare", "/random", "/tags", "/authors", "/author/artist", "/title/a-story"])(
+  it.each(["/references", "/calendar", "/compare", "/random", "/tags", "/authors", "/author/artist", "/title/a-story"])(
     "classifies %s consistently as public discovery", (pathname) => {
       expect(isPublicCreativeRoute(pathname)).toBe(true);
       expect(isDiscoverPurposeRoute(pathname)).toBe(true);

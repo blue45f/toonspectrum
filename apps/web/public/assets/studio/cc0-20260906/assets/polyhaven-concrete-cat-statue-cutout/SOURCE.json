@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_cat_statue",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-concrete-cat-statue",
+  "sourceModelSha256": "0ba99fe163e376e74d6903e807153793a9019a153d4aa3ff430772b81b10f80a",
+  "render": {
+    "sourceId": "polyhaven-concrete-cat-statue",
+    "sourceSha256": "0ba99fe163e376e74d6903e807153793a9019a153d4aa3ff430772b81b10f80a",
+    "path": "high-resolution-props/polyhaven-concrete-cat-statue.png",
+    "visiblePixels": 326170,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 11950
+  },
+  "independentOriginal": false
+}

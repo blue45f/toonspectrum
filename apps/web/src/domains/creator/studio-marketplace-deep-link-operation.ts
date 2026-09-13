@@ -90,7 +90,9 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
         };
       }
       if (!isCurrent()) return staleResult(normalizedResourceId);
-      if (!dependencies.insertAsset(asset)) {
+      const inserted = await dependencies.insertAsset(asset);
+      if (!isCurrent()) return staleResult(normalizedResourceId);
+      if (!inserted) {
         return {
           status: "error",
           message: `“${record.name}”을(를) 삽입하지 못했어요. 캔버스 잠금과 저장 상태를 확인해 주세요.`,

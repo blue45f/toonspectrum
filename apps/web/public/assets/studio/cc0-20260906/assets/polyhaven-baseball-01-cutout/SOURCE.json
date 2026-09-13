@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/baseball_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-baseball-01",
+  "sourceModelSha256": "1ac739a7d17744757e109577423898fd333a7a957d6f45f4b7a81cc984e53e0d",
+  "render": {
+    "sourceId": "polyhaven-baseball-01",
+    "sourceSha256": "1ac739a7d17744757e109577423898fd333a7a957d6f45f4b7a81cc984e53e0d",
+    "path": "high-resolution-props/polyhaven-baseball-01.png",
+    "visiblePixels": 624199,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 10848
+  },
+  "independentOriginal": false
+}

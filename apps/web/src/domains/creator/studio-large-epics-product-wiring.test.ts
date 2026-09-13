@@ -24,7 +24,8 @@ describe("large Studio epic product wiring", () => {
     expect(connectedPanel).toContain("applyStudioStrokeProposalTransaction");
     expect(bridge).toContain("export function useStudioAiCanvasBridge");
     expect(bridge).toContain("transaction.addedStrokes.forEach");
-    expect(bridge).toContain("input.appendElement");
+    expect(bridge).toContain("const { ownerId, documentId, elements, appendElement } = input;");
+    expect(bridge).toContain("appendElement(cloneElementForProposal(source, transaction, index))");
     expect(bridge).toContain("cloneElementForProposal");
   });
 

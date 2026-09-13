@@ -50,7 +50,17 @@ function row(value: unknown): Row {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
 }
 function text(value: unknown, max = 300): string {
-  return typeof value === "string" ? value.replace(/<[^>]*>/gu, "").replace(/\s+/gu, " ").trim().slice(0, max) : "";
+  if (typeof value !== "string") return "";
+  // Emit plain text only, including for nested or unterminated markup. A single
+  // tag-removal regex can leave executable angle brackets in malformed input.
+  let plain = "";
+  let inTag = false;
+  for (const character of value) {
+    if (character === "<") inTag = true;
+    else if (character === ">") inTag = false;
+    else if (!inTag) plain += character;
+  }
+  return plain.replace(/\s+/gu, " ").trim().slice(0, max);
 }
 export function safeOpenUrl(value: unknown, hosts?: string[]): string {
   if (typeof value !== "string" || value.length > 2000) return "";
@@ -67,7 +77,7 @@ export function openSearchQuery(provider: OpenProvider, query: string): string {
   if (normalized.length < 1 || normalized.length > 80) throw new Error("검색어를 1~80자로 입력하세요.");
   if (provider === "wikipedia") return normalized;
   // Deliberately a visible dictionary, not an AI translation or fabricated translation service.
-  return normalized.split(" ").map((word) => KEYWORDS[word] ?? word).join(" ");
+  return normalized.split(" ").map((word) => Object.hasOwn(KEYWORDS, word) ? KEYWORDS[word] : word).join(" ");
 }
 export function openSearchUrl(provider: OpenProvider, query: string, page = 1): string {
   if (!Number.isInteger(page) || page < 1 || page > 10) throw new Error("검색은 1~10페이지까지 지원합니다.");

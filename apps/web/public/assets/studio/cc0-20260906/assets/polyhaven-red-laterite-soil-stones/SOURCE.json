@@ -1,0 +1,102 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/red_laterite_soil_stones",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "name": "Red Laterite Soil Stones",
+    "categories": [
+      "outdoor",
+      "natural",
+      "terrain",
+      "rock",
+      "road",
+      "sand"
+    ],
+    "type": 1,
+    "tags": [
+      "rough",
+      "red",
+      "laterite",
+      "stones",
+      "ground",
+      "dirt",
+      "pebbles",
+      "rocks",
+      "gravel",
+      "debris",
+      "nature",
+      "pathway",
+      "path",
+      "rock",
+      "brown",
+      "chipped"
+    ],
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1666828800,
+    "prepaid": true,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "7162c7ae70b9626991753b8e0ba6c2b4abd633ca",
+    "description": "Free 8K texture of red laterite soil with coarse, compacted gravel and scattered pebble stones; rough, earthy brown-red surface with chipped rock fragments.",
+    "category_id": "ff767449-ea44-5527-96f0-d74aa52df2d0",
+    "category": "Ground & Terrain/Gravel & Pebbles/Crushed Aggregate",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "img_version": "3e15d464",
+    "download_count": 70690,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/red_laterite_soil_stones.png?width=256&height=256&v=3e15d464"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_laterite_soil_stones/red_laterite_soil_stones_diff_2k.jpg",
+      "bytes": 3593564,
+      "sha256": "db3568338ecdf4467ca74f88178a60ebdb5a98f9b644db73b411913e7044fef6",
+      "sourceMd5": "4ad08edd225b77462fca6f4329e96cb1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_laterite_soil_stones/red_laterite_soil_stones_rough_2k.jpg",
+      "bytes": 2819770,
+      "sha256": "b273fa011a704f23e293658ab4e06d924253cb07b3b2eff24366d5d87b120c69",
+      "sourceMd5": "6db06a3f782247c6f922077458f80459"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_laterite_soil_stones/red_laterite_soil_stones_nor_gl_2k.jpg",
+      "bytes": 5924499,
+      "sha256": "1b2e238e375c31719169428b318916a8c9ba72b5202d2f36eac46b3d861319b6",
+      "sourceMd5": "b034f4899e0d606e23f9cad992df00ea"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_laterite_soil_stones/red_laterite_soil_stones_ao_2k.jpg",
+      "bytes": 3914480,
+      "sha256": "9e0e9132df1a8097ff0f953557151ffa98287b9c351919415708e475efa2c35f",
+      "sourceMd5": "bf8b43c1d5aba445a323f67c7fae5e94"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_laterite_soil_stones/red_laterite_soil_stones_disp_2k.jpg",
+      "bytes": 2169376,
+      "sha256": "b11389ea93d9bc56ce534ed7361eefb432e796eb4d5b1e9be9a9566ff3c7c83b",
+      "sourceMd5": "2a574cb1d355f3b1ef9b210ba559809c"
+    }
+  ]
+}

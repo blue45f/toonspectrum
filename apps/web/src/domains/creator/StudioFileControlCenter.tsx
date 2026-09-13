@@ -228,7 +228,7 @@ function actionStatusText(actionId: StudioFileControlActionId): string {
     case "new-work":
       return "새 작업 준비 화면을 열었습니다.";
     case "named-version":
-      return "버전 체크포인트를 열었습니다.";
+      return "저장 기록을 열었습니다.";
     case "archive-copy":
       return "완전 사본 내보내기를 시작했습니다.";
     case "archive-recovery":
@@ -290,7 +290,7 @@ function FileReport({
       ) : null}
       {recommendations.length > 0 ? (
         <div className="mt-2 rounded-lg border border-line/70 p-2.5">
-          <p className="text-[0.6rem] font-bold text-fg-2">권장 브리지</p>
+          <p className="text-[0.6rem] font-bold text-fg-2">이 파일을 여는 방법</p>
           <ul className="mt-1 space-y-1 text-[0.61rem] leading-relaxed text-fg-3">
             {recommendations.map((recommendation) => (
               <li key={recommendation}>• {recommendation}</li>

@@ -129,27 +129,24 @@ function sanitizeIdList(value: unknown, limit: number): readonly string[] {
 
 function sanitizeRecents(value: unknown): readonly StudioUnifiedAssetRecentUse[] {
   if (!Array.isArray(value)) return Object.freeze([]);
-  const unique = new Set<string>();
-  const recents: StudioUnifiedAssetRecentUse[] = [];
+  const recents = new Map<string, StudioUnifiedAssetRecentUse>();
   for (const candidate of value) {
     if (!isRecord(candidate)) continue;
     const id = sanitizeId(candidate.id);
     const usedAt = candidate.usedAt;
-    if (
-      !id
-      || unique.has(id)
-      || typeof usedAt !== "number"
-      || !Number.isFinite(usedAt)
-      || usedAt < 0
-    ) {
-      continue;
+    if (!id || typeof usedAt !== "number" || !Number.isFinite(usedAt) || usedAt < 0) continue;
+    const previous = recents.get(id);
+    if (!previous || usedAt > previous.usedAt) recents.set(id, Object.freeze({ id, usedAt }));
+    // Keep memory bounded while still considering late, newer records.
+    if (recents.size > MAX_RECENTS) {
+      let oldest: StudioUnifiedAssetRecentUse | undefined;
+      for (const recent of recents.values()) {
+        if (!oldest || recent.usedAt < oldest.usedAt) oldest = recent;
+      }
+      if (oldest) recents.delete(oldest.id);
     }
-    unique.add(id);
-    recents.push(Object.freeze({ id, usedAt }));
-    if (recents.length >= MAX_RECENTS) break;
   }
-  recents.sort((left, right) => right.usedAt - left.usedAt);
-  return Object.freeze(recents);
+  return Object.freeze([...recents.values()].sort((left, right) => right.usedAt - left.usedAt));
 }
 
 function freezeState(

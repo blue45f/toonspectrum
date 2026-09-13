@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_pomegranate_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-food-pomegranate-01",
+  "sourceModelSha256": "091f3e637a283cb75ae11d36a0a550d741f0fc58658df38a7e0ac5bfa915fffc",
+  "render": {
+    "sourceId": "polyhaven-food-pomegranate-01",
+    "sourceSha256": "091f3e637a283cb75ae11d36a0a550d741f0fc58658df38a7e0ac5bfa915fffc",
+    "path": "high-resolution-props/polyhaven-food-pomegranate-01.png",
+    "visiblePixels": 594937,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 8142
+  },
+  "independentOriginal": false
+}

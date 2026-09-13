@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   StudioUnifiedAssetItem,
@@ -118,6 +118,15 @@ async function renderRoute(source: StudioUnifiedAssetSource) {
   );
   return context;
 }
+
+// Route assertions measure behavior after loading, not CI module-transform speed.
+// Await both real lazy-entry modules without mocking their exports or relaxing DOM timeouts.
+beforeAll(async () => {
+  await Promise.all([
+    import("./StudioUnifiedAssetToolPopoverContent"),
+    import("./StudioUnifiedAssetToolPopoverContentDirectDrag"),
+  ]);
+});
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -325,6 +334,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     const view = render(
       <StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />,
     );
+    await screen.findByRole("searchbox", { name: "에셋 통합 검색" });
     const input = view.container.querySelector('input[type="file"]');
     if (!(input instanceof HTMLInputElement)) {
       throw new Error("삽입 허브 파일 입력이 없습니다.");

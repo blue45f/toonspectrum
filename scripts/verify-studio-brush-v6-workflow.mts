@@ -407,7 +407,7 @@ try {
     let restoredDifference = Number.POSITIVE_INFINITY;
     let restoredRelativeInkError = Number.POSITIVE_INFINITY;
     for (let attempt = 0; attempt < 24; attempt += 1) {
-      const recovery = page.getByRole("button", { name: "복구하기", exact: true });
+      const recovery = page.getByRole("button", { name: "이어서 그리기", exact: true });
       if (await recovery.isVisible()) {
         evidence.usedRecoveryAction = true;
         await recovery.click();

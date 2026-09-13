@@ -1467,12 +1467,12 @@ function pointerSampleCount(contact: PointerContactEvidence | undefined): number
 
 async function restoreAutosave(page: Page): Promise<number> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
-  const banner = page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false });
+  const banner = page.locator("[data-studio-recovery-notice]");
   await banner.waitFor({ state: "visible", timeout: 12_000 });
   // Reload creates a fresh in-page monitor. Record its sequence immediately before the user-owned
   // restore action so initial blank-document loading/ready states cannot satisfy replay evidence.
   const restoreSequenceWatermark = (await readMonitor(page)).sequence;
-  await page.getByRole("button", { name: "복구하기", exact: true }).click();
+  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
   await banner.waitFor({ state: "detached", timeout: 12_000 });
   return restoreSequenceWatermark;
 }

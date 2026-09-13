@@ -1,0 +1,40 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "selectedCandidates": 64,
+  "acquisitionProfile": "explicit-plan",
+  "existingOriginalsExcluded": 1304,
+  "deliveredOriginals": 134,
+  "byKind": {
+    "model": 43,
+    "surface-texture": 14,
+    "background": 34,
+    "prop-image": 43
+  },
+  "byCategory": {
+    "furniture": 11,
+    "pbr-detailed-prop": 16,
+    "outdoor-prop": 4,
+    "architecture": 8,
+    "food": 6,
+    "nature": 3,
+    "surface-material": 14
+  },
+  "downloadedBytes": 469908254,
+  "errors": [
+    {
+      "id": "polyhaven-fabric-pattern-07",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    },
+    {
+      "id": "polyhaven-leather-red-02",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    }
+  ],
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "notice": "Review candidates only; not artistically approved or automatically added to the active Studio catalog.",
+  "browserRenderedModels": 48,
+  "browserRejectedModels": 0
+}

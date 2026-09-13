@@ -55,6 +55,13 @@ jobs:
         run: |
           set -o pipefail
           pnpm exec vitest run apps/web/src/domains/creator/catalog/ apps/web/src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts apps/web/src/domains/creator/StudioElementsPanel.test.tsx apps/web/src/domains/creator/studio-elements-catalog.test.ts apps/web/src/domains/creator/studio-scene-templates.test.ts apps/web/src/domains/creator/studio-comipo-assembly.test.ts apps/web/src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+      - uses: actions/setup-python@v5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        with:
+          python-version: '3.11'
+      - name: Install Python image verification dependencies
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python3 -m pip install Pillow==11.3.0 numpy==2.2.6
       - name: Offline asset packaging and curation unit tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

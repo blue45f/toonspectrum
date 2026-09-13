@@ -45,6 +45,11 @@ const SourcesPage = lazyRetry(
   "SourcesPage",
 );
 
+const MaterialAtlasPage = lazyRetry(
+  () => import("@/domains/creator-resources/MaterialAtlasPage").then((module) => ({ default: module.MaterialAtlasPage })),
+  "MaterialAtlasPage",
+);
+
 export const creatorResourcesRoutes = defineAppRoutes([
   // Legacy creator hubs now resolve to the canonical ToonStudio front door.
   { id: "resources-make", path: "/make", element: <Navigate to="/studio/new" replace /> },
@@ -55,6 +60,7 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "resources-now", path: "/now", element: <NowPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
+  { id: "research-materials", path: "/research/materials", element: <MaterialAtlasPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
   { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },
   { id: "resources-references", path: "/creator-hub/references", element: <Navigate to="/research/assets" replace /> },

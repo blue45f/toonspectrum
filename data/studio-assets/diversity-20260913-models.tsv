@@ -1,0 +1,49 @@
+sourceId	name	category
+CoffeeCart_01	카페 커피 카트 이동식 매대	furniture
+CashRegister_01	상점 계산대 금전 등록기	pbr-detailed-prop
+SchoolDesk_01	교실 학생 책상	furniture
+SchoolChair_01	교실 학생 의자	furniture
+BarberShopChair_01	이발소 바버샵 의자	furniture
+Camera_01	클래식 사진 카메라	pbr-detailed-prop
+Television_01	클래식 브라운관 텔레비전 TV	pbr-detailed-prop
+Lantern_01	캠핑 랜턴 휴대용 조명	outdoor-prop
+WetFloorSign_01	청소 중 미끄럼 주의 표지판	architecture
+Ukulele_01	우쿨렐레 악기	pbr-detailed-prop
+Drill_01	공구 전동 드릴	pbr-detailed-prop
+Megaphone_01	행사 확성기 메가폰	pbr-detailed-prop
+power_box_01	거리 전기 배전함	architecture
+utility_box_02	건물 설비 전기함	architecture
+exterior_aircon_unit	건물 에어컨 실외기	architecture
+metal_trash_can	거리 금속 쓰레기통	architecture
+concrete_road_barrier	도로 콘크리트 방호벽	architecture
+covered_car	덮개를 씌운 주차 자동차	architecture
+rollershutter_window_01	상점 롤러 셔터 창문	architecture
+old_tyre	정비소 자동차 타이어	outdoor-prop
+metal_tool_chest	작업실 금속 공구함	pbr-detailed-prop
+wooden_bucket_02	나무 양동이 물통	outdoor-prop
+wicker_basket_01	라탄 손잡이 바구니	pbr-detailed-prop
+standing_picture_frame_01	탁상 사진 액자	pbr-detailed-prop
+throw_pillows_01	소파 장식 쿠션 세트	furniture
+coffee_table_round_01	거실 원형 커피 테이블	furniture
+side_table_01	침실 원목 사이드 테이블	furniture
+Rockingchair_01	원목 흔들의자	furniture
+Ottoman_01	거실 패브릭 오토만 소파 스툴	furniture
+GothicBed_01	고딕 장식 침대	furniture
+ClassicNightstand_01	클래식 침대 옆 협탁	furniture
+Chandelier_03	실내 장식 샹들리에	pbr-detailed-prop
+brass_candleholders	황동 촛대 장식 세트	pbr-detailed-prop
+chess_set	체스 보드와 말 게임 세트	pbr-detailed-prop
+rubber_duck_toy	욕실 고무 오리 장난감	pbr-detailed-prop
+baseball_01	야구공 스포츠 소품	pbr-detailed-prop
+football	축구공 스포츠 소품	pbr-detailed-prop
+croissant	카페 크루아상 빵	food
+food_pomegranate_01	석류 과일	food
+food_pears_asian_01	배 과일 세트	food
+lemon	레몬 과일	food
+carrot_cake	카페 당근 케이크	food
+jug_01	주방 물병 저그	food
+anthurium_botany_01	실내 안스리움 화초	nature
+calathea_orbifolia_01	넓은 잎 칼라테아 화초	nature
+concrete_cat_statue	정원 고양이 조각상	nature
+horse_statue_01	장식 말 조각상	pbr-detailed-prop
+wooden_lantern_01	원목 랜턴 장식 조명	outdoor-prop

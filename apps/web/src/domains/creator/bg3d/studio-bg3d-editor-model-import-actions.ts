@@ -460,15 +460,38 @@ export function createStudioBg3dModelImportActions(
   async function handleDeleteModelFromLibrary(id: string) {
     const session = modalAssetSessionRef.current;
     if (!session || !isModalAssetSessionCurrent(session)) return;
-    if (isRestoringScene || sceneRestoreAbortRef.current !== null) return;
+    if (isRestoringScene || sceneRestoreAbortRef.current !== null) {
+      setError("장면을 복원하는 중에는 모델을 삭제할 수 없습니다. 복원이 끝난 뒤 다시 시도해 주세요.");
+      return;
+    }
+    if (modelImportAbortRef.current !== null) {
+      setError("모델을 가져오는 중입니다. 가져오기가 끝난 뒤 삭제해 주세요.");
+      return;
+    }
     if (placementSessionRef.current.phase === "preview") cancelCustomModelPlacement();
-    const thumbnailLeaseReleased = invalidateModelThumbnailCaptures();
-    if (thumbnailLeaseReleased) await thumbnailLeaseReleased;
-    if (!isModalAssetSessionCurrent(session) || captureInFlightRef.current) return;
+    try {
+      const thumbnailLeaseReleased = invalidateModelThumbnailCaptures();
+      if (thumbnailLeaseReleased) await thumbnailLeaseReleased;
+    } catch {
+      if (isModalAssetSessionCurrent(session)) {
+        setError("모델 미리보기 작업을 정리하지 못해 삭제를 시작하지 않았습니다. 다시 시도해 주세요.");
+      }
+      return;
+    }
+    if (!isModalAssetSessionCurrent(session)) return;
+    if (captureInFlightRef.current || sceneRestoreAbortRef.current !== null) {
+      setError("렌더링 또는 장면 복원이 진행 중입니다. 작업이 끝난 뒤 삭제해 주세요.");
+      return;
+    }
     const destructiveLease = destructiveMutationGuardRef.current.begin();
-    if (!destructiveLease) return;
+    if (!destructiveLease) {
+      setError("다른 변경 작업이 진행 중이라 삭제를 시작하지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
     let removalPreflightFailed = false;
+    let deletionCommitted = false;
     setDeletingModelId(id);
+    setError(null);
     try {
       const mutation = await studioBg3dModalOperationCoordinator.runSceneMutation(
         session,
@@ -482,14 +505,17 @@ export function createStudioBg3dModelImportActions(
             deletePersistedModel: (storageModelId) =>
               deleteStoredBg3dModel(storageModelId, { signal: lease.signal }),
           });
-          // A committed deletion is authoritative; reconcile it or replay its durable journal.
           if (!plan.ok) {
             removalPreflightFailed = true;
             throw new Error("scene-removal-preflight-failed");
           }
+          deletionCommitted = true;
           return { attachment, plan };
         },
         ({ attachment, plan }) => {
+          // Persistence already committed: do not depend on a second storage read to remove the row.
+          setModelLibrary((current) => current.filter((entry) => entry.id !== id));
+          setModelLibraryStatus("ready");
           commitSceneEntityRemoval(plan, { resetHistory: true });
           attachmentByStorageModelIdRef.current.delete(id);
           if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
@@ -497,7 +523,7 @@ export function createStudioBg3dModelImportActions(
           modelRootCacheRef.current.delete(id);
           if (cacheEntry) requestAnimationFrame(() => cacheEntry.dispose());
           setSelectedIds((current) => new Set(
-            [...current].filter((selectedId) => !plan.removedEntityIds.has(selectedId)),
+            [...current].filter((entityId) => !plan.removedEntityIds.has(entityId)),
           ));
           setGenericModelSourceFormats((previous) => {
             if (!previous.has(id)) return previous;
@@ -513,31 +539,37 @@ export function createStudioBg3dModelImportActions(
           });
           setRefTick((n) => n + 1);
         },
-        // IndexedDB deletion is an irreversible destructive boundary. Keep the lease comfortably
-        // above the browser transaction watchdog so ordinary timer pressure cannot report a
-        // committed delete as an abandoned scene operation.
-        {
-          timeoutMs: 10 * 60_000,
-          authoritativePersistence: true,
-        },
+        { timeoutMs: 10 * 60_000, authoritativePersistence: true },
       );
       if (mutation.status === "stale") return;
-      const entries = await listBg3dModelLibraryEntries();
-      studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
-        setModelLibrary(entries);
-      });
+      try {
+        const entries = await listBg3dModelLibraryEntries();
+        studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
+          setModelLibrary(entries);
+          setModelLibraryStatus("ready");
+        });
+      } catch {
+        studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
+          setModelLibraryStatus("degraded");
+          setError("3D 모델 원본 삭제는 완료했지만 보관함 목록을 새로고침하지 못했습니다. 보관함을 다시 열어 주세요.");
+        });
+      }
     } catch {
       if (!isModalAssetSessionCurrent(session)) return;
+      if (deletionCommitted) {
+        setModelLibrary((current) => current.filter((entry) => entry.id !== id));
+        setModelLibraryStatus("degraded");
+      }
       setError(removalPreflightFailed
         ? "자식 객체의 월드 변환을 보존할 수 없어 모델 원본 삭제를 시작하지 않았습니다."
-        : "3D 모델을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        : deletionCommitted
+          ? "3D 모델 원본은 삭제했지만 장면 동기화를 완료하지 못했습니다. 보관함을 다시 열어 상태를 확인해 주세요."
+          : "3D 모델을 삭제하지 못했습니다. 원본을 유지했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       destructiveMutationGuardRef.current.finish(destructiveLease);
-      studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
-        setDeletingModelId(null);
-      });
+      studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => setDeletingModelId(null));
     }
   }
 
-  return { handleDeleteModelFromLibrary, handleUploadModelFiles };
+  return { handleUploadModelFiles, handleDeleteModelFromLibrary };
 }

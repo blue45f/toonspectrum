@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   getStaticPolicyDocument,
   isPolicySlug,
@@ -74,6 +76,12 @@ export function createPolicyResolver(
         throw new Error("policy_upstream_unavailable");
       }
       document = parsePolicyDocument(await readBoundedJson(response), slug);
+      // Match TermsDesk shared/hash.ts: canonicalize line endings only, then hash UTF-8.
+      // Preserve the original response body; a digest match is integrity, not proof of recency.
+      const digest = createHash("sha256")
+        .update(document.body.replace(/\r\n/g, "\n").replace(/\r/g, "\n"), "utf8")
+        .digest("hex");
+      if (digest !== document.contentHash.toLowerCase()) throw new Error("policy_content_hash_mismatch");
     } catch {
       // Return real, pre-existing content, never an empty success or a fabricated publication.
       // Source=static is preserved end-to-end and renders the existing fallback notice.

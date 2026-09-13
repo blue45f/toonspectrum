@@ -186,6 +186,8 @@ export function admitStudioLiveTransformExactDraft(
     || pathLength < 0
     || !Number.isFinite(strokeWidth)
     || strokeWidth < 0
+    || (rendererMaxPaintRadius !== undefined
+      && (!Number.isFinite(rendererMaxPaintRadius) || rendererMaxPaintRadius < 0))
     || !Number.isSafeInteger(input.sceneElementCount)
     || input.sceneElementCount < 0
     || !Number.isFinite(input.rasterScale)
@@ -369,7 +371,10 @@ export function admitStudioLiveTransformExactDraft(
   // Unknown adapters have no certified radius helper. Charge a full (not half) clamped renderer
   // width on each side, then also charge the backing-pixel path sweep. This preserves the generic
   // low-DPR seam while preventing its 1,024-sample / 4,096px caps from bypassing zoom and DPR.
-  const genericPaintWidth = Math.max(1, strokeWidth, transformedStrokeWidth);
+  const genericPaintWidth = Math.max(
+    1, strokeWidth, transformedStrokeWidth,
+    (rendererMaxPaintRadius ?? 0) * Math.max(1, widthFactor),
+  );
   const backingPixels = rendererBackingPixelFootprint(
     input.targetBounds,
     genericPaintWidth,

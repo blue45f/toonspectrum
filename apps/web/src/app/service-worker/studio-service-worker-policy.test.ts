@@ -91,6 +91,9 @@ describe("classifyStudioServiceWorkerRequest", () => {
   it("classifies each asset family", () => {
     const cases: ReadonlyArray<readonly [string, string]> = [
       ["/assets/index-abc123.js", "immutable-asset"],
+      ["/assets/studio/cc0-20260906/manifest.json", "catalog-data"],
+      ["/assets/studio/cc0-20260906/manifest.json?v=diversity-20260913", "catalog-data"],
+      ["/assets/studio/cc0-20260906/assets/example/model.glb", "immutable-asset"],
       ["/assets/canvaskit-DB1zH3nD.wasm", "immutable-asset"],
       ["/assets/index-r07BZoLj.css", "immutable-asset"],
       ["/vrm/Vivi.vrm", "static-media"],

@@ -1,0 +1,117 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/CashRegister_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "date_published": 1585605600,
+    "name": "Cash Register 01",
+    "categories": [
+      "appliances",
+      "props"
+    ],
+    "type": 2,
+    "tags": [
+      "commercial",
+      "store",
+      "vintage",
+      "cash",
+      "transaction",
+      "register",
+      "money",
+      "sales",
+      "convenience store",
+      "cashier",
+      "retail",
+      "business"
+    ],
+    "authors": {
+      "Joe Seabuhr": "All"
+    },
+    "sponsors": [
+      "42579608",
+      "297038"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 9927,
+    "texel_density": 5156.575013122558,
+    "dimensions": [
+      600.4907041788101,
+      624.2051124572754,
+      621.3557496666908
+    ],
+    "files_hash": "a28caf40c20cabd1ee08e639d41982066d7340c6",
+    "description": "Free 8K vintage cash register model with worn cream finish, metal base and open coin drawer, featuring detailed keys, levers, decals, scratches & grime.",
+    "category_id": "136f0bfb-4dca-56bb-92b5-f3666e5bf8f5",
+    "category": "Electronics & Appliances/Devices & Instruments/Retail Machines",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "img_version": "ce53a8fc",
+    "download_count": 20730,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/CashRegister_01.png?width=256&height=256&v=ce53a8fc"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/CashRegister_01/CashRegister_01_2k.gltf",
+      "bytes": 6300,
+      "sha256": "9e7cd6c659466b56f3e8dd3375d3e9a47751556dcddca5b305badda95ea65bf9",
+      "sourceMd5": "bf674ab218a199becaec24283992bdb1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_glass_arm_2k.jpg",
+      "bytes": 202947,
+      "sha256": "858244b4434f417a4af43fb10a839f53598ea175253f8fa02e2152bc45c92f26",
+      "sourceMd5": "00d52b0709445dad680b9568731a4075"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/CashRegister_01/CashRegister_01.bin",
+      "bytes": 356396,
+      "sha256": "51cfd1329ae1700faaf4d1ce6116f73e795b6a31af7e86fbbb1047b57aa0fe3f",
+      "sourceMd5": "49c3cfeaf3b53d89cadab7875ffbd28a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_diff_2k.jpg",
+      "bytes": 400846,
+      "sha256": "222144e43c9df703685cc4cbbbc7ade26c8ce1beb81b8e410b91328a9443f0fb",
+      "sourceMd5": "8171ef1f26724ab891ffce1894d50283"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_nor_gl_2k.jpg",
+      "bytes": 414931,
+      "sha256": "1e2e6aaa8267b77f2911b2c9d2cbbd0821c2aa3e34ff9aa04718ed93e00d35df",
+      "sourceMd5": "917ba485b1629cd64478f955bcce9375"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_arm_2k.jpg",
+      "bytes": 626244,
+      "sha256": "ebdb551da131b20ad38bf1fc24d5acfaf6d1a024f0d282631a5254474307f280",
+      "sourceMd5": "5d0feba6337dc463633d9ccd2c3c344d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_glass_nor_gl_2k.jpg",
+      "bytes": 66229,
+      "sha256": "15ec1f4a61b4bf50c71d147f7c99e1a37a7dba4d6a47f6b782a80b5eb2b54ed6",
+      "sourceMd5": "88c76297e561700f3a87fb7eb12438e7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/CashRegister_01/CashRegister_01_glass_diff_2k.jpg",
+      "bytes": 288714,
+      "sha256": "7ec614d0b53c8e807594dfa4d9f7f5e60126fa4add96bff65a04477652a75259",
+      "sourceMd5": "d79f87843aad7ce79c0dbf6162d448ea"
+    }
+  ]
+}

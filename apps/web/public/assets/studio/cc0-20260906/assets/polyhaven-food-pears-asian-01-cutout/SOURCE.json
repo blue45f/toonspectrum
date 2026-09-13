@@ -1,0 +1,24 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_pears_asian_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "sourceId": "polyhaven-food-pears-asian-01",
+  "sourceModelSha256": "70a680af6b1c530a82d490baab5766103bb12c337e6426b9ff5bb6bed54c6c9e",
+  "render": {
+    "sourceId": "polyhaven-food-pears-asian-01",
+    "sourceSha256": "70a680af6b1c530a82d490baab5766103bb12c337e6426b9ff5bb6bed54c6c9e",
+    "path": "high-resolution-props/polyhaven-food-pears-asian-01.png",
+    "visiblePixels": 175392,
+    "width": 1536,
+    "height": 1536,
+    "renderer": "Three.js 184",
+    "triangles": 12572
+  },
+  "independentOriginal": false
+}

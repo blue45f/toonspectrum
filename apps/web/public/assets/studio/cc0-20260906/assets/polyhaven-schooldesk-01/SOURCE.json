@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/SchoolDesk_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "type": 2,
+    "date_published": 1585605600,
+    "name": "School Desk 01",
+    "categories": [
+      "furniture"
+    ],
+    "authors": {
+      "Ethan Place": "All"
+    },
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 4162,
+    "texel_density": 2254.880038685963,
+    "dimensions": [
+      711.7760181427002,
+      545.9675788879395,
+      882.6298794883769
+    ],
+    "sponsors": [
+      "42579608"
+    ],
+    "files_hash": "6de377a9a619e91fff0b2b89a601e99e408b29a0",
+    "tags": [
+      "table",
+      "school",
+      "desk",
+      "wood",
+      "metal",
+      "classroom",
+      "student",
+      "single-seat",
+      "school furniture",
+      "storage-shelf",
+      "metal legs",
+      "student seating"
+    ],
+    "description": "Free 4K model of a classic single-seat school desk with a wood top, gray metal storage shelf and adjustable tubular metal legs with worn finish.",
+    "category_id": "b37015ec-f872-5354-be8f-7a25172f366c",
+    "category": "Furniture/Tables/Desks",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "img_version": "52c372f5",
+    "download_count": 16653,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/SchoolDesk_01.png?width=256&height=256&v=52c372f5"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/SchoolDesk_01/SchoolDesk_01_2k.gltf",
+      "bytes": 2686,
+      "sha256": "98eb40d3ed2992d73d6e9150d5d5b8acd64937f4a832c1018eb668b72caabea6",
+      "sourceMd5": "9e940791852c775be0e4f84f3c616950"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolDesk_01/SchoolDesk_01_diff_2k.jpg",
+      "bytes": 259340,
+      "sha256": "e02cca7645b4ac33aec1d13457d6346fc44bc23e31c321ff1484f32d2523fbf3",
+      "sourceMd5": "da3cc4cb40e44b04a79f77c2bbb4c4ff"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolDesk_01/SchoolDesk_01_nor_gl_2k.jpg",
+      "bytes": 298581,
+      "sha256": "6c01d397344d262802516455a70347a668a00e4e73ae39f413ec13c1ba3f8110",
+      "sourceMd5": "da331c8270ac8b0ac72a9826a8cd5289"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/SchoolDesk_01/SchoolDesk_01_arm_2k.jpg",
+      "bytes": 442908,
+      "sha256": "de68c0fa738d75992e36a9ae5cd1dffeed8db3fa16b1bbb3e30cbb2d754e9f40",
+      "sourceMd5": "2312848559c4310917f024b2bd94f81a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/SchoolDesk_01/SchoolDesk_01.bin",
+      "bytes": 127564,
+      "sha256": "80d0ece097fde9b1efe15a9babfb6bb1573d228bab6e02e3806cb5eca39c2c0c",
+      "sourceMd5": "af08b1337236d6b951ea9805032abd32"
+    }
+  ]
+}

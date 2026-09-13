@@ -42,6 +42,7 @@ export function StudioUnifiedAssetSmartManager({
         type="button"
         onClick={onToggleOpen}
         aria-expanded={open}
+        aria-label="즐겨찾기 · 프로젝트 트레이 관리"
         className={cn(
           "mt-1.5 flex min-h-11 w-full items-center justify-between rounded-lg border border-line bg-card px-2.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised",
           SMART_LIBRARY_FOCUS,

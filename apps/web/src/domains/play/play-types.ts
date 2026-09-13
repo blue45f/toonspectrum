@@ -35,9 +35,13 @@ export interface PlayGameMeta {
   /** OKLCH hue(0-360) — 게임별 강조색. */
   hue: number;
   /** 분류 칩. */
-  category: "배틀" | "퍼즐" | "퀴즈" | "트래킹" | "보드" | "추천";
+  category: "배틀" | "퍼즐" | "퀴즈" | "트래킹" | "보드" | "추천" | "드로잉" | "스토리" | "색감";
   /** 웹캠 필요 여부(권한 안내/접근성 대체 제공). */
   usesCamera?: boolean;
+  duration?: string;
+  collection?: "draw" | "story" | "sense";
+  /** First load requires a connection; interaction does not call a server. */
+  localOnly?: boolean;
   /** 게임 본체 컴포넌트(허브가 인라인 렌더). */
   Component: ComponentType<PlayGameProps>;
 }
@@ -46,6 +50,7 @@ export interface PlayGameMeta {
 export interface PlayGameProps {
   /** 게임 종료/허브 복귀. */
   onExit: () => void;
+  seed?: string;
 }
 
 /** 랭킹/카탈로그 원본(부분) → PlayTitle 정규화. */

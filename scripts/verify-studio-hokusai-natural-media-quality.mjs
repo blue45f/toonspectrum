@@ -7,16 +7,19 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, normalizePath } from "vite";
 
 const EVIDENCE_ROOT =
   process.env.TOONSPECTRUM_HOKUSAI_QUALITY_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-hokusai-natural-media-quality-v2-${Date.now()}`);
 const HARNESS_PATH = "/__studio_hokusai_natural_media_quality_v2__";
-const HARNESS_ENTRY =
-  "/scripts/studio-hokusai-natural-media-quality-browser.ts";
+// Vite owns apps/web, while this harness lives in the workspace scripts directory.
+const HARNESS_ENTRY = `/@fs/${normalizePath(fileURLToPath(
+  new URL("./studio-hokusai-natural-media-quality-browser.ts", import.meta.url),
+))}`;
 // The browser harness intentionally runs many independent direct and Worker/WASM
 // renders. Each Worker render keeps its own 30-second failure timeout; this larger
 // value is only the outer orchestration budget for slower shared ARM runners.
@@ -299,6 +302,11 @@ async function main() { // NOSONAR javascript:S3776
         }`,
       );
     });
+
+    const harnessEntry = await context.request.get(`http://127.0.0.1:${port}${HARNESS_ENTRY}`);
+    invariant(harnessEntry.ok(), `Hokusai browser entry is unavailable: HTTP ${harnessEntry.status()}`);
+    invariant(harnessEntry.headers()["content-type"]?.includes("javascript"),
+      "Hokusai browser entry must be JavaScript, not an HTML fallback");
 
     await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, {
       waitUntil: "domcontentloaded",

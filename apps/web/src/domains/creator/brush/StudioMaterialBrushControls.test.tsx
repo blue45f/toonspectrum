@@ -102,4 +102,25 @@ describe("material brush controls inside Studio", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/material-${material.seed}/edit`);
   });
+  it("switches topology, edits meaningful physics and combines material/neon without losing the receipt", () => {
+    const original = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    const snapshot = structuredClone(original), onChange = vi.fn();
+    const view = render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material: original }} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText("획 구조 엔진"), { target: { value: "carrier-cpu-ballistic-spray-v1" } });
+    let next = onChange.mock.lastCall![0] as StudioBrushEngineProgramSet;
+    expect(next.material!.slots.physics).toEqual([]);
+    expect(next.material!.seed).toBe(original.seed); expect(next.material!.input).toEqual(original.input);
+    view.rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={next} onChange={onChange} />);
+    fireEvent.change(screen.getByRole("slider", { name: "중력 방향·강도" }), { target: { value: "-0.75" } });
+    next = onChange.mock.lastCall![0]; expect(next.material!.tuning.gravity).toBe(-0.75);
+    view.rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={next} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText("도포 재료"), { target: { value: "deposit-wet" } });
+    next = onChange.mock.lastCall![0]; expect(next.material!.slots.deposition).toBe("deposit-wet");
+    view.rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={next} onChange={onChange} />);
+    expect(screen.getByRole("slider", { name: "번짐" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "발광 마감 결합" }));
+    expect(onChange.mock.lastCall![0].material.slots.finish).toEqual(["finish-neon"]);
+    expect(original).toEqual(snapshot);
+  });
+
 });
