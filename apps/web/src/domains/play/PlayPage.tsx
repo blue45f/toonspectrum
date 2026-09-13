@@ -1,3 +1,6 @@
+import { PlayComicGuide } from "./PlayComicGuide";
+import { comicCast } from "@/shared/components/comic/comic-cast";
+import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { ArrowLeft, ArrowRight, Check, Clock3, Heart, Search, Shuffle, Sparkles, Trophy } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -15,6 +18,8 @@ import { SharePageButton } from "@/shared/components/share-page-button";
 const FILTERS = [["all", "전체"], ["draw", "드로잉"], ["story", "스토리"], ["sense", "색감"], ["arcade", "아케이드"], ["favorites", "즐겨찾기"]] as const;
 export function PlayPage() {
   const [params, setParams] = useSearchParams();
+  const cast = comicCast(params.get("cast")).id;
+  const changeCast = (id: ComicCastId) => { const next = new URLSearchParams(params); next.set("cast", id); setParams(next, { replace: true }); };
   const activeId = params.get("game") ?? undefined; const active = findGame(activeId);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { journal, toggleFavorite, warning } = usePlayJournal();
@@ -47,6 +52,7 @@ export function PlayPage() {
         <button type="button" className="play-button" aria-pressed={journal.favorites.includes(active.id)} onClick={() => toggleFavorite(active.id)}><Heart size={16} fill={journal.favorites.includes(active.id) ? "currentColor" : "none"} />즐겨찾기</button>
       </header>
       {warning && <p className="play-warning" role="status">{warning}</p>}
+      <PlayComicGuide key={active.id} cast={cast} onChange={changeCast} game={active.id} />
       <PlayGameBoundary key={`${active.id}:${safeSeed(params.get("seed"))}:${(params.get("idea") ?? "").slice(0, 30)}`} onExit={exitGame}>
         <Suspense fallback={<div className="play-loading" role="status"><div /><div /><p>창작 도구를 준비하고 있어요…</p></div>}><Game onExit={exitGame} seed={safeSeed(params.get("seed"))} /></Suspense>
       </PlayGameBoundary>
@@ -59,10 +65,11 @@ export function PlayPage() {
         <h1 ref={headingRef} tabIndex={-1} id="play-title">놀다 보면,<br /><em>다음 컷</em>이 떠오른다.</h1>
         <p>잘 그리려는 마음은 잠시 내려놓고.<br />선을 긋고, 색을 고르고, 이야기를 굴려 보세요.<br />작은 놀이가 나만의 작품으로 이어지는 창작 놀이터.</p>
         <div className="play-actions"><button type="button" className="play-button primary large" onClick={() => openGame("sketch-sprint", today)}>오늘의 드로잉 시작 <ArrowRight size={18} /></button><a className="play-text-link" href="#play-library">모든 콘텐츠 둘러보기 ↓</a></div>
-        <div className="play-hero-notes"><span>로그인 없이 시작</span><span>새 창작 도구 6종</span><span>브라우저에서 직접 창작</span></div>
+        <div className="play-hero-notes"><span>로그인 없이 시작</span><span>창작 도구 {PLAY_GAMES.filter((game) => game.localOnly).length}종</span><span>브라우저에서 직접 창작</span></div>
       </div>
       <div className="play-hero-art"><span className="play-art-label">LESS PRESSURE. MORE PLAY.</span><PlayArtwork kind="hero" /><span className="play-art-caption">한 번의 낙서가, 이야기의 시작.</span></div>
     </section>
+    <PlayComicGuide cast={cast} onChange={changeCast} />
     <section className="play-daily-row" aria-label="오늘의 창작과 내 기록">
       <div className="play-daily"><div className="play-daily-label"><span className="play-eyebrow">DAILY CREATIVE PROMPT</span><time dateTime={today}>{today.replaceAll("-", ".") } · KST</time></div><div className="play-daily-body"><div><h2>{daily[0]}</h2><p>{daily[1]}</p></div><button className="play-button" type="button" onClick={() => openGame("sketch-sprint", today)}>{dailyDone ? <Check size={16} /> : <Clock3 size={16} />}{dailyDone ? "다시 그려 보기" : "60초 도전"}</button></div></div>
       <div className="play-journal"><span className="play-eyebrow"><Trophy size={14} /> MY CREATIVE LOG</span><div className="play-journal-counts"><div><strong>{todayResults.length}</strong><span>오늘 완료</span></div><div><strong>{journal.results.length}</strong><span>완료 기록 · 최근 100개</span></div><div><strong>{journal.favorites.filter((id) => findGame(id)).length}</strong><span>즐겨찾기</span></div></div><p>이 브라우저에만 보관되는 나의 기록</p></div>

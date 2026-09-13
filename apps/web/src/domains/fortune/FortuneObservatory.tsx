@@ -1,3 +1,6 @@
+import { ComicDialogue } from "@/shared/components/comic/ComicCast";
+import { comicCast } from "@/shared/components/comic/comic-cast";
+import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -18,6 +21,8 @@ import "./fortune-cinematic.css";
 export function FortuneObservatory({ characterContent }: { characterContent?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const requested = params.get("content") ?? "";
+  const cast = comicCast(params.get("cast")).id;
+  const changeCast = (id: ComicCastId) => { const next = new URLSearchParams(params); next.set("cast", id); setParams(next, { replace: true }); };
   const selected = FORTUNE_EXPERIENCES.find((item) => item.id === requested);
   const [group, setGroup] = useState<FortuneGroup>("전체"), [search, setSearch] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false), [preferences, setPreferences] = useState(readFortunePreferences);
@@ -32,7 +37,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   const sequence = useRef(0), resultHeading = useRef<HTMLHeadingElement>(null), workHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { sequence.current += 1; setReading(null); setError(""); setRunning(false); setPick(null); if (requested) workHeading.current?.focus({ preventScroll: true }); return () => { sequence.current += 1; }; }, [requested]);
   useEffect(() => { if (reading) resultHeading.current?.focus({ preventScroll: true }); }, [reading]);
-  const navigate = (id: string) => { setParams(id ? { content: id } : {}); if (id) requestAnimationFrame(() => document.getElementById("fortune-workbench")?.scrollIntoView({ block: "start" })); };
+  const navigate = (id: string) => { setParams(id ? { content: id, cast } : { cast }); if (id) requestAnimationFrame(() => document.getElementById("fortune-workbench")?.scrollIntoView({ block: "start" })); };
   const persist = (next: FortunePreferences) => { setPreferences(next); const stored = writeFortunePreferences(next); if (!stored) setNotice("이 브라우저에서 저장이 제한되어 있어요. 현재 화면에서만 유지됩니다."); return stored; };
   const favorite = (id: string) => persist({ ...preferences, favorites: preferences.favorites.includes(id) ? preferences.favorites.filter((v) => v !== id) : [...preferences.favorites, id] });
   const saveReading = () => { if (!reading) return; const entry = { id: `${reading.id}-${Date.now()}`, title: reading.title, text: fortuneReadingText(reading), savedAt: fortuneKstDate() }; const stored = persist({ ...preferences, notebook: [entry, ...preferences.notebook].slice(0, 12) }); if (stored) setNotice("생일·시간·꿈 원문을 제외한 해석을 이 브라우저의 보관함에 추가했어요."); };
@@ -50,12 +55,13 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   const visible = FORTUNE_EXPERIENCES.filter((item) => (group === "전체" || item.group === group) && (!favoritesOnly || preferences.favorites.includes(item.id)) && `${item.title} ${item.subtitle} ${item.tag} ${item.group}`.includes(search.trim()));
   if (requested === "character") return <div className="fortune-observatory fo-legacy"><button type="button" className="fo-button" onClick={() => navigate("")}><ArrowLeft size={16} />운세 관측소로</button><p className="fo-safety">{FORTUNE_DISCLAIMER}</p>{characterContent}</div>;
   return <div className="fortune-observatory" data-fortune-experience="cinematic-v1">
-    <FortuneStoryPortal onNavigate={navigate} compact={Boolean(selected)} />
+    <FortuneStoryPortal onNavigate={navigate} compact={Boolean(selected)} cast={cast} onCastChange={changeCast} />
     <p className="fo-safety">{FORTUNE_DISCLAIMER}</p>
     {requested && !selected && <p role="status" className="fo-help">알 수 없는 콘텐츠 주소입니다. 아래에서 원하는 운세를 선택해 주세요.</p>}
     {selected && <section className="fo-workbench" id="fortune-workbench" data-theme={fortuneSceneTheme(selected.id)} aria-labelledby="fortune-work-title">
       <div className="fo-work-head"><div><p className="fo-eyebrow">{selected.group} · {selected.tag}</p><h2 id="fortune-work-title" ref={workHeading} tabIndex={-1}>{selected.glyph} {selected.title}</h2><p>{selected.subtitle}</p></div><button type="button" className="fo-icon-button" onClick={() => navigate("")} aria-label="콘텐츠 선택으로 돌아가기"><ArrowLeft size={19} /></button></div>
       <FortuneJourney hasReading={Boolean(reading)} running={running} />
+      {!reading && <ComicDialogue cast={cast}>{comicCast(cast).intro} {selected.title}의 단서를 준비하고, 아래 버튼으로 첫 컷을 열어 주세요.</ComicDialogue>}
       <form onSubmit={run} className="fo-form" aria-busy={running}>
         {(selected.input === "birth" || selected.input === "pair") && <FortuneBirthFields label={selected.input === "pair" ? "나의 생년월일" : "생년월일로 시작하기"} value={birth} onChange={(value) => { setBirth(value); invalidateReading(); }} />}
         {selected.input === "pair" && <FortuneBirthFields label="상대의 생년월일" value={partner} onChange={(value) => { setPartner(value); invalidateReading(); }} />}
@@ -72,7 +78,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
         <div className="fo-form-actions"><button className="fo-button fo-primary" type="submit" disabled={running}>{running ? "해석을 펼치고 있어요…" : `${selected.title} 열기`}<ArrowRight size={16} /></button><button type="button" className="fo-button" onClick={clearInputs}>입력·결과 지우기</button><span>추가 요금 · API 키 · 가입 없이</span></div>
         {error && <p role="alert" className="fo-error">{error}</p>}
       </form>
-      {reading && <div className="fo-result-wrap"><div className="fo-result-toolbar"><h2 ref={resultHeading} tabIndex={-1}>나의 해석 리포트</h2><button type="button" className="fo-button" onClick={saveReading}><BookmarkPlus size={16} />해석 보관</button></div><p className="fo-help">‘해석 보관’을 누를 때만 저장합니다. 생일·시간·꿈 원문은 저장하지 않아요.</p><FortuneReadingView key={`${reading.id}-${reading.generatedFor}-${sequence.current}`} reading={reading} /></div>}
+      {reading && <div className="fo-result-wrap"><div className="fo-result-toolbar"><h2 ref={resultHeading} tabIndex={-1}>나의 해석 리포트</h2><button type="button" className="fo-button" onClick={saveReading}><BookmarkPlus size={16} />해석 보관</button></div><p className="fo-help">‘해석 보관’을 누를 때만 저장합니다. 생일·시간·꿈 원문은 저장하지 않아요.</p><FortuneReadingView key={`${reading.id}-${reading.generatedFor}-${sequence.current}`} reading={reading} cast={cast} onCastChange={changeCast} /></div>}
     </section>}
     <section className="fo-discover" aria-labelledby="fo-discover-title"><div className="fo-discover-head"><div><p className="fo-eyebrow">CHOOSE YOUR CHAPTER</p><h2 id="fo-discover-title">오늘은 무엇이 궁금한가요?</h2><p>전통에서 일상까지, 나에게 맞는 발견을 골라 보세요.</p></div><button type="button" className="fo-button" onClick={() => { setNotebookOpen(!notebookOpen); if (!notebookOpen) requestAnimationFrame(() => { const notebook = document.getElementById("fo-notebook"); notebook?.scrollIntoView({ block: "start" }); notebook?.focus({ preventScroll: true }); }); }} aria-expanded={notebookOpen}><BookOpen size={16} />나의 보관함 {preferences.notebook.length}</button></div>
       <div className="fo-search-row"><label className="fo-search"><Search size={18} /><span className="sr-only">운세 콘텐츠 검색</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="만세력, 궁합, 타로…" type="search" /></label><button type="button" className="fo-button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}><Star size={16} />즐겨찾기 {preferences.favorites.length}</button></div>
