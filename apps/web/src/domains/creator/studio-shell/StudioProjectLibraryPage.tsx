@@ -32,6 +32,7 @@ import type {
   StudioProjectLibraryEntry,
   StudioProjectStatus,
 } from "../studio-project-library-store";
+import { StudioQuickStart } from "./StudioQuickStart";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 
 type Locale = "ko" | "en";
@@ -412,6 +413,8 @@ export function StudioProjectLibraryPage({
             </Link>
           </div>
         </div>
+
+        {view === "active" ? <StudioQuickStart locale={locale} /> : null}
 
         <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label={locale === "ko" ? "프로젝트 목록" : "Project lists"} className="overflow-x-auto">

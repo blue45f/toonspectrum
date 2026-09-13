@@ -12,6 +12,7 @@ interface UseStudioPageHistorySnapshotsOptions {
   readonly effectiveWorkId: string;
   readonly markStudioDocumentChanged: () => boolean;
   readonly workId: string | null;
+  readonly initialCanvasHeight?: number;
 }
 
 /** Bounded page-snapshot state used by page, stroke, and document undo/redo commands. */
@@ -19,6 +20,7 @@ export function useStudioPageHistorySnapshots({
   effectiveWorkId,
   markStudioDocumentChanged,
   workId,
+  initialCanvasHeight = 1080,
 }: UseStudioPageHistorySnapshotsOptions) {
   const [pagesHistory, setPagesHistoryState] = useState<PageState[][]>([
     [
@@ -29,7 +31,7 @@ export function useStudioPageHistorySnapshots({
         elements: [],
         bg: "#ffffff",
         bgGrad: null,
-        canvasH: 1080,
+        canvasH: initialCanvasHeight,
       },
     ],
   ]);

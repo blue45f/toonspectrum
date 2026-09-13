@@ -21,10 +21,13 @@ import {
 import { acquireProductStudioUiPreferencesRepository } from "../../studio-legacy-editor-runtime-helpers";
 import { applyStudioLaunchDensity, readStudioLaunchDensity } from "../../studio-launch-mode";
 
+import type { StudioDocumentWorkspaceId } from "../../studio-document-workspace";
+import { projectStudioTaskAppSettings } from "../../studio-task-tools";
 import type { StudioUiDensityMode } from "../../studio-ui-density";
 import type { StudioUiBooleanPreferenceKey } from "../../studio-ui-preferences-sqlite";
 
 interface UseStudioPreferencesRuntimeOptions {
+  readonly taskWorkspace?: StudioDocumentWorkspaceId | null;
   readonly applyMirroredSettings: (settings: StudioAppSettings) => void;
   readonly closeRightPanelForFocusMode: () => void;
 }
@@ -35,6 +38,7 @@ interface UseStudioPreferencesRuntimeOptions {
  * from the current canvas document and only exposes explicit UI-setting commands.
  */
 export function useStudioPreferencesRuntime({
+  taskWorkspace = null,
   applyMirroredSettings,
   closeRightPanelForFocusMode,
 }: UseStudioPreferencesRuntimeOptions) {
@@ -208,9 +212,10 @@ export function useStudioPreferencesRuntime({
   // Effect Events cannot cross a custom-hook boundary. The public command remains stable while the
   // callback refs above keep its host-owned side effects current without restarting hydration.
   const setStudioUiDensityFromCompanion = setStudioUiDensity;
+  const presentedSettings = projectStudioTaskAppSettings(appSettings, taskWorkspace, uiDensityMode);
   const isRailToolVisible = useCallback(
-    (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
-    [appSettings.toolbar.visibleIds],
+    (id: StudioRailToolId): boolean => presentedSettings.toolbar.visibleIds.includes(id),
+    [presentedSettings.toolbar.visibleIds],
   );
 
   const persistEffectFavoriteState = useCallback((next: StudioEffectFavoriteState): void => {
@@ -235,7 +240,7 @@ export function useStudioPreferencesRuntime({
   }, [persistEffectFavoriteState]);
 
   return {
-    appSettings,
+    appSettings: presentedSettings,
     appSettingsInitialTab,
     appSettingsOpen,
     appSettingsPersistenceState,
