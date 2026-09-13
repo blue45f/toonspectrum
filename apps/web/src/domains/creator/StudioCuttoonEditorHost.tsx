@@ -15755,7 +15755,7 @@ const puppetWarpArmed =
                 browserStudioCreatorPackStorage,
                 resolveStudioCreatorBundledCatalogTarget,
               },
-              { createStudioOriginalFreeAssetRecord },
+              { createStudioCommunityMarketplaceAssetRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
@@ -15763,7 +15763,7 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
-              import("./studio-original-free-asset-packs"),
+              import("./studio-community-marketplace-asset"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
             ]);
@@ -15810,7 +15810,7 @@ const puppetWarpArmed =
                   throw caught;
                 }
               },
-              openBundledPackCatalog: (pack) => {
+              openBundledPackCatalog: async (pack) => {
                 const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
                 if (resolution.status === "unsupported") {
                   return {
@@ -15827,10 +15827,24 @@ const puppetWarpArmed =
                   };
                 }
                 if (resolution.target.kind === "3d-asset-catalog") {
+                  const { prepareStudioMarketplaceCc0ModelScene } = await import("./studio-marketplace-cc0-model");
+                  const prepared = await prepareStudioMarketplaceCc0ModelScene(
+                    resolution.target.runtimeRef, isCurrentOperation,
+                  );
+                  if (!isCurrentOperation() || !isStudioPasteScopeCurrent({
+                    mutationAllowed: canApplyStudioMutation(mutationTicket),
+                    reviewLocked: activeSurfaceReviewLockedRef.current,
+                    targetPageId, currentPageId: currentPageIdRef.current,
+                    targetMasterEditMode, currentMasterEditMode: masterEditModeRef.current,
+                  })) {
+                    await prepared.cancel();
+                    return { status: "unsupported" as const, message: "작업 대상이 바뀌어 3D 에셋 열기를 취소했습니다." };
+                  }
                   openBackground3dFromMenu();
+                  setBg3dInitialScene(prepared.scene);
                   return {
                     status: "opened" as const,
-                    message: "3D 에셋 카탈로그를 열었어요. 3D 모델·소품을 선택해 캔버스 장면에 배치하세요.",
+                    message: `${prepared.name} 모델을 3D 편집기에 불러왔어요. 렌더링을 확인하고 컷에 삽입하세요.`,
                   };
                 }
                 openBackground3dFromMenu();
@@ -15844,7 +15858,9 @@ const puppetWarpArmed =
                   record,
                   compatibilityContext,
                 ),
-              insertAsset: (projectedAsset) => {
+              insertAsset: async (projectedAsset) => {
+                const asset = await createStudioCommunityMarketplaceAssetRecord(projectedAsset);
+                if (!isCurrentOperation()) return false;
                 if (!isStudioPasteScopeCurrent({
                   mutationAllowed: canApplyStudioMutation(mutationTicket),
                   reviewLocked: activeSurfaceReviewLockedRef.current,
@@ -15853,7 +15869,6 @@ const puppetWarpArmed =
                   targetMasterEditMode,
                   currentMasterEditMode: masterEditModeRef.current,
                 })) return false;
-                const asset = createStudioOriginalFreeAssetRecord(projectedAsset);
                 return addRenderedImage(asset.dataUrl, asset.width, asset.height);
               },
             };
