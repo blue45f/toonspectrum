@@ -397,41 +397,17 @@ export interface StudioAutosaveDurableAuthorityContext {
 export function clearStudioAutosaveDurableAuthority(
   ctx: StudioAutosaveDurableAuthorityContext
 ): void {
-  const { autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef } = ctx;
-    const sessionPromise = autosaveOpfsSessionRef.current;
-    const sqlitePromise = autosaveSqliteStoreRef.current;
-    if (!sessionPromise && !sqlitePromise) return;
-    const savedAt = new Date().toISOString();
-    void Promise.all([
-      sessionPromise ?? Promise.resolve(null),
-      sqlitePromise ?? Promise.resolve(null),
-    ])
-      .then(async ([session, sqlite]) => {
-        const attempted: Promise<unknown>[] = [];
-        if (session) attempted.push(session.clear(savedAt));
-        if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
-        const results = await Promise.allSettled(attempted);
-        if (
-          results.length > 0
-          && results.every((result) => result.status === "rejected")
-        ) {
-          throw new AggregateError(
-            results.map((result) =>
-              result.status === "rejected" ? result.reason : null
-            ),
-            "Studio durable autosave tombstones failed",
-          );
-        }
-      })
-      .catch((cause: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn("Studio durable autosave tombstone could not be written.", cause);
-        }
-      });
+  // Housekeeping remains best-effort. User-requested deletion below is strict and awaited.
+  void persistStudioAutosaveDeletion(ctx, false).catch((cause: unknown) => {
+    if (import.meta.env.DEV) console.warn("Studio durable autosave tombstone could not be written.", cause);
+  });
 }
 
 /** Explicit deletion requires acknowledgement from every available durable store. */
-export async function persistStudioAutosaveDeletion(ctx: StudioAutosaveDurableAuthorityContext): Promise<void> {
+export async function persistStudioAutosaveDeletion(
+  ctx: StudioAutosaveDurableAuthorityContext,
+  requireEveryStore = true,
+): Promise<void> {
   const { autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef } = ctx;
   const savedAt = new Date().toISOString();
   const [session, sqlite] = await Promise.all([
@@ -442,7 +418,8 @@ export async function persistStudioAutosaveDeletion(ctx: StudioAutosaveDurableAu
   if (session) attempted.push(session.clear(savedAt));
   if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
   const results = await Promise.allSettled(attempted);
-  if (results.length === 0 || results.some((result) => result.status === "rejected")) {
+  const failed = results.filter((result) => result.status === "rejected").length;
+  if (requireEveryStore ? results.length === 0 || failed > 0 : failed > 0 && failed === results.length) {
     throw new Error("저장 공간에 접근하지 못해 삭제를 마치지 못했어요. 이 탭을 닫기 전에 백업 파일을 받아 주세요.");
   }
 }

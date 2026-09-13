@@ -1,4 +1,4 @@
-import { ChevronDown, Download, ExternalLink, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 import { createStudioRecoveryNewDrawingHref } from "./studio-recovery-notice-model";
@@ -37,7 +37,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
       else if (action === "delete") await onDelete();
       else onBackup();
     } catch {
-      setError("요청을 마치지 못했어요. 그림은 지우지 말고 다시 시도하거나 백업 파일을 받아 주세요.");
+      setError("요청을 마치지 못했어요. 다시 시도하거나 백업 파일을 받아 주세요.");
     } finally {
       busyRef.current = false;
       setBusy(null);
@@ -47,11 +47,11 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
   }
 
   const description = blockedReason === "revision-mismatch"
-    ? "저장된 작품과 내용이 달라요. 덮어쓰지 않도록 이전 그림을 파일로 보관해 주세요."
+    ? "저장된 작품과 내용이 달라요. 덮어쓰지 않고 백업 파일로 보관해 주세요."
     : blockedReason === "work-mismatch"
-      ? "다른 작품의 그림이 남아 있어요. 지금 작품에 덮어쓰지 않고 파일로 보관할 수 있어요."
+      ? "다른 작품의 그림이에요. 덮어쓰지 않고 백업 파일로 보관해 주세요."
       : blockedReason
-        ? "이전 그림을 안전하게 열 수 있는지 확인하지 못했어요. 먼저 파일로 보관해 주세요."
+        ? "안전하게 열 수 있는지 확인하지 못했어요. 먼저 백업 파일을 받아 주세요."
         : "이 기기에 마지막으로 그리던 그림이 남아 있어요.";
 
   return (
@@ -92,12 +92,12 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
             }}
             className={cn(actionClass, "border border-line bg-card text-fg-2 hover:bg-raised", busy && "pointer-events-none opacity-50")}
           >
-            새 그림 그리기 <ExternalLink size={14} aria-label="새 탭" />
+            새 그림 그리기 <span className="text-[0.65rem]">새 탭</span>
           </a>
         </div>
       </div>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-        새 그림은 새 탭에서 열려요. 이 탭의 그림과 남겨 둔 작업은 그대로 유지됩니다.
+        새 탭에서 시작합니다. 현재 그림과 남겨 둔 작업은 유지돼요.
       </p>
       <button
         type="button"
@@ -107,12 +107,12 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
         onClick={() => setExpanded(!expanded)}
         className={cn(actionClass, "mt-1 text-fg-2 hover:bg-raised")}
       >
-        다른 방법 <ChevronDown size={14} aria-hidden className={expanded ? "rotate-180" : undefined} />
+        다른 방법 <span aria-hidden>{expanded ? "▴" : "▾"}</span>
       </button>
       {expanded && (
         <div id={detailsId} className="mt-1 border-t border-line pt-2">
           <p className="leading-relaxed text-fg-2">
-            이어 열기 전의 현재 화면은 ‘파일 → 저장 기록’에 자동 보관합니다. 보관에 실패하면 화면을 바꾸지 않아요.
+            현재 그림은 ‘파일 → 저장 기록’에 먼저 보관합니다. 실패하면 이어 열지 않아요.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {!blockedReason && (
@@ -124,7 +124,7 @@ export function StudioRecoveryNotice({ blockedReason, onRestore, onBackup, onDel
               <Trash2 size={14} aria-hidden /> {busy === "delete" ? "삭제 확인 중…" : "이전 그림 삭제…"}
             </button>
           </div>
-          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업 파일에는 이전 그림이 담겨요. ‘이전 그림 삭제’는 캔버스 지우기가 아니며, 확인 후 영구 삭제됩니다.</p>
+          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업에는 이전 그림이 담겨요. 삭제는 현재 캔버스가 아닌 이전 그림에 적용되며, 확인 후 되돌릴 수 없어요.</p>
         </div>
       )}
       {error && <p role="alert" className="mt-2 leading-relaxed text-bad">{error}</p>}

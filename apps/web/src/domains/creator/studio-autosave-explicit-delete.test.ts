@@ -132,3 +132,20 @@ describe("explicit drawing deletion", () => {
     }
   });
 });
+
+
+describe("background deletion compatibility", () => {
+  it.each(["unavailable", "partial-failure", "all-failed"])("keeps best-effort housekeeping distinct from explicit deletion: %s", async (mode) => {
+    const context = {
+      autosaveKey: "drawing",
+      autosaveOpfsSessionRef: { current: Promise.resolve(mode === "unavailable" ? null : {
+        clear: async () => { if (mode === "all-failed") throw new Error("denied"); },
+      } as unknown as StudioAutosaveOpfsSession) },
+      autosaveSqliteStoreRef: { current: Promise.resolve(mode === "unavailable" ? null : {
+        clear: async () => { throw new Error("busy"); },
+      } as unknown as StudioAutosaveSqlitePort) },
+    };
+    if (mode === "all-failed") await expect(persistStudioAutosaveDeletion(context, false)).rejects.toThrow();
+    else await expect(persistStudioAutosaveDeletion(context, false)).resolves.toBeUndefined();
+  });
+});
