@@ -2,11 +2,12 @@ name: Studio collaboration document sync
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
     branches: [main]
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -17,6 +18,7 @@ on:
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -52,6 +54,7 @@ jobs:
       - name: Verify presence/document readiness policy and transport contracts
         run: >-
           pnpm exec vitest run
+          scripts/verify-studio-collaboration-entry.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/live/studio-crdt-room-binding.test.ts
           apps/web/src/domains/creator/live/studio-live-collaboration-transport.test.ts
@@ -61,6 +64,7 @@ jobs:
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioCollaborationAccessRuntime.ts
+          scripts/verify-studio-collaboration-entry.test.ts
           scripts/verify-studio-collaboration-sync.mts
       - name: Resolve collaboration evidence directories
         run: |
