@@ -1,0 +1,59 @@
+name: Clean confirmed merged ancestors
+on:
+  push:
+    branches: [ops/merge-final-check-20260913]
+    paths: [.github/workflows/cleanup-confirmed-ancestors.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Delete only exact nonprotected merged refs with no open PR dependency
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime,json,os,pathlib,urllib.parse,urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          def call(path,method='GET'):
+              req=urllib.request.Request(api+path,headers=headers,method=method)
+              with urllib.request.urlopen(req,timeout=60) as r:return None if r.status==204 else json.load(r)
+          def pages(path):
+              result=[]
+              for page in range(1,100):
+                  batch=call(path+('&' if '?' in path else '?')+'per_page=100&page='+str(page));result.extend(batch)
+                  if len(batch)<100:return result
+              raise RuntimeError('Pagination limit')
+          deleted=[];skipped=[]
+          for branch in pages('branches'):
+              name=branch['name'];sha=branch['commit']['sha']
+              if name in ('main',os.environ['GITHUB_REF_NAME']) or branch['protected']:continue
+              main=call('branches/main')['commit']['sha']
+              compare=call('compare/'+sha+'...'+main+'?per_page=1')
+              if compare['behind_by']!=0 or compare['status'] not in ('ahead','identical'):
+                  skipped.append({'branch':name,'reason':'unique-history'});continue
+              pulls=pages('pulls?state=open')
+              if any(p['head']['ref']==name or p['base']['ref']==name for p in pulls):
+                  skipped.append({'branch':name,'reason':'open-pull-request'});continue
+              encoded=urllib.parse.quote(name,safe='/')
+              current=call('git/ref/heads/'+encoded)['object']['sha']
+              if current!=sha:
+                  skipped.append({'branch':name,'reason':'head-moved'});continue
+              # Never delete main, force a ref, or infer integration from a matching filename.
+              call('git/refs/heads/'+encoded,'DELETE')
+              deleted.append({'branch':name,'head':sha,'contained_in_main':main})
+          report={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'deleted':deleted,'skipped':skipped}
+          p=pathlib.Path('artifacts/confirmed-cleanup');p.mkdir(parents=True)
+          (p/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: confirmed-merged-branch-cleanup
+          path: artifacts/confirmed-cleanup/report.json
+          if-no-files-found: error
+          retention-days: 3
