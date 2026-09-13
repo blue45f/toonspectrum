@@ -1,0 +1,49 @@
+name: Non-studio journey audit
+on:
+  push:
+    branches: [feat/nonstudio-luminous-journeys-20260913]
+  pull_request:
+    paths:
+      - apps/web/src/shared/components/site-experience/**
+      - scripts/verify-nonstudio-live.mjs
+      - .github/workflows/nonstudio-journey-audit.yml
+permissions:
+  contents: read
+concurrency:
+  group: nonstudio-journey-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  public-browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            apps/web/src
+            scripts
+            .github
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install isolated browser audit dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/nonstudio-browser" --no-audit --no-fund playwright@1.62.1
+          "$RUNNER_TEMP/nonstudio-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Export public source for review
+        run: |
+          mkdir -p artifacts/nonstudio-audit
+          tar -czf artifacts/nonstudio-audit/web-source-review.tgz apps/web/src package.json tsconfig.json vite.config.ts eslint.config.mjs .github/workflows/ci.yml 2>/dev/null || test -s artifacts/nonstudio-audit/web-source-review.tgz
+      - name: Read-only production navigation audit
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/nonstudio-browser/node_modules/playwright/index.mjs
+          NONSTUDIO_BASE_URL: https://www.toonstudio.cloud
+        run: node scripts/verify-nonstudio-live.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstudio-browser-evidence-${{ github.run_id }}
+          path: artifacts/nonstudio-audit
+          retention-days: 7
