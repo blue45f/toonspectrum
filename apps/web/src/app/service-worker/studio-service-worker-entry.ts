@@ -34,6 +34,8 @@ import {
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
 
+import { emergencyDrawingPath, readEmergencyDrawing, navigationWithDeadline } from "./emergency-drawing";
+
 import type { StudioServiceWorkerManifest } from "./studio-service-worker-precache-plan";
 
 declare const __STUDIO_SERVICE_WORKER_MANIFEST__: StudioServiceWorkerManifest;
@@ -207,8 +209,9 @@ async function handleNavigation(
   if (routeClass === "studio-navigation") event.waitUntil(warmStudioPayload());
 
   try {
-    const preloaded = (await event.preloadResponse) as Response | undefined;
-    const response = preloaded ?? (await fetch(request));
+    const response = routeClass === "studio-navigation"
+      ? await navigationWithDeadline(request, event.preloadResponse as Promise<Response | undefined>)
+      : (await event.preloadResponse) ?? await fetch(request);
     // Only the two shell URLs are refreshed. Caching every visited deep link
     // would grow the precache without bound and could shadow the isolated
     // `/studio` document with a non-isolated one.
@@ -218,6 +221,12 @@ async function handleNavigation(
     }
     return response;
   } catch {
+    // A real server outage (including HTTP 5xx and a hanging response) must not
+    // boot an authenticated React shell which may wait forever on its API.
+    if (routeClass === "studio-navigation") {
+      const emergency = await readEmergencyDrawing();
+      if (emergency) return emergency;
+    }
     const pathname = new URL(request.url).pathname;
     const shellUrl = studioServiceWorkerOfflineShellUrl(pathname);
     const cache = await caches.open(cacheNames.precache);
@@ -265,6 +274,11 @@ scope.addEventListener("activate", (event) => {
 });
 
 scope.addEventListener("fetch", (event) => {
+  const emergencyPath = emergencyDrawingPath(event.request, scope.location.origin);
+  if (emergencyPath) {
+    event.respondWith((async () => (await readEmergencyDrawing(emergencyPath)) ?? fetch(event.request))());
+    return;
+  }
   const { request } = event;
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url,

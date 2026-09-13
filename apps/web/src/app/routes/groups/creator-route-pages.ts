@@ -130,3 +130,8 @@ export const StudioRouter = lazyRetry(
   },
   "StudioRouter",
 );
+
+export const CreatorInferencePage = lazyRetry(
+  () => import("@/domains/creator/ai/CreatorInferencePage").then((module) => ({ default: module.CreatorInferencePage })),
+  "CreatorInferencePage",
+);
