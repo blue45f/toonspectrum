@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
-import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
+import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
