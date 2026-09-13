@@ -7633,9 +7633,7 @@ export function StudioCuttoonEditor({
     workId,
   ]);
 
-  // 아래 여섯 동작의 본문은 studio-page-autosave-runtime.ts 로 옮겼다(2026-08, B-17).
-  // 페이지에는 얇은 래퍼 함수 선언만 남긴다 — effect 안에서 참조되는 심볼의 참조 안정성을
-  // react-hooks/exhaustive-deps 가 컴포넌트 스코프 함수 선언에 대해서만 전이 증명하기 때문이다.
+  // Autosave runtime owns these actions; wrappers preserve effect dependency tracking.
   function prepareStudioDocumentReplacement(
     label: string,
     options: { flushPending: boolean } = { flushPending: false }
@@ -7710,7 +7708,7 @@ export function StudioCuttoonEditor({
     });
   }
 
-  /** Confirm once, then recheck the same mutation ticket before and after durable deletion. */
+  /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
     const canClearAutosave = () => canApplyStudioMutation(ticket);
@@ -26171,8 +26169,7 @@ function clearSelectionForEdit() {
     } | null;
     readonly recoveredMasterStroke?: DrawEl | null;
   } = {}): StudioProjectSnapshot {
-    // Immediate pointerup commits advance these refs before React renders, closing the same-task
-    // route/pagehide gap where this render's `pages` could still be one stroke behind.
+    // Ref-backed pointerup commits protect route/pagehide snapshots before React renders.
     const pendingBatch = options.pendingStrokeCommits === undefined
       ? pendingStrokeCommitsRef.current
       : options.pendingStrokeCommits;
@@ -29202,6 +29199,7 @@ function clearSelectionForEdit() {
       storyboardGridOpen={storyboardGridOpen}
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
+      saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
