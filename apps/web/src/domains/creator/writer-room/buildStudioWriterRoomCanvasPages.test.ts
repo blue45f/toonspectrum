@@ -6,7 +6,7 @@ import {
 } from "../studio-writer-room";
 import { projectStudioWriterRoomToCanvasPlan } from "../studio-writer-room-canvas-projection";
 
-import { buildStudioWriterRoomCanvasPages } from "./buildStudioWriterRoomCanvasPages";
+import { buildStudioWriterRoomCanvasPages, insertStudioWriterRoomCanvasPages } from "./buildStudioWriterRoomCanvasPages";
 
 function readyWriterRoomDocument() {
   const empty = createEmptyStudioWriterRoomDocument();
@@ -118,5 +118,30 @@ describe("buildStudioWriterRoomCanvasPages", () => {
     expect(() => buildStudioWriterRoomCanvasPages({ plan, writerRoom })).toThrow(
       "WRITER_ROOM_PLAN_NOT_READY",
     );
+  });
+});
+
+
+describe("insertStudioWriterRoomCanvasPages", () => {
+  it("preserves page identity and inserts the full plan after the active page", () => {
+    const writerRoom = readyWriterRoomDocument();
+    const template = buildStudioWriterRoomCanvasPages({ plan: projectStudioWriterRoomToCanvasPlan(writerRoom), writerRoom })[0]!;
+    const pages = Object.freeze(["first", "active", "last"].map((id) => ({ ...template, id })));
+    const created = Object.freeze(["new-1", "new-2"].map((id) => ({ ...template, id })));
+    const result = insertStudioWriterRoomCanvasPages(pages, "active", created);
+    expect(result.map((page) => page.id)).toEqual(["first", "active", "new-1", "new-2", "last"]);
+    expect(result[0]).toBe(pages[0]); expect(result[1]).toBe(pages[1]);
+    expect(result[2]).toBe(created[0]); expect(result[4]).toBe(pages[2]);
+    expect(pages.map((page) => page.id)).toEqual(["first", "active", "last"]);
+    expect(created).toHaveLength(2);
+  });
+  it("retains the previous missing-active-page fallback and handles an empty source", () => {
+    const writerRoom = readyWriterRoomDocument();
+    const template = buildStudioWriterRoomCanvasPages({ plan: projectStudioWriterRoomToCanvasPlan(writerRoom), writerRoom })[0]!;
+    const pages = ["first", "last"].map((id) => ({ ...template, id }));
+    const created = [{ ...template, id: "new" }];
+    expect(insertStudioWriterRoomCanvasPages(pages, "missing", created).map((page) => page.id)).toEqual(["first", "new", "last"]);
+    expect(insertStudioWriterRoomCanvasPages([], "missing", created)).toEqual(created);
+    expect(insertStudioWriterRoomCanvasPages(pages, "last", []).map((page) => page.id)).toEqual(["first", "last"]);
   });
 });

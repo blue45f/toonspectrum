@@ -1315,6 +1315,51 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
   });
 
   describe("generateStudioWriterRoomDraft", () => {
+    it("does not load the optional codec for an unconfigured request", async () => {
+      const importer = vi.fn(async () => { throw new Error("Must not load"); });
+      const result = await generateStudioWriterRoomDraft(STUDIO_AI_DEFAULT_SETTINGS, {
+        stage: "premise", document: createEmptyStudioWriterRoomDocument(),
+      }, undefined, importer);
+      expect(result).toMatchObject({ ok: false, code: "not_configured" });
+      expect(importer).not.toHaveBeenCalled();
+    });
+    it("returns a recoverable codec error and retries loading without sending a request", async () => {
+      const fetchMock = vi.fn(); globalThis.fetch = fetchMock as unknown as typeof fetch;
+      const importer = vi.fn(async () => { throw new Error("Failed to fetch dynamically imported module"); });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const result = await generateStudioWriterRoomDraft(CONFIGURED, {
+          stage: "premise", document: createEmptyStudioWriterRoomDocument(),
+        }, undefined, importer);
+        expect(result).toMatchObject({ ok: false, code: "network_error" });
+      }
+      expect(importer).toHaveBeenCalledTimes(4); expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it("times out a stalled codec without retrying it or requesting the provider", async () => {
+      vi.useFakeTimers();
+      try {
+        const fetchMock = vi.fn(); globalThis.fetch = fetchMock as unknown as typeof fetch;
+        const importer = vi.fn(() => new Promise<never>(() => {}));
+        const pending = generateStudioWriterRoomDraft(CONFIGURED, {
+          stage: "premise", document: createEmptyStudioWriterRoomDocument(),
+        }, undefined, importer);
+        await vi.advanceTimersByTimeAsync(30_000);
+        await expect(pending).resolves.toMatchObject({ ok: false, code: "network_error", error: expect.stringContaining("초과") });
+        expect(importer).toHaveBeenCalledTimes(1); expect(fetchMock).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally { vi.useRealTimers(); }
+    });
+    it("settles cancellation during codec loading without starting an AI request", async () => {
+      const fetchMock = vi.fn(); globalThis.fetch = fetchMock as unknown as typeof fetch;
+      const controller = new AbortController();
+      const importer = vi.fn(() => new Promise<never>(() => {}));
+      const pending = generateStudioWriterRoomDraft(CONFIGURED, {
+        stage: "premise", document: createEmptyStudioWriterRoomDocument(), signal: controller.signal,
+      }, undefined, importer);
+      controller.abort();
+      await expect(pending).resolves.toMatchObject({ ok: false, code: "network_error" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("does not request an unconfigured transport", async () => {
       const mockFetch = vi.fn();
       globalThis.fetch = mockFetch as unknown as typeof fetch;
