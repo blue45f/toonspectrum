@@ -51,6 +51,7 @@ export interface StudioDraftSaveCenterInput {
   readonly hydrationFailed: boolean;
   readonly metadataRequired: boolean;
   readonly saving: boolean;
+  readonly durableSaveIntentPending?: boolean;
   readonly deferredSave: boolean;
   readonly collaborationLocked: boolean;
   readonly collaborationSyncPending: boolean;
@@ -356,6 +357,12 @@ export function resolveStudioDraftSaveCenter(
     compactLabel = "연결 후 저장 예약";
     headline = "온라인이 되면 초안을 저장할게요";
     detail = server.detail;
+  } else if (input.durableSaveIntentPending) {
+    phase = "queued";
+    tone = "warning";
+    compactLabel = "저장 대기 기록 확인";
+    headline = "이 문서의 서버 저장 대기 기록이 있어요";
+    detail = "기기 복구본과 현재 원고를 확인한 뒤 직접 서버에 저장해 주세요. 재실행한 기록만으로 자동 저장하지 않습니다.";
   } else if (!input.isOnline) {
     phase = "offline";
     tone = "warning";
