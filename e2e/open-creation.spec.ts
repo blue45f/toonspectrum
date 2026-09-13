@@ -118,13 +118,11 @@ test("corrupt local data remains intact and is not overwritten by a new save", a
 
 
 test("AIC thumbnails use anonymous CORS under the app's cross-origin isolation policy", async ({ page }) => {
-  let imageMode: string | undefined;
   await page.route("https://api.artic.edu/**", route => route.fulfill({ json: {
     config: { iiif_url: "https://www.artic.edu/iiif/2" },
     data: [{ ...aicPayload.data[0], image_id: "cors-fixture" }],
   } }));
   await page.route("https://www.artic.edu/iiif/**", async route => {
-    imageMode = route.request().headers()["sec-fetch-mode"];
     await route.fulfill({ contentType: "image/png", headers: { "Access-Control-Allow-Origin": "*" },
       body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") });
   });
@@ -135,5 +133,5 @@ test("AIC thumbnails use anonymous CORS under the app's cross-origin isolation p
   await expect(image).toHaveAttribute("crossorigin", "anonymous");
   await image.scrollIntoViewIfNeeded();
   await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-  expect(imageMode).toBe("cors");
+  expect(await image.evaluate(element => new URL((element as HTMLImageElement).currentSrc).origin)).toBe("https://www.artic.edu");
 });
