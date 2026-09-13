@@ -1,0 +1,104 @@
+name: Audit remaining main integrations
+on:
+  push:
+    branches: [ops/merge-all-audit-20260913]
+    paths: [.github/workflows/merge-all-audit.yml]
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Inventory branch ancestry, product deltas, conflicts and checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, concurrent.futures, hashlib, json, os, pathlib, subprocess, urllib.request
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          root=pathlib.Path('artifacts/branch-integration-audit');root.mkdir(parents=True)
+          def get(path):
+              req=urllib.request.Request(api+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
+          def pages(path,limit=100):
+              result=[]
+              for page in range(1,limit+1):
+                  batch=get(path+('&' if '?' in path else '?')+'per_page=100&page='+str(page))
+                  result.extend(batch)
+                  if len(batch)<100:return result
+              return result
+          refs=pages('branches'); main=next(b['commit']['sha'] for b in refs if b['name']=='main')
+          opens=pages('pulls?state=open');recent=pages('pulls?state=closed&sort=updated&direction=desc',3)
+          def pr_summary(p):return {k:p.get(k) for k in ('number','title','state','draft','merged_at','merge_commit_sha')}|{'head':p['head']['ref'],'sha':p['head']['sha'],'base':p['base']['ref'],'body':p.get('body')}
+          trees={};tree_shas={}
+          def tree(sha):
+              if sha not in trees:
+                  tree_sha=get('git/commits/'+sha)['tree']['sha'];tree_shas[sha]=tree_sha
+                  data=get('git/trees/'+tree_sha+'?recursive=1');assert not data.get('truncated'),sha
+                  trees[sha]={e['path']:{k:e[k] for k in ('sha','mode','type')} for e in data['tree'] if e['type']!='tree'}
+              return trees[sha]
+          mt=tree(main);audits=[];wanted={}
+          def want(sha,label,path):wanted.setdefault(sha,[]).append((label,path))
+          def text_path(path):
+              return pathlib.PurePosixPath(path).suffix.lower() in ('.ts','.tsx','.js','.jsx','.mjs','.cjs','.json','.yaml','.yml','.md','.py','.toml','.txt','.css','.html','.sh','.sql') and not path.endswith('pnpm-lock.yaml')
+          for branch in refs:
+              name=branch['name'];head=branch['commit']['sha']
+              if name in ('main','ops/merge-all-audit-20260913'):continue
+              comparison=get('compare/'+main+'...'+head+'?per_page=1')
+              ancestor=comparison['merge_base_commit']['sha'];bt,ht=tree(ancestor),tree(head)
+              changed=sorted(p for p in set(bt)|set(ht) if bt.get(p)!=ht.get(p))
+              remaining=[p for p in changed if mt.get(p)!=ht.get(p)]
+              overlaps=[p for p in remaining if mt.get(p)!=bt.get(p)]
+              related=[pr_summary(p) for p in opens if p['head']['ref']==name]
+              merged=[pr_summary(p) for p in recent if p['head']['ref']==name and p['head']['sha']==head and p['merged_at'] and p['base']['ref']=='main']
+              runs=get('actions/runs?head_sha='+head+'&per_page=100')
+              checks=get('commits/'+head+'/check-runs?per_page=100')
+              audit={'branch':name,'head':head,'base':ancestor,'protected':branch['protected'],'status':comparison['status'],'ahead_by':comparison['ahead_by'],'behind_by':comparison['behind_by'],'changed':changed,'remaining':remaining,'overlaps':overlaps,'pulls':related,'exact_merged_pulls':merged,'runs':[{'id':r['id'],'name':r['name'],'event':r['event'],'status':r['status'],'conclusion':r['conclusion'],'created_at':r['created_at'],'head_sha':r['head_sha']} for r in runs['workflow_runs']],'checks':[{'id':r['id'],'name':r['name'],'status':r['status'],'conclusion':r['conclusion']} for r in checks['check_runs']],'entries':{'base':{p:bt.get(p) for p in changed},'head':{p:ht.get(p) for p in changed},'main':{p:mt.get(p) for p in changed}}}
+              audits.append(audit)
+              for path in remaining:
+                  if not text_path(path):continue
+                  for label,mapping in [('base',bt),('head',ht),('main',mt)]:
+                      if path in mapping and mapping[path]['type']=='blob':want(mapping[path]['sha'],name+'/'+label,path)
+              print(name,comparison['status'],'unique paths',len(remaining),'overlaps',len(overlaps),'PRs',[p['number'] for p in related],flush=True)
+          for path in mt:
+              if pathlib.PurePosixPath(path).name=='AGENTS.md' or path in ('package.json','vitest.config.ts','.github/workflows/ci.yml','scripts/cleanup-merged-branches.mjs'):
+                  want(mt[path]['sha'],'main-contracts',path)
+          skipped=[]
+          def fetch_blob(sha):
+              data=get('git/blobs/'+sha);assert data['encoding']=='base64'
+              raw=base64.b64decode(data['content'])
+              assert hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()==sha
+              return sha,raw
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+              for sha,raw in pool.map(fetch_blob,wanted):
+                  if len(raw)>5000000:
+                      skipped.extend({'label':label,'path':path,'reason':'over-5MB'} for label,path in wanted[sha]);continue
+                  for label,path in wanted[sha]:
+                      target=root/'sources'/label/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+          for audit in audits:
+              conflicts=[]
+              for path in audit['overlaps']:
+                  folder=root/'sources'/audit['branch']
+                  sources=[folder/label/path for label in ('main','base','head')]
+                  if not all(p.is_file() for p in sources):
+                      conflicts.append({'path':path,'reason':'add-delete-or-binary'});continue
+                  result=subprocess.run(['git','merge-file','-p','-L','main','-L','base','-L','branch',*[str(p) for p in sources]],capture_output=True)
+                  target=folder/'merged'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(result.stdout)
+                  if result.returncode:conflicts.append({'path':path,'reason':'text-conflict','code':result.returncode})
+              audit['conflicts']=conflicts
+          report={'main':main,'main_tree':tree_shas[main],'refs':refs,'open_prs':[pr_summary(p) for p in opens],'branches':audits,'skipped':skipped,'refs_changed':False}
+          (root/'audit.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+          print(json.dumps({'main':main,'branches':[{'branch':a['branch'],'status':a['status'],'paths':len(a['remaining']),'conflicts':a['conflicts']} for a in audits]},ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: remaining-branch-integration-audit
+          path: artifacts/branch-integration-audit
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
