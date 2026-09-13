@@ -49,7 +49,7 @@ const INITIAL_ICON_MODULES = new Set([
   "sparkles",
   "star",
 ]);
-const STUDIO_CORE_ICON_MODULES = new Set([
+const STUDIO_WORKSPACE_ICON_MODULES = new Set([
   // Already-static Studio icon leaves (production manifest audited 2026-09-13).
   // Share the core request/compression dictionary; no lazy-only icon is admitted.
   "activity",
@@ -118,6 +118,8 @@ const STUDIO_CORE_ICON_MODULES = new Set([
   "users",
   "waves-horizontal",
   "zap",
+]);
+const STUDIO_CORE_ICON_MODULES = new Set([
   "a-large-small",
   "align-justify",
   "arrow-up-to-line",
@@ -232,6 +234,11 @@ function iconModuleName(id: string) {
 function isInitialIconModule(id: string) {
   const moduleName = iconModuleName(id);
   return Boolean(moduleName && INITIAL_ICON_MODULES.has(moduleName));
+}
+
+function isStudioWorkspaceIconModule(id: string) {
+  const moduleName = iconModuleName(id);
+  return Boolean(moduleName && STUDIO_WORKSPACE_ICON_MODULES.has(moduleName));
 }
 
 function isStudioCoreIconModule(id: string) {
@@ -488,6 +495,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks: createStudioManualChunks({
           isInitialIconModule,
           isStudioCoreIconModule,
+          isStudioWorkspaceIconModule,
         }),
       },
     },
