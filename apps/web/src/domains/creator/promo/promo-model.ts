@@ -85,7 +85,6 @@ export function promoTimeline(project: PromoProject): PromoScene[] {
     return scene;
   });
 }
-/** Real spatial trajectories, not differently named speed/strength copies. All values are bounded. */
 export function promoMotionAt(motion: PromoMotion, progress: number): { scale: number; x: number; y: number } {
   const t = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
   const eased = t * t * (3 - 2 * t);
