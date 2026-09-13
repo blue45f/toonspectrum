@@ -872,6 +872,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       const observations = [];
       for (let i = 0; fiber && i < 100; i++) {
         const value = fiber.memoizedProps?.value;
+        const props = fiber.memoizedProps as Record<string, unknown> | undefined;
+        if (typeof props?.checkpointError === "string") observations.push({ checkpointError: props.checkpointError });
+        if (props && "sourceHydrationPending" in props) observations.push({ sourceHydrationPending: props.sourceHydrationPending, collaborationDocumentUnavailable: props.collaborationDocumentUnavailable, workHydrated: props.workHydrated });
         if (value && value.availability !== undefined) observations.push({ error: value.error, availability: value.availability, sync: value.sync ?? value.syncSnapshot });
         fiber = fiber.return as typeof fiber;
       }
