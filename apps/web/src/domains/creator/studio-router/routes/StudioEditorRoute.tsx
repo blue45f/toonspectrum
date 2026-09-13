@@ -1,5 +1,7 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 
+import { resolveStudioLocalDocumentSource } from "../../studio-local-document-source";
 import { studioEditorInstanceKey } from "../../studio-editor-scope";
 import { studioWorkspaceDocumentIdentity } from "../../studio-workspace-route";
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -24,7 +26,17 @@ export function StudioEditorRoute({ resolution }: {
 }) {
   const { data: session } = useSession();
   const authScopeKey = session?.user?.id ?? null;
-  const route = resolution.workspaceRoute;
+  const location = useLocation();
+  const source = useMemo(() => {
+    let storage: Storage | null = null;
+    try {
+      if (typeof window !== "undefined") storage = window.localStorage;
+    } catch {
+      // Keep unknown sources locked when browser storage cannot be inspected.
+    }
+    return resolveStudioLocalDocumentSource(resolution.workspaceRoute, storage, location.search);
+  }, [location.search, resolution.workspaceRoute]);
+  const route = source.route;
   const identity = studioWorkspaceDocumentIdentity(route);
   const draftScope = useStudioDraftScope(identity, authScopeKey);
   const editorKey = studioEditorInstanceKey({
@@ -50,6 +62,10 @@ export function StudioEditorRoute({ resolution }: {
       .then(({ preloadStudioInspectorAside }) => preloadStudioInspectorAside())
       .catch(() => undefined);
   }, []);
+
+  if (source.redirectHref) {
+    return <Navigate replace state={location.state} to={`${source.redirectHref}${location.hash}`} />;
+  }
 
   return (
     <StudioDocumentRuntimeBoundary documentKey={editorKey}>
