@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171823"><meta name="robots" content="noindex">
+  <title>툰스튜디오 · 로컬 드로잉</title>
+  <link rel="stylesheet" href="/offline-draw/styles.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/studio" title="온라인 스튜디오로 이동">TOON<span>STUDIO</span></a>
+  <span class="badge">LOCAL DRAW</span>
+  <input id="title" aria-label="작업 제목" value="새 로컬 드로잉" maxlength="120">
+  <button id="simple" aria-pressed="true">심플 모드</button>
+</header>
+<div class="notice">서버·로그인 없이 그리는 작업실입니다. 기존 스튜디오 프로젝트는 변경하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
+<main>
+  <nav class="tools" aria-label="드로잉 도구">
+    <button data-tool="pen" aria-pressed="true" title="펜 (B)">펜</button>
+    <button data-tool="pencil" aria-pressed="false">연필</button>
+    <button data-tool="marker" aria-pressed="false">마커</button>
+    <button data-tool="eraser" aria-pressed="false" title="지우개 (E)">지우개</button>
+    <label>색상<input id="color" type="color" value="#292b3a" aria-label="브러시 색상"></label>
+    <label>크기 <output id="size-value">8</output><input id="size" type="range" min="1" max="128" value="8" aria-label="브러시 크기"></label>
+    <button id="undo" title="실행 취소 (Ctrl/⌘ Z)" disabled>실행 취소</button>
+    <button id="redo" title="다시 실행 (Ctrl/⌘ Shift Z)" disabled>다시 실행</button>
+  </nav>
+  <section class="workspace" aria-label="그리기 작업 영역">
+    <div id="viewport"><canvas id="canvas" width="1280" height="960" aria-label="드로잉 캔버스. 펜, 마우스 또는 터치로 그리세요."></canvas></div>
+    <div class="canvas-controls"><button id="fit">화면 맞춤</button><label>확대 <input id="zoom" type="range" min="20" max="250" value="100" aria-label="캔버스 확대 비율"></label><output id="zoom-value">100%</output><span id="dimensions">1280 × 960</span></div>
+  </section>
+  <aside id="advanced" hidden>
+    <h2>레이어</h2><div id="layers"></div><button id="add-layer">레이어 추가</button><button id="clear-layer">선택 레이어 비우기</button>
+    <h2>작업 관리</h2><button id="new">새 드로잉</button>
+    <label class="file-button">이미지 / 복구 파일 열기<input id="import" type="file" accept="image/png,image/jpeg,image/webp,.json,.toonlocal"></label>
+    <label>저장된 작업<select id="documents" aria-label="저장된 로컬 작업"><option value="">작업 선택</option></select></label>
+    <button id="history">이전 저장본 복구</button>
+    <button id="persist">기기에 보관 요청</button>
+    <p class="help">브라우저 데이터 삭제·용량 정리로 로컬 저장이 사라질 수 있습니다. 중요한 작업은 복구 파일도 보관하세요. 클라우드에 자동 업로드하지 않습니다.</p>
+  </aside>
+</main>
+<footer>
+  <div><strong id="save-status" role="status" aria-live="polite">로컬 저장소 확인 중…</strong><small id="save-detail">서버를 사용하지 않습니다.</small></div>
+  <a id="portable" href="/offline-draw/portable.html" download="ToonStudio-Offline-Drawing.html">휴대용 작업실 보관</a>
+  <button id="save">로컬 저장</button><button id="export-json">복구 파일</button><button id="export-png" class="primary">PNG 내보내기</button>
+</footer>
+<div id="error" role="alert" hidden></div>
+<dialog id="history-dialog"><h2>이전 저장본 복구</h2><p>선택한 저장본은 새 사본으로 열립니다. 현재 문서는 보존됩니다.</p><div id="history-list"></div><button id="close-history">닫기</button></dialog>
+<noscript>이 드로잉 작업실은 JavaScript가 필요합니다.</noscript>
+<script type="module" src="/offline-draw/editor.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CreatorInferenceController, CreatorInferenceGateway } from "./creator-inference.controller";
 
 import { Studio3dGenerationController } from "./studio-3d-generation.controller";
 import { Studio3dGenerationService } from "./studio-3d-generation.service";
@@ -19,11 +20,13 @@ import { StudioAiService } from "./studio-ai.service";
 
 @Module({
   controllers: [
+    CreatorInferenceController,
     StudioAiController,
     StudioAiComicDirectorController,
     Studio3dGenerationController,
   ],
   providers: [
+    CreatorInferenceGateway,
     studioAiAdmissionRepositoryProvider,
     studioAiAdmissionSchemaPreflightProvider,
     studioAiIdempotencySchemaPreflightProvider,

@@ -23,6 +23,8 @@ import {
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
 
+import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
+
 import type { StudioServiceWorkerManifest } from "./studio-service-worker-precache-plan";
 
 import { isStudioOfflinePreparationMessage } from "../../shared/lib/studio-offline-protocol";
@@ -158,16 +160,30 @@ function shellRequest(url: string): Request {
 async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWorkerRouteClass): Promise<Response> {
   if (routeClass === "studio-navigation") event.waitUntil(warmStudioPayload());
   const pathname = new URL(event.request.url).pathname;
-  return resolveStudioNavigation({
-    request: event.request, preloadResponse: event.preloadResponse,
-    isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
-    readShell: async () => {
-      const cache = await caches.open(cacheNames.precache);
-      return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
-    },
-    refreshShell: (response) => persist("precache", shellRequest(pathname), response),
-    waitUntil: (promise) => event.waitUntil(promise),
-  });
+  try {
+    const response = await resolveStudioNavigation({
+      request: event.request, preloadResponse: event.preloadResponse,
+      isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
+      readShell: async () => {
+        const cache = await caches.open(cacheNames.precache);
+        return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
+      },
+      refreshShell: (response) => persist("precache", shellRequest(pathname), response),
+      waitUntil: (promise) => event.waitUntil(promise),
+    });
+    // Prefer the validated full Studio shell. The independent drawing shell is
+    // a last resort for outages, never a replacement for 401/403/404 responses.
+    if (routeClass === "studio-navigation" && (response.status === 408 || response.status >= 500)) {
+      return (await readEmergencyDrawing()) ?? response;
+    }
+    return response;
+  } catch (error) {
+    if (routeClass === "studio-navigation") {
+      const emergency = await readEmergencyDrawing();
+      if (emergency) return emergency;
+    }
+    throw error;
+  }
 }
 
 scope.addEventListener("install", (event) => {
@@ -191,6 +207,11 @@ scope.addEventListener("activate", (event) => {
 });
 
 scope.addEventListener("fetch", (event) => {
+  const emergencyPath = emergencyDrawingPath(event.request, scope.location.origin);
+  if (emergencyPath) {
+    event.respondWith((async () => (await readEmergencyDrawing(emergencyPath)) ?? fetch(event.request))());
+    return;
+  }
   const { request } = event;
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url, origin: scope.location.origin, method: request.method,
