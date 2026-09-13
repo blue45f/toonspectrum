@@ -193,7 +193,7 @@ function PolicyPageShell({
     let alive = true;
     const controller = new AbortController();
     setDoc(fallbackDoc);
-    setLoading(false);
+    setLoading(true);
     setError(false);
     fetchPolicyDocument(slug, controller.signal)
       .then((payload) => {
@@ -222,19 +222,20 @@ function PolicyPageShell({
       <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">
         {doc?.name || fallbackName}
       </h1>
-      {error && doc ? (
-        <div className="mt-5 rounded-2xl border border-line/60 bg-card/20 p-4 text-sm leading-relaxed text-fg-2" role="status">
-          <p>TermsDesk 게시 정본을 동기화하지 못해 내장 정책 사본을 표시합니다.</p>
+      {(error || loading) && doc ? (
+        <div className="mt-5 rounded-2xl border border-line/60 bg-card/20 p-4 text-sm leading-relaxed text-fg-2">
+          <p role="status">{loading ? "게시 정본을 확인하고 있습니다. 아래 정책 사본은 계속 읽을 수 있습니다." : "TermsDesk 게시 정본을 동기화하지 못해 내장 정책 사본을 표시합니다."}</p>
           <button
             type="button"
             className={buttonClass({ size: "sm", variant: "outline", className: "mt-3" })}
             onClick={() => setReloadKey((v) => v + 1)}
+            disabled={loading}
           >
-            다시 시도
+            {loading ? "확인 중…" : "다시 시도"}
           </button>
         </div>
       ) : null}
-      {loading ? (
+      {loading && !doc ? (
         <PolicySkeleton label={fallbackName} />
       ) : !doc ? (
         <PolicyErrorFallback slug={slug} label={fallbackName} onRetry={() => setReloadKey((v) => v + 1)} />
