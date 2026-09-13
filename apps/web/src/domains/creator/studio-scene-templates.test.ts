@@ -175,6 +175,8 @@ describe("listSceneTemplates", () => {
       "school-rooftop",
       "school-exam-silence",
       "school-locker-note",
+      "school-club-reveal",
+      "school-festival-crossing",
     ]);
     expect(listSceneTemplates("fantasy").map((t) => t.id)).toEqual([
       "fantasy-throne",
@@ -182,6 +184,9 @@ describe("listSceneTemplates", () => {
       "fantasy-dungeon",
       "fantasy-royal-letter",
       "fantasy-portal-choice",
+      "fantasy-guild-quest",
+      "fantasy-level-up",
+      "fantasy-palace-whisper",
     ]);
   });
 
