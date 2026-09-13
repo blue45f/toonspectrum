@@ -1,0 +1,38 @@
+name: Legal policy recovery
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/legal/**'
+      - 'apps/api/src/modules/legal/**'
+      - 'packages/core/src/legal-policy.ts'
+      - 'scripts/verify-legal-policy-runtime.mjs'
+      - '.github/workflows/legal-policy-recovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/legal/**'
+      - 'apps/api/src/modules/legal/**'
+      - 'packages/core/src/legal-policy.ts'
+      - 'scripts/verify-legal-policy-runtime.mjs'
+      - '.github/workflows/legal-policy-recovery.yml'
+permissions:
+  contents: read
+concurrency:
+  group: legal-policy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  policy-display:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm exec vitest run apps/web/src/domains/legal/policy-page.test.tsx apps/web/src/domains/legal/policy-recovery.test.tsx
