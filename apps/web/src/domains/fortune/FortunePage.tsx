@@ -1,3 +1,4 @@
+import { FortuneObservatory } from "./FortuneObservatory";
 import { getCharacters } from "@toonspectrum/core";
 import {
   Sparkles,
@@ -56,6 +57,8 @@ interface SajuPillar {
 }
 
 interface SajuData {
+  birthTimeKnown?: boolean;
+  calculationNotes?: string[];
   yearPillar: SajuPillar;
   monthPillar: SajuPillar;
   dayPillar: SajuPillar;
@@ -189,7 +192,7 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
   "수": { bg: "bg-sky-500/10", text: "text-sky-400", dot: "bg-sky-500" },
 };
 
-export function FortunePage() {
+function CharacterFortunePage() {
   // 재방문 영속화 — 저장된 프로필로 입력 초기값을 채운다(재입력 제거)
   const savedProfile = useFortuneStore.getState();
   const setProfile = useFortuneStore((s) => s.setProfile);
@@ -1040,6 +1043,8 @@ export function FortunePage() {
                       {/* 사주 8자 격자 표 */}
                       <div className="space-y-3">
                         <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">사주 원판 (四柱八字)</h4>
+                        {fortuneResult.saju.birthTimeKnown === false && <p className="text-xs text-fg-3">출생시간 미상 · 시주를 제외한 6글자 분석입니다.</p>}
+                        {fortuneResult.saju.calculationNotes && <details className="text-xs text-fg-3"><summary>계산 기준과 한계</summary>{fortuneResult.saju.calculationNotes.map((note) => <p key={note}>{note}</p>)}</details>}
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
@@ -1055,10 +1060,10 @@ export function FortunePage() {
                             fortuneResult.saju.monthPillar,
                             fortuneResult.saju.yearPillar
                           ].map((p, i) => {
-                            const col = ELEMENT_COLORS[p.elementKan];
+                            const col = ELEMENT_COLORS[p.elementKan] ?? { bg: "bg-panel", text: "text-fg-3", dot: "bg-panel" };
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
-                                <span className={cn("text-2xl font-bold font-display", col.text)}>{p.kan}</span>
+                                <span className={cn("text-2xl font-bold font-display", col.text)}>{p.kan || "—"}</span>
                                 <span className="text-[10px] text-fg-3 mt-0.5">{p.kanKorean} ({p.elementKan})</span>
                               </div>
                             );
@@ -1071,10 +1076,10 @@ export function FortunePage() {
                             fortuneResult.saju.monthPillar,
                             fortuneResult.saju.yearPillar
                           ].map((p, i) => {
-                            const col = ELEMENT_COLORS[p.elementJi];
+                            const col = ELEMENT_COLORS[p.elementJi] ?? { bg: "bg-panel", text: "text-fg-3", dot: "bg-panel" };
                             return (
                               <div key={i} className={cn("rounded-lg p-2 flex flex-col items-center justify-center border border-line/40", col.bg)}>
-                                <span className={cn("text-2xl font-bold font-display", col.text)}>{p.ji}</span>
+                                <span className={cn("text-2xl font-bold font-display", col.text)}>{p.ji || "—"}</span>
                                 <span className="text-[10px] text-fg-3 mt-0.5">{p.jiKorean} ({p.elementJi})</span>
                               </div>
                             );
@@ -1712,3 +1717,5 @@ export function FortunePage() {
     </MotionConfig>
   );
 }
+
+export function FortunePage() { return <FortuneObservatory characterContent={<CharacterFortunePage />} />; }
