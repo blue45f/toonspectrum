@@ -7,6 +7,7 @@ import { studioRoutePath } from "@/domains/creator/studio-route-registry";
 import { defineAppRoutes } from "../app-route-definition";
 import {
   CharacterShaperLandingPage,
+  CreatorInferencePage,
   CreateChallengesPage,
   CreateGalleryPage,
   CreateSeriesPage,
@@ -27,6 +28,7 @@ import {
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
+  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <CreatorInferencePage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },

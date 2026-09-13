@@ -133,6 +133,7 @@ export function StudioPromoPage() {
         <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>컷을 올리고 이야기를 더하면, 홍보영상과 짧은 모션툰이 됩니다.</p></div>
         <span className="promo-badge">15 / 30 / 60초</span>
       </header>
+      <nav className="promo-button-row" aria-label="확장 제작실"><a href="/studio/ai-lab">실제 프레임을 생성하는 AI 애니메이션 제작실 →</a><a href="/spatial-reader/">공간형 웹툰 감상 →</a></nav>
       <div className="promo-workspace">
         <div className="promo-editing">
           <fieldset className="promo-card" disabled={busy}>
