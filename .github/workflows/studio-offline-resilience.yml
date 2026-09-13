@@ -1,0 +1,36 @@
+name: Studio offline resilience
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/studio-offline-resilience.yml
+      - apps/web/src/app/service-worker/**
+      - apps/web/src/shared/lib/studio-offline-protocol.ts
+      - apps/web/src/domains/creator/offline/**
+      - apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx
+      - scripts/studio-offline-resilience.test.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-offline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: node --test scripts/studio-offline-resilience.test.mjs
+      - run: pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline/StudioOfflinePanel.test.tsx apps/web/src/domains/creator/studio-editor-document-source.test.ts

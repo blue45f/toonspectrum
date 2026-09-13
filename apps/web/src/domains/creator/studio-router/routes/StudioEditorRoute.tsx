@@ -20,6 +20,11 @@ const LegacyStudioEditorAdapter = lazyRetry(
   "LegacyStudioEditorAdapter",
 );
 
+const StudioOfflinePanel = lazyRetry(
+  () => import("../../offline/StudioOfflinePanel").then((module) => ({ default: module.StudioOfflinePanel })),
+  "StudioOfflinePanel",
+);
+
 export function StudioEditorRoute({ resolution }: {
   readonly resolution: StudioEditorRouteResolution;
 }) {
@@ -61,6 +66,7 @@ export function StudioEditorRoute({ resolution }: {
         draftSessionEpoch={draftScope.epoch}
         studioRoute={route}
       >
+        <Suspense fallback={null}><StudioOfflinePanel /></Suspense>
         <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
           <LegacyStudioEditorAdapter
             remixId={route.remixSourceWorkId}
