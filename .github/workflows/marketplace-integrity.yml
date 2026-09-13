@@ -2,7 +2,7 @@ name: Marketplace integrity
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/domains/market/**'
@@ -14,6 +14,7 @@ on:
       - 'scripts/*production-database*'
       - '.github/workflows/marketplace-integrity.yml'
   push:
+    branches: [main]
     paths:
       - 'apps/web/src/domains/market/**'
       - 'apps/web/src/shared/lib/creator-marketplace*'

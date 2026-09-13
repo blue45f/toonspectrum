@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 from pathlib import Path
 import re
 import sys
@@ -26,22 +27,64 @@ def section(text, event):
             return "\n".join(lines[start:stop])
     raise AssertionError(f"{event} missing")
 
-failures = []
-for filename in TARGETS:
-    path = Path(".github/workflows") / filename
-    text = path.read_text(encoding="utf-8")
-    try:
-        pr = section(text, "pull_request")
-        push = section(text, "push")
-        assert "types: [opened, reopened, ready_for_review]" in pr
-        assert "synchronize" not in pr
-        assert not re.search(r"^    branches(?:-ignore)?:", push, re.MULTILINE)
-        assert f".github/workflows/{filename}" in pr
-        assert f".github/workflows/{filename}" in push
-        assert "group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}" in text
-    except (AssertionError, StopIteration) as error:
-        failures.append(f"{filename}: {error}")
-if failures:
-    print("\n".join(failures), file=sys.stderr)
-    raise SystemExit(1)
-print(f"Verified changed-area trigger policy for {len(TARGETS)} product workflows.")
+def list_field(block, key):
+    """Read only the flow/block string lists used in our reviewed event filters."""
+    lines = block.splitlines()
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"    " + re.escape(key) + r":\s*(.*)", line)
+        if not match:
+            continue
+        value = match.group(1).strip()
+        if value:
+            assert value.startswith("[") and value.endswith("]"), f"unsupported {key} list"
+            return [item.strip().strip("\"'") for item in value[1:-1].split(",") if item.strip()]
+        values = []
+        for item in lines[index + 1:]:
+            if not item.strip() or item.lstrip().startswith("#"):
+                continue
+            if not item.startswith("      - "):
+                break
+            values.append(item[8:].strip().strip("\"'"))
+        return values
+    return None
+
+
+def validate_repository(root):
+    failures = []
+    for filename in TARGETS:
+        try:
+            text = (root / ".github/workflows" / filename).read_text(encoding="utf-8")
+            pr = section(text, "pull_request")
+            push = section(text, "push")
+            assert list_field(pr, "types") == ["opened", "reopened", "synchronize", "ready_for_review"], "PR must validate every new head (synchronize)"
+            expected = list_field(pr, "branches") or ["main"]
+            assert list_field(push, "branches") == expected, "push must target only PR base branches, never every feature branch"
+            assert all(name in ["main", "release/salvage-integration-20260908"] for name in expected), "unreviewed target branch"
+            assert not re.search(r"^    branches-ignore:", push, re.MULTILINE), "negative push filters are forbidden"
+            paths = list_field(pr, "paths")
+            assert paths and paths == list_field(push, "paths"), "PR/push changed-area filters must match"
+            assert f".github/workflows/{filename}" in paths, "workflow must validate its own changes"
+            section(text, "workflow_dispatch")
+            concurrency = re.search(r"^concurrency:\n((?:[ \t].*\n|\n|#.*\n)*)", text, re.MULTILINE)
+            assert concurrency, "missing workflow concurrency"
+            assert "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}" in concurrency.group(1).splitlines(), "concurrency must be scoped to workflow and PR/ref, not SHA"
+            assert "  cancel-in-progress: true" in concurrency.group(1).splitlines(), "obsolete runs must be cancelled"
+        except (AssertionError, StopIteration, OSError) as error:
+            failures.append(f"{filename}: {error}")
+    return failures
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Validate deduplicated, current-head PR CI without installing dependencies.")
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    args = parser.parse_args()
+    failures = validate_repository(args.root)
+    if failures:
+        print("\n".join(failures), file=sys.stderr)
+        return 1
+    print(f"Verified PR updates, target-branch pushes and cancellation for {len(TARGETS)} product workflows.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
