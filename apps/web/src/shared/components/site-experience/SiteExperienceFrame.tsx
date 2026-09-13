@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { SiteExperienceContext } from "./site-experience-context";
-import { EXPERIENCE_MODE_KEY, parseExperienceMode, type ExperienceMode } from "./site-experience-model";
+import { EXPERIENCE_MODE_KEY, parseExperienceMode, type ExperienceMode } from "./site-experience-policy";
 
 import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/browser-preferences";
 

@@ -1,16 +1,7 @@
-export type ExperienceMode = "vivid" | "calm";
-export type ExperienceLocale = "ko" | "en";
-export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";
+import { supportsSiteExperience } from "./site-experience-policy";
 
-export function parseExperienceMode(value: string | null): ExperienceMode {
-  return value === "calm" ? "calm" : "vivid";
-}
-
-/** Editors and administrative tools never inherit promotional chrome or effects. */
-export function supportsSiteExperience(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/u, "").toLowerCase() || "/";
-  return !/^\/(?:studio|shaper|brush-lab|music|admin)(?:\/|$)/u.test(path);
-}
+// Retain the existing public model contract while keeping shell policy lightweight.
+export { EXPERIENCE_MODE_KEY, parseExperienceMode, supportsSiteExperience, type ExperienceMode, type ExperienceLocale } from "./site-experience-policy";
 
 export const EXPERIENCE_DESTINATIONS = {
   discover: { href: "/discover", icon: "discover", ko: ["영감 찾기", "취향에 맞는 작품에서 다음 장면의 힌트를 찾으세요."], en: ["Find inspiration", "Discover a story that sparks your next scene."] },

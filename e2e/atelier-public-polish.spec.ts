@@ -57,7 +57,7 @@ test("motion actually pauses, resumes, and obeys the system preference", async (
   await expect(art).toHaveCSS("animation-play-state", "running");
   await demo.getByRole("button", { name: "모션 일시정지" }).click();
   await expect(art).toHaveCSS("animation-play-state", "paused");
-  await demo.getByRole("button", { name: "모션 일시정지" }).click();
+  await demo.getByRole("button", { name: "모션 다시 재생" }).click();
   await expect(art).toHaveCSS("animation-play-state", "running");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(demo).toHaveAttribute("data-running", "false");
@@ -82,11 +82,17 @@ test("sensitive routes remain free of interactive promotional chapters", async (
 });
 
 test("calendar day lists expand without losing keyboard navigation or full export", async ({ page }, info) => {
+  const { readFile } = await import("node:fs/promises");
+  const calendar = JSON.parse(await readFile("apps/web/public/data/calendar.json", "utf8"));
+  await page.route("**/api/calendar**", (route) => route.fulfill({ status: 200, json: calendar }));
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto("/calendar");
   const monday = page.getByRole("tab", { name: /^월/u });
   await monday.click();
-  const panel = page.getByRole("tabpanel");
+  const panelId = await monday.getAttribute("aria-controls");
+  expect(panelId).toBeTruthy();
+  const panel = page.locator(`[id="${panelId}"]`);
+  await expect(panel).toHaveAttribute("role", "tabpanel");
   await expect(panel.locator('a[href^="/title/"]')).toHaveCount(24);
   await panel.getByRole("button", { name: /월요일 .*더 보기/u }).click();
   await expect(panel.locator('a[href^="/title/"]')).toHaveCount(48);
@@ -100,7 +106,6 @@ test("calendar day lists expand without losing keyboard navigation or full expor
   await page.getByRole("button", { name: /내보내기/u }).click();
   const download = await downloading;
   await download.saveAs(info.outputPath("full-week-calendar.ics"));
-  const { readFile } = await import("node:fs/promises");
   const content = await readFile(info.outputPath("full-week-calendar.ics"), "utf8");
   expect(content).toContain("BEGIN:VCALENDAR");
   expect(content.match(/BEGIN:VEVENT/gu)!.length).toBeGreaterThan(48);

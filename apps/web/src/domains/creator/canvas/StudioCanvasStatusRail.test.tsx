@@ -144,17 +144,18 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByText(/현재 서버 revision과 달라/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "복구하기" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "JSON 백업" }));
-    fireEvent.click(screen.getByRole("button", { name: "비우기" }));
+    expect(screen.getByText(/저장된 작품과 내용이 달라/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "이어서 그리기" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "백업 파일 받기" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
+    fireEvent.click(screen.getByRole("button", { name: "이전 그림 삭제…" }));
 
     expect(props.onDownloadAutosaveBackup).toHaveBeenCalledOnce();
     expect(props.onClearAutosave).toHaveBeenCalledOnce();
   });
 
   it("replaces the recovery banner with a read-only notice in a follower tab", () => {
-    // 후발 탭에서 "복구하기"를 누르면 선행 탭의 문서를 메모리에 올려놓고 저장은 못 하는
+    // 후발 탭에서 "이어서 그리기"를 누르면 선행 탭의 문서를 메모리에 올려놓고 저장은 못 하는
     // 최악의 상태가 된다 — 화면에는 작업이 있는데 어디에도 남지 않는다.
     const props = createProps({
       hasAutosave: true,
@@ -164,8 +165,8 @@ describe("StudioCanvasStatusRail", () => {
     render(<StudioCanvasStatusRail {...props} />);
 
     expect(screen.getByText(/다른 탭에서 편집 중/u)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "복구하기" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "비우기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "이어서 그리기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "이전 그림 삭제…" })).toBeNull();
     expect(screen.getByRole("button", { name: "새로고침으로 다시 확인" })).toBeTruthy();
   });
 
@@ -192,7 +193,7 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByRole("button", { name: "복구하기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "이어서 그리기" })).toBeTruthy();
     expect(screen.queryByText(/다른 탭에서 편집 중/u)).toBeNull();
   });
 
@@ -209,8 +210,9 @@ describe("StudioCanvasStatusRail", () => {
     });
 
     render(<StudioCanvasStatusRail {...props} />);
-    const restore = screen.getByRole("button", { name: "복구하기" });
-    fireEvent.click(screen.getByRole("button", { name: "비우기" }));
+    const restore = screen.getByRole("button", { name: "이어서 그리기" });
+    fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
+    fireEvent.click(screen.getByRole("button", { name: "이전 그림 삭제…" }));
 
     expect(props.onClearAutosave).toHaveBeenCalledOnce();
     expect(document.activeElement).not.toBe(restore);
@@ -225,10 +227,10 @@ describe("StudioCanvasStatusRail", () => {
     const props = createProps({ hasAutosave: true });
 
     render(<StudioCanvasStatusRail {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "복구하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "이어서 그리기" }));
 
     expect(props.onRestoreAutosave).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("button", { name: "JSON 백업" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "백업 파일 받기" })).toBeNull();
   });
 
   it("reserves the selection command lane so selecting cannot move the canvas", () => {
