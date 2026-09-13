@@ -1,7 +1,7 @@
 name: KMAS reference library
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/shared/lib/kmas-reference.ts'
@@ -16,6 +16,7 @@ on:
       - 'playwright.references.config.ts'
       - '.github/workflows/kmas-reference-library.yml'
   push:
+    branches: ["main"]
     paths:
       - 'apps/web/src/shared/lib/kmas-reference.ts'
       - 'apps/web/src/shared/lib/__tests__/kmas-reference*.test.ts'

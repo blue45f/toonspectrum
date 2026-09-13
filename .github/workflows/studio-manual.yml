@@ -2,7 +2,7 @@ name: Studio manual
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/manual/**'
@@ -15,6 +15,7 @@ on:
       - 'scripts/verify-studio-manual.mjs'
       - '.github/workflows/studio-manual.yml'
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'apps/web/src/domains/creator/manual/**'
       - 'apps/web/src/domains/creator/studio-help-menu-items*'

@@ -2,7 +2,7 @@ name: Studio CC0 library regression
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - '.github/workflows/studio-cc0-library.yml'
       - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
@@ -15,6 +15,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
   push:
+    branches: ["main"]
     paths:
       - '.github/workflows/studio-cc0-library.yml'
       - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'

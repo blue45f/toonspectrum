@@ -2,13 +2,14 @@ name: Studio collaboration synchronization
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - apps/web/src/domains/creator/live/**
       - scripts/verify-studio-p2p-channel-lifecycle.mjs
       - .github/workflows/studio-mesh-sync-repair.yml
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - apps/web/src/domains/creator/live/**
       - scripts/verify-studio-p2p-channel-lifecycle.mjs

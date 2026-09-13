@@ -96,11 +96,11 @@ describe("database integration runner CI policy", () => {
     "creator-resources.yml",
     "studio-vrm-asset-quality.yml",
     "kmas-reference-library.yml",
-  ])("runs %s on initial PR validation and changed-area branch pushes", (filename) => {
+  ])("runs %s on PR updates and target-branch pushes without duplicate feature pushes", (filename) => {
     const workflow = readYaml(`.github/workflows/${filename}`);
-    expect(workflow.on.pull_request.types).toEqual(["opened", "reopened", "ready_for_review"]);
+    expect(workflow.on.pull_request.types).toEqual(["opened", "reopened", "synchronize", "ready_for_review"]);
     expect(workflow.on.pull_request.paths).toEqual(workflow.on.push.paths);
-    expect(workflow.on.push.branches).toBeUndefined();
+    expect(workflow.on.push.branches).toEqual(workflow.on.pull_request.branches ?? ["main"]);
     expect(workflow.on).toHaveProperty("workflow_dispatch");
     expect(workflow.concurrency).toEqual({
       group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
