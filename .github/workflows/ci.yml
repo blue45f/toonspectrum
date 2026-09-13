@@ -61,6 +61,14 @@ jobs:
             apps/web/src/domains/creator/studio-project-document \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
+      - name: Studio quick start and task workspace regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-quick-task-workspaces.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-document-workspace.test.ts
       - name: Fortune observatory and calendar regressions
         run: |
           pnpm exec vitest run \
@@ -72,7 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test scripts/studio-offline-resilience.test.mjs
-          pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline apps/web/src/domains/creator/studio-editor-document-source.test.ts
+          pnpm exec vitest run apps/web/src/app/service-worker apps/web/src/domains/creator/offline
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
       - name: Recovered worktree regressions
@@ -195,9 +203,7 @@ jobs:
             apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
             apps/web/src/domains/creator/studio-checkpoints.test.ts \
             apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
-            apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
             apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
-            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
             apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx \
