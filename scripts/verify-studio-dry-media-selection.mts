@@ -127,7 +127,7 @@ try {
       // Establish the saved-document renderer through the real recovery flow. A freshly created
       // stroke can still have a retained gesture frame; that lifecycle is a separate ink gate.
       await page.reload({ waitUntil: "domcontentloaded" });
-      const recover = page.getByRole("button", { name: "복구하기", exact: true });
+      const recover = page.getByRole("button", { name: "이어서 그리기", exact: true });
       await recover.click();
       await recover.waitFor({ state: "detached" });
       result.recoveredThroughPublicUi = true;

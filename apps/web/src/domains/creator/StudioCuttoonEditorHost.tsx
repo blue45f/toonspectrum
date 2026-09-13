@@ -497,6 +497,7 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
+import { finitePositiveGroupResizeBounds } from "./studio-group-resize-bounds";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import { planHealCloneDabs } from "./studio-heal-clone";
@@ -4249,18 +4250,6 @@ export function StudioCuttoonEditor({
       announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
     }
   }
-  function finitePositiveGroupResizeBounds(
-    bounds: StudioGroupUniformResizeBounds
-  ): boolean {
-    return (
-      Number.isFinite(bounds.x) &&
-      Number.isFinite(bounds.y) &&
-      Number.isFinite(bounds.width) &&
-      Number.isFinite(bounds.height) &&
-      bounds.width > 0 &&
-      bounds.height > 0
-    );
-  }
   /**
    * Active resize target IDs: multi-marquee first, else single selected object.
    * Single draw free-scale uses the same uniform-resize planner as groups (CSP-style).
@@ -7727,28 +7716,25 @@ export function StudioCuttoonEditor({
     });
   }
 
-  function clearAutosaveRecord(canClearAutosave: () => boolean) {
-    return clearStudioAutosaveRecord({
-      canClearAutosave,
-      autosaveKey,
-      autosaveRecoveryCandidateRef,
-      clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
-        autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
-      }),
-      remixId,
-      setAutosaveRestoreBlockedReason,
-      setHasAutosave,
-      workId,
-    });
-  }
-
-  /** Clear recovery through the shared confirmation and durable-authority transaction. */
+  /** Confirm once, then recheck the same mutation ticket before and after durable deletion. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
+    const canClearAutosave = () => canApplyStudioMutation(ticket);
     await requestStudioAutosaveClear({
-      canClearAutosave: () => canApplyStudioMutation(ticket),
+      canClearAutosave,
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord: () => clearAutosaveRecord(() => canApplyStudioMutation(ticket)),
+      clearAutosaveRecord: () => clearStudioAutosaveRecord({
+        canClearAutosave,
+        autosaveKey,
+        autosaveRecoveryCandidateRef,
+        clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+          autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+        }),
+        remixId,
+        setAutosaveRestoreBlockedReason,
+        setHasAutosave,
+        workId,
+      }),
     });
   }
 
