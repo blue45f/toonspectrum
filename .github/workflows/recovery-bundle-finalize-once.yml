@@ -1,0 +1,113 @@
+name: Finalize recovery bundle repair
+
+on:
+  push:
+    branches: [fix/recovery-bundle-analysis-20260913]
+    paths: [.github/workflows/recovery-bundle-finalize-once.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/recovery-bundle-analysis-20260913'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Prepare the audited repair and import-only formatting corrections
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { execFileSync } from 'node:child_process';
+          import { parse } from 'yaml';
+          const workflow = readFileSync('.github/workflows/recovery-bundle-analysis-once.yml');
+          const sha = createHash('sha1').update(`blob ${workflow.length}\0`).update(workflow).digest('hex');
+          if (sha !== '8d68da816fdc3132f3b354743d3cdbf4a2519fa3') throw new Error('Repair plan changed; inspect before execution');
+          const steps = parse(workflow.toString()).jobs.repair.steps;
+          const get = (name) => {
+            const matches = steps.filter(s => s.name === name && typeof s.run === 'string');
+            if (matches.length !== 1) throw new Error('Missing exact audited step: ' + name);
+            return matches[0].run;
+          };
+          execFileSync('bash', ['-e', '-o', 'pipefail', '-c', get('Apply only reviewed leaf import changes to exact source blobs')], { stdio: 'inherit' });
+          const testPath = 'packages/studio-brush-platform/src/__tests__/public-entrypoints.test.ts';
+          const test = readFileSync(testPath, 'utf8');
+          const oldHeader = [
+            'import { readFileSync } from "node:fs";',
+            'import * as root from "@toonspectrum/studio-brush-platform";',
+            'import * as budget from "@toonspectrum/studio-brush-platform/stroke-budget";',
+            'import * as compiler from "@toonspectrum/studio-brush-platform/compile";',
+            'import { describe, expect, it } from "vitest";',
+          ].join('\n');
+          const newHeader = [
+            'import { readFileSync } from "node:fs";', '',
+            'import { describe, expect, it } from "vitest";', '',
+            'import * as root from "@toonspectrum/studio-brush-platform";',
+            'import * as compiler from "@toonspectrum/studio-brush-platform/compile";',
+            'import * as budget from "@toonspectrum/studio-brush-platform/stroke-budget";',
+          ].join('\n');
+          if (!test.startsWith(oldHeader)) throw new Error('Test import header drift');
+          writeFileSync(testPath, newHeader + test.slice(oldHeader.length));
+          const spacing = [
+            ['scripts/studio-material-atlas-boundary.test.ts', '09489ca728a16d9ae531d188a95c1344812d333a', 'import { verifyStudioMaterialAtlasBoundary }'],
+            ['scripts/verify-studio-collaboration-entry.test.ts', '39e410e37eaf53648f1b4a1de8dc8ea5061f2013', 'import {\n  installStudioCollaborationPreviewSession'],
+          ];
+          for (const [path, expected, marker] of spacing) {
+            const bytes = readFileSync(path);
+            const actual = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+            if (actual !== expected) throw new Error(path + ': source drift');
+            const source = bytes.toString();
+            if (source.split(marker).length !== 2) throw new Error('Ambiguous import boundary');
+            writeFileSync(path, source.replace(marker, '\n' + marker));
+          }
+          const dir = join(process.env.RUNNER_TEMP, 'recovery-bundle-plan');
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, 'verify.sh'), get('Verify public identity and existing drawing behavior'));
+          writeFileSync(join(dir, 'build.sh'), get('Verify actual production build and unchanged bundle ratchet'));
+          let publish = get('Publish only tested product files and remove this completed runner');
+          const fileAnchor = "    '.github/workflows/ci.yml',\n";
+          if (publish.split(fileAnchor).length !== 2) throw new Error('Publication allowlist drift');
+          publish = publish.replace(fileAnchor, fileAnchor + spacing.map(([path]) => `    '${path}',\n`).join(''));
+          const deletion = "entries.append({'path': '.github/workflows/recovery-bundle-analysis-once.yml', 'mode': '100644', 'type': 'blob', 'sha': None})";
+          if (publish.split(deletion).length !== 2) throw new Error('Temporary-runner cleanup drift');
+          publish = publish.replace(deletion, deletion + "\nentries.append({'path': '.github/workflows/recovery-bundle-finalize-once.yml', 'mode': '100644', 'type': 'blob', 'sha': None})");
+          writeFileSync(join(dir, 'publish.sh'), publish);
+          NODE
+          git diff --check
+      - name: Run actual entrypoint, drawing, formatting and API validation
+        run: |
+          set -euo pipefail
+          bash "$RUNNER_TEMP/recovery-bundle-plan/verify.sh" 2>&1 | tee artifacts/recovery-bundle-repair/validation.log
+          pnpm exec eslint scripts/studio-material-atlas-boundary.test.ts scripts/verify-studio-collaboration-entry.test.ts --max-warnings 0
+          pnpm exec vitest run scripts/studio-material-atlas-boundary.test.ts scripts/verify-studio-collaboration-entry.test.ts
+      - name: Require the real build, unchanged bundle ratchet and packaged API
+        run: bash "$RUNNER_TEMP/recovery-bundle-plan/build.sh"
+      - name: Publish tested files only to the unchanged isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash "$RUNNER_TEMP/recovery-bundle-plan/publish.sh"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: recovery-bundle-repair-${{ github.run_id }}
+          path: artifacts/recovery-bundle-repair
+          if-no-files-found: error
+          retention-days: 3
