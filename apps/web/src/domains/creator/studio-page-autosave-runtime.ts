@@ -1,3 +1,4 @@
+import { studioRecoveryDescription } from "./canvas/studio-recovery-notice-model";
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { recoverInterruptedStudioAiOperations } from "./ai/studio-ai-provenance-recorder";
@@ -248,9 +249,7 @@ export async function restoreStudioAutosaveRecovery(
       }
       if (saved.authority === "browser-storage-compatibility") {
         setAutosaveRestoreBlockedReason("legacy-unversioned");
-        setError(
-          "이전 그림을 안전하게 열 수 있는지 확인하지 못했어요. 백업 파일을 받아 보관해 주세요."
-        );
+        setError(studioRecoveryDescription("legacy-unversioned"));
         return;
       }
       {
@@ -261,11 +260,7 @@ export async function restoreStudioAutosaveRecovery(
           });
           if (!compatibility.compatible) {
             setAutosaveRestoreBlockedReason(compatibility.reason);
-            setError(
-              compatibility.reason === "revision-mismatch"
-                ? "공동 작업 중인 그림과 내용이 달라 덮어쓰지 않았어요. 백업 파일을 받아 이전 그림을 보관해 주세요."
-                : "같은 작품의 그림인지 확인하지 못해 덮어쓰지 않았어요. 백업 파일을 받아 보관해 주세요."
-            );
+            setError(studioRecoveryDescription(compatibility.reason));
             return;
           }
         }

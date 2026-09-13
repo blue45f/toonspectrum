@@ -16,9 +16,10 @@ import {
   ScanSearch,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import { presentStudioAutosaveDocumentLeadership } from "../studio-autosave-document-leader";
+import { StudioRecoveryNotice } from "./StudioRecoveryNotice";
 
 import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail";
 import { StudioToolHintTarget } from "../StudioToolHint";
@@ -31,10 +32,6 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { useIsMobile } from "@/hooks/use-media-query";
-
-const StudioRecoveryNotice = lazy(() =>
-  import("./StudioRecoveryNotice").then((module) => ({ default: module.StudioRecoveryNotice })),
-);
 
 const SELECTION_LAYOUT_HINTS = {
   group: {
@@ -499,20 +496,12 @@ export function StudioCanvasStatusRail({
       ) : null}
 
       {hasAutosave && !followerNotice && (
-        <Suspense
-          fallback={
-            <div role="status" className="mb-3 rounded-xl border border-accent/25 bg-panel p-3 text-xs text-fg-2">
-              남겨 둔 그림을 확인하는 중…
-            </div>
-          }
-        >
-          <StudioRecoveryNotice
-            blockedReason={autosaveRestoreBlockedReason}
-            onRestore={onRestoreAutosave}
-            onBackup={onDownloadAutosaveBackup}
-            onDelete={onClearAutosave}
-          />
-        </Suspense>
+        <StudioRecoveryNotice
+          blockedReason={autosaveRestoreBlockedReason}
+          onRestore={onRestoreAutosave}
+          onBackup={onDownloadAutosaveBackup}
+          onDelete={onClearAutosave}
+        />
       )}
 
       {normalizedActiveGroupName ? (

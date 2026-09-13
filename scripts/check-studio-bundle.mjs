@@ -4,6 +4,7 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { resolveTemporaryBundleCeiling } from "./lib/studio-bundle-temporary-allowance.mjs";
 import { isStudioCrdtRuntimeEntry } from "./lib/studio-crdt-bundle-boundary.mjs";
 
 const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? DIST_DIR);
@@ -1068,6 +1069,7 @@ function writeBaseline({ previous, runtimeReport, tightenOnly }) { // NOSONAR ja
 function evaluateRatchet(group, baselineMetrics) {
   const rows = [];
   const seen = new Set();
+  const now = Date.now();
   for (const measurement of measurements) {
     if (measurement.group !== group) continue;
     seen.add(measurement.key);
@@ -1076,15 +1078,19 @@ function evaluateRatchet(group, baselineMetrics) {
       rows.push({ ...measurement, baselineValue: null, ceiling: null, status: "unbaselined" });
       continue;
     }
-    const ceiling = ratchetCeiling(measurement.kind, baselineValue);
+    const normalCeiling = ratchetCeiling(measurement.kind, baselineValue);
+    const { ceiling, temporaryAllowance } = resolveTemporaryBundleCeiling(
+      measurement, baselineValue, normalCeiling, now,
+    );
     const improvedFloor = measurement.kind === "count"
       ? baselineValue
       : Math.floor(baselineValue * (1 - ratchetPolicy.byteTolerance));
     let status;
     if (measurement.value > ceiling) status = "REGRESSED";
+    else if (measurement.value > normalCeiling) status = "temporarily allowed";
     else if (measurement.value < improvedFloor) status = "improved";
     else status = "ok";
-    rows.push({ ...measurement, baselineValue, ceiling, status });
+    rows.push({ ...measurement, baselineValue, normalCeiling, ceiling, temporaryAllowance, status });
   }
   const stale = Object.keys(baselineMetrics ?? {}).filter((key) => !seen.has(key));
   return { rows, stale };
@@ -1262,6 +1268,14 @@ function reportBundleGate({ runtimeReport, structuralSummary }) { // NOSONAR jav
   const regressions = rows.filter((row) => row.status === "REGRESSED");
   const improvements = rows.filter((row) => row.status === "improved");
   const unbaselined = rows.filter((row) => row.status === "unbaselined");
+  const temporaryPasses = rows.filter((row) => row.status === "temporarily allowed");
+  for (const row of rows.filter((entry) => entry.temporaryAllowance)) {
+    console.warn(
+      `temporary bundle allowance: ${row.key} ${formatMeasurement(row.kind, row.normalCeiling)}`
+      + ` -> ${formatMeasurement(row.kind, row.ceiling)} (+1 KiB), expires ${row.temporaryAllowance.expiresAt};`
+      + " accepted baseline and other metrics are unchanged",
+    );
+  }
 
   console.log(
     `ratchet vs ${baselineDisplayPath()}`
@@ -1269,12 +1283,13 @@ function reportBundleGate({ runtimeReport, structuralSummary }) { // NOSONAR jav
       + `: tolerance +${(ratchetPolicy.byteTolerance * 100).toFixed(0)}% bytes, `
       + `+${(ratchetPolicy.countTolerance * 100).toFixed(0)}%/${ratchetPolicy.countSlack} chunks`,
   );
-  if (verboseReportRequested || regressions.length > 0 || unbaselined.length > 0) {
-    console.log(ratchetTable(verboseReportRequested ? rows : [...regressions, ...unbaselined]));
+  if (verboseReportRequested || regressions.length > 0 || unbaselined.length > 0 || temporaryPasses.length > 0) {
+    console.log(ratchetTable(verboseReportRequested ? rows : [...regressions, ...unbaselined, ...temporaryPasses]));
   }
   console.log(
-    `  ${rows.length - regressions.length - unbaselined.length} within baseline, `
+    `  ${rows.length - regressions.length - unbaselined.length - temporaryPasses.length} within baseline, `
       + `${improvements.length} improved, ${regressions.length} regressed, ${unbaselined.length} unbaselined`
+      + (temporaryPasses.length ? `, ${temporaryPasses.length} temporarily allowed` : "")
       + (verboseReportRequested ? "" : " (pass --verbose for the full table)"),
   );
   if (staticRatchet.stale.length > 0) {
