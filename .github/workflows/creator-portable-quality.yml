@@ -81,6 +81,9 @@ jobs:
                       assert pathlib.Path(downloaded.value.path()).read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
                       record('portable editable backup and actual PNG export' + suffix)
                       if denied:
+                          # Undo/redo starts a fresh autosave debounce. Wait for the actual
+                          # failed transaction instead of racing the asynchronous save.
+                          page.wait_for_function("document.querySelector('#save-status').textContent.includes('실패')")
                           assert '실패' in page.locator('#save-status').inner_text()
                       assert not requests, requests
                       assert not errors, errors
