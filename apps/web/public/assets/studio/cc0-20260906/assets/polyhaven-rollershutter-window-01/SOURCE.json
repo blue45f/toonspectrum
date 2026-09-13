@@ -1,0 +1,104 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rollershutter_window_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Rollershutter Window 01",
+    "type": 2,
+    "authors": {
+      "MP": "All"
+    },
+    "info": null,
+    "date_published": 1696982400,
+    "categories": [
+      "structures",
+      "industrial",
+      "buildings",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "urban",
+      "security",
+      "commercial",
+      "shutters",
+      "garage door",
+      "security shutter",
+      "warehouse door",
+      "roller garage door"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 1104,
+    "texel_density": 2450.1997736149383,
+    "dimensions": [
+      5100.001215934753,
+      300.0859081512317,
+      1850.7245529547163
+    ],
+    "files_hash": "55133df3196203d6ddd5b3ef1a4225625ff3aab7",
+    "description": "Free 8K model of an urban roller shutter with weathered metal slats, riveted frame and worn grime; includes a graffiti-covered variant with colorful tags.",
+    "category_id": "49d97a62-fac9-5a07-8302-1c233afcf789",
+    "category": "Architecture/Windows & Shutters/Roller Shutters",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "img_version": "e11965db",
+    "download_count": 20067,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rollershutter_window_01.png?width=256&height=256&v=e11965db"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/rollershutter_window_01/rollershutter_window_01_2k.gltf",
+      "bytes": 4991,
+      "sha256": "8a00239f2677a600d707a6002c04eb3ecb66a0b441287863d6eaabc4cf9525ef",
+      "sourceMd5": "ec47abd5dad0cc59ebf00c661aee22cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rollershutter_window_01/rollershutter_window_01_graffiti_diff_2k.jpg",
+      "bytes": 2490054,
+      "sha256": "9e04dc701a7ea76ed2a2c19f679373bf248e3ae53641e45b2c231444639d42e2",
+      "sourceMd5": "eb8e61d91603b1fd5971e7ca82393ac6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rollershutter_window_01/rollershutter_window_01_nor_gl_2k.jpg",
+      "bytes": 1413906,
+      "sha256": "9db824a282945e6367bd6e2669c5f46c0f07722d5eed9673cf81d23c8b7bd488",
+      "sourceMd5": "2837ed909639524f0f6d17f7d5e84f99"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rollershutter_window_01/rollershutter_window_01.bin",
+      "bytes": 54432,
+      "sha256": "a866c874c77c0f7600cd79b0af502d5f6333257e6ee86a2f00c4752ef50e2fbb",
+      "sourceMd5": "54837c166c34e1a1ca7f6495a82ab6d9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rollershutter_window_01/rollershutter_window_01_diff_2k.jpg",
+      "bytes": 2217772,
+      "sha256": "e233f50ed4687a0b245016261ae76f20240e4c7928598a4a0f9ca9e33db5f4e1",
+      "sourceMd5": "cc40934b97b0322cd6b35e0defb75976"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rollershutter_window_01/rollershutter_window_01_arm_2k.jpg",
+      "bytes": 2247637,
+      "sha256": "6596dc7f190e8720bbc65a598da09128837261c28aba77daf965368e32c0c8a1",
+      "sourceMd5": "802fef0837a9e1840a01d356d72f3938"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/coffee_table_round_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-13"
+  },
+  "metadata": {
+    "donated": true,
+    "type": 2,
+    "tags": [
+      "modern",
+      "marble",
+      "tea",
+      "coffee",
+      "metal",
+      "sleek",
+      "contemporary",
+      "cocktail"
+    ],
+    "name": "Coffee Table Round 01",
+    "categories": [
+      "furniture",
+      "table"
+    ],
+    "authors": {
+      "Ulan Cabanilla": "All"
+    },
+    "date_published": 1637884800,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 4044,
+    "texel_density": 3902.116327181834,
+    "dimensions": [
+      1301.3009428977966,
+      1301.3015985488892,
+      491.0094439983368
+    ],
+    "files_hash": "111d2440084dcd01332ef4f7a4008fc5a41e413b",
+    "description": "Free 8K model - round coffee table with white marble top and looping metal legs; sleek contemporary silhouette with subtle veining and matte metallic finish.",
+    "category_id": "14a9e15a-6ae7-5665-8142-d5fbda6b6a75",
+    "category": "Furniture/Tables/Coffee Tables",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "stone",
+        "metal"
+      ]
+    },
+    "img_version": "637507a6",
+    "download_count": 27534,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/coffee_table_round_01.png?width=256&height=256&v=637507a6"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/coffee_table_round_01/coffee_table_round_01_2k.gltf",
+      "bytes": 2776,
+      "sha256": "6b9dbd17317c9289ab8e008b05abd146dbe0831c975871732def694de4ad407d",
+      "sourceMd5": "c43a27b6ef35688f047de334ea8f4736"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/coffee_table_round_01/coffee_table_round_01_arm_2k.jpg",
+      "bytes": 2631627,
+      "sha256": "fa00d2026a24f65cd825f565e010d498206d68ede792fcc5f058f20a3d94aa88",
+      "sourceMd5": "4a5c3d6f8f923345d108b00a5fa7580d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/coffee_table_round_01/coffee_table_round_01_nor_gl_2k.jpg",
+      "bytes": 1177563,
+      "sha256": "b8e4f0780ee2008e33a3049656fcf3168d1036ad8d5cf368e925374123a5c553",
+      "sourceMd5": "84c6dcbe5e442b1f629541e94a15a241"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/coffee_table_round_01/coffee_table_round_01.bin",
+      "bytes": 131112,
+      "sha256": "9605a0c156bff4ec87e8717a79978d85d4e750d21b3193a3d08bed16e8666035",
+      "sourceMd5": "a664b067fa0ae9b6e0a8fa5878986816"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/coffee_table_round_01/coffee_table_round_01_diff_2k.jpg",
+      "bytes": 1721075,
+      "sha256": "d63b809f381622925f852f6d1b0f712428cbe75837298073ad0424069d60870d",
+      "sourceMd5": "d4333b0c534f7bce97dead1bd9667efd"
+    }
+  ]
+}

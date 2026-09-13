@@ -1,0 +1,676 @@
+{
+  "approvedAssets": 122,
+  "independentOriginals": 82,
+  "derivatives": 40,
+  "totalBytes": 260492260,
+  "byKind": {
+    "model": 41,
+    "surface-texture": 14,
+    "background": 27,
+    "prop-image": 40
+  },
+  "imageChecks": [
+    {
+      "id": "polyhaven-asphalt-pit-lane",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 10420973,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-pavement-02",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 11458283,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-cobblestone-floor-04",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9787783,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-roof-09",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9063810,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-gravel-embedded-concrete",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 10786643,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-brick-wall-001",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9235576,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-white-rough-plaster",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 10681279,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-marble-cliff-03",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9295624,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-stone-tiles-02",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9586791,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-rough-wood",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9151557,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-blue-metal-plate",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 3622517,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-gravel-concrete-03",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9326238,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-snow-02",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 6833817,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-red-laterite-soil-stones",
+      "width": 2048,
+      "height": 2048,
+      "pngBytes": 9679815,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-hansaplatz",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4499265,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-urban-street-01",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 5396458,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-urban-street-03",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4414821,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-crosswalk",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4795305,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-modern-buildings-night",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3421598,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-venetian-crossroads",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3961127,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-courtyard-night",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4227000,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-decor-shop",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4014600,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-machine-shop-02",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4829235,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-carpentry-shop-02",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4332456,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-freight-station",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3640715,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-dresden-station-night",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4021942,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-subway-entrance",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 2905336,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-wooden-lounge",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3379203,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-ballroom",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4123672,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-large-corridor",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 1724168,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-winter-lake-01",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 2167033,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-misty-pines",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4466978,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-mossy-forest",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 5699097,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-river-walk-1",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 6369440,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-tiergarten",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 5873349,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-small-harbor-01",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3185282,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-venice-sunset",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 2759995,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-leadenhall-market",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 4956805,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-derelict-overpass",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3137056,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-rural-winter-roadside",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3271706,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-background-royal-esplanade",
+      "width": 2048,
+      "height": 1152,
+      "pngBytes": 3227363,
+      "transparent": false,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-coffeecart-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 682720,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-cashregister-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 901637,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-schooldesk-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 350374,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-schoolchair-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 560352,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-barbershopchair-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 869836,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-television-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 935366,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-lantern-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 438562,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-wetfloorsign-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 340628,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-ukulele-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 332535,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-drill-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 482784,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-megaphone-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 446503,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-power-box-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 781794,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-utility-box-02-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 856914,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-metal-trash-can-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 743712,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-concrete-road-barrier-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 908561,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-covered-car-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 371146,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-rollershutter-window-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 492441,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-old-tyre-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 954635,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-metal-tool-chest-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1593491,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-wooden-bucket-02-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1176925,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-wicker-basket-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1172157,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-throw-pillows-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 740826,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-coffee-table-round-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 268963,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-side-table-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1780086,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-rockingchair-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 713850,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-ottoman-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1313283,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-gothicbed-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 792257,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-classicnightstand-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 979184,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-chandelier-03-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 438358,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-rubber-duck-toy-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 349934,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-baseball-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 720379,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-football-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 547401,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-croissant-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 464762,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-food-pomegranate-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1449258,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-food-pears-asian-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 327592,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-lemon-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 961643,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-carrot-cake-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 1033093,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-jug-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 386983,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-concrete-cat-statue-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 839127,
+      "transparent": true,
+      "rightsConfirmed": true
+    },
+    {
+      "id": "polyhaven-wooden-lantern-01-cutout",
+      "width": 1536,
+      "height": 1536,
+      "pngBytes": 610361,
+      "transparent": true,
+      "rightsConfirmed": true
+    }
+  ],
+  "componentChecks": [
+    "kind-filters",
+    "Korean-search",
+    "preview-Escape-focus-contract",
+    "background-insertion-callback",
+    "prop-insertion-callback",
+    "mobile-viewport"
+  ],
+  "negativeChecks": {
+    "hashRejected": true,
+    "abortRejected": true
+  },
+  "fullStudioProjectRoundTrip": false,
+  "errors": []
+}

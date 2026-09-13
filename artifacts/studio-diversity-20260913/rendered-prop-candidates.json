@@ -1,0 +1,437 @@
+{
+  "rendered": [
+    {
+      "sourceId": "polyhaven-coffeecart-01",
+      "sourceSha256": "f3ffc98aef2fe321ae2c76c7da0e24a114880feb09aea004f5b08cd577cafaa0",
+      "path": "high-resolution-props/polyhaven-coffeecart-01.png",
+      "visiblePixels": 320665,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 27659
+    },
+    {
+      "sourceId": "polyhaven-cashregister-01",
+      "sourceSha256": "444ec20199cc3de6423c7b29342edde7604c43b3bcc089d262ac7e555c6e3010",
+      "path": "high-resolution-props/polyhaven-cashregister-01.png",
+      "visiblePixels": 710860,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 9933
+    },
+    {
+      "sourceId": "polyhaven-schooldesk-01",
+      "sourceSha256": "cabfdcbc5a983c8710af07056c9820cb0eb9bac43762c4cc6ee55cfaee86a551",
+      "path": "high-resolution-props/polyhaven-schooldesk-01.png",
+      "visiblePixels": 310035,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4162
+    },
+    {
+      "sourceId": "polyhaven-schoolchair-01",
+      "sourceSha256": "f3b7b61ee57c154b979956a09ba6d7bbedd1222383fd6680c64068e1948dff75",
+      "path": "high-resolution-props/polyhaven-schoolchair-01.png",
+      "visiblePixels": 245806,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 5072
+    },
+    {
+      "sourceId": "polyhaven-barbershopchair-01",
+      "sourceSha256": "7e9da03732fc21df7f5b86a54ec40488bc5df958b926fbc64de9346b9638d6bf",
+      "path": "high-resolution-props/polyhaven-barbershopchair-01.png",
+      "visiblePixels": 334191,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4280
+    },
+    {
+      "sourceId": "polyhaven-television-01",
+      "sourceSha256": "af538f9989a9e36d214b023a1c9cc589e4e6150b4df42dc42fa1f4c173406186",
+      "path": "high-resolution-props/polyhaven-television-01.png",
+      "visiblePixels": 734948,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 1918
+    },
+    {
+      "sourceId": "polyhaven-lantern-01",
+      "sourceSha256": "f28125f90216376db04506f2787c1aef0f4bd6bc4360db0c8c954eed536a195e",
+      "path": "high-resolution-props/polyhaven-lantern-01.png",
+      "visiblePixels": 155544,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 67804
+    },
+    {
+      "sourceId": "polyhaven-wetfloorsign-01",
+      "sourceSha256": "d6aa6d8887c9b1880f17d31c91bdb7d8193a805f7b511de1dab69dba93b89ae3",
+      "path": "high-resolution-props/polyhaven-wetfloorsign-01.png",
+      "visiblePixels": 389724,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 228
+    },
+    {
+      "sourceId": "polyhaven-ukulele-01",
+      "sourceSha256": "a2fa1e3450228fe68d205ebc8ccb6cbf0d15a464a5ec38ef83b8a0bf54a2cd7d",
+      "path": "high-resolution-props/polyhaven-ukulele-01.png",
+      "visiblePixels": 113483,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 8912
+    },
+    {
+      "sourceId": "polyhaven-drill-01",
+      "sourceSha256": "c2a77734defe626575ec7a0aa6b14f715137a93e50c1e1813237ba3fe61f3af5",
+      "path": "high-resolution-props/polyhaven-drill-01.png",
+      "visiblePixels": 335904,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 2926
+    },
+    {
+      "sourceId": "polyhaven-megaphone-01",
+      "sourceSha256": "7e4ec29fe3f397b81649cfaad69afc7922424e950279f8759bbb81628e64f14d",
+      "path": "high-resolution-props/polyhaven-megaphone-01.png",
+      "visiblePixels": 336249,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 15814
+    },
+    {
+      "sourceId": "polyhaven-power-box-01",
+      "sourceSha256": "8b24b151fda1fc42e7908f078136a4d3be3bcecda18491c062d18ee34fea136a",
+      "path": "high-resolution-props/polyhaven-power-box-01.png",
+      "visiblePixels": 847925,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 21272
+    },
+    {
+      "sourceId": "polyhaven-utility-box-02",
+      "sourceSha256": "43e0494ef80d29d013cb48d479873c0eb7c7b53b7e222f9f7f404cfe41ff38eb",
+      "path": "high-resolution-props/polyhaven-utility-box-02.png",
+      "visiblePixels": 651210,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6268
+    },
+    {
+      "sourceId": "polyhaven-metal-trash-can",
+      "sourceSha256": "bb2ee98fa996bb9094488dcb3785ac22b6c6b5c71e3d16ed44e01f231a1d394b",
+      "path": "high-resolution-props/polyhaven-metal-trash-can.png",
+      "visiblePixels": 300982,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 13960
+    },
+    {
+      "sourceId": "polyhaven-concrete-road-barrier",
+      "sourceSha256": "dbc5788bb54fa3646b19d127621ec2618cafb7b0b833676c157631cbb04ae695",
+      "path": "high-resolution-props/polyhaven-concrete-road-barrier.png",
+      "visiblePixels": 401936,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 60928
+    },
+    {
+      "sourceId": "polyhaven-covered-car",
+      "sourceSha256": "32389568f3bf78aa4af1ebd604b05fab01ce569cdf90e8d1d44302e817bb6ffd",
+      "path": "high-resolution-props/polyhaven-covered-car.png",
+      "visiblePixels": 208131,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 12592
+    },
+    {
+      "sourceId": "polyhaven-rollershutter-window-01",
+      "sourceSha256": "5cb622fd3dd2871511d69af9982c12e5f8420cb338c0203ec79a0733abe3a3fc",
+      "path": "high-resolution-props/polyhaven-rollershutter-window-01.png",
+      "visiblePixels": 177284,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 1104
+    },
+    {
+      "sourceId": "polyhaven-old-tyre",
+      "sourceSha256": "4cf3afbd144f3b56cf09218928c35ea8146794f600f14d0c54e27c5b640af608",
+      "path": "high-resolution-props/polyhaven-old-tyre.png",
+      "visiblePixels": 445899,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 2880
+    },
+    {
+      "sourceId": "polyhaven-metal-tool-chest",
+      "sourceSha256": "a10dc3e9f5a657056444906515162d14c240105c12cc6bd22ab388610db52fb2",
+      "path": "high-resolution-props/polyhaven-metal-tool-chest.png",
+      "visiblePixels": 768835,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 13360
+    },
+    {
+      "sourceId": "polyhaven-wooden-bucket-02",
+      "sourceSha256": "d527fd7adc419c2947ed9fcaeafecbb5cad5603bf68e18c0ad52f34ec9cc9ed3",
+      "path": "high-resolution-props/polyhaven-wooden-bucket-02.png",
+      "visiblePixels": 536046,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 7252
+    },
+    {
+      "sourceId": "polyhaven-wicker-basket-01",
+      "sourceSha256": "94630a425dfff2edb47270ff49f351e855d4851bca6350ecec93f839025f97d8",
+      "path": "high-resolution-props/polyhaven-wicker-basket-01.png",
+      "visiblePixels": 389595,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 22276
+    },
+    {
+      "sourceId": "polyhaven-throw-pillows-01",
+      "sourceSha256": "7b262f73a66b527ad360e1334df0b6b71b7af8b49a16aa4346fce443d69af3c2",
+      "path": "high-resolution-props/polyhaven-throw-pillows-01.png",
+      "visiblePixels": 260483,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 6362
+    },
+    {
+      "sourceId": "polyhaven-coffee-table-round-01",
+      "sourceSha256": "e76d78cf83ec79e457fb1cb325a5b31837781e090ee1f50f1b17733b6985744a",
+      "path": "high-resolution-props/polyhaven-coffee-table-round-01.png",
+      "visiblePixels": 252923,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4044
+    },
+    {
+      "sourceId": "polyhaven-side-table-01",
+      "sourceSha256": "106a04b45e6338a5e0026618d3fc0003e2c784095674bfa60a0974e7b7e354fe",
+      "path": "high-resolution-props/polyhaven-side-table-01.png",
+      "visiblePixels": 1016615,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 2756
+    },
+    {
+      "sourceId": "polyhaven-rockingchair-01",
+      "sourceSha256": "b196136fc3cf5278422511203870248e3188533e2c0aed3663c7efc1af066bf6",
+      "path": "high-resolution-props/polyhaven-rockingchair-01.png",
+      "visiblePixels": 272624,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 11866
+    },
+    {
+      "sourceId": "polyhaven-ottoman-01",
+      "sourceSha256": "5b33a28a36549565174ecf192b467d5be665a1804a2bbf37e76fcc547b0ebe82",
+      "path": "high-resolution-props/polyhaven-ottoman-01.png",
+      "visiblePixels": 633319,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4240
+    },
+    {
+      "sourceId": "polyhaven-gothicbed-01",
+      "sourceSha256": "f56eef6da6b462fe0aa793f477a3c1cd923b8c2f273a3e8d4cf1a7e29a67f7e3",
+      "path": "high-resolution-props/polyhaven-gothicbed-01.png",
+      "visiblePixels": 473834,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 18745
+    },
+    {
+      "sourceId": "polyhaven-classicnightstand-01",
+      "sourceSha256": "8e4ea304364fd3d6234db633b7319628db7d85c0a73ada42ad49fbac131eda6e",
+      "path": "high-resolution-props/polyhaven-classicnightstand-01.png",
+      "visiblePixels": 678454,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 2002
+    },
+    {
+      "sourceId": "polyhaven-chandelier-03",
+      "sourceSha256": "ec40b90205168265ee823ed9037bbe7f8e38eb3d43dd085e8da465f64139e56d",
+      "path": "high-resolution-props/polyhaven-chandelier-03.png",
+      "visiblePixels": 144147,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 63082
+    },
+    {
+      "sourceId": "polyhaven-rubber-duck-toy",
+      "sourceSha256": "0d9dd0ce3d5404b68c60d83de4e550eaf0d3937a277e4dbc0df2a64db1b763dd",
+      "path": "high-resolution-props/polyhaven-rubber-duck-toy.png",
+      "visiblePixels": 468905,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4288
+    },
+    {
+      "sourceId": "polyhaven-baseball-01",
+      "sourceSha256": "1ac739a7d17744757e109577423898fd333a7a957d6f45f4b7a81cc984e53e0d",
+      "path": "high-resolution-props/polyhaven-baseball-01.png",
+      "visiblePixels": 624199,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 10848
+    },
+    {
+      "sourceId": "polyhaven-football",
+      "sourceSha256": "865f444b75a26ef30c898aefd27d661b95caf87aa54fce91e852e0c0a6634068",
+      "path": "high-resolution-props/polyhaven-football.png",
+      "visiblePixels": 211092,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4296
+    },
+    {
+      "sourceId": "polyhaven-croissant",
+      "sourceSha256": "e22d0dc4374b7d1ac9bde4a1ebcb9131b8b403c3f8322413684ce08a2872a17c",
+      "path": "high-resolution-props/polyhaven-croissant.png",
+      "visiblePixels": 176501,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 1990
+    },
+    {
+      "sourceId": "polyhaven-food-pomegranate-01",
+      "sourceSha256": "091f3e637a283cb75ae11d36a0a550d741f0fc58658df38a7e0ac5bfa915fffc",
+      "path": "high-resolution-props/polyhaven-food-pomegranate-01.png",
+      "visiblePixels": 594937,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 8142
+    },
+    {
+      "sourceId": "polyhaven-food-pears-asian-01",
+      "sourceSha256": "70a680af6b1c530a82d490baab5766103bb12c337e6426b9ff5bb6bed54c6c9e",
+      "path": "high-resolution-props/polyhaven-food-pears-asian-01.png",
+      "visiblePixels": 175392,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 12572
+    },
+    {
+      "sourceId": "polyhaven-lemon",
+      "sourceSha256": "60080c0dfed4a5be3eb6a10cd0f18a6b7b412aaaea62c34e1a679526cf8959dc",
+      "path": "high-resolution-props/polyhaven-lemon.png",
+      "visiblePixels": 417591,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 4012
+    },
+    {
+      "sourceId": "polyhaven-carrot-cake",
+      "sourceSha256": "5a6c9e3fe92ac091f5fdb574afc500b1f145ed42e6252b2c3684810ff3ceac28",
+      "path": "high-resolution-props/polyhaven-carrot-cake.png",
+      "visiblePixels": 427546,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 13790
+    },
+    {
+      "sourceId": "polyhaven-jug-01",
+      "sourceSha256": "ca2467e354dc995588b832f1ad6b0c472430730a4b94e43a552bb44142001832",
+      "path": "high-resolution-props/polyhaven-jug-01.png",
+      "visiblePixels": 375042,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 5770
+    },
+    {
+      "sourceId": "polyhaven-anthurium-botany-01",
+      "sourceSha256": "30aad56a01f78b56a2c33d17302ca22551bc3bc2de9a60dbe9446723ccfb6c2b",
+      "path": "high-resolution-props/polyhaven-anthurium-botany-01.png",
+      "visiblePixels": 40609,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 67152
+    },
+    {
+      "sourceId": "polyhaven-calathea-orbifolia-01",
+      "sourceSha256": "c349962fdd45ec993147340cec604ea8dfc4639fec85c40988230599dd559a41",
+      "path": "high-resolution-props/polyhaven-calathea-orbifolia-01.png",
+      "visiblePixels": 21164,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 16688
+    },
+    {
+      "sourceId": "polyhaven-concrete-cat-statue",
+      "sourceSha256": "0ba99fe163e376e74d6903e807153793a9019a153d4aa3ff430772b81b10f80a",
+      "path": "high-resolution-props/polyhaven-concrete-cat-statue.png",
+      "visiblePixels": 326170,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 11950
+    },
+    {
+      "sourceId": "polyhaven-horse-statue-01",
+      "sourceSha256": "07cdf7e91d697a9b6f1f9d7d10bd0ce26703ea738b9436f90de23587561adc79",
+      "path": "high-resolution-props/polyhaven-horse-statue-01.png",
+      "visiblePixels": 249466,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 22388
+    },
+    {
+      "sourceId": "polyhaven-wooden-lantern-01",
+      "sourceSha256": "e05089321749ad809effdfce35685c93161495588ac76de6ccb3d1df561b3930",
+      "path": "high-resolution-props/polyhaven-wooden-lantern-01.png",
+      "visiblePixels": 283089,
+      "width": 1536,
+      "height": 1536,
+      "renderer": "Three.js 184",
+      "triangles": 8369
+    }
+  ],
+  "rejected": [],
+  "independentOriginals": 0,
+  "artisticApproval": false
+}
