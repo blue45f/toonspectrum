@@ -11,6 +11,7 @@ import App from "./App";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import "../styles/globals.css";
 import "../styles/studio-overlay-stacking.css";
+import "../styles/design-themes.css";
 
 const STUDIO_BG3D_MAGIC_PRODUCTION_PROOF_QUERY =
   "__studioBg3dMagicProductionProof";
