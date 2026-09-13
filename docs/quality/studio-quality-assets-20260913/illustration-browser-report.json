@@ -1,0 +1,247 @@
+{
+  "renderer": "Chromium",
+  "passed": 24,
+  "actualStudioRoundTrip": false,
+  "results": [
+    {
+      "id": "original-quality-20260913-cafe-street",
+      "svgSha256": "5cc7ba0ff98dffd30b1980ad14294fb1acd46269d828a2483a64854d9647b12a",
+      "pngSha256": "5119d7e24dfd024da0103a0bba0b487a5eaa0b4e653000d0b7827d80d92cf33e",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-rain-alley",
+      "svgSha256": "0e3f68b3e1b0a977202b5593a87a0eed0549faea200b3663850c4dd6baefb9cb",
+      "pngSha256": "83c3676b5338946d14e927e909513b3792ff80843903ab90a2ee5e5a0cabe999",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-metro-platform",
+      "svgSha256": "61d01daf8305bafac4382b9e54c9f3f56b700c614085eec0d674f65a01ccd8f7",
+      "pngSha256": "b57fd2a32554ca4f0dd468917053092c228637c3f463c8f02d4098c175fb9010",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-reading-room",
+      "svgSha256": "e2b7ab3a8d11ab357bfb0ac6fb5980f7d9bfb88b415e0023845e7929a0146f62",
+      "pngSha256": "7fac5ef9f792143a6554a7735f730bae1f9d1ef29a3a74288c1eb3f7855c15d1",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-botanical-house",
+      "svgSha256": "6b58ecbe3729b49f8373c91ca4c255590b59677bd2a4ff6c2bcd9b6f4ddbd4d5",
+      "pngSha256": "71c20f18ef705af061226fd316de85e0cb3e0da736511b8f28078cbfc11b6aa4",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-river-promenade",
+      "svgSha256": "8b79b69d9cc50d3f4a18b77d37bfd6fc25025414c817f38e40844ed4cc2d98de",
+      "pngSha256": "74d6c56b443901abe4fa3e96562a82d308d8400bd86e18852fa7c2fce8f4ab05",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-rooftop-garden",
+      "svgSha256": "5f73c4564b758bd0e60f13d910c3118735f70d8967d105b79f0a00f04dcaa5b9",
+      "pngSha256": "d355b5e55cc7faa0a71789928df81e5c32c46b045cc57d0320461e1541ea19cb",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-artist-loft",
+      "svgSha256": "0963e6aea62f4636b58b2ec3d092e27e6f448536f69cfef4f0452de8f30d473d",
+      "pngSha256": "dc3a014c412f8ae38ddb53035ca0e0930e5723d09081d87b225d6c2135a806f3",
+      "naturalWidth": 1280,
+      "naturalHeight": 800,
+      "visible": 163840,
+      "transparent": 0,
+      "pixels": 163840
+    },
+    {
+      "id": "original-quality-20260913-slatted-bench",
+      "svgSha256": "33ef67a0486cb8eeccaffec45693a07bf93651c466783b2055bdaf482444e7b7",
+      "pngSha256": "0193640efdb94f33f5f89c026ea25020fe2ee18a66018657ca689fcb62b30c58",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 49677,
+      "transparent": 211981,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-heritage-lamp",
+      "svgSha256": "22602491d20fa578ce60906fa72d79ad057847ef35597b27eb7ef31bbb2074f4",
+      "pngSha256": "5e52069f0512d1e45a15791564bc2c3094f880ceb96fd64ed9d180559862e090",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 14706,
+      "transparent": 247285,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-leaf-planter",
+      "svgSha256": "876b547e66b505f2f60fe2c15f9e8ed31873bfe34a40b86ef660eeb6faac19e6",
+      "pngSha256": "3020d1d3c50c69ba08c38a071a730a208639107c9835e75c2785fe34bbf22840",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 50273,
+      "transparent": 211563,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-reading-bookshelf",
+      "svgSha256": "3716057642a05a88a3f6a9222d8e7ac3936faa184c717577fa69151648b03c67",
+      "pngSha256": "059b8b6ac0b4dedf1135ddacf335f2f20bc8e502c04e98ae9d94ac3e454422f6",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 166261,
+      "transparent": 95879,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-patio-table",
+      "svgSha256": "2550411c6b56d38fc964d18a00fd74c8906d31c29c67721637309373fe73d1fd",
+      "pngSha256": "af565bbccc1c42733bc725c5fdb9b6720daba9aedce4b68864044eeeb8812bec",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 55261,
+      "transparent": 206360,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-coffee-cart",
+      "svgSha256": "bb2e96b29a3513c5db1c371225196d3138317fa0ceceb7672654e0b297946df5",
+      "pngSha256": "2de9045dbcd0c9ec60ff3471bcf0c75163eb5c3d20a346b642dd2c8cf23c0977",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 119315,
+      "transparent": 142498,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-glass-vending-machine",
+      "svgSha256": "3aaa9d4fd87f25a97372d701137bbb2345bf0074a79814961fdad3f8ea773d70",
+      "pngSha256": "00bf84c97f52db63e9c0bb3ff9221df616929b35e166d9cf23450a541101ee31",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 125884,
+      "transparent": 136128,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-commuter-bicycle",
+      "svgSha256": "63dd51c9385d05509a4be346cb35a8ddad3b5f25a748e6e6d61f2bedecf8fb54",
+      "pngSha256": "effbe0f75d7c1c0eb1371f52eebe542dc1adde036a03e044f2b5d92ecf63dd5c",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 73136,
+      "transparent": 188365,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-bus-shelter",
+      "svgSha256": "83587cbde7ebe1be3abc53017472e5b2b34f8bc4efae46304d631f6147fe277f",
+      "pngSha256": "ff35516fa0ab8fdb238ec3c858975dc4d205833930acdc952f9670ca6b643311",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 148621,
+      "transparent": 113090,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-ticket-kiosk",
+      "svgSha256": "838cf4c260184d0ceefa05250b9881b2a705ad7f3ec2a89b81595d7811516bd2",
+      "pngSha256": "54ffc8a8fe2c1d62b918293e94147b6b7ed10601afdcb4488fece83237b4b7b3",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 107071,
+      "transparent": 154876,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-rolling-suitcase",
+      "svgSha256": "f464f354f259cd0ead077c4a512bc228ada805173cb2bc315452304792a31277",
+      "pngSha256": "acf48071bc76db67cb58ab69b5e4c8be41e3babce3e9b4c4c7b5f2136745572e",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 88481,
+      "transparent": 173460,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-vinyl-record-player",
+      "svgSha256": "5ac3eedec86feefd017819d33a5eb548b5bcf48f46f8ec2afd0ca603de2bc1de",
+      "pngSha256": "1ddcfd5e5c796a2d31e7d765c48184029fa06bbdd8b081771faa67ba4c177ae9",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 124697,
+      "transparent": 137017,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-cafe-lounge-sofa",
+      "svgSha256": "68d42e91b4b237ac137e3508dcf037ceeede8c545b9527aaeda487dc47ca9173",
+      "pngSha256": "4be2e47dd7b5d29ba6221978afe9bea25c087d87848f4b59a87dd1ff02fe7365",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 112069,
+      "transparent": 149639,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-drawing-desk",
+      "svgSha256": "ce3352d16d542f1b9a08ed4f59a49e77499b48decfb847ab0cd5bd7a0ba393f7",
+      "pngSha256": "b83200ed7f575f22bc75c4609242c87950d083313be2f6d3917327f03fca76c0",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 75850,
+      "transparent": 185697,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-parcel-handtruck",
+      "svgSha256": "040060617b6621532e82771a0ab3f965f33695e4396662b4a0816d938aa6c275",
+      "pngSha256": "72a6fc8543ca1df9adb1f5a51c8fcba384d21680408c93bfcedd66a6ca9b8514",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 70827,
+      "transparent": 191094,
+      "pixels": 262144
+    },
+    {
+      "id": "original-quality-20260913-street-drinking-fountain",
+      "svgSha256": "9b71587300b2bb6ccc979c47252b4a8049e8911613e81862a8d120d80800cd4b",
+      "pngSha256": "b72812d13b8a5f7531de45b1a617358759143762f92501e2ccb1c111f2b308b2",
+      "naturalWidth": 512,
+      "naturalHeight": 512,
+      "visible": 68358,
+      "transparent": 193478,
+      "pixels": 262144
+    }
+  ]
+}
