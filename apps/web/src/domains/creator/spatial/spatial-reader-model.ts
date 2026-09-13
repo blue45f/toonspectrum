@@ -76,12 +76,22 @@ export function spatialReaderTextureSize(crop: SpatialReaderCrop, maxEdge: numbe
   const factor = Math.min(1, finite(maxEdge, 1536, 256, 2048) / Math.max(crop.width, crop.height));
   return { width: Math.max(1, Math.round(crop.width * factor)), height: Math.max(1, Math.round(crop.height * factor)) };
 }
+/** Return the validated URL itself so DOM sinks never receive the unchecked input. */
+export function resolveSpatialReaderImageSource(value: string | undefined, base: string): string | null {
+  if (!value || value.length > 32 * 1024 * 1024) return null;
+  if (/^data:image\/(?:png|jpeg|webp|avif|gif);base64,[a-z\d+/=\r\n]+$/iu.test(value)) return value;
+  try {
+    const url = new URL(value, base);
+    const origin = new URL(base).origin;
+    if (url.username || url.password) return null;
+    if (url.protocol === "https:") return url.href;
+    if (url.protocol === "http:" && url.origin === origin) return url.href;
+    if (url.protocol === "blob:" && url.origin === origin) return url.href;
+    return null;
+  } catch { return null; }
+}
 export function isSpatialReaderImageSource(value: string, base: string): boolean {
-  if (!value || value.length > 32 * 1024 * 1024) return false;
-  if (/^data:image\/(?:png|jpeg|webp|avif|gif);base64,[a-z\d+/=\r\n]+$/iu.test(value)) return true;
-  try { const url = new URL(value, base); const origin = new URL(base).origin;
-    return (url.protocol === "https:" || (url.protocol === "http:" && url.origin === origin) || (url.protocol === "blob:" && url.origin === origin)) && !url.username && !url.password;
-  } catch { return false; }
+  return resolveSpatialReaderImageSource(value, base) !== null;
 }
 export function validateSpatialReaderFiles(files: readonly Pick<File, "name" | "type" | "size">[]): string | null {
   if (files.length === 0) return "PNG·JPEG·WebP·AVIF·GIF 원고 이미지를 선택해 주세요.";
