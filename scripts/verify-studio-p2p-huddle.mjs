@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { createServer } from "vite";
@@ -10,6 +11,9 @@ const server = await createServer({ configFile: false, root: `${root}apps/web`,
   define: { "process.env": JSON.stringify({ NODE_ENV: "test" }) },
   optimizeDeps: { noDiscovery: false, include: ["react", "react/jsx-runtime", "react/compiler-runtime", "react-dom/client"] }, logLevel: "warn",
   cacheDir: `${root}.qa/p2p-vite-cache`, server: { host: "127.0.0.1", port: 0, strictPort: false } });
+const deployment = JSON.parse(readFileSync(`${root}vercel.json`, "utf8"));
+const permissionsPolicy = deployment.headers.find((rule) => rule.source === "/(.*)").headers
+  .find((header) => header.key === "Permissions-Policy").value;
 let browser;
 try {
   await server.listen();
@@ -24,7 +28,7 @@ try {
   const pages = await Promise.all(contexts.map((context) => context.newPage()));
   for (const page of pages) {
     page.setDefaultTimeout(30000);
-    await page.route("**/__p2p-fixture", (route) => route.fulfill({ contentType: "text/html",
+    await page.route("**/__p2p-fixture", (route) => route.fulfill({ contentType: "text/html", headers: { "Permissions-Policy": permissionsPolicy },
       body: '<!doctype html><html lang="ko"><head><title>P2P QA</title></head><body><div id="test-root"></div></body></html>' }));
     await page.goto(`${origin}/__p2p-fixture`);
   }

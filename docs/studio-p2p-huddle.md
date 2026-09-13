@@ -56,3 +56,7 @@ RTC 직접 채널은 작업 ID를 검사하고, 발신자 프로필은 데이터
 - WebRTC peer connections / signaling / STUN / TURN: https://webrtc.org/getting-started/peer-connections
 - MDN perfect negotiation: https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 - MDN screen capture: https://developer.mozilla.org/en-US/docs/Web/API/Screen_Capture_API/Using_Screen_Capture
+
+## 배포 권한 헤더
+
+Vercel 문서 응답과 Studio 개발 서버의 `Permissions-Policy`에서 카메라·마이크는 `(self)`만 허용한다. 기존 `microphone=()`는 사용자가 권한을 허용해도 음성 캡처 자체를 차단하므로 제거했다. 같은 출처 허용은 자동 캡처나 브라우저 권한 승인과 다르며, 기기 요청은 P2P 참여 후 명시적인 장치 버튼에서만 발생한다. API 응답의 장치 차단 정책과 외부 프레임의 권한은 완화하지 않는다. 브라우저 검증 fixture도 `vercel.json`의 실제 Permissions-Policy 값을 읽어 적용한다.
