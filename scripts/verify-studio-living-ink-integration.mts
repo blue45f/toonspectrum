@@ -1467,12 +1467,12 @@ function pointerSampleCount(contact: PointerContactEvidence | undefined): number
 
 async function restoreAutosave(page: Page): Promise<number> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
-  const banner = page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false });
+  const banner = page.locator("[data-studio-recovery-notice]");
   await banner.waitFor({ state: "visible", timeout: 12_000 });
   // Reload creates a fresh in-page monitor. Record its sequence immediately before the user-owned
   // restore action so initial blank-document loading/ready states cannot satisfy replay evidence.
   const restoreSequenceWatermark = (await readMonitor(page)).sequence;
-  await page.getByRole("button", { name: "복구하기", exact: true }).click();
+  await banner.getByRole("button", { name: "이어서 그리기", exact: true }).click();
   await banner.waitFor({ state: "detached", timeout: 12_000 });
   return restoreSequenceWatermark;
 }
@@ -2209,14 +2209,20 @@ async function runRetiredAdmission(browser: Browser, studioUrl: string) {
       }
       await waitForLayerCount(page, 1);
       // Modal panels correctly block document shortcuts. Return focus to the canvas for history.
-      if (mobile) await page.getByRole("button", { name: "작업 패널 닫기", exact: true }).click();
+      if (mobile) {
+        await page.keyboard.press("Escape");
+        await page.locator('[data-studio-sheet-id="props"]').waitFor({ state: "hidden" });
+      }
       await page.keyboard.press("Meta+z");
       if (mobile) {
         await page.getByRole("button", { name: "작업 패널", exact: true }).click();
         await openLayerNavigator(page);
       }
       await waitForLayerCount(page, 0);
-      if (mobile) await page.getByRole("button", { name: "작업 패널 닫기", exact: true }).click();
+      if (mobile) {
+        await page.keyboard.press("Escape");
+        await page.locator('[data-studio-sheet-id="props"]').waitFor({ state: "hidden" });
+      }
       await page.keyboard.press("Meta+Shift+z");
       if (mobile) {
         await page.getByRole("button", { name: "작업 패널", exact: true }).click();
@@ -2273,7 +2279,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = `${origin}studio/canvas`;
   const preview: ChildProcess | null = externalOrigin
     ? null
     : spawn(
