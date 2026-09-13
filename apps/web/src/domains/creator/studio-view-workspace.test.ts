@@ -15,10 +15,9 @@ describe("studio view workspace precision math", () => {
   it("keeps effective magnification separate from the user zoom multiplier", () => {
     const baseScale = deriveStudioViewBaseScale(0.8, 2);
     expect(baseScale).toBeCloseTo(0.4);
-    expect(resolveStudioViewMagnificationBounds(baseScale)).toEqual({
-      min: 0.08,
-      max: 2,
-    });
+    const bounds = resolveStudioViewMagnificationBounds(baseScale);
+    expect(bounds.min).toBeCloseTo(0.08, 12);
+    expect(bounds.max).toBe(2);
     expect(studioUserZoomForMagnification(1, baseScale)).toBeCloseTo(2.5);
   });
 
