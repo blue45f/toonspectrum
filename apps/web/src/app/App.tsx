@@ -168,7 +168,7 @@ function WebFloatingControls() {
 
   return (
     <FloatingControls
-      placement="bottom-left"
+      placement="bottom-right"
       showSound={false}
       showBgm={false}
       className={hideOnMobile ? "max-md:hidden" : undefined}

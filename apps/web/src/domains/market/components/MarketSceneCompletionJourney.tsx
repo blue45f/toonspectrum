@@ -5,6 +5,7 @@ import Link from "@/compat/router-link";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
+import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
 import {
   marketSceneCompletionBrowseHref,
   marketSceneCompletionSequenceForKind,
@@ -23,7 +24,7 @@ const FAMILY_META = {
 } as const;
 
 export function MarketSceneCompletionJourney({ record, className }: MarketSceneCompletionJourneyProps) {
-  const tag = record.tags[0]?.trim() || null;
+  const tag = record.tags.map((value) => value.trim()).find((value) => isMarketPublicKeywordTag(value)) || null;
   const sequence = marketSceneCompletionSequenceForKind(record.kind);
 
   return (
