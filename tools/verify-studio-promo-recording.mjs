@@ -54,7 +54,7 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     width = 0;
     height = 0;
     getContext(_kind, options) { contextOptions.push(options); return {}; }
-    captureStream() { return stream; }
+    captureStream(fps) { assert.equal(fps, 30, "recording must request its declared 30fps, never 5fps"); return stream; }
   }
   class Recorder {
     static isTypeSupported(mime) { return supportedMimes ? supportedMimes.includes(mime) : true; }
@@ -78,10 +78,12 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     removeEventListener: (name, callback) => { if (listeners.get(name) === callback) listeners.delete(name); },
   };
   const mocks = {
+    "../animatic/studio-animatic-recorded-webm": { finalizeStudioAnimaticRecordedWebm: async (blob) => blob },
     "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
     "./promo-model": {
       PROMO_FPS: 30,
-      promoAudioGain: () => 0,
+      promoMusicGain: () => 0,
+      promoVoiceGain: () => 0,
       promoFrameCount: (project) => project.seconds * 30,
       promoSize: () => ({ width: 720, height: 1280 }),
     },
