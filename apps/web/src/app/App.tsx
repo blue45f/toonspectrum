@@ -3,9 +3,11 @@ import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
 import { BrowserCompatModal } from "../components/browser-compat-modal";
+import { ErrorBoundary } from "../components/error-boundary";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
+import { dismissBrowserCompatibility, hasDismissedBrowserCompatibility } from "./public-site-storage";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
@@ -87,8 +89,7 @@ function DeskCloudHost() {
 }
 
 function DeferredFooter() {
-  const ready = useDeferredByScroll();
-  if (!ready) return null;
+  // Legal/help links must be reachable without a scroll event or a 6.5s timer.
   return (
     <Suspense fallback={null}>
       <SiteFooter />
@@ -229,13 +230,12 @@ function AppRuntime() {
   useEffect(() => {
     const result = checkBrowserCompatibility();
     setCompatResult(result);
-    const dismissed = sessionStorage.getItem("toonspectrum-compat-dismissed");
-    if (result.recommendUpdate && !dismissed) setShowCompatModal(true);
+    if (result.recommendUpdate && !hasDismissedBrowserCompatibility()) setShowCompatModal(true);
   }, []);
 
   const handleCloseCompatModal = () => {
     setShowCompatModal(false);
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    dismissBrowserCompatibility();
   };
 
   return (
@@ -265,9 +265,11 @@ function AppRuntime() {
         }
         chromeOverlay={
           <>
-            <Suspense fallback={null}>
-              <StudioBg3dRetainedOwnerHost />
-            </Suspense>
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={null}>
+                <StudioBg3dRetainedOwnerHost />
+              </Suspense>
+            </ErrorBoundary>
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />

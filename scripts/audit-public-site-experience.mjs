@@ -3,27 +3,27 @@ import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 // Read-only observation: no sign-in, payment, upload, deletion or form submission.
-// A successful process means the evidence was captured, NOT that all routes passed.
+// A successful process means evidence was captured, NOT that all features passed.
 const root = process.env.AUDIT_REPOSITORY || process.cwd();
 const output = process.env.AUDIT_OUTPUT || path.join(root, 'public-site-audit');
 const base = new URL(process.env.AUDIT_BASE_URL || 'https://www.toonstudio.cloud');
-if (!['www.toonstudio.cloud', 'toonstudio.cloud', '127.0.0.1', 'localhost'].includes(base.hostname)) {
-  throw new Error('Audit origin is not allow-listed');
-}
+if (!['www.toonstudio.cloud', 'toonstudio.cloud', '127.0.0.1', 'localhost'].includes(base.hostname)) throw new Error('Audit origin is not allow-listed');
 await mkdir(output, { recursive: true });
 const groupDir = path.join(root, 'apps/web/src/app/routes/groups');
-const concrete = new Set(['/']);
+// These legacy entrypoints were observed redirecting into the excluded editor.
+const studioAliases = new Set(['/make', '/brush-lab', '/creator-hub', '/music', '/publishing', '/shaper']);
+const concrete = new Set(['/', '/learn', '/learn/glossary', '/learn/studio', '/admin']);
 const deferred = [];
 const excluded = [];
 for (const name of (await readdir(groupDir)).filter((name) => name.endsWith('.routes.tsx'))) {
   const source = await readFile(path.join(groupDir, name), 'utf8');
   for (const [, route] of source.matchAll(/\bpath:\s*["']([^"']+)["']/g)) {
-    if (route === '/studio' || route.startsWith('/studio/')) excluded.push({ route, reason: 'User excluded Studio' });
-    else if (route.includes(':') || route.includes('*')) deferred.push({ route, reason: 'Needs a real record or explicit fixture' });
+    if (route === '/studio' || route.startsWith('/studio/') || studioAliases.has(route)) excluded.push({ route, reason: 'User excluded Studio, including legacy aliases' });
+    else if (route.includes(':') || route.includes('*')) deferred.push({ route, reason: 'Needs a real record or an explicit nested-route fixture' });
     else if (route.startsWith('/')) concrete.add(route);
   }
 }
-const priority = ['/', '/discover', '/search', '/ranking', '/explore', '/research', '/learn', '/market', '/make', '/showcase', '/community', '/library', '/my', '/settings', '/help', '/about'];
+const priority = ['/', '/discover', '/search', '/ranking', '/explore', '/research', '/learn', '/market', '/showcase', '/community', '/library', '/my', '/settings', '/help', '/about'];
 const routes = [...concrete].sort((a, b) => {
   const ai = priority.indexOf(a); const bi = priority.indexOf(b);
   return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b);
@@ -33,13 +33,22 @@ const results = [];
 try {
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     const context = await browser.newContext({ viewport, locale: 'ko-KR', reducedMotion: 'reduce' });
-    // Enforce the exclusion even if a public route redirects into the editor.
+    // Block both document navigation and SPA redirects into the excluded editor.
     await context.route('**/*', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      if (request.isNavigationRequest() && (url.pathname === '/studio' || url.pathname.startsWith('/studio/'))) {
-        await route.abort('blockedbyclient');
-      } else await route.continue();
+      if (request.isNavigationRequest() && (url.pathname === '/studio' || url.pathname.startsWith('/studio/'))) await route.abort('blockedbyclient');
+      else await route.continue();
+    });
+    await context.addInitScript(() => {
+      for (const method of ['pushState', 'replaceState']) {
+        const original = history[method];
+        history[method] = function (state, unused, url) {
+          const pathname = url == null ? location.pathname : new URL(String(url), location.href).pathname;
+          if (pathname === '/studio' || pathname.startsWith('/studio/')) throw new DOMException('Studio is excluded from this audit', 'AbortError');
+          return original.call(this, state, unused, url);
+        };
+      }
     });
     let cursor = 0;
     await Promise.all(Array.from({ length: 3 }, async () => {
@@ -76,12 +85,10 @@ try {
               unnamedButtons: [...document.querySelectorAll('button')].filter(visible).filter((element) => !element.textContent?.trim() && !element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby') && !element.getAttribute('title')).length,
             };
           });
-          if (priority.includes(route) || result.view.overflow > 2 || errors.length) {
-            const file = `${viewport.width}-${route === '/' ? 'home' : route.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
-            await page.screenshot({ path: path.join(output, file), fullPage: false });
-            result.screenshot = file;
-          }
-          result.observation = errors.length || result.view.overflow > 2 || (result.status ?? 0) >= 400 ? 'needs-review' : 'rendered';
+          const file = `${viewport.width}-${route === '/' ? 'home' : route.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+          await page.screenshot({ path: path.join(output, file), fullPage: false });
+          result.screenshot = file;
+          result.observation = errors.length || result.view.overflow > 2 || (result.status ?? 0) >= 400 || apiFailures.length ? 'needs-review' : 'rendered';
           if (result.finalPath !== route) result.observation = 'redirected-needs-review';
         } catch (error) {
           result.observation = 'blocked-or-failed';
@@ -100,7 +107,7 @@ try {
   const report = { date: new Date().toISOString(), base: base.origin, mode: 'read-only unauthenticated observation, not full feature verification', routes, deferred, excluded, results };
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
   const count = (status) => results.filter((result) => result.observation === status).length;
-  const summary = `# Public site browser observation\n\nOrigin: ${base.origin}\n\n${results.length} observations across ${routes.length} concrete routes, desktop and mobile.\n\nRendered: ${count('rendered')}; needs review: ${count('needs-review')}; redirects: ${count('redirected-needs-review')}; blocked: ${count('blocked-or-failed')}.\n\nThis is not a claim of authenticated, mutation, payment, or full feature coverage. Studio paths were blocked. ${deferred.length} parameterized routes need real-record follow-up.\n`;
+  const summary = `# Public site browser observation\n\nOrigin: ${base.origin}\n\n${results.length} observations across ${routes.length} concrete routes, desktop and mobile.\n\nRendered: ${count('rendered')}; needs review: ${count('needs-review')}; redirects: ${count('redirected-needs-review')}; blocked: ${count('blocked-or-failed')}.\n\nThis is not a claim of authenticated, mutation, payment, or full feature coverage. Studio paths and known legacy editor aliases were excluded. ${deferred.length} parameterized/nested definitions require separate fixtures.\n`;
   await writeFile(path.join(output, 'SUMMARY.md'), summary);
   if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, summary, { flag: 'a' });
 }

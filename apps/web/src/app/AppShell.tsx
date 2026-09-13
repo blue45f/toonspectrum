@@ -1,10 +1,13 @@
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
+import { PublicSiteNavigationEffects } from "./PublicSiteNavigationEffects";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
+import { PublicSiteNextSteps } from "@/shared/components/public-site-next-steps";
+import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { pingVisit } from "@/shared/lib/visits-api";
@@ -134,6 +137,7 @@ export function AppShell({
   trackVisit = true,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
+  const { pathname } = useLocation();
   useVisitPing(trackVisit);
   return (
     <AuthSessionProvider>
@@ -141,6 +145,7 @@ export function AppShell({
         <StoreSync />
       </Suspense>
       <ScrollToTop />
+      <PublicSiteNavigationEffects />
       <CreatorContinuityTracker />
       {showSkipLink ? (
         <a
@@ -152,8 +157,9 @@ export function AppShell({
       ) : null}
       {header}
       <PwaInstallNudge />
-      <main id="main-content" tabIndex={-1} className={mainClassName}>
+      <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={isPublicCreativeRoute(pathname) ? "atelier" : undefined}>
         <AppRouter />
+        <PublicSiteNextSteps pathname={pathname} />
       </main>
       {footer}
       {showCommandPalette ? <CommandPaletteHost /> : null}
