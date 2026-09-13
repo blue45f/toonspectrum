@@ -8,12 +8,16 @@
 import { Suspense, useLayoutEffect, useState } from "react";
 import { createStudioLeftToolRailRuntime } from "../editor-client/studio-left-tool-rail-client";
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
+import { StudioWorkspaceArrangementToolbar } from "../StudioWorkspaceArrangementToolbar";
+import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
 import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorCanvasColumn } from "./StudioCuttoonEditorCanvasColumn";
 import { StudioCuttoonEditorInspectorColumn } from "./StudioCuttoonEditorInspectorColumn";
 import { StudioCuttoonEditorPanels } from "./StudioCuttoonEditorPanels";
 import { StudioCuttoonEditorSessionDialogs } from "./StudioCuttoonEditorSessionDialogs";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
+
+const TOOL_RAIL_LAYOUT = { version: 2, xRatio: 0.02, yRatio: 0.1, width: 96, height: 720, dock: "free", positionLocked: false, sizeLocked: false } as const;
 
 export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) {
   const {
@@ -232,6 +236,16 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         </Suspense>
 
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
+        <StudioWorkspaceRegion
+          surfaceId="tool-rail"
+          label="그리기 도구"
+          defaultLayout={TOOL_RAIL_LAYOUT}
+          disabled={isMobile || canvasOnlyMode || mobileImmersive || presentationPanelsHidden}
+          minWidth={80}
+          minHeight={240}
+          maxWidth={320}
+          allowedDockEdges={["left", "right"]}
+        >
         <Suspense
           fallback={(
             <div
@@ -243,6 +257,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         >
         <LazyStudioLeftToolRail client={studioLeftToolRailRuntime.client} />
         </Suspense>
+        </StudioWorkspaceRegion>
 
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -251,6 +266,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         </div>
         <StudioCuttoonEditorPanels {...s} />
         <StudioCuttoonEditorSessionDialogs {...s} />
+        <StudioWorkspaceArrangementToolbar disabled={isMobile || canvasOnlyMode || mobileImmersive || presentationPanelsHidden} />
       </div>
   );
 }
