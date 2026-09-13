@@ -1,5 +1,5 @@
 import { CanvasTexture, LinearFilter, SRGBColorSpace } from "three";
-import { isSpatialReaderImageSource, spatialReaderTextureSize } from "./spatial-reader-model";
+import { resolveSpatialReaderImageSource, spatialReaderTextureSize } from "./spatial-reader-model";
 import type { SpatialReaderCrop } from "./spatial-reader-model";
 
 interface ImageEntry { image: HTMLImageElement; promise: Promise<HTMLImageElement>; cancel: () => void }
@@ -9,9 +9,11 @@ export class SpatialReaderImagePool {
   private disposed = false;
   load(source: string): Promise<HTMLImageElement> {
     if (this.disposed) return Promise.reject(new Error("리더가 닫혔습니다."));
-    if (!isSpatialReaderImageSource(source, document.baseURI)) return Promise.reject(new Error("이 이미지 주소는 공간 리더에서 사용할 수 없습니다."));
-    const cached = this.entries.get(source);
-    if (cached) { this.entries.delete(source); this.entries.set(source, cached); return cached.promise; }
+    // Share the 2D reader boundary: use the validated URL for both the DOM sink and cache.
+    const imageSource = resolveSpatialReaderImageSource(source, document.baseURI);
+    if (!imageSource) return Promise.reject(new Error("이 이미지 주소는 공간 리더에서 사용할 수 없습니다."));
+    const cached = this.entries.get(imageSource);
+    if (cached) { this.entries.delete(imageSource); this.entries.set(imageSource, cached); return cached.promise; }
     while (this.entries.size >= 3) {
       const key = this.entries.keys().next().value!;
       this.entries.get(key)!.cancel(); this.entries.delete(key);
@@ -34,10 +36,10 @@ export class SpatialReaderImagePool {
         } else finish();
       };
       image.onerror = () => finish(new Error("이미지를 공간 화면에 올리지 못했습니다. 네트워크·이미지 CORS 권한을 확인해 주세요. 2D 원본 보기는 계속 이용할 수 있습니다."));
-      image.src = source;
+      image.src = imageSource;
     });
-    this.entries.set(source, { image, promise, cancel });
-    void promise.catch(() => { if (this.entries.get(source)?.promise === promise) this.entries.delete(source); });
+    this.entries.set(imageSource, { image, promise, cancel });
+    void promise.catch(() => { if (this.entries.get(imageSource)?.promise === promise) this.entries.delete(imageSource); });
     return promise;
   }
   dispose(): void {
