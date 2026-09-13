@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { StudioSmartFiltersPanel, studioSmartFilterMutationError } from "./StudioSmartFiltersPanel";
+import { StudioSmartFiltersPanel } from "./StudioSmartFiltersPanel";
+import { studioSmartFilterMutationError } from "./studio-smart-filter-mutation";
 
 describe("StudioSmartFiltersPanel", () => {
   // Catalogue titles are the #771 (c9ef0ff7) vocabulary; the former names remain search keywords.
