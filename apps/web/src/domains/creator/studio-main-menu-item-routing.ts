@@ -51,6 +51,7 @@ import {
   buildStudioVectorMenuItems,
 } from "./studio-main-menu-items-story";
 import { buildStudioWindowMenuItems } from "./studio-main-menu-items-workspace";
+import { applyStudioSaveFirstFileMenu } from "./save-first/studio-save-first-menu";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
@@ -65,6 +66,11 @@ const joined =
   (context) =>
     builders.flatMap((build) => build(context));
 
+const buildStudioSaveFirstFileMenuItems = joined(
+  buildStudioFileMenuItems,
+  buildStudioProjectMenuItems,
+);
+
 /**
  * Every §15.3 group except Help routes through this table (Help builds its own
  * shell because its labels probe the active locale pack).
@@ -77,7 +83,7 @@ const joined =
 export const STUDIO_MENU_ITEM_BUILDERS: Readonly<
   Record<string, StudioMainMenuItemBuilder>
 > = {
-  file: joined(buildStudioFileMenuItems, buildStudioProjectMenuItems),
+  file: (context) => applyStudioSaveFirstFileMenu(buildStudioSaveFirstFileMenuItems(context)),
   edit: joined(buildStudioEditMenuItems, buildStudioAutomationMenuItems),
   view: joined(buildStudioViewMenuItems, buildStudioViewSurfaceMenuItems),
   canvas: joined(buildStudioCanvasMenuItems, buildStudioCanvasSurfaceMenuItems),
