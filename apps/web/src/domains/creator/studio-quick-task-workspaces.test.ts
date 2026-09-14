@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { STUDIO_CREATION_PRESETS, studioCreationPreset } from "./studio-creation-presets";
-import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
+import { readStudioLocalCanvasSeed, studioLocalCanvasSeedPage } from "./studio-local-canvas-seed";
 import { readStudioLaunchDensity, readStudioLaunchPrimaryTool } from "./studio-launch-mode";
 import { createStudioProjectWithInitialDocument } from "./studio-project-creation";
 import { ensureInitialStudioProjectDocument } from "./studio-project-document-store";
@@ -33,6 +33,26 @@ describe("quick and task-specific studio workspaces", () => {
       projectId: project.id, projectTitle: project.title, projectKind: project.kind,
       templateId: "different-template",
     }).id).toBe(document.id);
+  });
+  it("seeds four editable frames only for a new four-cut webtoon document", () => {
+    const storage = new MemoryStorage();
+    const { project, document } = createStudioProjectWithInitialDocument(storage, {
+      title: "Four cut", kind: "webtoon", templateId: "webtoon-four-cut",
+    });
+    const seed = readStudioLocalCanvasSeed({
+      projectId: project.id, documentId: document.id, workId: null, remixSourceWorkId: null,
+    }, storage);
+    expect(seed).not.toBeNull();
+    if (!seed) return;
+    const page = studioLocalCanvasSeedPage(seed, "page-a");
+    expect(page.name).toBe(document.title);
+    expect(page.elements).toHaveLength(4);
+    for (const [index, frame] of page.elements.entries()) {
+      expect(frame).toMatchObject({ id: `page-a-initial-frame-${index + 1}`, type: "frame" });
+      if (frame.type !== "frame") throw new Error("expected an initial frame");
+      expect(frame.x + frame.width).toBeLessThan(STUDIO_CANVAS_WIDTH);
+      expect(frame.y + frame.height).toBeLessThan(seed.canvasH);
+    }
   });
   it("rejects unavailable storage and does not borrow another task's template", () => {
     const route = { projectId: "test", documentId: "test", workId: null, remixSourceWorkId: null };

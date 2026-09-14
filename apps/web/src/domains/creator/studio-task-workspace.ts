@@ -23,7 +23,10 @@ export function applyStudioTaskWorkspace(
   state: StudioWorkspaceState,
   workspaceId: StudioDefaultWorkspaceId | null | undefined,
 ): StudioWorkspaceState {
-  return !workspaceId || state.activeWorkspaceId === workspaceId
+  const customWorkspaceActive = state.customWorkspaces.some(
+    (workspace) => workspace.id === state.activeWorkspaceId,
+  );
+  return !workspaceId || state.activeWorkspaceId === workspaceId || customWorkspaceActive
     ? state
     : switchStudioWorkspace(state, workspaceId);
 }

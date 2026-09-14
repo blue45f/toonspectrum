@@ -55,15 +55,18 @@ function resolution() {
 
 function renderHub() {
   const onChangeWorkspace = vi.fn();
+  const onToggleQuickMode = vi.fn();
   render(
     <StudioDocumentWindowHub
       locale="ko"
       resolution={resolution()}
       search="?workspace=draw&focus=cut%3A2&language=ko&version=v3&room=team-a"
+      quickMode={false}
       onChangeWorkspace={onChangeWorkspace}
+      onToggleQuickMode={onToggleQuickMode}
     />,
   );
-  return { onChangeWorkspace };
+  return { onChangeWorkspace, onToggleQuickMode };
 }
 
 beforeEach(() => {

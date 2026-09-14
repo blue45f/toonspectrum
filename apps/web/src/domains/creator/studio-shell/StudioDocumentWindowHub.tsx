@@ -9,6 +9,7 @@ import {
   PanelsTopLeft,
   Radio,
   X,
+  Zap,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -51,7 +52,9 @@ interface StudioDocumentWindowHubProps {
   readonly locale: "ko" | "en";
   readonly resolution: StudioDocumentResolution;
   readonly search: string;
+  readonly quickMode: boolean;
   readonly onChangeWorkspace: (workspace: StudioDocumentWorkspaceId) => void;
+  readonly onToggleQuickMode: () => void;
 }
 
 function workspaceLabel(workspace: StudioDocumentWorkspaceId, locale: "ko" | "en"): string {
@@ -119,7 +122,9 @@ export function StudioDocumentWindowHub({
   locale,
   resolution,
   search,
+  quickMode,
   onChangeWorkspace,
+  onToggleQuickMode,
 }: StudioDocumentWindowHubProps) {
   const { snapshot, requestFocus } = useStudioDocumentWindows({
     documentKey: resolution.documentKey,
@@ -261,7 +266,11 @@ export function StudioDocumentWindowHub({
   }
 
   return (
-    <div ref={shellRef} data-studio-document-window-hub="true">
+    <div
+      ref={shellRef}
+      data-studio-document-window-hub="true"
+      data-studio-quick-mode={quickMode}
+    >
       <div className="pointer-events-none fixed left-1/2 top-2 z-[121] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden">
         <div className="pointer-events-auto flex min-h-11 items-center gap-1 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur-xl">
           <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -295,6 +304,31 @@ export function StudioDocumentWindowHub({
               {locale === "ko" ? currentWorkspace.descriptionKo : currentWorkspace.descriptionEn}
             </p>
           </div>
+          {resolution.workspace === "draw" ? (
+            <button
+              type="button"
+              aria-pressed={quickMode}
+              aria-label={quickMode
+                ? locale === "ko" ? "일반 모드" : "Full mode"
+                : locale === "ko" ? "퀵모드" : "Quick mode"}
+              title={locale === "ko"
+                ? "그림은 유지하고 패널 배치와 기본 도구만 바꿉니다."
+                : "Keep the artwork and change only panel layout and the primary tool."}
+              className={buttonClass({
+                variant: quickMode ? "solid" : "quiet",
+                size: "sm",
+                className: "shrink-0 gap-1 rounded-xl px-2",
+              })}
+              onClick={onToggleQuickMode}
+            >
+              <Zap size={15} aria-hidden="true" />
+              <span className="hidden sm:inline">
+                {quickMode
+                  ? locale === "ko" ? "일반 모드" : "Full mode"
+                  : locale === "ko" ? "퀵모드" : "Quick mode"}
+              </span>
+            </button>
+          ) : null}
           <button
             type="button"
             className={iconButtonClass}
