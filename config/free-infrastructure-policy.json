@@ -1,10 +1,13 @@
 {
-  "version": "toonspectrum.free-infrastructure.v1",
+  "version": "toonspectrum.free-infrastructure.v2",
   "mode": "free-strict",
   "automaticDeployments": false,
   "automaticPaidFailover": false,
   "defaultProjectStorage": "local-or-byos",
-  "forbiddenProviders": ["oracle", "oci"],
+  "forbiddenProviders": [
+    "oracle",
+    "oci"
+  ],
   "quotaThresholds": {
     "warn": 0.6,
     "forecast": 0.7,
@@ -15,71 +18,538 @@
   "authorities": {
     "staticWeb": "cloudflare-static-assets",
     "edgeGateway": "cloudflare-workers",
+    "edgeConfiguration": "cloudflare-kv",
+    "edgeRelationalIndex": "cloudflare-d1",
     "transactionalDatabase": "neon-postgres",
+    "derivedReadModels": "turso-libsql",
+    "socialDatabase": "supabase-social",
+    "playgroundDatabase": "supabase-playground",
     "realtimeCoordination": "cloudflare-durable-objects",
+    "eventDelivery": "cloudflare-queues",
     "publicAssets": "cloudflare-r2",
+    "thumbnailDelivery": "imagekit",
     "backupArchive": "backblaze-b2",
     "localProjects": "local-opfs",
     "userOwnedProjects": "user-owned-storage",
-    "email": "resend"
+    "email": "resend",
+    "batchCompute": "local-m2-runner",
+    "legacyCompute": "cloud-run-compatibility"
   },
   "providers": {
     "cloudflare-static-assets": {
-      "roles": ["static-web"],
+      "roles": [
+        "static-web",
+        "public-catalog-read",
+        "edge-config-read",
+        "public-assets-read",
+        "thumbnail-read",
+        "release-artifacts"
+      ],
       "billingBoundary": "hard-stop-free",
       "applicationHardCapRatio": 1
     },
     "cloudflare-workers": {
-      "roles": ["edge-gateway", "lightweight-api"],
-      "billingBoundary": "free-allowance-with-app-cap",
-      "applicationHardCapRatio": 0.85
-    },
-    "cloudflare-durable-objects": {
-      "roles": ["realtime-coordination"],
-      "billingBoundary": "free-allowance-with-app-cap",
-      "applicationHardCapRatio": 0.85
-    },
-    "cloudflare-r2": {
-      "roles": ["public-assets", "published-artifacts"],
+      "roles": [
+        "edge-gateway",
+        "lightweight-api",
+        "signed-upload-admission"
+      ],
       "billingBoundary": "free-allowance-with-app-cap",
       "applicationHardCapRatio": 0.8
     },
-    "neon-postgres": {
-      "roles": ["transactional-database"],
+    "cloudflare-kv": {
+      "roles": [
+        "edge-config-read",
+        "edge-config-write",
+        "manifest-read"
+      ],
       "billingBoundary": "hard-stop-free",
       "applicationHardCapRatio": 0.8
     },
+    "cloudflare-d1": {
+      "roles": [
+        "edge-config-read",
+        "edge-index-read",
+        "edge-index-write",
+        "public-catalog-read"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "cloudflare-durable-objects": {
+      "roles": [
+        "realtime-coordination"
+      ],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8
+    },
+    "cloudflare-queues": {
+      "roles": [
+        "derived-event-delivery"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "cloudflare-r2": {
+      "roles": [
+        "public-assets-read",
+        "public-assets-write",
+        "thumbnail-read",
+        "thumbnail-write",
+        "published-artifacts"
+      ],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8
+    },
+    "cloudflare-images": {
+      "roles": [
+        "dynamic-image-read",
+        "dynamic-image-transform"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "neon-postgres": {
+      "roles": [
+        "transactional-read",
+        "transactional-write",
+        "outbox-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "turso-libsql": {
+      "roles": [
+        "public-catalog-read",
+        "public-catalog-write",
+        "derived-read-model"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "supabase-social": {
+      "roles": [
+        "social-read",
+        "social-write",
+        "social-attachments"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "supabase-playground": {
+      "roles": [
+        "playground-read",
+        "playground-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "supabase-object-storage": {
+      "roles": [
+        "private-object-storage",
+        "published-artifacts"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "imagekit": {
+      "roles": [
+        "thumbnail-read",
+        "thumbnail-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
     "backblaze-b2": {
-      "roles": ["backup-archive"],
+      "roles": [
+        "backup-read",
+        "backup-write"
+      ],
       "billingBoundary": "free-allowance-with-app-cap",
       "applicationHardCapRatio": 0.8
     },
     "local-opfs": {
-      "roles": ["local-projects", "local-rendering"],
+      "roles": [
+        "private-project-read",
+        "private-project-write",
+        "local-rendering",
+        "thumbnail-write"
+      ],
       "billingBoundary": "device-owned",
       "applicationHardCapRatio": 0.95
     },
     "user-owned-storage": {
-      "roles": ["personal-projects", "large-private-assets"],
+      "roles": [
+        "private-project-read",
+        "private-project-write",
+        "large-private-assets",
+        "user-backup-write"
+      ],
       "billingBoundary": "user-owned",
       "applicationHardCapRatio": 0.95
     },
     "resend": {
-      "roles": ["transactional-email"],
+      "roles": [
+        "transactional-email"
+      ],
       "billingBoundary": "hard-stop-free",
       "applicationHardCapRatio": 0.8
     },
-    "cloud-run-compatibility": {
-      "roles": ["legacy-nest-api"],
-      "billingBoundary": "free-allowance-with-app-cap",
-      "applicationHardCapRatio": 0.8,
-      "optional": true
-    },
-    "supabase-compatibility": {
-      "roles": ["legacy-private-object-storage"],
+    "upstash-redis": {
+      "roles": [
+        "coordination-cache",
+        "rate-limit"
+      ],
       "billingBoundary": "hard-stop-free",
       "applicationHardCapRatio": 0.8,
       "optional": true
+    },
+    "github-actions-manual": {
+      "roles": [
+        "release-validation",
+        "catalog-build"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "local-m2-runner": {
+      "roles": [
+        "heavy-batch",
+        "catalog-build",
+        "asset-transform",
+        "backup-verify"
+      ],
+      "billingBoundary": "device-owned",
+      "applicationHardCapRatio": 0.95
+    },
+    "cloud-run-compatibility": {
+      "roles": [
+        "legacy-nest-api",
+        "heavy-api-compatibility"
+      ],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    }
+  },
+  "workloads": {
+    "static-web-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "cloudflare-static-assets",
+      "candidates": [
+        "cloudflare-static-assets"
+      ],
+      "requiredRoles": [
+        "static-web"
+      ],
+      "allowReadFallback": false
+    },
+    "public-catalog-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "turso-libsql",
+      "candidates": [
+        "turso-libsql",
+        "cloudflare-d1",
+        "cloudflare-static-assets"
+      ],
+      "requiredRoles": [
+        "public-catalog-read"
+      ],
+      "allowReadFallback": true
+    },
+    "public-catalog-write": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "turso-libsql",
+      "candidates": [
+        "turso-libsql"
+      ],
+      "requiredRoles": [
+        "public-catalog-write"
+      ],
+      "allowReadFallback": false
+    },
+    "edge-config-read": {
+      "operation": "read",
+      "consistency": "replicated",
+      "authority": "cloudflare-kv",
+      "candidates": [
+        "cloudflare-kv",
+        "cloudflare-d1",
+        "cloudflare-static-assets"
+      ],
+      "requiredRoles": [
+        "edge-config-read"
+      ],
+      "allowReadFallback": true
+    },
+    "critical-ledger-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "neon-postgres",
+      "candidates": [
+        "neon-postgres"
+      ],
+      "requiredRoles": [
+        "transactional-read"
+      ],
+      "allowReadFallback": false
+    },
+    "critical-ledger-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "neon-postgres",
+      "candidates": [
+        "neon-postgres"
+      ],
+      "requiredRoles": [
+        "transactional-write"
+      ],
+      "allowReadFallback": false
+    },
+    "outbox-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "neon-postgres",
+      "candidates": [
+        "neon-postgres"
+      ],
+      "requiredRoles": [
+        "outbox-write"
+      ],
+      "allowReadFallback": false
+    },
+    "social-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "supabase-social",
+      "candidates": [
+        "supabase-social"
+      ],
+      "requiredRoles": [
+        "social-read"
+      ],
+      "allowReadFallback": false
+    },
+    "social-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "supabase-social",
+      "candidates": [
+        "supabase-social"
+      ],
+      "requiredRoles": [
+        "social-write"
+      ],
+      "allowReadFallback": false
+    },
+    "playground-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "supabase-playground",
+      "candidates": [
+        "supabase-playground"
+      ],
+      "requiredRoles": [
+        "playground-read"
+      ],
+      "allowReadFallback": false
+    },
+    "playground-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "supabase-playground",
+      "candidates": [
+        "supabase-playground"
+      ],
+      "requiredRoles": [
+        "playground-write"
+      ],
+      "allowReadFallback": false
+    },
+    "realtime-compute": {
+      "operation": "compute",
+      "consistency": "ephemeral",
+      "authority": "cloudflare-durable-objects",
+      "candidates": [
+        "cloudflare-durable-objects"
+      ],
+      "requiredRoles": [
+        "realtime-coordination"
+      ],
+      "allowReadFallback": false
+    },
+    "derived-event-delivery": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "cloudflare-queues",
+      "candidates": [
+        "cloudflare-queues"
+      ],
+      "requiredRoles": [
+        "derived-event-delivery"
+      ],
+      "allowReadFallback": false
+    },
+    "public-asset-read": {
+      "operation": "read",
+      "consistency": "replicated",
+      "authority": "cloudflare-r2",
+      "candidates": [
+        "cloudflare-r2",
+        "cloudflare-static-assets"
+      ],
+      "requiredRoles": [
+        "public-assets-read"
+      ],
+      "allowReadFallback": true
+    },
+    "public-asset-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "cloudflare-r2",
+      "candidates": [
+        "cloudflare-r2"
+      ],
+      "requiredRoles": [
+        "public-assets-write"
+      ],
+      "allowReadFallback": false
+    },
+    "thumbnail-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "imagekit",
+      "candidates": [
+        "imagekit",
+        "cloudflare-r2",
+        "cloudflare-static-assets"
+      ],
+      "requiredRoles": [
+        "thumbnail-read"
+      ],
+      "allowReadFallback": true
+    },
+    "thumbnail-write": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "local-opfs",
+      "candidates": [
+        "local-opfs",
+        "imagekit",
+        "cloudflare-r2"
+      ],
+      "requiredRoles": [
+        "thumbnail-write"
+      ],
+      "allowReadFallback": false
+    },
+    "private-project-read": {
+      "operation": "read",
+      "consistency": "replicated",
+      "authority": "local-opfs",
+      "candidates": [
+        "local-opfs",
+        "user-owned-storage"
+      ],
+      "requiredRoles": [
+        "private-project-read"
+      ],
+      "allowReadFallback": true
+    },
+    "private-project-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "local-opfs",
+      "candidates": [
+        "local-opfs",
+        "user-owned-storage"
+      ],
+      "requiredRoles": [
+        "private-project-write"
+      ],
+      "allowReadFallback": false
+    },
+    "backup-archive-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "backblaze-b2",
+      "candidates": [
+        "backblaze-b2"
+      ],
+      "requiredRoles": [
+        "backup-write"
+      ],
+      "allowReadFallback": false
+    },
+    "user-backup-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "user-owned-storage",
+      "candidates": [
+        "user-owned-storage"
+      ],
+      "requiredRoles": [
+        "user-backup-write"
+      ],
+      "allowReadFallback": false
+    },
+    "transactional-email-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "resend",
+      "candidates": [
+        "resend"
+      ],
+      "requiredRoles": [
+        "transactional-email"
+      ],
+      "allowReadFallback": false
+    },
+    "catalog-build-compute": {
+      "operation": "compute",
+      "consistency": "derived",
+      "authority": "local-m2-runner",
+      "candidates": [
+        "local-m2-runner",
+        "github-actions-manual"
+      ],
+      "requiredRoles": [
+        "catalog-build"
+      ],
+      "allowReadFallback": false
+    },
+    "asset-transform-compute": {
+      "operation": "compute",
+      "consistency": "derived",
+      "authority": "local-m2-runner",
+      "candidates": [
+        "local-m2-runner"
+      ],
+      "requiredRoles": [
+        "asset-transform"
+      ],
+      "allowReadFallback": false
+    },
+    "legacy-api-compute": {
+      "operation": "compute",
+      "consistency": "authoritative",
+      "authority": "cloud-run-compatibility",
+      "candidates": [
+        "cloud-run-compatibility"
+      ],
+      "requiredRoles": [
+        "legacy-nest-api"
+      ],
+      "allowReadFallback": false
     }
   }
 }

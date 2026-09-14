@@ -333,8 +333,10 @@ export class S3CompatiblePrivateObjectStoragePort
       controller.abort();
     }, this.config.timeoutMs);
 
-    const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_HASH;
-    const requestBody = body ? Uint8Array.from(body).buffer : undefined;
+    const requestBody = body ? snapshotBytes(body) : undefined;
+    const payloadHash = requestBody
+      ? sha256Hex(requestBody)
+      : EMPTY_PAYLOAD_HASH;
     const headers = signedRequestHeaders(
       this.config,
       method,

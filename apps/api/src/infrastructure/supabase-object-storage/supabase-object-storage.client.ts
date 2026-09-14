@@ -258,11 +258,18 @@ export class SupabaseRestObjectStoragePort
   ) {}
 
   async verifyPrivatePurposeBuckets(
-    options: SupabaseObjectStorageCallOptions = {}
+    options: SupabaseObjectStorageCallOptions = {},
+    purposes: readonly SupabaseObjectPurpose[] =
+      SupabaseObjectPurposeSchema.options,
   ): Promise<SupabaseObjectStorageReadiness> {
-    const purposes = ["source", "derived", "export"] as const;
+    const requestedPurposes = [...new Set(
+      purposes.map((purpose) => SupabaseObjectPurposeSchema.parse(purpose)),
+    )];
+    if (requestedPurposes.length === 0) {
+      throw new SupabaseObjectStorageError("INVALID_INPUT");
+    }
     const buckets = await Promise.all(
-      purposes.map(async (purpose) => {
+      requestedPurposes.map(async (purpose) => {
         const bucket = this.bucketFor(purpose);
         const response = await this.requestJson(
           {
@@ -288,7 +295,10 @@ export class SupabaseRestObjectStoragePort
       throw new SupabaseObjectStorageError("BUCKET_POLICY_INVALID");
     }
 
-    return { ready: true, privatePurposeBuckets: 3 };
+    return {
+      ready: true,
+      privatePurposeBuckets: requestedPurposes.length,
+    };
   }
 
   async uploadImmutable(

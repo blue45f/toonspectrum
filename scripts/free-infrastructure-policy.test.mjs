@@ -53,4 +53,36 @@ describe("free infrastructure policy", () => {
       "forbiddenProviders must include oci",
     ]));
   });
+
+  it("commits an aggressive provider federation with explicit workload authorities", () => {
+    expect(Object.keys(policy.providers).length).toBeGreaterThanOrEqual(20);
+    expect(Object.keys(policy.workloads).length).toBeGreaterThanOrEqual(20);
+    expect(policy.authorities).toMatchObject({
+      staticWeb: "cloudflare-static-assets",
+      transactionalDatabase: "neon-postgres",
+      derivedReadModels: "turso-libsql",
+      socialDatabase: "supabase-social",
+      playgroundDatabase: "supabase-playground",
+      batchCompute: "local-m2-runner",
+    });
+    expect(policy.workloads["private-project-write"]).toMatchObject({
+      authority: "local-opfs",
+      candidates: ["local-opfs", "user-owned-storage"],
+    });
+  });
+
+  it("rejects unknown candidates, role mismatches, and authoritative write failover", () => {
+    const changed = clone(policy);
+    changed.workloads["critical-ledger-write"].candidates = [
+      "neon-postgres",
+      "cloudflare-d1",
+      "missing-provider",
+    ];
+    const issues = validateFreeInfrastructurePolicy(changed);
+    expect(issues).toEqual(expect.arrayContaining([
+      "workloads.critical-ledger-write authoritative writes must have exactly one authority candidate",
+      "workloads.critical-ledger-write provider cloudflare-d1 lacks role transactional-write",
+      "workloads.critical-ledger-write references unknown provider missing-provider",
+    ]));
+  });
 });

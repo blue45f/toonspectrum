@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Module, type DynamicModule } from "@nestjs/common";
 
-import { SupabaseObjectStorageModule } from "../supabase-object-storage/supabase-object-storage.module";
+import { PrivateObjectStorageModule } from "../private-object-storage/private-object-storage.module";
 import { UpstashCoordinationModule } from "../upstash-coordination/upstash-coordination.module";
 import { UpstashQStashModule } from "../upstash-qstash/upstash-qstash.module";
 
@@ -29,19 +29,19 @@ import {
 
 const upstashCoordinationModule =
   UpstashCoordinationModule.fromEnvironment(process.env);
-const supabaseObjectStorageModule =
-  SupabaseObjectStorageModule.fromEnvironment(process.env);
+const privateObjectStorageModule =
+  PrivateObjectStorageModule.fromEnvironment(process.env);
 const upstashQStashModule =
   UpstashQStashModule.fromEnvironment(process.env);
 
 const optionalInfrastructureModules = [
   ...(upstashCoordinationModule ? [upstashCoordinationModule] : []),
-  ...(supabaseObjectStorageModule ? [supabaseObjectStorageModule] : []),
+  ...(privateObjectStorageModule ? [privateObjectStorageModule] : []),
   ...(upstashQStashModule ? [upstashQStashModule] : []),
 ];
 const optionalInfrastructureExports = [
   ...(upstashCoordinationModule ? [UpstashCoordinationModule] : []),
-  ...(supabaseObjectStorageModule ? [SupabaseObjectStorageModule] : []),
+  ...(privateObjectStorageModule ? [PrivateObjectStorageModule] : []),
   ...(upstashQStashModule ? [UpstashQStashModule] : []),
 ];
 
