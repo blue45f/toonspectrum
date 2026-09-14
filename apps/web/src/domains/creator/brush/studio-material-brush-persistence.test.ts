@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_STUDIO_V6_RECIPES, createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import {
+  BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+  BRUSH_STUDIO_V6_RECIPES,
+  analyzeBrushStudioV6Program,
+  createBrushStudioV6Program,
+} from "../brush-lab/brush-studio-v6-engine";
 import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 import { parseStudioAutosave, serializeStudioAutosave } from "../studio-autosave";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "../studio-project-file";
@@ -8,6 +13,13 @@ import { normalizeStudioToolOperationMemory, rememberStudioToolOperationSnapshot
 import { brushMatchesSnapshot, importBrushFromJson, normalizeStoredBrush, sanitizeBrushSnapshot, writeBrushJson } from "./studio-brush-library";
 import { parseStudioToolOperationMemory, serializeStudioToolOperationMemory } from "../studio-tool-operation-memory-sqlite";
 import { planStudioMaterialBrush, studioMaterialBrushConfig } from "./studio-material-brush-runtime";
+
+const SAVABLE_RECIPE_IDS = BRUSH_STUDIO_V6_RECIPES
+  .filter((recipe) => analyzeBrushStudioV6Program(recipe.create(), BRUSH_STUDIO_V6_FULL_CAPABILITIES).providerPlan.valid)
+  .map((recipe) => recipe.id);
+const BLOCKED_RECIPE_IDS = BRUSH_STUDIO_V6_RECIPES
+  .filter((recipe) => !SAVABLE_RECIPE_IDS.includes(recipe.id))
+  .map((recipe) => recipe.id);
 
 describe("saved material brush preservation", () => {
   it.each([[1, 0.01], [240, 0.01], [240, 1]])("retains material size %s and opacity %s through save, JSON, tool memory and runtime", (size, opacity) => {
@@ -27,7 +39,7 @@ describe("saved material brush preservation", () => {
     }
   });
 
-  it.each(BRUSH_STUDIO_V6_RECIPES.map((recipe) => recipe.id))("exports and imports %s without changing the material renderer or marks", (recipe) => {
+  it.each(SAVABLE_RECIPE_IDS)("exports and imports %s without changing the material renderer or marks", (recipe) => {
     const saved = createBrushStudioV6ProductBrush(createBrushStudioV6Program(recipe));
     const { brush: imported, adjustedFields } = importBrushFromJson(writeBrushJson(saved));
     expect(adjustedFields).toEqual([]);
@@ -38,11 +50,16 @@ describe("saved material brush preservation", () => {
       .toEqual(planStudioMaterialBrush({ ...stroke, brushEnginePrograms: saved.enginePrograms! }));
   });
 
+  it.each(BLOCKED_RECIPE_IDS)("refuses unavailable recipe %s instead of persisting a substituted renderer", (recipe) => {
+    expect(() => createBrushStudioV6ProductBrush(createBrushStudioV6Program(recipe))).toThrow(/무폴백/u);
+  });
+
   it.each([
     ["future program set", { version: 2 }],
     ["malformed program set", "material"],
     ["missing program version", {}],
-    ["future material kernel", { version: 1, material: { version: 2 } }],
+    ["future material kernel", { version: 1, material: { version: 3 } }],
+    ["v2 material without runtime receipt", { version: 1, material: { version: 2 } }],
     ["malformed material", { version: 1, material: { version: 1, seed: 12 } }],
     ["malformed nested oil", { version: 1, oil: { bristlePhysics: "true" } }],
     ["discarded unknown extension", { version: 1, nextRenderer: {} }],

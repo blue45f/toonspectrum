@@ -1,5 +1,6 @@
 import { isBrushStudioV6TopologyNodeCompatible } from "./brush-studio-v6-topology-material";
 import { BRUSH_STUDIO_V6_TOPOLOGIES, brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
+import { planBrushStudioV6ProviderRuntime } from "./brush-studio-v6-provider-runtime";
 import {
   BRUSH_STUDIO_V6_DEFAULT_LICENSE_PROFILE,
   brushStudioV6LicenseProfileAllows,
@@ -9,6 +10,7 @@ import type {
   BrushStudioV6LicenseProfile,
   BrushStudioV6Rights,
 } from "./brush-studio-v6-license-profile";
+import type { BrushStudioV6ProviderRuntimePlan } from "./brush-studio-v6-provider-runtime";
 
 export const BRUSH_STUDIO_V6_SCHEMA_VERSION = 6 as const;
 
@@ -113,7 +115,7 @@ export interface BrushStudioV6Capabilities { readonly webgpu: boolean; readonly 
 export interface BrushStudioV6Issue { readonly id: string; readonly severity: BrushStudioV6IssueSeverity; readonly title: string; readonly detail: string; readonly fix?: string; }
 export interface BrushStudioV6ExecutionPass { readonly id: string; readonly phase: BrushStudioV6Phase; readonly domain: BrushStudioV6Domain; readonly label: string; readonly nodeIds: readonly BrushStudioV6NodeId[]; readonly canonical: boolean; readonly budgetMs: number; }
 export interface BrushStudioV6Resource { readonly id: string; readonly format: string; readonly scale: number; readonly owner: BrushStudioV6Authority; readonly estimatedMb: number; }
-export interface BrushStudioV6Analysis { readonly valid: boolean; readonly issues: readonly BrushStudioV6Issue[]; readonly nodes: readonly BrushStudioV6NodeDescriptor[]; readonly passes: readonly BrushStudioV6ExecutionPass[]; readonly resources: readonly BrushStudioV6Resource[]; readonly metrics: { readonly handFeel: number; readonly materialFidelity: number; readonly colorFidelity: number; readonly temporalFidelity: number; readonly uniqueness: number; readonly performance: number; readonly determinism: number; }; readonly estimatedInputLatencyMs: number; readonly estimatedFrameCostMs: number; readonly estimatedSettleMs: number; readonly estimatedGpuMemoryMb: number; readonly rightsProfile: "commercial-safe" | "copyleft-distribution" | "noncommercial" | "private-grant"; readonly licenseProfile: BrushStudioV6LicenseProfile; readonly resolvedTransport: Exclude<BrushStudioV6InputTransport, "auto">; }
+export interface BrushStudioV6Analysis { readonly valid: boolean; readonly issues: readonly BrushStudioV6Issue[]; readonly nodes: readonly BrushStudioV6NodeDescriptor[]; readonly passes: readonly BrushStudioV6ExecutionPass[]; readonly resources: readonly BrushStudioV6Resource[]; readonly metrics: { readonly handFeel: number; readonly materialFidelity: number; readonly colorFidelity: number; readonly temporalFidelity: number; readonly uniqueness: number; readonly performance: number; readonly determinism: number; }; readonly estimatedInputLatencyMs: number; readonly estimatedFrameCostMs: number; readonly estimatedSettleMs: number; readonly estimatedGpuMemoryMb: number; readonly rightsProfile: "commercial-safe" | "copyleft-distribution" | "noncommercial" | "private-grant"; readonly licenseProfile: BrushStudioV6LicenseProfile; readonly providerPlan: BrushStudioV6ProviderRuntimePlan; readonly resolvedTransport: Exclude<BrushStudioV6InputTransport, "auto">; }
 export interface BrushStudioV6Recipe { readonly id: string; readonly label: string; readonly group: string; readonly description: string; readonly create: () => BrushStudioV6Program; }
 
 const GOALS: readonly BrushStudioV6QualityGoal[] = ["responsive", "balanced", "material", "cinematic"];
@@ -189,7 +191,7 @@ export function detectBrushStudioV6Capabilities(): BrushStudioV6Capabilities {
   return Object.freeze({ webgpu: Boolean(nav?.gpu), wasm: typeof WebAssembly !== "undefined", webgl2: typeof document !== "undefined" && Boolean(document.createElement("canvas").getContext("webgl2")), sharedArrayBuffer: typeof SharedArrayBuffer !== "undefined" && Boolean(globalThis.crossOriginIsolated), pointerRawUpdate: Boolean(win && "onpointerrawupdate" in win), coalescedEvents: typeof proto?.getCoalescedEvents === "function", predictedEvents: typeof proto?.getPredictedEvents === "function", pressure: typeof PointerEvent !== "undefined", tilt: Boolean(proto && "tiltX" in proto), twist: Boolean(proto && "twist" in proto), hover: typeof matchMedia === "function" && matchMedia("(hover: hover)").matches, maxTextureDimension2D: 8192, memoryBudgetMb: 512 });
 }
 export const BRUSH_STUDIO_V6_FULL_CAPABILITIES: BrushStudioV6Capabilities = Object.freeze({ webgpu: true, wasm: true, webgl2: true, sharedArrayBuffer: true, pointerRawUpdate: true, coalescedEvents: true, predictedEvents: true, pressure: true, tilt: true, twist: true, hover: true, maxTextureDimension2D: 16384, memoryBudgetMb: 2048 });
-function active(program: BrushStudioV6Program): readonly BrushStudioV6NodeDescriptor[] {
+export function brushStudioV6ActiveNodes(program: BrushStudioV6Program): readonly BrushStudioV6NodeDescriptor[] {
   const topology = brushStudioV6Topology(program.slots.carrier);
   return Object.freeze([program.slots.input, program.slots.motion, program.slots.carrier, program.slots.tip,
     program.slots.surface, program.slots.deposition, program.slots.pickup, program.slots.pigment,
@@ -221,8 +223,18 @@ export function analyzeBrushStudioV6Program(
   c: BrushStudioV6Capabilities = detectBrushStudioV6Capabilities(),
   licenseProfile: BrushStudioV6LicenseProfile = BRUSH_STUDIO_V6_DEFAULT_LICENSE_PROFILE,
 ): BrushStudioV6Analysis {
-  const program = normalizeBrushStudioV6Program(input); const nodes = active(program); const p = new Set(program.slots.physics); const issues: BrushStudioV6Issue[] = [];
+  const program = normalizeBrushStudioV6Program(input); const nodes = brushStudioV6ActiveNodes(program); const p = new Set(program.slots.physics); const issues: BrushStudioV6Issue[] = [];
+  const providerPlan = planBrushStudioV6ProviderRuntime(nodes, licenseProfile);
   for (const node of nodes) for (const requirement of node.requires) if (!capability(c, requirement)) issues.push(issue(`capability-${node.id}-${requirement}`, "error", `${node.label} 실행 불가`, `${requirement} 기능이 현재 브라우저에 없습니다.`));
+  for (const nodeId of providerPlan.blockedNodeIds) {
+    const node = nodeFor(nodeId);
+    issues.push(issue(
+      `provider-${nodeId}`,
+      "error",
+      `${node.label} 무폴백 실행 불가`,
+      "선택한 엔진 또는 명시적 호환 어댑터가 제품 재료 경로에 연결되지 않았습니다. 다른 엔진으로 자동 대체하지 않습니다.",
+    ));
+  }
   for (const node of nodes) if (!brushStudioV6LicenseProfileAllows(licenseProfile, node.rights)) issues.push(issue(
     `license-${node.id}`,
     "error",
@@ -246,7 +258,7 @@ export function analyzeBrushStudioV6Program(
   if (p.has("physics-inkwash") && p.has("physics-thin-film")) issues.push(issue("wet-coupling", "info", "Inkwash→Thin-film 결합", "질량 보존 어댑터를 사용합니다."));
   if (!brushStudioV6Topology(program.slots.carrier) && program.tuning.bristleStrands * program.tuning.bristleIterations > 768) issues.push(issue("bristle-cost", "warning", "강모 비용이 높음", "라이브 LOD를 낮추세요."));
   const allocated = resources(program); const chosenTransport = transport(program, c); const inputLatency = 2.4 + (chosenTransport === "move-basic" ? 5 : chosenTransport === "move-coalesced" ? 2 : 0.7) + program.tuning.stabilization * 2.5; const frameCost = 0.7 + nodes.reduce((sum, node) => sum + (100 - node.latency) / 70, 0) + (p.has("physics-bristle") ? program.tuning.bristleStrands * program.tuning.bristleIterations / 520 : 0) + (p.has("physics-particles") ? program.tuning.particleCount / 1250 : 0); const settle = brushStudioV6Topology(program.slots.carrier) ? 0 : 6 + (p.has("physics-inkwash") ? 72 : 0) + (p.has("physics-thin-film") ? 58 : 0) + (p.has("physics-reaction") ? 84 : 0) + (p.has("physics-height") ? 28 : 0); const memory = allocated.reduce((sum, entry) => sum + entry.estimatedMb, 0); const average = (key: "fidelity" | "uniqueness") => nodes.reduce((sum, node) => sum + node[key], 0) / Math.max(1, nodes.length); const score = (value: number) => Math.round(Math.max(0, Math.min(100, value))); const metrics = Object.freeze({ handFeel: score(102 - inputLatency * 3), materialFidelity: score(average("fidelity") + program.tuning.surfaceTooth * 4 + program.tuning.pickup * 4), colorFidelity: score(program.slots.pigment === "pigment-rgb" ? 68 : 94 + program.tuning.granulation * 5), temporalFidelity: score(55 + program.slots.physics.filter((id) => ["physics-inkwash", "physics-thin-film", "physics-reaction", "physics-height"].includes(id)).length * 11), uniqueness: score(average("uniqueness") + program.slots.physics.length * 2), performance: score(105 - frameCost * 6 - memory * 0.08), determinism: score(100 - (program.proofs.deterministicPatternSeed ? 0 : 24) - (program.proofs.rasterReceipt ? 0 : program.slots.physics.length * 8)) }); const rightsProfile = nodes.some((node) => node.rights === "private-grant") ? "private-grant" : nodes.some((node) => node.rights === "noncommercial") ? "noncommercial" : nodes.some((node) => node.rights === "copyleft") ? "copyleft-distribution" : "commercial-safe";
-  return Object.freeze({ valid: !issues.some((entry) => entry.severity === "error"), issues: Object.freeze(issues), nodes, passes: passes(nodes), resources: allocated, metrics, estimatedInputLatencyMs: Number(inputLatency.toFixed(1)), estimatedFrameCostMs: Number(frameCost.toFixed(1)), estimatedSettleMs: Math.round(settle), estimatedGpuMemoryMb: Number(memory.toFixed(1)), rightsProfile, licenseProfile, resolvedTransport: chosenTransport });
+  return Object.freeze({ valid: !issues.some((entry) => entry.severity === "error"), issues: Object.freeze(issues), nodes, passes: passes(nodes), resources: allocated, metrics, estimatedInputLatencyMs: Number(inputLatency.toFixed(1)), estimatedFrameCostMs: Number(frameCost.toFixed(1)), estimatedSettleMs: Math.round(settle), estimatedGpuMemoryMb: Number(memory.toFixed(1)), rightsProfile, licenseProfile, providerPlan, resolvedTransport: chosenTransport });
 }
 
 export function optimizeBrushStudioV6Program(input: BrushStudioV6Program, capabilities: BrushStudioV6Capabilities = detectBrushStudioV6Capabilities()): BrushStudioV6Program { const program = normalizeBrushStudioV6Program(input); let next = patch(program, { input: { transport: transport(program, capabilities), tiltEnabled: program.input.tiltEnabled && capabilities.tilt, hoverPreview: program.input.hoverPreview && capabilities.hover } }); if (next.qualityGoal === "responsive") next = patch(next, { tuning: { bristleStrands: Math.min(48, next.tuning.bristleStrands), bristleIterations: Math.min(4, next.tuning.bristleIterations), particleCount: Math.min(768, next.tuning.particleCount), diffusion: Math.min(0.55, next.tuning.diffusion) } }); return normalizeBrushStudioV6Program(next); }
