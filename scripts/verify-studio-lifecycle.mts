@@ -20,6 +20,8 @@ import { createHash } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
+  mkdtempSync,
+  rmSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -196,8 +198,7 @@ function isExpectedStaticPreviewError(message: string, studioUrl: string): boole
   }
 }
 
-function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollector {
-  const collector: BrowserErrorCollector = { messages: [], failedResponses: [] };
+function collectBrowserErrors(page: Page, studioUrl: string, collector: BrowserErrorCollector = { messages: [], failedResponses: [] }): BrowserErrorCollector {
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
@@ -558,11 +559,12 @@ async function prepareOfflineLifecycle(page: Page): Promise<void> {
 async function runLifecycle(browser: Browser, origin: string): Promise<LifecycleResult> {
   // /studio is the project home; draw/undo/reload/export exercise the explicit canvas route.
   const studioUrl = `${origin}studio/canvas`;
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 1000 },
-    acceptDownloads: true,
-  });
-  const page = await context.newPage();
+  const contextOptions = { viewport: { width: 1440, height: 1000 }, acceptDownloads: true };
+  const profile = VERIFY_OFFLINE_DRAWING ? mkdtempSync(join(tmpdir(), "toonstudio-offline-profile-")) : null;
+  let context = profile
+    ? await chromium.launchPersistentContext(profile, { ...contextOptions, headless: true, args: ["--no-sandbox"] })
+    : await browser.newContext(contextOptions);
+  let page = await context.newPage();
   const browserErrors = collectBrowserErrors(page, studioUrl);
   await installCleanStudioState(page);
 
@@ -665,9 +667,8 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       "durable autosave left a browser compatibility record before reload",
     );
 
-    // Export is a separately lazy-loaded capability. Warm it online once, then
-    // verify the cached export and persisted artwork after a truly offline boot.
-    if (VERIFY_OFFLINE_DRAWING) await context.setOffline(false);
+    // The explicit preparation pack must include first-use PNG/backup resources.
+    // Do not reconnect or warm the export UI online to make this test pass.
     const beforeDownload = await captureDownload(page, beforeExportPath);
     const beforePng = inspectPngIntegrity(beforeDownload.bytes);
     const beforeStats = await decodedPngStats(page, beforeDownload.bytes);
@@ -682,12 +683,21 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       `PNG dimensions are ${beforePng.width}x${beforePng.height}, expected ${expectedWidth}x${expectedHeight}`,
     );
 
-    if (VERIFY_OFFLINE_DRAWING) {
-      await prepareOfflineLifecycle(page);
-      await context.setOffline(true);
-    }
     const reloadStartedAt = performance.now();
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
+    if (profile) {
+      const reopenUrl = page.url();
+      await context.close();
+      context = await chromium.launchPersistentContext(profile, {
+        ...contextOptions, headless: true, args: ["--no-sandbox"], offline: true,
+      });
+      page = await context.newPage();
+      collectBrowserErrors(page, studioUrl, browserErrors);
+      // Reuse only persisted browser storage, not storageState or injected artwork.
+      await page.goto(reopenUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      log("OFFLINE RESTART: fresh Chromium process, same profile, no network and no injected recovery data");
+    } else {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
+    }
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
     await dismissQuickStart(page);
     // Playwright preserves the physical pointer across navigation. The pre-reload download leaves
@@ -808,7 +818,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       browserErrors,
       limitations: [
         VERIFY_OFFLINE_DRAWING
-          ? "Network disabled for pen/undo/redo/autosave and again for reload/recovery/PNG export; export is first warmed online. This is not a browser-restart or every-tool test."
+          ? "Network disabled continuously for pen/undo/redo/autosave, first-use PNG export, full Chromium process restart, recovery and pixel-identical PNG export. This is not an every-tool test."
           : "Network remains online in this baseline lifecycle run.",
         "Persistence coverage is the shipped OPFS/SQLite autosave and reload/recovery UI path, not authenticated server/database save.",
         "historyReadyAfterPointerUpMs includes Playwright transport and DOM polling overhead; it is diagnostic, not input-latency p95.",
@@ -827,6 +837,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     throw error;
   } finally {
     await context.close();
+    if (profile) rmSync(profile, { recursive: true, force: true });
   }
 }
 
