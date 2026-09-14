@@ -303,10 +303,9 @@ export function createUpstreamApiRequest(
   headers.set("x-toonspectrum-edge-route", route);
   headers.set("x-toonspectrum-edge-attempt", String(attempt));
 
-  return new Request(upstream, {
-    method: request.method,
+  const upstreamRequest = new Request(upstream, request);
+  return new Request(upstreamRequest, {
     headers,
-    body: request.body,
     redirect: "manual",
     signal: request.signal,
   });
