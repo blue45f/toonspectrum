@@ -57,15 +57,23 @@ test("cached video text matches direct canvas rendering, survives seeking, and b
         }
       }
     }
+    const rasterTarget = document.createElement("canvas");
+    rasterTarget.width = 360; rasterTarget.height = 640;
+    const rasterCached = wrap(rasterTarget.getContext("2d")!, true);
     for (let i = 0; i < 150; i += 1) {
-      renderer.drawPromoFrame(cached, { ...project, title: `수정된 작품 제목 ${i}` }, images, 90, target.width, target.height);
+      renderer.drawPromoFrame(rasterCached, { ...project, title: `수정된 작품 제목 ${i}` }, images, 90, 360, 640);
     }
     const alive = tiles.filter((tile) => tile.width > 0 && tile.height > 0);
     const allocatedPixels = alive.reduce((sum, tile) => sum + tile.width * tile.height, 0);
-    renderer.releasePromoTextCache(cached);
+    renderer.releasePromoTextCache(rasterCached);
     const released = tiles.every((tile) => tile.width === 0 && tile.height === 0);
+    const measurementsBeforeRelease = measurements;
+    renderer.releasePromoTextCache(cached);
+    renderer.drawPromoFrame(cached, project, images, 90, target.width, target.height);
+    const remeasuredAfterRelease = measurements - measurementsBeforeRelease;
     return { firstMeasurements, repeatedMeasurements, maxMeanError, cases,
-      alive: alive.length, allocatedPixels, evicted: tiles.length - alive.length, released };
+      alive: alive.length, allocatedPixels, evicted: tiles.length - alive.length, released,
+      remeasuredAfterRelease };
   });
   await testInfo.attach("renderer-quality.json", { body: JSON.stringify(result, null, 2), contentType: "application/json" });
   expect(result.firstMeasurements).toBeGreaterThan(0);
@@ -77,4 +85,5 @@ test("cached video text matches direct canvas rendering, survives seeking, and b
   expect(result.allocatedPixels).toBeLessThanOrEqual(2_000_000);
   expect(result.evicted).toBeGreaterThan(100);
   expect(result.released).toBe(true);
+  expect(result.remeasuredAfterRelease).toBeGreaterThan(0);
 });

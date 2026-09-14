@@ -1147,6 +1147,7 @@ import {
   rememberStudioToolOperationSnapshot,
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
+import type { StudioToolOperationMemoryController } from "./studio-tool-operation-memory-sqlite";
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import {
   hasStudioUnloadPromptWork,
@@ -4686,29 +4687,13 @@ export function StudioCuttoonEditor({
   const toolOperationMemoryErrorAnnouncedRef = useRef<string | null>(null);
   const [toolOperationMemoryPersistenceDirty, setToolOperationMemoryPersistenceDirty] =
     useState(false);
-  const toolOperationMemoryPersistenceRef = useRef<{
-    hydrate(): Promise<StudioToolOperationMemory>;
-    scheduleSave(memory: StudioToolOperationMemory): void;
-    save(memory: StudioToolOperationMemory): Promise<boolean>;
-    retry(): Promise<boolean>;
-    flush(): Promise<boolean>;
-    subscribe(listener: () => void): () => void;
-    getSnapshot(): {
-      readonly dirty: boolean;
-      readonly lastError: {
-        readonly code: "corrupt" | "unavailable";
-        readonly message: string;
-      } | null;
-    };
-  } | null>(null);
+  const toolOperationMemoryPersistenceRef = useRef<StudioToolOperationMemoryController | null>(null);
   const toolOperationMemoryPersistenceLoadRef = useRef<Promise<NonNullable<
     typeof toolOperationMemoryPersistenceRef.current
   >> | null>(null);
   const pendingToolOperationMemorySaveRef = useRef<StudioToolOperationMemory | null>(null);
   const retryToolOperationMemoryPersistenceRef = useRef<() => void>(() => undefined);
-  const queueToolOperationMemorySaveRef = useRef<
-    (memory: StudioToolOperationMemory) => void
-  >(() => undefined);
+  const queueToolOperationMemorySaveRef = useRef<(memory: StudioToolOperationMemory) => void>(() => undefined);
   queueToolOperationMemorySaveRef.current = (memory) => {
     const persistence = toolOperationMemoryPersistenceRef.current;
     if (persistence) {
@@ -4719,9 +4704,7 @@ export function StudioCuttoonEditor({
     setToolOperationMemoryPersistenceDirty(true);
   };
   const currentBrushSnapshotRef = useRef<StudioBrushSnapshot | null>(null);
-  const applyToolOperationSnapshotRef = useRef<
-    (snapshot: StudioBrushSnapshot) => void
-  >(() => undefined);
+  const applyToolOperationSnapshotRef = useRef<(snapshot: StudioBrushSnapshot) => void>(() => undefined);
   const [color, setColor] = useState(initialToolOperationMemory.paint.color);
   const inspectorColorSampleApplyRef = useRef<((color: string) => void) | null>(null);
   const [pixelArtMode, setPixelArtMode] = useState<StudioPixelArtModeState>(() => createStudioPixelArtMode());
@@ -4740,12 +4723,9 @@ export function StudioCuttoonEditor({
   }, [pixelArtMode.enabled, pixelArtMode.gridSnap, pixelArtMode.pixelPencil]);
   function applyStudioDrawingColor(next: string) {
     const applyInspectorSample = inspectorColorSampleApplyRef.current;
-    if (applyInspectorSample) {
-      inspectorColorSampleApplyRef.current = null;
-      applyInspectorSample(next);
-      return;
-    }
-    setColor(admitStudioPixelArtStrokeColor(next, pixelArtMode));
+    inspectorColorSampleApplyRef.current = null;
+    if (applyInspectorSample) applyInspectorSample(next);
+    else setColor(admitStudioPixelArtStrokeColor(next, pixelArtMode));
   }
   function insertStudioStickyNote(presetId: import("./studio-sticky-note").StudioStickyNotePresetId) {
     const note = createStudioStickyNoteElement({
@@ -16643,10 +16623,8 @@ No text, logo, watermark, or copyrighted character.`;
   disarmAllPixelToolsRef.current = disarmAllPixelTools;
 
   function requestInspectorColorSample(applyColor: (color: string) => void): void {
-    disarmAllPixelTools();
-    inspectorColorSampleApplyRef.current = applyColor;
-    setEyedropperActive(true);
-    announceDrawingShortcut("캔버스에서 적용할 색을 클릭하세요 · Esc로 취소");
+    disarmAllPixelTools(); inspectorColorSampleApplyRef.current = applyColor;
+    setEyedropperActive(true); announceDrawingShortcut("캔버스에서 적용할 색을 클릭하세요 · Esc로 취소");
   }
 
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
@@ -16893,11 +16871,7 @@ No text, logo, watermark, or copyrighted character.`;
     commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
   }
 
-  // Inspector scrubbers/color previews deliberately keep one coalescing key while the gesture is
-  // active. Close/cancel must sever that chain so a later popup session receives its own undo step.
-  function finishPatchElCoalescing(): void {
-    coalesceKeyRef.current = null;
-  }
+  function finishPatchElCoalescing(): void { coalesceKeyRef.current = null; }
 
   /**
    * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않고, 스테이지 래스터는 언제나 **문서 전체**다.
