@@ -53,7 +53,25 @@ function hasRestriction(value: unknown): boolean {
   return value != null && (typeof value !== "string" || value.trim().length > 0);
 }
 function text(value: unknown, max = 300): string {
-  return typeof value === "string" ? value.replace(/<[^>]*>/gu, "").replace(/\s+/gu, " ").trim().slice(0, max) : "";
+  if (typeof value !== "string") return "";
+  let plain = "";
+  let markupDepth = 0;
+  let pendingSpace = false;
+  for (const character of value) {
+    if (character === "<") { markupDepth += 1; continue; }
+    if (markupDepth > 0) {
+      if (character === ">") markupDepth -= 1;
+      continue;
+    }
+    if (/\s/u.test(character) || character.charCodeAt(0) < 0x20 || character === "\u007f") {
+      pendingSpace = plain.length > 0;
+      continue;
+    }
+    if (pendingSpace) { plain += " "; pendingSpace = false; }
+    plain += character;
+    if (plain.length >= max) break;
+  }
+  return plain.trim().slice(0, max);
 }
 export function safeOpenUrl(value: unknown, hosts?: string[]): string {
   if (typeof value !== "string" || value.length > 2000) return "";

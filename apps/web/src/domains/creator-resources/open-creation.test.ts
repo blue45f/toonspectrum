@@ -92,6 +92,13 @@ test("duplicate records are deduplicated and text markup is stripped", () => {
   const parsed = parseOpenReferences("artic", { data: [item, item] }, NOW);
   assert.equal(parsed.length, 1); assert.equal(parsed[0].title, "Armor");
 });
+test("malformed or nested markup cannot survive partial multi-character stripping", () => {
+  const [item] = parseOpenReferences("artic", { data: [{
+    id: 1, title: "Safe <scr<script>ipt>alert(1)</script> title", is_public_domain: true,
+  }] }, NOW);
+  assert.equal(item.title, "Safe alert(1) title");
+  assert.ok(!item.title.includes("<"));
+});
 test("existing resources are copied conservatively without promoting book image rights", () => {
   const book = fromExistingResource({ id: "kakao:123", provider: "kakao", title: "Book", sourceUrl: "https://search.daum.net/", imageUrl: "https://example.com/book.jpg", license: "CC0", fetchedAt: NOW });
   assert.ok(book); assert.equal(book.rights, "원문 확인"); assert.equal(book.imageUrl, "");

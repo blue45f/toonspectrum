@@ -61,8 +61,24 @@ async function boundedBytes(response: Response, maximum: number): Promise<Uint8A
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return bytes;
 }
+export function isPersonalInferenceRequestPath(path: string): boolean {
+  if (path.length < 2 || path.length > 512 || path[0] !== "/" || path.includes("..")) return false;
+  const segments = path.slice(1).split("/");
+  if (segments.some((segment) => segment.length === 0 || segment.length > 128)) return false;
+  return segments.every((segment) => {
+    for (const character of segment) {
+      const code = character.charCodeAt(0);
+      const alphaNumeric = code >= 0x30 && code <= 0x39
+        || code >= 0x41 && code <= 0x5a
+        || code >= 0x61 && code <= 0x7a;
+      if (!alphaNumeric && character !== "." && character !== "_" && character !== "-") return false;
+    }
+    return true;
+  });
+}
+
 async function request(path: string, init: RequestInit = {}, maximum = 1536 * 1024): Promise<Response> {
-  if (!/^\/(?:[A-Za-z0-9._-]+\/?)+$/u.test(path) || path.includes("..")) throw new Error("개인 추론 서버 경로가 올바르지 않습니다.");
+  if (!isPersonalInferenceRequestPath(path)) throw new Error("개인 추론 서버 경로가 올바르지 않습니다.");
   const current = connection();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${current.token}`);
