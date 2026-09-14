@@ -12,6 +12,18 @@ import {
 
 const OPERATION_ID = "composition-00000000-0000-4000-8000-000000000001";
 
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => { values.delete(key); },
+    setItem: (key, value) => { values.set(key, String(value)); },
+  };
+}
+
 function configureUserKey(): void {
   globalThis.sessionStorage.setItem(STUDIO_AI_SETTINGS_STORAGE_KEY, JSON.stringify({
     baseUrl: "https://provider.example/v1",
@@ -26,8 +38,8 @@ function configureUserKey(): void {
 
 describe("studio user-funded AI client", () => {
   beforeEach(() => {
-    globalThis.sessionStorage.clear();
     vi.restoreAllMocks();
+    vi.stubGlobal("sessionStorage", memoryStorage());
   });
 
   it("reports that operator-funded server AI is unavailable", async () => {
