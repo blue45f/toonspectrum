@@ -1,0 +1,28 @@
+/* Save is the primary authoring action. Publication remains available but secondary. */
+[data-studio-menubar-actions="true"] button[aria-label="작업 저장"],
+[data-studio-menubar-actions="true"] button[aria-label="공동 저장"] {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--color-accent-2), transparent 35%) !important;
+  font-weight: 800;
+}
+
+[data-studio-menubar-actions="true"] button[aria-label="작업 저장"]:hover,
+[data-studio-menubar-actions="true"] button[aria-label="공동 저장"]:hover {
+  background: var(--color-accent-2) !important;
+}
+
+[data-studio-menubar-actions="true"] [data-testid="studio-publish"] {
+  border: 1px solid var(--color-line) !important;
+  background: transparent !important;
+  color: var(--color-fg-2) !important;
+  box-shadow: none !important;
+  font-weight: 700;
+}
+
+[data-studio-menubar-actions="true"] [data-testid="studio-publish"]:hover {
+  border-color: color-mix(in oklch, var(--color-accent), var(--color-line) 55%) !important;
+  background: var(--color-raised) !important;
+  color: var(--color-fg) !important;
+}
