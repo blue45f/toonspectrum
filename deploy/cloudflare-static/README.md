@@ -131,4 +131,4 @@ pnpm run generate:cloudflare-static-rules -- --check
 - 특정 기능 권위가 중단되어도 정적 앱과 로컬 OPFS 프로젝트는 계속 사용할 수 있어야 한다.
 - Vercel 수동 fallback은 Cloudflare 전환 기간의 비상 경로일 뿐 자동 배포 권위가 아니다.
 - 사용자 프로젝트 원본은 이 정적 배포 단위에 저장하지 않는다.
-- Oracle/OCI는 운영·fallback·복구 경로에 포함하지 않는다.
+- 사용 금지된 퇴역 공급자는 운영·fallback·복구 경로에 포함하지 않는다.

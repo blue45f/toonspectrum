@@ -8,7 +8,7 @@
     "pnpm": ">=11"
   },
   "scripts": {
-    "prepare": "husky && git config core.hooksPath .husky",
+    "prepare": "node scripts/prepare-git-hooks.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
     "build:bundle": "NODE_OPTIONS='--max-old-space-size=8192' vite build",
