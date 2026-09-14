@@ -5,18 +5,33 @@ test("promo editor uploads, edits, plans, exports and cancels", async ({ page },
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.route("**/api/studio-ai/status", (route) => route.fulfill({ json: { configured: true, requiresAuth: true } }));
   let malformed = false;
   let posted = "";
-  await page.route("**/api/studio-ai/chat", (route) => {
-    const body = route.request().postDataJSON() as { user: string };
-    posted = body.user;
-    const data = JSON.parse(body.user) as { panels: { id: string }[] };
-    expect(route.request().headers()["idempotency-key"]).toMatch(/^promo-/u);
-    return route.fulfill({ json: { provider: "zai", model: "ci-text-fixture", content: malformed ? '{"scenes":[]}' : JSON.stringify({ scenes: [...data.panels].reverse().map((panel, index) => ({ id: panel.id, caption: `예고편 자막 ${index + 1}`, motion: "push-in", weight: 1 })) }) } });
+  await page.route("https://promo-ai.invalid/v1/chat/completions", (route) => {
+    const body = route.request().postDataJSON() as {
+      model: string;
+      messages: Array<{ role: string; content: string }>;
+    };
+    const user = body.messages.find((message) => message.role === "user")?.content ?? "";
+    posted = user;
+    const data = JSON.parse(user) as { panels: { id: string }[] };
+    expect(body.model).toBe("ci-text-fixture");
+    expect(route.request().headers().authorization).toBe("Bearer promo-e2e-key");
+    expect(route.request().headers().cookie).toBeUndefined();
+    const content = malformed
+      ? '{"scenes":[]}'
+      : JSON.stringify({
+          scenes: [...data.panels].reverse().map((panel, index) => ({
+            id: panel.id,
+            caption: `예고편 자막 ${index + 1}`,
+            motion: "push-in",
+            weight: 1,
+          })),
+        });
+    return route.fulfill({ json: { choices: [{ message: { content } }] } });
   });
   await page.setViewportSize({ width: 1440, height: 1050 });
-  await page.goto("/tools/browser-harnesses/promo-e2e.html");
+  await page.goto("/tools/browser-harnesses/promo-e2e.html?user-ai=fixture");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const fixtures = await page.evaluate(() => [0, 1, 2].map((index) => {
     const canvas = document.createElement("canvas");
@@ -40,7 +55,7 @@ test("promo editor uploads, edits, plans, exports and cancels", async ({ page },
   await page.getByRole("button", { name: "로컬 연출 템플릿", exact: true }).click();
   await expect(page.locator(".promo-feedback")).toContainText("AI 생성 결과가 아니며");
   await page.getByRole("button", { name: "AI로 홍보 콘티 구성", exact: true }).click();
-  await expect(page.locator(".promo-feedback")).toContainText("ci-text-fixture");
+  await expect(page.locator(".promo-feedback")).toContainText("내 API 키의 텍스트 AI 구성 적용");
   expect(posted).not.toContain("base64");
   expect(posted).not.toContain('"src"');
   await expect(page.locator('input[id^="caption-"]').first()).toHaveValue("예고편 자막 1");
