@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PublicSiteAtelierJourney } from "../public-site-next-steps";
 import { AtelierWorkbenchDemo } from "./AtelierWorkbenchDemo";
 import { SiteAtelierChapter } from "./SiteAtelierChapter";
 import { SiteExperienceFrame } from "./SiteExperienceFrame";
@@ -111,6 +112,20 @@ describe("atelier workbench", () => {
     result.rerender(<MemoryRouter><SiteAtelierChapter pathname="/" locale="ko" /></MemoryRouter>);
     expect(screen.queryByTestId("atelier-workbench")).toBeNull();
     result.rerender(<MemoryRouter><SiteAtelierChapter pathname="/studio/comic" locale="ko" /></MemoryRouter>);
+    expect(screen.queryByTestId("atelier-workbench")).toBeNull();
+  });
+});
+
+// The public shell uses a separate lazy onward-journey owner from account pages.
+// Test that real owner: a standalone chapter test alone cannot detect missing wiring.
+describe("public onward-journey integration", () => {
+  it.each([["/market/browse", "materials"], ["/community", "motion"], ["/research", "layers"]])("mounts the matching chapter through the actual %s owner", (path, scene) => {
+    mount(<PublicSiteAtelierJourney pathname={path} />);
+    expect(demo().dataset.scene).toBe(scene);
+    expect(screen.getAllByTestId("atelier-workbench")).toHaveLength(1);
+  });
+  it.each(["/", "/studio", "/settings", "/terms"])("does not add an onward chapter at %s", (path) => {
+    mount(<PublicSiteAtelierJourney pathname={path} />);
     expect(screen.queryByTestId("atelier-workbench")).toBeNull();
   });
 });

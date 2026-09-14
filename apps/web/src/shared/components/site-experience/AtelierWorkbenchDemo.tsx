@@ -24,6 +24,7 @@ export function AtelierWorkbenchDemo({ locale = "ko", initialScene = "ink" }: { 
   const [layers, setLayers] = useState({ color: true, line: true, dialogue: true });
   const [vertical, setVertical] = useState(false);
   const [camera, setCamera] = useState(35);
+  const [manualCamera, setManualCamera] = useState(false);
   const [weight, setWeight] = useState(7);
   const [failedImage, setFailedImage] = useState("");
   const { hostRef, running, motionAllowed, paused, setPaused } = useAtelierMotion();
@@ -39,10 +40,10 @@ export function AtelierWorkbenchDemo({ locale = "ko", initialScene = "ink" }: { 
     if (next === null) return;
     event.preventDefault();
     setScene(ATELIER_SCENE_IDS[next]);
-    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]').item(next).focus();
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]').item(next).focus({ preventScroll: true });
   };
   return (
-    <div ref={hostRef} className="atelier-workbench" data-scene={scene} data-running={running} data-testid="atelier-workbench" style={{ "--atelier-camera": camera, "--atelier-weight": weight } as CSSProperties}>
+    <div ref={hostRef} className="atelier-workbench" data-scene={scene} data-running={running} data-manual-camera={manualCamera} data-testid="atelier-workbench" style={{ "--atelier-camera": camera, "--atelier-weight": weight } as CSSProperties}>
       <div className="atelier-workbench__topline"><span><SlidersHorizontal size={14} aria-hidden="true" />{ko ? "표현 방식 미리보기" : "Explore an approach"}</span><span className="atelier-workbench__badge">{ko ? "인터랙티브 콘셉트 데모" : "INTERACTIVE CONCEPT DEMO"}</span></div>
       <div className="atelier-workbench__tabs" role="tablist" aria-label={ko ? "드로잉 표현 방식" : "Drawing approaches"}>
         {ATELIER_SCENE_IDS.map((key, index) => {
@@ -64,13 +65,13 @@ export function AtelierWorkbenchDemo({ locale = "ko", initialScene = "ink" }: { 
           <p className="atelier-workbench__kicker">{selected.tag}</p><h3>{title}</h3><p>{description}</p>
           <div className="atelier-workbench__controls">
             {scene === "ink" && <label htmlFor={`${id}-weight`}><span>{ko ? "예시 선 굵기" : "Example line weight"}<output>{weight}</output></span><input id={`${id}-weight`} type="range" min={2} max={16} value={weight} onChange={(event) => setWeight(Number(event.target.value))} /></label>}
-            {scene === "layers" && <div role="group" aria-label={ko ? "설명 레이어 표시" : "Illustrative layer visibility"}>{LAYERS.map((layer, index) => <button key={layer} type="button" aria-pressed={layers[layer]} onClick={() => setLayers({ ...layers, [layer]: !layers[layer] })}><Check size={14} aria-hidden="true" />{LAYER_NAMES[locale][index]}</button>)}</div>}
+            {scene === "layers" && <div role="group" aria-label={ko ? "설명 레이어 표시" : "Illustrative layer visibility"}>{LAYERS.map((layer, index) => <button key={layer} type="button" aria-pressed={layers[layer]} onClick={() => setLayers((current) => ({ ...current, [layer]: !current[layer] }))}><Check size={14} aria-hidden="true" />{LAYER_NAMES[locale][index]}</button>)}</div>}
             {scene === "panels" && <div role="group" aria-label={ko ? "컷 배치 예시" : "Example panel arrangement"}><button type="button" aria-pressed={!vertical} onClick={() => setVertical(false)}>{ko ? "가로 흐름" : "Horizontal"}</button><button type="button" aria-pressed={vertical} onClick={() => setVertical(true)}>{ko ? "세로 흐름" : "Vertical"}</button></div>}
-            {scene === "motion" && <label htmlFor={`${id}-camera`}><span>{ko ? "카메라 위치 직접 조절" : "Scrub camera position"}<output>{camera}%</output></span><input id={`${id}-camera`} type="range" min={0} max={100} value={camera} onChange={(event) => { setCamera(Number(event.target.value)); setPaused(true); }} /></label>}
+            {scene === "motion" && <label htmlFor={`${id}-camera`}><span>{ko ? "카메라 위치 직접 조절" : "Scrub camera position"}<output>{camera}%</output></span><input id={`${id}-camera`} type="range" min={0} max={100} value={camera} onChange={(event) => { setCamera(Number(event.target.value)); setManualCamera(true); setPaused(true); }} /></label>}
             {scene === "materials" && <nav aria-label={ko ? "재료 탐색 경로" : "Material destinations"}><Link href="/market/browse">{ko ? "리소스 마켓" : "Resource market"}<ArrowUpRight size={14} aria-hidden="true" /></Link><Link href="/research/assets">{ko ? "오픈 소재 자료" : "Open material references"}<ArrowUpRight size={14} aria-hidden="true" /></Link></nav>}
           </div>
           <Link href={selected.href} className="atelier-workbench__action">{action}<ArrowUpRight size={17} aria-hidden="true" /></Link>
-          <div className="atelier-workbench__motion-control">{motionAllowed ? <button type="button" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}{ko ? "모션 일시정지" : "Pause motion"}</button> : <span>{ko ? "모션 감소 설정 적용 중" : "Reduced-motion preference active"}</span>}<small>{ko ? "스튜디오 원고에는 영향을 주지 않습니다." : "Your studio documents are never changed."}</small></div>
+          <div className="atelier-workbench__motion-control">{motionAllowed ? <button type="button" aria-pressed={paused} title={ko ? (paused ? "모션 다시 재생" : "현재 위치에서 모션 정지") : (paused ? "Resume motion" : "Pause at the current position")} onClick={() => { setManualCamera(false); setPaused((current) => !current); }}>{paused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}{ko ? "모션 일시정지" : "Pause motion"}</button> : <span>{ko ? "모션 감소 설정 적용 중" : "Reduced-motion preference active"}</span>}<small>{ko ? "스튜디오 원고에는 영향을 주지 않습니다." : "Your studio documents are never changed."}</small></div>
         </div>
       </div>
     </div>

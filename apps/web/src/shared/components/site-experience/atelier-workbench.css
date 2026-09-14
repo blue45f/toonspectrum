@@ -17,7 +17,7 @@
 .atelier-workbench__art-note { position: absolute; z-index: 2; bottom: 13px; left: 18px; right: 18px; font-size: 0.61rem; color: oklch(0.95 0.01 85); }
 .atelier-workbench__detail { display: flex; flex-direction: column; align-items: start; justify-content: center; gap: 18px; padding: clamp(22px, 3vw, 38px); }
 .atelier-workbench__kicker { color: var(--color-accent); font-family: var(--font-display); font-size: 0.61rem; letter-spacing: 0.1em; }
-.atelier-workbench__detail h3 { font-size: clamp(1.35rem, 2.5vw, 1.95rem); line-height: 1.35; letter-spacing: -0.045em; font-weight: 750; word-break: keep-all; text-wrap: balance; }
+.atelier-workbench .atelier-workbench__detail h3 { font-size: clamp(1.35rem, 2.5vw, 1.95rem); line-height: 1.35; letter-spacing: -0.045em; font-weight: 750; word-break: keep-all; text-wrap: balance; }
 .atelier-workbench__detail > p:not(.atelier-workbench__kicker) { font-size: 0.83rem; color: var(--color-fg-2); line-height: 1.85; text-wrap: pretty; }
 .atelier-workbench__controls { width: 100%; min-height: 54px; }
 .atelier-workbench__controls label { display: grid; gap: 10px; font-size: 0.76rem; color: var(--color-fg-2); }
@@ -45,7 +45,7 @@
 .atelier-workbench__strokes > div:nth-child(3) { color: oklch(0.57 0.14 42); }
 .atelier-workbench__strokes > div:nth-child(3) path { stroke-width: calc(var(--atelier-weight) * 2.1); opacity: 0.6; }
 .atelier-workbench__strokes > div:nth-child(4) path { stroke-dasharray: 0.012 0.009; stroke-width: calc(var(--atelier-weight) * 1.5); }
-.atelier-workbench[data-running="true"] .atelier-workbench__strokes > div:first-child path { animation: atelier-ink-trace 5s ease-in-out infinite; }
+.atelier-workbench .atelier-workbench__strokes > div:first-child path { animation: atelier-ink-trace 5s ease-in-out infinite paused; }
 /* The same concept image demonstrates color visibility; the overlay remains explanatory. */
 .atelier-workbench[data-scene="layers"] [data-color="false"] .atelier-workbench__art { filter: grayscale(1) contrast(0.8); opacity: 0.38; }
 .atelier-workbench[data-scene="layers"] [data-color="false"][data-line="false"] .atelier-workbench__art { opacity: 0; }
@@ -63,7 +63,7 @@
 .atelier-workbench [data-vertical="true"] .atelier-workbench__panels { grid-template-columns: 1fr; grid-template-rows: 1.2fr 0.65fr 1fr; }
 .atelier-workbench [data-vertical="true"] .atelier-workbench__panels > div:nth-child(2) { margin: 0 35px; }
 .atelier-workbench[data-scene="motion"] .atelier-workbench__art { transform: scale(calc(1.04 + var(--atelier-camera) * 0.0015)) translateX(calc((var(--atelier-camera) - 50) * -0.08%)); }
-.atelier-workbench[data-scene="motion"][data-running="true"] .atelier-workbench__art { animation: atelier-camera-drift 10s ease-in-out infinite alternate; }
+.atelier-workbench[data-scene="motion"] .atelier-workbench__art { animation: atelier-camera-drift 10s ease-in-out infinite alternate paused; }
 .atelier-workbench__viewfinder { position: absolute; inset: 28px 32px 86px; pointer-events: none; }
 .atelier-workbench__viewfinder i { position: absolute; width: 24px; height: 24px; border-color: var(--atelier-paper); border-style: solid; border-width: 2px 0 0 2px; }
 .atelier-workbench__viewfinder i:nth-child(2) { right: 0; transform: rotate(90deg); }
@@ -74,7 +74,9 @@
 .atelier-workbench__timeline i { flex: 1; background: oklch(0.6 0.08 55); border-radius: 2px; opacity: 0.8; }
 .atelier-workbench__timeline i:nth-child(2n) { opacity: 0.45; }
 .atelier-workbench__timeline b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--atelier-paper); left: calc(5% + var(--atelier-camera) * 0.9%); }
-.atelier-workbench[data-running="true"] .atelier-workbench__timeline b { animation: atelier-playhead 10s linear infinite alternate; }
+.atelier-workbench .atelier-workbench__timeline b { animation: atelier-playhead 10s ease-in-out infinite alternate paused; }
+.atelier-workbench[data-running="true"] :is(.atelier-workbench__strokes path, .atelier-workbench__art, .atelier-workbench__timeline b) { animation-play-state: running; }
+.atelier-workbench[data-scene="motion"][data-manual-camera="true"] :is(.atelier-workbench__art, .atelier-workbench__timeline b) { animation: none; }
 .atelier-workbench__material-notes { position: absolute; inset: 25px 24px 50px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; }
 .atelier-workbench__material-notes span { padding: 8px 12px; background: var(--atelier-paper); color: var(--atelier-ink); border-left: 3px solid var(--color-accent); font-family: var(--font-display); font-size: 0.6rem; letter-spacing: 0.06em; box-shadow: 4px 4px 0 oklch(0.23 0.02 68 / 0.25); }
 .atelier-workbench__material-notes span:nth-child(2) { align-self: flex-end; }

@@ -1,7 +1,6 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
 
-import { artworkSourcesForPath } from "./site-experience/site-art-direction";
 import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { isPublicCreativeRoute } from "./site-public-routes";

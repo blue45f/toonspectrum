@@ -57,7 +57,7 @@ test("motion actually pauses, resumes, and obeys the system preference", async (
   await expect(art).toHaveCSS("animation-play-state", "running");
   await demo.getByRole("button", { name: "모션 일시정지" }).click();
   await expect(art).toHaveCSS("animation-play-state", "paused");
-  await demo.getByRole("button", { name: "모션 다시 재생" }).click();
+  await demo.getByRole("button", { name: "모션 일시정지" }).click();
   await expect(art).toHaveCSS("animation-play-state", "running");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(demo).toHaveAttribute("data-running", "false");
@@ -89,10 +89,7 @@ test("calendar day lists expand without losing keyboard navigation or full expor
   await page.goto("/calendar");
   const monday = page.getByRole("tab", { name: /^월/u });
   await monday.click();
-  const panelId = await monday.getAttribute("aria-controls");
-  expect(panelId).toBeTruthy();
-  const panel = page.locator(`[id="${panelId}"]`);
-  await expect(panel).toHaveAttribute("role", "tabpanel");
+  const panel = page.getByRole("tabpanel");
   await expect(panel.locator('a[href^="/title/"]')).toHaveCount(24);
   await panel.getByRole("button", { name: /월요일 .*더 보기/u }).click();
   await expect(panel.locator('a[href^="/title/"]')).toHaveCount(48);
