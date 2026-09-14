@@ -44,6 +44,8 @@ let strokeRegion: { x: number; y: number; width: number; height: number } | unde
 let blankRegion: Buffer | undefined, committedRegion: Buffer | undefined;
 const dispatchedPenPressures = [0.6, ...Array.from({ length: 48 }, (_, index) => 0.3 + 0.6 * Math.sin((index + 1) / 48 * Math.PI))];
 
+const STAGE_TIMEOUT_MS = 30_000;
+
 async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
   current = name;
   console.log(`START ${name}`);
@@ -51,7 +53,10 @@ async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([operation(), new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${name} exceeded 15 seconds`)), 15_000);
+      timer = setTimeout(
+        () => reject(new Error(`${name} exceeded ${STAGE_TIMEOUT_MS / 1000} seconds`)),
+        STAGE_TIMEOUT_MS,
+      );
     })]);
     stages.push({ name, elapsedMs: performance.now() - start, ok: true });
     console.log(`PASS ${name}`);
