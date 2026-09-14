@@ -194,7 +194,15 @@ describe("Cloudflare static gateway", () => {
     });
     const request = new Request(
       "https://www.toonstudio.cloud/api/titles?genre=fantasy",
-      { headers: { "cf-ray": "stable-ray-id" } },
+      {
+        headers: {
+          "cf-ray": "stable-ray-id",
+          authorization: "Bearer private-session-token",
+          cookie: "session=private",
+          "x-user-id": "private-user",
+          "x-forwarded-for": "203.0.113.200",
+        },
+      },
     );
 
     const response = await gateway(request, env);
@@ -208,6 +216,12 @@ describe("Cloudflare static gateway", () => {
       attempt.headers.get("x-toonspectrum-edge-attempt"))).toEqual(["0", "1"]);
     expect(attempts.every((attempt) =>
       attempt.headers.get("x-toonspectrum-edge-route") === "public-read")).toBe(true);
+    for (const attempt of attempts) {
+      expect(attempt.headers.get("authorization")).toBeNull();
+      expect(attempt.headers.get("cookie")).toBeNull();
+      expect(attempt.headers.get("x-user-id")).toBeNull();
+      expect(attempt.headers.get("x-forwarded-for")).toBeNull();
+    }
   });
 
   it("keeps public writes on the core authority instead of replica failover", async () => {
@@ -303,6 +317,21 @@ describe("Cloudflare static gateway", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: "CORE_API_UNAVAILABLE" });
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects any self-reference inside the public read pool", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/titles"),
+      environment({
+        PUBLIC_READ_API_ORIGINS:
+          "https://catalog.example.test,https://www.toonstudio.cloud",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("rejects a self-referential core origin before it can create a proxy loop", async () => {
