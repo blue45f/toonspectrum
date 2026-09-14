@@ -14,6 +14,7 @@ test("workspace regions remain reachable while arranging", async ({ page }, test
   await page.getByRole("button", { name: "배치 편집", exact: true }).click();
   const region = page.locator('[data-studio-workspace-region="tool-rail"]');
   const handle = region.getByRole("button", { name: "그리기 도구 이동", exact: true });
+  await expect(handle).toBeVisible();
   const box = await handle.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);

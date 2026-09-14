@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronUp, GripHorizontal, MoreHorizontal, PanelLeftClose, Pin, RotateCcw } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { ChevronDown, ChevronUp, GripHorizontal, MoreHorizontal, PanelLeftClose, Pin } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import {
   createStudioFloatingSurfaceLayout, moveStudioFloatingSurfaceRect,
@@ -16,6 +16,8 @@ import { readStudioWorkspaceRegionDetached, registerStudioWorkspaceRegion, studi
 import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
 
 import { cn } from "@/shared/lib/utils";
+
+import type { StudioWorkspaceRegionMenuProps } from "./StudioWorkspaceRegionMenu";
 
 const DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = {
   version: STUDIO_FLOATING_SURFACE_LAYOUT_VERSION, xRatio: 0.15, yRatio: 0.12,
@@ -76,6 +78,18 @@ export function StudioWorkspaceRegion({
   });
   const [detached, setDetached] = useState(() => readStudioWorkspaceRegionDetached(surfaceId));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [Menu, setMenu] = useState<ComponentType<StudioWorkspaceRegionMenuProps> | null>(null);
+  const [menuFailed, setMenuFailed] = useState(false);
+  const [menuAttempt, setMenuAttempt] = useState(0);
+  useEffect(() => {
+    if (!menuOpen || Menu) return;
+    let cancelled = false;
+    setMenuFailed(false);
+    void import("./StudioWorkspaceRegionMenu").then(module => {
+      if (!cancelled) setMenu(() => module.StudioWorkspaceRegionMenu);
+    }).catch(() => { if (!cancelled) setMenuFailed(true); });
+    return () => { cancelled = true; };
+  }, [menuOpen, Menu, menuAttempt]);
   const [collapsed, setCollapsed] = useState(false);
   const [widthInput, setWidthInput] = useState("");
   const [heightInput, setHeightInput] = useState("");
@@ -282,26 +296,9 @@ export function StudioWorkspaceRegion({
         style={floating ? { position: "fixed", right: "auto", left: Math.max(12, Math.min(rect.x, viewport.width - 276)), top: Math.max(viewport.insetTop, Math.min(rect.y + (compact ? 84 : 44), viewport.height - 440)) } : undefined}
         className="absolute right-0 top-11 z-[70] max-h-[min(26rem,70dvh)] w-64 overflow-y-auto rounded-lg border border-line-strong bg-panel p-2 text-fg shadow-2xl"
         onKeyDownCapture={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); menuButtonRef.current?.focus(); } }}>
-        <p className="px-2 py-1 text-xs font-bold">드래그 없이 배치</p>
-        <div className="flex flex-wrap gap-1">{choices.map(([dock, name]) => <button type="button" key={dock} className={buttonClass} disabled={layout.positionLocked}
-          onClick={() => { setLayout({ ...layout, dock }); changeDetached(true); }}>{name}</button>)}</div>
-        <div className="my-1 flex justify-center gap-1">{([
-          [-10, 0, "왼쪽으로 이동", ArrowLeft], [0, -10, "위로 이동", ArrowUp],
-          [0, 10, "아래로 이동", ArrowDown], [10, 0, "오른쪽으로 이동", ArrowRight],
-        ] as const).map(([dx, dy, name, Icon]) => <button key={name} type="button" className={buttonClass} aria-label={`${label} ${name}`} disabled={layout.positionLocked} onClick={() => move(dx, dy)}><Icon size={15} aria-hidden /></button>)}</div>
-        <fieldset disabled={layout.sizeLocked} className="my-2 grid grid-cols-2 gap-2 rounded-md border border-line p-2">
-          <legend className="px-1 text-xs font-semibold">크기 직접 입력 · px</legend>
-          <label className="text-xs">너비<input aria-label={`${label} 너비`} type="number" min={minWidth} max={Math.min(maxWidth, viewport.width - 24)} value={widthInput} onChange={event => setWidthInput(event.target.value)} className={cn("mt-1 w-full rounded border border-line bg-panel p-1", STUDIO_FOCUS_RING)} /></label>
-          <label className="text-xs">높이<input aria-label={`${label} 높이`} type="number" min={minHeight} max={Math.min(maxHeight, viewport.height - insetTop - 12)} value={heightInput} onChange={event => setHeightInput(event.target.value)} className={cn("mt-1 w-full rounded border border-line bg-panel p-1", STUDIO_FOCUS_RING)} /></label>
-          <button type="button" className={cn(buttonClass, "col-span-2 bg-raised")} onClick={applySize}>크기 적용</button>
-        </fieldset>
-        <button type="button" className={cn(buttonClass, "w-full justify-start")} aria-pressed={layout.positionLocked}
-          onClick={() => setLayout({ ...layout, positionLocked: !layout.positionLocked })}><Pin size={14} aria-hidden />위치 잠금 {layout.positionLocked ? "켬" : "끔"}</button>
-        <button type="button" className={cn(buttonClass, "w-full justify-start")} aria-pressed={layout.sizeLocked}
-          onClick={() => setLayout({ ...layout, sizeLocked: !layout.sizeLocked })}>크기 잠금 {layout.sizeLocked ? "켬" : "끔"}</button>
-        <button type="button" className={cn(buttonClass, "w-full justify-start")} onClick={attach}><PanelLeftClose size={14} aria-hidden />원래 자리로 붙이기</button>
-        <button type="button" className={cn(buttonClass, "w-full justify-start")} onClick={reset}><RotateCcw size={14} aria-hidden />위치·크기·잠금 초기화</button>
-        <p className="px-2 py-1 text-[0.65rem] text-fg-3">{authority === "sqlite-opfs" ? "위치·크기는 기기에 저장됩니다. 분리·접기까지 보관하려면 배치 편집 → 기기에 저장을 사용하세요." : "현재 탭에서 배치를 유지합니다. 기기 저장 여부는 배치 편집에서 확인하세요."}</p>
+        {Menu ? <Menu label={label} buttonClass={buttonClass} choices={choices} layout={layout} setLayout={setLayout} changeDetached={changeDetached} move={move} minWidth={minWidth} maxWidth={maxWidth} minHeight={minHeight} maxHeight={maxHeight} viewport={viewport} insetTop={insetTop} widthInput={widthInput} heightInput={heightInput} setWidthInput={setWidthInput} setHeightInput={setHeightInput} applySize={applySize} attach={attach} reset={reset} authority={authority} /> : <div role="status" className="p-2 text-xs">
+          {menuFailed ? <>설정을 불러오지 못했어요. <button type="button" className={buttonClass} onClick={() => setMenuAttempt(value => value + 1)}>다시 시도</button></> : "배치 설정 여는 중…"}
+        </div>}
       </div>}
       <div hidden={folded} inert={folded} style={folded ? { display: "none" } : undefined} className={floating
         ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto [&>[data-studio-sheet-id]]:!h-full [&>[data-studio-sheet-id]]:!w-full [&>[data-studio-sheet-id]]:!min-w-0 [&>[data-studio-sheet-id]]:!max-h-none [&_button[title='자유_배치_창으로_분리']]:hidden"

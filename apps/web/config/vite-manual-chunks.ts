@@ -3,6 +3,7 @@ export type StudioChunkPredicate = (id: string) => boolean;
 export function createStudioManualChunks(predicates: {
   isInitialIconModule: StudioChunkPredicate;
   isStudioCoreIconModule: StudioChunkPredicate;
+  isStudioWorkspaceIconModule?: StudioChunkPredicate;
 }) {
   const { isInitialIconModule, isStudioCoreIconModule } = predicates;
   return (id: string): string | undefined => {
@@ -205,6 +206,10 @@ export function createStudioManualChunks(predicates: {
     }
     if (isInitialIconModule(id)) {
       return "lucide-initial-icons";
+    }
+    // These Studio-only leaves must not inflate the icon chunk shared by the app shell.
+    if (predicates.isStudioWorkspaceIconModule?.(id)) {
+      return "lucide-studio-workspace-icons";
     }
     if (isStudioCoreIconModule(id)) {
       return "lucide-studio-core-icons";
