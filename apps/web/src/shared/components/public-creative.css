@@ -1,0 +1,11 @@
+.public-creative-journey { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--color-line); border-radius: 18px; background: var(--color-line); margin-block: 32px; }
+.public-creative-journey > a { min-height: 108px; display: flex; align-items: center; gap: 14px; padding: 22px; background: var(--color-panel); color: var(--color-fg-2); text-decoration: none; transition: background 180ms; }
+.public-creative-journey > a:hover { background: var(--color-raised); }
+.public-creative-journey > a:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.public-creative-journey > a > svg:first-child { flex-shrink: 0; color: var(--color-accent); }
+.public-creative-journey > a > svg:last-child { margin-left: auto; flex-shrink: 0; }
+.public-creative-journey strong, .public-creative-journey small { display: block; }
+.public-creative-journey strong { font-size: 14px; color: var(--color-fg); }
+.public-creative-journey small { font-size: 12px; margin-top: 6px; line-height: 1.5; }
+.public-creative-journey--compact > a { min-height: 86px; padding: 16px; }
+@media (prefers-reduced-motion: reduce) { .public-creative-journey > a { transition: none; } }

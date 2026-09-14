@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "purpose": "Original brand concept art for ToonStudio public webtoon drawing pages. These are not editor captures or community submissions.",
+  "generator": "Built-in image_gen",
+  "dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "assets": [
+    {
+      "file": "/brand/atelier-world.webp",
+      "prompt": "Use case: illustration-story. Asset type: original hero artwork for ToonStudio, a professional browser drawing and webtoon tool. Create one exceptionally polished wide 3:2 narrative illustration, full bleed, without text or UI. A lone young adult female illustrator-traveler in a rust red coat with a sketchbook stands on an ornate rooftop overlooking an imaginative hillside harbor city, huge soft ivory clouds and a sunlit warm apricot sky. Expressive disciplined ink linework, beautiful architecture perspective, rich detailed foliage and rooftops, painterly gouache shading with visible delicate brush grain, beautifully composed editorial Korean webtoon key art. Foreground silhouette anchors right third, sweeping city architecture across lower half, atmospheric depth. Sophisticated warm umber/cream/persimmon with muted sage and teal in artwork only. Cinematic sunrise. Specific world-building, hand-drawn quality, professional portfolio concept art. No logos, words, letters, watermarks, interface frames, or copyrighted characters. Image must work within dark warm ink site chrome."
+    },
+    {
+      "file": "/brand/atelier-process.webp",
+      "prompt": "Use case: stylized-concept. Asset type: wide 3:2 art process illustration for a professional webtoon and drawing software website. Create a beautiful art-director's working sheet on subtly textured warm ivory paper. Same original scene developed across the whole image in three seamlessly connected vertical zones: LEFT loose graphite construction lines and perspective guides of an imaginative hillside harbor city and rooftop traveler; MIDDLE elegant precise dark ink drawing, detailed roof architecture and foliage; RIGHT finished gouache/cel shaded painterly scene in warm apricot light, rust red travel coat, sage and teal roof details. The visual communicates rough sketch to clean ink to finished color. Three zones form one aligned continuous panorama, same geometry across transitions. Sophisticated professional concept art, crisp confident line weight and genuine material grain. No text, words, numbers, software UI, branding or watermarks. Exceptionally polished and richly detailed."
+    },
+    {
+      "file": "/brand/atelier-materials.webp",
+      "prompt": "Use case: ads-marketing. Asset type: wide 3:2 editorial artwork for a professional digital drawing resource library. Create a beautiful flat lay / art director moodboard entirely filling the image: layered sheets with sophisticated expressive ink brush strokes and hatching, translucent terracotta watercolor blooms, gouache pigment swatches in apricot ivory sage and ink, a precise graphite character gesture study, a small refined architectural city sketch, several fan-arranged rich textured paper samples. Include sleek dark drawing stylus on one edge, no logos. Tangible pigment textures, fine paper fibers, thoughtful compositions, warm studio side light with soft paper shadows. Professional creative tools visual, rich and restrained, mainly charcoal-brown, ivory and burnt orange. No text, labels, letters, numbers, watermarks, logos or interface. Original premium editorial art photography mixed with hand-drawn sketches."
+    }
+  ]
+}

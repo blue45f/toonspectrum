@@ -598,7 +598,7 @@ export function MarketPublishPage() {
 
           {/* Right Live Preview Column */}
           <div className="min-w-0 space-y-4">
-            <div className="sticky top-20 min-w-0 overflow-hidden rounded-xl border border-line bg-card p-4">
+            <div className="sticky top-[var(--site-header-sticky-offset,5rem)] min-w-0 overflow-hidden rounded-xl border border-line bg-card p-4">
               <p className="eyebrow text-accent">Live Preview</p>
               <h3 className="mt-1 text-sm font-bold text-fg">실시간 마켓 카드 미리보기</h3>
               <p className="mt-0.5 text-xs text-fg-3">

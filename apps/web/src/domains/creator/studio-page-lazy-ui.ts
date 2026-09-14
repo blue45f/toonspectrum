@@ -734,7 +734,7 @@ const StudioAppSettingsPanel = lazyRetry(
 );
 
 const studioExportMenuPanelLoader = createStudioIntentLazyLoader(() =>
-  import("./export/StudioExportMenuPanel").then((mod) => ({ default: mod.StudioExportMenuPanel }))
+  import("./export/StudioEnhancedExportMenuPanel").then((mod) => ({ default: mod.StudioEnhancedExportMenuPanel }))
 );
 
 const StudioExportMenuPanel = lazyRetry(studioExportMenuPanelLoader.load, "StudioExportMenuPanel");

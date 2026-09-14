@@ -7,7 +7,7 @@
  * be proved on tiny synthetic buffers instead of a GPU.
  *
  * Conventions shared by every function:
- *  - inputs are never mutated; each call allocates exactly one output buffer;
+ *  - inputs are never mutated; every returned raster has its own output buffer;
  *  - loops are single-pass over the pixels (plus one luma/coverage field for the Sobel);
  *  - `Uint8ClampedArray` assignment does the rounding and the 0–255 clamping, so the bodies stay
  *    free of `Math.min`/`Math.max` ladders.
@@ -58,8 +58,8 @@ export function lumaOf(r: number, g: number, b: number): number {
  * subtraction would cancel to zero and produce an empty layer. Instead the result carries the
  * shared coverage (`min` of both alphas) scaled by the largest channel difference — a pixel that
  * did not change between the two passes stays fully transparent instead of painting black, and a
- * pixel that changed a lot is both darker and more opaque. That is what makes the difference
- * usable as a 음영(multiply) / 하이라이트(screen) layer.
+ * pixel that changed a lot has stronger coverage. This is a difference visualization, not an
+ * inverse of Multiply/Screen compositing; use `deriveCharacterShadingLayers` for PSD shading.
  */
 export function subtractClamped(a: Uint8ClampedArray, b: Uint8ClampedArray): Uint8ClampedArray {
   assertRgba(a, "차분 원본");
@@ -84,6 +84,53 @@ export function subtractClamped(a: Uint8ClampedArray, b: Uint8ClampedArray): Uin
     out[i + 3] = (strongest * coverage) / 255;
   }
   return out;
+}
+
+export interface CharacterShadingLayers {
+  readonly shadow: Uint8ClampedArray;
+  readonly highlight: Uint8ClampedArray;
+}
+
+/**
+ * Derive Multiply then Screen layers that reconstruct opaque beauty from opaque flat RGB.
+ * For each normalized channel F/B, darkening uses M=B/F and brightening uses S=(B-F)/(1-F).
+ * Unchanged/opposite-direction channels are neutral (Multiply white, Screen black), allowing
+ * one pixel to darken red while brightening blue. Strict comparisons avoid division by zero
+ * at black/white. RGBA8 factor quantization introduces at most one byte of reconstruction error.
+ *
+ * Unchanged pixels and pixels without shared coverage remain transparent. Changed layers carry
+ * min(flat alpha, beauty alpha); this preserves a bounded silhouette but does not invert general
+ * source-over compositing at antialiased/translucent edges. Exact reconstruction assumes opaque
+ * pixels and the same RGB blend space as these captures. Different alpha, clipping/group rules,
+ * gamma settings, extra line layers, and translucent materials require separate composite QA.
+ */
+export function deriveCharacterShadingLayers(
+  flat: Uint8ClampedArray,
+  beauty: Uint8ClampedArray,
+): CharacterShadingLayers {
+  assertRgba(flat, "밑색");
+  assertRgba(beauty, "미리보기");
+  if (flat.length !== beauty.length) throw new TypeError("음영을 분리할 두 패스의 크기가 다릅니다.");
+
+  const shadow = new Uint8ClampedArray(flat.length);
+  const highlight = new Uint8ClampedArray(flat.length);
+  for (let i = 0; i < flat.length; i += 4) {
+    const coverage = Math.min(flat[i + 3], beauty[i + 3]);
+    if (coverage === 0) continue;
+    let darkened = false;
+    let brightened = false;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const source = flat[i + channel];
+      const target = beauty[i + channel];
+      shadow[i + channel] = target < source ? 255 * target / source : 255;
+      highlight[i + channel] = target > source ? 255 * (target - source) / (255 - source) : 0;
+      darkened ||= target < source;
+      brightened ||= target > source;
+    }
+    shadow[i + 3] = darkened ? coverage : 0;
+    highlight[i + 3] = brightened ? coverage : 0;
+  }
+  return { shadow, highlight };
 }
 
 /**

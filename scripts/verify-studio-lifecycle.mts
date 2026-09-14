@@ -530,7 +530,8 @@ function cleanScratch(): void {
 }
 
 async function runLifecycle(browser: Browser, origin: string): Promise<LifecycleResult> {
-  const studioUrl = `${origin}studio`;
+  // /studio is the project home; draw/undo/reload/export exercise the explicit canvas route.
+  const studioUrl = `${origin}studio/canvas`;
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     acceptDownloads: true,

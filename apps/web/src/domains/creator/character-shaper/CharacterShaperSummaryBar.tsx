@@ -372,9 +372,9 @@ export function CharacterShaperSummaryBar({
   return (
     <header
       data-character-shaper-summary="true"
-      className="relative z-30 flex shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-2.5 py-2 backdrop-blur sm:gap-3 sm:px-4"
+      className="relative z-30 flex min-w-0 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-2.5 py-2 backdrop-blur max-[380px]:flex-wrap sm:gap-3 sm:px-4"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 max-[380px]:basis-full sm:gap-3">
         <div className="min-w-0">
           <p className="truncate text-[0.62rem] font-semibold tracking-wide text-accent">캐릭터 워크숍</p>
           <h2 id={titleId} className="truncate text-[0.95rem] font-bold tracking-tight text-fg sm:text-base">
@@ -401,7 +401,7 @@ export function CharacterShaperSummaryBar({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+      <div className="flex shrink-0 items-center gap-1 max-[380px]:w-full max-[380px]:justify-between sm:gap-1.5">
         {undoRedo}
         {compareButton}
         {compact ? (
@@ -492,7 +492,7 @@ export function CharacterShaperSummaryBar({
           aria-label={popover === "reset" ? "처음 상태로 되돌리기" : popover === "save" ? "변형 저장" : "더 보기"}
           data-character-shaper-popover={popover}
           className={cn(
-            "absolute top-full z-40 mt-1 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-card p-3 shadow-[0_18px_48px_oklch(0.05_0.01_70/0.5)]",
+            "absolute top-full z-40 mt-1 w-80 max-w-[calc(100%-1rem)] rounded-2xl border border-line bg-card p-3 shadow-[0_18px_48px_oklch(0.05_0.01_70/0.5)]",
             compact ? "right-2" : "right-14",
           )}
         >

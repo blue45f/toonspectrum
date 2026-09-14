@@ -650,7 +650,7 @@ function crdtUpdate(key = "stroke", value = "1"): string {
 
 function crdtUpdateRequest(sequence = 1) {
   return {
-    protocolVersion: 7 as const,
+    protocolVersion: 8 as const,
     workId: "work-1",
     updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
     clientSequence: sequence,
@@ -705,7 +705,7 @@ function crdtBinaryUpdate(key = "stroke", value = "1"): Uint8Array {
 
 function crdtBinaryUpdateRequest(sequence = 1, workId = "work-1") {
   return {
-    protocolVersion: 7 as const,
+    protocolVersion: 8 as const,
     wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
     workId,
     updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
@@ -733,7 +733,7 @@ async function selectBinaryCrdtWire(
   return harness.gateway.selectCrdtBinaryWire(
     socket as never,
     {
-      protocolVersion: 7,
+      protocolVersion: 8,
       wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
       workId,
       format: STUDIO_CRDT_BINARY_WIRE_FORMAT,
@@ -840,7 +840,7 @@ describe("studio live protocol", () => {
 
   it("enforces the exact CRDT v7 request shape and rejects stale v1-v6 peers", () => {
     const sync = {
-      protocolVersion: 7,
+      protocolVersion: 8,
       workId: "work-1",
       requestId: "request-1",
       stateVector: crdtStateVector(),
@@ -6645,7 +6645,7 @@ describe("StudioLiveGateway", () => {
     const response = await harness.gateway.syncCrdtDocumentBinary(
       viewer as never,
       {
-        protocolVersion: 7,
+        protocolVersion: 8,
         wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
         workId: "work-1",
         requestId: "binary-sync-request",
@@ -6674,7 +6674,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocumentBinary(
         unselected as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
           workId: "work-1",
           requestId: "binary-sync-unselected",
@@ -6737,7 +6737,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
         workId: "work-1",
         updateId: request.updateId,
@@ -6750,7 +6750,7 @@ describe("StudioLiveGateway", () => {
       target: "from:binary-update-editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "87",
@@ -6823,7 +6823,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocumentBinary(
         viewer as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
           workId: "work-1",
           requestId: "binary-revoked-sync",
@@ -6852,7 +6852,7 @@ describe("StudioLiveGateway", () => {
     const response = await harness.gateway.syncCrdtDocument(
       viewer as never,
       {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         requestId: "request-1",
         stateVector: crdtStateVector(),
@@ -6863,7 +6863,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         requestId: "request-1",
         transferId: expect.any(String),
@@ -6915,7 +6915,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -6927,7 +6927,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -7036,7 +7036,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           workId: "work-1",
           requestId: "corrupt-storage-sync",
           stateVector: crdtStateVector(),
@@ -7103,7 +7103,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 7,
+        protocolVersion: 8,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "8",
@@ -7183,7 +7183,7 @@ describe("StudioLiveGateway", () => {
           harness.gateway.syncCrdtDocument(
             firstConnection as never,
             {
-              protocolVersion: 7,
+              protocolVersion: 8,
               workId: "work-1",
               requestId: `sync-before-${request}`,
               stateVector: crdtStateVector(),
@@ -7202,7 +7202,7 @@ describe("StudioLiveGateway", () => {
         harness.gateway.syncCrdtDocument(
           reconnected as never,
           {
-            protocolVersion: 7,
+            protocolVersion: 8,
             workId: "work-1",
             requestId: "sync-after-reconnect",
             stateVector: crdtStateVector(),
@@ -7249,7 +7249,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         unjoined as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           workId: "work-1",
           requestId: "unjoined-sync",
           stateVector: crdtStateVector(),
@@ -7270,7 +7270,7 @@ describe("StudioLiveGateway", () => {
         harness.gateway.syncCrdtDocument(
           joined as never,
           {
-            protocolVersion: 7,
+            protocolVersion: 8,
             workId: "work-1",
             requestId: `uncharged-sync-${request}`,
             stateVector: crdtStateVector(),
@@ -7283,7 +7283,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         joined as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           workId: "work-1",
           requestId: "charged-sync-limit",
           stateVector: crdtStateVector(),
@@ -7345,7 +7345,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           workId: "work-1",
           requestId: "bounded-quota-map",
           stateVector: crdtStateVector(),
@@ -7360,7 +7360,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 7,
+          protocolVersion: 8,
           workId: "work-1",
           requestId: "purge-stale-quota",
           stateVector: crdtStateVector(),

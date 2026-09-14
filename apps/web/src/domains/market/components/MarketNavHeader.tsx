@@ -48,6 +48,10 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
 
   return (
     <nav aria-label="마켓 주요 내비게이션" className={cn("mb-6 border-b border-line/70 pb-4 pt-1", className)}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line/60 pb-2">
+        <Link href="/market" className="inline-flex min-h-11 items-center gap-2 text-[0.65rem] font-bold tracking-[.12em] text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"><span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />TOONSTUDIO / 웹툰 소재 작업실</Link>
+        <div className="flex items-center gap-4 text-xs text-fg-2"><Link href="/research/assets" className="inline-flex min-h-11 items-center hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">장면 레퍼런스</Link><Link href="/learn" className="inline-flex min-h-11 items-center hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">제작 강좌 ↗</Link></div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-1">
           <Link
@@ -124,7 +128,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
               </div>
             </details>
           ) : null}
-          <Link href="/studio" className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
+          <Link href="/studio" aria-label="ToonStudio 드로잉 화면 열기" className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
             <Palette className="size-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Studio</span>
           </Link>

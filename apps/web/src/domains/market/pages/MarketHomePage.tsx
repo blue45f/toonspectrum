@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { MarketMaterialPreview } from "../components/MarketMaterialPreview";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { MarketResourceFamilyExplorer } from "../components/MarketResourceFamilyExplorer";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
@@ -22,7 +23,6 @@ import { MARKET_CURATED_THEMES } from "../models/market-theme";
 import { Container } from "@/shared/components/section";
 import {
   FriendlyQuickGuide,
-  PurposeExperienceStage,
 } from "@/shared/components/purpose-experience-stage";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import Link from "@/compat/router-link";
@@ -72,12 +72,12 @@ export function MarketHomePage() {
           <MarketNavHeader />
           <div className="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
             <div>
-              <p className="eyebrow text-accent">Creator Resource Market</p>
-              <h1 className="mt-2 text-pretty font-display text-[clamp(2.2rem,6vw,4.6rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">
-                리소스 마켓
+              <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON MATERIALS</p>
+              <h1 className="mt-4 text-pretty text-[clamp(2.4rem,5vw,4.5rem)] font-bold leading-[1.15] tracking-[-0.055em] text-fg">
+                웹툰의 한 컷을,<br />더 깊게 만드는 재료.
               </h1>
-              <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:text-lg">
-                장면을 만드는 모든 재료가 Studio와 바로 이어지는 곳.
+              <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
+                리소스 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.
               </p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-3">
                 템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
@@ -111,11 +111,7 @@ export function MarketHomePage() {
               </div>
             </div>
 
-            <PurposeExperienceStage
-              variant="market"
-              ariaLabel="리소스를 찾아 미리 보고 Studio에서 사용하는 흐름 미리보기"
-              steps={["필요한 결과 선택", "미리보기·조건 확인", "Studio에서 바로 사용"]}
-            />
+            <MarketMaterialPreview />
           </div>
 
           <FriendlyQuickGuide
@@ -143,7 +139,7 @@ export function MarketHomePage() {
             <div>
               <p className="eyebrow text-accent">Webtoon Collections</p>
               <h2 className="mt-1 text-lg font-bold text-fg sm:text-xl">장르·제작 목적 컬렉션</h2>
-              <p className="mt-1 text-xs leading-5 text-fg-3">템플릿부터 브러시·배경·효과까지 같은 장면에 함께 쓰기 좋은 리소스를 묶었습니다.</p>
+              <p className="mt-1 text-xs leading-5 text-fg-3">장면 예시에서 출발해 관련 태그의 리소스를 탐색하세요. 이미지는 테마를 설명하기 위한 예시입니다.</p>
             </div>
             <Link
               href="/market/browse"
@@ -159,9 +155,9 @@ export function MarketHomePage() {
                 <Link
                   key={theme.id}
                   href={`/market/browse?tag=${encodeURIComponent(theme.tag)}`}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all duration-200 hover:-translate-y-1 hover:border-line-strong hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  className="market-collection-card group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-card p-4 transition-colors duration-200 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
-                  <div className={`absolute -right-8 -top-8 size-28 rounded-full bg-gradient-to-br ${theme.gradient} blur-2xl opacity-60 transition-all duration-500 group-hover:scale-125 group-hover:opacity-100`} />
+                  <img src={theme.image} alt="" loading="lazy" width={640} height={360} className="-mx-4 -mt-4 mb-4 aspect-[1.9] max-w-none object-cover transition-transform duration-200 motion-reduce:transition-none" style={{ width: "calc(100% + 2rem)", objectPosition: theme.id === "pose-guide-3d" ? "40% 45%" : "center" }} />
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-[0.65rem] font-bold text-accent">
@@ -174,7 +170,7 @@ export function MarketHomePage() {
                     <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">{theme.subtitle}</p>
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-2.5 text-[0.7rem] font-medium text-fg-2">
-                    <span className="font-semibold text-accent">#{theme.tag} 세트</span>
+                    <span className="font-semibold text-accent">#{theme.tag} 리소스 찾기</span>
                     <span className="flex items-center gap-1 text-fg-3 transition-transform group-hover:translate-x-1">
                       보러가기 <ArrowRight className="size-3" aria-hidden="true" />
                     </span>
@@ -298,6 +294,10 @@ export function MarketHomePage() {
       </Container>
 
       <Container size="wide" className="pb-14">
+        <section className="market-production-route mb-12" aria-labelledby="market-next-step-title">
+          <div><span className="eyebrow text-accent">MATERIALS INTO YOUR NEXT PANEL</span><h2 id="market-next-step-title" className="mt-3">재료를 골랐다면,<br />이제 내 원고에 맞춰보세요.</h2><p>마음에 드는 소재를 모으고 제작 조건을 비교하세요. 선화·채색이 막히는 순간에는 학습 과정을, 장면의 근거가 필요할 때에는 리서치 데스크를 이어서 활용할 수 있습니다.</p></div>
+          <nav aria-label="리소스 선택 다음 작업"><Link href="/market/library">내 리소스에서 작업 재료 정리 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/learn/paths/visual-finish">선과 색의 완성도를 높이는 실습 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/research/assets">복식·소품·배경 레퍼런스 찾기 <ArrowRight size={16} aria-hidden="true" /></Link><Link href="/studio">ToonStudio에서 다음 컷 그리기 <ArrowRight size={16} aria-hidden="true" /></Link></nav>
+        </section>
         <div>
           <h2 className="eyebrow text-fg-3">사용권 안내</h2>
           <p className="mt-1 text-xs leading-5 text-fg-3">무료 여부와 별개로 상업 이용, 수정, 출처 표기 조건을 확인하세요.</p>

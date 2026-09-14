@@ -209,7 +209,7 @@ export function StudioLayerNavigatorTree({
               aria-level={1}
               aria-selected={allChildrenSelected}
               aria-expanded={node.empty ? undefined : node.expanded}
-              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
+              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Shift+ArrowUp Shift+ArrowDown Shift+Home Shift+End Shift+Space Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
               aria-label={`${node.group.name}, 그룹, ${node.entries.length}개 레이어${
                 groupStatus ? `, ${groupStatus}` : ""
               }`}

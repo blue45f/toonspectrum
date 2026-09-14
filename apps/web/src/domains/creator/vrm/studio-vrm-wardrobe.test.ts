@@ -517,6 +517,12 @@ describe("실측 몸통 재단", () => {
   expect(outerEdge).toBeGreaterThanOrEqual(m.shoulderW * 0.5);
   expect(Math.max(...leftBridge.shape.profile.map((point) => point.radius))).toBeGreaterThanOrEqual(sleeve.shape.rTop);
   expect(leftBridge.squash?.[2]).toBeLessThan(1);
+  // The bridge must remain below the measured shoulder line, not protrude toward the neck.
+  const bridgeTop = leftBridge.offset[1]
+    + Math.max(...leftBridge.shape.profile.map((point) => point.radius)) * (leftBridge.squash?.[0] ?? 1);
+  expect(bridgeTop).toBeLessThanOrEqual(m.spineToNeck * 0.86 + 1e-8);
+  expect(outerEdge).toBeLessThan(m.shoulderW * 0.5 + sleeve.shape.rTop * 0.15);
+  expect(leftBridge.shoulderBone).toBe("leftUpperArm");
 
   const measuredStart = sleeve.offset[0] - sleeve.shape.h / 2;
   const measuredEnd = sleeve.offset[0] + sleeve.shape.h / 2;
@@ -528,7 +534,7 @@ describe("실측 몸통 재단", () => {
   expect(measuredEnd).toBeCloseTo(fallback.offset[0] + fallback.shape.h / 2, 10);
 });
 
-it("양쪽 어깨 브리지의 전체 폭은 실측 어깨에서 나온다", () => {
+it("넓은 골반이 어깨 브리지를 팔 관절 바깥으로 밀어내지 않는다", () => {
   const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.4 }));
   const spanOf = (m: WardrobeMetrics): number => {
     const bridges = buildGarmentParts("tshirt", m, 1).filter((part) => (
@@ -542,7 +548,9 @@ it("양쪽 어깨 브리지의 전체 폭은 실측 어깨에서 나온다", () 
     }
     return Math.max(...xs) - Math.min(...xs);
   };
-  expect(spanOf(measured(wider))).toBeGreaterThan(spanOf(measured()));
+  expect(spanOf(measured(wider))).toBeCloseTo(spanOf(measured()), 10);
+  expect(spanOf({ ...measured(), shoulderW: measured().shoulderW * 1.3 }))
+    .toBeGreaterThan(spanOf(measured()));
 });
 
   it("스커트 허리는 실측 골반 링에서 나오고 밑단은 그대로 완만하다", () => {

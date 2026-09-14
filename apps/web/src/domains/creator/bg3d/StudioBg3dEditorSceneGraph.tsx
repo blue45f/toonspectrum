@@ -5,6 +5,10 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import {
+  applyStudioBg3dLensShiftToThreeCamera,
+  resolveStudioBg3dMinimumOrbitDistance,
+} from "./studio-bg3d-camera-application";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 
 export function bindStudioBg3dEditorSceneGraph(h) {
@@ -450,16 +454,7 @@ export function bindStudioBg3dEditorSceneGraph(h) {
   const applyLensShift = (c: THREE.PerspectiveCamera | THREE.OrthographicCamera) => {
     c.near = mainCameraNearClip;
     c.up.set(mainCameraUp[0], mainCameraUp[1], mainCameraUp[2]);
-    if (sceneBaseDocument.camera.lensShift) {
-      const [sx, sy] = sceneBaseDocument.camera.lensShift;
-      if (sx === 0 && sy === 0) {
-        c.clearViewOffset();
-      } else {
-        c.setViewOffset(1000, 1000, sx * 1000, sy * 1000, 1000, 1000);
-      }
-    } else {
-      if (c.view !== null) c.clearViewOffset();
-    }
+    applyStudioBg3dLensShiftToThreeCamera(c, sceneBaseDocument.camera.lensShift);
     c.updateProjectionMatrix();
   };
   const mainCameraNode = isMainOrtho ? (
@@ -530,7 +525,7 @@ export function bindStudioBg3dEditorSceneGraph(h) {
         && !placementActive
         && !measurementActive
       }
-      minDistance={2}
+              minDistance={resolveStudioBg3dMinimumOrbitDistance(mainCameraNearClip)}
       maxDistance={mainCameraMaxOrbitDistance}
     />
   );

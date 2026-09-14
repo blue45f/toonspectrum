@@ -1,3 +1,4 @@
+import { hasValidStudioBrushEngineProgramExtension, STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION } from "../../../shared/lib/studio-brush-material-program-contract";
 import { payloadMetadataByteLength } from "./studio-crdt-payload-metadata";
 
 import {
@@ -318,6 +319,7 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
   if (
     payload.brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
     && payload.version !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    && payload.version !== STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION
   ) {
     throw new Error("테이퍼 간격 브러시는 획 페이로드 v5가 필요합니다.");
   }
@@ -350,6 +352,9 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
     && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다.");
+  }
+  if (!hasValidStudioBrushEngineProgramExtension(payload.version, payload.extensions?.brushEnginePrograms)) {
+    throw new Error("브러시 엔진 프로그램과 획 페이로드 버전이 호환되지 않습니다.");
   }
   const outlineStroke = payload.extensions?.outlineStroke;
   if (outlineStroke !== undefined) {

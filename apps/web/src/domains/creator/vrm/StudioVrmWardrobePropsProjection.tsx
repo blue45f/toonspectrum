@@ -197,6 +197,7 @@ export function StudioVrmPropAttachment({
   instance,
   metrics,
   rigRevision,
+  capturePaused = false,
   onAttachmentStatus,
 }: {
   vrm: VRM;
@@ -204,6 +205,7 @@ export function StudioVrmPropAttachment({
   metrics: VrmPropRigMetrics;
   /** Re-resolves normalized bone identities after a humanoid rebuild. */
   rigRevision?: number;
+  capturePaused?: boolean;
   onAttachmentStatus?: (
     uid: string,
     propId: string,
@@ -368,6 +370,7 @@ export function StudioVrmPropAttachment({
   }, [proceduralObject]);
 
   useFrame((_, rawDelta) => {
+    if (capturePaused) return;
     const group = smartGroupRef.current;
     if (!group || !boneNode || !resolved?.usesSmartRig) {
       if (instance.rig) reportAttachmentStatus("unavailable");
@@ -1074,6 +1077,7 @@ export interface StudioVrmWardrobeAttachmentProps {
     itemId: string,
     status: StudioVrmProjectionAttachmentStatus,
   ) => void;
+  readonly capturePaused?: boolean;
   readonly onXpbdCaptureSyncChange?: (
     slot: WardrobeSlot,
     sync: StudioVrmWardrobeCaptureSync,
@@ -1093,6 +1097,7 @@ export function StudioVrmWardrobeAttachment(props: StudioVrmWardrobeAttachmentPr
         metrics={props.metrics}
         effectiveFit={props.effectiveFit}
         topologyGeneration={props.rigRevision}
+        capturePaused={props.capturePaused}
         onSurfaceReceipt={props.onSurfaceReceipt}
         onAttachmentStatus={props.onAttachmentStatus}
         onCaptureSyncChange={props.onXpbdCaptureSyncChange}
@@ -1252,15 +1257,18 @@ export function StudioVrmRuntimeCommit({
   vrm,
   physicsPreview,
   webcamActive,
+  capturePaused = false,
   onCommitFrame,
 }: {
   vrm: VRM;
   physicsPreview: boolean;
   webcamActive: boolean;
+  capturePaused?: boolean;
   onCommitFrame?: (frame: number) => void;
 }) {
   const frameRef = useRef(0);
   useFrame((_, delta) => {
+    if (capturePaused) return;
     // 흔들림 미리보기·웹캠 트래킹 중에만 스프링본을 전진시키고, 탭 복귀 폭주는 상한 처리한다.
     const springDelta = webcamActive || physicsPreview
       ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA)

@@ -1,3 +1,5 @@
+import { isStudioBrushEngineProgramWireValue } from "../../../shared/lib/studio-brush-material-program-contract";
+import type { StudioBrushEngineProgramSet } from "../brush/studio-brush-engine-program-set";
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
@@ -31,6 +33,7 @@ import {
 } from "../studio-outline-stroke-contract";
 
 import {
+  STUDIO_CRDT_ENGINE_PROGRAM_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
@@ -88,6 +91,7 @@ export interface StudioCrdtCompatibleDrawElement {
   contactWidths?: number[];
   contactHeights?: number[];
   sampleTimeOffsets?: number[];
+  brushEnginePrograms?: StudioBrushEngineProgramSet;
   brushDynamics?: unknown;
   brushTip?: unknown;
   stamp?: unknown;
@@ -294,6 +298,12 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
     const normalized = jsonValue(element[key]);
     if (normalized !== undefined) extensions[key] = normalized;
   }
+  if (element.brushEnginePrograms !== undefined) {
+    if (!isStudioBrushEngineProgramWireValue(element.brushEnginePrograms)) {
+      throw new Error("브러시 엔진 프로그램이 올바르지 않습니다.");
+    }
+    extensions.brushEnginePrograms = jsonObject(element.brushEnginePrograms)!;
+  }
   // Keep this versioned opt-in out of the generic JSON whitelist: an unknown future string must
   // never be persisted as if this client knew how to render its pressure semantics.
   if (isStudioInkPressureModel(element.pressureModel)) {
@@ -386,7 +396,9 @@ export function studioDrawElementToCrdtStroke(
   // Preserve legacy payload versions. Only newly authored taper-aware spacing requires v5;
   // existing segmented continuation and immutable R8 grain keep their v4 snapshots.
   const usesTaperSpacing = brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4;
-  const payloadVersion = usesTaperSpacing
+  const payloadVersion = extensions?.brushEnginePrograms !== undefined
+    ? STUDIO_CRDT_ENGINE_PROGRAM_STROKE_PAYLOAD_VERSION
+    : usesTaperSpacing
     ? STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
     : usesSegmentedCausalDeposit
       || usesR8TextureGrain

@@ -1031,7 +1031,7 @@ function setSaturation(
 }
 
 function blendChannel(
-  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity">,
+  mode: Exclude<StudioAdjustmentLayerBlendMode, "color" | "luminosity" | "hue" | "saturation">,
   base: number,
   blend: number,
 ): number {
@@ -1065,6 +1065,14 @@ function blendChannel(
       return Math.min(base, blend);
     case "lighten":
       return Math.max(base, blend);
+    case "color-dodge":
+      return base === 0 ? 0 : blend === 255 ? 255 : Math.min(255, base * 255 / (255 - blend));
+    case "color-burn":
+      return base === 255 ? 255 : blend === 0 ? 0 : 255 - Math.min(255, (255 - base) * 255 / blend);
+    case "difference":
+      return Math.abs(base - blend);
+    case "exclusion":
+      return base + blend - 2 * base * blend / 255;
   }
 }
 
@@ -1073,6 +1081,12 @@ function blendRgb(
   base: readonly [number, number, number],
   filtered: readonly [number, number, number],
 ): [number, number, number] {
+  if (mode === "hue") {
+    return setLuminance(setSaturation(filtered, saturation(...base)), luminance(...base));
+  }
+  if (mode === "saturation") {
+    return setLuminance(setSaturation(base, saturation(...filtered)), luminance(...base));
+  }
   if (mode === "color") {
     return setLuminance(
       setSaturation(filtered, saturation(base[0], base[1], base[2])),

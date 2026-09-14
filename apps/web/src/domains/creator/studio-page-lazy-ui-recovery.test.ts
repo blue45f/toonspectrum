@@ -15,7 +15,7 @@ const panels = [
   { name: "StudioAssetMenuPanel", path: "./StudioAssetMenuPanel", preload: "preloadStudioAssetMenuPanel" },
   { name: "StudioStockImagePanel", path: "./StudioStockImagePanel", preload: "preloadStudioStockImagePanel" },
   { name: "StudioIntegrationsSettingsPanel", path: "./StudioIntegrationsSettingsPanel", preload: "preloadStudioIntegrationsSettingsPanel" },
-  { name: "StudioExportMenuPanel", path: "./export/StudioExportMenuPanel", preload: "preloadStudioExportMenuPanel" },
+  { name: "StudioExportMenuPanel", path: "./export/StudioEnhancedExportMenuPanel", preload: "preloadStudioExportMenuPanel", exportName: "StudioEnhancedExportMenuPanel" },
   { name: "StudioColorPopover", path: "./StudioColorPopover", preload: "preloadStudioColorPopover" },
 ] as const;
 
@@ -39,7 +39,7 @@ describe("Studio optional panel warmup recovery", () => {
     expect(offlineImport).toHaveBeenCalledOnce();
 
     const Component = () => null;
-    const restoredImport = vi.fn(() => ({ [panel.name]: Component }));
+    const restoredImport = vi.fn(() => ({ ["exportName" in panel ? panel.exportName : panel.name]: Component }));
     // The next network request can succeed; the old rejected registry promise must not win.
     vi.doMock(panel.path, restoredImport);
     const activate = activationLoaders.get(panel.name);

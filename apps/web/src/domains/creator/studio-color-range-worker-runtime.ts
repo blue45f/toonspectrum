@@ -4,7 +4,9 @@ import {
   flipColorRangeMask,
 } from "./studio-color-range";
 
-import type { StudioColorRangeWorkerRunRequest } from "./studio-color-range-worker-protocol";
+import { executeStudioSelectionBorderWorkerRequest } from "./studio-selection-border-worker-runtime";
+
+import type { StudioSelectionComputeWorkerRunRequest } from "./studio-color-range-worker-protocol";
 import type { PixelSelection } from "./studio-selection-tools";
 
 /**
@@ -14,8 +16,9 @@ import type { PixelSelection } from "./studio-selection-tools";
  * point-in-selection filtering, connected-component labelling, and contour extraction.
  */
 export function executeStudioColorRangeWorkerRequest(
-  request: StudioColorRangeWorkerRunRequest,
+  request: StudioSelectionComputeWorkerRunRequest,
 ): PixelSelection | null {
+  if (request.kind === "selection-border") return executeStudioSelectionBorderWorkerRequest(request);
   const sourceMask = buildColorRangeMask(
     request.data,
     request.width,

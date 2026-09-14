@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 
 export function StudioBg3dEditorSidebar({ h }) {
@@ -382,6 +383,7 @@ export function StudioBg3dEditorSidebar({ h }) {
               {open ? (
                 <StudioBg3dShapesPanel
                   hidden={hideOnTab("shapes")}
+                  disabled={!isStudioBg3dSceneEditReady(h)}
                   context={{
                   Boxes,
                   ADD_BUTTONS,

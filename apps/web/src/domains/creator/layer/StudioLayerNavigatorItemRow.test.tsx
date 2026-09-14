@@ -351,7 +351,7 @@ describe("StudioLayerNavigatorItemRow", () => {
     renderRow(rowProps({ tabStop: true }));
 
     expect(screen.getByRole("treeitem").getAttribute("aria-keyshortcuts")).toBe(
-      "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
+      "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Shift+ArrowUp Shift+ArrowDown Shift+Home Shift+End Shift+Space Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
     );
   });
 

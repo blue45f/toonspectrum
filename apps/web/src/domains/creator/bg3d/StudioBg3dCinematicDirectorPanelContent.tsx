@@ -142,6 +142,10 @@ export function StudioBg3dCinematicDirectorPanel({
   }, [localBookmarks, onApplyProductionShot, onApplyShotBookmark, productionMode, productionShots]);
 
   useEffect(() => {
+    if (disabled) {
+      setIsPlaying(false);
+      return undefined;
+    }
     if (!isPlaying || continuityShots.length === 0) return undefined;
     applyDeckShot(activeDeckIndex);
     const localBookmark = productionMode ? undefined : localBookmarks[activeDeckIndex];
@@ -159,7 +163,7 @@ export function StudioBg3dCinematicDirectorPanel({
       setActiveDeckIndex((current) => current + 1);
     }, delayMs);
     return () => window.clearTimeout(timer);
-  }, [activeDeckIndex, applyDeckShot, continuityShots.length, isPlaying, localBookmarks, productionMode]);
+  }, [activeDeckIndex, applyDeckShot, continuityShots.length, disabled, isPlaying, localBookmarks, productionMode]);
 
   useEffect(() => {
     if (activeDeckIndex < continuityShots.length) return;

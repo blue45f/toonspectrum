@@ -15,7 +15,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { createCharacterExportPreflight, formatCharacterBytes } from "../export/character-export-preflight";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
-import { isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
+import { CHARACTER_SHAPER_TABLET_QUERY, isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
 import { CharacterCanonicalPartsPanel } from "./CharacterCanonicalPartsPanel";
 import { useCharacterPlatformWorkbench } from "./use-character-platform-workbench";
 
@@ -26,6 +26,7 @@ import type { CharacterPoseRegion } from "../pose/character-pose-v2";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 type WorkbenchTab = "quality" | "presets" | "pose" | "ink" | "render";
 type ImportTarget = "manifest" | "presets" | "ink";
@@ -131,6 +132,8 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   const [presetName, setPresetName] = useState("");
   const [savingPreset, setSavingPreset] = useState(false);
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const [launcherRoot, setLauncherRoot] = useState<HTMLElement | null>(null);
+  const compact = !useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
   const savingPresetRef = useRef(false);
   const workbench = useCharacterPlatformWorkbench(h, binding);
   const drawing = open && workbench.surfaceInk.active;
@@ -138,8 +141,10 @@ export function CharacterPlatformWorkbench({ h, binding }: {
 
   useEffect(() => {
     // Escape the app's stacking context while remaining inside the poser's focus boundary.
-    setPortalRoot(ownerDialogRef?.current ?? document.body);
-  }, [ownerDialogRef]);
+    const root = ownerDialogRef?.current ?? document.body;
+    setPortalRoot(root);
+    setLauncherRoot(compact ? root.querySelector<HTMLElement>("[data-character-quality-launcher]") : null);
+  }, [compact, ownerDialogRef]);
 
   const captureCanvas = h.captureRef?.current?.gl?.domElement as HTMLCanvasElement | undefined;
   const exportSize = useMemo(() => ({
@@ -436,14 +441,12 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     </>
   ) : null;
 
-  return portalRoot ? createPortal(
-    <>
-      <button ref={triggerRef} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} className={cn("fixed bottom-20 right-4 z-[90] inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/55 bg-panel/95 px-4 text-[0.72rem] font-bold text-accent shadow-lg backdrop-blur hover:bg-accent-soft", STUDIO_FOCUS_RING)}>
+  const launcher = (
+      <button ref={triggerRef} type="button" data-character-quality-trigger="true" aria-label="품질 도구V2" aria-haspopup="dialog" aria-expanded={open} title="캐릭터 품질 도구" onClick={() => setOpen(true)} className={cn("inline-flex min-h-11 items-center justify-center gap-2 border border-accent/55 bg-panel/95 text-[0.72rem] font-bold text-accent hover:bg-accent-soft", launcherRoot ? "size-11 rounded-xl" : "fixed bottom-20 right-4 z-[90] rounded-full px-4 shadow-lg backdrop-blur", STUDIO_FOCUS_RING)}>
         <Gauge size={16} aria-hidden />
-        품질 도구
-        <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.58rem] text-on-accent">V2</span>
+        <span className={launcherRoot ? "sr-only" : undefined}>품질 도구</span>
+        <span className={launcherRoot ? "sr-only" : "rounded-full bg-accent px-1.5 py-0.5 text-[0.58rem] text-on-accent"}>V2</span>
       </button>
-      {panel}
-    </>, portalRoot,
-  ) : null;
+  );
+  return portalRoot ? <>{createPortal(launcher, launcherRoot ?? portalRoot)}{createPortal(panel, portalRoot)}</> : null;
 }

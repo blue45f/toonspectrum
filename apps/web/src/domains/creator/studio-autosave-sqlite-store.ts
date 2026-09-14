@@ -39,9 +39,17 @@ export type StudioAutosaveSqliteReadResult =
     }> & StudioAutosaveSqliteRecoveryMarker)
   | null;
 
+export type StudioAutosaveSqliteWriteOptions = Readonly<{
+  mode?: "normal" | "emergency";
+}>;
+
 export interface StudioAutosaveSqlitePort {
   read(key: string): Promise<StudioAutosaveSqliteReadResult>;
-  write(key: string, payload: StudioAutosavePayload): Promise<void>;
+  write(
+    key: string,
+    payload: StudioAutosavePayload,
+    options?: StudioAutosaveSqliteWriteOptions,
+  ): Promise<void>;
   clear(key: string, savedAt?: string): Promise<void>;
 }
 
@@ -143,9 +151,10 @@ async function readLastKnownGood(
 async function archiveCurrentEnvelope(
   database: Pick<StudioLocalDatabase, "kvGet" | "kvSet">,
   key: string,
+  isCurrent: () => boolean,
 ): Promise<void> {
   const raw = await database.kvGet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, key);
-  if (raw === null) return;
+  if (raw === null || !isCurrent()) return;
 
   try {
     // Only rotate a fully validated authority row. A corrupt primary must never overwrite the
@@ -165,6 +174,54 @@ async function archiveCurrentEnvelope(
 export function createStudioAutosaveSqliteStore(
   database: Pick<StudioLocalDatabase, "kvGet" | "kvSet">,
 ): StudioAutosaveSqlitePort {
+  type Mutation = Readonly<{ completion: Promise<void> }>;
+  type MutationGroup = { latest: Mutation; pending: number };
+  const mutations = new Map<string, MutationGroup>();
+
+  function mutate(key: string, execute: (isCurrent: () => boolean) => Promise<void>): Promise<void> {
+    let resolveCompletion!: () => void;
+    let rejectCompletion!: (cause: unknown) => void;
+    const completion = new Promise<void>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+    const mutation: Mutation = { completion };
+    const group = mutations.get(key) ?? { latest: mutation, pending: 0 };
+    group.latest = mutation;
+    group.pending += 1;
+    mutations.set(key, group);
+
+    async function finish() {
+      let outcome: { failed: false } | { failed: true; cause: unknown } = { failed: false };
+      try {
+        // Start immediately: an emergency primary must not queue behind an older recovery RPC.
+        await execute(() => group.latest === mutation);
+      } catch (cause) {
+        outcome = { failed: true, cause };
+      }
+
+      // Superseded callers share the newest result instead of acknowledging a snapshot that was
+      // skipped. Follow further successors too if another mutation starts while awaiting a receipt.
+      let observed = mutation;
+      while (group.latest !== observed) {
+        observed = group.latest;
+        try {
+          await observed.completion;
+          outcome = { failed: false };
+        } catch (cause) {
+          outcome = { failed: true, cause };
+        }
+      }
+      if (outcome.failed) rejectCompletion(outcome.cause);
+      else resolveCompletion();
+      group.pending -= 1;
+      if (group.pending === 0) mutations.delete(key);
+    }
+
+    void finish();
+    return completion;
+  }
+
   return Object.freeze({
     async read(key: string) {
       const raw = await database.kvGet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, key);
@@ -187,16 +244,26 @@ export function createStudioAutosaveSqliteStore(
       }
     },
 
-    async write(key: string, payload: StudioAutosavePayload) {
+    async write(
+      key: string,
+      payload: StudioAutosavePayload,
+      options?: StudioAutosaveSqliteWriteOptions,
+    ) {
       if (!studioAutosaveHasContent(payload)) {
         throw new Error("내용이 없는 Studio 자동저장은 SQLite snapshot으로 기록하지 않습니다.");
       }
-      await archiveCurrentEnvelope(database, key);
-      await database.kvSet(
-        STUDIO_AUTOSAVE_SQLITE_NAMESPACE,
-        key,
-        encodeEnvelope("snapshot", payload.savedAt, payload),
-      );
+      const envelope = encodeEnvelope("snapshot", payload.savedAt, payload);
+      // beforeunload can suspend the recovery-read response before this document submits its
+      // newest snapshot. Emergency writes submit the primary without that round trip, retaining
+      // the existing recovery generation until a normal write rotates it. Success still requires
+      // the primary commit below; dispatch alone is not a durability receipt.
+      return mutate(key, async (isCurrent) => {
+        if (options?.mode !== "emergency") {
+          await archiveCurrentEnvelope(database, key, isCurrent);
+        }
+        if (!isCurrent()) return;
+        await database.kvSet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, key, envelope);
+      });
     },
 
     async clear(key: string, savedAt = new Date().toISOString()) {
@@ -204,12 +271,15 @@ export function createStudioAutosaveSqliteStore(
       // Commit the recovery tombstone first. If it cannot be made durable, the operation fails
       // while the primary snapshot remains intact; acknowledging success would allow that older
       // recovery generation to resurrect after a later primary-row failure.
-      await database.kvSet(
-        STUDIO_AUTOSAVE_SQLITE_NAMESPACE,
-        studioAutosaveSqliteLastKnownGoodKey(key),
-        tombstone,
-      );
-      await database.kvSet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, key, tombstone);
+      return mutate(key, async (isCurrent) => {
+        await database.kvSet(
+          STUDIO_AUTOSAVE_SQLITE_NAMESPACE,
+          studioAutosaveSqliteLastKnownGoodKey(key),
+          tombstone,
+        );
+        if (!isCurrent()) return;
+        await database.kvSet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, key, tombstone);
+      });
     },
   });
 }

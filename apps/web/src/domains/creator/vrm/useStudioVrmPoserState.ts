@@ -568,7 +568,7 @@ export function useStudioVrmPoserState({
   const insertCaptureFrameRef = useRef<number | null>(null);
   const insertCaptureAbortRef = useRef<AbortController | null>(null);
   const sharePoseAbortRef = useRef<AbortController | null>(null);
-  const captureOperationRef = useRef<"insert" | "thumbnail" | "share" | null>(null);
+  const captureOperationRef = useRef<"insert" | "thumbnail" | "share" | "export" | null>(null);
   const sharedPoseListRequestRef = useRef(0);
   const sharedPoseSelectionRequestRef = useRef(0);
   const sharedPoseCatalogAbortRef = useRef<AbortController | null>(null);

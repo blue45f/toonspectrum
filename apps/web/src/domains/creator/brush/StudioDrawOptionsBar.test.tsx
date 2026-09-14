@@ -20,6 +20,27 @@ const studioGlobalsSource = readFileSync(resolve(process.cwd(), "apps/web/src/st
 afterEach(cleanup);
 
 describe("StudioDrawOptionsBar", () => {
+  it("allows a saved material brush to edit its full size and opacity ranges", () => {
+    const onWidth = vi.fn();
+    const onOpacity = vi.fn();
+    render(<StudioDrawOptionsBar
+      drawMode="pen" brushId="brush" materialBrush strokeWidth={240} brushOpacity={0.01}
+      stabilizer={0} color="#112233" quickShapeActive={false}
+      onSelectBrush={vi.fn()} onStrokeWidthChange={onWidth} onOpacityChange={onOpacity}
+      onStabilizerChange={vi.fn()} onColorChange={vi.fn()} onToggleQuickShape={vi.fn()}
+    />);
+    const width = screen.getByRole("slider", { name: "브러시 크기" }) as HTMLInputElement;
+    const opacity = screen.getByRole("slider", { name: "브러시 불투명도" }) as HTMLInputElement;
+    expect(width.max).toBe("240");
+    expect(width.value).toBe("240");
+    expect(opacity.min).toBe("1");
+    expect(opacity.value).toBe("1");
+    fireEvent.change(width, { target: { value: "180" } });
+    fireEvent.change(opacity, { target: { value: "2" } });
+    expect(onWidth).toHaveBeenCalledWith(180);
+    expect(onOpacity).toHaveBeenCalledWith(0.02);
+  });
+
   it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar

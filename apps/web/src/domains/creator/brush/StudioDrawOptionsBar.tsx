@@ -61,6 +61,7 @@ import {
 import { StudioToolHintTarget } from "../StudioToolHint";
 
 import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
+import { MATERIAL_BRUSH_OPACITY_RANGE, MATERIAL_BRUSH_STROKE_WIDTH_RANGE } from "./studio-brush-library";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -85,6 +86,7 @@ export interface StudioDrawOptionsBarProps {
   brushCatalogItems?: readonly StudioBrushTrayItem[];
   strokeWidth: number;
   brushOpacity: number;
+  materialBrush?: boolean;
   stabilizer: number;
   stabilizerMode?: StudioStabilizerModeUi;
   postCorrection?: number;
@@ -230,6 +232,7 @@ export function StudioDrawOptionsBar({
   secondaryColor = "#ffffff",
   recentSwatches = [],
   brushSlots = [],
+  materialBrush = false,
   symmetryType = "none",
   quickShapeActive,
   canvasFlipH = false,
@@ -847,7 +850,7 @@ export function StudioDrawOptionsBar({
                 <input
                   type="range"
                   min={STUDIO_BRUSH_SIZE_RANGE.min}
-                  max={STUDIO_BRUSH_SIZE_RANGE.max}
+                  max={materialBrush ? MATERIAL_BRUSH_STROKE_WIDTH_RANGE[1] : STUDIO_BRUSH_SIZE_RANGE.max}
                   value={strokeWidth}
                   onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
                   className="studio-range w-16 sm:w-20"
@@ -883,7 +886,7 @@ export function StudioDrawOptionsBar({
             <span className="sr-only">불투명</span>
             <input
               type="range"
-              min={5}
+              min={materialBrush ? MATERIAL_BRUSH_OPACITY_RANGE[0] * 100 : 5}
               max={100}
               step={1}
               value={Math.round(brushOpacity * 100)}

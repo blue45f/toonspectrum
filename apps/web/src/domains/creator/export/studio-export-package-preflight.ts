@@ -20,6 +20,8 @@ import {
   type DialogueRubySpan,
 } from "../lettering/studio-dialogue-ruby";
 
+import { resolveStudioExportPageSelection } from "./studio-export-page-selection";
+
 export type StudioExportPageRange = {
   /** Inclusive 0-based index into the page list. */
   fromIndex: number;
@@ -45,6 +47,8 @@ export type StudioExportPackagePreflightInput = {
   pageCount: number;
   /** When omitted, the full range [0, pageCount-1] is used. */
   pageRange?: StudioExportPageRange | null;
+  /** Optional explicit page list, e.g. "1, 3–5, 8". When present, replaces pageRange. */
+  pageSelection?: string;
   geometry?: StudioExportGeometryInput | null;
   /** When true, package must include a non-empty dialogue TXT when pages have dialogue. */
   requireDialogueTxt?: boolean;
@@ -687,14 +691,16 @@ export function planStudioExportDialogueTxt(input: {
   title?: string;
   pageIndices?: readonly number[];
 }): StudioExportDialogueTxtPlan | null {
-  const pages =
-    input.pageIndices && input.pageIndices.length > 0
-      ? input.pageIndices
-          .map((index) => input.pages[index])
-          .filter((page): page is DialoguePageLike => page != null)
-      : [...input.pages];
+  const sourceIndices = input.pageIndices != null
+    ? input.pageIndices.filter((index) => input.pages[index] != null)
+    : input.pages.map((_, index) => index);
+  const pages = sourceIndices.map((index) => input.pages[index]!);
   if (pages.length === 0) return null;
-  const items = collectDialogueItems(pages);
+  // TXT page markers must still identify the original manuscript pages on translation import.
+  const items = collectDialogueItems(pages).map((item) => ({
+    ...item,
+    pageIndex: sourceIndices[item.pageIndex]!,
+  }));
   if (items.length === 0) return null;
   const enriched = enrichDialogueItemsWithRubyPreview(items, pages);
   const document = studioDialogueItemsToInterchange(enriched, {
@@ -714,7 +720,14 @@ export function preflightStudioExportPackage(
   input: StudioExportPackagePreflightInput
 ): StudioExportPackagePreflightResult {
   const issues: StudioExportPackageIssue[] = [];
-  const range = resolveStudioExportPageRange(input.pageCount, input.pageRange);
+  const selection = input.pageSelection == null
+    ? null
+    : resolveStudioExportPageSelection(input.pageCount, input.pageSelection);
+  const range = selection == null
+    ? resolveStudioExportPageRange(input.pageCount, input.pageRange)
+    : selection.ok
+      ? selection
+      : { ok: false as const, issues: [issue("PAGE_RANGE_INVALID", "error", selection.message)] };
   let pageIndices: number[] = [];
   if (!range.ok) {
     issues.push(...range.issues);
@@ -754,7 +767,7 @@ export function preflightStudioExportPackage(
     dialogueTxt = planStudioExportDialogueTxt({
       pages: input.pagesForDialogue,
       title: input.dialogueTitle,
-      pageIndices: pageIndices.length > 0 ? pageIndices : undefined,
+      pageIndices,
     });
   }
 

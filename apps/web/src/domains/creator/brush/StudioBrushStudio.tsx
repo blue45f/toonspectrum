@@ -1379,6 +1379,7 @@ export function StudioBrushStudio({
       <StudioBrushEngineProgramControls
         brushId={brushId}
         programSet={currentSnapshot.enginePrograms ?? null}
+        currentSnapshot={currentSnapshot}
         onChange={onEngineProgramsChange ?? (() => undefined)}
       />
       <StudioBrushWatercolorProgramControls

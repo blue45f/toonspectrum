@@ -2,15 +2,20 @@ import * as THREE from "three";
 
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "../bg3d/studio-bg3d-shot-batch-limits";
-import { encodeStudioBg3dShotPngInWorker } from "../bg3d/studio-bg3d-shot-png-worker-client";
-import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "../bg3d/studio-bg3d-shot-png-worker-protocol";
 import { createStudioBg3dStraightAlphaOutputPass } from "../bg3d/studio-bg3d-straight-alpha-output-pass";
 
-import type { StudioBg3dLtRasterLayer } from "../bg3d/studio-bg3d-lt-render";
+import { encodeStudioVrmPngInWorker } from "./studio-vrm-png-worker-client";
+import { STUDIO_VRM_PNG_MAX_OUTPUT_BYTES, STUDIO_VRM_PNG_MAX_PIXELS } from "./studio-vrm-png-worker-protocol";
 
-// The explicit main-thread encoder supports the full capture budget. It is never selected because
-// a Worker request failed; callers must choose it before the encoding request starts.
+import type { StudioBg3dLtRasterLayer } from "../bg3d/studio-bg3d-lt-render";
+import type { MToonMaterial } from "@pixiv/three-vrm";
+
+// Only the dedicated single-image Worker accepts 4K. Explicit main-thread encoding retains its
+// previous 8MP budget and is never selected automatically after a Worker request fails.
 const STUDIO_VRM_CAPTURE_MAIN_THREAD_MAX_PIXELS = STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
+// A 4096-square scene at 4x MSAA would allocate hundreds of MB of GPU attachments. Render its
+// exact pixels through bounded sub-frusta instead; the LT/PSD multi-layer budget stays at 8MP.
+const STUDIO_VRM_CAPTURE_TILE_EDGE = 1024;
 
 export type StudioVrmRasterPngEncoderBackend = "worker" | "main-thread";
 
@@ -32,6 +37,18 @@ export interface StudioVrmRasterCaptureOptions {
   readonly timeoutMs?: number;
   /** Selected once before encoding starts. Omission selects the product Worker backend. */
   readonly encoderBackend?: StudioVrmRasterPngEncoderBackend;
+}
+
+export interface StudioVrmCaptureProgress {
+  readonly completedTiles: number;
+  readonly totalTiles: number;
+}
+
+export interface StudioVrmCooperativeCaptureOptions {
+  readonly signal?: AbortSignal;
+  /** The caller owns the frozen scene and must reject a changed model/pose/appearance. */
+  readonly assertCurrent?: () => void;
+  readonly onProgress?: (progress: StudioVrmCaptureProgress) => void;
 }
 
 export interface StudioVrmRasterCaptureDependencies {
@@ -78,7 +95,7 @@ function assertDimensions(
     throw new RangeError("VRM 캡처 크기가 허용 범위를 벗어났습니다.");
   }
   const pixels = width * height;
-  if (!Number.isSafeInteger(pixels) || pixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS) {
+  if (!Number.isSafeInteger(pixels) || pixels > STUDIO_VRM_PNG_MAX_PIXELS) {
     throw new RangeError("VRM 캡처 픽셀 예산을 초과했습니다.");
   }
   return dimensions;
@@ -142,13 +159,14 @@ export function flipStudioVrmCaptureRows(
  * active tone mapping + output color space into an RGBA8 target suitable for readback — the same
  * contract as the bg3d capture adapter.
  */
-export function captureStudioVrmRgba(
+function* captureStudioVrmRgbaTiles(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.Camera,
   dimensions: StudioVrmRasterCaptureDimensions,
   background: StudioVrmRasterCaptureBackground = {},
-): Uint8ClampedArray {
+  cooperative = false,
+): Generator<StudioVrmCaptureProgress, Uint8ClampedArray | undefined, void> {
   const { width, height } = assertDimensions(dimensions);
   const clearAlpha = typeof background.alpha === "number" && Number.isFinite(background.alpha)
     ? Math.min(1, Math.max(0, background.alpha))
@@ -158,13 +176,25 @@ export function captureStudioVrmRgba(
       ? background.color
       : 0x000000,
   );
-  const previousRenderTarget = renderer.getRenderTarget();
-  const previousActiveCubeFace = renderer.getActiveCubeFace();
-  const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
-  const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
-  const previousClearAlpha = renderer.getClearAlpha();
-  const previousSceneBackground = scene.background;
-  const sceneTarget = new THREE.WebGLRenderTarget(width, height, {
+  const tiled = cooperative || width * height > STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
+  const tileWidth = tiled ? Math.min(width, STUDIO_VRM_CAPTURE_TILE_EDGE) : width;
+  const tileHeight = tiled ? Math.min(height, STUDIO_VRM_CAPTURE_TILE_EDGE) : height;
+  const originalProjection = tiled ? camera.projectionMatrix.clone() : null;
+  const originalProjectionInverse = tiled ? camera.projectionMatrixInverse.clone() : null;
+  const screenOutlineFactors = new Map<MToonMaterial, number>();
+  if (tiled) {
+    scene.traverse((object) => {
+      const source = (object as THREE.Mesh).material;
+      for (const material of Array.isArray(source) ? source : source ? [source] : []) {
+        const mtoon = material as MToonMaterial;
+        if (mtoon.isMToonMaterial && mtoon.outlineWidthMode === "screenCoordinates" && Number.isFinite(mtoon.outlineWidthFactor)) {
+          screenOutlineFactors.set(mtoon, mtoon.outlineWidthFactor);
+        }
+      }
+    });
+  }
+  const cropProjection = new THREE.Matrix4();
+  const sceneTarget = new THREE.WebGLRenderTarget(tileWidth, tileHeight, {
     depthBuffer: true,
     format: THREE.RGBAFormat,
     generateMipmaps: false,
@@ -177,7 +207,7 @@ export function captureStudioVrmRgba(
   // Intermediate working-color buffer: the straight-alpha output pass owns the one explicit
   // tone-map/sRGB transfer, so this texture must not declare an output color space of its own.
   sceneTarget.texture.colorSpace = THREE.NoColorSpace;
-  const outputTarget = new THREE.WebGLRenderTarget(width, height, {
+  const outputTarget = new THREE.WebGLRenderTarget(tileWidth, tileHeight, {
     depthBuffer: false,
     format: THREE.RGBAFormat,
     generateMipmaps: false,
@@ -188,29 +218,81 @@ export function captureStudioVrmRgba(
   });
   outputTarget.texture.colorSpace = THREE.NoColorSpace;
   const outputPass = createStudioBg3dStraightAlphaOutputPass();
-  const bottomUp = new Uint8Array(width * height * 4);
+  const bottomUp = new Uint8Array(tileWidth * tileHeight * 4);
+  const output = new Uint8ClampedArray(width * height * 4);
+  const totalTiles = Math.ceil(width / tileWidth) * Math.ceil(height / tileHeight);
+  let completedTiles = 0;
 
   try {
-    renderer.setRenderTarget(sceneTarget);
-    // Pass a numeric hex so engine adapters (and capture tests) can distinguish the capture
-    // clear from the subsequent restore of the previous THREE.Color instance.
-    renderer.setClearColor(clearColor.getHex(), clearAlpha);
-    // Transparent subject cutouts must not inherit a solid scene.background from the viewport.
-    if (clearAlpha === 0) scene.background = null;
-    renderer.clear(true, true, true);
-    renderer.render(scene, camera);
-    // Sampling the MSAA scene texture resolves it; the pass writes display-ready straight-alpha
-    // RGBA8 into the non-MSAA output target, which is then read back synchronously.
-    outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
-    renderer.readRenderTargetPixels(outputTarget, 0, 0, width, height, bottomUp);
+    for (let top = 0; top < height; top += tileHeight) {
+      for (let left = 0; left < width; left += tileWidth) {
+        // Restore before yielding: R3F can draw another frame while the next tile is waiting.
+        // Read the current renderer state per tile instead of overwriting a later frame's state.
+        const previousRenderTarget = renderer.getRenderTarget();
+        const previousActiveCubeFace = renderer.getActiveCubeFace();
+        const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
+        const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
+        const previousClearAlpha = renderer.getClearAlpha();
+        const previousSceneBackground = scene.background;
+        try {
+          const w = Math.min(tileWidth, width - left);
+          const h = Math.min(tileHeight, height - top);
+          sceneTarget.setSize(w, h);
+          outputTarget.setSize(w, h);
+          if (originalProjection) {
+            // Crop the existing clip window, including perspective/orthographic zoom and lens
+            // shift. Multiplying its projection preserves the exact full-frame camera aspect.
+            const scaleX = width / w;
+            const scaleY = height / h;
+            cropProjection.set(
+              scaleX, 0, 0, (width - 2 * left - w) / w,
+              0, scaleY, 0, (2 * top + h - height) / h,
+              0, 0, 1, 0,
+              0, 0, 0, 1,
+            );
+            camera.projectionMatrix.multiplyMatrices(cropProjection, originalProjection);
+            camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+            // MToon's screen outline divides its world extrusion by projectionMatrix[1].y.
+            // Compensate the tile's vertical crop scale so the assembled full-frame line keeps
+            // its original width, including the final partial tile. Material.update(0) retains
+            // this public uniform value; no shader or persistent preset is replaced.
+            for (const [material, factor] of screenOutlineFactors) {
+              material.outlineWidthFactor = factor * scaleY;
+              material.uniformsNeedUpdate = true;
+            }
+          }
+          renderer.setRenderTarget(sceneTarget);
+          // Pass a numeric hex so adapters can distinguish capture clear from color restoration.
+          renderer.setClearColor(clearColor.getHex(), clearAlpha);
+          if (clearAlpha === 0) scene.background = null;
+          renderer.clear(true, true, true);
+          renderer.render(scene, camera);
+          outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
+          const pixels = bottomUp.subarray(0, w * h * 4);
+          renderer.readRenderTargetPixels(outputTarget, 0, 0, w, h, pixels);
+          // Stitch bottom-up GPU rows directly into the one full-resolution top-down snapshot.
+          for (let row = 0; row < h; row += 1) {
+            const sourceOffset = (h - row - 1) * w * 4;
+            output.set(pixels.subarray(sourceOffset, sourceOffset + w * 4), ((top + row) * width + left) * 4);
+          }
+        } finally {
+          for (const [material, factor] of screenOutlineFactors) {
+            material.outlineWidthFactor = factor;
+            material.uniformsNeedUpdate = true;
+          }
+          if (originalProjection && originalProjectionInverse) {
+            camera.projectionMatrix.copy(originalProjection);
+            camera.projectionMatrixInverse.copy(originalProjectionInverse);
+          }
+          renderer.setRenderTarget(previousRenderTarget, previousActiveCubeFace, previousActiveMipmapLevel);
+          renderer.setClearColor(previousClearColor, previousClearAlpha);
+          scene.background = previousSceneBackground;
+        }
+        completedTiles += 1;
+        yield { completedTiles, totalTiles };
+      }
+    }
   } finally {
-    renderer.setRenderTarget(
-      previousRenderTarget,
-      previousActiveCubeFace,
-      previousActiveMipmapLevel,
-    );
-    renderer.setClearColor(previousClearColor, previousClearAlpha);
-    scene.background = previousSceneBackground;
     // OutputPass owns a module-shared fullscreen geometry, so dispose only its per-capture
     // material. Its public dispose() would also dispose that shared geometry.
     outputPass.material.dispose();
@@ -218,7 +300,82 @@ export function captureStudioVrmRgba(
     outputTarget.dispose();
   }
 
-  return flipStudioVrmCaptureRows(bottomUp, dimensions);
+  return output;
+}
+
+/** Synchronous compatibility boundary for short captures and semantic PSD material scopes. */
+export function captureStudioVrmRgba(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  background: StudioVrmRasterCaptureBackground = {},
+): Uint8ClampedArray {
+  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background);
+  let step = tiles.next();
+  while (!step.done) step = tiles.next();
+  if (!step.value) throw new Error("VRM 캡처가 완료되지 않았습니다.");
+  return step.value;
+}
+
+function yieldStudioVrmCapture(signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const finish = () => {
+      signal?.removeEventListener("abort", cancel);
+      resolve();
+    };
+    const timer = setTimeout(finish, 0);
+    const cancel = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", cancel);
+      reject(abortError());
+    };
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+  });
+}
+
+/**
+ * Cooperative PNG capture. Each render/readback remains synchronous, but is at most 1024²;
+ * actual tasks between tiles let input, progress and cancellation run. No asynchronous GPU
+ * job survives cancellation. Temporary camera/material/renderer state is restored before
+ * every yield. The caller must hold the scene capture lease until this promise settles.
+ * Do not use across semantic material scopes that are only restored after this promise.
+ */
+export async function captureStudioVrmRgbaCooperatively(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  background: StudioVrmRasterCaptureBackground = {},
+  options: StudioVrmCooperativeCaptureOptions = {},
+): Promise<Uint8ClampedArray> {
+  assertDimensions(dimensions);
+  const assertCurrent = () => {
+    if (options.signal?.aborted) throw abortError();
+    options.assertCurrent?.();
+    if (renderer.getContext?.().isContextLost()) {
+      throw new Error("3D 화면 연결이 끊겨 내보내기를 중단했습니다. 화면을 다시 연 뒤 시도해 주세요.");
+    }
+  };
+  assertCurrent();
+  await yieldStudioVrmCapture(options.signal);
+  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background, true);
+  try {
+    for (;;) {
+      assertCurrent();
+      const step = tiles.next();
+      assertCurrent();
+      if (step.done) {
+        if (!step.value) throw new Error("VRM 캡처가 완료되지 않았습니다.");
+        return step.value;
+      }
+      options.onProgress?.(step.value);
+      if (step.value.completedTiles < step.value.totalTiles) await yieldStudioVrmCapture(options.signal);
+    }
+  } finally {
+    tiles.return(undefined);
+  }
 }
 
 async function validatePngBlob(
@@ -229,7 +386,7 @@ async function validatePngBlob(
   if (signal?.aborted) throw abortError();
   if (
     png.type !== "image/png" || png.size < 24 ||
-    png.size > STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES
+    png.size > STUDIO_VRM_PNG_MAX_OUTPUT_BYTES
   ) {
     throw new TypeError("VRM PNG 결과가 올바르지 않습니다.");
   }
@@ -315,7 +472,7 @@ export function readStudioVrmPngBlobAsDataUrl(
   if (signal?.aborted) return Promise.reject(abortError());
   if (
     png.type !== "image/png" || png.size < 24 ||
-    png.size > STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES
+    png.size > STUDIO_VRM_PNG_MAX_OUTPUT_BYTES
   ) {
     return Promise.reject(new TypeError("VRM PNG 결과가 올바르지 않습니다."));
   }
@@ -375,7 +532,7 @@ export function readStudioVrmPngBlobAsDataUrl(
 }
 
 const DEFAULT_DEPENDENCIES: StudioVrmRasterCaptureDependencies = {
-  encodePngInWorker: encodeStudioBg3dShotPngInWorker,
+  encodePngInWorker: encodeStudioVrmPngInWorker,
   encodePngOnMainThread: encodeStudioVrmCapturePngOnMainThread,
   blobToDataUrl: readStudioVrmPngBlobAsDataUrl,
 };

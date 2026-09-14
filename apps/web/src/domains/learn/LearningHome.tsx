@@ -30,6 +30,7 @@ import {
   type SessionMinutes,
 } from "./learning-profile";
 import { useLearningProgress, type LearningStore } from "./use-learning-progress";
+import { LearningProcessStudy } from "./LearningProcessStudy";
 
 import "./learning-hub.css";
 
@@ -219,9 +220,9 @@ export function LearningHome() {
 
       <header className="learn-hub-hero">
         <div className="learn-hub-hero-copy">
-          <p className="learn-eyebrow">TOONSTUDIO LEARNING STUDIO</p>
-          <h1>배우는 순간,<br />내 웹툰이 앞으로 갑니다.</h1>
-          <p className="learn-intro">목표를 고르면 필요한 강좌를 순서대로 안내하고, 매 수업은 직접 확인할 수 있는 작은 결과물로 끝납니다. 읽기만 하는 도움말이 아니라 만들면서 익히는 학습 공간입니다.</p>
+          <p className="learn-eyebrow">TOONSTUDIO / ARTIST CLASSROOM</p>
+          <h1>상상하던 장면이,<br />내 손끝의 실력으로.</h1>
+          <p className="learn-intro">웹툰 콘티의 첫 선부터 빛과 색, 원고의 마무리까지. 전문 웹툰 드로잉 도구를 내 작업에 맞게 익히고, 매 수업마다 작은 결과물을 완성해 보세요.</p>
           <div className="learn-actions">
             <Link className="learn-primary" to={lessonUrl(nextLesson.id)}>
               {recommendedStats.started ? "추천 경로 이어서 학습" : "내 추천 경로 시작"} <span aria-hidden="true">→</span>
@@ -230,7 +231,10 @@ export function LearningHome() {
           </div>
           <p className="learn-small">로그인 없이 시작 · 완료 기록과 메모는 현재 브라우저에 저장</p>
         </div>
-        <aside className="learn-dashboard-card" aria-label="내 학습 현황">
+        <figure className="learn-hero-art"><img src="/brand/atelier-world.webp" alt="배경과 인물, 빛과 색이 어우러진 상상 속 항구 도시 콘셉트 아트" width={1536} height={1024} fetchPriority="high" /><figcaption><span>YOUR NEXT SCENE</span><strong>관찰하고. 익히고. 그려보세요.</strong><span>ToonStudio 콘셉트 아트</span></figcaption></figure>
+      </header>
+
+        <aside className="learn-dashboard-card learn-dashboard-overview" aria-label="내 학습 현황">
           <div className="learn-dashboard-heading">
             <div><span className="learn-eyebrow">MY LEARNING</span><h2>{recommendedPath.title}</h2></div>
             <strong aria-label={`전체 강좌 ${overallPercent}% 완료`}>{overallPercent}%</strong>
@@ -247,7 +251,8 @@ export function LearningHome() {
             <Link to={lessonUrl(nextLesson.id)}>{nextLesson.title} →</Link>
           </div>
         </aside>
-      </header>
+
+      <LearningProcessStudy />
 
       <section className="learn-hub-facts" aria-label="학습 콘텐츠 요약">
         <div><strong>{LEARNING_PATHS.length}</strong><span>목표별 학습 경로</span></div>
@@ -349,7 +354,7 @@ export function LearningHome() {
               <progress value={skill.completed} max={Math.max(skill.total, 1)} aria-label={`${skill.label} 관련 강좌 완료율`} />
               <button type="button" onClick={() => {
                 setFilter("skill", skill.id);
-                document.querySelector("#learn-library")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                document.querySelector("#learn-library")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
               }}>{skill.label} 강좌 보기</button>
             </article>
           ))}

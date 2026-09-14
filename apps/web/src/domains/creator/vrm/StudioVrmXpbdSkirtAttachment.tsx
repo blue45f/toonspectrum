@@ -778,6 +778,7 @@ export function StudioVrmXpbdSkirtAttachment({
   metrics,
   effectiveFit,
   topologyGeneration = 0,
+  capturePaused = false,
   onSurfaceReceipt,
   onAttachmentStatus,
   onCaptureSyncChange,
@@ -788,6 +789,7 @@ export function StudioVrmXpbdSkirtAttachment({
   readonly metrics: WardrobeMetrics;
   readonly effectiveFit: number;
   readonly topologyGeneration?: number;
+  readonly capturePaused?: boolean;
   readonly onSurfaceReceipt: (
     slot: WardrobeSlot,
     receipt: StudioVrmXpbdSkirtSurfaceReceipt | null,
@@ -972,6 +974,7 @@ export function StudioVrmXpbdSkirtAttachment({
   }, [equip.itemId, runtime, runtimeUnavailable, slot]);
 
   useFrame((_, delta) => {
+    if (capturePaused) return;
     if (!runtime || runtimeUnavailable || runtime.surface.disposed) return;
     if (poseFenceRef.current.runtime !== runtime) {
       poseFenceRef.current = { runtime, nextPoseGeneration: 0 };

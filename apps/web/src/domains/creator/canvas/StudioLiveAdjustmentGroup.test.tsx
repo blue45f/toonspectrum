@@ -49,14 +49,16 @@ describe("live adjustment actual runtime and capture fence", () => {
     let completed = false;
     const captured = waitForStudioRasterImagePresentations(identities, () => scene.draw()).then(() => { completed = true; });
     expect(completed).toBe(false);
-    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));
+    // A cold CI runner also transforms the lazily loaded CPU/Worker filter graph. Keep the
+    // real ready/draw assertions, but do not mistake compilation taking >1s for readiness.
+    await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"), { timeout: 10_000 });
     expect([...scene.output]).toEqual([245, 235, 225, 128]);
     expect([...scene.source]).toEqual([10, 20, 30, 128]);
     expect(completed).toBe(false);
     act(() => scene.draw()); await captured;
     expect(completed).toBe(true);
     expect(view.getByText("editable original")).toBeTruthy();
-  });
+  }, 15_000);
   it("rebuilds the real parent compositor when a late image Worker publishes newer pixels", async () => {
     render(mount());
     await waitFor(() => expect(readStudioLiveAdjustmentStatus("adjustment")?.state).toBe("ready"));

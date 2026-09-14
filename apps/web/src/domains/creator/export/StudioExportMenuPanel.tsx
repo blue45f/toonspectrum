@@ -36,7 +36,6 @@ import {
   writeStudioExportGeometryDraft,
 } from "./studio-export-geometry-draft";
 import {
-  formatExportPageRangeLabel,
   planMultiPageExportCapture,
   preflightStudioExportPackage,
   STUDIO_EXPORT_BLEED_MM_RANGE,
@@ -46,6 +45,11 @@ import {
   type StudioExportGeometryPresetId,
   type StudioExportPackageIssue,
 } from "./studio-export-package-preflight";
+import {
+  assertStudioExportCaptureComplete,
+  formatStudioExportPageSelection,
+  STUDIO_EXPORT_PAGE_SELECTION_MAX_LENGTH,
+} from "./studio-export-page-selection";
 import {
   EXPORT_PRESETS,
   exportPresetSlices,
@@ -65,7 +69,7 @@ import type { StudioInkMlExportResult } from "../studio-inkml-interchange";
 import type { PsdExportResult } from "./studio-psd-export";
 import type { SvgExportResult } from "./studio-svg-export";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { cx } from "@/shared/lib/cx";
 
@@ -97,6 +101,14 @@ function safeExportBaseName(title: string): string {
     .join("")
     .trim()
     .slice(0, 120) || "toonspectrum-comic";
+}
+
+export interface StudioExportMenuPackageContext {
+  pageIndices: readonly number[];
+  canExport: boolean;
+  busy: boolean;
+  rangeLabel: string;
+  capturePages: () => Promise<{ pages: HTMLCanvasElement[]; indices: number[]; rangeLabel: string }>;
 }
 
 export interface StudioExportMenuPanelProps {
@@ -163,6 +175,8 @@ export interface StudioExportMenuPanelProps {
   exportCurrentPageToRasterInterchange?: (
     format: StudioRasterInterchangeFormat
   ) => Promise<StudioRasterEncoded>;
+  /** Additional delivery formats share this panel's selection, preflight, and capture lock. */
+  renderAdditionalExports?: (context: StudioExportMenuPackageContext) => ReactNode;
 }
 
 export function StudioExportMenuPanel({
@@ -195,6 +209,7 @@ export function StudioExportMenuPanel({
   exportCurrentPageToWillV1,
   exportCurrentPageToPsd,
   exportCurrentPageToRasterInterchange,
+  renderAdditionalExports,
 }: StudioExportMenuPanelProps) {
   // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
   const [presetBusy, setPresetBusy] = useState(false);
@@ -223,6 +238,8 @@ export function StudioExportMenuPanel({
   /** Inclusive 1-based page numbers for package range (user-facing). */
   const [rangeFromPage, setRangeFromPage] = useState(1);
   const [rangeToPage, setRangeToPage] = useState(Math.max(1, pageCount));
+  const [usePageSelection, setUsePageSelection] = useState(false);
+  const [pageSelection, setPageSelection] = useState("");
   const [includeDialogueTxt, setIncludeDialogueTxt] = useState(false);
   const [packageStatus, setPackageStatus] = useState<ExportRunStatus | null>(null);
   /**
@@ -267,6 +284,7 @@ export function StudioExportMenuPanel({
       fromIndex: Math.max(0, rangeFromPage - 1),
       toIndex: Math.max(0, rangeToPage - 1),
     },
+    ...(usePageSelection ? { pageSelection } : {}),
     geometry: {
       widthPx: canvasWidth,
       heightPx: canvasHeight,
@@ -366,10 +384,11 @@ export function StudioExportMenuPanel({
   async function captureMultiPageExportCanvases(): Promise<{
     pages: HTMLCanvasElement[];
     indices: number[];
-    fromPage: number;
-    toPage: number;
     rangeLabel: string;
   }> {
+    if (!packagePreflight.canExport) {
+      throw new Error(packagePreflight.errors[0]?.message ?? "내보내기 설정을 확인하세요.");
+    }
     const plan = planMultiPageExportCapture({
       pageIndices: packagePreflight.pageIndices,
       pageCount,
@@ -385,26 +404,23 @@ export function StudioExportMenuPanel({
         rangeError?.message ?? "선택한 페이지 범위에 내보낼 페이지가 없습니다."
       );
     }
-    const fromPage = plan.indices[0]! + 1;
-    const toPage = plan.indices[plan.indices.length - 1]! + 1;
-    const rangeLabel = formatExportPageRangeLabel(fromPage, toPage);
+    const rangeLabel = formatStudioExportPageSelection(plan.indices);
 
     if (plan.mode === "indices" && capturePagesForIndices) {
       const pages = await capturePagesForIndices(plan.indices);
-      return { pages, indices: plan.indices, fromPage, toPage, rangeLabel };
+      assertStudioExportCaptureComplete(pages, plan.indices.length);
+      return { pages, indices: plan.indices, rangeLabel };
     }
 
     const all = await capturePagesForPreset("all");
+    // A missing page in an all-pages capture can shift every subsequent index. Reject the
+    // complete capture before selecting, including missing pages outside the requested range.
+    assertStudioExportCaptureComplete(all, pageCount);
     if (plan.mode === "all-then-slice") {
-      const pages = plan.indices
-        .map((index) => all[index])
-        .filter((canvas): canvas is HTMLCanvasElement => canvas != null);
-      if (pages.length === 0) {
-        throw new Error("내보낼 페이지를 캡처하지 못했습니다.");
-      }
-      return { pages, indices: plan.indices, fromPage, toPage, rangeLabel };
+      const pages = plan.indices.map((index) => all[index]!);
+      return { pages, indices: plan.indices, rangeLabel };
     }
-    return { pages: all, indices: plan.indices, fromPage, toPage, rangeLabel };
+    return { pages: all, indices: plan.indices, rangeLabel };
   }
 
   function exportDialogueTxtPackage() {
@@ -422,7 +438,7 @@ export function StudioExportMenuPanel({
     setPackageStatus({
       tone: issueTone(packagePreflight.issues),
       text: [
-        `대사 TXT ${file.cueCount}개를 저장했어요. (페이지 ${rangeFromPage}–${rangeToPage})`,
+        `대사 TXT ${file.cueCount}개를 저장했어요. (${exportRangeLabel})`,
         ...packagePreflight.warnings.map((issue) => issue.message),
       ].join(" "),
     });
@@ -470,7 +486,7 @@ export function StudioExportMenuPanel({
       tone: "info",
       text:
         kind === "cbz"
-          ? `CBZ로 묶는 중… (${formatExportPageRangeLabel(rangeFromPage, rangeToPage)})`
+          ? `CBZ로 묶는 중… (${exportRangeLabel})`
           : "현재 페이지를 OpenRaster로 묶는 중…",
     });
     try {
@@ -646,17 +662,15 @@ export function StudioExportMenuPanel({
   const maxH = selectedPreset?.maxImageHeight;
   const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
   const quality = exportQuality(exportFormat);
-  /** Selected package range size for multi-page chrome (falls back to full document). */
-  const exportRangeCount =
-    packagePreflight.pageIndices.length > 0 ? packagePreflight.pageIndices.length : Math.max(1, pageCount);
-  const exportRangeLabel = formatExportPageRangeLabel(rangeFromPage, rangeToPage);
+  const exportRangeCount = packagePreflight.pageIndices.length;
+  const exportRangeLabel = formatStudioExportPageSelection(packagePreflight.pageIndices);
   const exportRangeIsPartial = exportRangeCount < Math.max(1, pageCount);
 
   // 선택 범위 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
   async function runPdfExport() {
     if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null) return;
     setPdfBusy(true);
-    const pendingRange = formatExportPageRangeLabel(rangeFromPage, rangeToPage);
+    const pendingRange = exportRangeLabel;
     setPdfStatus({
       tone: "info",
       text: pageCount > 1 ? `${pendingRange} 캡처 중…` : "페이지 캡처 중…",
@@ -693,7 +707,7 @@ export function StudioExportMenuPanel({
     if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null) return;
     const preset = CONTACT_SHEET_PAGE_PRESETS.find((p) => p.id === contactPagePresetId) ?? CONTACT_SHEET_PAGE_PRESETS[0];
     setContactBusy(true);
-    const pendingRange = formatExportPageRangeLabel(rangeFromPage, rangeToPage);
+    const pendingRange = exportRangeLabel;
     setContactStatus({
       tone: "info",
       text: pageCount > 1 ? `${pendingRange} 캡처 중…` : "페이지 캡처 중…",
@@ -799,7 +813,7 @@ export function StudioExportMenuPanel({
   async function runPresetSliceExport(scope: PresetExportScope) {
     if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || archiveBusy !== null) return;
     setPresetBusy(true);
-    const pendingRange = formatExportPageRangeLabel(rangeFromPage, rangeToPage);
+    const pendingRange = exportRangeLabel;
     setPresetStatus({
       tone: "info",
       text: scope === "all" ? `${pendingRange} 캡처 중…` : "페이지 캡처 중…",
@@ -882,7 +896,7 @@ export function StudioExportMenuPanel({
         <div className="flex items-center justify-between gap-2">
           <span className="block text-xs font-semibold text-fg-2">페이지 범위 · 사전검사</span>
           <span className="tabular-nums text-[0.58rem] text-fg-3">
-            {pageCount}P · {packagePreflight.canExport ? "통과" : "차단"}
+            선택 {exportRangeCount}P · {packagePreflight.canExport ? "통과" : "차단"}
           </span>
         </div>
         <div className="flex flex-wrap gap-1" role="group" aria-label="범위 빠른 선택">
@@ -891,6 +905,7 @@ export function StudioExportMenuPanel({
             onClick={() => {
               setRangeFromPage(1);
               setRangeToPage(Math.max(1, pageCount));
+              setUsePageSelection(false);
             }}
             className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
           >
@@ -901,6 +916,7 @@ export function StudioExportMenuPanel({
             onClick={() => {
               setRangeFromPage(1);
               setRangeToPage(1);
+              setUsePageSelection(false);
             }}
             className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
           >
@@ -912,13 +928,34 @@ export function StudioExportMenuPanel({
               onClick={() => {
                 setRangeFromPage(pageCount);
                 setRangeToPage(pageCount);
+                setUsePageSelection(false);
               }}
               className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
             >
               마지막
             </button>
           ) : null}
-          {rangeFromPage > rangeToPage ? (
+          <button
+            type="button"
+            aria-pressed={usePageSelection}
+            onClick={() => {
+              if (!usePageSelection && !pageSelection) {
+                setPageSelection(rangeFromPage === rangeToPage
+                  ? String(rangeFromPage)
+                  : `${rangeFromPage}–${rangeToPage}`);
+              }
+              setUsePageSelection((current) => !current);
+            }}
+            className={cx(
+              "min-h-9 rounded-lg border px-2 text-[0.6rem] font-semibold",
+              usePageSelection
+                ? "border-accent bg-accent-soft text-fg"
+                : "border-line bg-card text-fg-2 hover:bg-raised"
+            )}
+          >
+            직접 지정
+          </button>
+          {!usePageSelection && rangeFromPage > rangeToPage ? (
             <button
               type="button"
               onClick={() => {
@@ -931,38 +968,61 @@ export function StudioExportMenuPanel({
             </button>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          <label className="text-[0.62rem] font-medium text-fg-3">
-            시작 (1–{Math.max(1, pageCount)})
+        {usePageSelection ? (
+          <label className="block text-[0.62rem] font-medium text-fg-3">
+            내보낼 페이지
             <input
-              type="number"
-              min={1}
-              max={Math.max(1, pageCount)}
-              value={rangeFromPage}
-              onChange={(event) => {
-                const next = Number(event.target.value) || 1;
-                setRangeFromPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
-              }}
+              type="text"
+              value={pageSelection}
+              onChange={(event) => setPageSelection(event.target.value)}
+              maxLength={STUDIO_EXPORT_PAGE_SELECTION_MAX_LENGTH}
+              placeholder="예: 1, 3–5, 8"
+              aria-label="내보내기 페이지 직접 지정"
+              aria-describedby="studio-export-page-selection-help"
+              aria-invalid={packagePreflight.errors.some((issue) => issue.code.startsWith("PAGE_"))}
               className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label="내보내기 시작 페이지"
             />
+            <span id="studio-export-page-selection-help" className="mt-1 block leading-snug">
+              쉼표로 페이지를 고르고, 3–5처럼 범위를 함께 입력하세요. 중복을 빼고 원고 순서로 저장합니다.
+            </span>
           </label>
-          <label className="text-[0.62rem] font-medium text-fg-3">
-            끝 (1–{Math.max(1, pageCount)})
-            <input
-              type="number"
-              min={1}
-              max={Math.max(1, pageCount)}
-              value={rangeToPage}
-              onChange={(event) => {
-                const next = Number(event.target.value) || 1;
-                setRangeToPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
-              }}
-              className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label="내보내기 끝 페이지"
-            />
-          </label>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-1.5">
+            <label className="text-[0.62rem] font-medium text-fg-3">
+              시작 (1–{Math.max(1, pageCount)})
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, pageCount)}
+                value={rangeFromPage}
+                onChange={(event) => {
+                  const next = Number(event.target.value) || 1;
+                  setRangeFromPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
+                }}
+                className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="내보내기 시작 페이지"
+              />
+            </label>
+            <label className="text-[0.62rem] font-medium text-fg-3">
+              끝 (1–{Math.max(1, pageCount)})
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, pageCount)}
+                value={rangeToPage}
+                onChange={(event) => {
+                  const next = Number(event.target.value) || 1;
+                  setRangeToPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
+                }}
+                className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="내보내기 끝 페이지"
+              />
+            </label>
+          </div>
+        )}
+        <p className="text-[0.62rem] leading-snug text-fg-2" aria-live="polite">
+          {exportRangeLabel} · {exportRangeCount}P
+        </p>
         <div className="space-y-1.5 border-t border-line/50 pt-1.5">
           <span className="block text-[0.62rem] font-semibold text-fg-2">인쇄 지오메트리</span>
           <div className="flex flex-wrap gap-1" role="group" aria-label="지오메트리 프리셋">
@@ -1391,6 +1451,7 @@ export function StudioExportMenuPanel({
             type="button"
             onClick={() => void runArchiveExport("cbz")}
             disabled={
+              !packagePreflight.canExport ||
               archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
               isExporting || contactBusy
             }
@@ -1468,7 +1529,7 @@ export function StudioExportMenuPanel({
       <button
         type="button"
         onClick={() => void runPdfExport()}
-        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null}
         className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         title={`${exportRangeLabel}(${exportRangeCount}장)를 JPG로 담은 PDF 한 파일로 저장`}
       >
@@ -1494,9 +1555,9 @@ export function StudioExportMenuPanel({
         rows={contactRows}
         pagePresetId={contactPagePresetId}
         showLabels={contactShowLabels}
-        pageCount={pageCount}
+        pageCount={exportRangeCount}
         busy={contactBusy}
-        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null}
         status={contactStatus}
         setColumns={setContactColumns}
         setRows={setContactRows}
@@ -1611,6 +1672,7 @@ export function StudioExportMenuPanel({
                 type="button"
                 onClick={() => void runPresetSliceExport("all")}
                 disabled={
+                  !packagePreflight.canExport || openRasterBusy ||
                   presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
                 }
                 className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
@@ -1618,7 +1680,7 @@ export function StudioExportMenuPanel({
               >
                 <Scissors size={12} />{" "}
                 {exportRangeIsPartial
-                  ? `${exportRangeLabel} · ${exportRangeCount}장`
+                  ? `선택 ${exportRangeCount}페이지`
                   : `전체 ${pageCount}페이지`}
               </button>
             )}
@@ -1638,6 +1700,13 @@ export function StudioExportMenuPanel({
           </p>
         </div>
       )}
+      {renderAdditionalExports?.({
+        pageIndices: packagePreflight.pageIndices,
+        canExport: packagePreflight.canExport,
+        busy: isExporting || presetBusy || pdfBusy || svgBusy || psdBusy || openRasterBusy || contactBusy || archiveBusy !== null,
+        rangeLabel: exportRangeLabel,
+        capturePages: captureMultiPageExportCanvases,
+      })}
     </div>
   );
 }

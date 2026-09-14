@@ -57,6 +57,39 @@ beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
 
 describe("CharacterShaperShelf discovery integration", () => {
+  it("keeps unreviewed garments out of default discovery and recommendations until explicit opt-in", () => {
+    const original: CharacterSlotEntry = { ...entry("top:original", "원본 유지", "accessory", true), slot: "top",
+      apply: { kind: "costume-original", wardrobeSlot: "top", costumeSlots: ["tops"] } };
+    const experimental: CharacterSlotEntry = { ...entry("top:tshirt", "티셔츠", "accessory", true), slot: "top",
+      apply: { kind: "wardrobe", slot: "top", itemId: "tshirt", color: "#ffffff" } };
+    const b = binding();
+    const p = props({ slot: "top", binding: binding({ catalog: { ...b.catalog, entries: [original, experimental] } }) });
+    render(<CharacterShaperShelf {...p} />);
+    expect(cardIds()).toEqual(["top:original"]);
+    expect(document.querySelector('[data-character-shaper-featured="top:tshirt"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "실험 의상 표시" }));
+    expect(cardIds()).toEqual(["top:original", "top:tshirt"]);
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-character-shaper-featured="top:tshirt"]')).toBeNull();
+    fireEvent.click(cards()[1]);
+    expect(p.onCommitEntry).toHaveBeenCalledWith(experimental);
+    fireEvent.click(screen.getByRole("button", { name: "실험 의상 표시" }));
+    expect(cardIds()).toEqual(["top:original"]);
+  });
+
+  it("keeps a previously saved experimental selection visible without silently replacing it", () => {
+    const experimental: CharacterSlotEntry = { ...entry("top:tshirt", "티셔츠", "accessory", true), slot: "top",
+      apply: { kind: "wardrobe", slot: "top", itemId: "tshirt", color: "#ffffff" } };
+    const b = binding();
+    const p = props({ slot: "top", binding: binding({ catalog: { ...b.catalog, entries: [experimental] },
+      recipe: { ...recipe, slots: { ...recipe.slots, top: "top:tshirt" } } }) });
+    render(<CharacterShaperShelf {...p} />);
+    expect(cardIds()).toEqual(["top:tshirt"]);
+    expect(screen.getByRole("button", { name: "실험 의상 표시" }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByText("실험 의상 · 원고 적용 전 형태 확인")).not.toBeNull();
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+  });
+
   it("provides all fifteen slots without asserting a partial fixture into a complete recipe", () => {
     expect(Object.keys(recipe.slots).sort()).toEqual([...CHARACTER_SLOT_KINDS].sort());
   });

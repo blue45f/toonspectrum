@@ -364,6 +364,7 @@ export function useStudioBg3dEditorEffects(h) {
     if (!open) return;
     const session = studioBg3dModalOperationCoordinator.beginSession();
     modalAssetSessionRef.current = session;
+    setIsRestoringScene(true);
     return () => {
       invalidateModelThumbnailCaptures();
       ltInsertAbortRef.current?.abort();

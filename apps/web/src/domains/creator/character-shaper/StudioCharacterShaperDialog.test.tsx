@@ -323,6 +323,39 @@ afterEach(() => {
 });
 
 describe("StudioCharacterShaperDialog shell", () => {
+  it.each([320, 390])("reserves camera controls above the measured canvas at mobile width %s", (width) => {
+    const { h } = renderDialog({ width });
+    const viewport = document.querySelector<HTMLElement>('[data-character-shaper-viewport="true"]')!;
+    const cameraBar = document.querySelector<HTMLElement>('[data-character-shaper-camera-bar="true"]')!;
+    const presets = screen.getByRole("group", { name: "카메라 프리셋" });
+    const inspection = screen.getByRole("combobox", { name: "부위·방향 확대 검사" });
+    expect(cameraBar).not.toBeNull();
+    expect(cameraBar.parentElement).toBe(viewport.parentElement);
+    expect(cameraBar.nextElementSibling).toBe(viewport);
+    expect(cameraBar.contains(presets)).toBe(true);
+    expect(cameraBar.contains(inspection)).toBe(true);
+    expect(viewport.contains(presets)).toBe(false);
+    expect(viewport.contains(inspection)).toBe(false);
+    expect(cameraBar.classList.contains("absolute")).toBe(false);
+    expect(viewport.classList.contains("flex-1")).toBe(true);
+    expect(presets.querySelectorAll("button")).toHaveLength(5);
+    for (const button of presets.querySelectorAll("button")) expect(button.classList.contains("min-h-11")).toBe(true);
+    expect(inspection.classList.contains("min-h-11")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "전신" }));
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("fullBody");
+    fireEvent.change(inspection, { target: { value: "inspectFeet" } });
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("inspectFeet");
+    expect(screen.getAllByRole("button", { name: /^확대$/ })).toHaveLength(1);
+  });
+
+  it("retains the existing floating camera controls on desktop", () => {
+    renderDialog({ width: 1440 });
+    const viewport = document.querySelector<HTMLElement>('[data-character-shaper-viewport="true"]')!;
+    expect(document.querySelector('[data-character-shaper-camera-bar="true"]')).toBeNull();
+    expect(viewport.contains(screen.getByRole("group", { name: "카메라 프리셋" }))).toBe(true);
+    expect(viewport.contains(screen.getByRole("combobox", { name: "부위·방향 확대 검사" }))).toBe(true);
+  });
+
   it("owns a single viewport chrome and routes contact inspection through the existing camera", () => {
     const { h } = renderDialog({ width: 390 });
     expect(screen.getByTestId("viewport").getAttribute("data-presentation")).toBe("shaper");

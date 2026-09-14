@@ -79,7 +79,7 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     expect(source).toContain("{ preserveBeforeCamera: true }");
   });
 
-  it("fits one registered Object3D AABB through the live projection and records one camera command", () => {
+  it("fits the eligible selection through the live projection and records one camera command", () => {
     const fit = sourceBetween(
       "function focusSelectedEntity()",
       "const registerPrimitiveRef",
@@ -89,11 +89,14 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
       "function zoomCameraBy(",
     );
 
-    expect(fit).toContain("selectedIds.size !== 1");
-    expect(fit).toContain("readStudioBg3dObjectWorldBounds(object)");
+    expect(fit).toContain("h.focusSelectionDisabledReason");
+    expect(fit).toContain("captureInFlightRef.current");
+    expect(fit).toContain("readStudioBg3dSelectionBounds(h.focusSelectionIds");
+    expect(fit).toContain("readStudioBg3dObjectWorldBounds(primitiveObjectsRef.current.get(id), { visibleOnly: true })");
     expect(fit).toContain("viewportApiRef.current?.readFramingState()");
     expect(fit).toContain("fitStudioBg3dCameraToBounds({");
     expect(fit).toContain("orthographicFrustumAtZoomOne");
+    expect(fit).toContain("exportAspectRatio: sceneBaseDocument.output.exportAspectRatio");
     expect(fit.match(/commitCameraViewCommand/gu)).toHaveLength(1);
     expect(fit).toContain("선택한 객체의 실제 경계 또는 카메라 화면을 아직 준비하지 못했습니다.");
 

@@ -46,6 +46,86 @@ const CAPTURE_HEIGHT = 64;
 /** From STUDIO_BG3D_ENGINE_BENCHMARK_PIXEL_CHANNEL_TOLERANCE / _DEPTH_TOLERANCE. */
 const CHANNEL_TOLERANCE = 4;
 const DEPTH_TOLERANCE = 0.001;
+const GPU_LANE = "swiftshader-determinism";
+
+interface RendererGpuDevice {
+  readonly adapterInfo?: {
+    readonly vendor?: string;
+    readonly architecture?: string;
+    readonly device?: string;
+    readonly description?: string;
+    readonly isFallbackAdapter?: boolean;
+  };
+  readonly features: Iterable<string>;
+  readonly limits: { readonly maxBufferSize: number };
+}
+
+function readWebGpuFingerprint(renderer: unknown) {
+  // Three r184 exposes the initialized backend's actual device. A fresh requestAdapter() would
+  // fingerprint an unrelated adapter: Three requests featureLevel:"compatibility" itself.
+  const backend = (renderer as {
+    readonly backend?: { readonly isWebGPUBackend?: boolean; readonly device?: RendererGpuDevice };
+  }).backend;
+  const device = backend?.device;
+  const info = device?.adapterInfo;
+  const features = device ? [...device.features].sort() : [];
+  return {
+    source: "renderer.backend.device.adapterInfo",
+    isWebGPUBackend: backend?.isWebGPUBackend === true,
+    devicePresent: Boolean(device),
+    vendor: info?.vendor ?? null,
+    architecture: info?.architecture ?? null,
+    device: info?.device ?? null,
+    description: info?.description ?? null,
+    isFallbackAdapter: info?.isFallbackAdapter ?? null,
+    deviceFeatures: features,
+    deviceFeatureCount: features.length,
+    deviceMaxBufferSize: device?.limits.maxBufferSize ?? null,
+  };
+}
+
+function readWebGlFingerprint(renderer: THREE.WebGLRenderer) {
+  const gl = renderer.getContext();
+  const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+  return {
+    source: "renderer.getContext().WEBGL_debug_renderer_info",
+    debugRendererInfoAvailable: Boolean(debugInfo),
+    vendor: debugInfo ? String(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)) : null,
+    renderer: debugInfo ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)) : null,
+    version: String(gl.getParameter(gl.VERSION)),
+    maxTextureSize: Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)),
+  };
+}
+
+const executionEvidence: {
+  lane: typeof GPU_LANE;
+  origin: string;
+  secureContext: boolean;
+  webgpu?: ReturnType<typeof readWebGpuFingerprint>;
+  webgl?: ReturnType<typeof readWebGlFingerprint>;
+} = {
+  lane: GPU_LANE,
+  origin: location.origin,
+  secureContext: window.isSecureContext,
+};
+
+function assertSoftwareRendererIdentity(evidence: typeof executionEvidence): void {
+  const gpu = evidence.webgpu;
+  const gl = evidence.webgl;
+  if (evidence.origin === "null" || !evidence.secureContext) {
+    throw new Error("GPU lane requires a non-opaque secure origin.");
+  }
+  if (!gpu?.isWebGPUBackend || !gpu.devicePresent
+    || gpu.vendor?.toLowerCase() !== "google"
+    || gpu.architecture?.toLowerCase() !== "swiftshader"
+    || gpu.isFallbackAdapter === false) {
+    throw new Error(`Wrong WebGPU adapter for ${GPU_LANE}: ${JSON.stringify(gpu)}`);
+  }
+  // Privacy-masked/absent identity is unverified, not evidence of software or hardware rendering.
+  if (!gl?.debugRendererInfoAvailable || !/swiftshader/iu.test(gl.renderer ?? "")) {
+    throw new Error(`Wrong WebGL adapter for ${GPU_LANE}: ${JSON.stringify(gl)}`);
+  }
+}
 
 interface RasterComparison {
   readonly maxChannelDelta: number;
@@ -483,7 +563,7 @@ async function run(): Promise<unknown> {
     gpu: (navigator as Navigator & { gpu?: Parameters<typeof probeStudioBg3dWebGpuCapability>[0]["gpu"] }).gpu,
   });
   if (!probe.supported) {
-    return { status: "unsupported", reason: probe.reason, probe };
+    return { status: "unsupported", reason: probe.reason, probe, executionEvidence };
   }
 
   const webgpuCanvas = document.createElement("canvas");
@@ -513,6 +593,17 @@ async function run(): Promise<unknown> {
   applyRenderContract(webglRenderer);
   webglRenderer.setSize(CAPTURE_WIDTH, CAPTURE_HEIGHT, false);
 
+  executionEvidence.webgpu = readWebGpuFingerprint(webgpuRenderer);
+  executionEvidence.webgl = readWebGlFingerprint(webglRenderer);
+  try {
+    // The declared lane must match BOTH actual renderers before any capture or timing begins.
+    assertSoftwareRendererIdentity(executionEvidence);
+  } catch (error) {
+    webglRenderer.dispose();
+    await runtime.dispose();
+    throw error;
+  }
+
   const scene = buildScene();
   const webgpuAdapter = createStudioBg3dThreeWebGpuCaptureAdapter({
     renderer: webgpuRenderer,
@@ -534,10 +625,8 @@ async function run(): Promise<unknown> {
   // material means a shader build plus a render pipeline. That looked like a reason to cache
   // per-size targets for a shot batch — so measure before caching on a guess.
   //
-  // Reported, deliberately not asserted: a wall-clock threshold in CI buys flakes, not signal.
-  // What matters is the *shape* — `first` well above `medianAfterFirst` means the pipeline cost is
-  // paid once and Three/Dawn is caching by graph structure, so per-capture allocation is free and
-  // a cache would be complexity for nothing. The two converging is the signal to revisit.
+  // Software timing diagnostics only. They are not hardware performance evidence and do not
+  // establish that allocations are free or justify accepting/rejecting a cache for real devices.
   const captureCost = {
     webgpu: await measureCaptureCost(webgpuAdapter, 6),
     webgl: await measureCaptureCost(webglAdapter, 6),
@@ -547,6 +636,7 @@ async function run(): Promise<unknown> {
     status: "ok",
     captureCost,
     backend: "real-chromium-three-webgpu",
+    executionEvidence,
     probe,
     adapters: {
       webgpu: {
@@ -616,6 +706,7 @@ run().then(
   (error: unknown) => {
     window.__studioBg3dWebGpuEngineResult = {
       status: "error",
+      executionEvidence,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? (error.stack ?? null) : null,
     };

@@ -10,8 +10,32 @@ async function deflate(bytes: Uint8Array<ArrayBuffer>, signal?: AbortSignal): Pr
   signal?.throwIfAborted();
   if (typeof CompressionStream !== "function") throw new Error("이 브라우저에서 ICC PNG 압축을 지원하지 않습니다.");
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
-  const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
-  signal?.throwIfAborted(); return compressed;
+  const reader = stream.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let length = 0;
+  const abort = () => { void reader.cancel(signal?.reason).catch(() => {}); };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    signal?.throwIfAborted();
+    while (true) {
+      const next = await reader.read();
+      signal?.throwIfAborted();
+      if (next.done) break;
+      chunks.push(Uint8Array.from(next.value));
+      length += next.value.byteLength;
+    }
+    const compressed = new Uint8Array(length);
+    let offset = 0;
+    for (const part of chunks) { compressed.set(part, offset); offset += part.byteLength; }
+    return compressed;
+  } catch (error) {
+    void reader.cancel(error).catch(() => {});
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    chunks.length = 0;
+    reader.releaseLock();
+  }
 }
 
 /** Encode target-profile samples directly. Passing them through an sRGB Canvas encoder would
@@ -20,6 +44,7 @@ export async function encodeStudioColorProofPng(input: {
   rgba: Uint8ClampedArray; width: number; height: number; profileBytes: Uint8Array; signal?: AbortSignal;
 }): Promise<Blob> {
   const { rgba, width, height, profileBytes, signal } = input;
+  signal?.throwIfAborted();
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1
     || width * height > 16_777_216 || rgba.length !== width * height * 4) throw new Error("ICC PNG 크기가 올바르지 않습니다.");
   const ihdr = new Uint8Array(13); const view = new DataView(ihdr.buffer);

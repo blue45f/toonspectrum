@@ -837,7 +837,19 @@ export function StudioCanvasViewportDocumentLayer({
                       .map((pel, pIdx) => renderEl(pel, pIdx, { asMask: true }))}
                   </Group>
                 ) : null;
-                const renderDocumentElement = (el: El, idx: number, compositeOverride?: string) => {
+                const adjustmentTree = canvasRenderElements.some(isStudioLiveAdjustment)
+                  ? buildStudioLiveAdjustmentRenderTree(canvasRenderElements, (element) =>
+                    !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id), Boolean(masterUnderlay))
+                  : null;
+                const adjustmentNodes = new Map<string, Extract<StudioLiveAdjustmentRenderTree, { kind: "adjustment" }>>();
+                const indexAdjustments = (nodes: readonly StudioLiveAdjustmentRenderTree[]) => {
+                  for (const node of nodes) {
+                    if (node.kind === "adjustment") adjustmentNodes.set(node.id, node);
+                    if (node.kind === "adjustment" || node.kind === "group") indexAdjustments(node.children);
+                  }
+                };
+                if (adjustmentTree) indexAdjustments(adjustmentTree);
+                const renderDocumentElement = (el: El, idx: number, compositeOverride?: string, maskKey?: string) => {
                   if (isEffectivelyHidden(el, groups) || localHiddenElementIds.has(el.id)) return null; // 숨긴 레이어/그룹 + "나만 숨기기"는 렌더·내보내기에서 제외
                   // A verified raster frame and these vector fallbacks switch in one React commit.
                   // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
@@ -852,6 +864,7 @@ export function StudioCanvasViewportDocumentLayer({
                     canonicalDryMediaHiddenElementId,
                   )) return null;
                   const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
+                  const adjustmentBase = base ? adjustmentNodes.get(base.id) : undefined;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
                   const maskOn = el.type === "image" && shouldApplyLayerMask(el as ImageEl);
@@ -859,7 +872,8 @@ export function StudioCanvasViewportDocumentLayer({
                   // maskSrc로 자른 ClipMaskGroup"으로 한 번 더 감싼다. opts는 clipBelow 분기
                   // (source-in override)와 평범한 분기(opts={}) 양쪽에서 재사용된다.
                   const renderWithOwnMask = (opts: { compositeOverride?: string } = {}) => {
-                    if (!maskOn) return renderEl(el, idx, opts);
+                    const renderOptions = { ...opts, asMask: maskKey !== undefined };
+                    if (!maskOn) return renderEl(el, idx, renderOptions);
                     // The sandwich content must composite `source-in` against its mask sibling —
                     // ALWAYS, not only when the caller wanted source-in for the element itself.
                     // The plain branch used to pass the content through with `source-over`, which
@@ -867,7 +881,7 @@ export function StudioCanvasViewportDocumentLayer({
                     // measurably changed nothing. The caller's intent (the element's blend mode,
                     // or clipBelow's source-in) moves onto the cached sandwich root instead, where
                     // it applies exactly once to the flattened, already-masked result.
-                    const content = renderEl(el, idx, { ...opts, compositeOverride: "source-in" });
+                    const content = renderEl(el, idx, { ...renderOptions, compositeOverride: "source-in" });
                     const imgEl = el as ImageEl;
                     const maskSrc = (el as El).maskSrc;
                     // 마스크 노드는 최소 필드만 새로 구성한다(el 스프레드 후 필터 필드를 하나하나
@@ -931,36 +945,42 @@ export function StudioCanvasViewportDocumentLayer({
                       (el as { rotation?: number }).rotation ?? 0,
                       (base as { rotation?: number }).rotation ?? 0,
                       maskOn ? ((el as El).maskSrc ?? "") : "", // 마스크가 캐시 키에도 반영되게.
+                      adjustmentBase ? JSON.stringify([adjustmentBase, masterRenderEls]) : "",
                     ].join("|");
                     return (
                       <ClipMaskGroup key={el.id} cacheKey={ck}>
-                        {renderEl(base, idx - 1, { asMask: true })}
+                        {adjustmentBase
+                          ? renderAdjustmentTree(adjustmentBase, true, `${maskKey ?? ""}_${el.id}`)
+                          : renderEl(base, idx - 1, { asMask: true })}
                         {renderWithOwnMask({ compositeOverride: "source-in" })}
                       </ClipMaskGroup>
                     );
                   }
                   return renderWithOwnMask({ compositeOverride });
                 };
-                const renderAdjustmentTree = (node: StudioLiveAdjustmentRenderTree, neutralizeComposite = false): ReactNode => {
-                  if (node.kind === "content") return renderDocumentElement(node.element, node.index, neutralizeComposite ? "source-over" : undefined);
-                  const children = node.children.map((child) => renderAdjustmentTree(child, node.kind === "adjustment" && node.isolatedSource));
+                const renderAdjustmentTree = (node: StudioLiveAdjustmentRenderTree, neutralizeComposite = false, maskKey?: string): ReactNode => {
+                  if (node.kind === "underlay") return <Fragment key={node.id}>{masterUnderlay}</Fragment>;
+                  if (node.kind === "content") return renderDocumentElement(node.element, node.index, neutralizeComposite ? "source-over" : undefined, maskKey);
+                  const children = node.children.map((child) => renderAdjustmentTree(child, node.kind === "adjustment" && node.isolatedSource, maskKey));
                   if (node.kind === "group") return <Fragment key={node.id}>{children}</Fragment>;
-                  return <StudioLiveAdjustmentGroup key={node.id} element={node.element}
+                  // Mask copies retain independent cache/presentation identities and never claim
+                  // the editable element's Konva ref or interaction handlers.
+                  const element = maskKey === undefined ? node.element
+                    : { ...node.element, id: `${node.id}__clip_${maskKey}` };
+                  return <StudioLiveAdjustmentGroup key={element.id} element={element}
                     composite={neutralizeComposite ? "source-over" : node.composite}
                     width={CANVAS_W} height={activePage.canvasH} sourceIds={node.children.map((child) => child.id)}
                     cacheKey={JSON.stringify([node, timelinePlayhead, timelinePreviewFrame,
-                      [...studioLiveGesturePreviewRenderPlan.previewSequenceByElementId], groups])}>
+                      [...studioLiveGesturePreviewRenderPlan.previewSequenceByElementId], groups, masterRenderEls, maskKey])}>
                     {children}
                   </StudioLiveAdjustmentGroup>;
                 };
-                const mainEls = canvasRenderElements.some(isStudioLiveAdjustment)
-                  ? buildStudioLiveAdjustmentRenderTree(canvasRenderElements, (element) =>
-                    !isEffectivelyHidden(element, groups) && !localHiddenElementIds.has(element.id))
-                    .map((node) => renderAdjustmentTree(node))
+                const mainEls = adjustmentTree
+                  ? adjustmentTree.map((node) => renderAdjustmentTree(node))
                   : canvasRenderElements.map((element, index) => renderDocumentElement(element, index));
                 return (
                   <>
-                    {masterUnderlay}
+                    {adjustmentTree ? null : masterUnderlay}
                     {mainEls}
                     {!masterEditMode
                       ? studioWorkAssetRenderPlaceholders.map((placeholder) => (

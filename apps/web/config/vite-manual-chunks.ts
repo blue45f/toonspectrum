@@ -102,6 +102,9 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-element-model.ts")
       || id.endsWith("/src/domains/creator/render/studio-raster-image-presentation.ts")
       || id.endsWith("/src/domains/creator/brush/studio-brush-engine-program-set.ts")
+      || id.endsWith("/src/domains/creator/contracts/studio-adjustment-engine-ids.ts")
+      || id.endsWith("/src/domains/creator/studio-live-adjustment-status.ts")
+      || id.endsWith("/src/domains/creator/studio-crc32.ts")
     ) {
       // These lightweight contracts are shared by several Studio lazy entries. Similar-style
       // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
@@ -138,6 +141,7 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-work-metadata.ts")
       || id.endsWith("/src/domains/creator/studio-page-review.ts")
       || id.endsWith("/src/domains/creator/studio-frame-animation-timing.ts")
+      || id.endsWith("/src/domains/creator/studio-live-adjustment-visibility.ts")
     ) {
       // These pure document models have no runtime dependencies. Review status and frame
       // timing are already needed by the editor and reused by the lazy quality inspector;

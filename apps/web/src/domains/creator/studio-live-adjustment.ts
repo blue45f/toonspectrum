@@ -20,12 +20,13 @@ export function createStudioLiveAdjustment(id: string, width: number, height: nu
 }
 
 export type StudioLiveAdjustmentRenderTree =
+  | { kind: "underlay"; id: string }
   | { kind: "content"; id: string; element: El; index: number }
   | { kind: "group"; id: string; children: StudioLiveAdjustmentRenderTree[] }
   | { kind: "adjustment"; id: string; element: StudioLiveAdjustmentElement; composite: string; isolatedSource: boolean; children: StudioLiveAdjustmentRenderTree[] };
 
 function treeComposite(node: StudioLiveAdjustmentRenderTree | undefined): string {
-  if (!node || node.kind === "group") return "source-over";
+  if (!node || node.kind === "group" || node.kind === "underlay") return "source-over";
   if (node.kind === "adjustment") return node.composite;
   return node.element.type === "draw" && node.element.mode === "eraser"
     ? "destination-out" : node.element.blendMode ?? "source-over";
@@ -46,8 +47,9 @@ function foldScope(nodes: StudioLiveAdjustmentRenderTree[]): StudioLiveAdjustmen
 }
 
 /** Group runs stay in painter order; root adjustments include preceding groups as composite inputs. */
-export function buildStudioLiveAdjustmentRenderTree(elements: readonly El[], visible: (element: El) => boolean): StudioLiveAdjustmentRenderTree[] {
-  const roots: StudioLiveAdjustmentRenderTree[] = [];
+export function buildStudioLiveAdjustmentRenderTree(elements: readonly El[], visible: (element: El) => boolean, includeMasterUnderlay = false): StudioLiveAdjustmentRenderTree[] {
+  const roots: StudioLiveAdjustmentRenderTree[] = includeMasterUnderlay
+    ? [{ kind: "underlay", id: "studio-master-underlay" }] : [];
   let group: Extract<StudioLiveAdjustmentRenderTree, { kind: "group" }> | undefined;
   elements.forEach((element, index) => {
     if (!visible(element)) return;
