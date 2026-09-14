@@ -27,17 +27,22 @@ describe("creator image asset generation policy", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(generateImageAsset({
-      prompt: "비 오는 서울 골목 배경",
-      size: "2048x1152",
-      quality: "xhigh",
-    })).rejects.toMatchObject({
-      response: expect.objectContaining({
-        code: "USER_AI_CONNECTION_REQUIRED",
-        operatorFunded: false,
-      }),
-    } satisfies Partial<ServiceUnavailableException>);
+    let caught: unknown;
+    try {
+      await generateImageAsset({
+        prompt: "비 오는 서울 골목 배경",
+        size: "2048x1152",
+        quality: "xhigh",
+      });
+    } catch (error) {
+      caught = error;
+    }
 
+    expect(caught).toBeInstanceOf(ServiceUnavailableException);
+    expect((caught as ServiceUnavailableException).getResponse()).toMatchObject({
+      code: "USER_AI_CONNECTION_REQUIRED",
+      operatorFunded: false,
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
