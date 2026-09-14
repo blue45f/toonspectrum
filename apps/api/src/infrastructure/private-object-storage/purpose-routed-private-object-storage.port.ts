@@ -1,10 +1,16 @@
 import { PrivateObjectStorageError } from "./private-object-storage.error";
 import {
+  PRIVATE_OBJECT_STORAGE_PROVIDER_IDS,
   PrivateObjectPurposeSchema,
+  PrivateObjectReferenceSchema,
+  isLocatedPrivateObjectReference,
+  locatePrivateObjectReference,
+  unlocatePrivateObjectReference,
   type CreatePrivateSignedReadUrl,
   type DeletePrivateObject,
   type PrivateObjectPurpose,
   type PrivateObjectReference,
+  type PrivateObjectStorageProviderId,
   type PrivateSignedReadUrl,
   type UploadPrivateObject,
 } from "./private-object-storage.contract";
@@ -17,14 +23,8 @@ import type {
   PrivateObjectStorageReadiness,
 } from "./private-object-storage.port";
 
-export const PRIVATE_OBJECT_STORAGE_PROVIDER_IDS = [
-  "supabase",
-  "cloudflare-r2",
-  "backblaze-b2",
-] as const;
-
-export type PrivateObjectStorageProviderId =
-  (typeof PRIVATE_OBJECT_STORAGE_PROVIDER_IDS)[number];
+export { PRIVATE_OBJECT_STORAGE_PROVIDER_IDS };
+export type { PrivateObjectStorageProviderId };
 
 export type PrivateObjectStoragePurposeRouting = Readonly<
   Record<PrivateObjectPurpose, PrivateObjectStorageProviderId>
@@ -109,37 +109,67 @@ export class PurposeRoutedPrivateObjectStoragePort
     input: UploadPrivateObject,
     options: PrivateObjectStorageCallOptions = {},
   ): Promise<PrivateObjectReference> {
-    const providerId = this.providerIdFor(input.purpose);
+    const providerId = this.providerIdForPurpose(input.purpose);
     await this.writeAdmission?.assertUploadAllowed(providerId, input);
-    return this.requireProvider(providerId).uploadImmutable(input, options);
+    const uploaded = await this.requireProvider(providerId).uploadImmutable(
+      input,
+      options,
+    );
+    try {
+      return locatePrivateObjectReference(providerId, uploaded);
+    } catch {
+      throw new PrivateObjectStorageError("INVALID_RESPONSE");
+    }
   }
 
-  createSignedReadUrl(
-    input: CreatePrivateSignedReadUrl,
+  async createSignedReadUrl(
+    inputValue: CreatePrivateSignedReadUrl,
     options: PrivateObjectStorageCallOptions = {},
   ): Promise<PrivateSignedReadUrl> {
-    return this.providerFor(input.object.purpose).createSignedReadUrl(
-      input,
+    const input = this.parseLocatedOperation(inputValue);
+    return await this.requireProvider(input.providerId).createSignedReadUrl(
+      {
+        object: unlocatePrivateObjectReference(input.object),
+        expiresInSeconds: input.expiresInSeconds,
+      },
       options,
     );
   }
-  deleteGeneratedObject(
-    input: DeletePrivateObject,
+
+  async deleteGeneratedObject(
+    inputValue: DeletePrivateObject,
     options: PrivateObjectStorageCallOptions = {},
   ): Promise<void> {
-    return this.providerFor(input.object.purpose).deleteGeneratedObject(
-      input,
+    const object = PrivateObjectReferenceSchema.parse(inputValue.object);
+    const providerId = this.providerIdForObject(object);
+    await this.requireProvider(providerId).deleteGeneratedObject(
+      { object: unlocatePrivateObjectReference(object) },
       options,
     );
   }
 
-  private providerFor(
-    purposeValue: PrivateObjectPurpose,
-  ): PrivateObjectStoragePort {
-    return this.requireProvider(this.providerIdFor(purposeValue));
+  private parseLocatedOperation(inputValue: CreatePrivateSignedReadUrl): {
+    readonly providerId: PrivateObjectStorageProviderId;
+    readonly object: PrivateObjectReference;
+    readonly expiresInSeconds: number;
+  } {
+    const object = PrivateObjectReferenceSchema.parse(inputValue.object);
+    return {
+      providerId: this.providerIdForObject(object),
+      object,
+      expiresInSeconds: inputValue.expiresInSeconds,
+    };
   }
 
-  private providerIdFor(
+  private providerIdForObject(
+    object: PrivateObjectReference,
+  ): PrivateObjectStorageProviderId {
+    return isLocatedPrivateObjectReference(object)
+      ? object.providerId
+      : this.providerIdForPurpose(object.purpose);
+  }
+
+  private providerIdForPurpose(
     purposeValue: PrivateObjectPurpose,
   ): PrivateObjectStorageProviderId {
     const purpose = PrivateObjectPurposeSchema.parse(purposeValue);

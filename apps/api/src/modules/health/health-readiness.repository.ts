@@ -41,6 +41,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_asset_report",
   "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_storage_replica",
   "creator_asset_upload_session",
   "creator_campaign",
   "creator_challenge",

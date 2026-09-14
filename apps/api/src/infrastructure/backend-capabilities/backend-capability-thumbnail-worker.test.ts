@@ -9,7 +9,7 @@ import {
 } from "./backend-capability-thumbnail-worker";
 
 import type { BackendCapabilityWorkerConfig } from "./backend-capability-worker.config";
-import type { SupabaseObjectStoragePort } from "../supabase-object-storage/supabase-object-storage.port";
+import type { PrivateObjectStoragePort } from "../private-object-storage/private-object-storage.port";
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
@@ -40,7 +40,8 @@ describe("Supabase thumbnail capability worker", () => {
   );
   const sourceDigest = sha256(sourceBytes);
   const sourceObject = {
-    contractVersion: "toonspectrum.supabase-object-storage.v1" as const,
+    contractVersion: "toonspectrum.private-object-storage.v2" as const,
+    providerId: "cloudflare-r2" as const,
     purpose: "source" as const,
     digest: `sha256:${sourceDigest}` as const,
     objectPath: `sha256/${sourceDigest.slice(0, 2)}/${sourceDigest}` as const,
@@ -79,7 +80,8 @@ describe("Supabase thumbnail capability worker", () => {
     storage.uploadImmutable.mockImplementation(async (input: { bytes: Uint8Array }) => {
       const digest = sha256(input.bytes);
       return {
-        contractVersion: "toonspectrum.supabase-object-storage.v1",
+        contractVersion: "toonspectrum.private-object-storage.v2",
+        providerId: "supabase",
         purpose: "derived",
         digest: `sha256:${digest}`,
         objectPath: `sha256/${digest.slice(0, 2)}/${digest}`,
@@ -93,7 +95,7 @@ describe("Supabase thumbnail capability worker", () => {
     return new SupabaseThumbnailCapabilityWorker(
       config,
       runtime,
-      storage as unknown as SupabaseObjectStoragePort,
+      storage as unknown as PrivateObjectStoragePort,
     );
   }
 

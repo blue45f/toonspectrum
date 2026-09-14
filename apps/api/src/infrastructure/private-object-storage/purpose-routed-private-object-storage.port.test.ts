@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION,
+  PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
+  locatePrivateObjectReference,
   type PrivateObjectPurpose,
   type PrivateObjectReference,
 } from "./private-object-storage.contract";
@@ -23,7 +24,7 @@ function reference(
       ? "b".repeat(64)
       : "c".repeat(64);
   return {
-    contractVersion: PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION,
+    contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
     purpose,
     digest: `sha256:${hash}`,
     objectPath: `sha256/${hash.slice(0, 2)}/${hash}`,
@@ -103,7 +104,7 @@ describe("purpose-routed private object storage", () => {
     const derived = reference("derived");
 
     await expect(client.uploadImmutable(sourceUpload)).resolves.toEqual(
-      reference("source"),
+      locatePrivateObjectReference("cloudflare-r2", reference("source")),
     );
     await client.createSignedReadUrl({
       object: derived,
@@ -121,6 +122,65 @@ describe("purpose-routed private object storage", () => {
       {},
     );
     expect(supabase.uploadImmutable).not.toHaveBeenCalled();
+  });
+
+
+  it("keeps reads and deletes pinned to the recorded provider after routing changes", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+    );
+    const historical = locatePrivateObjectReference(
+      "cloudflare-r2",
+      reference("derived"),
+    );
+
+    await client.createSignedReadUrl({
+      object: historical,
+      expiresInSeconds: 60,
+    });
+    await client.deleteGeneratedObject({ object: historical });
+
+    expect(r2.createSignedReadUrl).toHaveBeenCalledWith(
+      { object: reference("derived"), expiresInSeconds: 60 },
+      {},
+    );
+    expect(r2.deleteGeneratedObject).toHaveBeenCalledWith(
+      { object: reference("derived") },
+      {},
+    );
+    expect(supabase.createSignedReadUrl).not.toHaveBeenCalled();
+    expect(supabase.deleteGeneratedObject).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when a recorded historical provider is no longer configured", async () => {
+    const supabaseOnlyRouting = {
+      source: "supabase",
+      derived: "supabase",
+      export: "supabase",
+    } as const;
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      supabaseOnlyRouting,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["supabase", supabase],
+      ]),
+    );
+    const historical = locatePrivateObjectReference(
+      "cloudflare-r2",
+      reference("derived"),
+    );
+
+    await expect(client.createSignedReadUrl({
+      object: historical,
+      expiresInSeconds: 60,
+    })).rejects.toMatchObject({ code: "PROVIDER_NOT_CONFIGURED" });
+    expect(supabase.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
   it("runs write admission before sending bytes to the routed provider", async () => {

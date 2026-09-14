@@ -83,8 +83,8 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       artifacts.push({ id: artifactId, role, purpose, digest: objectDigest, contentType: "image/png",
         byteLength: 1, required: true, qualityProfile: "default", deviceProfile: "universal", width: null, height: null });
       await connection.query(`INSERT INTO creator_asset_storage_object
-        (purpose, digest, "contractVersion", "objectPath", "byteLength", "contentType")
-        VALUES ($1, $2, 'toonspectrum.supabase-object-storage.v1', $3, 1, 'image/png')`,
+        (purpose, digest, "contractVersion", "providerId", "objectPath", "byteLength", "contentType")
+        VALUES ($1, $2, 'toonspectrum.private-object-storage.v2', 'supabase', $3, 1, 'image/png')`,
       [purpose, objectDigest, `sha256/${objectDigest.slice(7, 9)}/${objectDigest.slice(7)}`]);
       await connection.query(`INSERT INTO creator_asset_artifact
         ("artifactSetId", "artifactId", role, purpose, "objectDigest", "contentType", "byteLength", "qualityProfile", "deviceProfile")

@@ -105,6 +105,7 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_asset_qa_report",
   "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_storage_replica",
   "creator_asset_upload_session",
   "creator_collab_application",
   "creator_collab_bookmark",
@@ -1069,6 +1070,7 @@ GRANT INSERT (
   "purpose",
   "digest",
   "contractVersion",
+  "providerId",
   "objectPath",
   "byteLength",
   "contentType"
@@ -1125,6 +1127,7 @@ export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
         'purpose',
         'digest',
         'contractVersion',
+        'providerId',
         'objectPath',
         'byteLength',
         'contentType'
@@ -1173,6 +1176,7 @@ export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
         'purpose',
         'digest',
         'contractVersion',
+        'providerId',
         'objectPath',
         'byteLength',
         'contentType',

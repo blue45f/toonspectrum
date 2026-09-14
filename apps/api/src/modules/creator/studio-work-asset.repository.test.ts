@@ -11,6 +11,7 @@ import {
 } from "../../../../web/src/shared/lib/studio-work-asset-contract";
 import {
   creatorAssetStorageObjects,
+  creatorAssetStorageReplicas,
   creatorWorkAssetStorageReferences,
 } from "../../db/creator-asset-object-storage.schema";
 import {
@@ -126,7 +127,8 @@ function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
     sha256,
     intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
     storageObject: {
-      contractVersion: "toonspectrum.supabase-object-storage.v1",
+      contractVersion: "toonspectrum.private-object-storage.v2",
+      providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${sha256}`,
       objectPath: `sha256/${sha256.slice(0, 2)}/${sha256}`,
@@ -185,9 +187,32 @@ describe("studio work-scoped asset persistence contract", () => {
       "creator_asset_storage_object_contract_check",
       "creator_asset_storage_object_digest_path_check",
       "creator_asset_storage_object_lifecycle_check",
+      "creator_asset_storage_object_provider_check",
       "creator_asset_storage_object_purpose_check",
       "creator_asset_storage_object_source_retention_check",
       "creator_asset_storage_object_state_check",
+    ]);
+
+    const replicaTable = getTableConfig(creatorAssetStorageReplicas);
+    expect(replicaTable.name).toBe("creator_asset_storage_replica");
+    expect(replicaTable.primaryKeys.map((key) => key.getName())).toEqual([
+      "creator_asset_storage_replica_pkey",
+    ]);
+    expect(replicaTable.foreignKeys.map((key) => key.getName())).toEqual([
+      "creator_asset_storage_replica_object_fkey",
+    ]);
+    expect(names(replicaTable.indexes)).toEqual([
+      "creator_asset_storage_replica_path_unique",
+      "idx_creator_asset_storage_replica_state",
+    ]);
+    expect(names(replicaTable.checks)).toEqual([
+      "creator_asset_storage_replica_byte_length_check",
+      "creator_asset_storage_replica_content_type_check",
+      "creator_asset_storage_replica_digest_path_check",
+      "creator_asset_storage_replica_lifecycle_check",
+      "creator_asset_storage_replica_provider_check",
+      "creator_asset_storage_replica_purpose_check",
+      "creator_asset_storage_replica_state_check",
     ]);
 
     const referenceTable = getTableConfig(creatorWorkAssetStorageReferences);

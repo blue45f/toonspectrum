@@ -77,10 +77,12 @@ pnpm run infra:storage-routing-fingerprint -- \
   --export=backblaze-b2
 ```
 
-현재 v1 저장 참조는 기존 행 호환을 위해 provider id를 포함하지 않는다. 따라서 첫 운영 write 이후
-라우팅 fingerprint만 바꾸면 안 된다. 변경하려면 `복사 → 크기·SHA-256 검증 → 원장/라우팅 전환
-→ canary → 구 객체 정리` migration을 먼저 수행한다. B2 adapter가 존재한다고 해서 R2 객체가
-자동 백업되는 것도 아니다. replica inventory와 복제 작업은 별도의 승인된 백업 경계다.
+신규 저장 참조는 `toonspectrum.private-object-storage.v2`와 `providerId`를 함께 기록한다.
+`0048_creator_asset_storage_locations`는 기존 v1 행을 역사적 Supabase primary로 승격한다. 따라서
+라우팅 fingerprint를 바꿔도 기존 객체 읽기·삭제는 기록된 공급자로 유지되고 새 객체만 새 배치를
+따른다. 기존 primary를 보유한 공급자 credential은 명시적 migration이 완료될 때까지 제거하면 안
+된다. B2 adapter가 존재한다고 해서 R2 객체가 자동 백업되는 것도 아니다. 검증된 secondary copy는
+`creator_asset_storage_replica` inventory에 기록하고 복제·승격은 별도의 승인된 작업으로 수행한다.
 
 ## 저장소 배치 규칙
 
@@ -139,8 +141,9 @@ transaction과 outbox를 완료한 뒤 idempotent consumer가 파생 데이터�
 
 ### Private object storage 쓰기 admission
 
-목적별 R2/Supabase/B2 라우팅은 객체 위치의 권위다. 현재 v1 객체 참조에는 provider locator가
-없으므로 quota 부족 시 다른 공급자로 자동 write failover하지 않는다. 대신 선택된 공급자에
+목적별 R2/Supabase/B2 라우팅은 신규 객체 배치 정책이고, 저장된 v2 `providerId`가 기존 객체
+위치의 권위다. locator가 있더라도 quota 부족 시 다른 공급자로 자동 write failover하지 않는다.
+대신 선택된 공급자에
 바이트를 보내기 전에 `FreeTierPrivateObjectStorageWriteAdmission`이 다음을 검증한다.
 
 - 공급자 상태가 `healthy`인지
@@ -187,13 +190,15 @@ upgrade, OG crawler HTML, Studio WASM/WebGPU 로딩을 canary에서 확인한다
 
 ## 단계별 후속 전환
 
-### 2차: 위치 인식 asset registry와 replica inventory
+### 2차: 위치 인식 asset registry와 replica inventory — 구현 완료
 
-- provider-neutral private object storage port와 목적별 R2/B2/Supabase 라우팅은 구현되어 있다.
-- 다음 단계에서 provider, bucket, object key, digest, bytes, MIME, visibility, replica location을
-  원장에 기록해 라우팅 변경과 객체 migration을 데이터로 추적한다.
-- R2 공개·게시 에셋과 B2 backup replica는 서로 다른 lifecycle·egress 정책으로 관리한다.
-- 동일 사용자 요청의 다중 공급자 동시 쓰기는 하지 않고 outbox 기반 복제를 사용한다.
+- provider-neutral private object storage port는 신규 upload를 provider-located v2 reference로 감싼다.
+- `creator_asset_storage_object.providerId`가 primary 위치를 고정해 목적별 라우팅 변경 후에도 기존
+  객체를 다른 공급자로 오인하지 않는다.
+- `creator_asset_storage_replica`는 검증 시각·상태·경로·digest·bytes·MIME를 기록하며 trigger가
+  primary와 동일한 공급자 또는 불일치 metadata를 거부한다.
+- replica는 자동 write/read authority가 아니며 승격은 별도 operator-gated migration으로만 수행한다.
+- 다음 단계는 outbox 기반 비동기 복제 작업과 digest 검증 후 inventory 등록을 연결하는 것이다.
 
 ### 3차: BYOS
 

@@ -32,16 +32,16 @@ import {
   serializeStudioWorkAssetDescriptorCanonical,
 } from "../../../../web/src/shared/lib/studio-work-asset-contract";
 import {
-  SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
-  SupabaseObjectReferenceSchema,
-  SupabaseSignedReadUrlSchema,
-  type SupabaseObjectPurpose,
-  type SupabaseObjectReference,
-  type SupabaseSignedReadUrl,
-} from "../../infrastructure/supabase-object-storage/supabase-object-storage.contract";
+  PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
+  PrivateObjectReferenceSchema,
+  PrivateSignedReadUrlSchema,
+  type PrivateObjectPurpose,
+  type PrivateObjectReference,
+  type PrivateSignedReadUrl,
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
 import {
   SUPABASE_OBJECT_STORAGE_PORT,
-  type SupabaseObjectStoragePort,
 } from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
 
 import {
@@ -134,11 +134,11 @@ export interface StudioWorkAssetGeneratedDeleteResult {
 
 export interface StudioWorkAssetSignedRead {
   readonly reference: StudioWorkAssetStorageReference;
-  readonly signedRead: SupabaseSignedReadUrl;
+  readonly signedRead: PrivateSignedReadUrl;
 }
 
 interface ResolvedStudioWorkAssetStorageObject {
-  readonly object: SupabaseObjectReference;
+  readonly object: PrivateObjectReference;
   readonly uploaded: boolean;
 }
 
@@ -553,11 +553,11 @@ function exactLayerLiftUploadFiles(
 }
 
 function storageObjectFor(
-  purpose: SupabaseObjectPurpose,
+  purpose: PrivateObjectPurpose,
   admitted: AdmittedStudioWorkAssetPayload,
-): SupabaseObjectReference {
-  return SupabaseObjectReferenceSchema.parse({
-    contractVersion: SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+): PrivateObjectReference {
+  return PrivateObjectReferenceSchema.parse({
+    contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
     purpose,
     digest: `sha256:${admitted.sha256}`,
     objectPath: `sha256/${admitted.sha256.slice(0, 2)}/${admitted.sha256}`,
@@ -589,7 +589,7 @@ export class StudioWorkAssetService {
     private readonly repository: StudioWorkAssetRepository,
     @Optional()
     @Inject(SUPABASE_OBJECT_STORAGE_PORT)
-    private readonly objectStorage?: SupabaseObjectStoragePort,
+    private readonly objectStorage?: PrivateObjectStoragePort,
   ) {}
 
   async uploadLayerLiftBatch(
@@ -946,7 +946,7 @@ export class StudioWorkAssetService {
     allowAdminOverride: boolean,
   ): Promise<number> {
     let deletedReferences = 0;
-    let storage: SupabaseObjectStoragePort | undefined;
+    let storage: PrivateObjectStoragePort | undefined;
     while (true) {
       const references = await this.run(() =>
         this.repository.listGeneratedStorageReferencesForWorkDeletion(
@@ -1231,8 +1231,8 @@ export class StudioWorkAssetService {
   }
 
   private async resolveStorageObject(
-    storage: SupabaseObjectStoragePort,
-    purpose: SupabaseObjectPurpose,
+    storage: PrivateObjectStoragePort,
+    purpose: PrivateObjectPurpose,
     admitted: AdmittedStudioWorkAssetPayload,
     workId: string,
     referenceId: string,
@@ -1249,7 +1249,7 @@ export class StudioWorkAssetService {
     }
 
     const uploaded = await this.storageCall(async () =>
-      SupabaseObjectReferenceSchema.parse(await storage.uploadImmutable({
+      PrivateObjectReferenceSchema.parse(await storage.uploadImmutable({
         purpose,
         contentType: admitted.mimeType,
         bytes: Uint8Array.from(admitted.payload),
@@ -1277,7 +1277,7 @@ export class StudioWorkAssetService {
   ): Promise<StudioWorkAssetSignedRead> {
     const storage = await this.requirePrivateObjectStorage();
     const signedRead = await this.storageCall(async () =>
-      SupabaseSignedReadUrlSchema.parse(await storage.createSignedReadUrl({
+      PrivateSignedReadUrlSchema.parse(await storage.createSignedReadUrl({
         object: reference.object,
         expiresInSeconds,
       }))
@@ -1294,7 +1294,7 @@ export class StudioWorkAssetService {
     return { reference, signedRead };
   }
 
-  private async requirePrivateObjectStorage(): Promise<SupabaseObjectStoragePort> {
+  private async requirePrivateObjectStorage(): Promise<PrivateObjectStoragePort> {
     const storage = this.objectStorage;
     if (!storage) {
       throw new ServiceUnavailableException(
