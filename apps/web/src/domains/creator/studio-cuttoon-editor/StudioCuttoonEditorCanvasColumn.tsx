@@ -723,6 +723,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
         <StudioSelectionContextBar
           visible={
             tool === "select"
+            && !nodeEditArmed
             && currentCanvasSelectionCount > 0
             && !canvasOnlyMode
             && !canvasInteractionBlocked
