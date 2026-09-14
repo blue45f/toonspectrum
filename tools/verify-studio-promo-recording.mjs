@@ -280,3 +280,18 @@ test("every newly rendered timeline frame is requested once, including detached 
   assert.equal(context.frameRequests(), 4);
   context.cleaned();
 });
+
+test("every newly rendered timeline frame is requested once, including detached canvases", async () => {
+  const context = await recording();
+  assert.equal(context.frameRequests(), 1, "the first frame must be explicitly requested");
+  context.tick(10);
+  assert.equal(context.frameRequests(), 1, "do not recapture an unchanged frame");
+  context.tick(34);
+  assert.equal(context.frameRequests(), 2);
+  context.tick(67);
+  assert.equal(context.frameRequests(), 3);
+  context.end(); context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  assert.equal(context.frameRequests(), 4);
+  context.cleaned();
+});

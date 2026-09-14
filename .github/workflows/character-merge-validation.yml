@@ -2,7 +2,7 @@ name: Character merge validation
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
@@ -20,6 +20,7 @@ on:
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - "scripts/verify-character-contact-naturalness.mjs"
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'

@@ -2,7 +2,7 @@ name: Studio AI comic director complete
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
@@ -28,6 +28,7 @@ on:
       - "apps/api/src/db/schema/index.ts"
       - ".github/workflows/studio-ai-comic-director-complete.yml"
   push:
+    branches: ["main"]
     paths:
       - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
       - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"

@@ -2,7 +2,7 @@ name: Character Shaper discovery quality
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - "apps/web/src/domains/creator/character-shaper/**"
@@ -15,6 +15,7 @@ on:
       - "vitest.config.ts"
       - "vitest.setup.ts"
   push:
+    branches: ["main"]
     paths:
       - "apps/web/src/domains/creator/character-shaper/**"
       - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"

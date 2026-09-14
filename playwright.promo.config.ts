@@ -7,7 +7,7 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Inv
 const channel = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /studio-promo(?:-render-quality)?\.spec\.ts/u,
+  testMatch: /studio-promo(?:-render-quality|-production)?\.spec\.ts/u,
   outputDir: process.env.STUDIO_PROMO_E2E_OUTPUT ?? "test-results/promo",
   fullyParallel: false, workers: 1, retries: 0, forbidOnly: Boolean(process.env.CI),
   timeout: 180_000, expect: { timeout: 30_000 }, reporter: [["list"]],

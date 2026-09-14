@@ -1,7 +1,7 @@
 name: Creator resources verification
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/shared/lib/creator-resources.ts'
@@ -19,6 +19,7 @@ on:
       - 'scripts/verify-creator-workspace-browser.mjs'
       - '.github/workflows/creator-resources.yml'
   push:
+    branches: ["main"]
     paths:
       - 'apps/web/src/shared/lib/creator-resources.ts'
       - 'apps/web/src/shared/lib/creator-resource-workflow.ts'
