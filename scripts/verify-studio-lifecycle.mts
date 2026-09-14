@@ -705,7 +705,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "복구하기", exact: true }).click();
+    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
     await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
 
     const restoredStage = page.locator(".konvajs-content").first();

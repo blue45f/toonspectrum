@@ -825,14 +825,18 @@ async function dismissTransientChrome(page: Page, clearAutosave = true): Promise
   await dismissQuickStartOverlay(page, 250);
   if (
     clearAutosave
-    && await page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false })
+    && await page.locator("[data-studio-recovery-notice]")
       .isVisible({ timeout: 250 })
       .catch(() => false)
   ) {
-    await page.getByRole("button", { name: "비우기", exact: true }).click();
+    const recovery = page.locator("[data-studio-recovery-notice]");
+    const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
+    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+    await recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true }).click();
     const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-    await confirmation.getByRole("button", { name: "임시저장본 영구 삭제", exact: true }).click();
+    await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
     await confirmation.waitFor({ state: "hidden" });
+    await recovery.waitFor({ state: "hidden" });
   }
 }
 
@@ -3921,8 +3925,8 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible" });
   await dismissTransientChrome(page, false);
   // Local guest documents offer an explicit recovery choice on a cold visit.
-  await page.getByRole("button", { name: "복구하기", exact: true }).click();
-  await page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false }).waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
+  await page.locator("[data-studio-recovery-notice]").waitFor({ state: "detached" });
   await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
   await page.locator('[data-studio-command-bar-settings-trigger="true"]').click();
   await page.locator('[data-studio-command-bar-settings-panel="true"] select').nth(7).selectOption("correct-current-stroke");
@@ -4621,7 +4625,7 @@ async function runDeferredDurabilityAudit(
     );
     await recoveryText.waitFor({ state: "visible", timeout: 8_000 });
     const recoveryBannerShown = true;
-    await page.getByRole("button", { name: "복구하기", exact: true }).click();
+    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
     await recoveryText.waitFor({ state: "detached", timeout: 8_000 });
     const restoredStage = page.locator(".konvajs-content").first();
     await restoredStage.waitFor({ state: "visible" });

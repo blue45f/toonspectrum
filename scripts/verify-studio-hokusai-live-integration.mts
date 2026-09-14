@@ -1090,7 +1090,7 @@ async function restoreAutosaveAfterReload(page: Page): Promise<void> {
     { exact: false },
   );
   await banner.waitFor({ state: "visible", timeout: 10_000 });
-  await page.getByRole("button", { name: "복구하기", exact: true }).click();
+  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
   await banner.waitFor({ state: "detached", timeout: 10_000 });
 }
 

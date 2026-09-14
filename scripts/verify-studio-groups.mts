@@ -61,7 +61,7 @@ const CLEAN_SESSION_KEY = "toonspectrum-group-verifier-cleaned";
 const LIVE_DRAW_STROKE = "#0b9b6d";
 const FIXTURE_TEXT_FILL = "#16100c";
 /**
- * Every locator below names a Korean control ("텍스트 추가", "복구하기", "3개 선택", …).
+ * Every locator below names a Korean control ("텍스트 추가", "이어서 그리기", "3개 선택", …).
  * Studio localizes its chrome from the browser locale (`apps/web/src/shared/lib/i18n.ts` seeds the store with
  * `detectBrowserLocale()`), and Playwright's default context is `en-US`, so the audited
  * pages must be opened the way the Korean UI these assertions describe is actually served.
@@ -380,11 +380,15 @@ async function dismissTransientChrome(page: Page, clearAutosave = true): Promise
   }
   if (
     clearAutosave
-    && await page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", {
-      exact: false,
-    }).isVisible({ timeout: 250 }).catch(() => false)
+    && await page.locator("[data-studio-recovery-notice]").isVisible({ timeout: 250 }).catch(() => false)
   ) {
-    await page.getByRole("button", { name: "비우기", exact: true }).click();
+    const recovery = page.locator("[data-studio-recovery-notice]");
+    const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
+    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+    await recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true }).click();
+    const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
+    await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
+    await recovery.waitFor({ state: "hidden" });
   }
 }
 
@@ -417,7 +421,7 @@ async function prepareSeededMobilePage(page: Page, studioUrl: string): Promise<v
     state: "visible",
     timeout: 15_000,
   });
-  const restore = page.getByRole("button", { name: "복구하기", exact: true });
+  const restore = page.getByRole("button", { name: "이어서 그리기", exact: true });
   // Static preview can spend a few seconds waiting for unavailable API proxies before
   // the autosave banner settles, and the durable-recovery probe itself runs in an idle
   // callback. Do not start the mobile canvas audit against the temporary blank document
