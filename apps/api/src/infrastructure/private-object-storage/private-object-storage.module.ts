@@ -12,6 +12,10 @@ import {
 } from "./private-object-storage.config";
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "./private-object-storage.port";
 import {
+  resolvePrivateObjectStorageWriteAdmission,
+  type PrivateObjectStorageWriteAdmission,
+} from "./private-object-storage-write-admission";
+import {
   PurposeRoutedPrivateObjectStoragePort,
   type PrivateObjectStorageProviderId,
 } from "./purpose-routed-private-object-storage.port";
@@ -23,6 +27,7 @@ import {
 export interface PrivateObjectStorageRuntimes {
   readonly supabase?: SupabaseObjectStorageRuntime;
   readonly s3?: S3CompatibleObjectStorageRuntime;
+  readonly writeAdmission?: PrivateObjectStorageWriteAdmission;
 }
 
 export function createDefaultS3CompatibleObjectStorageRuntime(): S3CompatibleObjectStorageRuntime {
@@ -65,6 +70,7 @@ export function createPrivateObjectStoragePort(
   return new PurposeRoutedPrivateObjectStoragePort(
     plan.routing,
     providers,
+    runtimes.writeAdmission,
   );
 }
 
@@ -102,8 +108,15 @@ export class PrivateObjectStorageModule {
     runtimes: PrivateObjectStorageRuntimes = {},
   ): DynamicModule | null {
     const plan = resolvePrivateObjectStoragePlan(environment);
-    return plan
-      ? PrivateObjectStorageModule.register(plan, runtimes)
-      : null;
+    if (!plan) return null;
+    const writeAdmission = runtimes.writeAdmission
+      ?? resolvePrivateObjectStorageWriteAdmission(
+        environment,
+        plan.routing,
+      );
+    return PrivateObjectStorageModule.register(
+      plan,
+      writeAdmission ? { ...runtimes, writeAdmission } : runtimes,
+    );
   }
 }
