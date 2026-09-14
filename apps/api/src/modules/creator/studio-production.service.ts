@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   GoneException,
@@ -17,6 +18,7 @@ import {
 import {
   STUDIO_PRODUCTION_REPOSITORY,
   StudioProductionForbiddenError,
+  StudioProductionInvalidPageError,
   StudioProductionNotFoundError,
   StudioProductionQuotaError,
   StudioProductionRevisionConflictError,
@@ -132,14 +134,36 @@ export class StudioProductionService {
             : "사용자 계정을 찾을 수 없습니다.";
         throw new NotFoundException(message);
       }
+      if (error instanceof StudioProductionInvalidPageError) {
+        throw new BadRequestException(
+          "선택한 검토 페이지가 현재 작품에 없거나 더 이상 존재하지 않습니다."
+        );
+      }
       if (error instanceof StudioProductionForbiddenError) {
-        const message = error.operation === "view"
-          ? "이 작품의 제작 운영 정보를 볼 권한이 없습니다."
-          : error.operation === "edit"
-            ? "이 작품의 제작 운영 정보를 편집할 권한이 없습니다."
-            : error.operation === "manage-links"
-              ? "이 작품의 외부 검토 링크를 관리할 권한이 없습니다."
-              : "이 링크에는 검토 의견 작성 권한이 없습니다.";
+        let message: string;
+        switch (error.operation) {
+          case "view":
+            message = "이 작품의 제작 운영 정보를 볼 권한이 없습니다.";
+            break;
+          case "edit":
+            message = "이 작품의 제작 운영 정보를 편집할 권한이 없습니다.";
+            break;
+          case "manage-links":
+            message = "이 작품의 외부 검토 링크를 관리할 권한이 없습니다.";
+            break;
+          case "manage-roles":
+            message = "제작 역할과 팀 범위를 변경할 권한이 없습니다.";
+            break;
+          case "approve":
+            message = "승인 단계 또는 승인 필수 검수를 변경할 권한이 없습니다.";
+            break;
+          case "publish":
+            message = "게시 준비 단계를 변경할 권한이 없습니다.";
+            break;
+          case "comment":
+            message = "이 링크에는 검토 의견 작성 권한이 없습니다.";
+            break;
+        }
         throw new ForbiddenException(message);
       }
       if (error instanceof StudioProductionRevisionConflictError) {

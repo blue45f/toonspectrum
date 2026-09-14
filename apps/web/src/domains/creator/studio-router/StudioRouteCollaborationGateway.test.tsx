@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioProductionHubPage } from "../studio-production/StudioProductionHubPage";
+import { createEmptyProductionWorkspace } from "../studio-production/studio-production-workspace";
 
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRoutePlaceholder } from "./StudioRouteFallbacks";
@@ -18,7 +19,40 @@ vi.mock("../studio-local-database-runtime", () => ({
   acquireStudioLocalDatabase: async () => database,
 }));
 
-beforeEach(() => vi.clearAllMocks());
+const server = vi.hoisted(() => ({ loadWorkspace: vi.fn(), saveWorkspace: vi.fn() }));
+vi.mock("../studio-production/studio-production-server-client", () => {
+  class StudioProductionServerConflictError extends Error {
+    constructor(readonly currentRevision: number) {
+      super("conflict");
+    }
+  }
+  return {
+    loadStudioServerProductionWorkspace: server.loadWorkspace,
+    saveStudioServerProductionWorkspace: server.saveWorkspace,
+    StudioProductionServerConflictError,
+  };
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  server.loadWorkspace.mockImplementation(async (workId: string) => {
+    const document = createEmptyProductionWorkspace(`work:${workId}`);
+    return {
+      workId,
+      revision: document.revision,
+      updatedAt: document.updatedAt,
+      capabilities: {
+        view: true,
+        edit: true,
+        manageLinks: true,
+        manageRoles: true,
+        approve: true,
+        publish: true,
+      },
+      document,
+    };
+  });
+});
 afterEach(cleanup);
 
 function renderPlaceholder(placeholderId: Parameters<typeof StudioRoutePlaceholder>[0]["placeholderId"]) {
@@ -33,10 +67,16 @@ describe("Studio collaboration route gateways", () => {
   // Review is now an actual production surface, not an asset-guidance placeholder. Exercise the
   // shipped surface and its scope-preserving editor exit instead of widening the placeholder API.
   it.each([
-    ["/studio/review", "draft", "/studio/canvas"],
-    ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas"],
-    ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas"],
-  ])("opens the review workspace rather than a dead end at %s", async (pathname, scopeKey, editorHref) => {
+    ["/studio/review", "draft", "/studio/canvas", "SQLite/OPFS 저장됨", null],
+    ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas", "서버 저장됨", "work-1"],
+    ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas", "SQLite/OPFS 저장됨", null],
+  ])("opens the review workspace rather than a dead end at %s", async (
+    pathname,
+    scopeKey,
+    editorHref,
+    persistenceLabel,
+    serverWorkId,
+  ) => {
     expect(resolveStudioRoute({ pathname })).toMatchObject({ kind: "production" });
     const onOpenStudio = vi.fn();
     render(
@@ -45,8 +85,14 @@ describe("Studio collaboration route gateways", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("SQLite/OPFS 저장됨");
-    expect(database.kvGet).toHaveBeenCalledWith("studio-production-command-center-v1", scopeKey);
+    await screen.findByText(persistenceLabel);
+    if (serverWorkId) {
+      expect(server.loadWorkspace).toHaveBeenCalledWith(serverWorkId);
+      expect(database.kvGet).not.toHaveBeenCalled();
+    } else {
+      expect(database.kvGet).toHaveBeenCalledWith("studio-production-command-center-v1", scopeKey);
+      expect(server.loadWorkspace).not.toHaveBeenCalled();
+    }
     expect(screen.getByRole("heading", { name: "리뷰 및 승인" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /^리뷰$/u }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(editorHref);

@@ -85,6 +85,22 @@ export type ProductionTaskStatus = "todo" | "doing" | "blocked" | "done";
 export type ProductionReviewSeverity = "blocker" | "major" | "minor";
 export type ProductionReviewStatus = "open" | "resolved";
 
+export function isValidProductionHierarchyParent(
+  kind: ProductionHierarchyKind,
+  parentKind: ProductionHierarchyKind | null,
+): boolean {
+  switch (kind) {
+    case "episode":
+      return parentKind === null;
+    case "sequence":
+      return parentKind === "episode";
+    case "scene":
+      return parentKind === "sequence";
+    case "page":
+      return parentKind === "scene";
+  }
+}
+
 export interface ProductionTask {
   readonly id: string;
   readonly title: string;
@@ -190,6 +206,7 @@ export interface StudioProductionWorkspaceCapabilities {
   readonly canEdit: boolean;
   readonly canPersistLocally: boolean;
   readonly canInvite: boolean;
+  readonly canManageRoles: boolean;
   readonly canApprove: boolean;
   readonly canPublish: boolean;
   readonly serverAuthoritative: boolean;
@@ -504,6 +521,8 @@ function parseHierarchy(value: unknown): ProductionHierarchyNode[] | null {
   }
   for (const node of typed) {
     if (node.parentId === node.id || (node.parentId !== null && !byId.has(node.parentId))) return null;
+    const parentKind = node.parentId === null ? null : byId.get(node.parentId)?.kind ?? null;
+    if (!isValidProductionHierarchyParent(node.kind, parentKind)) return null;
     const visited = new Set<string>([node.id]);
     let cursor = node.parentId;
     while (cursor !== null) {
@@ -663,6 +682,26 @@ function duplicateIds(items: readonly { readonly id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size !== items.length;
 }
 
+function hasTaskDependencyCycle(tasks: readonly ProductionTask[]): boolean {
+  const dependenciesById = new Map(
+    tasks.map((task) => [task.id, task.dependencyIds ?? []] as const),
+  );
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (taskId: string): boolean => {
+    if (visiting.has(taskId)) return true;
+    if (visited.has(taskId)) return false;
+    visiting.add(taskId);
+    for (const dependencyId of dependenciesById.get(taskId) ?? []) {
+      if (visit(dependencyId)) return true;
+    }
+    visiting.delete(taskId);
+    visited.add(taskId);
+    return false;
+  };
+  return tasks.some((task) => visit(task.id));
+}
+
 function referencesAreValid(input: {
   readonly tasks: readonly ProductionTask[];
   readonly reviews: readonly ProductionReviewIssue[];
@@ -675,18 +714,30 @@ function referencesAreValid(input: {
     || duplicateIds(input.reviews)
     || duplicateIds(input.roleAssignments)
     || duplicateIds(input.handoffs)
+    || hasTaskDependencyCycle(input.tasks)
   ) {
     return false;
   }
   const taskIds = new Set(input.tasks.map((task) => task.id));
   const hierarchyIds = new Set(input.hierarchy.map((node) => node.id));
+  const pageIds = new Set(
+    input.hierarchy.flatMap((node) => node.pageId === null ? [] : [node.pageId]),
+  );
+  const assignmentIds = new Set<string>();
+  for (const assignment of input.roleAssignments) {
+    assignmentIds.add(assignment.id);
+    if (assignment.memberId) assignmentIds.add(assignment.memberId);
+  }
   return input.tasks.every((task) =>
     (task.hierarchyNodeId === null || task.hierarchyNodeId === undefined
       || hierarchyIds.has(task.hierarchyNodeId))
-    && (task.dependencyIds ?? []).every((dependencyId) => taskIds.has(dependencyId)))
+    && (task.dependencyIds ?? []).every((dependencyId) => taskIds.has(dependencyId))
+    && (task.assigneeIds ?? []).every((assigneeId) => assignmentIds.has(assigneeId))
+    && (task.reviewerIds ?? []).every((reviewerId) => assignmentIds.has(reviewerId)))
     && input.reviews.every((review) =>
-      review.hierarchyNodeId === null || review.hierarchyNodeId === undefined
-      || hierarchyIds.has(review.hierarchyNodeId))
+      (review.hierarchyNodeId === null || review.hierarchyNodeId === undefined
+        || hierarchyIds.has(review.hierarchyNodeId))
+      && (review.pageId === null || review.pageId === undefined || pageIds.has(review.pageId)))
     && input.roleAssignments.every((assignment) =>
       assignment.hierarchyNodeId === null || hierarchyIds.has(assignment.hierarchyNodeId))
     && input.handoffs.every((handoff) => hierarchyIds.has(handoff.hierarchyNodeId));
@@ -1011,6 +1062,7 @@ export function studioProductionWorkspaceCapabilities(
       canEdit: true,
       canPersistLocally: false,
       canInvite: true,
+      canManageRoles: true,
       canApprove: true,
       canPublish: true,
       serverAuthoritative: true,
@@ -1021,6 +1073,7 @@ export function studioProductionWorkspaceCapabilities(
       canEdit: false,
       canPersistLocally: false,
       canInvite: false,
+      canManageRoles: false,
       canApprove: false,
       canPublish: false,
       serverAuthoritative: false,
@@ -1031,6 +1084,7 @@ export function studioProductionWorkspaceCapabilities(
       canEdit: true,
       canPersistLocally: false,
       canInvite: false,
+      canManageRoles: false,
       canApprove: false,
       canPublish: false,
       serverAuthoritative: false,
@@ -1040,6 +1094,7 @@ export function studioProductionWorkspaceCapabilities(
     canEdit: true,
     canPersistLocally: true,
     canInvite: false,
+    canManageRoles: false,
     canApprove: false,
     canPublish: false,
     serverAuthoritative: false,

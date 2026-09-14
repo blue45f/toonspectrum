@@ -15,6 +15,7 @@ export interface StudioServerProductionCapabilities {
   readonly view: boolean;
   readonly edit: boolean;
   readonly manageLinks: boolean;
+  readonly manageRoles: boolean;
   readonly approve: boolean;
   readonly publish: boolean;
 }
@@ -110,6 +111,7 @@ const CapabilitiesSchema = z.object({
   view: z.boolean(),
   edit: z.boolean(),
   manageLinks: z.boolean(),
+  manageRoles: z.boolean(),
   approve: z.boolean(),
   publish: z.boolean(),
 }).strict();
@@ -128,6 +130,45 @@ const PersonalKitScalarSchema = z.union([
 ]);
 const PersonalKitMapSchema = z.record(z.string().min(1).max(80), PersonalKitScalarSchema);
 const PersonalKitObjectSchema = z.record(z.string().min(1).max(80), z.unknown());
+const FORBIDDEN_PERSONAL_KIT_KEYS = [
+  "apikey",
+  "secret",
+  "password",
+  "credential",
+  "authorization",
+  "clipboard",
+  "rawprompt",
+  "rawstroke",
+  "documentsnapshot",
+  "privatekey",
+] as const;
+
+function inspectPersonalKitValue(value: unknown): boolean {
+  let entries = 0;
+  const visit = (current: unknown, depth: number): boolean => {
+    if (depth > 8 || entries > 5_000) return false;
+    if (Array.isArray(current)) {
+      entries += current.length;
+      return current.length <= 1_000 && current.every((item) => visit(item, depth + 1));
+    }
+    if (current && typeof current === "object") {
+      const pairs = Object.entries(current as Record<string, unknown>);
+      entries += pairs.length;
+      if (pairs.length > 500) return false;
+      return pairs.every(([key, nested]) => {
+        const normalized = key.toLowerCase().replace(/[^a-z0-9]/gu, "");
+        return !FORBIDDEN_PERSONAL_KIT_KEYS.some((forbidden) => normalized.includes(forbidden))
+          && visit(nested, depth + 1);
+      });
+    }
+    return current === null
+      || typeof current === "string"
+      || typeof current === "boolean"
+      || (typeof current === "number" && Number.isFinite(current));
+  };
+  return visit(value, 0);
+}
+
 const PersonalKitDocumentSchema = z.object({
   schemaVersion: z.literal(1),
   updatedAt: IsoDateTimeSchema,
@@ -146,13 +187,22 @@ const PersonalKitDocumentSchema = z.object({
   if (new Set(document.favoriteRefs).size !== document.favoriteRefs.length) {
     context.addIssue({ code: "custom", path: ["favoriteRefs"], message: "duplicate favorite refs" });
   }
+  if (!inspectPersonalKitValue(document)) {
+    context.addIssue({
+      code: "custom",
+      message: "Personal Kit cannot contain secrets, source documents, clipboard data, or unsafe values",
+    });
+  }
+  if (JSON.stringify(document).length > 512_000) {
+    context.addIssue({ code: "custom", message: "Personal Kit exceeds the size limit" });
+  }
 });
 const PersonalKitEnvelopeSchema = z.object({
   revision: RevisionSchema,
   updatedAt: IsoDateTimeSchema,
   document: PersonalKitDocumentSchema,
 }).strict();
-const ReviewLinkSchema = z.object({
+const ReviewLinkFields = {
   id: OpaqueIdSchema,
   workId: OpaqueIdSchema,
   role: z.enum(["viewer", "commenter"]),
@@ -162,31 +212,57 @@ const ReviewLinkSchema = z.object({
   expiresAt: IsoDateTimeSchema,
   revokedAt: IsoDateTimeSchema.nullable(),
   createdAt: IsoDateTimeSchema,
-}).strict().superRefine((link, context) => {
+} as const;
+
+function refineReviewLink(
+  link: { readonly pageIds: readonly string[]; readonly expiresAt: string; readonly createdAt: string },
+  context: z.RefinementCtx,
+): void {
   if (new Set(link.pageIds).size !== link.pageIds.length) {
     context.addIssue({ code: "custom", path: ["pageIds"], message: "duplicate page ids" });
   }
   if (Date.parse(link.expiresAt) <= Date.parse(link.createdAt)) {
     context.addIssue({ code: "custom", path: ["expiresAt"], message: "invalid expiry" });
   }
-});
-const CreatedReviewLinkSchema = ReviewLinkSchema.extend({
+}
+
+const ReviewLinkBaseSchema = z.object(ReviewLinkFields).strict();
+const ReviewLinkSchema = ReviewLinkBaseSchema.superRefine(refineReviewLink);
+const CreatedReviewLinkSchema = z.object({
+  ...ReviewLinkFields,
   token: z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/u),
-}).strict();
+}).strict().superRefine(refineReviewLink);
+const ExternalReviewLinkSchema = z.object({
+  id: OpaqueIdSchema,
+  role: z.enum(["viewer", "commenter"]),
+  pageIds: z.array(OpaqueIdSchema).max(500),
+  watermark: z.boolean(),
+  allowDownload: z.boolean(),
+  expiresAt: IsoDateTimeSchema,
+}).strict().superRefine((link, context) => {
+  if (new Set(link.pageIds).size !== link.pageIds.length) {
+    context.addIssue({ code: "custom", path: ["pageIds"], message: "duplicate page ids" });
+  }
+});
+const ExternalFeedbackAnchorSchema = z.object({
+  pageId: OpaqueIdSchema,
+  x: z.number().finite().min(0).max(1).optional(),
+  y: z.number().finite().min(0).max(1).optional(),
+}).strict().superRefine((anchor, context) => {
+  if ((anchor.x === undefined) !== (anchor.y === undefined)) {
+    context.addIssue({ code: "custom", message: "x and y must be provided together" });
+  }
+});
 const ExternalFeedbackSchema = z.object({
   id: OpaqueIdSchema,
   kind: z.enum(["comment", "approve", "reject"]),
   reviewerName: z.string().trim().min(1).max(120),
-  anchor: z.object({
-    pageId: OpaqueIdSchema,
-    x: z.number().finite().min(0).max(1).optional(),
-    y: z.number().finite().min(0).max(1).optional(),
-  }).strict().nullable(),
+  anchor: ExternalFeedbackAnchorSchema.nullable(),
   body: z.string().max(4_000),
   createdAt: IsoDateTimeSchema,
 }).strict();
 const ExternalReviewSchema = z.object({
-  link: ReviewLinkSchema.omit({ workId: true, revokedAt: true, createdAt: true }),
+  link: ExternalReviewLinkSchema,
   work: z.object({
     id: OpaqueIdSchema,
     title: z.string().trim().min(1).max(240),
@@ -473,7 +549,7 @@ function canonicalExternalFeedbackInput(
   const parsed = z.object({
     kind: z.enum(["comment", "approve", "reject"]),
     reviewerName: z.string().trim().min(1).max(120),
-    anchor: ExternalFeedbackSchema.shape.anchor,
+    anchor: ExternalFeedbackAnchorSchema.nullable(),
     body: z.string().trim().max(4_000),
   }).strict().safeParse(input);
   if (!parsed.success || (parsed.data.kind !== "approve" && parsed.data.body.length === 0)) {

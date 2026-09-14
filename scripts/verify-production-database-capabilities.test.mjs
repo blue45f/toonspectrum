@@ -13,6 +13,7 @@ import {
   buildMigrationLedgerRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
+  buildStudioProductionRuntimeAclViolationSql,
 } from "./run-production-database-migrations.mjs";
 
 test("loads the runtime health readiness relation and cutover contract", () => {
@@ -24,6 +25,14 @@ test("loads the runtime health readiness relation and cutover contract", () => {
   expect(contract.relationNames).toContain(
     "creator_marketplace_package_moderation",
   );
+  for (const relation of [
+    "creator_studio_personal_kit",
+    "creator_work_production_workspace",
+    "creator_work_review_feedback",
+    "creator_work_review_link",
+  ]) {
+    expect(contract.relationNames).toContain(relation);
+  }
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
     "0025_auth_lifecycle_contract",
@@ -44,6 +53,9 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildCreatorMarketplaceRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildStudioProductionRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildRuntimeCutoverLedgerAclViolationSql("webdex_runtime"),
@@ -112,6 +124,7 @@ test("generated verification covers runtime capabilities and exact migration che
     "runtime database role owns the migration ledger",
     "runtime role lacks the exact creator object-storage privileges",
     "runtime role lacks the exact creator marketplace privileges",
+    "runtime role lacks the exact Studio production privileges",
     "runtime role lacks the exact cutover-readiness ledger privileges",
     "authentication lifecycle schema capability is incomplete",
     "runtime role lacks the exact authentication lifecycle privileges",

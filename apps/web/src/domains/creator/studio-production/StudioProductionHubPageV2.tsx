@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   FileClock,
   FolderKanban,
   HardDrive,
@@ -44,14 +43,14 @@ import {
   resolveStudioProductionWorkspaceMode,
   studioProductionWorkspaceCapabilities,
   studioProductionWorkspaceModeLabel,
-  type ProductionReviewSeverity,
-  type ProductionTaskStatus,
   type ProductionVersionSnapshot,
   type ProductionWorkspace,
   type StudioProductionWorkspaceMode,
 } from "./studio-production-workspace";
 import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
 import { StudioProductionOperationsPanel } from "./StudioProductionOperationsPanel";
+import { StudioProductionReviewBoard } from "./StudioProductionReviewBoard";
+import { StudioProductionTaskBoard } from "./StudioProductionTaskBoard";
 import {
   loadStudioServerProductionWorkspace,
   saveStudioServerProductionWorkspace,
@@ -229,19 +228,6 @@ const SURFACE_META: Readonly<
   join: { label: "참여", icon: Users },
 };
 
-function taskTone(status: ProductionTaskStatus): "neutral" | "success" | "danger" | "accent" {
-  if (status === "done") return "success";
-  if (status === "blocked") return "danger";
-  if (status === "doing") return "accent";
-  return "neutral";
-}
-
-function reviewTone(severity: ProductionReviewSeverity): "neutral" | "warning" | "danger" {
-  if (severity === "blocker") return "danger";
-  if (severity === "major") return "warning";
-  return "neutral";
-}
-
 function ModeNotice({ mode }: { readonly mode: StudioProductionWorkspaceMode }) {
   const sharedClass = "rounded-xl border px-3 py-2.5 text-xs leading-relaxed";
   if (mode === "demo") {
@@ -336,6 +322,7 @@ function StudioProductionHubWorkspace({
       ...base,
       canEdit: serverCapabilities.edit,
       canInvite: serverCapabilities.manageLinks,
+      canManageRoles: serverCapabilities.manageRoles,
       canApprove: serverCapabilities.approve,
       canPublish: serverCapabilities.publish,
     };
@@ -571,7 +558,7 @@ function StudioProductionHubWorkspace({
       ...current.reviews,
       {
         id: createId("review"),
-        title: "새 검수 항목",
+        title: mode === "server-work" ? "새 검수 항목" : "새 로컬 검수 항목",
         assignee: "미배정",
         severity: "minor",
         status: "open",
@@ -582,23 +569,6 @@ function StudioProductionHubWorkspace({
       },
     ],
   }), "검수 항목을 추가했습니다.");
-
-  const toggleTask = (id: string) => void commit((current) => ({
-    ...current,
-    tasks: current.tasks.map((task) => {
-      if (task.id !== id) return task;
-      return task.status === "done"
-        ? { ...task, status: "doing", progress: Math.min(task.progress, 90) }
-        : { ...task, status: "done", progress: 100 };
-    }),
-  }), "작업 상태를 갱신했습니다.");
-
-  const toggleReview = (id: string) => void commit((current) => ({
-    ...current,
-    reviews: current.reviews.map((issue) => issue.id === id
-      ? { ...issue, status: issue.status === "open" ? "resolved" : "open" }
-      : issue),
-  }), "검수 상태를 갱신했습니다.");
 
   const createSnapshot = () => void commit((current) => ({
     ...current,
@@ -784,7 +754,9 @@ function StudioProductionHubWorkspace({
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <Card
               title="제작 보드"
-              description="현재 기기에 저장되는 작업 목록입니다. 서버 원고 상태와 자동으로 동일시하지 않습니다."
+              description={mode === "server-work"
+                ? "서버 리비전으로 저장되는 제작 작업입니다. 원고 컷·레이어 리비전과는 분리됩니다."
+                : "현재 기기에 저장되는 작업 목록입니다. 서버 원고 상태와 자동으로 동일시하지 않습니다."}
               action={(
                 <button
                   type="button"
@@ -797,57 +769,20 @@ function StudioProductionHubWorkspace({
                 </button>
               )}
             >
-              {workspace.tasks.length === 0 ? (
-                <EmptyState
-                  title="등록된 제작 작업이 없습니다"
-                  description="실제 작품 범위에는 샘플 작업을 자동으로 넣지 않습니다. 필요한 작업을 직접 추가하세요."
-                  action={(
-                    <button type="button" className={buttonClass({ size: "sm" })} onClick={addTask}>
-                      첫 작업 추가
-                    </button>
-                  )}
-                />
-              ) : (
-                <div className="space-y-2">
-                  {workspace.tasks.map((task) => (
-                    <article key={task.id} className="rounded-xl border border-line bg-panel p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-bold">{task.title}</h3>
-                            <Pill tone={taskTone(task.status)}>{task.status}</Pill>
-                          </div>
-                          <p className="mt-1 text-xs text-fg-2">{task.owner || "미배정"} · 마감 {task.due}</p>
-                        </div>
-                        <button
-                          type="button"
-                          className={buttonClass({ variant: "outline", size: "sm" })}
-                          onClick={() => toggleTask(task.id)}
-                          disabled={!capabilities.canEdit || Boolean(loadError)}
-                        >
-                          {task.status === "done" ? (
-                            <RotateCcw className="size-4" aria-hidden="true" />
-                          ) : (
-                            <CheckCircle2 className="size-4" aria-hidden="true" />
-                          )}
-                          {task.status === "done" ? "재개" : "완료"}
-                        </button>
-                      </div>
-                      <div
-                        className="mt-3 h-2 overflow-hidden rounded-full bg-raised"
-                        role="progressbar"
-                        aria-valuenow={task.progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
-                        <div className="h-full rounded-full bg-accent" style={{ width: `${task.progress}%` }} />
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
+              <StudioProductionTaskBoard
+                workspace={workspace}
+                canEdit={capabilities.canEdit && !loadError}
+                canApprove={capabilities.canApprove}
+                canPublish={capabilities.canPublish}
+                onCommit={(update, message) => { void commit(update, message); }}
+              />
             </Card>
-            <Card title="출시 게이트" description="현재 화면은 로컬 점검 도구이며 서버 승인 기록이 아닙니다.">
+            <Card
+              title="출시 게이트"
+              description={mode === "server-work"
+                ? "서버 권한을 적용한 제작 작업·검수 기준입니다. 실제 공개 전 원고 검수도 함께 확인하세요."
+                : "현재 화면은 로컬 점검 도구이며 서버 승인 기록이 아닙니다."}
+            >
               <div className={cn(
                 "rounded-2xl border p-4 text-center",
                 releaseReady
@@ -860,7 +795,9 @@ function StudioProductionHubWorkspace({
                   <AlertTriangle className="mx-auto size-9 text-amber-600" aria-hidden="true" />
                 )}
                 <p className="mt-2 text-sm font-black">
-                  {releaseReady ? "로컬 점검 완료" : configured ? "조치 필요" : "작업을 먼저 구성하세요"}
+                  {releaseReady
+                    ? mode === "server-work" ? "운영 점검 완료" : "로컬 점검 완료"
+                    : configured ? "조치 필요" : "작업을 먼저 구성하세요"}
                 </p>
                 <p className="mt-1 text-xs text-fg-2">
                   차단 작업 {blocked} · 중요 검수 {openBlockers + openMajor}
@@ -871,6 +808,7 @@ function StudioProductionHubWorkspace({
             <StudioProductionOperationsPanel
               workspace={workspace}
               canEdit={capabilities.canEdit && !loadError}
+              canManageRoles={capabilities.canManageRoles && !loadError}
               onCommit={(update, message) => { void commit(update, message); }}
             />
           </div>
@@ -878,8 +816,10 @@ function StudioProductionHubWorkspace({
 
         {surface === "review" ? (
           <Card
-            title="로컬 리뷰 메모"
-            description="서버 리비전에 고정된 공식 Review Snapshot이 아니라 현재 기기의 작업 메모입니다."
+            title={mode === "server-work" ? "제작 검수 항목" : "로컬 리뷰 메모"}
+            description={mode === "server-work"
+              ? "서버 제작 운영 리비전에 저장됩니다. 외부 검토 링크의 댓글·승인 기록과는 별도입니다."
+              : "서버 리비전에 고정된 공식 Review Snapshot이 아니라 현재 기기의 작업 메모입니다."}
             action={(
               <button
                 type="button"
@@ -892,46 +832,22 @@ function StudioProductionHubWorkspace({
               </button>
             )}
           >
-            {workspace.reviews.length === 0 ? (
-              <EmptyState
-                title="로컬 검수 항목이 없습니다"
-                description="샘플 검수 내용을 실제 작품에 자동 삽입하지 않습니다. 공식 승인은 서버 검수본 기능에서만 제공됩니다."
-              />
-            ) : (
-              <div className="space-y-2">
-                {workspace.reviews.map((issue) => (
-                  <article
-                    key={issue.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"
-                  >
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-bold">{issue.title}</h3>
-                        <Pill tone={reviewTone(issue.severity)}>{issue.severity}</Pill>
-                        <Pill tone={issue.status === "resolved" ? "success" : "accent"}>{issue.status}</Pill>
-                      </div>
-                      <p className="mt-1 text-xs text-fg-2">담당 {issue.assignee || "미배정"}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={buttonClass({ variant: "outline", size: "sm" })}
-                      onClick={() => toggleReview(issue.id)}
-                      disabled={!capabilities.canEdit || Boolean(loadError)}
-                    >
-                      {issue.status === "open" ? "해결" : "다시 열기"}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
+            <StudioProductionReviewBoard
+              workspace={workspace}
+              canEdit={capabilities.canEdit && !loadError}
+              canApprove={capabilities.canApprove}
+              onCommit={(update, message) => { void commit(update, message); }}
+            />
           </Card>
         ) : null}
 
         {surface === "versions" ? (
           <div className="space-y-4">
             <Card
-              title="로컬 작업·검수 체크포인트"
-              description="로컬 작업·검수 목록만 저장·복원합니다. 원고의 컷·레이어와 서버 리비전은 포함하지 않습니다."
+              title={mode === "server-work" ? "제작 운영 체크포인트" : "로컬 작업·검수 체크포인트"}
+              description={mode === "server-work"
+                ? "작업·검수·역할·인계 상태를 서버 제작 운영 문서 안에 저장합니다. 원고 컷·레이어 복원본은 아닙니다."
+                : "로컬 작업·검수 목록만 저장·복원합니다. 원고의 컷·레이어와 서버 리비전은 포함하지 않습니다."}
               action={(
                 <button
                   type="button"
@@ -946,7 +862,7 @@ function StudioProductionHubWorkspace({
             >
               {workspace.versions.length === 0 ? (
                 <EmptyState
-                  title="로컬 체크포인트가 없습니다"
+                  title={mode === "server-work" ? "제작 운영 체크포인트가 없습니다" : "로컬 체크포인트가 없습니다"}
                   description="서버 원고 리비전과 별개로, 이 화면의 작업·검수 상태를 보관할 수 있습니다."
                 />
               ) : (
@@ -969,7 +885,7 @@ function StudioProductionHubWorkspace({
                         disabled={!capabilities.canEdit || Boolean(loadError)}
                       >
                         <RotateCcw className="size-4" aria-hidden="true" />
-                        로컬 복원
+                        {mode === "server-work" ? "운영 상태 복원" : "로컬 복원"}
                       </button>
                     </article>
                   ))}

@@ -7,7 +7,7 @@ import {
   Send,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 
 import {
   addStudioExternalReviewFeedback,
@@ -33,6 +33,11 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
   const [reviewerName, setReviewerName] = useState("");
   const [kind, setKind] = useState<"comment" | "approve" | "reject">("comment");
   const [pageId, setPageId] = useState("");
+  const [selectedAnchor, setSelectedAnchor] = useState<{
+    readonly pageId: string;
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,8 +66,8 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
     return () => controller.abort();
   }, [load]);
 
-  const feedback = state.kind === "ready" ? state.snapshot.feedback : [];
   const groupedFeedback = useMemo(() => {
+    const feedback = state.kind === "ready" ? state.snapshot.feedback : [];
     const groups = new Map<string, StudioExternalReviewFeedback[]>();
     for (const item of feedback) {
       const key = item.anchor?.pageId ?? "project";
@@ -71,7 +76,20 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
       groups.set(key, group);
     }
     return groups;
-  }, [feedback]);
+  }, [state]);
+
+  const selectPagePoint = (
+    targetPageId: string,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+    const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+    setPageId(targetPageId);
+    setSelectedAnchor({ pageId: targetPageId, x, y });
+    setNotice("선택한 위치에 검토 의견을 연결합니다.");
+  };
 
   const submit = async () => {
     if (!token || state.kind !== "ready" || state.snapshot.link.role !== "commenter") return;
@@ -85,7 +103,11 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
       const created = await addStudioExternalReviewFeedback(token, {
         kind,
         reviewerName: reviewerName.trim(),
-        anchor: pageId ? { pageId } : null,
+        anchor: pageId
+          ? selectedAnchor?.pageId === pageId
+            ? selectedAnchor
+            : { pageId }
+          : null,
         body: body.trim(),
       });
       setState((current) => current.kind === "ready"
@@ -98,6 +120,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
           }
         : current);
       setBody("");
+      setSelectedAnchor(null);
       setNotice(kind === "approve" ? "승인 의견을 저장했습니다." : "검토 의견을 저장했습니다.");
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : "검토 의견을 저장하지 못했습니다.");
@@ -182,6 +205,48 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                     loading={index > 1 ? "lazy" : "eager"}
                     draggable={false}
                   />
+                  {commenter ? (
+                    <button
+                      type="button"
+                      className="absolute inset-0 z-10 cursor-crosshair bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+                      onClick={(event) => selectPagePoint(page.id, event)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        setPageId(page.id);
+                        setSelectedAnchor({ pageId: page.id, x: 0.5, y: 0.5 });
+                        setNotice("키보드 입력으로 페이지 중앙을 선택했습니다.");
+                      }}
+                      aria-label={`${index + 1}페이지에서 검토 의견 위치 선택`}
+                    >
+                      <span className="sr-only">페이지를 클릭해 댓글 위치를 선택합니다.</span>
+                    </button>
+                  ) : null}
+                  {(groupedFeedback.get(page.id) ?? []).map((feedback, feedbackIndex) => (
+                    feedback.anchor?.x !== undefined && feedback.anchor.y !== undefined ? (
+                      <span
+                        key={`marker-${feedback.id}`}
+                        className="pointer-events-none absolute z-20 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-accent text-[0.6875rem] font-black text-on-accent shadow-lg"
+                        style={{
+                          left: `${feedback.anchor.x * 100}%`,
+                          top: `${feedback.anchor.y * 100}%`,
+                        }}
+                        aria-hidden="true"
+                      >
+                        {feedbackIndex + 1}
+                      </span>
+                    ) : null
+                  ))}
+                  {selectedAnchor?.pageId === page.id ? (
+                    <span
+                      className="pointer-events-none absolute z-20 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-red-500 shadow-lg"
+                      style={{
+                        left: `${selectedAnchor.x * 100}%`,
+                        top: `${selectedAnchor.y * 100}%`,
+                      }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   {snapshot.link.watermark ? (
                     <div
                       className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden"
@@ -245,7 +310,11 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                 <select
                   className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                   value={pageId}
-                  onChange={(event) => setPageId(event.currentTarget.value)}
+                  onChange={(event) => {
+                    const nextPageId = event.currentTarget.value;
+                    setPageId(nextPageId);
+                    setSelectedAnchor((current) => current?.pageId === nextPageId ? current : null);
+                  }}
                 >
                   <option value="">프로젝트 전체</option>
                   {snapshot.work.pages.map((page, index) => (
@@ -253,6 +322,20 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                   ))}
                 </select>
               </label>
+              {selectedAnchor?.pageId === pageId ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent-soft p-3 text-xs">
+                  <span>
+                    위치 {Math.round(selectedAnchor.x * 100)}% · {Math.round(selectedAnchor.y * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    className={buttonClass({ variant: "quiet", size: "sm" })}
+                    onClick={() => setSelectedAnchor(null)}
+                  >
+                    페이지 전체로 변경
+                  </button>
+                </div>
+              ) : null}
               <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
                 {kind === "reject" ? "반려 사유" : "의견"}
                 <textarea
@@ -316,6 +399,11 @@ function FeedbackItem({ feedback }: { readonly feedback: StudioExternalReviewFee
         <strong>{feedback.reviewerName}</strong>
         <span className="text-fg-3">{new Date(feedback.createdAt).toLocaleString("ko-KR")}</span>
       </div>
+      {feedback.anchor?.x !== undefined && feedback.anchor.y !== undefined ? (
+        <p className="mt-1 text-[0.6875rem] font-semibold text-accent">
+          위치 {Math.round(feedback.anchor.x * 100)}% · {Math.round(feedback.anchor.y * 100)}%
+        </p>
+      ) : null}
       <p className="mt-2 whitespace-pre-wrap leading-relaxed text-fg-2">
         {feedback.body || (feedback.kind === "approve" ? "승인" : "")}
       </p>

@@ -17,6 +17,7 @@ import {
   type ProductionHandoffBrief,
   type ProductionHandoffStatus,
   type ProductionHierarchyKind,
+  type ProductionHierarchyNode,
   type ProductionRole,
   type ProductionWorkspace,
 } from "./studio-production-workspace-runtime";
@@ -27,6 +28,7 @@ import { cn } from "@/shared/lib/utils";
 interface StudioProductionOperationsPanelProps {
   readonly workspace: ProductionWorkspace;
   readonly canEdit: boolean;
+  readonly canManageRoles: boolean;
   readonly onCommit: (
     update: (current: ProductionWorkspace) => ProductionWorkspace,
     message: string,
@@ -80,9 +82,18 @@ function parentKinds(kind: ProductionHierarchyKind): readonly ProductionHierarch
     case "page": return ["scene"];
   }
 }
+function splitHandoffLines(value: string): readonly string[] {
+  return [...new Set(value
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean))]
+    .slice(0, 128);
+}
+
 export function StudioProductionOperationsPanel({
   workspace,
   canEdit,
+  canManageRoles,
   onCommit,
 }: StudioProductionOperationsPanelProps) {
   const [hierarchyKind, setHierarchyKind] = useState<ProductionHierarchyKind>("episode");
@@ -97,6 +108,9 @@ export function StudioProductionOperationsPanel({
   const [handoffTo, setHandoffTo] = useState<ProductionRole>("storyboard");
   const [handoffPurpose, setHandoffPurpose] = useState("");
   const [handoffEmotion, setHandoffEmotion] = useState("");
+  const [handoffMustShow, setHandoffMustShow] = useState("");
+  const [handoffContinuity, setHandoffContinuity] = useState("");
+  const [handoffAcceptance, setHandoffAcceptance] = useState("");
   const [handoffCreator, setHandoffCreator] = useState("");
   const [handoffAssignee, setHandoffAssignee] = useState("");
   const [lockedFields, setLockedFields] = useState<readonly ProductionAuthorityField[]>([
@@ -110,7 +124,7 @@ export function StudioProductionOperationsPanel({
   }, [hierarchyKind, workspace.hierarchy]);
 
   const hierarchyByParent = useMemo(() => {
-    const map = new Map<string | null, typeof workspace.hierarchy>();
+    const map = new Map<string | null, ProductionHierarchyNode[]>();
     for (const node of workspace.hierarchy) {
       const entries = map.get(node.parentId) ?? [];
       map.set(node.parentId, [...entries, node].sort((a, b) => a.order - b.order));
@@ -207,10 +221,10 @@ export function StudioProductionOperationsPanel({
       status: "draft",
       scenePurpose: handoffPurpose.trim(),
       emotionalBeat: handoffEmotion.trim(),
-      mustShow: [],
-      continuityNotes: [],
+      mustShow: splitHandoffLines(handoffMustShow),
+      continuityNotes: splitHandoffLines(handoffContinuity),
       lockedFields,
-      acceptanceCriteria: [],
+      acceptanceCriteria: splitHandoffLines(handoffAcceptance),
       createdBy: handoffCreator.trim(),
       assignedTo: handoffAssignee.trim(),
       updatedAt: new Date().toISOString(),
@@ -221,6 +235,9 @@ export function StudioProductionOperationsPanel({
     }), "스토리·작화 인계 브리프를 추가했습니다.");
     setHandoffPurpose("");
     setHandoffEmotion("");
+    setHandoffMustShow("");
+    setHandoffContinuity("");
+    setHandoffAcceptance("");
   };
 
   const setHandoffStatus = (id: string, status: ProductionHandoffStatus) => {
@@ -241,7 +258,7 @@ export function StudioProductionOperationsPanel({
 
   const orderedHierarchy = useMemo(() => {
     const ordered: Array<{
-      readonly node: (typeof workspace.hierarchy)[number];
+      readonly node: ProductionHierarchyNode;
       readonly depth: number;
     }> = [];
     const visit = (currentParent: string | null, depth: number) => {
@@ -252,7 +269,7 @@ export function StudioProductionOperationsPanel({
     };
     visit(null, 0);
     return ordered;
-  }, [hierarchyByParent, workspace.hierarchy]);
+  }, [hierarchyByParent]);
 
   return (
     <div className="space-y-4">
@@ -403,7 +420,7 @@ export function StudioProductionOperationsPanel({
               value={memberName}
               onChange={(event) => setMemberName(event.currentTarget.value)}
               maxLength={240}
-              disabled={!canEdit}
+              disabled={!canManageRoles}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
@@ -412,7 +429,7 @@ export function StudioProductionOperationsPanel({
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberRole}
               onChange={(event) => setMemberRole(event.currentTarget.value as ProductionRole)}
-              disabled={!canEdit}
+              disabled={!canManageRoles}
             >
               {STUDIO_PRODUCTION_ROLES.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
@@ -425,7 +442,7 @@ export function StudioProductionOperationsPanel({
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberScope}
               onChange={(event) => setMemberScope(event.currentTarget.value)}
-              disabled={!canEdit}
+              disabled={!canManageRoles}
             >
               <option value="">프로젝트 전체</option>
               {orderedHierarchy.map(({ node, depth }) => (
@@ -439,7 +456,7 @@ export function StudioProductionOperationsPanel({
             type="button"
             className={cn(buttonClass({ size: "sm" }), "self-end")}
             onClick={addRoleAssignment}
-            disabled={!canEdit || !memberName.trim()}
+            disabled={!canManageRoles || !memberName.trim()}
           >
             <Plus className="size-4" aria-hidden="true" />
             역할 배정
@@ -470,7 +487,7 @@ export function StudioProductionOperationsPanel({
                       type="button"
                       className={buttonClass({ variant: "quiet", size: "icon" })}
                       onClick={() => removeRoleAssignment(assignment.id)}
-                      disabled={!canEdit}
+                      disabled={!canManageRoles}
                       aria-label={`${assignment.displayName} 역할 해제`}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -557,6 +574,39 @@ export function StudioProductionOperationsPanel({
               disabled={!canEdit}
             />
           </label>
+          <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2 xl:col-span-4">
+            반드시 보여야 할 요소 · 한 줄에 하나
+            <textarea
+              className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
+              value={handoffMustShow}
+              onChange={(event) => setHandoffMustShow(event.currentTarget.value)}
+              maxLength={12_000}
+              placeholder={"핵심 소품\n표정 또는 행동\n장소 표식"}
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
+            연속성 메모 · 한 줄에 하나
+            <textarea
+              className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
+              value={handoffContinuity}
+              onChange={(event) => setHandoffContinuity(event.currentTarget.value)}
+              maxLength={12_000}
+              placeholder={"이전 장면 의상 유지\n오른손에 소품 유지"}
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
+            인수 완료 기준 · 한 줄에 하나
+            <textarea
+              className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
+              value={handoffAcceptance}
+              onChange={(event) => setHandoffAcceptance(event.currentTarget.value)}
+              maxLength={12_000}
+              placeholder={"대사와 컷 번호 일치\n캐릭터 바이블 검수 완료"}
+              disabled={!canEdit}
+            />
+          </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
             작성자
             <input
@@ -633,6 +683,21 @@ export function StudioProductionOperationsPanel({
                       <p className="mt-1 text-xs text-fg-3">
                         {handoff.createdBy || "작성자 미정"} → {handoff.assignedTo || "인수자 미정"}
                       </p>
+                      {handoff.mustShow.length > 0 ? (
+                        <p className="mt-2 text-xs text-fg-2">
+                          필수 연출: {handoff.mustShow.join(" · ")}
+                        </p>
+                      ) : null}
+                      {handoff.continuityNotes.length > 0 ? (
+                        <p className="mt-1 text-xs text-fg-2">
+                          연속성: {handoff.continuityNotes.join(" · ")}
+                        </p>
+                      ) : null}
+                      {handoff.acceptanceCriteria.length > 0 ? (
+                        <p className="mt-1 text-xs text-fg-2">
+                          완료 기준: {handoff.acceptanceCriteria.join(" · ")}
+                        </p>
+                      ) : null}
                       {handoff.lockedFields.length > 0 ? (
                         <p className="mt-2 text-xs text-fg-2">
                           승인 필요: {handoff.lockedFields.map((field) => AUTHORITY_LABELS[field]).join(" · ")}

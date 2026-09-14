@@ -34,6 +34,7 @@ export interface StudioProductionCapabilities {
   readonly view: boolean;
   readonly edit: boolean;
   readonly manageLinks: boolean;
+  readonly manageRoles: boolean;
   readonly approve: boolean;
   readonly publish: boolean;
 }
@@ -120,7 +121,15 @@ export class StudioProductionNotFoundError extends Error {
 }
 
 export class StudioProductionForbiddenError extends Error {
-  constructor(readonly operation: "view" | "edit" | "manage-links" | "comment") {
+  constructor(readonly operation:
+    | "view"
+    | "edit"
+    | "manage-links"
+    | "manage-roles"
+    | "approve"
+    | "publish"
+    | "comment"
+  ) {
     super(`studio_production_${operation}_forbidden`);
     this.name = "StudioProductionForbiddenError";
   }
@@ -146,12 +155,60 @@ export class StudioProductionQuotaError extends Error {
   }
 }
 
+export class StudioProductionInvalidPageError extends Error {
+  constructor(readonly pageId: string) {
+    super("studio_production_invalid_page");
+    this.name = "StudioProductionInvalidPageError";
+  }
+}
+
 type StudioProductionTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 interface StudioProductionContext {
   readonly ownerUserId: string;
   readonly title: string;
+  readonly pageSources: readonly string[];
+  readonly document: unknown;
   readonly access: CreatorCollaborationAccess;
+}
+
+function protectedProductionOperation(
+  current: StudioProductionWorkspaceDocument,
+  next: StudioProductionWorkspaceDocument,
+): "manage-roles" | "approve" | "publish" | null {
+  if (
+    JSON.stringify(current.roleAssignments) !== JSON.stringify(next.roleAssignments)
+    || JSON.stringify(current.members) !== JSON.stringify(next.members)
+  ) {
+    return "manage-roles";
+  }
+  const currentTasks = new Map(current.tasks.map((task) => [task.id, task] as const));
+  const nextTasks = new Map(next.tasks.map((task) => [task.id, task] as const));
+  for (const task of next.tasks) {
+    const previousStage = currentTasks.get(task.id)?.stage ?? null;
+    if (previousStage === task.stage) continue;
+    if (previousStage === "publishing" || task.stage === "publishing") return "publish";
+    if (previousStage === "approved" || task.stage === "approved") return "approve";
+  }
+  for (const task of current.tasks) {
+    if (nextTasks.has(task.id)) continue;
+    if (task.stage === "publishing") return "publish";
+    if (task.stage === "approved") return "approve";
+  }
+  const currentReviews = new Map(current.reviews.map((review) => [review.id, review] as const));
+  const nextReviews = new Map(next.reviews.map((review) => [review.id, review] as const));
+  for (const review of next.reviews) {
+    const previous = currentReviews.get(review.id);
+    const approvalBoundaryChanged = !previous
+      ? review.approvalRequired && review.status === "resolved"
+      : (previous.status !== review.status || previous.approvalRequired !== review.approvalRequired)
+        && (previous.approvalRequired || review.approvalRequired);
+    if (approvalBoundaryChanged) return "approve";
+  }
+  if (current.reviews.some((review) => review.approvalRequired && !nextReviews.has(review.id))) {
+    return "approve";
+  }
+  return null;
 }
 
 function productionCapabilities(access: CreatorCollaborationAccess): StudioProductionCapabilities {
@@ -159,6 +216,7 @@ function productionCapabilities(access: CreatorCollaborationAccess): StudioProdu
     view: access.view,
     edit: access.edit,
     manageLinks: access.manageMembers,
+    manageRoles: access.manageMembers,
     approve: access.manageMembers,
     publish: access.manageMembers,
   };
@@ -208,7 +266,12 @@ async function loadContext(
   lock: boolean,
 ): Promise<StudioProductionContext> {
   let workQuery = transaction
-    .select({ ownerUserId: creatorWorks.userId, title: creatorWorks.title })
+    .select({
+      ownerUserId: creatorWorks.userId,
+      title: creatorWorks.title,
+      pageSources: creatorWorks.pages,
+      document: creatorWorks.doc,
+    })
     .from(creatorWorks)
     .where(eq(creatorWorks.id, workId))
     .limit(1);
@@ -230,6 +293,8 @@ async function loadContext(
   return {
     ownerUserId: work.ownerUserId,
     title: work.title,
+    pageSources: work.pageSources,
+    document: work.document,
     access: resolveCreatorCollaborationAccess({
       actorUserId,
       ownerUserId: work.ownerUserId,
@@ -270,6 +335,52 @@ function reviewLinkSummary(row: {
     createdAt: iso(row.createdAt),
   };
 }
+
+function validReviewPageId(value: unknown): value is string {
+  if (
+    typeof value !== "string"
+    || value.length < 1
+    || value.length > 160
+    || value.trim() !== value
+    || value.includes("\\")
+  ) {
+    return false;
+  }
+  return ![...value].some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+  });
+}
+
+function projectExternalReviewPages(
+  pageSources: readonly string[],
+  document: unknown,
+): StudioExternalReviewPage[] {
+  const rawDocument = document && typeof document === "object" && !Array.isArray(document)
+    ? document as Record<string, unknown>
+    : {};
+  const rawPages = Array.isArray(rawDocument.pagesList) ? rawDocument.pagesList : [];
+  const usedPageIds = new Set<string>();
+  return pageSources.map((source, index) => {
+    const rawPage = rawPages[index];
+    const rawId = rawPage && typeof rawPage === "object" && !Array.isArray(rawPage)
+      ? (rawPage as Record<string, unknown>).id
+      : null;
+    const fallbackId = `page-${index + 1}`;
+    let pageId = validReviewPageId(rawId) ? rawId : fallbackId;
+    if (usedPageIds.has(pageId)) {
+      pageId = fallbackId;
+      let suffix = 2;
+      while (usedPageIds.has(pageId)) {
+        pageId = `${fallbackId}-${suffix}`;
+        suffix += 1;
+      }
+    }
+    usedPageIds.add(pageId);
+    return { id: pageId, index, source };
+  });
+}
+
 interface StudioProductionRepositoryOptions {
   readonly now?: () => Date;
   readonly createId?: () => string;
@@ -325,7 +436,10 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       const context = await loadContext(transaction, actorUserId, workId, true);
       requireAccess(context.access, "edit");
       const [stored] = await transaction
-        .select({ revision: creatorWorkProductionWorkspaces.revision })
+        .select({
+          revision: creatorWorkProductionWorkspaces.revision,
+          document: creatorWorkProductionWorkspaces.document,
+        })
         .from(creatorWorkProductionWorkspaces)
         .where(eq(creatorWorkProductionWorkspaces.workId, workId))
         .limit(1);
@@ -342,6 +456,13 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
         updatedAt: iso(now),
         inviteToken: null,
       });
+      const currentDocument = stored
+        ? StudioProductionWorkspaceDocumentSchema.parse(stored.document)
+        : emptyProductionDocument(workId, context.title, now);
+      if (!context.access.manageMembers) {
+        const protectedOperation = protectedProductionOperation(currentDocument, canonical);
+        if (protectedOperation) throw new StudioProductionForbiddenError(protectedOperation);
+      }
       await transaction
         .insert(creatorWorkProductionWorkspaces)
         .values({
@@ -462,6 +583,11 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
     return db.transaction(async (transaction) => {
       const context = await loadContext(transaction, actorUserId, workId, true);
       requireAccess(context.access, "manage-links");
+      const availablePageIds = new Set(
+        projectExternalReviewPages(context.pageSources, context.document).map((page) => page.id),
+      );
+      const invalidPageId = input.pageIds.find((pageId) => !availablePageIds.has(pageId));
+      if (invalidPageId) throw new StudioProductionInvalidPageError(invalidPageId);
       const now = this.now();
       const [{ value: activeCount = 0 } = { value: 0 }] = await transaction
         .select({ value: count() })
@@ -550,20 +676,9 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
     if (record.link.expiresAt.getTime() <= now.getTime()) {
       throw new StudioReviewLinkUnavailableError("expired");
     }
-    const rawDocument = record.doc && typeof record.doc === "object" && !Array.isArray(record.doc)
-      ? record.doc as Record<string, unknown>
-      : {};
-    const rawPages = Array.isArray(rawDocument.pagesList) ? rawDocument.pagesList : [];
     const allowed = new Set(record.link.pageIds);
-    const pages = record.pages.flatMap((source, index) => {
-      const rawPage = rawPages[index];
-      const id = rawPage && typeof rawPage === "object" && !Array.isArray(rawPage)
-        && typeof (rawPage as Record<string, unknown>).id === "string"
-        ? String((rawPage as Record<string, unknown>).id)
-        : `page-${index + 1}`;
-      if (allowed.size > 0 && !allowed.has(id)) return [];
-      return [{ id, index, source } satisfies StudioExternalReviewPage];
-    });
+    const pages = projectExternalReviewPages(record.pages, record.doc)
+      .filter((page) => allowed.size === 0 || allowed.has(page.id));
     const feedbackRows = await db
       .select()
       .from(creatorWorkReviewFeedback)
@@ -612,8 +727,19 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       if (link.role !== "commenter") {
         throw new StudioProductionForbiddenError("comment");
       }
-      if (input.anchor && link.pageIds.length > 0 && !link.pageIds.includes(input.anchor.pageId)) {
-        throw new StudioProductionForbiddenError("comment");
+      if (input.anchor) {
+        const [work] = await transaction
+          .select({ pageSources: creatorWorks.pages, document: creatorWorks.doc })
+          .from(creatorWorks)
+          .where(eq(creatorWorks.id, link.workId))
+          .limit(1);
+        const availablePageIds = new Set(
+          work ? projectExternalReviewPages(work.pageSources, work.document).map((page) => page.id) : [],
+        );
+        const pageIsShared = link.pageIds.length === 0 || link.pageIds.includes(input.anchor.pageId);
+        if (!pageIsShared || !availablePageIds.has(input.anchor.pageId)) {
+          throw new StudioProductionForbiddenError("comment");
+        }
       }
       const [{ value: feedbackCount = 0 } = { value: 0 }] = await transaction
         .select({ value: count() })
@@ -657,6 +783,11 @@ function projectFeedback(row: {
     createdAt: iso(row.createdAt),
   };
 }
+
+export const studioProductionRepositoryTestHelpers = {
+  protectedProductionOperation,
+  projectExternalReviewPages,
+};
 
 export const studioProductionRepositoryProvider = {
   provide: STUDIO_PRODUCTION_REPOSITORY,

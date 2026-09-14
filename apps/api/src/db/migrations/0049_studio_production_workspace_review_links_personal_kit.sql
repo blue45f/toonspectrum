@@ -125,4 +125,9 @@ CREATE INDEX IF NOT EXISTS "idx_creator_work_review_feedback_link_created"
 CREATE INDEX IF NOT EXISTS "idx_creator_work_review_feedback_user_created"
   ON "creator_work_review_feedback" ("reviewerUserId", "createdAt" DESC);
 
+REVOKE ALL ON TABLE "creator_work_production_workspace" FROM PUBLIC;
+REVOKE ALL ON TABLE "creator_studio_personal_kit" FROM PUBLIC;
+REVOKE ALL ON TABLE "creator_work_review_link" FROM PUBLIC;
+REVOKE ALL ON TABLE "creator_work_review_feedback" FROM PUBLIC;
+
 COMMIT;

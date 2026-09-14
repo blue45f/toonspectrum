@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { studioReviewLinkHref } from "./studio-review-link-url";
 import {
   createStudioServerReviewLink,
   listStudioServerReviewLinks,
@@ -19,7 +20,6 @@ import type { ProductionWorkspace } from "./studio-production-workspace-runtime"
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { studioExternalReviewHref } from "@/domains/creator/studio-route-registry";
 
 interface StudioReviewLinkManagerProps {
   readonly workId: string;
@@ -30,10 +30,6 @@ interface StudioReviewLinkManagerProps {
 
 type LoadState = "loading" | "ready" | "error";
 
-export function studioReviewLinkHref(token: string): string {
-  const relative = studioExternalReviewHref(token);
-  return typeof window === "undefined" ? relative : new URL(relative, window.location.origin).toString();
-}
 function linkState(link: StudioServerReviewLink): "active" | "expired" | "revoked" {
   if (link.revokedAt) return "revoked";
   return Date.parse(link.expiresAt) <= Date.now() ? "expired" : "active";

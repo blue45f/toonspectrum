@@ -41,11 +41,28 @@ const ProductionAuthorityFieldSchema = z.enum([
   "dialogue", "balloon-layout", "panel-layout", "character-continuity",
   "background", "publishing",
 ]);
+
+type ProductionHierarchyKind = z.infer<typeof ProductionHierarchyKindSchema>;
+function isValidProductionHierarchyParent(
+  kind: ProductionHierarchyKind,
+  parentKind: ProductionHierarchyKind | null,
+): boolean {
+  switch (kind) {
+    case "episode": return parentKind === null;
+    case "sequence": return parentKind === "episode";
+    case "scene": return parentKind === "sequence";
+    case "page": return parentKind === "scene";
+  }
+}
+
 const IdentityListSchema = z.array(OpaqueIdSchema).max(128).refine(
   (items) => new Set(items).size === items.length,
   "식별자 목록에 중복을 포함할 수 없습니다."
 );
-const TextListSchema = z.array(z.string().trim().min(1).max(600)).max(128);
+const TextListSchema = z.array(z.string().trim().min(1).max(600)).max(128).refine(
+  (items) => new Set(items).size === items.length,
+  "텍스트 목록에 중복 항목을 포함할 수 없습니다."
+);
 
 export const ProductionTaskSchema = z.object({
   id: OpaqueIdSchema,
@@ -155,10 +172,20 @@ export const ProductionVersionSnapshotSchema = z.object({
 function uniqueIds(items: readonly { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
+const ProductionScopeKeySchema = z
+  .string()
+  .min(6)
+  .max(170)
+  .refine(
+    (value) => value.startsWith("work:")
+      && OpaqueIdSchema.safeParse(value.slice("work:".length)).success,
+    "작품 제작 범위 식별자가 올바르지 않습니다.",
+  );
+
 export const StudioProductionWorkspaceDocumentSchema = z.object({
   schemaVersion: z.literal(3),
   revision: z.number().int().min(0).max(2_147_483_647),
-  scopeKey: z.string().min(6).max(170).regex(/^work:[^\\\u0000-\u001f\u007f]+$/u),
+  scopeKey: ProductionScopeKeySchema,
   title: ShortTextSchema,
   updatedAt: DateTimeSchema,
   tasks: z.array(ProductionTaskSchema).max(1_000),
@@ -187,10 +214,22 @@ export const StudioProductionWorkspaceDocumentSchema = z.object({
   }
   const hierarchyById = new Map(workspace.hierarchy.map((node) => [node.id, node] as const));
   const taskIds = new Set(workspace.tasks.map((task) => task.id));
+  const assignmentIds = new Set<string>();
+  for (const assignment of workspace.roleAssignments) {
+    assignmentIds.add(assignment.id);
+    if (assignment.memberId) assignmentIds.add(assignment.memberId);
+  }
   const pageIds = new Set<string>();
   for (const node of workspace.hierarchy) {
-    if (node.parentId !== null && !hierarchyById.has(node.parentId)) {
+    const parent = node.parentId === null ? null : hierarchyById.get(node.parentId);
+    if (node.parentId !== null && !parent) {
       context.addIssue({ code: "custom", path: ["hierarchy"], message: "계층 부모 노드를 찾을 수 없습니다." });
+    } else if (!isValidProductionHierarchyParent(node.kind, parent?.kind ?? null)) {
+      context.addIssue({
+        code: "custom",
+        path: ["hierarchy"],
+        message: "에피소드→시퀀스→장면→페이지 순서로 제작 계층을 구성해야 합니다.",
+      });
     }
     if (node.pageId !== null) {
       if (pageIds.has(node.pageId)) {
@@ -209,6 +248,22 @@ export const StudioProductionWorkspaceDocumentSchema = z.object({
       cursor = hierarchyById.get(cursor)?.parentId ?? null;
     }
   }
+  const taskDependencies = new Map(
+    workspace.tasks.map((task) => [task.id, task.dependencyIds] as const),
+  );
+  const visitingTasks = new Set<string>();
+  const visitedTasks = new Set<string>();
+  const dependencyCycle = (taskId: string): boolean => {
+    if (visitingTasks.has(taskId)) return true;
+    if (visitedTasks.has(taskId)) return false;
+    visitingTasks.add(taskId);
+    for (const dependencyId of taskDependencies.get(taskId) ?? []) {
+      if (dependencyCycle(dependencyId)) return true;
+    }
+    visitingTasks.delete(taskId);
+    visitedTasks.add(taskId);
+    return false;
+  };
   for (const task of workspace.tasks) {
     if (task.hierarchyNodeId !== null && !hierarchyById.has(task.hierarchyNodeId)) {
       context.addIssue({ code: "custom", path: ["tasks"], message: "작업의 제작 범위를 찾을 수 없습니다." });
@@ -216,10 +271,22 @@ export const StudioProductionWorkspaceDocumentSchema = z.object({
     if (task.dependencyIds.some((id) => !taskIds.has(id))) {
       context.addIssue({ code: "custom", path: ["tasks"], message: "작업 의존 대상을 찾을 수 없습니다." });
     }
+    if (task.assigneeIds.some((id) => !assignmentIds.has(id))) {
+      context.addIssue({ code: "custom", path: ["tasks"], message: "작업 담당 역할 배정을 찾을 수 없습니다." });
+    }
+    if (task.reviewerIds.some((id) => !assignmentIds.has(id))) {
+      context.addIssue({ code: "custom", path: ["tasks"], message: "작업 검수 역할 배정을 찾을 수 없습니다." });
+    }
+  }
+  if (workspace.tasks.some((task) => dependencyCycle(task.id))) {
+    context.addIssue({ code: "custom", path: ["tasks"], message: "작업 의존 관계에 순환 참조가 있습니다." });
   }
   for (const review of workspace.reviews) {
     if (review.hierarchyNodeId !== null && !hierarchyById.has(review.hierarchyNodeId)) {
       context.addIssue({ code: "custom", path: ["reviews"], message: "검수 항목의 제작 범위를 찾을 수 없습니다." });
+    }
+    if (review.pageId !== null && !pageIds.has(review.pageId)) {
+      context.addIssue({ code: "custom", path: ["reviews"], message: "검수 항목의 원고 페이지를 찾을 수 없습니다." });
     }
   }
   for (const assignment of workspace.roleAssignments) {
