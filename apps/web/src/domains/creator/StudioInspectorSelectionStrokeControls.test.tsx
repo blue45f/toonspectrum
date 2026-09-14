@@ -4,7 +4,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveStudioChromeInspectorPropertySurface } from "./studio-chrome-ia-map";
-import { resetStudioRecentColorsBridgeForTests } from "./studio-recent-colors-bridge";
+import {
+  getStudioRecentColorsSnapshot,
+  rememberSharedStudioRecentColor,
+  resetStudioRecentColorsBridgeForTests,
+} from "./studio-recent-colors-bridge";
+import { resetStudioStrokeVisibilityMemoryForTests } from "./studio-stroke-visibility-memory";
 import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
 
 import type { DrawEl } from "./studio-element-model";
@@ -12,6 +17,7 @@ import type { DrawEl } from "./studio-element-model";
 afterEach(() => {
   cleanup();
   resetStudioRecentColorsBridgeForTests();
+  resetStudioStrokeVisibilityMemoryForTests();
 });
 
 function drawSelection(overrides: Partial<DrawEl> = {}): DrawEl {
@@ -85,6 +91,25 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     expect(onRememberColor).toHaveBeenCalledWith("#445566");
   });
 
+  it("keeps an explicit recent-colour surface isolated from the shared owner", () => {
+    rememberSharedStudioRecentColor("#010203");
+    const patchEl = vi.fn();
+    render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection()}
+        patchEl={patchEl}
+        recentColors={["#445566"]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "선 색상 최근 색상 #445566 적용" }),
+    );
+
+    expect(patchEl).toHaveBeenCalledWith("draw-1", { stroke: "#445566" });
+    expect(getStudioRecentColorsSnapshot()).toEqual(["#010203"]);
+  });
+
   it("hides a freehand stroke with opacity and restores its authored color", () => {
     const patchEl = vi.fn();
     const view = render(
@@ -116,6 +141,34 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     });
   });
 
+  it("restores a freehand opacity after the inspector unmounts", () => {
+    const firstPatch = vi.fn();
+    const first = render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ opacity: 0.35 })}
+        patchEl={firstPatch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "선 없음" }));
+    expect(firstPatch).toHaveBeenLastCalledWith("draw-1", { opacity: 0 });
+    first.unmount();
+
+    const restoredPatch = vi.fn();
+    render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ opacity: 0 })}
+        patchEl={restoredPatch}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "선 없음" }));
+
+    expect(restoredPatch).toHaveBeenLastCalledWith("draw-1", {
+      stroke: "#112233",
+      opacity: 0.35,
+    });
+  });
+
   it("removes only the outline from a filled vector shape and restores it", () => {
     const patchEl = vi.fn();
     const view = render(
@@ -140,5 +193,49 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "선 없음" }));
     expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "#334455" });
+  });
+
+  it("keeps vector restoration colours scoped to the selected element", () => {
+    const patchEl = vi.fn();
+    const view = render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({
+          id: "shape-a",
+          kind: "rect",
+          fill: "#ffffff",
+          stroke: "#445566",
+        })}
+        patchEl={patchEl}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "선 없음" }));
+    expect(patchEl).toHaveBeenLastCalledWith("shape-a", { stroke: "transparent" });
+
+    view.rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({
+          id: "shape-b",
+          kind: "rect",
+          fill: "#ffffff",
+          stroke: "#abcdef",
+        })}
+        patchEl={patchEl}
+      />,
+    );
+    view.rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({
+          id: "shape-a",
+          kind: "rect",
+          fill: "#ffffff",
+          stroke: "transparent",
+        })}
+        patchEl={patchEl}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "선 없음" }));
+    expect(patchEl).toHaveBeenLastCalledWith("shape-a", { stroke: "#445566" });
   });
 });

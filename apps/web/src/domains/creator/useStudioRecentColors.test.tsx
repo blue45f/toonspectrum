@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ensureSharedStudioRecentColorsLoaded,
+  getStudioRecentColorsSnapshot,
   rememberSharedStudioRecentColor,
   resetStudioRecentColorsBridgeForTests,
 } from "./studio-recent-colors-bridge";
@@ -53,6 +54,39 @@ describe("SQLite recent-color owner", () => {
     expect(f.store.get).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores hydration that resolves after its owner was replaced", async () => {
+    const staleLoad = deferred<string[]>();
+    const staleRepository = {
+      loadRecentColors: vi.fn(() => staleLoad.promise),
+      saveRecentColors: vi.fn(async () => undefined),
+    };
+    const staleOwner = renderHook(() => useStudioRecentColors({
+      acquireRepository: async () => staleRepository,
+      onPersistenceUnavailable: vi.fn(),
+    }));
+    act(() => staleOwner.result.current.ensureRecentColorsLoaded());
+    staleOwner.unmount();
+
+    const currentRepository = {
+      loadRecentColors: vi.fn(async () => ["#445566"]),
+      saveRecentColors: vi.fn(async () => undefined),
+    };
+    const currentOwner = renderHook(() => useStudioRecentColors({
+      acquireRepository: async () => currentRepository,
+      onPersistenceUnavailable: vi.fn(),
+    }));
+    act(() => currentOwner.result.current.ensureRecentColorsLoaded());
+    await waitFor(() =>
+      expect(currentOwner.result.current.recentColors).toEqual(["#445566"]),
+    );
+
+    await act(async () => { staleLoad.resolve(["#112233"]); });
+
+    expect(currentOwner.result.current.recentColors).toEqual(["#445566"]);
+    expect(getStudioRecentColorsSnapshot()).toEqual(["#445566"]);
+    expect(staleRepository.saveRecentColors).not.toHaveBeenCalled();
+  });
+
   it("persists colour intents emitted by a prop-drill-free inspector consumer", async () => {
     const f = fixture(); const hook = f.render();
     act(() => rememberSharedStudioRecentColor("#445566"));
@@ -98,6 +132,70 @@ describe("SQLite recent-color owner", () => {
     expect(reopened.result.current.recentColors).toEqual([]);
   });
 
+  it("waits for an in-flight previous-owner save before replacement hydration", async () => {
+    const f = fixture();
+    const previousOwner = f.render();
+    act(() => previousOwner.result.current.ensureRecentColorsLoaded());
+    await waitFor(() => expect(previousOwner.result.current.recentColors).toEqual(["#112233"]));
+
+    const previousWrite = deferred<void>();
+    const previousWriteStarted = deferred<void>();
+    vi.mocked(f.store.set).mockImplementationOnce(async (key, value) => {
+      previousWriteStarted.resolve();
+      await previousWrite.promise;
+      f.values.set(key, value);
+    });
+    act(() => previousOwner.result.current.rememberColor("#abcdef"));
+    await previousWriteStarted.promise;
+    previousOwner.unmount();
+
+    const replacementOwner = f.render();
+    act(() => replacementOwner.result.current.ensureRecentColorsLoaded());
+    await Promise.resolve();
+    expect(f.store.get).toHaveBeenCalledTimes(1);
+
+    await act(async () => { previousWrite.resolve(); });
+    await waitFor(() =>
+      expect(replacementOwner.result.current.recentColors).toEqual(["#abcdef", "#112233"]),
+    );
+    expect(f.store.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes an in-flight stale-owner save before replacement-owner persistence", async () => {
+    const f = fixture();
+    const staleOwner = f.render();
+    act(() => staleOwner.result.current.ensureRecentColorsLoaded());
+    await waitFor(() => expect(staleOwner.result.current.recentColors).toEqual(["#112233"]));
+
+    const staleWrite = deferred<void>();
+    const staleWriteStarted = deferred<void>();
+    vi.mocked(f.store.set).mockImplementationOnce(async (key, value) => {
+      staleWriteStarted.resolve();
+      await staleWrite.promise;
+      f.values.set(key, value);
+    });
+    act(() => staleOwner.result.current.rememberColor("#abcdef"));
+    await staleWriteStarted.promise;
+    staleOwner.unmount();
+
+    const currentOwner = f.render();
+    act(() => {
+      currentOwner.result.current.ensureRecentColorsLoaded();
+      currentOwner.result.current.rememberColor("#fedcba");
+    });
+    expect(currentOwner.result.current.recentColors).toEqual(["#fedcba"]);
+
+    await act(async () => { staleWrite.resolve(); });
+    await waitFor(() =>
+      expect(f.values.get("recent-colors")).toBe('["#fedcba","#abcdef","#112233"]'),
+    );
+    expect(getStudioRecentColorsSnapshot()).toEqual([
+      "#fedcba",
+      "#abcdef",
+      "#112233",
+    ]);
+  });
+
   it("clear then a new color stores only that new color even before initial hydration completes", async () => {
     const f = fixture(); const loading = deferred<string | null>();
     vi.mocked(f.store.get).mockReturnValueOnce(loading.promise);
@@ -121,13 +219,22 @@ describe("SQLite recent-color owner", () => {
     expect(hook.result.current.recentColors).toEqual([]);
   });
 
-  it("does not write invalid colors and finishes an accepted write after unmount", async () => {
-    const f = fixture(); const hook = f.render();
+  it("does not write invalid colours or persist a deferred stale owner", async () => {
+    const f = fixture();
+    const loading = deferred<string | null>();
+    vi.mocked(f.store.get).mockReturnValueOnce(loading.promise);
+    const hook = f.render();
+
     act(() => hook.result.current.rememberColor("invalid"));
     expect(f.acquireRepository).not.toHaveBeenCalled();
+
     act(() => hook.result.current.rememberColor("#123456"));
     hook.unmount();
-    await waitFor(() => expect(f.values.get("recent-colors")).toBe('["#123456","#112233"]'));
+    await act(async () => { loading.resolve('["#112233"]'); });
+    await Promise.resolve();
+
+    expect(f.store.set).not.toHaveBeenCalled();
+    expect(f.values.get("recent-colors")).toBe('["#112233"]');
     expect(f.unavailable).not.toHaveBeenCalled();
   });
 });
