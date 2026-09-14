@@ -4,6 +4,7 @@ import {
   Clock3,
   Clapperboard,
   Grid2x2,
+  GitCompareArrows,
   Image as ImageIcon,
   Images,
   LayoutTemplate,
@@ -30,7 +31,15 @@ import {
   type ReactNode,
 } from "react";
 
+import { StudioAssetDecisionPanel } from "./StudioAssetDecisionPanel";
 import { svgToDataUrl } from "./studio-characters";
+import {
+  filterStudioInsertHubEntriesByIntent,
+  reconcileStudioAssetComparisonIds,
+  STUDIO_ASSET_INTENT_LABELS,
+  toggleStudioAssetComparisonId,
+  type StudioAssetIntent,
+} from "./studio-asset-workspace-decision";
 import {
   buildStudioInsertHubEntries,
   countStudioInsertHubEntries,
@@ -46,6 +55,7 @@ import {
   STUDIO_INSERT_PLACEMENT_LABELS,
   toggleStudioInsertFavorite,
   type StudioInsertActionId,
+  type StudioInsertHubAssetEntry,
   type StudioInsertHubCategory,
   type StudioInsertHubCollection,
   type StudioInsertHubEntry,
@@ -97,6 +107,17 @@ const QUICK_QUERIES = [
   "3D",
   "내 에셋",
 ] as const;
+
+const INTENT_OPTIONS: readonly StudioAssetIntent[] = [
+  "all",
+  "dialogue",
+  "entrance",
+  "action",
+  "emotion",
+  "transition",
+  "time",
+  "atmosphere",
+];
 
 const IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
@@ -232,6 +253,9 @@ export function StudioInsertHubWorkspace({
   const uploadRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<StudioInsertHubWorkspaceView>(initialView);
   const [query, setQuery] = useState("");
+  const [intent, setIntent] = useState<StudioAssetIntent>("all");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [comparisonIds, setComparisonIds] = useState<readonly string[]>([]);
   const [category, setCategory] = useState<StudioInsertHubCategory>("all");
   const [collection, setCollection] =
     useState<StudioInsertHubCollection>("all");
@@ -256,7 +280,7 @@ export function StudioInsertHubWorkspace({
     preferences.recentIds,
     availableIds,
   );
-  const results = useMemo(
+  const discoveredResults = useMemo(
     () =>
       selectStudioInsertHubEntries(entries, {
         query,
@@ -267,12 +291,42 @@ export function StudioInsertHubWorkspace({
       }),
     [category, collection, entries, preferences, query],
   );
+  const results = useMemo(
+    () => filterStudioInsertHubEntriesByIntent(discoveredResults, intent),
+    [discoveredResults, intent],
+  );
+  const assetEntries = useMemo(
+    () => entries.filter(
+      (entry): entry is StudioInsertHubAssetEntry => entry.kind === "asset",
+    ),
+    [entries],
+  );
+  const assetEntryById = useMemo(
+    () => new Map(assetEntries.map((entry) => [entry.id, entry] as const)),
+    [assetEntries],
+  );
+  const selectedAsset = selectedAssetId
+    ? assetEntryById.get(selectedAssetId) ?? null
+    : null;
+  const comparisonEntries = comparisonIds
+    .map((id) => assetEntryById.get(id))
+    .filter((entry): entry is StudioInsertHubAssetEntry => Boolean(entry));
   const quickEntries = useMemo(() => {
     const byId = new Map(entries.map((entry) => [entry.id, entry] as const));
     return QUICK_ENTRY_IDS.map((id) => byId.get(id)).filter(
       (entry): entry is StudioInsertHubEntry => Boolean(entry),
     );
   }, [entries]);
+
+  useEffect(() => {
+    const availableAssetIds = new Set(assetEntries.map((entry) => entry.id));
+    setComparisonIds((current) =>
+      reconcileStudioAssetComparisonIds(current, availableAssetIds),
+    );
+    setSelectedAssetId((current) =>
+      current && availableAssetIds.has(current) ? current : null,
+    );
+  }, [assetEntries]);
 
   function commitPreferences(next: StudioInsertHubPreferences): void {
     const saved = saveStudioInsertHubPreferences(browserStorage(), next);
@@ -368,6 +422,7 @@ export function StudioInsertHubWorkspace({
         );
       }
       rememberRecent(entry.id);
+      if (entry.kind === "asset") setSelectedAssetId(null);
       setStatus({ tone: "success", message: successMessage(entry) });
     } catch (caught: unknown) {
       setStatus({
@@ -414,6 +469,7 @@ export function StudioInsertHubWorkspace({
     setQuery("");
     setCategory("all");
     setCollection("all");
+    setIntent("all");
     setStatus(null);
   }
 
@@ -601,6 +657,34 @@ export function StudioInsertHubWorkspace({
           ) : null}
 
           <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
+                작업 의도
+              </p>
+              <span className="text-[0.55rem] text-fg-3">컷 목적 기준 탐색</span>
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="작업 의도 필터">
+              {INTENT_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => { setIntent(option); setStatus(null); }}
+                  aria-pressed={intent === option}
+                  className={cn(
+                    "min-h-10 shrink-0 rounded-full border px-3 text-[0.62rem] font-semibold transition-colors pointer-coarse:min-h-11",
+                    FOCUS,
+                    intent === option
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-3 hover:bg-raised",
+                  )}
+                >
+                  {STUDIO_ASSET_INTENT_LABELS[option]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
               내 작업
             </p>
@@ -713,13 +797,33 @@ export function StudioInsertHubWorkspace({
             </p>
           </fieldset>
 
+          <StudioAssetDecisionPanel
+            selected={selectedAsset}
+            comparisonEntries={comparisonEntries}
+            placementMode={preferences.placementMode}
+            selectionPlacementAvailable={selectionPlacementAvailable}
+            pending={selectedAsset !== null && pendingId === selectedAsset.id}
+            onConfirm={(entry) => void handleUseEntry(entry)}
+            onClose={() => setSelectedAssetId(null)}
+            onToggleComparison={(id) => setComparisonIds((current) =>
+              toggleStudioAssetComparisonId(current, id),
+            )}
+            onSelectComparison={(id) => setSelectedAssetId(id)}
+            onRemoveComparison={(id) => setComparisonIds((current) =>
+              toggleStudioAssetComparisonId(current, id),
+            )}
+            onClearComparison={() => setComparisonIds([])}
+          />
+
           <div className="flex items-center justify-between gap-2 text-xs">
             <p role="status" aria-live="polite" className="text-fg-3">
               {query.trim()
                 ? `검색 결과 ${results.length}개`
-                : `${STUDIO_INSERT_HUB_COLLECTION_LABELS[collection]} ${results.length}개`}
+                : intent !== "all"
+                  ? `${STUDIO_ASSET_INTENT_LABELS[intent]} 결과 ${results.length}개`
+                  : `${STUDIO_INSERT_HUB_COLLECTION_LABELS[collection]} ${results.length}개`}
             </p>
-            {query || category !== "all" || collection !== "all" ? (
+            {query || category !== "all" || collection !== "all" || intent !== "all" ? (
               <button
                 type="button"
                 onClick={resetDiscovery}
@@ -740,6 +844,8 @@ export function StudioInsertHubWorkspace({
                 const isCaution =
                   entry.kind === "asset" &&
                   entry.item.discoverability === "caution";
+                const inComparison =
+                  entry.kind === "asset" && comparisonIds.includes(entry.id);
                 return (
                   <article
                     key={entry.id}
@@ -775,6 +881,23 @@ export function StudioInsertHubWorkspace({
                           aria-hidden
                         />
                       </button>
+                      {entry.kind === "asset" ? (
+                        <button
+                          type="button"
+                          onClick={() => setComparisonIds((current) =>
+                            toggleStudioAssetComparisonId(current, entry.id),
+                          )}
+                          aria-label={`${entry.title} 비교 ${inComparison ? "제거" : "추가"}`}
+                          aria-pressed={inComparison}
+                          className={cn(
+                            "absolute bottom-1 right-1 grid size-11 place-items-center rounded-full border border-line bg-panel/95 text-fg-3 shadow-sm hover:text-accent",
+                            inComparison && "text-accent",
+                            FOCUS,
+                          )}
+                        >
+                          <GitCompareArrows size={14} aria-hidden />
+                        </button>
+                      ) : null}
                       {isCaution ? (
                         <span className="absolute bottom-1.5 left-1.5 rounded-full border border-warn/40 bg-panel/95 px-2 py-0.5 text-[0.52rem] font-bold text-warn">
                           권리 확인 필요
@@ -815,8 +938,19 @@ export function StudioInsertHubWorkspace({
                       <button
                         type="button"
                         disabled={pendingId !== null}
-                        onClick={() => void handleUseEntry(entry)}
-                        aria-label={`${entry.title} ${entry.useLabel}`}
+                        onClick={() => {
+                          if (entry.kind === "asset") {
+                            setSelectedAssetId(entry.id);
+                            setStatus(null);
+                            return;
+                          }
+                          void handleUseEntry(entry);
+                        }}
+                        aria-label={
+                          entry.kind === "asset"
+                            ? `${entry.title} 적용 전 검토`
+                            : `${entry.title} ${entry.useLabel}`
+                        }
                         className={cn(
                           "mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.65rem] font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50",
                           FOCUS,
@@ -827,7 +961,11 @@ export function StudioInsertHubWorkspace({
                         ) : (
                           <ImageIcon size={13} aria-hidden />
                         )}
-                        {pendingId === entry.id ? "처리 중…" : entry.useLabel}
+                        {pendingId === entry.id
+                          ? "처리 중…"
+                          : entry.kind === "asset"
+                            ? "적용 전 검토"
+                            : entry.useLabel}
                       </button>
                     </div>
                   </article>

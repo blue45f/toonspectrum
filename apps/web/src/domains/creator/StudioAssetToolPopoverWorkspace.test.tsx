@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -109,13 +109,21 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
   return { toolBelt, stableHandlers, setMenu };
 }
 
+async function reviewAndConfirmAsset(title = "테스트 에셋"): Promise<void> {
+  fireEvent.click(
+    await screen.findByRole("button", { name: `${title} 적용 전 검토` }),
+  );
+  const review = await screen.findByRole("region", {
+    name: `${title} 적용 전 검토`,
+  });
+  fireEvent.click(within(review).getByRole("button", { name: /확정$/u }));
+}
+
 async function renderRoute(source: StudioUnifiedAssetSource) {
   mocks.catalog = [createItem(source)];
   const context = createToolBelt();
   render(<StudioAssetToolPopoverWorkspace toolBelt={context.toolBelt} />);
-  fireEvent.click(
-    await screen.findByRole("button", { name: /테스트 에셋/ }),
-  );
+  await reviewAndConfirmAsset();
   return context;
 }
 
@@ -151,7 +159,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     const insert = kind === "background" ? stableHandlers.addBgScene : stableHandlers.addCatalogElement;
     insert.mockReturnValue(accepted);
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
-    fireEvent.click(await screen.findByRole("button", { name: /테스트 에셋/ }));
+    await reviewAndConfirmAsset();
     if (accepted) {
       expect(await screen.findByText("테스트 에셋을(를) 캔버스에 삽입했습니다.")).toBeTruthy();
     } else {

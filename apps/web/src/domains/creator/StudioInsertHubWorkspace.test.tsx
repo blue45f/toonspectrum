@@ -44,6 +44,34 @@ const localAsset: StudioUnifiedAssetItem = {
   },
 };
 
+function createLocalAsset(
+  id: string,
+  title: string,
+  keywords: readonly string[],
+  caution = false,
+): StudioUnifiedAssetItem {
+  return {
+    ...localAsset,
+    id: `local:${id}`,
+    title,
+    description: `${title} 제작 에셋`,
+    keywords,
+    badges: caution ? ["권리 미확인"] : ["내 에셋"],
+    discoverability: caution ? "caution" : "standard",
+    source: {
+      kind: "local",
+      value: {
+        id,
+        name: title,
+        dataUrl: "data:image/png;base64,AA==",
+        width: 1_200,
+        height: 800,
+        createdAt: 1,
+      },
+    },
+  };
+}
+
 function renderWorkspace(
   options: {
     items?: readonly StudioUnifiedAssetItem[];
@@ -178,12 +206,119 @@ describe("StudioInsertHubWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "페이지 맞춤" }));
     fireEvent.click(
       within(entryCard(view.container, localAsset.id)).getByRole("button", {
-        name: "내 주인공 시트 캔버스에 삽입",
+        name: "내 주인공 시트 적용 전 검토",
       }),
     );
+    expect(screen.getByRole("region", {
+      name: "내 주인공 시트 적용 전 검토",
+    })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", {
+      name: "내 주인공 시트 캔버스에 삽입 확정",
+    }));
     await waitFor(() =>
       expect(view.onUseItem).toHaveBeenCalledWith(localAsset, "page"),
     );
+  });
+
+  it("filters catalog entries by webtoon production intent", () => {
+    const dialogue = createLocalAsset(
+      "dialogue",
+      "옥상 2인 대화",
+      ["대사", "긴장", "night"],
+    );
+    const chase = createLocalAsset(
+      "chase",
+      "야간 추격",
+      ["액션", "속도", "night"],
+    );
+    const view = renderWorkspace({ items: [dialogue, chase] });
+
+    fireEvent.click(screen.getByRole("button", { name: "2인 대화" }));
+    expect(view.container.querySelector(
+      `[data-studio-insert-entry="${dialogue.id}"]`,
+    )).toBeTruthy();
+    expect(view.container.querySelector(
+      `[data-studio-insert-entry="${chase.id}"]`,
+    )).toBeNull();
+    expect(screen.getByText(/2인 대화 결과/u)).toBeTruthy();
+  });
+
+  it("requires an explicit rights acknowledgement before applying caution assets", () => {
+    const caution = createLocalAsset(
+      "external-background",
+      "외부 배경",
+      ["배경"],
+      true,
+    );
+    const view = renderWorkspace({ items: [caution] });
+    fireEvent.click(
+      within(entryCard(view.container, caution.id)).getByRole("button", {
+        name: "외부 배경 적용 전 검토",
+      }),
+    );
+    const confirm = screen.getByRole("button", {
+      name: "외부 배경 캔버스에 삽입 확정",
+    });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", {
+      name: "라이선스와 원본 출처를 확인했습니다.",
+    }));
+    expect(confirm.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(confirm);
+    expect(view.onUseItem).toHaveBeenCalledWith(caution, "auto");
+  });
+
+  it("does not carry rights acknowledgement to another caution asset", () => {
+    const first = createLocalAsset(
+      "external-background-a",
+      "외부 배경 A",
+      ["배경"],
+      true,
+    );
+    const second = createLocalAsset(
+      "external-background-b",
+      "외부 배경 B",
+      ["배경"],
+      true,
+    );
+    const view = renderWorkspace({ items: [first, second] });
+
+    fireEvent.click(
+      within(entryCard(view.container, first.id)).getByRole("button", {
+        name: "외부 배경 A 적용 전 검토",
+      }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", {
+      name: "라이선스와 원본 출처를 확인했습니다.",
+    }));
+    expect(screen.getByRole("button", {
+      name: "외부 배경 A 캔버스에 삽입 확정",
+    }).hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(
+      within(entryCard(view.container, second.id)).getByRole("button", {
+        name: "외부 배경 B 적용 전 검토",
+      }),
+    );
+    expect(screen.getByRole("button", {
+      name: "외부 배경 B 캔버스에 삽입 확정",
+    }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps selected asset candidates in a visible comparison tray", () => {
+    const dialogue = createLocalAsset("dialogue", "대화 장면", ["대화"]);
+    const chase = createLocalAsset("chase", "추격 장면", ["액션"]);
+    const view = renderWorkspace({ items: [dialogue, chase] });
+    fireEvent.click(within(entryCard(view.container, dialogue.id)).getByRole(
+      "button",
+      { name: "대화 장면 비교 추가" },
+    ));
+    fireEvent.click(within(entryCard(view.container, chase.id)).getByRole(
+      "button",
+      { name: "추격 장면 비교 추가" },
+    ));
+    expect(screen.getByRole("region", { name: "에셋 비교함" })).toBeTruthy();
+    expect(screen.getByText("비교함 2/3")).toBeTruthy();
   });
 
   it("enables selection placement for a valid editor selection", () => {
