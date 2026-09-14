@@ -59,12 +59,14 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     effectivePublishPackageSettings,
     elementById,
     fxPanelOpen,
+    hybridDccRouteAccess,
     isMobile,
     isStudioCommentAnchorValid,
     loadedWork,
     loggedIn,
     macroSession,
     masterEditMode,
+    openHybridDccWorkspace,
     pageDnd,
     pageReviewOpen,
     pages,
@@ -221,6 +223,18 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
         bg3dSeedTemplateId={bg3dSeedTemplateId}
           bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
           onSeedObjectInsertConsumed={clearStudioObjectInsertSeeds}
+          onOpenPrecisionModeler={(scene) => {
+            if (hybridDccRouteAccess !== "allowed") {
+              // Reuse the navigation gate so the visible blocked/pending reason is announced, but
+              // keep BG3D mounted and untouched when the DCC route cannot actually open.
+              openHybridDccWorkspace("model");
+              return;
+            }
+            setBg3dInitialDataUrl(undefined);
+            setBg3dInitialScene(scene);
+            setBg3dOpen(false);
+            openHybridDccWorkspace("model");
+          }}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}
           checkpointError={checkpointError}

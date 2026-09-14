@@ -5,6 +5,11 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import {
+  clearStudioBg3dCommandHistory,
+  commitStudioBg3dDebouncedHistory,
+  resetStudioBg3dCommandHistory,
+} from "./studio-bg3d-history-command-adapter";
 
 export function useStudioBg3dEditorRestoreEffects(h) {
   const {
@@ -231,6 +236,7 @@ export function useStudioBg3dEditorRestoreEffects(h) {
     handleViewportReady, resetWebXrPresentationUi, finishWebXrControllerCleanup,
     disposeCurrentWebXrControllerGeneration, disposeWebXrControllerForOpenChange,
     handleWebXrControllerReady, handleWebXrSessionStateChange, historyRef, historyIndexRef,
+    historyCommandTimelineRef,
     deviceQuality, hasCloneFailure, hasPendingClone, hasPendingSharedCharacter,
     hasUnavailableSharedCharacter, physicsInteractionLocked, insertBlocked,
     magicLayerSelectedPrimitive, magicLayerLensShift, magicLayerUnavailableReason,
@@ -319,7 +325,11 @@ export function useStudioBg3dEditorRestoreEffects(h) {
     setGenericModelClassifications, setGenericModelSourceFormats, setRefTick, setSceneRecoveryError,
   } = { ...R, ...h };
 
-
+  const commandHistoryRefs = {
+    historyRef,
+    historyIndexRef,
+    historyCommandTimelineRef,
+  };
 
   // 이 effect 가 어떤 입력으로 이미 복원을 돌렸는지. renderer 아이덴티티는 일부러 넣지 않는다.
   const restoredSourceRef = useRef(null);
@@ -440,8 +450,7 @@ export function useStudioBg3dEditorRestoreEffects(h) {
     setPhysicsError(null);
     setFailedCloneIds(new Set());
     setReadyCloneIds(new Set());
-    historyRef.current = [];
-    historyIndexRef.current = -1;
+    clearStudioBg3dCommandHistory(commandHistoryRefs);
     setCanUndo(false);
     setCanRedo(false);
     disposeModelCache(modelRootCacheRef.current);
@@ -455,12 +464,14 @@ export function useStudioBg3dEditorRestoreEffects(h) {
       const canonicalInitial = canonicalSceneDocument(initialScene);
       if (initialScene && !canonicalInitial) {
         if (isCurrent()) {
-          historyRef.current = [createStudioBg3dHistorySnapshot({
-            primitives: [],
-            customModels: [],
-            document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
-          })];
-          historyIndexRef.current = 0;
+          resetStudioBg3dCommandHistory(
+            commandHistoryRefs,
+            createStudioBg3dHistorySnapshot({
+              primitives: [],
+              customModels: [],
+              document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+            }),
+          );
           setPrimitives([]);
           setCustomModels([]);
           setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
@@ -535,12 +546,14 @@ export function useStudioBg3dEditorRestoreEffects(h) {
           storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
         });
         if (!isCurrent()) return;
-        historyRef.current = [createStudioBg3dHistorySnapshot({
-          primitives: hydrated.primitives,
-          customModels: hydrated.customModels,
-          document: restoredDocument,
-        })];
-        historyIndexRef.current = 0;
+        resetStudioBg3dCommandHistory(
+          commandHistoryRefs,
+          createStudioBg3dHistorySnapshot({
+            primitives: hydrated.primitives,
+            customModels: hydrated.customModels,
+            document: restoredDocument,
+          }),
+        );
         setPrimitives(hydrated.primitives);
         setCustomModels(hydrated.customModels);
         const restoredWorkflow = readGenericWorkflowMapsFromAttachments(
@@ -571,12 +584,14 @@ export function useStudioBg3dEditorRestoreEffects(h) {
         : DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
       const nextPrimitives = parsed?.primitives ?? [];
       const nextModels = parsed?.customModels ?? [];
-      historyRef.current = [createStudioBg3dHistorySnapshot({
-        primitives: nextPrimitives,
-        customModels: nextModels,
-        document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
-      })];
-      historyIndexRef.current = 0;
+      resetStudioBg3dCommandHistory(
+        commandHistoryRefs,
+        createStudioBg3dHistorySnapshot({
+          primitives: nextPrimitives,
+          customModels: nextModels,
+          document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+        }),
+      );
       setPrimitives(nextPrimitives);
       setCustomModels(nextModels);
 
@@ -651,26 +666,23 @@ export function useStudioBg3dEditorRestoreEffects(h) {
         customModels,
         document: studioBg3dHistoryDocumentAtView(sceneBaseDocument, liveView),
       });
-      const base = historyRef.current.slice(0, historyIndexRef.current + 1);
-      const lastIndex = base.length - 1;
-      const previousLast = base[lastIndex];
-      if (previousLast) {
-        // Orbit is intentionally not a high-frequency history command. Rebase the current state's
-        // existing entry and its pending edit onto the same sampled view so unrelated undo never
-        // jumps back to an old document camera.
-        base[lastIndex] = {
-          ...previousLast,
-          document: studioBg3dHistoryDocumentAtView(previousLast.document, liveView),
-        };
-      }
-      const last = base[base.length - 1];
-      if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
-      base.push(snap);
-      if (base.length > 60) base.shift();
-      historyRef.current = base;
-      historyIndexRef.current = base.length - 1;
-      setCanUndo(historyIndexRef.current > 0);
-      setCanRedo(false);
+      const current = historyCommandTimelineRef.current?.readState()
+        ?? historyRef.current[historyIndexRef.current]
+        ?? snap;
+      // Orbit is intentionally not a high-frequency history command. Rebase the current state's
+      // existing entry and its pending edit onto the same sampled view so unrelated undo never
+      // jumps back to an old document camera. The typed timeline owns equality, bounded retention,
+      // redo invalidation and legacy-ref projection from this point forward.
+      const rebasedCurrent = {
+        ...current,
+        document: studioBg3dHistoryDocumentAtView(current.document, liveView),
+      };
+      const receipt = commitStudioBg3dDebouncedHistory(commandHistoryRefs, {
+        rebasedCurrent,
+        next: snap,
+      });
+      setCanUndo(receipt.canUndo);
+      setCanRedo(receipt.canRedo);
     }, 400);
     return () => clearTimeout(timer);
   }, [customModels, isBatchRenderingShots, isRestoringScene, primitives, sceneBaseDocument]);

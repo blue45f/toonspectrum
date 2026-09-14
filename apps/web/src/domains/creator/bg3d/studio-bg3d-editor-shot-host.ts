@@ -397,7 +397,9 @@ export function attachStudioBg3dEditorShotHost(h) {
     updateCameraLens((view) => ({ lensShift: [view.lensShift?.[0] ?? 0, 0] }));
   }
   h.resetTwoPointPerspective = resetTwoPointPerspective;
-  function readCurrentCanonicalSceneForShot(): StudioBg3dSceneDocument | null {
+  function readCurrentCanonicalScene(
+    purpose: "shot" | "precision-modeler" = "shot",
+  ): StudioBg3dSceneDocument | null {
     if (
       captureInFlightRef.current ||
       isCapturing ||
@@ -415,7 +417,9 @@ export function attachStudioBg3dEditorShotHost(h) {
       baseDocument: { ...sceneBaseDocument, camera: currentView },
     });
     if (!adaptation.ok) {
-      setError("현재 장면이 안전 예산을 초과해 컷 기록을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      setError(purpose === "precision-modeler"
+        ? "현재 장면이 안전 예산을 초과해 정밀 모델링 전환을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요."
+        : "현재 장면이 안전 예산을 초과해 컷 기록을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
       return null;
     }
     const adapted = adaptation.value;
@@ -427,10 +431,16 @@ export function attachStudioBg3dEditorShotHost(h) {
       adapted.counts.emittedPrimitives !== primitives.length ||
       adapted.counts.emittedCustomModels !== customModels.length
     ) {
-      setError("컷에 현재 장면을 손실 없이 기록할 수 없습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
+      setError(purpose === "precision-modeler"
+        ? "현재 장면을 손실 없이 보존할 수 없어 정밀 모델링 워크스페이스를 열지 않았습니다. 문제가 있는 도형이나 모델을 확인해 주세요."
+        : "컷에 현재 장면을 손실 없이 기록할 수 없습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
       return null;
     }
     return adapted.document;
+  }
+  h.readCurrentCanonicalScene = readCurrentCanonicalScene;
+  function readCurrentCanonicalSceneForShot(): StudioBg3dSceneDocument | null {
+    return readCurrentCanonicalScene("shot");
   }
   h.readCurrentCanonicalSceneForShot = readCurrentCanonicalSceneForShot;
   function commitAppliedShot(

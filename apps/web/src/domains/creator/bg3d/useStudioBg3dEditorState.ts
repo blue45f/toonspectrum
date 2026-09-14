@@ -6,6 +6,8 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 
+import type { StudioBg3dHistoryCommandTimeline } from "./studio-bg3d-history-command-adapter";
+
 import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
 
 export function useStudioBg3dEditorState(props) {
@@ -445,6 +447,7 @@ export function useStudioBg3dEditorState(props) {
 
   const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
+  const historyCommandTimelineRef = useRef<StudioBg3dHistoryCommandTimeline | null>(null);
 
   Object.assign(h, {
     primitiveGeometryPool,
@@ -737,6 +740,7 @@ export function useStudioBg3dEditorState(props) {
     setRefTick,
     historyRef,
     historyIndexRef,
+    historyCommandTimelineRef,
     commitSharedCharacterTransform,
     effectiveSelectedSharedCharacter,
     effectiveSelectedSharedCharacterElementId,

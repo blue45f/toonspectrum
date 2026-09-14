@@ -204,6 +204,7 @@ export interface StudioBg3dViewPanelProps {
   readonly onUseCurrentFrameAsAiReference?: () => void;
   readonly aiReferenceBusy?: boolean;
   readonly aiReferenceDisabled?: boolean;
+  readonly onOpenPrecisionModeler?: () => void;
 }
 
 export interface StudioBg3dAiReferenceActionProps {
@@ -421,6 +422,7 @@ export function StudioBg3dViewPanel({
   onUseCurrentFrameAsAiReference,
   aiReferenceBusy = false,
   aiReferenceDisabled = false,
+  onOpenPrecisionModeler,
 }: StudioBg3dViewPanelProps) {
   const {
     VIEW_EDITOR_SECTIONS,
@@ -610,7 +612,10 @@ export function StudioBg3dViewPanel({
                   aria-labelledby="bg3d-view-tab-prosuite"
                   hidden={viewEditorSection !== "prosuite"}
                 >
-                  <StudioBg3dProSuitePanel disabled={isCapturing || isRestoringScene} />
+                  <StudioBg3dProSuitePanel
+                    disabled={isCapturing || isRestoringScene}
+                    onOpenPrecisionModeler={onOpenPrecisionModeler}
+                  />
                 </div>
 
                 <div
