@@ -194,7 +194,7 @@ window.runStudioSkirtQuality = async (expectedRenderer) => {
             let uploadedPositionVersion = "version" in positionBuffer ? positionBuffer.version : positionBuffer.data.version;
             const bodyProfile = JSON.stringify(runtime.bodyProfile);
             const profileKey = `${kind}/${tier}`;
-            
+
             const restThighs = thighVectors(vrm);
             const restHipMatrix = vrm.humanoid.getRawBoneNode("hips")!.matrixWorld.clone();
             let standingPositionsHash = "";
