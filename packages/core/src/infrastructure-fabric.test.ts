@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   decideInfrastructurePlacement,
+  planInfrastructurePlacement,
   type InfrastructureProviderPolicy,
   type InfrastructureProviderSnapshot,
   type InfrastructureWorkloadPolicy,
@@ -15,12 +16,14 @@ function provider(
   hardCap = 0.8,
   boundary: InfrastructureProviderPolicy["billingBoundary"] =
     "free-allowance-with-app-cap",
+  overrides: Partial<InfrastructureProviderPolicy> = {},
 ): InfrastructureProviderPolicy {
   return {
     providerId,
     roles,
     billingBoundary: boundary,
     applicationHardCapRatio: hardCap,
+    ...overrides,
   };
 }
 
@@ -28,6 +31,7 @@ function snapshot(
   providerId: string,
   usageRatio: number,
   health: InfrastructureProviderSnapshot["health"] = "healthy",
+  overrides: Partial<InfrastructureProviderSnapshot> = {},
 ): InfrastructureProviderSnapshot {
   return {
     providerId,
@@ -35,6 +39,7 @@ function snapshot(
     health,
     observedAtEpochMs: now - 1_000,
     staleAfterMs: 60_000,
+    ...overrides,
   };
 }
 
@@ -283,6 +288,167 @@ describe("infrastructure fabric placement", () => {
     expect(decision).toMatchObject({
       outcome: "selected",
       providerId: "imagekit",
+    });
+  });
+
+  it("distributes affinity keys deterministically according to provider traffic weights", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      [
+        "turso",
+        provider("turso", ["catalog-read"], 0.8, "hard-stop-free", {
+          trafficWeight: 4,
+        }),
+      ],
+      [
+        "d1",
+        provider("d1", ["catalog-read"], 0.8, "hard-stop-free", {
+          trafficWeight: 1,
+        }),
+      ],
+    ]);
+    const snapshots = new Map([
+      ["turso", snapshot("turso", 0.2)],
+      ["d1", snapshot("d1", 0.2)],
+    ]);
+    const selected: Record<string, number> = { turso: 0, d1: 0 };
+
+    for (let index = 0; index < 1_000; index += 1) {
+      const routingKey = `catalog-request-${index}`;
+      const first = decideInfrastructurePlacement({
+        workload: workload({ trafficDistribution: "weighted-rendezvous" }),
+        providers,
+        snapshots,
+        nowEpochMs: now,
+        routingKey,
+      });
+      const second = decideInfrastructurePlacement({
+        workload: workload({ trafficDistribution: "weighted-rendezvous" }),
+        providers,
+        snapshots,
+        nowEpochMs: now,
+        routingKey,
+      });
+
+      expect(second).toEqual(first);
+      expect(first.outcome).toBe("selected");
+      if (first.outcome === "selected") selected[first.providerId] += 1;
+    }
+
+    expect(selected.turso).toBeGreaterThan(700);
+    expect(selected.d1).toBeGreaterThan(0);
+  });
+
+  it("routes by the most constrained quota dimension instead of an aggregate average", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["r2", provider("r2", ["asset-read"])],
+      ["b2", provider("b2", ["asset-read"])],
+    ]);
+    const decision = decideInfrastructurePlacement({
+      workload: workload({
+        workloadId: "asset-read",
+        authority: "r2",
+        candidates: ["r2", "b2"],
+        requiredRoles: ["asset-read"],
+        quotaDimensions: ["requests", "egress"],
+      }),
+      providers,
+      snapshots: new Map([
+        [
+          "r2",
+          snapshot("r2", 0.2, "healthy", {
+            quotaDimensions: {
+              requests: { usageRatio: 0.2 },
+              egress: { usageRatio: 0.79 },
+            },
+          }),
+        ],
+        [
+          "b2",
+          snapshot("b2", 0.3, "healthy", {
+            quotaDimensions: {
+              requests: { usageRatio: 0.3 },
+              egress: { usageRatio: 0.3 },
+            },
+          }),
+        ],
+      ]),
+      nowEpochMs: now,
+      estimatedQuotaImpactByDimension: {
+        requests: 0.01,
+        egress: 0.02,
+      },
+    });
+
+    expect(decision).toMatchObject({
+      outcome: "selected",
+      providerId: "b2",
+      bottleneckQuotaDimension: "egress",
+    });
+  });
+
+  it("returns an ordered retry plan without retrying an already attempted provider", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["static", provider("static", ["catalog-read"], 1, "hard-stop-free")],
+      ["turso", provider("turso", ["catalog-read"], 1, "hard-stop-free")],
+      ["d1", provider("d1", ["catalog-read"], 1, "hard-stop-free")],
+    ]);
+    const plan = planInfrastructurePlacement({
+      workload: workload({
+        authority: "turso",
+        candidates: ["turso", "d1", "static"],
+        trafficDistribution: "weighted-rendezvous",
+      }),
+      providers,
+      snapshots: new Map([
+        ["static", snapshot("static", 0.1)],
+        ["turso", snapshot("turso", 0.1)],
+        ["d1", snapshot("d1", 0.1)],
+      ]),
+      nowEpochMs: now,
+      routingKey: "catalog:popular",
+      excludedProviderIds: ["turso"],
+    });
+
+    expect(plan.outcome).toBe("selected");
+    if (plan.outcome === "selected") {
+      expect(plan.primary.providerId).not.toBe("turso");
+      expect(plan.retries).toHaveLength(1);
+      expect(plan.rejectedProviders).toEqual(["turso"]);
+      expect(new Set([
+        plan.primary.providerId,
+        ...plan.retries.map(({ providerId }) => providerId),
+      ])).toEqual(new Set(["d1", "static"]));
+    }
+  });
+
+  it("fails closed when a declared quota dimension is missing from telemetry", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["r2", provider("r2", ["asset-read"])],
+    ]);
+    const decision = decideInfrastructurePlacement({
+      workload: workload({
+        workloadId: "asset-read",
+        authority: "r2",
+        candidates: ["r2"],
+        requiredRoles: ["asset-read"],
+        quotaDimensions: ["requests", "egress"],
+      }),
+      providers,
+      snapshots: new Map([
+        [
+          "r2",
+          snapshot("r2", 0.2, "healthy", {
+            quotaDimensions: { requests: { usageRatio: 0.2 } },
+          }),
+        ],
+      ]),
+      nowEpochMs: now,
+    });
+
+    expect(decision).toEqual({
+      outcome: "rejected",
+      reason: "QUOTA_SNAPSHOT_REQUIRED",
+      rejectedProviders: ["r2"],
     });
   });
 });
