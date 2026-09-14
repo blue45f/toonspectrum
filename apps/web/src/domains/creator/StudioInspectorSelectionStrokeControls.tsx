@@ -196,11 +196,11 @@ export function StudioInspectorSelectionStrokeControls({
               />
             </svg>
           </div>
+          {/* LazyStudioColorPopover owns aria-label="선 색상" on the full-field trigger. */}
           <LazyStudioColorPopover
             value={activeColor}
             onChange={applyColor}
             recentColors={recentColors ?? localRecentColors}
-            onUseColor={rememberColor}
             onLoadRecentColors={onEnsureRecentColorsLoaded}
             label="선 색상"
             purpose="generic"
