@@ -99,6 +99,31 @@ async function setWheelMode(mode: "브러시 크기" | "확대/축소"): Promise
   await dialog.getByRole("button", { name: "설정 닫기", exact: true }).click();
 }
 
+async function installStudioGuestApiFixture(target: Page): Promise<void> {
+  await target.route("**/api/auth/session", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false, user: null }),
+    });
+  });
+  await target.route("**/api/kmas/merge-on-access**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ merged: false }),
+    });
+  });
+  await target.route("**/api/studio-ai/status**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ enabled: false }),
+    });
+  });
+}
+
 async function probeLibrary(id: string) {
   if (!probeModuleUrl) return null;
   await page.evaluate("globalThis.__name ??= (target) => target");
@@ -209,6 +234,7 @@ try {
     browser = await chromium.launch({ channel: "chromium", headless: process.platform !== "darwin", timeout: 15_000 });
     context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page = await context.newPage();
+    await installStudioGuestApiFixture(page);
     page.setDefaultTimeout(15_000);
     page.setDefaultNavigationTimeout(15_000);
     page.on("pageerror", error => errors.push(error.stack ?? error.message));

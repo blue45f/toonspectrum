@@ -24,7 +24,7 @@ describe("Brush Studio V6 quality authority", () => {
   it("creates recipes with the one actual contact output while preserving unsupported imported output intent", () => {
     const outputNodes = BRUSH_STUDIO_V6_NODES.filter((node) => node.slot === "output" && isBrushStudioV6MaterialNodeImplemented(node.id));
     expect(outputNodes.map((node) => node.id)).toEqual(["output-contact-canvas-svg"]);
-    expect(outputNodes[0]).toMatchObject({ label: "Canvas Contacts + SVG", domain: "main", provider: "ToonSpectrum CPU Contacts", requires: [] });
+    expect(outputNodes[0]).toMatchObject({ label: "Canvas Contacts + SVG", domain: "main", provider: "ToonSpectrum Contact Kernel", requires: [] });
     for (const recipe of BRUSH_STUDIO_V6_RECIPES) {
       expect(recipe.create().slots.output).toBe("output-contact-canvas-svg");
       expect(normalizeBrushStudioV6MaterialConfig(recipe.create())?.slots.output).toBe("output-contact-canvas-svg");
@@ -35,6 +35,21 @@ describe("Brush Studio V6 quality authority", () => {
       expect(imported.slots.output).toBe(output);
       expect(normalizeBrushStudioV6MaterialConfig(imported)?.slots.output).toBe(output);
       expect(isBrushStudioV6MaterialNodeImplemented(output)).toBe(false);
+    }
+  });
+
+  it("keeps every authored Mixbox recipe executable on the material-contact path", () => {
+    for (const recipe of BRUSH_STUDIO_V6_RECIPES.filter((entry) => entry.id.startsWith("mixbox-"))) {
+      const analysis = analyzeBrushStudioV6Program(
+        recipe.create(),
+        BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+      );
+      expect(analysis.providerPlan.valid, `${recipe.id}: ${analysis.providerPlan.blockedNodeIds.join(", ")}`)
+        .toBe(true);
+      expect(analysis.valid, `${recipe.id}: ${analysis.issues.map((entry) => entry.id).join(", ")}`)
+        .toBe(true);
+      expect(analysis.providerPlan.bindings.some((entry) => entry.providerId === "mixbox-js-v2"))
+        .toBe(true);
     }
   });
 

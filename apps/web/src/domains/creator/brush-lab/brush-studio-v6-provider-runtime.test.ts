@@ -27,7 +27,7 @@ function nodes(program: BrushStudioV6Program) {
 describe("Brush Studio V6 provider runtime", () => {
   it("pins every Mixbox/Krita-compatible oil node without a fallback ladder", () => {
     const plan = planBrushStudioV6ProviderRuntime(nodes(createBrushStudioV6Program("mixbox-oil-bristle")));
-    expect(plan).toMatchObject({ version: 1, fallbackPolicy: "none", valid: true, blockedNodeIds: [] });
+    expect(plan).toMatchObject({ version: 2, fallbackPolicy: "none", valid: true, blockedNodeIds: [] });
     expect(plan.bindings.map((entry) => entry.providerId)).toEqual(expect.arrayContaining([
       "mixbox-js-v2",
       "krita-contact-adapter-gpl-v1",
@@ -70,4 +70,31 @@ describe("Brush Studio V6 provider runtime", () => {
     expect(hokusai).toMatchObject({ execution: "compatibility-adapter" });
     expect(hokusai?.nodeIds).toContain("carrier-hokusai-dabs");
   });
+  it("rejects exact engines that belong to a different product path", () => {
+    for (const [slot, id, productPath] of [
+      ["motion", "motion-google-ink", "vector-runtime"],
+      ["carrier", "carrier-google-mesh", "vector-runtime"],
+      ["carrier", "carrier-p5-flow", "settled-generator"],
+      ["pattern", "pattern-flow-field", "settled-generator"],
+    ] as const) {
+      const base = createBrushStudioV6Program("clean-ink");
+      const program = { ...base, slots: { ...base.slots, [slot]: id } };
+      const plan = planBrushStudioV6ProviderRuntime(nodes(program));
+      expect(plan.valid).toBe(false);
+      expect(plan.blockedNodes).toContainEqual(expect.objectContaining({
+        nodeId: id, reason: "wrong-product-path", productPath,
+      }));
+    }
+  });
+
+  it("keeps manifest and material execution admission in one source of truth", () => {
+    for (const recipeId of [
+      "clean-ink", "natural-calligraphy", "mixbox-watercolor-bloom", "mixbox-oil-bristle",
+    ]) {
+      const plan = planBrushStudioV6ProviderRuntime(nodes(createBrushStudioV6Program(recipeId)));
+      expect(plan.valid, recipeId).toBe(true);
+      expect(plan.bindings.every((binding) => binding.productPath === "material-contact")).toBe(true);
+    }
+  });
+
 });

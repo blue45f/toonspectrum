@@ -5,6 +5,7 @@ import { BRUSH_STUDIO_V6_RECIPE_SEEDS } from "./brush-studio-v6-recipe-catalog";
 import {
   BRUSH_STUDIO_V6_DEFAULT_LICENSE_PROFILE,
   brushStudioV6LicenseProfileAllows,
+  brushStudioV6ProviderManifestForNode,
 } from "./brush-studio-v6-license-profile";
 
 import type {
@@ -85,8 +86,7 @@ const LABELS: Readonly<Record<string, string>> = Object.freeze({
 function labelFor(id: string): string { return brushStudioV6Topology(id)?.label ?? LABELS[id] ?? id.replace(/^(deposit|surface|carrier|motion|tip|physics|pattern|finish|pigment|pickup|output)-/u, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "); }
 function providerFor(id: string): string {
   if (brushStudioV6Topology(id)) return "ToonSpectrum CPU Topology";
-  if (id === "output-contact-canvas-svg" || id === "pickup-pigment-reservoir") return "ToonSpectrum CPU Contacts";
-  if (id.includes("krita")) return "Krita GPL"; if (id.includes("libmypaint")) return "libmypaint"; if (id.includes("hokusai")) return "Hokusai"; if (id.includes("google")) return "Google Ink"; if (id.includes("perfect")) return "perfect-freehand"; if (id.includes("p5")) return "p5.brush"; if (id.includes("inkwash")) return "Inkwash"; if (id.includes("spectral")) return "Spectral.js"; if (id.includes("open-km")) return "open-km"; if (id.includes("painter")) return "pigment-painter"; if (id.includes("mixbox")) return "Mixbox"; if (id.includes("realbrush") || id.includes("exemplar")) return "RealBrush Exemplar"; return "ToonSpectrum WebGPU";
+  return brushStudioV6ProviderManifestForNode(id)?.label ?? "Unregistered provider";
 }
 function ports(slot: BrushStudioV6Slot): readonly [readonly BrushStudioV6PortType[], readonly BrushStudioV6PortType[]] {
   const map: Record<BrushStudioV6Slot, readonly [readonly BrushStudioV6PortType[], readonly BrushStudioV6PortType[]]> = {

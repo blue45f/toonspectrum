@@ -4,6 +4,13 @@ import type { BrushStudioV6ProviderRuntimePlan } from "./brush-studio-v6-provide
 
 const ITEM = "rounded-xl border border-line bg-bg-2/55 p-3";
 
+const BLOCKED_REASON = Object.freeze({
+  "license-profile": "현재 라이선스 프로필에서 제외",
+  "provider-not-connected": "제품 프로바이더가 아직 연결되지 않음",
+  "provider-unregistered": "등록된 실행 프로바이더 없음",
+  "wrong-product-path": "별도 벡터·정착 엔진이며 재료 접촉 경로가 아님",
+} as const);
+
 export function StudioBrushV6ProviderPlan({
   plan,
 }: {
@@ -26,9 +33,17 @@ export function StudioBrushV6ProviderPlan({
         </span>
       </div>
 
-      {plan.blockedNodeIds.length > 0 ? (
-        <div role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs font-bold text-danger">
-          실행 프로바이더 없음: {plan.blockedNodeIds.map((id) => brushStudioV6Node(id).label).join(", ")}
+      {plan.blockedNodes.length > 0 ? (
+        <div role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
+          <p className="font-black">현재 저장 브러시 경로에서 실행할 수 없는 노드</p>
+          <ul className="mt-2 space-y-1">
+            {plan.blockedNodes.map((entry) => (
+              <li key={entry.nodeId}>
+                <strong>{brushStudioV6Node(entry.nodeId).label}</strong> · {BLOCKED_REASON[entry.reason]}
+                {entry.productPath ? ` · ${entry.productPath}` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
@@ -48,7 +63,7 @@ export function StudioBrushV6ProviderPlan({
             <p className="mt-1 break-all text-[0.68rem] font-bold text-fg-2">
               {binding.providerId}@{binding.version}
             </p>
-            <p className="mt-1 text-[0.65rem] text-fg-3">{binding.license} · {binding.rights}</p>
+            <p className="mt-1 text-[0.65rem] text-fg-3">{binding.license} · {binding.rights} · {binding.productPath}</p>
             <p className="mt-2 text-[0.68rem] leading-5 text-fg-3">
               {binding.nodeIds.map((id) => brushStudioV6Node(id).label).join(" · ")}
             </p>

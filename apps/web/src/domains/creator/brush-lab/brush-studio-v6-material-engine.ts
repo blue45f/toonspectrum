@@ -1,4 +1,5 @@
 import { BrushStudioV6MaterialPaletteCache } from "./brush-studio-v6-material-palette-cache";
+import { brushStudioV6MaterialExecutionForNode } from "./brush-studio-v6-license-profile";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import { createBrushStudioV6TopologyStroke } from "./brush-studio-v6-topology-engine";
 import { brushStudioV6TopologyActiveTuning, brushStudioV6TopologyStep, paintBrushStudioV6TopologyPrimitive } from "./brush-studio-v6-topology-material";
@@ -102,7 +103,11 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
     particle: ["particleCount", "patternJitter", ...(program.slots.physics.includes("physics-reaction") ? ["reactionRate"] as const : [])],
     grain: ["surfaceTooth", "granulation"],
     relief: ["reservoir", "plasticity", "relief"],
-    wet: ["absorbency", "diffusion", "wetness", "granulation", "edgeDarkening", ...(program.slots.physics.includes("physics-dry-contact") ? ["surfaceTooth"] as const : [])],
+    wet: [
+      "absorbency", "diffusion", "wetness", "granulation",
+      ...(program.slots.finish.includes("finish-edge-bloom") ? ["edgeDarkening"] as const : []),
+      ...(program.slots.physics.includes("physics-dry-contact") ? ["surfaceTooth"] as const : []),
+    ],
     ink: program.slots.deposition === "deposit-marker" ? ["edgeDarkening"] : [],
   };
   for (const key of modeKeys[mode]) result.add(key);
@@ -182,34 +187,14 @@ export function sampleBrushStudioV6PaperContact(surface: string, x: number, y: n
 
 export type BrushStudioV6MaterialNodeExecution = "native" | "adapter" | "unavailable";
 
-const MATERIAL_NATIVE_NODES = new Set([
-  "input-pointer-v3", "motion-direct", "motion-adaptive-ema", "motion-spring",
-  "motion-brush-inertia", "motion-lazy-leash", "carrier-webgpu-centerline",
-  "carrier-webgpu-ribbon", "carrier-webgpu-particles", "tip-round-sdf", "tip-chisel-sdf",
-  "tip-grain-exemplar", "surface-smooth", "surface-kent", "surface-coldpress",
-  "surface-printmaking", "surface-linen", "surface-porous", "deposit-ink", "deposit-marker",
-  "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "deposit-light", "pickup-none",
-  "pickup-pigment-reservoir", "pigment-rgb", "pigment-spectral", "pigment-mixbox",
-  "pigment-open-km", "pigment-inkwash-density", "physics-dry-contact", "physics-inkwash",
-  "physics-thin-film", "physics-bristle", "physics-particles", "physics-reaction",
-  "physics-height", "pattern-none", "pattern-dot-tone", "pattern-cross-hatch",
-  "pattern-weave", "pattern-brick", "pattern-foliage", "pattern-stitch", "pattern-kaleido",
-  "pattern-rainbow", "tip-motif-atlas", "finish-edge-bloom", "finish-wet-sheen",
-  "finish-grain", "finish-relief", "finish-neon", "finish-chroma",
-  "output-contact-canvas-svg",
-]);
-const MATERIAL_ADAPTER_NODES = new Set([
-  "carrier-perfect-outline", "carrier-libmypaint-dabs", "carrier-hokusai-dabs", "carrier-krita-hairy",
-  "tip-krita-dual", "tip-pigment-normal", "surface-realbrush", "pickup-krita-smudge",
-  "physics-porous-paper",
-]);
-
-/** Exact product kernels and explicit, persisted compatibility adapters. */
+/** Exact product kernels and explicit, persisted compatibility adapters share one provider manifest. */
 export function brushStudioV6MaterialNodeExecution(
   id: string,
 ): BrushStudioV6MaterialNodeExecution {
-  if (brushStudioV6Topology(id) || MATERIAL_NATIVE_NODES.has(id)) return "native";
-  if (MATERIAL_ADAPTER_NODES.has(id)) return "adapter";
+  if (brushStudioV6Topology(id)) return "native";
+  const execution = brushStudioV6MaterialExecutionForNode(id);
+  if (execution === "native") return "native";
+  if (execution === "compatibility-adapter") return "adapter";
   return "unavailable";
 }
 
