@@ -77,9 +77,9 @@ BG3D primitive/model을 B-Rep 또는 CAD 형상으로 조용히 추정 변환하
 - TypeScript 전체 검사 통과
 - architecture validation 통과
 - 변경 TypeScript ESLint zero-warning 통과
-- typed command/document/history/Pro Suite 집중 검사 46개 통과
-- Studio shell, DCC product gate, BG3D shot/camera/transform, Scene3D contract 회귀 60개 통과
-- 접근 권한 fail-closed 보강 후 집중 회귀 12개 통과
+- 최종 커밋 상태에서 Scene3D, BG3D command/history/UI, Hybrid DCC 제품·handoff 19파일 139개 통과
+- production build 통과: TypeScript, Vite/Rolldown, service worker, third-party notices, Vercel CSP, OG metadata
+- 빌드 경고는 기존 외부 의존성 `file-type`, `wasm-vips`, `three-vrm`과 기존 대형 chunk 경고이며 이번 변경에서 새 오류를 만들지 않았다.
 
 위 검증은 SHAPER 또는 Shapr3D와 동일 자산을 사용한 직접 작업시간·픽셀 품질 비교를 뜻하지
 않는다. 이번 변경의 완료 범위는 공통 명령 코어와 실제 제품 DCC 연결이다. 기존 Hybrid DCC가
