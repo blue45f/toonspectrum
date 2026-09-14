@@ -1,35 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
-import { StudioP2pHuddleController, type HuddleSnapshot } from "./studio-p2p-huddle-controller";
+import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
-
-const controlClass = "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-xs text-fg hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40";
-function MediaTile({ stream, name, muted, visual }: {
-  stream: MediaStream | null; name: string; muted: boolean; visual: boolean;
-}) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [needsPlay, setNeedsPlay] = useState(false);
-  useEffect(() => {
-    const video = ref.current;
-    if (!video) return;
-    let active = true;
-    video.srcObject = stream;
-    if (stream) void video.play().then(() => { if (active) setNeedsPlay(false); })
-      .catch(() => { if (active) setNeedsPlay(true); });
-    return () => { active = false; video.srcObject = null; };
-  }, [stream]);
-  return <div className="relative overflow-hidden rounded-xl border border-line bg-panel">
-    {/* eslint-disable-next-line jsx-a11y/media-has-caption -- Live WebRTC has no prerecorded captions; typed P2P chat is available alongside. */}
-    <video ref={ref} autoPlay playsInline muted={muted} aria-label={`${name} 영상`}
-      className={visual ? "aspect-video w-full object-contain" : "h-0 w-0"} />
-    {!visual && <div className="grid h-16 place-items-center text-lg text-fg-3" aria-hidden>{name.slice(0, 1)}</div>}
-    <p className="truncate px-2 py-1 text-xs text-fg">{name}</p>
-    {needsPlay && <button className={controlClass} type="button" onClick={() => {
-      void ref.current?.play().then(() => setNeedsPlay(false)).catch(() => setNeedsPlay(true));
-    }}>소리·영상 재생</button>}
-  </div>;
-}
+import { StudioP2pMediaTile as MediaTile, P2P_CONTROL_CLASS as controlClass } from "./StudioP2pMediaTile";
+import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
 
 export default function StudioP2pHuddleLauncher() {
   const live = useStudioLiveCollaboration();
@@ -59,14 +34,17 @@ export default function StudioP2pHuddleLauncher() {
   function leave() {
     cleanup.current?.(); cleanup.current = null;
     controller.current?.close(); controller.current = null;
-    setSnapshot(null); setDraft(""); setBusy(false);
+    setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false);
   }
   function join() {
     if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current) return;
     const next = new StudioP2pHuddleController(room.participant, room.direct);
     controller.current = next;
     const unsubscribe = next.subscribe(() => setSnapshot(next.snapshot()));
-    const terminate = () => { next.close(); setNotice("작업실 연결이 종료되어 카메라와 마이크를 해제했습니다."); };
+    const terminate = () => {
+      if (controller.current !== next) return;
+      leave(); setNotice("작업실 연결이 종료되어 카메라와 마이크를 해제했습니다. 연결이 복구되면 다시 참여할 수 있습니다.");
+    };
     const offRoom = room.subscribe((event) => {
       if (event.type === "transport-status" && (!room.ready || !event.status.recoverable)) terminate();
     });
@@ -75,8 +53,8 @@ export default function StudioP2pHuddleLauncher() {
     setNotice(null); next.start(); setSnapshot(next.snapshot());
   }
   async function capture(action: () => Promise<void>) {
-    setBusy(true);
-    try { await action(); } finally { setBusy(false); }
+    const owner = controller.current; setBusy(true);
+    try { await action(); } finally { if (controller.current === owner) setBusy(false); }
   }
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -85,6 +63,7 @@ export default function StudioP2pHuddleLauncher() {
   }
   if (!room || !live.canChat) return null;
   const canJoin = Boolean(room.direct && live.availability === "ready");
+  const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside className="fixed bottom-3 right-3 z-[65] max-w-[calc(100vw-1.5rem)]" aria-label="P2P 협업 대화">
     <section hidden={!open} className="mb-2 w-[360px] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
@@ -102,11 +81,12 @@ export default function StudioP2pHuddleLauncher() {
           <button className={controlClass} type="button" disabled={!canJoin} onClick={join}>동의하고 P2P 채팅 참여</button>
         </div> : <>
           <p className="text-xs text-fg-2" role="status">나 포함 {(snapshot?.peers.length ?? 0) + 1}명 참여 · 연결 가능 {snapshot?.availablePeers ?? 0}명</p>
+          {!mediaAvailable && <p role="status" className="text-xs text-warn">이 브라우저는 카메라·마이크를 지원하지 않습니다. 지원하는 브라우저에서 같은 작업실을 열어 주세요. 채팅·활동은 계속 사용할 수 있습니다.</p>}
           <div className="grid grid-cols-3 gap-1.5">
-            <button className={controlClass} type="button" disabled={busy} aria-pressed={!snapshot?.muted}
+            <button className={controlClass} type="button" disabled={busy || !mediaAvailable} aria-pressed={!snapshot?.muted}
               onClick={() => void capture(() => controller.current?.setMicrophone(Boolean(snapshot?.muted)) ?? Promise.resolve())}>
               {snapshot?.muted ? <MicOff size={14} /> : <Mic size={14} />}{snapshot?.muted ? "마이크 켜기" : "마이크 끄기"}</button>
-            <button className={controlClass} type="button" disabled={busy} aria-pressed={snapshot?.camera}
+            <button className={controlClass} type="button" disabled={busy || !mediaAvailable} aria-pressed={snapshot?.camera}
               onClick={() => void capture(() => controller.current?.setVideo(snapshot?.camera ? null : "camera") ?? Promise.resolve())}>
               <Video size={14} />{snapshot?.camera ? "카메라 끄기" : "카메라 켜기"}</button>
             <button className={controlClass} type="button" disabled={busy || !navigator.mediaDevices?.getDisplayMedia} aria-pressed={snapshot?.sharing}
@@ -124,7 +104,7 @@ export default function StudioP2pHuddleLauncher() {
               <MediaTile name={peer.participant.displayName} stream={peer.stream} muted={deafened} visual={peer.camera || peer.sharing} />
               <p className="mt-1 text-[11px] text-fg-3">{peer.muted ? "마이크 꺼짐" : "마이크 켜짐"} {peer.hand ? "✋" : ""} {peer.reaction ?? ""}
                 {peer.connection === "failed" ? " · 연결 실패" : peer.connection === "connected" ? " · 직접 연결" : ""}</p>
-              <button type="button" className="min-h-8 text-[11px] text-fg-3 underline" onClick={() => controller.current?.block(peer.participant.sessionId)}>
+              <button type="button" className="min-h-11 text-[11px] text-fg-3 underline" onClick={() => controller.current?.block(peer.participant.sessionId)}>
                 {peer.participant.displayName} 이 세션에서 차단</button>
             </div>)}
           </div>
@@ -132,17 +112,17 @@ export default function StudioP2pHuddleLauncher() {
             <button key={emoji} className={controlClass} type="button" aria-label={`${emoji} 리액션 보내기`}
               onClick={() => controller.current?.react(emoji)}>{emoji}</button>)}</div>
           {!snapshot?.peers.length && <p className="text-xs text-fg-3">같은 공동작업 원고에서 상대도 P2P 채팅에 참여해야 연결됩니다. 연결되지 않으면 네트워크를 확인해 주세요.</p>}
+          {controller.current && <StudioP2pActivitiesPanel controller={controller.current} />}
           <div ref={log} role="log" aria-label="P2P 대화 기록" aria-live="polite" aria-relevant="additions" className="max-h-48 space-y-2 overflow-y-auto rounded-xl bg-card p-2 text-xs">
             {snapshot?.messages.map((message) => <div key={message.id} className="break-words">
-              <strong>{message.self ? "나" : message.name}</strong>
-              <p className="whitespace-pre-wrap">{message.text}</p>
+              <strong>{message.self ? "나" : message.name}</strong><p className="whitespace-pre-wrap">{message.text}</p>
               {message.self && <span className="text-[10px] text-fg-3">전송 {message.sent.length}/{message.targets.length} · 수신 확인 {message.received.length}/{message.targets.length}</span>}
             </div>)}
           </div>
           <form onSubmit={submit} className="flex gap-2">
             <label className="sr-only" htmlFor="studio-p2p-message">P2P 메시지</label>
             <input id="studio-p2p-message" value={draft} maxLength={HUDDLE_TEXT_LIMIT} autoComplete="off"
-              className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 text-xs"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 text-xs"
               placeholder="P2P 메시지 · 기록 저장 안 함" onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter" && (event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault(); }} />
             <button type="submit" className={controlClass} disabled={!draft.trim() || !snapshot?.peers.length}>전송</button>
