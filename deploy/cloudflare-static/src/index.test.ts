@@ -193,7 +193,7 @@ describe("Cloudflare static gateway", () => {
         "https://catalog-a.example.test,https://catalog-b.example.test",
     });
     const request = new Request(
-      "https://www.toonstudio.cloud/api/catalog/titles?genre=fantasy",
+      "https://www.toonstudio.cloud/api/titles?genre=fantasy",
       { headers: { "cf-ray": "stable-ray-id" } },
     );
 
@@ -215,7 +215,7 @@ describe("Cloudflare static gateway", () => {
       new Response("core-write", { status: 503 }));
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
     const response = await gateway(
-      new Request("https://www.toonstudio.cloud/api/catalog/rebuild", {
+      new Request("https://www.toonstudio.cloud/api/catalog/refresh", {
         method: "POST",
         body: "{}",
         headers: { "content-type": "application/json" },
@@ -231,6 +231,35 @@ describe("Cloudflare static gateway", () => {
     const proxied = upstream.mock.calls[0]?.[0] as Request;
     expect(new URL(proxied.url).origin).toBe("https://core.example.test");
     expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("core");
+  });
+
+  it("keeps catalog ingest operations and readiness checks on core", async () => {
+    const upstream = vi.fn<typeof fetch>(async (request) => new Response(
+      JSON.stringify({
+        host: new URL((request as Request).url).host,
+        route: (request as Request).headers.get("x-toonspectrum-edge-route"),
+      }),
+    ));
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const env = environment({
+      PUBLIC_READ_API_ORIGINS:
+        "https://catalog-a.example.test,https://catalog-b.example.test",
+    });
+
+    for (const pathname of [
+      "/api/catalog/ingest/status",
+      "/api/health/ready",
+      "/api/config",
+    ]) {
+      const response = await gateway(
+        new Request(`https://www.toonstudio.cloud${pathname}`),
+        env,
+      );
+      await expect(response.json()).resolves.toEqual({
+        host: "core.example.test",
+        route: "core",
+      });
+    }
   });
 
   it("fails closed for an explicitly configured invalid domain authority", async () => {
