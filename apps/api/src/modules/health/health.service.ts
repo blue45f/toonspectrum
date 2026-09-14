@@ -2,9 +2,9 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 
 import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
 import {
-  SUPABASE_OBJECT_STORAGE_PORT,
-  type SupabaseObjectStoragePort,
-} from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
+  PRIVATE_OBJECT_STORAGE_PORT,
+  type PrivateObjectStoragePort,
+} from "../../infrastructure/private-object-storage/private-object-storage.port";
 import { resolveUpstashCoordinationConfig } from "../../infrastructure/upstash-coordination/upstash-coordination.config";
 import {
   UPSTASH_COORDINATION_PORT,
@@ -34,6 +34,7 @@ export type HealthEnvironment = Partial<
     | "STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED"
     | "STUDIO_LIVE_POSTGRES_POOL_MAX"
     | "STUDIO_LIVE_POSTGRES_URL"
+    | "PRIVATE_OBJECT_STORAGE_ENABLED"
     | "SUPABASE_OBJECT_STORAGE_ENABLED"
     | "UPSTASH_COORDINATION_ENABLED"
     | "UPSTASH_COORDINATION_REST_URL"
@@ -67,8 +68,8 @@ export class HealthService {
     @Inject(HEALTH_ENVIRONMENT)
     private readonly environment: HealthEnvironment,
     @Optional()
-    @Inject(SUPABASE_OBJECT_STORAGE_PORT)
-    private readonly objectStorage?: SupabaseObjectStoragePort,
+    @Inject(PRIVATE_OBJECT_STORAGE_PORT)
+    private readonly objectStorage?: PrivateObjectStoragePort,
     @Optional()
     @Inject(UPSTASH_COORDINATION_PORT)
     private readonly coordination?: UpstashCoordinationPort,
@@ -127,9 +128,10 @@ export class HealthService {
   }
 
   private async isObjectStorageReady(): Promise<boolean> {
-    if (this.environment.SUPABASE_OBJECT_STORAGE_ENABLED !== "true") {
-      return true;
-    }
+    const storageRequired =
+      this.environment.PRIVATE_OBJECT_STORAGE_ENABLED === "true"
+      || this.environment.SUPABASE_OBJECT_STORAGE_ENABLED === "true";
+    if (!storageRequired) return true;
     const objectStorage = this.objectStorage;
     if (!objectStorage) return false;
     return this.safeCheck(async () => {

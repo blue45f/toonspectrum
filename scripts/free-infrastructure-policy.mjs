@@ -2,13 +2,20 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const FREE_INFRASTRUCTURE_POLICY_VERSION =
-  "toonspectrum.free-infrastructure.v1";
+  "toonspectrum.free-infrastructure.v2";
 
 const BILLING_BOUNDARIES = new Set([
   "hard-stop-free",
   "free-allowance-with-app-cap",
   "device-owned",
   "user-owned",
+]);
+const OPERATIONS = new Set(["read", "write", "compute"]);
+const CONSISTENCY_CLASSES = new Set([
+  "authoritative",
+  "replicated",
+  "derived",
+  "ephemeral",
 ]);
 
 function record(value) {
@@ -17,6 +24,10 @@ function record(value) {
 
 function finiteRatio(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1;
+}
+
+function identifier(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]*$/u.test(value);
 }
 
 function collectStrings(value, path, issues) {
@@ -101,6 +112,9 @@ export function validateFreeInfrastructurePolicy(policy) { // NOSONAR javascript
     if (!finiteRatio(provider.applicationHardCapRatio)) {
       issues.push(`providers.${providerId}.applicationHardCapRatio must be a ratio in (0, 1]`);
     }
+    if (provider.optional !== undefined && typeof provider.optional !== "boolean") {
+      issues.push(`providers.${providerId}.optional must be boolean when present`);
+    }
     if (
       provider.billingBoundary === "free-allowance-with-app-cap"
       && finiteRatio(provider.applicationHardCapRatio)
@@ -121,18 +135,77 @@ export function validateFreeInfrastructurePolicy(policy) { // NOSONAR javascript
   const requiredAuthorities = [
     "staticWeb",
     "edgeGateway",
+    "edgeConfiguration",
+    "edgeRelationalIndex",
     "transactionalDatabase",
+    "derivedReadModels",
+    "socialDatabase",
+    "playgroundDatabase",
     "realtimeCoordination",
+    "eventDelivery",
     "publicAssets",
+    "thumbnailDelivery",
     "backupArchive",
     "localProjects",
     "userOwnedProjects",
     "email",
+    "batchCompute",
+    "legacyCompute",
   ];
   for (const authority of requiredAuthorities) {
     const providerId = authorities[authority];
     if (typeof providerId !== "string" || !providers[providerId]) {
       issues.push(`authorities.${authority} must reference a configured provider`);
+    }
+  }
+
+  const workloads = record(policy.workloads) ? policy.workloads : {};
+  if (Object.keys(workloads).length === 0) issues.push("workloads must not be empty");
+  for (const [workloadId, workload] of Object.entries(workloads)) {
+    const path = `workloads.${workloadId}`;
+    if (!identifier(workloadId)) issues.push(`workload id is invalid: ${workloadId}`);
+    if (!record(workload)) {
+      issues.push(`${path} must be an object`);
+      continue;
+    }
+    if (!OPERATIONS.has(workload.operation)) issues.push(`${path}.operation is invalid`);
+    if (!CONSISTENCY_CLASSES.has(workload.consistency)) {
+      issues.push(`${path}.consistency is invalid`);
+    }
+    const candidates = collectStrings(workload.candidates, `${path}.candidates`, issues);
+    const requiredRoles = collectStrings(
+      workload.requiredRoles,
+      `${path}.requiredRoles`,
+      issues,
+    );
+    if (typeof workload.allowReadFallback !== "boolean") {
+      issues.push(`${path}.allowReadFallback must be boolean`);
+    }
+    if (!candidates.includes(workload.authority)) {
+      issues.push(`${path}.authority must be included in candidates`);
+    }
+    if (workload.operation !== "read" && workload.allowReadFallback === true) {
+      issues.push(`${path}.allowReadFallback is valid only for reads`);
+    }
+    if (
+      workload.operation === "write"
+      && workload.consistency === "authoritative"
+      && (candidates.length !== 1 || candidates[0] !== workload.authority)
+    ) {
+      issues.push(`${path} authoritative writes must have exactly one authority candidate`);
+    }
+    for (const providerId of candidates) {
+      const provider = providers[providerId];
+      if (!record(provider)) {
+        issues.push(`${path} references unknown provider ${providerId}`);
+        continue;
+      }
+      const roles = new Set(Array.isArray(provider.roles) ? provider.roles : []);
+      for (const role of requiredRoles) {
+        if (!roles.has(role)) {
+          issues.push(`${path} provider ${providerId} lacks role ${role}`);
+        }
+      }
     }
   }
 

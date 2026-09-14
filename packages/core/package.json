@@ -40,6 +40,11 @@
     },
     "./fortune": "./src/fortune/index.ts",
     "./collaboration": "./src/collaboration.ts",
-    "./promotion": "./src/promotion.ts"
+    "./promotion": "./src/promotion.ts",
+    "./infrastructure-fabric": {
+      "types": "./src/infrastructure-fabric.ts",
+      "import": "./src/infrastructure-fabric.ts",
+      "default": "./src/infrastructure-fabric.ts"
+    }
   }
 }

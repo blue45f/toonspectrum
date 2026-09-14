@@ -1,6 +1,7 @@
 import type {
   CreateSupabaseSignedReadUrl,
   DeleteSupabaseObject,
+  SupabaseObjectPurpose,
   SupabaseObjectReference,
   SupabaseSignedReadUrl,
   UploadSupabaseObject,
@@ -16,7 +17,7 @@ export interface SupabaseObjectStorageCallOptions {
 
 export interface SupabaseObjectStorageReadiness {
   readonly ready: true;
-  readonly privatePurposeBuckets: 3;
+  readonly privatePurposeBuckets: number;
 }
 
 /**
@@ -27,7 +28,8 @@ export interface SupabaseObjectStorageReadiness {
  */
 export interface SupabaseObjectStoragePort {
   verifyPrivatePurposeBuckets(
-    options?: SupabaseObjectStorageCallOptions
+    options?: SupabaseObjectStorageCallOptions,
+    purposes?: readonly SupabaseObjectPurpose[],
   ): Promise<SupabaseObjectStorageReadiness>;
   uploadImmutable(
     input: UploadSupabaseObject,
