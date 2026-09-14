@@ -349,7 +349,10 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).toContain('[data-studio-rail-tool-id="select"]');
     expect(source).toContain('page.keyboard.press("Meta+z")');
     expect(source).toContain('page.keyboard.press("Meta+Shift+z")');
-    expect(source).toContain('page.reload({ waitUntil: "domcontentloaded"');
+    expect(source).toContain("await reopenStudioAfterDurableWriterRelease(page, studioUrl)");
+    expect(source).toContain('name === "writer-lease.bin"');
+    expect(source).toContain('startsWith("toonspectrum-opfs-recovery:")');
+    expect(source).toContain("stayed released for 1.5s");
     expect(source).toContain('name: "이어서 그리기"');
     expect(source).not.toContain("waitForWorkerReady");
     expect(source).not.toContain("readStoredDocument");
@@ -370,4 +373,15 @@ it("exercises the three current shelf representatives without reviving excluded 
   expect(STUDIO_HOKUSAI_SHELF_SCENARIOS.map((item) => item.presetId)).toEqual(["pencil", "charcoal", "oil"]);
   expect(studioBrushQualityPortfolioEntryById("charcoal")).toBeNull();
   expect(studioBrushQualityPortfolioEntryById("oil")).toBeNull();
+});
+
+it("fixtures only the unauthenticated session transport for the static production preview", () => {
+  const source = readFileSync(
+    new URL("./verify-studio-hokusai-live-integration.mts", import.meta.url),
+    "utf8",
+  );
+  expect(source).toContain('page.route("**/api/auth/session"');
+  expect(source).toContain('JSON.stringify({ authenticated: false, user: null })');
+  expect(source).toContain("await installStudioGuestSessionBoundary(page)");
+  expect(source).not.toContain("continue-on-error");
 });
