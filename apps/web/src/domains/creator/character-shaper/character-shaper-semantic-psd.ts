@@ -80,6 +80,7 @@ export interface CharacterSemanticCaptureProgress {
 }
 
 export interface CaptureCharacterSemanticPassesInput {
+  readonly screenOutlineScale?: number;
   readonly capture: CharacterSemanticCaptureState;
   readonly vrm: VRM;
   readonly width: number;
@@ -538,6 +539,7 @@ export async function captureCharacterSemanticPasses(
     const rgba = dependencies.captureRgbaCooperatively
       ? await dependencies.captureRgbaCooperatively(capture.gl, capture.scene, capture.camera, dimensions, {
         signal, assertCurrent: input.assertCurrent, prepareTile,
+        screenOutlineScale: input.screenOutlineScale,
         onProgress: ({ completedTiles, totalTiles }) => progress(pass, "render", completedTiles, totalTiles),
       })
       : withRestore(prepareTile?.() ?? (() => undefined), () =>

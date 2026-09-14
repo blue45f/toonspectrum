@@ -16,7 +16,9 @@ import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { roundExportSize } from "../vrm/studio-vrm-poser-helpers";
 import { encodeStudioVrmCapturePngBlob, captureStudioVrmRgbaCooperatively } from "../vrm/studio-vrm-raster-capture";
 
-import { acquireCharacterExportSession, CHARACTER_EXPORT_EDGES, characterExportSize } from "./character-shaper-export";
+import { characterFrameRect, characterFramedExportSize, createCharacterFramedCamera, DEFAULT_CHARACTER_OUTPUT_FRAMING } from "./character-shaper-framing";
+import { CharacterShaperFramingControls } from "./CharacterShaperFramingControls";
+import { acquireCharacterExportSession, CHARACTER_EXPORT_EDGES } from "./character-shaper-export";
 import { boundCharacterSemanticCaptureSize, exportCharacterSemanticPsd } from "./character-shaper-semantic-psd";
 import { pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
 
@@ -29,7 +31,7 @@ import type { Camera as ThreeCamera } from "three";
 import { cn } from "@/shared/lib/utils";
 
 type DrawerMode = Exclude<CharacterShaperDrawerMode, null>;
-type ExportKind = "png" | "psd";
+type ExportKind = "png" | "psd" | "sheet4" | "sheet8";
 
 interface DockNotice {
   readonly tone: "info" | "good" | "bad";
@@ -109,6 +111,8 @@ export function CharacterShaperOutputDock({
   paintActive,
   onTogglePaint,
   compact,
+  framing = DEFAULT_CHARACTER_OUTPUT_FRAMING,
+  onFramingChange,
 }: CharacterShaperOutputDockProps) {
   const sheetId = useId();
   const aliveRef = useRef(true);
@@ -148,7 +152,7 @@ export function CharacterShaperOutputDock({
   useEffect(() => {
     if (!sheetOpen) return;
     const panel = sheetRef.current;
-    panel?.querySelector<HTMLElement>("button, input")?.focus({ preventScroll: true });
+    panel?.querySelector<HTMLElement>("button, input, select")?.focus({ preventScroll: true });
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
@@ -210,7 +214,7 @@ export function CharacterShaperOutputDock({
     exportRef.current = session;
     setRunning(kind);
     setNotice(null);
-    setProgress(kind === "png" ? "PNG로 굽는 중" : "레이어를 나누는 중 · 밑색 · 음영 · 하이라이트 · 주선");
+    setProgress(kind === "png" ? "PNG로 굽는 중" : kind === "psd" ? "레이어를 나누는 중 · 밑색 · 음영 · 하이라이트 · 주선" : "다각도 설정화 준비 중");
     void (async () => {
       let releaseHelpers: (() => void) | undefined;
       try {
@@ -223,19 +227,44 @@ export function CharacterShaperOutputDock({
           if (!sync().ok) throw new Error("의상 천 물리를 현재 포즈에 맞추지 못했습니다. 다시 시도해 주세요.");
         }
         const sourceCamera = capture.camera as ThreeCamera;
-        const exportCamera = sourceCamera.clone?.() ?? sourceCamera;
         const gl = capture.gl as { domElement: HTMLCanvasElement };
-        const display = roundExportSize(gl.domElement);
-        const requested = characterExportSize(display.width, display.height, exportEdge);
+        const canvasRect = gl.domElement.getBoundingClientRect();
+        const display = framing.aspect === "viewport" ? roundExportSize(gl.domElement) : {
+          width: canvasRect.width || gl.domElement.width,
+          height: canvasRect.height || gl.domElement.height,
+        };
+        const framed = framing.aspect === "viewport"
+          ? { camera: sourceCamera.clone?.() ?? sourceCamera, screenOutlineScale: 1 }
+          : createCharacterFramedCamera(
+            sourceCamera, characterFrameRect(display.width, display.height, framing.aspect),
+          );
+        const exportCamera = framed.camera;
+        const requested = characterFramedExportSize(display.width, display.height, exportEdge, framing.aspect);
         const size = kind === "psd" ? boundCharacterSemanticCaptureSize(requested.width, requested.height) : requested;
-        releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: kind === "psd" || transparent });
+        releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: kind !== "png" || transparent });
         helperLeaseRef.current = releaseHelpers ?? null;
         let blob: Blob;
         let receipt: DockNotice;
-        if (kind === "png") {
+        if (kind === "sheet4" || kind === "sheet8") {
+          const { exportCharacterTurnaround } = await import("./character-shaper-turnaround-export");
+          session.assertCurrent();
+          const sheet = await exportCharacterTurnaround({
+            gl: capture.gl as never, scene: capture.scene as never, camera: sourceCamera,
+            count: kind === "sheet4" ? 4 : 8, signal: session.signal, assertCurrent: session.assertCurrent,
+            onProgress: (text) => { if (aliveRef.current) setProgress(text); },
+            onCaptured: () => {
+              releaseHelpers?.();
+              releaseHelpers = undefined;
+              helperLeaseRef.current = null;
+            },
+          });
+          blob = sheet.blob;
+          receipt = { tone: "good", text: `${sheet.count}방향 설정화 저장 · ${sheet.width}×${sheet.height} · 동일 축척 · 체커보드 배경` };
+        } else if (kind === "png") {
           const rgba = await captureStudioVrmRgbaCooperatively(capture.gl as never, capture.scene as never, exportCamera,
             size, transparent ? { alpha: 0 } : { color: insertBackgroundColor, alpha: 1 }, {
               signal: session.signal,
+              screenOutlineScale: framed.screenOutlineScale,
               assertCurrent: session.assertCurrent,
               onProgress: ({ completedTiles, totalTiles }) => {
                 if (aliveRef.current) setProgress(`PNG 이미지 만드는 중 · ${Math.round(completedTiles / totalTiles * 100)}%`);
@@ -253,6 +282,7 @@ export function CharacterShaperOutputDock({
           const result = await exportCharacterSemanticPsd({
             capture: { gl: capture.gl as never, scene: capture.scene as never, camera: exportCamera },
             vrm: h.vrm, width: size.width, height: size.height, title: modelName,
+            screenOutlineScale: framed.screenOutlineScale,
             signal: session.signal, assertCurrent: session.assertCurrent,
             onProgress: ({ pass, phase, completed, total }) => {
               if (!aliveRef.current || exportRef.current !== session || session.signal.aborted) return;
@@ -277,7 +307,7 @@ export function CharacterShaperOutputDock({
         }
         session.assertCurrent();
         if (!aliveRef.current) return;
-        if (!downloadBlob(blob, `${safeFileStem(modelName)}-${timestamp()}.${kind}`)) {
+        if (!downloadBlob(blob, `${safeFileStem(modelName)}-${timestamp()}${kind.startsWith("sheet") ? `-${kind}` : ""}.${kind === "psd" ? "psd" : "png"}`)) {
           fail("이 브라우저에서는 파일을 내려받을 수 없습니다.");
           return;
         }
@@ -286,7 +316,7 @@ export function CharacterShaperOutputDock({
         if (session.signal.aborted) {
           if (aliveRef.current) setNotice({ tone: "info", text: "내보내기를 취소했습니다." });
         } else {
-          fail(kind === "png" ? "PNG를 저장하지 못했습니다." : "PSD를 내보내지 못했습니다.",
+          fail(kind === "png" ? "PNG를 저장하지 못했습니다." : kind === "psd" ? "PSD를 내보내지 못했습니다." : "설정화를 내보내지 못했습니다.",
             error instanceof Error ? error.message : undefined);
         }
       } finally {
@@ -379,15 +409,21 @@ export function CharacterShaperOutputDock({
   );
 
   const exportSettings = (
-    <label className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1.5 text-[0.7rem] font-semibold text-fg-2">
+    <div className="min-w-0 space-y-1">
+    {onFramingChange ? <CharacterShaperFramingControls value={framing} onChange={onFramingChange} disabled={exportBlocked} /> : null}
+    <div role="group" aria-label="파일 내보내기 설정" className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1.5 text-[0.7rem] font-semibold text-fg-2">
       <span className="shrink-0">파일 긴 변</span>
       <select aria-label="파일 내보내기 해상도" value={exportEdge} disabled={exportBlocked}
         onChange={(event) => setExportEdge(Number(event.currentTarget.value) as CharacterExportEdge)}
         className={cn("min-h-11 shrink-0 rounded-lg border border-line bg-panel px-2 text-fg disabled:opacity-45", STUDIO_FOCUS_RING)}>
         {CHARACTER_EXPORT_EDGES.map((edge) => <option key={edge} value={edge}>{edge} px</option>)}
       </select>
-      <span data-character-export-size-help="true" className={cn("min-w-0 text-fg-3", compact && "basis-full")}>비율 유지 · PSD 최대 2048 px</span>
-    </label>
+      <span data-character-export-size-help="true" className={cn("min-w-0 text-fg-3", compact && "basis-full")}>{framing.aspect === "viewport" ? "화면 비율 유지" : "가이드 안쪽을 잘라 저장"} · PSD 최대 2048 px</span>
+      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet4")} title="현재 방향을 기준으로 90°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">4방향 설정화</button>
+      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet8")} title="현재 방향을 기준으로 45°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">8방향 설정화</button>
+    </div>
+    {framing.aspect !== "viewport" ? <p className="text-[0.65rem] text-fg-3">가이드는 파일에 포함되지 않습니다. 캔버스에 추가는 현재 화면 전체를 사용합니다.</p> : null}
+    </div>
   );
 
   const statusLine = progress ?? notice?.text ?? (auditionActive
@@ -503,7 +539,7 @@ export function CharacterShaperOutputDock({
           role="group"
           aria-label="내보내기"
           data-character-export-sheet="true"
-          className="absolute inset-x-2 bottom-full z-40 mb-1.5 ml-auto max-w-80 rounded-2xl border border-line bg-panel p-2 shadow-[0_-12px_40px_oklch(0.05_0.01_70/0.45)]"
+          className="absolute inset-x-2 bottom-full z-40 mb-1.5 ml-auto max-w-80 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel p-2 shadow-[0_-12px_40px_oklch(0.05_0.01_70/0.45)]"
         >
           {exportSettings}
           <div className="flex flex-wrap items-center gap-1.5">

@@ -306,7 +306,7 @@ describe("CharacterShaperOutputDock", () => {
     fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
     expect(await screen.findByText(/3277×4096/u)).toBeTruthy();
     expect(captureStudioVrmRgbaCooperatively).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
-      { width: 3277, height: 4096 }, { alpha: 0 }, { signal: expect.any(AbortSignal), assertCurrent: expect.any(Function), onProgress: expect.any(Function) });
+      { width: 3277, height: 4096 }, { alpha: 0 }, { signal: expect.any(AbortSignal), screenOutlineScale: 1, assertCurrent: expect.any(Function), onProgress: expect.any(Function) });
   });
 
   it("cancels during pixel capture before encoding and only releases authority after capture settles", async () => {

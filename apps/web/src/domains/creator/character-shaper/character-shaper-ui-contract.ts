@@ -16,6 +16,7 @@ import type {
   CharacterSlotEntry,
   CharacterSlotKind,
 } from "./character-shaper-contract";
+import type { CharacterOutputFraming } from "./character-shaper-framing";
 import type { CharacterDocumentV2 } from "../character-platform/document/character-document-v2";
 import type { CharacterPartPresetV1 } from "../character-platform/presets/character-part-preset";
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
@@ -178,6 +179,8 @@ export interface CharacterShaperOutputDockProps {
   readonly paintActive: boolean;
   readonly onTogglePaint: () => void;
   readonly compact: boolean;
+  readonly framing?: CharacterOutputFraming;
+  readonly onFramingChange?: (value: CharacterOutputFraming) => void;
 }
 
 export interface CharacterShaperPaintHudProps {
