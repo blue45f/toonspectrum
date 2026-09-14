@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 
 import { chromium } from "playwright";
 
+import { hasExactExportedHttpsUrl } from "./lib/exported-url-provenance";
+
 const base = process.env.CONTENT_PACKS_BASE_URL ?? "http://127.0.0.1:5193";
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE_PATH ?? (existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : undefined) });
 try {
@@ -29,7 +31,7 @@ try {
   const output = "/private/tmp/toonstudio-free-content-browser-brief.md";
   await download.saveAs(output);
   const text = await readFile(output, "utf8");
-  if (!text.includes("https://www.artic.edu/artworks/116363") || !text.includes("Browser test fixture")) throw new Error("Missing exported provenance");
+  if (!hasExactExportedHttpsUrl(text, "https://www.artic.edu/artworks/116363") || !text.includes("Browser test fixture")) throw new Error("Missing exported provenance");
   await page.screenshot({ path: "/private/tmp/toonstudio-free-content-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "/private/tmp/toonstudio-free-content-mobile.png", fullPage: true });
