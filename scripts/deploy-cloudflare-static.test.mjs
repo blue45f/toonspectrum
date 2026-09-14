@@ -26,7 +26,7 @@ function createFakePnpm() {
   const executable = join(binDirectory, "pnpm");
   writeFileSync(
     executable,
-    `#!/usr/bin/env node\nconst { appendFileSync } = require("node:fs");\nappendFileSync(process.env.COMMAND_LOG, JSON.stringify(process.argv.slice(2)) + "\\n");\n`,
+    `#!/usr/bin/env node\nconst { appendFileSync } = require("node:fs");\nappendFileSync(process.env.COMMAND_LOG, JSON.stringify({ args: process.argv.slice(2), catalogSource: process.env.VITE_CATALOG_SOURCE ?? null }) + "\\n");\n`,
   );
   chmodSync(executable, 0o755);
   return { binDirectory, commandLog };
@@ -74,7 +74,8 @@ describe("Cloudflare static deployment origin contract", () => {
 
     expect(result.status).toBe(0);
     expect(commands).toHaveLength(3);
-    expect(commands[2]).toEqual(expect.arrayContaining([
+    expect(commands[1]).toMatchObject({ catalogSource: "static" });
+    expect(commands[2].args).toEqual(expect.arrayContaining([
       "exec",
       "wrangler",
       "deploy",
@@ -105,7 +106,7 @@ describe("Cloudflare static deployment origin contract", () => {
     for (const origin of [
       "http://social.example.test",
       "https://social.example.test/private",
-      "https://user:password@social.example.test",
+      "https://user:opaque@social.example.test",
     ]) {
       const { result, commands } = runDeploy({
         CLOUDFLARE_SOCIAL_API_ORIGIN: origin,
@@ -116,5 +117,20 @@ describe("Cloudflare static deployment origin contract", () => {
       );
       expect(commands).toEqual([]);
     }
+  });
+
+  it("allows an explicit API catalog build for compatibility rollbacks", () => {
+    const { result, commands } = runDeploy({ VITE_CATALOG_SOURCE: "api" });
+
+    expect(result.status).toBe(0);
+    expect(commands[1]).toMatchObject({ catalogSource: "api" });
+  });
+
+  it("rejects an unknown catalog source before invoking pnpm", () => {
+    const { result, commands } = runDeploy({ VITE_CATALOG_SOURCE: "hybrid" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("VITE_CATALOG_SOURCE must be static or api");
+    expect(commands).toEqual([]);
   });
 });
