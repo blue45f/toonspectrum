@@ -15026,12 +15026,7 @@ const puppetWarpArmed =
     () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
     [serverAiStatus]
   );
-  const activeServerAiProviderLabel =
-    textAiTransport.mode !== "server"
-      ? "내 API"
-      : serverAiProvider === "auto"
-        ? `${configuredServerAiProviders.map((provider) => provider.label).join(" → ") || "서버 AI"} 자동`
-        : configuredServerAiProviders.find((provider) => provider.id === serverAiProvider)?.label ?? "서버 AI";
+  const activeServerAiProviderLabel = "내 API";
   function updateServerAiProvider(next: StudioServerAiProviderPreference) {
     serverAiProviderUserRevisionRef.current += 1;
     serverAiProviderRef.current = next;
@@ -15051,23 +15046,7 @@ const puppetWarpArmed =
     return `${scope}-${entropy}`.slice(0, 120);
   }
   function pendingTextAiProviderContext() {
-    const preferredProviderId = textAiTransport.mode === "server"
-      ? serverAiProvider === "auto"
-        ? serverAiStatus?.selection.order.find((providerId) =>
-            configuredServerAiProviders.some((provider) => provider.id === providerId)
-          )
-        : serverAiProvider
-      : undefined;
-    const preferredProvider = configuredServerAiProviders.find(
-      (provider) => provider.id === preferredProviderId
-    );
-    return studioTextAiProviderContext(
-      aiSettings,
-      textAiTransport,
-      preferredProvider
-        ? { provider: preferredProvider.id, model: preferredProvider.model }
-        : null
-    );
+    return studioTextAiProviderContext(aiSettings, textAiTransport, null);
   }
   function beginTrackedStudioAiOperation(
     scope: string,

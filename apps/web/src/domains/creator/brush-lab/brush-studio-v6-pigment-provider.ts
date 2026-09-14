@@ -72,9 +72,9 @@ function parseColor(hex: string): Rgb {
 }
 
 function hexColor(color: Rgb | readonly number[]): string {
-  const channels = Array.isArray(color)
+  const channels: readonly number[] = Array.isArray(color)
     ? color
-    : [color.r, color.g, color.b];
+    : [(color as Rgb).r, (color as Rgb).g, (color as Rgb).b];
   return `#${channels.slice(0, 3).map((channel) =>
     Math.round(unit(channel ?? 0) * 255).toString(16).padStart(2, "0")
   ).join("")}`;

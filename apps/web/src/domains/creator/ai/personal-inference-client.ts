@@ -70,7 +70,7 @@ async function request(path: string, init: RequestInit = {}, maximum = 1536 * 10
   const response = await fetch(`${current.base}${path}`, { ...init, headers, credentials: "omit", redirect: "error", referrerPolicy: "no-referrer", cache: "no-store" });
   const bytes = await boundedBytes(response, maximum);
   if (!response.ok) throw new Error(`개인 추론 서버 요청 실패 (HTTP ${response.status}). 자동 재시도하지 않았습니다.`);
-  return new Response(bytes, { status: response.status, headers: response.headers });
+  return new Response(Uint8Array.from(bytes).buffer, { status: response.status, headers: response.headers });
 }
 async function json<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await request(path, init);
