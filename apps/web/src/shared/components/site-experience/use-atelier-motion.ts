@@ -12,7 +12,7 @@ export function useAtelierMotion() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry?.isIntersecting ?? false), { threshold: 0.08 });
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.08 });
     observer.observe(host);
     return () => observer.disconnect();
   }, []);
@@ -21,13 +21,10 @@ export function useAtelierMotion() {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const onChange = () => setReduced(media.matches);
     const onVisibility = () => setForeground(document.visibilityState !== "hidden");
-    // Older embedded WebKit exposes only the legacy MediaQueryList listener.
-    if (typeof media.addEventListener === "function") media.addEventListener("change", onChange);
-    else media.addListener?.(onChange);
+    media.addEventListener("change", onChange);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      if (typeof media.removeEventListener === "function") media.removeEventListener("change", onChange);
-      else media.removeListener?.(onChange);
+      media.removeEventListener("change", onChange);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
