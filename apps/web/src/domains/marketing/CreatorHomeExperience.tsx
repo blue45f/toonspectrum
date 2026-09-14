@@ -20,7 +20,7 @@ const COPY = {
   ko: {
     eyebrow: "THE PROFESSIONAL WEBTOON ATELIER", title: ["한 획에서,", "한 편의 웹툰까지."],
     intro: "웹툰을 그리는 전문 작업실, ToonStudio. 펜선과 채색, 컷과 말풍선, 캐릭터와 배경 구도까지. 장면을 쌓아 당신의 이야기를 완성하세요.",
-    start: "웹툰 스튜디오 열기", simple: "처음이라면 심플 모드", projects: "내 프로젝트", watch: "24초 브랜드 필름",
+    start: "웹툰 스튜디오 열기", simple: "처음이라면 바로 그리기", projects: "내 프로젝트", watch: "24초 브랜드 필름",
     trust: ["브러시 · 레이어 · 필압", "컷 · 말풍선 · 3D 구도", "브라우저에서 바로 시작"],
     stageLabel: "작업 단계별 구성 가이드 선택", signature: "당신의 선으로, 당신의 세계를.",
     strip: ["DRAW WITH INTENTION", "COMPOSE YOUR WORLD", "MAKE IT YOURS"],
@@ -30,7 +30,7 @@ const COPY = {
     processAlt: "캐릭터의 스케치, 채색과 완성된 웹툰 장면을 보여주는 창작 과정 콘셉트 아트",
     processCaption: "FROM THE FIRST MARK TO THE FINAL SCENE", processNote: "각 제작 단계를 설명하는 콘셉트 아트",
     flowSteps: [
-      { title: "관찰하고, 수집하다.", body: "복식과 건축, 소품의 디테일. 출처가 있는 자료로 장면의 설득력을 더하세요.", href: "/research", action: "리서치 데스크에서 찾기", tag: "RESEARCH" },
+      { title: "관찰하고, 수집하다.", body: "복식과 건축, 소품의 디테일. 출처가 있는 자료로 장면의 설득력을 더하세요.", href: "/research", action: "참고자료 찾기", tag: "RESEARCH" },
       { title: "그리고, 구성하다.", body: "선을 쌓고 색을 고르고 컷을 나누세요. 캐릭터와 배경 도구로 장면의 구도까지 다듬으세요.", href: "/studio", action: "스튜디오에서 그리기", tag: "CREATE" },
       { title: "움직이고, 전하다.", body: "완성한 컷에 움직임과 자막, 음악을 더해 작품을 소개하는 모션툰으로 이어가세요.", href: "/create/promo", action: "홍보 영상 구성하기", tag: "PRESENT" },
     ],
@@ -128,7 +128,7 @@ export function CreatorHomeExperience() {
             <h1 id="creator-home-title">{text.title[0]}<br /><em>{text.title[1]}</em></h1>
             <p className="cf-lead">{text.intro}</p>
             <div className="cf-actions"><Link href="/studio" className="cf-button cf-primary">{text.start}<ArrowRight size={19} aria-hidden="true" /></Link><Link href="/studio/projects" className="cf-button cf-secondary">{text.projects}</Link></div>
-            <div className="cf-hero-links"><Link href="/studio?uiMode=simple">{text.simple}<ArrowRight size={14} aria-hidden="true" /></Link><a className="cf-film-link" href="#creator-film" onClick={focusExperienceSection}><Play size={13} fill="currentColor" aria-hidden="true" />{text.watch}</a></div>
+            <div className="cf-hero-links"><Link href="/studio/new#quick-draw">{text.simple}<ArrowRight size={14} aria-hidden="true" /></Link><a className="cf-film-link" href="#creator-film" onClick={focusExperienceSection}><Play size={13} fill="currentColor" aria-hidden="true" />{text.watch}</a></div>
             <div className="cf-trust">{text.trust.map((item) => <span key={item}><Check size={13} aria-hidden="true" />{item}</span>)}</div>
             <div className="cf-hero-signature"><span aria-hidden="true">T/s.</span><p>{text.signature}</p><a href="#creator-toolkit-title" onClick={focusExperienceSection} aria-label={text.jumpLabels[0]}><ArrowDown size={18} aria-hidden="true" /></a></div>
           </div>

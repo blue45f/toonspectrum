@@ -73,7 +73,7 @@ const HOME_ACTIONS: readonly FrontDoorCard[] = [
   {
     href: "/studio/assets",
     icon: Boxes,
-    title: { ko: "에셋", en: "Assets" },
+    title: { ko: "소재", en: "Assets" },
     description: {
       ko: "브러시, 캐릭터, 배경, 글꼴과 오디오를 찾고 제작에 연결합니다.",
       en: "Find brushes, characters, backgrounds, fonts and audio for your project.",
@@ -197,8 +197,8 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
     href: "/market",
     icon: Store,
-    title: { ko: "에셋 마켓", en: "Asset market" },
-    description: { ko: "상업 이용·호환성을 확인하고 새 에셋을 찾습니다.", en: "Find assets with clear commercial-use and compatibility information." },
+    title: { ko: "소재 마켓", en: "Asset market" },
+    description: { ko: "상업 이용·호환성을 확인하고 새 소재를 찾습니다.", en: "Find assets with clear commercial-use and compatibility information." },
   },
 ];
 
