@@ -472,24 +472,36 @@ async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   throw new Error(`메인 메뉴 [${label}] 열기 실패: 다시 클릭해도 메뉴가 열리지 않음`);
 }
 
-async function hasVisibleMenuItem(menu: Locator, name: string): Promise<boolean> {
-  for (const role of ["menuitem", "menuitemcheckbox", "menuitemradio"] as const) {
-    // Shortcut badges are intentionally part of the rendered row and therefore extend the
-    // computed accessible name (for example `초안 저장 ⌘S`).  Keep the semantic-role check while
-    // requiring the row's visible label span to match exactly; a partial role-name query alone
-    // would let `게시` pass by finding `게시 패키지…`.
-    const matches = menu.getByRole(role, { name, exact: false });
-    const count = await matches.count();
-    for (let index = 0; index < count; index += 1) {
-      const row = matches.nth(index);
-      // Scope the exact text lookup to this row. Passing a locator rooted at `menu` into
-      // `filter({ has })` would look for a nested menu below the row and incorrectly return zero.
-      if ((await row.getByText(name, { exact: true }).count()) === 0) continue;
-      await row.scrollIntoViewIfNeeded().catch(() => undefined);
-      if (await row.isVisible().catch(() => false)) return true;
-    }
-  }
-  return false;
+export function menuItemRowHasExactLabel(rowText: string, name: string): boolean {
+  return rowText
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .includes(name);
+}
+
+async function visibleMenuItemRowTexts(menu: Locator): Promise<string[]> {
+  const rows = menu.locator(
+    '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
+  );
+  // Capture the complete open-menu frame in one browser evaluation. Desktop hover ownership may
+  // close a short dropdown as soon as Playwright performs a later scroll/focus query; a synchronous
+  // snapshot proves the shipped rows without racing that ordinary lifecycle.
+  return rows.evaluateAll((elements) =>
+    elements.flatMap((element) => {
+      if (!(element instanceof HTMLElement)) return [];
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (
+        style.display === "none"
+        || style.visibility === "hidden"
+        || rect.width <= 0
+        || rect.height <= 0
+      ) {
+        return [];
+      }
+      return [element.innerText];
+    }),
+  );
 }
 
 /**
@@ -624,6 +636,7 @@ async function assertMainMenus(page: Page): Promise<string[]> {
     try {
       await openMainMenuGroup(page, presented.title);
       const menu = page.locator(`[role="menu"][aria-label="${presented.title}"]`);
+      const visibleItemRows = await visibleMenuItemRowTexts(menu);
       for (const section of presented.sections) {
         // Only a composite dropdown captions its sections; a stand-alone title's caption
         // is the menubar label itself and is not repeated inside the panel.
@@ -631,7 +644,9 @@ async function assertMainMenus(page: Page): Promise<string[]> {
           failures.push(`메인 메뉴 [${presented.title}] 섹션 캡션 없음: ${section.caption}`);
         }
         for (const item of section.items) {
-          const visible = await hasVisibleMenuItem(menu, item);
+          const visible = visibleItemRows.some((rowText) =>
+            menuItemRowHasExactLabel(rowText, item),
+          );
           if (!visible) {
             const where = presented.composite
               ? `${presented.title} ▸ ${section.caption}`

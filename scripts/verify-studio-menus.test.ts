@@ -11,7 +11,11 @@ import { buildStudioBrushMenuItems } from "../apps/web/src/domains/creator/studi
 import { createStudioUiPreferencesRepository } from "../apps/web/src/domains/creator/studio-ui-preferences-sqlite";
 import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBackgroundPanel";
 
-import { CATALOGUE_GROUPS, MENU_DRIVEN_POPOVERS } from "./verify-studio-menus.mts";
+import {
+  CATALOGUE_GROUPS,
+  MENU_DRIVEN_POPOVERS,
+  menuItemRowHasExactLabel,
+} from "./verify-studio-menus.mts";
 
 import type {
   StudioMainMenuBuilderState,
@@ -26,6 +30,12 @@ vi.mock("@/shared/lib/i18n", () => ({
 afterEach(() => cleanup());
 
 describe("production menu verifier follows shipped feature entry points", () => {
+  it("matches a direct menu-row label exactly without confusing shortcut or prefix text", () => {
+    expect(menuItemRowHasExactLabel("AI 어시스트", "AI 어시스트")).toBe(true);
+    expect(menuItemRowHasExactLabel("초안 저장\n⌘S", "초안 저장")).toBe(true);
+    expect(menuItemRowHasExactLabel("게시 패키지…", "게시")).toBe(false);
+    expect(menuItemRowHasExactLabel("슬롯 3: 초안 저장", "초안 저장")).toBe(false);
+  });
   it("requires the current stroke label and preserves the same correction action", () => {
     const correctCurrentStroke = vi.fn();
     const item = buildStudioBrushMenuItems({
