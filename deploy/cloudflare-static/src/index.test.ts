@@ -46,6 +46,7 @@ describe("Cloudflare static gateway", () => {
       assets?: { run_worker_first?: string[] };
     };
 
+    expect((wrangler as { workers_dev?: boolean }).workers_dev).toBe(true);
     expect(wrangler.assets?.run_worker_first).toEqual([
       "/api",
       "/api/*",
@@ -55,6 +56,8 @@ describe("Cloudflare static gateway", () => {
       "/market",
       "/market/browse",
       "/market/resource/*",
+      "/assets/opencascade.wasm-*.wasm",
+      "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
     ]);
     expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
   });
@@ -161,6 +164,42 @@ describe("Cloudflare static gateway", () => {
       );
       await expect(response.json()).resolves.toEqual({ host, route });
     }
+  });
+
+  it("proxies oversized immutable assets without forwarding session credentials", async () => {
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      const proxied = request as Request;
+      return new Response(JSON.stringify({
+        url: proxied.url,
+        route: proxied.headers.get("x-toonspectrum-edge-route"),
+        range: proxied.headers.get("range"),
+        authorization: proxied.headers.get("authorization"),
+        cookie: proxied.headers.get("cookie"),
+      }));
+    });
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request(
+        "https://www.toonstudio.cloud/assets/opencascade.wasm-build123.wasm",
+        {
+          headers: {
+            range: "bytes=0-1023",
+            authorization: "Bearer private",
+            cookie: "session=private",
+          },
+        },
+      ),
+      environment({ LARGE_ASSET_ORIGIN: "https://large-assets.example.test" }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      url: "https://large-assets.example.test/assets/opencascade.wasm-build123.wasm",
+      route: "large-asset",
+      range: "bytes=0-1023",
+      authorization: null,
+      cookie: null,
+    });
+    expect(upstream).toHaveBeenCalledOnce();
   });
 
   it("falls back to the core authority while a domain-specific service is not configured", async () => {

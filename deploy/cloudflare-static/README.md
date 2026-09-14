@@ -25,6 +25,7 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 | playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
 | realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
+| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | `LARGE_ASSET_ORIGIN` | 세션·사용자 헤더 제거 후 단일 불변 파일 권위로 전달 |
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
 
@@ -43,7 +44,7 @@ core·social·playground·admin·realtime 요청의 전달 IP는 클라이언트
 각 upstream 요청에는 다음 관측 헤더가 추가된다.
 
 - `x-toonspectrum-edge: cloudflare-static-gateway-v2`
-- `x-toonspectrum-edge-route: core | public-read | social | playground | admin | realtime`
+- `x-toonspectrum-edge-route: core | public-read | social | playground | admin | realtime | large-asset`
 - `x-toonspectrum-edge-attempt: 0..n`
 
 사용자 credential을 Worker 변수에 저장하지 않는다.
@@ -87,6 +88,10 @@ pnpm run cloudflare:static:dry-run
 - Vercel과 Cloudflare 보안 헤더 계약 동기화
 
 `dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성과 모든 origin 변수를 검사하지만 원격에 배포하지 않는다.
+
+### 25 MiB 초과 정적 파일
+
+Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB만 `.assetsignore`에 기록한다. 다른 파일이 한도를 넘으면 배포는 실패한다. 무시된 경로는 Worker가 `LARGE_ASSET_ORIGIN`에서 동일 URL로 가져오며 Authorization, Cookie, 사용자·관리자·세션 헤더를 전달하지 않는다. R2가 계정에서 활성화되면 이 임시 origin을 R2 binding으로 대체한다.
 
 ## 수동 운영 배포
 

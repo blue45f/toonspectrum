@@ -13,6 +13,7 @@ const OPTIONAL_SINGLE_ORIGINS = [
   ["CLOUDFLARE_PLAYGROUND_API_ORIGIN", "PLAYGROUND_API_ORIGIN"],
   ["CLOUDFLARE_ADMIN_API_ORIGIN", "ADMIN_API_ORIGIN"],
   ["CLOUDFLARE_REALTIME_API_ORIGIN", "REALTIME_API_ORIGIN"],
+  ["CLOUDFLARE_LARGE_ASSET_ORIGIN", "LARGE_ASSET_ORIGIN"],
 ];
 const MAX_PUBLIC_READ_ORIGINS = 8;
 
@@ -102,6 +103,10 @@ for (const command of [
       ...process.env,
       VITE_CATALOG_SOURCE: staticCatalogSource,
     },
+  },
+  {
+    executable: "pnpm",
+    args: ["run", "prepare:cloudflare-static-assets"],
   },
   {
     executable: "pnpm",

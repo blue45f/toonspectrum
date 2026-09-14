@@ -70,12 +70,14 @@ describe("Cloudflare static deployment origin contract", () => {
       CLOUDFLARE_PLAYGROUND_API_ORIGIN: "https://playground.example.test",
       CLOUDFLARE_ADMIN_API_ORIGIN: "https://admin.example.test",
       CLOUDFLARE_REALTIME_API_ORIGIN: "https://realtime.example.test",
+      CLOUDFLARE_LARGE_ASSET_ORIGIN: "https://large-assets.example.test",
     });
 
     expect(result.status).toBe(0);
-    expect(commands).toHaveLength(3);
+    expect(commands).toHaveLength(4);
     expect(commands[1]).toMatchObject({ catalogSource: "static" });
-    expect(commands[2].args).toEqual(expect.arrayContaining([
+    expect(commands[2].args).toEqual(["run", "prepare:cloudflare-static-assets"]);
+    expect(commands[3].args).toEqual(expect.arrayContaining([
       "exec",
       "wrangler",
       "deploy",
@@ -86,6 +88,7 @@ describe("Cloudflare static deployment origin contract", () => {
       "PLAYGROUND_API_ORIGIN:https://playground.example.test",
       "ADMIN_API_ORIGIN:https://admin.example.test",
       "REALTIME_API_ORIGIN:https://realtime.example.test",
+      "LARGE_ASSET_ORIGIN:https://large-assets.example.test",
     ]));
   });
 

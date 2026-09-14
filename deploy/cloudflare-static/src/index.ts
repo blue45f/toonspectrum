@@ -1,3 +1,5 @@
+import { isCloudflareOversizedAssetPath } from "./large-static-assets";
+
 export interface AssetsBinding {
   fetch(request: Request): Promise<Response>;
 }
@@ -11,6 +13,7 @@ export interface CloudflareStaticEnv {
   readonly PLAYGROUND_API_ORIGIN?: string;
   readonly ADMIN_API_ORIGIN?: string;
   readonly REALTIME_API_ORIGIN?: string;
+  readonly LARGE_ASSET_ORIGIN?: string;
 }
 
 interface GatewayRuntime {
@@ -23,7 +26,8 @@ type DynamicRoute =
   | "social"
   | "playground"
   | "admin"
-  | "realtime";
+  | "realtime"
+  | "large-asset";
 
 interface OriginResolution {
   readonly origins: readonly URL[];
@@ -89,7 +93,8 @@ function hasExactlyOneEncodedSegment(
 }
 
 function isDynamicPath(pathname: string): boolean {
-  return pathname === "/api"
+  return isCloudflareOversizedAssetPath(pathname)
+    || pathname === "/api"
     || pathname.startsWith("/api/")
     || pathname === "/socket.io"
     || pathname.startsWith("/socket.io/")
@@ -160,6 +165,9 @@ function isPublicReadPath(pathname: string): boolean {
 }
 
 function classifyDynamicRoute(request: Request, requestUrl: URL): DynamicRoute {
+  if (isCloudflareOversizedAssetPath(requestUrl.pathname)) {
+    return "large-asset";
+  }
   if (
     requestUrl.pathname === "/socket.io"
     || requestUrl.pathname.startsWith("/socket.io/")
@@ -253,6 +261,8 @@ function resolveOrigins(
       return optionalOrigin(env.ADMIN_API_ORIGIN, core);
     case "realtime":
       return optionalOrigin(env.REALTIME_API_ORIGIN, core);
+    case "large-asset":
+      return optionalOrigin(env.LARGE_ASSET_ORIGIN, core);
     case "core":
       return {
         origins: core ? [core] : [],
@@ -361,7 +371,7 @@ export function createUpstreamApiRequest(
   headers.delete("true-client-ip");
   headers.delete("x-forwarded-for");
   headers.delete("x-real-ip");
-  if (route === "public-read") {
+  if (route === "public-read" || route === "large-asset") {
     removePublicReadCredentials(headers);
   } else if (connectingIp) {
     headers.set("x-forwarded-for", connectingIp);
