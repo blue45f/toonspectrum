@@ -2,12 +2,19 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  rememberSharedStudioRecentColor,
+  resetStudioRecentColorsBridgeForTests,
+} from "./studio-recent-colors-bridge";
 import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import { useStudioRecentColors } from "./useStudioRecentColors";
 
 import type { StudioAsyncKeyValueStore } from "./studio-local-database";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetStudioRecentColorsBridgeForTests();
+});
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -35,6 +42,15 @@ describe("SQLite recent-color owner", () => {
     act(() => hook.result.current.rememberColor("#ABC"));
     await waitFor(() => expect(f.values.get("recent-colors")).toBe('["#aabbcc","#112233"]'));
     expect(hook.result.current.recentColors).toEqual(["#aabbcc", "#112233"]);
+  });
+
+  it("persists colour intents emitted by a prop-drill-free inspector consumer", async () => {
+    const f = fixture(); const hook = f.render();
+    act(() => rememberSharedStudioRecentColor("#445566"));
+    await waitFor(() =>
+      expect(f.values.get("recent-colors")).toBe('["#445566","#112233"]'),
+    );
+    expect(hook.result.current.recentColors).toEqual(["#445566", "#112233"]);
   });
 
   it("replays clear after a late hydration and never restores old colors", async () => {
