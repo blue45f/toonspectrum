@@ -490,6 +490,16 @@ export class StudioLiveRoom {
     return this.ready ? this.transport?.direct ?? null : null;
   }
 
+  /** Capability-scoped RTC feature lanes, exposed only after room admission. */
+  get peerFabric(): import("./studio-peer-fabric").StudioPeerFabricPort | null {
+    return this.ready ? this.transport?.peerFabric ?? null : null;
+  }
+
+  /** Shared RTC-only bulk exchange, exposed only after room admission. */
+  get peerBulk(): import("./studio-peer-bulk-exchange").StudioPeerBulkExchangePort | null {
+    return this.ready ? this.transport?.peerBulk ?? null : null;
+  }
+
   get crdtFanout(): import( "./studio-live-collaboration-transport").StudioLiveCrdtFanout | undefined {
     return this.transport?.crdtFanout;
   }

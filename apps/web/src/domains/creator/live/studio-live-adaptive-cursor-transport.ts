@@ -101,6 +101,8 @@ function compactCursorEnvelope(
  */
 class StudioAdaptiveCursorTransport implements StudioLiveTransport {
   readonly direct?: StudioLiveTransport["direct"];
+  readonly peerFabric?: StudioLiveTransport["peerFabric"];
+  readonly peerBulk?: StudioLiveTransport["peerBulk"];
   readonly mode: StudioLiveTransport["mode"];
   readonly crdtFanout?: StudioLiveTransport["crdtFanout"];
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
@@ -149,6 +151,8 @@ class StudioAdaptiveCursorTransport implements StudioLiveTransport {
     this.workId = context.workId;
     this.inner = inner;
     this.direct = inner.direct;
+    this.peerFabric = inner.peerFabric;
+    this.peerBulk = inner.peerBulk;
     this.mode = inner.mode;
     this.crdtFanout = inner.crdtFanout;
     this.canonicalSessionId = inner.canonicalSessionId?.bind(inner);

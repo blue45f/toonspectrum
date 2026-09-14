@@ -66,6 +66,7 @@ import {
   STUDIO_COMPANION_TOOL_LABELS,
   STUDIO_COMPANION_TOOL_ORDER,
   studioCompanionPrimaryUrl,
+  type StudioCompanionChannelFactory,
   type StudioCompanionCommandName,
   type StudioCompanionControl,
   type StudioCompanionDensity,
@@ -200,7 +201,13 @@ function decodeStudioCompanionBlobImage(
   });
 }
 
-export function StudioToolsCompanionPage() {
+export interface StudioToolsCompanionPageProps {
+  readonly channelFactory?: StudioCompanionChannelFactory;
+}
+
+export function StudioToolsCompanionPage({
+  channelFactory,
+}: StudioToolsCompanionPageProps = {}) {
   const location = useLocation();
   const t = useT();
   const sessionId = parseStudioCompanionSessionId(location.search);
@@ -653,7 +660,9 @@ export function StudioToolsCompanionPage() {
     }
     const companionInstanceId = companionIdentity.instanceId;
     companionInstanceIdRef.current = companionInstanceId;
-    const channel = createStudioCompanionChannel(sessionId);
+    const channel = channelFactory
+      ? channelFactory(sessionId)
+      : createStudioCompanionChannel(sessionId);
     channelRef.current = channel;
     if (!channel) {
       setPresentationSafeTransport("memory-only");
@@ -1083,6 +1092,7 @@ export function StudioToolsCompanionPage() {
     clearPendingBrushControl,
     clearPendingNavigatorControl,
     clearReviewState,
+    channelFactory,
     companionDocumentScopeKey,
     sessionId,
     surface,
