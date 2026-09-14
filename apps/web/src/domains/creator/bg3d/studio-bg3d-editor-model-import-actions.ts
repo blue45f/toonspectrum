@@ -126,6 +126,11 @@ export interface StudioBg3dModelImportActionsContext {
 
 /** The two model-library actions the asset library panel drives, bound to one editor context. */
 export interface StudioBg3dModelImportActions {
+  readonly importModelFiles: (
+    files: readonly File[],
+    rights: NonNullable<Bg3dModelImportItem["rights"]>,
+    signal?: AbortSignal,
+  ) => Promise<boolean>;
   readonly handleUploadModelFiles: (
     event: ChangeEvent<HTMLInputElement>,
     rights: NonNullable<Bg3dModelImportItem["rights"]>,
@@ -183,16 +188,26 @@ export function createStudioBg3dModelImportActions(
   ) {
     const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = ""; // StudioVrmPoser.tsx handleFileChange와 동일 — 같은 파일 재선택 허용
-    if (files.length === 0) return;
+    await importModelFiles(files, rights);
+  }
+
+  async function importModelFiles(
+    files: readonly File[],
+    rights: NonNullable<Bg3dModelImportItem["rights"]>,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    if (files.length === 0 || signal?.aborted) return false;
     if (placementSessionRef.current.phase === "preview") cancelCustomModelPlacement();
     const session = modalAssetSessionRef.current;
-    if (!session || !isModalAssetSessionCurrent(session)) return;
+    if (!session || !isModalAssetSessionCurrent(session)) return false;
 
     // A new import supersedes only thumbnail post-processing. Verified model import itself proceeds
     // even while another non-thumbnail capture owns the renderer and may leave placeholders.
     invalidateModelThumbnailCaptures();
     modelImportAbortRef.current?.abort();
     const importController = new AbortController();
+    const abortImport = () => importController.abort();
+    signal?.addEventListener("abort", abortImport, { once: true });
     modelImportAbortRef.current = importController;
     setIsUploadingModel(true);
     setError(null);
@@ -422,7 +437,7 @@ export function createStudioBg3dModelImportActions(
     } catch (importFailure) {
       // 저장은 atomic import가 책임지고, 화면 배치는 별도 all-or-none이다. 이번 시도에서 처음 로드한
       // 캐시만 되돌려 기존 장면 인스턴스가 공유 중인 자원은 건드리지 않는다.
-      if (!isModalAssetSessionCurrent(session)) return;
+      if (!isModalAssetSessionCurrent(session)) return false;
       setError(
         modelImportRuntime && importFailure instanceof modelImportRuntime.StudioBg3dModelImportError
           ? importFailure.message
@@ -445,6 +460,7 @@ export function createStudioBg3dModelImportActions(
         });
       }
     } finally {
+      signal?.removeEventListener("abort", abortImport);
       if (!uploadCommitted) cleanupUncommittedUploadCache();
       if (modelImportAbortRef.current === importController) modelImportAbortRef.current = null;
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
@@ -455,6 +471,7 @@ export function createStudioBg3dModelImportActions(
     if (uploadCommitted && thumbnailCandidates.length > 0) {
       startModelThumbnailCaptureBatch(thumbnailCandidates, session);
     }
+    return uploadCommitted;
   }
 
   async function handleDeleteModelFromLibrary(id: string) {
@@ -571,5 +588,5 @@ export function createStudioBg3dModelImportActions(
     }
   }
 
-  return { handleUploadModelFiles, handleDeleteModelFromLibrary };
+  return { handleDeleteModelFromLibrary, handleUploadModelFiles, importModelFiles };
 }

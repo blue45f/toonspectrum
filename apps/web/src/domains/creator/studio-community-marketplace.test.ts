@@ -673,3 +673,28 @@ describe("studio community marketplace projection", () => {
     })).rejects.toThrow("다시 공유할 수 없습니다");
   });
 });
+
+describe("reviewed marketplace image and model delivery", () => {
+  it("projects high-resolution CC0 backgrounds and cutouts alongside existing SVG assets", () => {
+    for (const id of ["polyhaven-background-wide-street-01", "polyhaven-painted-wooden-chair-01-cutout"]) {
+      const result = projectCreatorMarketplaceRecordToAssets(record("asset", { recipeId: id }));
+      expect(result.unsupportedCount).toBe(0);
+      expect(result.assets[0]?.id).toBe(id);
+    }
+  });
+  it("does not project a model or arbitrary path as a 2D image", () => {
+    for (const id of ["polyhaven-painted-wooden-chair-01", "../private", "https://example.com/asset.webp"]) {
+      expect(projectCreatorMarketplaceRecordToAssets(record("asset", { recipeId: id })).assets).toEqual([]);
+    }
+  });
+  it("installs only the exact reviewed 3D reference", () => {
+    for (const [id, valid] of [["polyhaven-painted-wooden-chair-01", true], ["polyhaven-sofa-02", true], ["missing", false], ["polyhaven-background-wide-street-01", false]] as const) {
+      const projection = projectCreatorMarketplaceRecordToStudioPack(record("3d-asset", {
+        recipeId: `studio-3d-asset:${id}`,
+      }, { mode: "procedural-recipe", engines: ["webgl2"] }));
+      expect(projection.status).toBe("installable");
+      if (projection.status !== "installable") throw new Error("missing projection");
+      expect(validateStudioCreatorPack(projection.pack).valid).toBe(valid);
+    }
+  });
+});

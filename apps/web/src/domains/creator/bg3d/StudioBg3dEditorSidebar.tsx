@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { StudioMarketplaceModelImport } from "./StudioMarketplaceModelImport";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 
@@ -324,6 +325,12 @@ export function StudioBg3dEditorSidebar({ h }) {
   } = { ...R, ...h };
   return (
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
+            <StudioMarketplaceModelImport
+              modelId={h.marketplaceModelId ?? null}
+              scopeKey={h.sharedStageSessionScopeKey}
+              disabled={Boolean(h.isRestoringScene || h.isUploadingModel || h.physicsInteractionLocked || h.immersiveSceneActive || h.sceneRecoveryError)}
+              onImport={h.importMarketplaceModelFiles}
+            />
             <div
               role="tablist"
               aria-label="컨트롤 카테고리"

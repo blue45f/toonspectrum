@@ -71,8 +71,8 @@ import {
   type StudioMarketplaceRuntimeCompatibilityContext,
 } from "./studio-marketplace-runtime-compatibility";
 import {
-  createStudioCommunityMarketplaceAssetRecord,
-} from "./studio-community-marketplace-asset";
+  createStudioMarketplaceImageRecord,
+} from "./studio-marketplace-assets";
 import {
   getProductStudioPaletteSqliteRepository,
 } from "./studio-palette-sqlite-repository";
@@ -926,7 +926,7 @@ function CommunityRecordCard({
         generation,
       );
       if (!current) return;
-      const asset = await createStudioCommunityMarketplaceAssetRecord(selectedAsset, controller.signal);
+      const asset = await createStudioMarketplaceImageRecord(selectedAsset, controller.signal);
       if (controller.signal.aborted || publicActionGenerationRef.current !== generation) return;
       const inserted = onUseAsset(asset);
       onStatus(

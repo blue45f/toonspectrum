@@ -6031,6 +6031,7 @@ export function StudioCuttoonEditor({
   /** Elements 3D rail → VRM poser one-shot prop seed (cleared after consume). */
   const [poserSeedPropId, setPoserSeedPropId] = useState<string | null>(null);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  const [bg3dMarketplaceModelId, setBg3dMarketplaceModelId] = useState<string | null>(null);
   function openVrmPoserFromMenu() {
     // 두 VRM 표면이 같은 문서 위에 동시에 서지 않게 한다. 셰이퍼에서 레거시 빌더로 무손실
     // 전환하는 길은 셰이퍼 안의 「고급 편집」이다.
@@ -6044,6 +6045,7 @@ export function StudioCuttoonEditor({
     navigateStudio2dSurface("character");
   }
   function openBackground3dFromMenu() {
+    setBg3dMarketplaceModelId(null);
     setBg3dSeedTemplateId(null);
     setBg3dSeedPrimitiveKind(null);
     setBg3dInitialDataUrl(undefined);
@@ -6080,6 +6082,7 @@ export function StudioCuttoonEditor({
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!bg3dOpen) {
+      setBg3dMarketplaceModelId(null);
       bg3dDccSourceRef.current = null;
       bg3dDccShotMappingsRef.current = [];
       // Every close path (dialog, route Back, DCC admission, rail toggle) retires the edit target.
@@ -15730,9 +15733,11 @@ const puppetWarpArmed =
                 projectCreatorMarketplaceRecordToAssets,
               },
               { installStudioCreatorPackProduct },
-              { browserStudioCreatorPackStorage },
-              { openStudioMarketplaceCatalog, confirmStudioMarketplacePackSync },
-              { createStudioCommunityMarketplaceAssetRecord },
+              {
+                browserStudioCreatorPackStorage,
+                resolveStudioCreatorBundledCatalogTarget,
+              },
+              { createStudioMarketplaceImageRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
@@ -15740,8 +15745,7 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
-              import("./studio-marketplace-catalog-open"),
-              import("./studio-community-marketplace-asset"),
+              import("./studio-marketplace-assets"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
             ]);
@@ -15766,11 +15770,57 @@ const puppetWarpArmed =
                     message: "로그인하지 않아 계정 라이브러리에는 기록하지 않았습니다.",
                   };
                 }
-                return confirmStudioMarketplacePackSync(
-                  () => synchronizeStudioCommunityMarketplaceInstalledPack(record, pack), guard,
-                  () => setStudioMarketplaceCloudSyncRetry(null),
-                  (issue) => setStudioMarketplaceCloudSyncRetry({ record, pack, issue }),
-                );
+                guard.assertCurrent();
+                try {
+                  const synchronized =
+                    await synchronizeStudioCommunityMarketplaceInstalledPack(
+                      record,
+                      pack,
+                    );
+                  guard.assertCurrent();
+                  setStudioMarketplaceCloudSyncRetry(null);
+                  return {
+                    status: "synchronized" as const,
+                    message: synchronized.message,
+                  };
+                } catch (caught: unknown) {
+                  guard.assertCurrent();
+                  const issue = caught instanceof Error && caught.message.trim()
+                    ? caught.message
+                    : "계정 라이브러리 설치 확인을 동기화하지 못했습니다.";
+                  setStudioMarketplaceCloudSyncRetry({ record, pack, issue });
+                  throw caught;
+                }
+              },
+              openBundledPackCatalog: (pack) => {
+                const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
+                if (resolution.status === "unsupported") {
+                  return {
+                    status: "unsupported" as const,
+                    message: resolution.reason,
+                  };
+                }
+                if (resolution.target.kind === "scene-template-catalog") {
+                  setMenu("scene");
+                  setSceneSimilarAnchorId(resolution.target.templateId);
+                  return {
+                    status: "opened" as const,
+                    message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
+                  };
+                }
+                if (resolution.target.kind === "3d-asset-catalog") {
+                  openBackground3dFromMenu();
+                  setBg3dMarketplaceModelId(resolution.target.runtimeRef.slice("studio-3d-asset:".length));
+                  return {
+                    status: "opened" as const,
+                    message: "선택한 마켓 모델을 3D 편집기에 전달했어요. ‘선택한 마켓 모델 가져오기’로 검증 후 장면에 배치하세요.",
+                  };
+                }
+                openBackground3dFromMenu();
+                return {
+                  status: "opened" as const,
+                  message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
+                };
               },
               openBundledPackCatalog: (pack) => openStudioMarketplaceCatalog(pack, {
                 isCurrent: isCurrentOperation,
@@ -15790,16 +15840,17 @@ const puppetWarpArmed =
                   compatibilityContext,
                 ),
               insertAsset: async (projectedAsset) => {
-                const asset = await createStudioCommunityMarketplaceAssetRecord(projectedAsset);
-                if (!isCurrentOperation()) return false;
-                if (!isStudioPasteScopeCurrent({
+                const isInsertCurrent = () => isCurrentOperation() && isStudioPasteScopeCurrent({
                   mutationAllowed: canApplyStudioMutation(mutationTicket),
                   reviewLocked: activeSurfaceReviewLockedRef.current,
                   targetPageId,
                   currentPageId: currentPageIdRef.current,
                   targetMasterEditMode,
                   currentMasterEditMode: masterEditModeRef.current,
-                })) return false;
+                });
+                if (!isInsertCurrent()) return false;
+                const asset = await createStudioMarketplaceImageRecord(projectedAsset);
+                if (!isInsertCurrent()) return false;
                 return addRenderedImage(asset.dataUrl, asset.width, asset.height);
               },
             };
@@ -28400,6 +28451,7 @@ function clearSelectionForEdit() {
       bg3dInitialScene={bg3dInitialScene}
       bg3dOpen={bg3dOpen}
       bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
+      bg3dMarketplaceModelId={bg3dMarketplaceModelId}
       bg3dSeedTemplateId={bg3dSeedTemplateId}
       bg3dTargetBundleId={bg3dTargetBundleId}
       bgGrad={bgGrad}

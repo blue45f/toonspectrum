@@ -35,6 +35,7 @@ export interface StudioBackground3DProps {
    * `onSeedObjectInsertConsumed`.
    */
   seedSceneTemplateId?: string | null;
+  marketplaceModelId?: string | null;
   /** One-shot seed: spawn a primitive kind after open. */
   seedPrimitiveKind?: BgPrimitiveKind | null;
   onSeedObjectInsertConsumed?: () => void;

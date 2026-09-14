@@ -35,7 +35,8 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     bg3dInitialElementId,
     bg3dInitialScene,
     bg3dSeedPrimitiveKind,
-    bg3dSeedTemplateId,
+    bg3dMarketplaceModelId,
+  bg3dSeedTemplateId,
     bg3dTargetBundleId,
     characterBible,
     characterBibleOpen,
@@ -216,7 +217,8 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
           bg3dOpen={admittedBg3dOpen}
-          bg3dSeedTemplateId={bg3dSeedTemplateId}
+          bg3dMarketplaceModelId={bg3dMarketplaceModelId}
+        bg3dSeedTemplateId={bg3dSeedTemplateId}
           bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
           onSeedObjectInsertConsumed={clearStudioObjectInsertSeeds}
           characterBible={characterBible}

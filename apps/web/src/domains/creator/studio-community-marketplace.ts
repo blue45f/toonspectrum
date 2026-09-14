@@ -13,8 +13,9 @@ import {
   STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
 } from "./studio-marketplace-runtime-compatibility";
 import {
-  findStudioOriginalFreeAsset,
-} from "./studio-original-free-asset-packs";
+  findStudioMarketplaceImageAsset,
+  type StudioMarketplaceImageAsset,
+} from "./studio-marketplace-assets";
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
@@ -126,7 +127,7 @@ export type StudioCommunityPackProjection =
     }>;
 
 export interface StudioCommunityAssetProjection {
-  readonly assets: readonly StudioCommunityImageAsset[];
+  readonly assets: readonly StudioMarketplaceImageAsset[];
   readonly unsupportedCount: number;
   readonly reason: string | null;
 }
@@ -487,12 +488,12 @@ export function projectCreatorMarketplaceRecordToAssets(
     };
   }
   // See the pack projection above: product calls never guess a missing runtime authority.
-  const assets: StudioCommunityImageAsset[] = [];
+  const assets: StudioMarketplaceImageAsset[] = [];
   let unsupportedCount = 0;
   for (const entry of record.entries) {
     const assetId = originalAssetIdFromEntry(entry);
-    const asset = assetId ? (findStudioOriginalFreeAsset(assetId) ?? findStudioMarketplaceCc0Asset(assetId)) : null;
-    if (!asset || asset.kind === "model") {
+    const asset = assetId ? findStudioMarketplaceImageAsset(assetId) : null;
+    if (!asset) {
       unsupportedCount += 1;
       continue;
     }
@@ -503,7 +504,7 @@ export function projectCreatorMarketplaceRecordToAssets(
     unsupportedCount,
     reason: assets.length > 0
       ? null
-      : "현재 기기에 검증된 절차형 2D recipe가 없어 삽입할 수 없습니다.",
+      : "현재 기기에 검증된 2D 에셋 참조가 없어 삽입할 수 없습니다.",
   };
 }
 

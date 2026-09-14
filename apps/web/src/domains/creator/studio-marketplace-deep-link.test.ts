@@ -149,7 +149,7 @@ describe("Studio marketplace deep link", () => {
     const handler = studioPageSource.slice(start, end);
     const captureIndex = handler.indexOf("const mutationTicket = captureStudioMutationTicket();");
     const executeIndex = handler.indexOf("await executeStudioMarketplaceDeepLinkOperation(");
-    const guardIndex = handler.indexOf("if (!isStudioPasteScopeCurrent({", executeIndex);
+    const guardIndex = handler.indexOf("const isInsertCurrent = () => isCurrentOperation() && isStudioPasteScopeCurrent({", executeIndex);
     const insertIndex = handler.indexOf("return addRenderedImage(asset.dataUrl", guardIndex);
 
     expect(start).toBeGreaterThanOrEqual(0);
@@ -164,6 +164,10 @@ describe("Studio marketplace deep link", () => {
     expect(handler).toContain("currentPageId: currentPageIdRef.current");
     expect(handler).toContain("currentMasterEditMode: masterEditModeRef.current");
     expect(insertIndex).toBeGreaterThan(guardIndex);
+    const downloadIndex = handler.indexOf("await createStudioMarketplaceImageRecord(projectedAsset)", guardIndex);
+    expect(downloadIndex).toBeGreaterThan(guardIndex);
+    expect(handler.slice(guardIndex, downloadIndex)).toContain("if (!isInsertCurrent()) return false;");
+    expect(handler.slice(downloadIndex, insertIndex)).toContain("if (!isInsertCurrent()) return false;");
   });
 
   it("wires authenticated post-install account sync and an explicit local-safe retry surface", () => {
@@ -653,5 +657,26 @@ describe("Studio marketplace deep link", () => {
       lifecycle,
       operationGeneration,
     )).toBe(false);
+  });
+});
+
+describe("asynchronous marketplace image insertion", () => {
+  it("waits for actual insertion instead of treating a Promise as success", async () => {
+    const pending = deferred<boolean>();
+    const deps = { ...dependencies({ kind: "asset", assets: ["background"] }), insertAsset: vi.fn(() => pending.promise) };
+    const operation = applyStudioMarketplaceDeepLink("asset-1", deps);
+    await vi.waitFor(() => expect(deps.insertAsset).toHaveBeenCalledOnce());
+    pending.resolve(false);
+    expect((await operation).status).toBe("error");
+  });
+  it("discards the result of an image operation superseded during download", async () => {
+    const pending = deferred<boolean>();
+    let current = true;
+    const deps = { ...dependencies({ kind: "asset", assets: ["background"] }), insertAsset: vi.fn(() => pending.promise) };
+    const operation = applyStudioMarketplaceDeepLink("asset-1", deps, { isCurrent: () => current });
+    await vi.waitFor(() => expect(deps.insertAsset).toHaveBeenCalledOnce());
+    current = false;
+    pending.resolve(true);
+    expect((await operation).status).toBe("stale");
   });
 });
