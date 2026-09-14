@@ -61,6 +61,18 @@ export function useStudioBg3dEditor(props) {
   h.importMarketplaceModelFiles = actions.importModelFiles;
   h.marketplaceModelId = props.marketplaceModelId;
   bindStudioBg3dEditorSceneGraph(h);
+  h.handleOpenPrecisionModeler = props.onOpenPrecisionModeler
+    ? () => {
+        const scene = h.readCurrentCanonicalScene?.("precision-modeler");
+        if (!scene) return;
+        try {
+          props.onOpenPrecisionModeler(scene);
+        } catch (error) {
+          console.error(error);
+          h.setError("정밀 모델링 워크스페이스로 안전하게 전환하지 못했습니다. 현재 3D 장면은 그대로 유지됩니다.");
+        }
+      }
+    : undefined;
   useStudioBg3dEditorEffects(h);
   useStudioBg3dEditorRestoreEffects(h);
   return h;

@@ -161,7 +161,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     seedPrimitiveKind, onSeedObjectInsertConsumed, sharedSceneSession, sharedStageResolution,
     sharedStageSessionScopeKey, sharedCharactersLinkedToOtherBackgroundCount, operation,
     recoveryScope, validateRecoveryAccess, onWebXrCleanupPendingChange, onClose, onInsert,
-    onUseAsAiMethodReference, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
+    onUseAsAiMethodReference, handleOpenPrecisionModeler, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
     setAdaptiveDprScale, sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey, readSharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKeyRef, sharedCharacterCaptureAuthorityRevisionRef,
@@ -571,6 +571,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
                 engineFrameTimeMs={engineFrameTimeMs}
                 onEnginePreferenceChange={engineRuntime.setPreference}
+                onOpenPrecisionModeler={handleOpenPrecisionModeler}
                 aiReferenceBusy={isCapturing}
                 aiReferenceDisabled={
                   insertBlocked || (primitives.length === 0 && customModels.length === 0)

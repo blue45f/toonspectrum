@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { pushRecentColor } from "./studio-color-utils";
+import {
+  publishStudioRecentColorsSnapshot,
+  registerStudioRecentColorsOwner,
+  type StudioRecentColorsOwner,
+} from "./studio-recent-colors-bridge";
 
 import type { StudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 
@@ -28,6 +33,8 @@ export function useStudioRecentColors({
   const pendingChangesRef = useRef<Change[]>([]);
   const writeTailRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
+  const ownerActionsRef = useRef<StudioRecentColorsOwner | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
@@ -35,6 +42,7 @@ export function useStudioRecentColors({
 
   function publish(colors: string[]) {
     colorsRef.current = colors;
+    publishStudioRecentColorsSnapshot(colors);
     if (mountedRef.current) setRecentColors(colors);
   }
 
@@ -79,10 +87,27 @@ export function useStudioRecentColors({
     writeTailRef.current = write.catch(reportUnavailable);
   }
 
+  const ensureRecentColorsLoaded = () => { void load().catch(reportUnavailable); };
+  const rememberColor = (color: string) =>
+    update((colors) => pushRecentColor(colors, color));
+  const clearRecentColors = () => update(() => []);
+
+  ownerActionsRef.current = {
+    ensureRecentColorsLoaded,
+    rememberColor,
+    clearRecentColors,
+  };
+
+  useEffect(() => registerStudioRecentColorsOwner({
+    ensureRecentColorsLoaded: () => ownerActionsRef.current?.ensureRecentColorsLoaded(),
+    rememberColor: (color) => ownerActionsRef.current?.rememberColor(color),
+    clearRecentColors: () => ownerActionsRef.current?.clearRecentColors(),
+  }), []);
+
   return {
     recentColors,
-    ensureRecentColorsLoaded: () => { void load().catch(reportUnavailable); },
-    rememberColor: (color: string) => update((colors) => pushRecentColor(colors, color)),
-    clearRecentColors: () => update(() => []),
+    ensureRecentColorsLoaded,
+    rememberColor,
+    clearRecentColors,
   };
 }

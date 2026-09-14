@@ -143,6 +143,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     onMoveProductionShot: context.moveSavedShot,
     onRemoveProductionShot: context.removeSavedShot,
     onUseCurrentFrameAsAiReference: props.onUseCurrentFrameAsAiReference,
+    onOpenPrecisionModeler: props.onOpenPrecisionModeler,
     aiReferenceBusy: props.aiReferenceBusy ?? false,
     aiReferenceDisabled: (props.aiReferenceDisabled ?? false) || disabled,
   };
