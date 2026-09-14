@@ -41,11 +41,11 @@ export function nextExperienceDestinations(pathname: string): ExperienceDestinat
     || /^\/(?:terms|privacy|copyright)(?:\/|$)/u.test(path)) return [];
   let ids: ExperienceDestinationId[];
   if (/^\/(?:learn|help|guide)(?:\/|$)/u.test(path)) ids = ["research", "market", "showcase"];
-  else if (/^\/(?:research|references|market)(?:\/|$)/u.test(path)) ids = ["learn", "showcase", "community"];
+  else if (/^\/(?:research|references|insights|now|opportunities|market)(?:\/|$)/u.test(path)) ids = ["learn", "showcase", "community"];
   else if (/^\/(?:showcase|create|community|reviews|pencafe)(?:\/|$)/u.test(path)) ids = ["discover", "learn", "market"];
   else if (path === "/library") ids = ["calendar", "discover", "showcase"];
   else if (/^\/(?:discover|search|ranking|calendar|explore|recommend|random|tags|authors|author|title|compare)(?:\/|$)/u.test(path)) ids = ["research", "library", "learn"];
-  else if (["/", "/about", "/contact", "/support", "/sitemap", "/news", "/now", "/insights", "/opportunities"].includes(path)) ids = ["discover", "learn", "showcase"];
+  else if (["/", "/make", "/about", "/about/data", "/contact", "/support", "/sitemap", "/news", "/now", "/insights", "/opportunities"].includes(path)) ids = ["discover", "learn", "showcase"];
   else return [];
   return ids.filter((id) => EXPERIENCE_DESTINATIONS[id].href !== path);
 }
