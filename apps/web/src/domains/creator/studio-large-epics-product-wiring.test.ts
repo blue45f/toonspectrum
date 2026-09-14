@@ -29,7 +29,7 @@ describe("large Studio epic product wiring", () => {
     expect(bridge).toContain("cloneElementForProposal");
   });
 
-  it("keeps 3D generation on the authenticated advanced AI surface", () => {
+  it("keeps 3D generation authenticated and sourced from the unified user-key settings", () => {
     const advancedTools = source(
       "apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx",
     );
@@ -37,9 +37,11 @@ describe("large Studio epic product wiring", () => {
       "apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.tsx",
     );
 
-    expect(advancedTools).toContain("userId && connection?.apiKey");
-    expect(advancedTools).toContain('assignments["three-d"]');
-    expect(advancedTools).toContain("providerApiKey: () => connection.apiKey");
+    expect(advancedTools).toContain("useUnifiedAiAuxSettings()");
+    expect(advancedTools).toContain("userId && hasProviderKey");
+    expect(advancedTools).toContain(
+      "providerApiKey: () => getUnifiedAiAuxSettings().hyper3dApiKey || undefined",
+    );
     expect(advancedTools).toContain("onInsertArtifact={");
     expect(advancedTools).toContain("onSaveArtifact={");
     expect(panel).toContain("readonly client: Studio3dGenerationHttpClient");

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -25,6 +26,25 @@ import type { Request, Response } from "express";
 function requireUserId(userId: string | undefined): string {
   if (!userId?.trim()) throw new UnauthorizedException("3D 생성 기능을 사용하려면 로그인이 필요해요.");
   return userId.trim();
+}
+
+function requireProviderApiKey(value: string | undefined): string {
+  const key = value?.trim() ?? "";
+  if (key.length < 12 || key.length > 4096) {
+    throw new BadRequestException({
+      code: "USER_PROVIDER_KEY_REQUIRED",
+      message: "통합 AI 설정에서 Hyper3D/Rodin 사용자 키를 등록하세요.",
+      settingsHref: "/studio/ai-settings",
+      operatorFunded: false,
+    });
+  }
+  if (Array.from(key).some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  })) {
+    throw new BadRequestException("3D 공급자 키 형식을 확인해 주세요.");
+  }
+  return key;
 }
 
 function clientSignal(request: Request, response: Response): {
@@ -59,8 +79,15 @@ export class Studio3dGenerationController {
 
   @Get("status")
   @Header("Cache-Control", "no-store, max-age=0")
-  status() {
-    return this.service.status();
+  status(@Headers("x-studio-3d-provider-key") providerApiKey: string | undefined) {
+    const status = this.service.status();
+    return {
+      ...status,
+      configured: Boolean(providerApiKey?.trim()),
+      operatorFunded: false,
+      requiresUserProviderKey: true,
+      settingsHref: "/studio/ai-settings",
+    };
   }
 
   @Get("jobs")
@@ -89,15 +116,16 @@ export class Studio3dGenerationController {
     @Res({ passthrough: true }) response: Response,
   ) {
     if (!idempotencyKey?.trim()) {
-      throw new UnauthorizedException("3D 생성 작업 식별자가 필요해요.");
+      throw new BadRequestException("3D 생성 작업 식별자가 필요해요.");
     }
+    const userKey = requireProviderApiKey(providerApiKey);
     const client = clientSignal(request, response);
     try {
       return await this.service.create(
         requireUserId(userId),
         idempotencyKey,
         input,
-        providerApiKey,
+        userKey,
         client.signal,
       );
     } finally {
@@ -119,7 +147,7 @@ export class Studio3dGenerationController {
       return await this.service.advance(
         requireUserId(userId),
         jobId,
-        providerApiKey,
+        requireProviderApiKey(providerApiKey),
         client.signal,
       );
     } finally {
@@ -134,7 +162,11 @@ export class Studio3dGenerationController {
     @Headers("x-studio-3d-provider-key") providerApiKey: string | undefined,
     @Param("jobId") jobId: string,
   ) {
-    return this.service.cancel(requireUserId(userId), jobId, providerApiKey);
+    return this.service.cancel(
+      requireUserId(userId),
+      jobId,
+      requireProviderApiKey(providerApiKey),
+    );
   }
 
   @Get("artifacts/:revisionId")

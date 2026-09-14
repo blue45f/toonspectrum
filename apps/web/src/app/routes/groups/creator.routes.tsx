@@ -1,5 +1,8 @@
 import { Navigate } from "react-router-dom";
 
+import { PersonalInferencePage } from "@/domains/creator/ai/PersonalInferencePage";
+import { StudioAiSettingsPage } from "@/domains/creator/ai/StudioAiSettingsPage";
+
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
 
 import { studioRoutePath } from "@/domains/creator/studio-route-registry";
@@ -35,7 +38,9 @@ import {
 
 
 export const creatorRoutes = defineAppRoutes([
-  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <CreatorInferencePage /> },
+  { id: "creator-ai-settings", path: "/studio/ai-settings", element: <StudioAiSettingsPage /> },
+  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <PersonalInferencePage /> },
+  { id: "creator-ai-runtime", path: "/studio/ai-runtime", element: <CreatorInferencePage /> },
   { id: "creator-character-convert", path: "/studio/character-convert", element: <StudioCharacterConversionPage /> },
   { id: "creator-ecosystem", path: "/studio/ecosystem", element: <CreatorEcosystemPage /> },
   { id: "creator-ecosystem-viewer", path: "/studio/ecosystem/viewer", element: <CreatorEcosystemViewerPage /> },
