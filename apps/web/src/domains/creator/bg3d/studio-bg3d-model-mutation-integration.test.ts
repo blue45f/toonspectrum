@@ -210,7 +210,8 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "setCustomModels(next.customModels)",
       "setSceneBaseDocument(next.document)",
     ]);
-    expect(commit).toContain("historyRef.current = [createStudioBg3dHistorySnapshot(next)]");
+    expect(commit).toContain("resetStudioBg3dCommandHistory(");
+    expect(commit).toContain("createStudioBg3dHistorySnapshot(next)");
   });
 
   it("waits for a prior destructive lane and replays its durable journal before hydration", () => {
@@ -229,11 +230,17 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     ]);
   });
 
-  it("hands undo and redo camera compositions to a replacement projection controller", () => {
-    const undoRedo = sourceBetween("const doUndo = () => {", "const addPrimitive = (");
-    expect(undoRedo.match(/applyOrDeferStudioBg3dHistoryCamera\(/gu)).toHaveLength(2);
-    expect(undoRedo.match(/pendingInitialCameraRef/gu)).toHaveLength(2);
-    expect(undoRedo.match(/snap\.document\.camera/gu)).toHaveLength(2);
-    expect(undoRedo.match(/physicsRuntimeSourceRef\.current =/gu)).toHaveLength(2);
+  it("hands typed command undo and redo through one replacement projection path", () => {
+    const undoRedo = sourceBetween(
+      'const applyCommandHistoryStep = (direction: "undo" | "redo"): void => {',
+      "const canAdmitSceneNodes = (",
+    );
+    expect(undoRedo).toContain("stepStudioBg3dCommandHistory(commandHistoryRefs, direction)");
+    expect(undoRedo).toContain('const doUndo = () => applyCommandHistoryStep("undo")');
+    expect(undoRedo).toContain('const doRedo = () => applyCommandHistoryStep("redo")');
+    expect(undoRedo.match(/applyOrDeferStudioBg3dHistoryCamera\(/gu)).toHaveLength(1);
+    expect(undoRedo.match(/pendingInitialCameraRef/gu)).toHaveLength(1);
+    expect(undoRedo.match(/snap\.document\.camera/gu)).toHaveLength(1);
+    expect(undoRedo.match(/physicsRuntimeSourceRef\.current =/gu)).toHaveLength(1);
   });
 });
