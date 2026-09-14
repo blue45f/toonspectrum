@@ -1,3 +1,4 @@
+import { BRUSH_STUDIO_V6_ARTISTRY_TOPOLOGIES, type BrushStudioV6ArtistryModel } from "./brush-studio-v6-artistry-catalog";
 import type { BrushStudioV6Tuning } from "./brush-studio-v6-engine";
 
 export interface BrushStudioV6TopologyControl {
@@ -10,7 +11,8 @@ export interface BrushStudioV6TopologyControl {
 export interface BrushStudioV6TopologyDescriptor {
   readonly id: string;
   readonly recipeId: string;
-  readonly model: "spring" | "curl" | "ballistic" | "weave" | "branch" | "orbit";
+  readonly model: "spring" | "curl" | "ballistic" | "weave" | "branch" | "orbit" | BrushStudioV6ArtistryModel;
+  readonly group?: string;
   readonly label: string;
   readonly description: string;
   readonly controls: readonly BrushStudioV6TopologyControl[];
@@ -21,7 +23,7 @@ const unit = (key: BrushStudioV6TopologyControl["key"], label: string): BrushStu
 const population = { key: "particleCount", label: "입자 밀도", min: 128, max: 4096, step: 128 } as const;
 const scale = { key: "patternScale", label: "구조 주기", min: 0.1, max: 4, step: 0.01 } as const;
 
-/** Six distinct algorithms. Version-pinned IDs keep every existing stroke opt-out. */
+/** Distinct, version-pinned algorithms. Existing stroke IDs retain their original solvers. */
 export const BRUSH_STUDIO_V6_TOPOLOGIES: readonly BrushStudioV6TopologyDescriptor[] = Object.freeze([
   { id: "carrier-cpu-spring-filaments-v1", recipeId: "elastic-filaments", model: "spring", label: "탄성 실선",
     description: "감쇠 스프링으로 추적하는 실가닥. 급회전에서 관성·벌어짐이 남습니다.",
@@ -47,6 +49,7 @@ export const BRUSH_STUDIO_V6_TOPOLOGIES: readonly BrushStudioV6TopologyDescripto
     description: "두 주기의 트로코이드 궤적과 연결 매듭을 만드는 기하 엔진입니다. 유체 물리가 아니며, 고주파 곡선 간격은 자동 보정합니다.",
     controls: [unit("patternDensity", "궤도 돌기 수"), scale, unit("patternJitter", "궤도 편심")],
     tuning: { size: 42, spacing: 0.045, patternDensity: 0.55, patternScale: 1.1, patternJitter: 0.65 } },
+  ...BRUSH_STUDIO_V6_ARTISTRY_TOPOLOGIES,
 ].map((entry) => Object.freeze({ ...entry, controls: Object.freeze(entry.controls.map((control) => Object.freeze(control))), tuning: Object.freeze(entry.tuning) })) as BrushStudioV6TopologyDescriptor[]);
 const BY_ID = new Map(BRUSH_STUDIO_V6_TOPOLOGIES.map((entry) => [entry.id, entry]));
 export function brushStudioV6Topology(id: string): BrushStudioV6TopologyDescriptor | undefined {

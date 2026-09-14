@@ -1,3 +1,5 @@
+import { isBrushStudioV6ArtistryModel } from "./brush-studio-v6-artistry-catalog";
+import { createBrushStudioV6ArtistryStroke } from "./brush-studio-v6-artistry-engine";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import type { BrushStudioV6MaterialProgram } from "./brush-studio-v6-material-engine";
 
@@ -30,6 +32,7 @@ const noise = (a: number, b: number, seed: number): number => {
 export function createBrushStudioV6TopologyStroke(program: BrushStudioV6MaterialProgram, step: number): BrushTopologyStroke | null {
   const descriptor = brushStudioV6Topology(program.slots.carrier);
   if (!descriptor) return null;
+  if (isBrushStudioV6ArtistryModel(descriptor.model)) return createBrushStudioV6ArtistryStroke(program, descriptor.model, step);
   const model = descriptor.model, t = program.tuning;
   const size = clamp(t.size, 1, 240), seed = program.seed | 0;
   const count = model === "spring" ? Math.round(clamp(t.bristleStrands / 4, 2, 32))
