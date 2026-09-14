@@ -49,6 +49,7 @@ export function ContentPacksPage() {
     catch { setNotice("파일을 내보내지 못했습니다. 아래 미리보기의 내용을 복사해 보관하세요."); }
   };
   return <ResourceLayout title="오픈 콘텐츠 제작실" intro="무료 공개 자료를 내 장면의 근거로 바꾸세요. 12개 창작 팩에서 출발해 자료를 검색·저장하고, 출처를 붙인 콘티와 설정집을 만듭니다. 가입·유료 AI 호출은 필요하지 않습니다.">
+    <Link className={RESOURCE_BUTTON} to="/research/open-creation">주제를 직접 정해 캐릭터·홍보·연습 브리프 만들기</Link>
     <section className="grid gap-3 sm:grid-cols-3" aria-label="무료 제작 방식">
       {["장면 팩·브리프 조합은 브라우저에서 처리", "공식 자료 검색은 선택한 제공처만 호출", "메타데이터 저장과 이미지 재사용 권한은 별도"].map((text) => <p key={text} className="rounded-xl border border-line bg-panel p-4 text-sm leading-7">{text}</p>)}
     </section>
@@ -61,7 +62,7 @@ export function ContentPacksPage() {
       <p className="text-sm leading-7 text-fg-2">공개 이용 표시가 확인된 자료만 보여줍니다. 한글 검색은 제한된 미술 용어 사전으로 확장하며, 일반 번역 서비스는 아닙니다.</p>
       <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={(event) => { event.preventDefault(); changeParams({ q: draft.trim(), page: "1" }); }}>
         <label className="sm:w-60">제공처<select className={RESOURCE_INPUT} value={provider} onChange={(event) => changeParams({ provider: event.target.value, q: null, page: null })}>{(["aic", "cleveland", "met"] as const).map((value) => <option key={value} value={value}>{RESOURCE_LABELS[value]}</option>)}</select></label>
-        <label className="flex-1">자료 검색어<input className={RESOURCE_INPUT} type="search" minLength={2} maxLength={80} required value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="예: 갑옷, 도자기, 정원" /></label>
+        <label className="flex-1">자료 검색어<input className={RESOURCE_INPUT} type="search" onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} minLength={2} maxLength={80} required value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="예: 갑옷, 도자기, 정원" /></label>
         <button type="submit" className={RESOURCE_BUTTON} disabled={search.loading}>자료 검색</button>
       </form>
       <div className="flex flex-wrap gap-2">{pack.keywords.map((keyword) => <button key={keyword} className={RESOURCE_BUTTON} disabled={search.loading} onClick={() => changeParams({ q: keyword, page: "1" })}>{keyword} 검색</button>)}</div>

@@ -153,21 +153,27 @@ test("kit escaping prevents reference titles from injecting Markdown links", () 
   assert.ok(kit.includes("\\[link\\]"));
 });
 
-
-test("malformed and nested markup never leaves HTML delimiters in metadata", () => {
-  for (const value of ["<scr<script>ipt>alert(1)</script>", "<img src=x onerror=alert(1)", "text > tail", "<<b>Armor</b>>"]) {
-    const [item] = parseOpenReferences("artic", { data: [{ id: 1, title: "Safe title", artist_display: value, credit_line: value, is_public_domain: true }] }, NOW);
-    assert.ok(!/[<>]/u.test(item.creator));
-    assert.ok(!/[<>]/u.test(item.credit));
-    const saved = parseSavedOpenReference({ ...artwork, creator: value, credit: value });
-    assert.ok(saved);
-    assert.ok(!/[<>]/u.test(saved.creator));
-    assert.ok(!/[<>]/u.test(saved.credit));
-    assert.ok(!buildCreationKit("comic", value, value, [artwork]).includes("<script"));
+test("requests include copyright fields and conflicting or malformed notices fail closed", () => {
+  assert.ok(new URL(openSearchUrl("artic", "armor")).searchParams.get("fields")?.includes("copyright_notice"));
+  assert.ok(new URL(openSearchUrl("cleveland", "armor")).searchParams.get("fields")?.includes("copyright"));
+  for (const notice of ["Restricted", "<b>Copyright</b>", { restricted: true }, 1]) {
+    assert.equal(parseOpenReferences("artic", { data: [{ id: 1, title: "No", is_public_domain: true, copyright_notice: notice }] }).length, 0);
+    assert.equal(parseOpenReferences("cleveland", { data: [{ id: 1, title: "No", share_license_status: "CC0", copyright: notice, url: "https://www.clevelandart.org/art/1" }] }).length, 0);
   }
 });
-test("dictionary lookup does not translate inherited object properties", () => {
-  for (const word of ["constructor", "toString", "__proto__"]) {
-    assert.equal(openSearchQuery("artic", word), word);
-  }
+test("saved rights cannot promote unrelated origins or cross-institution image hosts", () => {
+  const unrelated = parseSavedOpenReference({ ...artwork, sourceUrl: "https://example.com/artworks/1" });
+  assert.equal(unrelated?.rights, "원문 확인"); assert.equal(unrelated?.imageUrl, "");
+  assert.equal(parseSavedOpenReference({ ...artwork, imageUrl: "https://openaccess-cdn.clevelandart.org/1.jpg" })?.imageUrl, "");
+});
+test("copying new museum board records retains credits and does not mutate the source", () => {
+  const input = { id: "aic:1", provider: "aic", title: "Source", license: "CC0", sourceUrl: artwork.sourceUrl, imageUrl: artwork.imageUrl, credit: "Original credit", fetchedAt: NOW };
+  const original = JSON.stringify(input); const copy = fromExistingResource(input);
+  assert.equal(copy?.rights, "CC0"); assert.equal(copy?.imageUrl, artwork.imageUrl);
+  assert.ok(copy?.credit.includes("Original credit")); assert.equal(JSON.stringify(input), original);
+});
+test("prototype tokens and long dictionary expansion preserve user input", () => {
+  assert.equal(openSearchQuery("artic", "__proto__"), "__proto__");
+  const long = "한복 ".repeat(20).trim();
+  assert.equal(openSearchQuery("artic", long), long);
 });

@@ -55,6 +55,11 @@ const ContentPacksPage = lazyRetry(
   "ContentPacksPage",
 );
 
+const OpenCreationPage = lazyRetry(
+  () => import("@/domains/creator-resources/OpenCreationPage").then((module) => ({ default: module.OpenCreationPage })),
+  "OpenCreationPage",
+);
+
 export const creatorResourcesRoutes = defineAppRoutes([
   // Legacy creator hubs now resolve to the canonical ToonStudio front door.
   { id: "resources-make", path: "/make", element: <Navigate to="/studio/new" replace /> },
@@ -67,6 +72,7 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "research-catalog-notebook", path: "/research/catalog/notebook", element: <CatalogResearchPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
+  { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },
   { id: "research-content-packs", path: "/research/packs", element: <ContentPacksPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
   { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },

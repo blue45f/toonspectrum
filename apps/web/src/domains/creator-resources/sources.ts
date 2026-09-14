@@ -7,6 +7,7 @@ export type ResourceSourceCommercialStatus =
   | "운영 제외";
 
 export interface ResourceSource {
+  freeKeyless?: boolean;
   name: string;
   category: string;
   status: string;
@@ -16,11 +17,12 @@ export interface ResourceSource {
 }
 
 export const RESOURCE_SOURCES: ResourceSource[] = [
-  { name: "시카고 미술관 (Art Institute of Chicago)", category: "복식·소품·배경", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://api.artic.edu/docs/", note: "가입 없이 공식 API를 검색합니다. is_public_domain=true이며 저작권 제한이 없는 자료만 공개 미리보기를 표시합니다. CC BY 설명문은 수집하지 않고, 브리프에는 출처·조회일을 보존합니다." },
-  { name: "클리블랜드 미술관", category: "유물·문양·미술", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://openaccess-api.clevelandart.org/", note: "공식 API를 한 번에 최대 12건 검색합니다. share_license_status=CC0 및 이미지 호스트를 확인하며, 저작권 제한이나 권리 미확인 항목은 제외합니다. 검색 결과는 기존 저장 보드와 제작실에서 활용합니다." },
-  { name: "The Met", category: "창작 자료", status: "검색 어댑터 구현", commercial: "상업 핵심 후보", url: "https://metmuseum.github.io/", note: "키 없는 v1.1 검색과 상세 조회를 사용합니다. isPublicDomain=true이고 권리 제한 문구가 없는 자료만 CC0 미리보기로 표시합니다." },
-  { name: "Open Library", category: "글로벌 판본", status: "검색 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openlibrary.org/developers/api", note: "사람 중심의 저용량 작품·판본 발견에 사용합니다. 대량 카탈로그 동기화에는 월간 데이터 덤프를 별도로 검토하며 표지·원문 권리는 자동 승계하지 않습니다." },
-  { name: "openBD", category: "일본 판본", status: "ISBN 조회 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openbd.jp/", note: "ISBN 정확 조회로 일본 도서 서지를 확인합니다. 도서 소개·홍보 목적, 원본 정보의 임의 변경 금지, 수정·삭제 반영 조건을 보존합니다." },
+  { name: "한국어 위키백과", freeKeyless: true, category: "배경지식·용어", status: "키 없는 제목·원문 검색 구현", commercial: "조건부 상업 이용", url: "https://www.mediawiki.org/wiki/API:Cross-site_requests", note: "무료 창작 재료실에서 문서 제목·원문 링크만 검색합니다. 본문·이미지는 수집하지 않으며, 링크 저장을 이미지·본문의 복제 또는 각색 허락으로 표시하지 않습니다." },
+  { name: "시카고 미술관 (Art Institute of Chicago)", freeKeyless: true, category: "복식·소품·배경", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://api.artic.edu/docs/", note: "가입 없이 공식 API를 검색합니다. is_public_domain=true이며 저작권 제한이 없는 자료만 공개 미리보기를 표시합니다. CC BY 설명문은 수집하지 않고, 브리프에는 출처·조회일을 보존합니다." },
+  { name: "클리블랜드 미술관", freeKeyless: true, category: "유물·문양·미술", status: "무료·키 없는 검색 구현", commercial: "상업 핵심 후보", url: "https://openaccess-api.clevelandart.org/", note: "공식 API를 한 번에 최대 12건 검색합니다. share_license_status=CC0 및 이미지 호스트를 확인하며, 저작권 제한이나 권리 미확인 항목은 제외합니다. 검색 결과는 기존 저장 보드와 제작실에서 활용합니다." },
+  { name: "The Met", freeKeyless: true, category: "창작 자료", status: "검색 어댑터 구현", commercial: "상업 핵심 후보", url: "https://metmuseum.github.io/", note: "키 없는 v1.1 검색과 상세 조회를 사용합니다. isPublicDomain=true이고 권리 제한 문구가 없는 자료만 CC0 미리보기로 표시합니다." },
+  { name: "Open Library", freeKeyless: true, category: "글로벌 판본", status: "검색 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openlibrary.org/developers/api", note: "사람 중심의 저용량 작품·판본 발견에 사용합니다. 대량 카탈로그 동기화에는 월간 데이터 덤프를 별도로 검토하며 표지·원문 권리는 자동 승계하지 않습니다." },
+  { name: "openBD", freeKeyless: true, category: "일본 판본", status: "ISBN 조회 어댑터 구현", commercial: "조건부 상업 이용", url: "https://openbd.jp/", note: "ISBN 정확 조회로 일본 도서 서지를 확인합니다. 도서 소개·홍보 목적, 원본 정보의 임의 변경 금지, 수정·삭제 반영 조건을 보존합니다." },
   { name: "카카오 책 검색", category: "작품 탐색", status: "서버 인증키 필요", commercial: "조건부 상업 이용", url: "https://developers.kakao.com/docs/ko/daum-search/dev-guide", note: "도서 메타데이터 어댑터가 구현되어 있습니다. 카카오웹툰 전용 API가 아니며 KAKAO_REST_API_KEY가 없으면 연결 대기로 표시합니다." },
   { name: "기업마당", category: "창작 기회", status: "서버 인증키 필요", commercial: "조건부 상업 이용", url: "https://www.bizinfo.go.kr/apiDetail.do?id=bizinfoApi", note: "지원사업 어댑터가 구현되어 있습니다. BIZINFO_API_KEY 필요. 접수 상태·정확한 마감 시간·신청 자격은 공식 공고 원문을 확인합니다." },
   { name: "만화규장각 KMAS", category: "한국 만화 IP", status: "기존 기능 재사용", commercial: "조건부 상업 이용", url: "https://www.kmas.or.kr/guide/openapi", note: "작품·만화책·작가·출판사·ISBN·연재·영화·드라마·게임·공연·행사·상품 메타데이터를 기존 카탈로그와 레퍼런스 검색에서 사용합니다." },
@@ -35,8 +37,7 @@ export const RESOURCE_SOURCES: ResourceSource[] = [
   { name: "공유마당", category: "이미지·음원", status: "권리 매핑 예정", commercial: "조건부 상업 이용", url: "https://gongu.copyright.or.kr/", note: "저작물별 CCL·공공누리와 원문 제공 범위를 확인합니다. 번역문·삽화·음원의 권리를 원작과 동일하게 간주하지 않습니다." },
   { name: "IIIF 제공기관", category: "고해상도 자료", status: "표준 어댑터 예정", commercial: "조건부 상업 이용", url: "https://iiif.io/api/presentation/3.0/", note: "Manifest의 rights와 requiredStatement를 그대로 보존하고, 확대 보기·다중 뷰·주석 기능에 사용합니다." },
   { name: "Openverse", category: "오픈 라이선스 검색", status: "원제공처 재검증 필요", commercial: "비상업·내부 검토", url: "https://openverse.org/", note: "발견 인덱스로만 사용합니다. Openverse 표시만으로 Studio 가져오기를 승인하지 않고 원 제공기관의 현재 라이선스를 다시 확인합니다." },
-  { name: "Poly Haven", category: "3D·HDRI·텍스처", status: "무료 API 정적 카탈로그", commercial: "상업 핵심 후보", url: "https://polyhaven.com/our-api", note: "2026-07-18 공개된 무료 API 정책을 확인했습니다. 키 없는 API로 선별한 메타데이터를 소재 도감에 정적으로 제공합니다. 앱 식별 User-Agent와 출처 표시를 유지하며, 실시간 전체 검색이나 원본 자동 다운로드는 하지 않습니다." },
-  { name: "ambientCG", category: "배경·재질·텍스처", status: "무료 API 정적 카탈로그", commercial: "상업 핵심 후보", url: "https://docs.ambientcg.com/api/", note: "키 없는 공식 API로 확인한 선별 재질을 소재 도감에 제공합니다. 공개 자산·미리보기의 CC0 정책과 원문 출처를 보존합니다. 기존 호스팅 한도까지 무제한 무료를 보장하는 기능은 아닙니다." },
+  { name: "Poly Haven", freeKeyless: true, category: "3D·HDRI·텍스처", status: "무료 API 확인·연동 후보", commercial: "조건부 상업 이용", url: "https://polyhaven.com/our-api", note: "2026-07-18 공식 변경: 기본 API는 상업 용도도 무료이며 가입·키가 필요 없습니다. 라이브 API 사용 시 Poly Haven 출처 표시와 고유 User-Agent가 필요합니다. 대용량 3D·HDRI 자동 다운로드나 신규 연동 완료를 의미하지 않습니다." },
   { name: "Smithsonian Open Access", category: "박물관·3D", status: "API 키 신청 예정", commercial: "조건부 상업 이용", url: "https://www.si.edu/openaccess/devtools", note: "역사·자연사·과학·2D·3D 자료의 연구 후보입니다. 각 레코드의 사용조건과 제3자 권리를 확인합니다." },
   { name: "Europeana", category: "유럽 문화유산", status: "API 키 신청 예정", commercial: "조건부 상업 이용", url: "https://pro.europeana.eu/page/apis", note: "유럽 박물관·도서관·아카이브와 IIIF 자료를 연결합니다. rights statement와 원 제공기관 정보를 최종 판정에 사용합니다." },
   { name: "OpenStreetMap", category: "장소·건축", status: "자체·계약형 인프라 검토", commercial: "조건부 상업 이용", url: "https://www.openstreetmap.org/copyright", note: "장소·도로·건물 구조 연구에 사용합니다. ODbL 출처표시와 데이터베이스 공유 조건을 따르며 공개 타일 서버에 운영 트래픽을 의존하지 않습니다." },
