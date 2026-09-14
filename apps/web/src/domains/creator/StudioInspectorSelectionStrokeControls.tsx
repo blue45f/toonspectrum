@@ -32,6 +32,11 @@ function isTransparentStroke(value: string): boolean {
   return TRANSPARENT_STROKE_VALUES.has(value.trim().toLowerCase());
 }
 
+function clampOpacity(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(0.1, Math.min(1, value));
+}
+
 export interface StudioInspectorSelectionStrokeControlsProps {
   readonly selected: DrawEl;
   readonly patchEl: (id: string, patch: Partial<El>) => void;
@@ -49,13 +54,23 @@ export function StudioInspectorSelectionStrokeControls({
   onRememberColor,
 }: StudioInspectorSelectionStrokeControlsProps) {
   const normalizedSelectedStroke = normalizeHexColor(selected.stroke);
-  const strokeDisabled = isTransparentStroke(selected.stroke);
+  const freehandStrokeOnly = (selected.kind ?? "freehand") === "freehand";
+  const selectedOpacity = Number.isFinite(selected.opacity) ? (selected.opacity ?? 1) : 1;
+  const strokeDisabled =
+    isTransparentStroke(selected.stroke) || (freehandStrokeOnly && selectedOpacity <= 0);
   const lastVisibleStrokeRef = useRef(normalizedSelectedStroke ?? DEFAULT_STROKE_COLOR);
+  const lastVisibleOpacityRef = useRef(
+    selectedOpacity > 0 ? clampOpacity(selectedOpacity) : 1,
+  );
   const [localRecentColors, setLocalRecentColors] = useState<string[]>(readLocalRecentColors);
 
   useEffect(() => {
     if (normalizedSelectedStroke) lastVisibleStrokeRef.current = normalizedSelectedStroke;
   }, [normalizedSelectedStroke]);
+
+  useEffect(() => {
+    if (selectedOpacity > 0) lastVisibleOpacityRef.current = clampOpacity(selectedOpacity);
+  }, [selectedOpacity]);
 
   const activeColor = normalizedSelectedStroke ?? lastVisibleStrokeRef.current;
   const displayedRecentColors = normalizeRecentColors(
@@ -63,7 +78,8 @@ export function StudioInspectorSelectionStrokeControls({
     5,
   );
   const width = Math.max(1, Math.min(48, selected.strokeWidth ?? 3));
-  const opacity = Math.max(0.1, Math.min(1, selected.opacity ?? 1));
+  const opacity =
+    selectedOpacity > 0 ? clampOpacity(selectedOpacity) : lastVisibleOpacityRef.current;
   const previewThickness = Math.max(1, Math.min(12, width * 0.55));
 
   const rememberColor = (rawColor: string): string | null => {
@@ -90,7 +106,12 @@ export function StudioInspectorSelectionStrokeControls({
   const applyColor = (rawColor: string) => {
     const color = rememberColor(rawColor);
     if (!color) return;
-    patchEl(selected.id, { stroke: color } as Partial<El>);
+    patchEl(selected.id, {
+      stroke: color,
+      ...(freehandStrokeOnly && selectedOpacity <= 0
+        ? { opacity: lastVisibleOpacityRef.current }
+        : {}),
+    } as Partial<El>);
   };
 
   const toggleStroke = () => {
@@ -100,10 +121,21 @@ export function StudioInspectorSelectionStrokeControls({
         displayedRecentColors[0] ??
         DEFAULT_STROKE_COLOR;
       rememberColor(restored);
-      patchEl(selected.id, { stroke: restored } as Partial<El>);
+      patchEl(selected.id, {
+        stroke: restored,
+        ...(freehandStrokeOnly && selectedOpacity <= 0
+          ? { opacity: lastVisibleOpacityRef.current }
+          : {}),
+      } as Partial<El>);
       return;
     }
+
     if (normalizedSelectedStroke) lastVisibleStrokeRef.current = normalizedSelectedStroke;
+    if (freehandStrokeOnly) {
+      lastVisibleOpacityRef.current = opacity;
+      patchEl(selected.id, { opacity: 0 } as Partial<El>);
+      return;
+    }
     patchEl(selected.id, { stroke: "transparent" } as Partial<El>);
   };
 
