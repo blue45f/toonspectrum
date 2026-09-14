@@ -39,6 +39,26 @@ describe("Cloudflare static gateway", () => {
     }
   });
 
+  it("keeps the Worker-first route list limited to dynamic and crawler paths", () => {
+    const wrangler = JSON.parse(
+      readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
+    ) as {
+      assets?: { run_worker_first?: string[] };
+    };
+
+    expect(wrangler.assets?.run_worker_first).toEqual([
+      "/api",
+      "/api/*",
+      "/socket.io",
+      "/socket.io/*",
+      "/title/*",
+      "/market",
+      "/market/browse",
+      "/market/resource/*",
+    ]);
+    expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
+  });
+
   it("leaves static traffic on the free Static Assets path", async () => {
     const upstream = vi.fn<typeof fetch>();
     const env = environment();
@@ -48,6 +68,32 @@ describe("Cloudflare static gateway", () => {
 
     expect(await response.text()).toBe("static");
     expect(env.ASSETS.fetch).toHaveBeenCalledOnce();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("keeps non-OG marketplace and nested crawler routes on Static Assets", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const env = environment();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    for (const pathname of [
+      "/market/library",
+      "/market/wishlist",
+      "/market/manage",
+      "/market/publish",
+      "/market/fit",
+      "/market/compare",
+      "/market/resource/nested/path",
+      "/title/nested/path",
+    ]) {
+      const response = await gateway(
+        new Request(`https://www.toonstudio.cloud${pathname}`),
+        env,
+      );
+      expect(await response.text()).toBe("static");
+    }
+
+    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(8);
     expect(upstream).not.toHaveBeenCalled();
   });
 
@@ -108,6 +154,37 @@ describe("Cloudflare static gateway", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: "CORE_API_UNAVAILABLE" });
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a self-referential core origin before it can create a proxy loop", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/me"),
+      environment({ CORE_API_ORIGIN: "https://www.toonstudio.cloud" }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("passes WebSocket upgrade responses through without reconstructing them", async () => {
+    const upstreamResponse = new Response(null, {
+      status: 200,
+      headers: { "x-upstream-websocket": "preserved" },
+    });
+    const upstream = vi.fn<typeof fetch>(async () => upstreamResponse);
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/socket.io/?EIO=4&transport=websocket", {
+        headers: { upgrade: "websocket" },
+      }),
+      environment(),
+    );
+
+    expect(response).toBe(upstreamResponse);
+    expect(response.headers.get("x-upstream-websocket")).toBe("preserved");
+    expect(response.headers.get("content-security-policy")).toBeNull();
   });
 
   it("returns a bounded upstream error without exposing exception details", async () => {

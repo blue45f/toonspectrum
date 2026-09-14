@@ -20,6 +20,45 @@ const fixtureKeys = [
   "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "KAKAO_REST_API_KEY", "KAKAO_CLIENT_SECRET",
   "NAVER_OAUTH_CLIENT_ID", "NAVER_OAUTH_CLIENT_SECRET", "WEB_APP_BASE_URL", "OAUTH_REDIRECT_BASE_URL",
   "KAKAO_OAUTH_CLIENT_ID", "KAKAO_OAUTH_CLIENT_SECRET", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
+  "PRIVATE_OBJECT_STORAGE_ENABLED",
+  "PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER",
+  "PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER",
+  "PRIVATE_OBJECT_STORAGE_EXPORT_PROVIDER",
+  "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT",
+  "SUPABASE_OBJECT_STORAGE_ENABLED",
+  "SUPABASE_OBJECT_STORAGE_URL",
+  "SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY",
+  "SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET",
+  "SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET",
+  "SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET",
+  "SUPABASE_OBJECT_STORAGE_TIMEOUT_MS",
+  "SUPABASE_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES",
+  "SUPABASE_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES",
+  "SUPABASE_OBJECT_STORAGE_MAXIMUM_RESPONSE_BYTES",
+  "R2_OBJECT_STORAGE_ENABLED",
+  "R2_OBJECT_STORAGE_ENDPOINT",
+  "R2_OBJECT_STORAGE_REGION",
+  "R2_OBJECT_STORAGE_ACCESS_KEY_ID",
+  "R2_OBJECT_STORAGE_SECRET_ACCESS_KEY",
+  "R2_OBJECT_STORAGE_SOURCE_BUCKET",
+  "R2_OBJECT_STORAGE_DERIVED_BUCKET",
+  "R2_OBJECT_STORAGE_EXPORT_BUCKET",
+  "R2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED",
+  "R2_OBJECT_STORAGE_TIMEOUT_MS",
+  "R2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES",
+  "R2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES",
+  "B2_OBJECT_STORAGE_ENABLED",
+  "B2_OBJECT_STORAGE_ENDPOINT",
+  "B2_OBJECT_STORAGE_REGION",
+  "B2_OBJECT_STORAGE_ACCESS_KEY_ID",
+  "B2_OBJECT_STORAGE_SECRET_ACCESS_KEY",
+  "B2_OBJECT_STORAGE_SOURCE_BUCKET",
+  "B2_OBJECT_STORAGE_DERIVED_BUCKET",
+  "B2_OBJECT_STORAGE_EXPORT_BUCKET",
+  "B2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED",
+  "B2_OBJECT_STORAGE_TIMEOUT_MS",
+  "B2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES",
+  "B2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES",
 ];
 let requests;
 let existing;
@@ -128,6 +167,29 @@ describe("production reconciliation runtime authority", () => {
     expect(report.planned).toEqual(expect.arrayContaining(["WEB_APP_BASE_URL", "OAUTH_REDIRECT_BASE_URL"]));
   });
 
+  it("discovers and forwards the purpose-routed private storage contract", async () => {
+    existing.push({ key: "AUTH_STATE_SECRET", type: "sensitive", target: ["production"] });
+    vi.stubEnv("PRIVATE_OBJECT_STORAGE_ENABLED_VALUE", "true");
+    vi.stubEnv("PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER_VALUE", "cloudflare-r2");
+    vi.stubEnv("PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER_VALUE", "supabase");
+    vi.stubEnv("PRIVATE_OBJECT_STORAGE_EXPORT_PROVIDER_VALUE", "backblaze-b2");
+    vi.stubEnv(
+      "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE",
+      `sha256:${"a".repeat(64)}`,
+    );
+    vi.stubEnv("R2_OBJECT_STORAGE_ENDPOINT_VALUE", "https://account.r2.example");
+
+    const report = await reconcile();
+
+    expect(posted("PRIVATE_OBJECT_STORAGE_ENABLED")?.value).toBe("true");
+    expect(posted("PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER")?.value).toBe("cloudflare-r2");
+    expect(posted("R2_OBJECT_STORAGE_ENDPOINT")?.value).toBe("https://account.r2.example");
+    expect(report.planned).toEqual(expect.arrayContaining([
+      "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT",
+      "R2_OBJECT_STORAGE_ENDPOINT",
+    ]));
+  });
+
   it("fails before adding auth or origins when the database is missing", async () => {
     existing = [];
     vi.stubEnv("AUTH_SESSION_SECRET_VALUE", SECRET);
@@ -231,6 +293,12 @@ describe("production readiness workflow", () => {
     expect(reconciliation.env.DEPLOY).toBe("${{ inputs.deploy }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_SESSION_SECRET_VALUE).toBe("${{ secrets.AUTH_SESSION_SECRET }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_STATE_SECRET_VALUE).toBe("${{ secrets.AUTH_STATE_SECRET }}");
+    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE).toBe(
+      "${{ secrets.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT }}",
+    );
+    expect(workflow.jobs["reconcile-and-deploy"].env.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE).toBe(
+      "${{ secrets.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY }}",
+    );
     expect(steps.findIndex((step) => step === validation)).toBeLessThan(steps.findIndex((step) => step === reconciliation));
   });
   it("rejects a missing CLI org/project pair before any remote command", () => {

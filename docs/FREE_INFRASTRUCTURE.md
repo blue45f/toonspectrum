@@ -1,7 +1,9 @@
 # ToonSpectrum 무료 우선 인프라 운영 기준
 
-상태: **활성 아키텍처 정책**  
-정책 파일: [`config/free-infrastructure-policy.json`](../config/free-infrastructure-policy.json)  
+상태: **활성 아키텍처 정책**
+
+정책 파일: [`config/free-infrastructure-policy.json`](../config/free-infrastructure-policy.json)
+
 검증: `pnpm run verify:free-infrastructure`
 
 ## 목표
@@ -32,7 +34,7 @@
 | 기존 NestJS API | 기존 운영 경계 → scale-to-zero 호환 경계 | Worker로 옮기지 못한 핵심 API만 남긴다. |
 | AI | 사용자 키 또는 로컬 모델 | 운영자 AI key를 기본 경로로 사용하지 않는다. |
 
-## 현재 구현된 1차 전환
+## 현재 구현된 전환 경계
 
 ### 정적 웹 분리
 
@@ -58,6 +60,27 @@
 기존 `deploy/oci` 실행 scaffold와 migration runbook은 제거했다. 정책 검증은 해당 경로가 다시
 추가되면 실패한다. 계정 중단 경험이 있는 공급자를 단순 무료 용량 때문에 복구 경로로 다시
 도입하지 않는다.
+
+### 목적별 private object storage 라우팅
+
+API는 Supabase 전용 구현 대신 provider-neutral port를 사용한다. source·derived·export 목적은 각각
+Supabase, Cloudflare R2, Backblaze B2 중 정확히 한 공급자에 고정할 수 있다. S3-compatible 공급자는
+AWS SigV4, SHA-256 content-addressed path, immutable upload, signed read URL, private bucket readiness를
+동일한 계약으로 검증한다. 라우팅에서 사용하지 않는 purpose bucket은 만들 필요가 없다.
+
+라우팅은 다음 명령으로 fingerprint를 만든 뒤 환경변수와 함께 검토한다.
+
+```bash
+pnpm run infra:storage-routing-fingerprint -- \
+  --source=cloudflare-r2 \
+  --derived=supabase \
+  --export=backblaze-b2
+```
+
+현재 v1 저장 참조는 기존 행 호환을 위해 provider id를 포함하지 않는다. 따라서 첫 운영 write 이후
+라우팅 fingerprint만 바꾸면 안 된다. 변경하려면 `복사 → 크기·SHA-256 검증 → 원장/라우팅 전환
+→ canary → 구 객체 정리` migration을 먼저 수행한다. B2 adapter가 존재한다고 해서 R2 객체가
+자동 백업되는 것도 아니다. replica inventory와 복제 작업은 별도의 승인된 백업 경계다.
 
 ## 저장소 배치 규칙
 
@@ -141,12 +164,13 @@ upgrade, OG crawler HTML, Studio WASM/WebGPU 로딩을 canary에서 확인한다
 
 ## 단계별 후속 전환
 
-### 2차: 공급자 중립 asset registry
+### 2차: 위치 인식 asset registry와 replica inventory
 
-- 기존 Supabase 전용 포트 이름을 private object storage 포트로 일반화한다.
-- provider, bucket, object key, digest, bytes, MIME, visibility, replica location을 원장에 기록한다.
-- R2는 공개·게시 에셋, B2는 backup replica로만 활성화한다.
-- 동일 요청의 다중 공급자 동시 쓰기는 하지 않는다.
+- provider-neutral private object storage port와 목적별 R2/B2/Supabase 라우팅은 구현되어 있다.
+- 다음 단계에서 provider, bucket, object key, digest, bytes, MIME, visibility, replica location을
+  원장에 기록해 라우팅 변경과 객체 migration을 데이터로 추적한다.
+- R2 공개·게시 에셋과 B2 backup replica는 서로 다른 lifecycle·egress 정책으로 관리한다.
+- 동일 사용자 요청의 다중 공급자 동시 쓰기는 하지 않고 outbox 기반 복제를 사용한다.
 
 ### 3차: BYOS
 

@@ -12,11 +12,16 @@ import { gunzipSync } from "node:zlib";
 
 import {
   buildDetailExtra,
+  CATALOG_SHARD_COUNT,
+  CATALOG_SHARD_MANIFEST_VERSION,
+  catalogShardFileForBucket,
   detailShardBucket,
   detailShardFileForBucket,
   DETAIL_SHARD_COUNT,
   toCalendarTitle,
   toListTitle,
+  type CatalogShardDescriptor,
+  type CatalogShardManifest,
   type DetailShardFile,
 } from "../apps/web/src/shared/lib/catalog-slim";
 import { PLATFORM_LIST } from "../apps/web/src/shared/lib/platforms";
@@ -37,7 +42,7 @@ import { kstDayOfWeek } from "../apps/web/src/shared/lib/utils";
 
 import { readFileIfExists, writeNews } from "./news-gen";
 
-import type { Title } from "../apps/web/src/shared/lib/types";
+import type { Title, TitleCard } from "../apps/web/src/shared/lib/types";
 
 const RANK_TYPES = ["all", "webtoon", "webnovel"];
 
@@ -149,12 +154,49 @@ function buildHome() {
   };
 }
 
+const STATIC_ASSET_APPLICATION_LIMIT_BYTES = 24 * 1024 * 1024;
+
 function writeJson(name: string, data: unknown): void {
   const file = path.join(OUT, name);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify(data));
   const kb = (statSync(file).size / 1024).toFixed(0);
   console.log(`  ${name.padEnd(16)} ${kb.padStart(7)} KB`);
+}
+
+function writeCatalogShards(titles: readonly Title[]): void {
+  const cards = titles.map(toListTitle);
+  const shardCount = Math.min(CATALOG_SHARD_COUNT, Math.max(1, cards.length));
+  const shardSize = Math.ceil(cards.length / shardCount);
+  const descriptors: CatalogShardDescriptor[] = [];
+  let totalBytes = 0;
+
+  for (let bucket = 0; bucket < shardCount; bucket += 1) {
+    const shard = cards.slice(bucket * shardSize, (bucket + 1) * shardSize) as TitleCard[];
+    if (shard.length === 0) continue;
+    const name = catalogShardFileForBucket(bucket);
+    const file = path.join(OUT, name);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(shard));
+    const bytes = statSync(file).size;
+    if (bytes > STATIC_ASSET_APPLICATION_LIMIT_BYTES) {
+      throw new Error(
+        `${name} exceeds the 24 MiB application guard (${bytes} bytes); increase CATALOG_SHARD_COUNT`,
+      );
+    }
+    descriptors.push({ file: name, count: shard.length });
+    totalBytes += bytes;
+  }
+
+  const manifest: CatalogShardManifest = {
+    version: CATALOG_SHARD_MANIFEST_VERSION,
+    count: cards.length,
+    shards: descriptors,
+  };
+  writeJson("catalog/manifest.json", manifest);
+  console.log(
+    `  catalog/*.json  ${String(descriptors.length).padStart(5)} files (${cards.length} entries, ${(totalBytes / 1024).toFixed(0)} KB)`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -168,10 +210,11 @@ async function main(): Promise<void> {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
-  // 전체 카탈로그(클라이언트 검색·탐색·랭킹·추천 계산용) — 경량 카드로 슬리밍해 싣는다.
-  // 상세 전용 필드(시놉시스 원문·availability.url·ratingDist)는 detail/<bucket>.json 샤드로 분리.
-  // 메모리 스토어(TITLES)는 풀 데이터를 유지 — insights(평점분포)·뉴스 매칭 등 빌드 계산은 원본 사용.
-  writeJson("catalog.json", TITLES.map(toListTitle));
+  // 전체 카탈로그(클라이언트 검색·탐색·랭킹·추천 계산용)는 Static Assets의 개별 파일
+  // 제한을 넘지 않도록 경량 카드 순서 보존 샤드 + manifest로 생성한다. 상세 전용 필드
+  // (시놉시스 원문·availability.url·ratingDist)는 detail/<bucket>.json 샤드로 별도 분리한다.
+  // 메모리 스토어(TITLES)는 풀 데이터를 유지 — insights·뉴스 매칭 등 빌드 계산은 원본 사용.
+  writeCatalogShards(TITLES);
   const { files: detailShards, entryCount: detailEntryCount } = buildDetailShards(TITLES);
   let detailBytes = 0;
   detailShards.forEach((shard, bucket) => {

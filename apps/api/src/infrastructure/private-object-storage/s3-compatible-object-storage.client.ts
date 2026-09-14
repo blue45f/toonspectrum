@@ -304,6 +304,9 @@ export class S3CompatiblePrivateObjectStoragePort
   ): URL {
     const url = new URL(this.config.endpoint);
     const bucket = this.config.buckets[purpose];
+    if (!bucket) {
+      throw new S3CompatibleObjectStorageError("PROVIDER_NOT_CONFIGURED");
+    }
     const path = objectPath
       ? `/${bucket}/${objectPath}`
       : `/${bucket}`;

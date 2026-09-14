@@ -43,9 +43,12 @@ Vercel 비상 fallback을 실제로 실행할 때만 필요한 권한:
 - `OPENAI_API_KEY`
 - `OPENROUTER_API_KEY`
 - `BLOB_READ_WRITE_TOKEN`
-- `R2_*`
-- `S3_*`
-- `CREATOR_ASSET_OBJECT_STORAGE_*`
+- `PRIVATE_OBJECT_STORAGE_ENABLED`, `PRIVATE_OBJECT_STORAGE_*_PROVIDER`,
+  `PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT`
+- `R2_OBJECT_STORAGE_*` — R2가 선택된 purpose만 구성
+- `B2_OBJECT_STORAGE_*` — B2가 선택된 purpose만 구성
+- `SUPABASE_OBJECT_STORAGE_*` — legacy 또는 선택된 Supabase purpose
+- 기존 `R2_*`, `S3_*`, `CREATOR_ASSET_OBJECT_STORAGE_*` — 해당 레거시 코드가 실제 참조할 때만 유지
 
 선택적 공급자 값이 없으면 해당 기능은 명시적으로 비활성 또는 구성되지 않음 상태를 표시해야 하며, 공개 페이지와 기본 Studio 기능을 중단해서는 안 된다.
 

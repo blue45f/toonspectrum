@@ -219,7 +219,10 @@ export function readFreeInfrastructurePolicy(
   try {
     parsed = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    throw new Error(`free infrastructure policy is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `free infrastructure policy is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
   const issues = validateFreeInfrastructurePolicy(parsed);
   if (issues.length > 0) {

@@ -56,9 +56,9 @@ const S3ProviderEnvironmentSchema = z
     region: z.string().min(1).max(80).regex(/^[A-Za-z0-9-]+$/u),
     accessKeyId: z.string().min(8).max(512),
     secretAccessKey: z.string().min(16).max(2_048),
-    sourceBucket: BucketNameSchema,
-    derivedBucket: BucketNameSchema,
-    exportBucket: BucketNameSchema,
+    sourceBucket: BucketNameSchema.optional(),
+    derivedBucket: BucketNameSchema.optional(),
+    exportBucket: BucketNameSchema.optional(),
     privateBucketsConfirmed: z.literal("true"),
     timeoutMs: IntegerEnvironmentValueSchema(15_000, 100, 120_000),
     maximumAssetBytes: IntegerEnvironmentValueSchema(
@@ -78,7 +78,7 @@ const S3ProviderEnvironmentSchema = z
       value.sourceBucket,
       value.derivedBucket,
       value.exportBucket,
-    ];
+    ].filter((bucket): bucket is string => bucket !== undefined);
     if (new Set(buckets).size !== buckets.length) {
       context.addIssue({
         code: "custom",
@@ -106,10 +106,10 @@ export interface S3CompatibleObjectStorageConfig {
   readonly region: string;
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
-  readonly buckets: Readonly<Record<
+  readonly buckets: Readonly<Partial<Record<
     z.infer<typeof PrivateObjectPurposeSchema>,
     string
-  >>;
+  >>>;
   readonly timeoutMs: number;
   readonly maximumAssetBytes: number;
   readonly maximumControlMetadataBytes: number;
@@ -176,6 +176,7 @@ function configuredS3Environment(
 function resolveS3ProviderConfig(
   environment: Readonly<Record<string, string | undefined>>,
   providerId: Exclude<PrivateObjectStorageProviderId, "supabase">,
+  purposes: readonly z.infer<typeof PrivateObjectPurposeSchema>[],
 ): S3CompatibleObjectStorageConfig | null {
   const prefix = s3EnvironmentPrefix(providerId);
   const enabled = environment[`${prefix}_ENABLED`];
@@ -191,17 +192,27 @@ function resolveS3ProviderConfig(
   if (!parsed.success) {
     throw new PrivateObjectStorageConfigurationError();
   }
+  const bucketByPurpose = {
+    source: parsed.data.sourceBucket,
+    derived: parsed.data.derivedBucket,
+    export: parsed.data.exportBucket,
+  } as const;
+  const buckets: Partial<Record<
+    z.infer<typeof PrivateObjectPurposeSchema>,
+    string
+  >> = {};
+  for (const purpose of purposes) {
+    const bucket = bucketByPurpose[purpose];
+    if (!bucket) throw new PrivateObjectStorageConfigurationError();
+    buckets[purpose] = bucket;
+  }
   return {
     providerId,
     endpoint: parsed.data.endpoint,
     region: parsed.data.region,
     accessKeyId: parsed.data.accessKeyId,
     secretAccessKey: parsed.data.secretAccessKey,
-    buckets: {
-      source: parsed.data.sourceBucket,
-      derived: parsed.data.derivedBucket,
-      export: parsed.data.exportBucket,
-    },
+    buckets,
     timeoutMs: parsed.data.timeoutMs,
     maximumAssetBytes: parsed.data.maximumAssetBytes,
     maximumControlMetadataBytes:
@@ -287,7 +298,14 @@ export function resolvePrivateObjectStoragePlan(
     "backblaze-b2",
   ] as const) {
     if (!selected.has(providerId)) continue;
-    const config = resolveS3ProviderConfig(environment, providerId);
+    const purposes = PrivateObjectPurposeSchema.options.filter(
+      (purpose) => routing[purpose] === providerId,
+    );
+    const config = resolveS3ProviderConfig(
+      environment,
+      providerId,
+      purposes,
+    );
     if (!config) throw new PrivateObjectStorageConfigurationError();
     s3[providerId] = config;
   }

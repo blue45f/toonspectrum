@@ -171,7 +171,8 @@
     "verify:cloudflare-static": "pnpm run generate:cloudflare-static-rules -- --check && pnpm run typecheck:cloudflare-static && pnpm run test:cloudflare-static",
     "cloudflare:static:dry-run": "node scripts/deploy-cloudflare-static.mjs --dry-run",
     "cloudflare:static:deploy": "node scripts/deploy-cloudflare-static.mjs --production",
-    "verify:free-infrastructure": "node scripts/verify-free-infrastructure-policy.mjs"
+    "verify:free-infrastructure": "node scripts/verify-free-infrastructure-policy.mjs",
+    "infra:storage-routing-fingerprint": "tsx scripts/private-object-storage-routing-fingerprint.mts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
