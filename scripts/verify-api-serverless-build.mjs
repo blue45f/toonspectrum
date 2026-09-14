@@ -321,7 +321,11 @@ export async function verifyApiServerlessBuild() {
         },
       });
       await writeFile(resolve(output, `${prefix}bootstrap.log`), child.stdout + child.stderr);
-      assertArtifactProbeSucceeded(child, name, resolve(output, `${prefix}bootstrap.log`));
+      if (child.status !== 0) {
+        // Probe processes receive synthetic credentials only. Keep their failure visible in CI.
+        console.error(`Lambda probe ${name} failed: ${child.error?.message ?? child.stderr.slice(-8_000)}`);
+      }
+      assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
     }
   }
   console.log(`Vercel HTTP/native/OG packaging, isolated API reads, partition/CSRF and fail-closed gateway probes passed: ${output}`);
