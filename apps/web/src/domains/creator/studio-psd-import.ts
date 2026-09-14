@@ -29,13 +29,14 @@
  *    명시돼 있지 않아 이 파일에서 studio-psd-export.ts 와 같은 톤으로 새로 작성했다.
  *
  * 이 파일은 대부분 순수 로직이다 — flattenPsdLayers/mapPsdBlendMode/placementForLayer 는 DOM 없이
- * 단위테스트 가능하고, importPsdFile 자체도 PsdImportDeps 로 readPsd/downscaleDataUrl 을 주입받아
+ * 단위테스트 가능하고, importPsdFile 자체도 PsdImportDeps 로 readPsd/마스크 변환을 주입받아
  * 테스트에서 실제 파일/canvas 없이 검증 가능하다.
  */
 
 import { readPsd, type BlendMode, type Layer, type Psd, type ReadOptions } from "ag-psd";
 
-import { downscaleDataUrl } from "./studio-image-utils";
+import { encodeStudioLosslessCanvasSource } from "./studio-lossless-canvas-source";
+import { reportStudioPsdImportProgress, throwIfStudioPsdImportAborted, type StudioPsdImportOptions } from "./studio-psd-import-progress";
 import {
   rasterizePsdLayerMasks,
   type PsdLayerMaskRasterInput,
@@ -49,7 +50,7 @@ import {
 export interface PsdImportedElement {
   id: string;
   type: "image";
-  /** downscaleDataUrl 을 거친 최종 data URL(webp, maxW=1280 — onPickImage 와 동일 관례). */
+  /** 원본 래스터 크기를 보존하는 무손실 PNG. 배치 크기와 저장 픽셀은 별개다. */
   src: string;
   x: number;
   y: number;
@@ -71,6 +72,8 @@ export interface PsdImportedElement {
 }
 
 export interface PsdImportResult {
+  /** Original decoded layer pixels, not preservation of every PSD editing feature. */
+  layerPixelStorage?: "native-png";
   /** Studio z-order(뒤→앞, elements[0]=맨 뒤)로 이미 정렬된 상태. */
   elements: PsdImportedElement[];
   /** 원본 PSD 캔버스 크기(스케일 반영 전) — 새 페이지 생성 시 canvasH 계산에 필요. */
@@ -153,8 +156,7 @@ export interface PsdImportDeps {
   /** 기본 ag-psd readPsd(skipCompositeImageData:true). 테스트에서 손으로 만든 Psd 픽스처를
    *  즉시 반환하도록 모킹. */
   readPsdImpl?: (buffer: ArrayBuffer, options?: ReadOptions) => Psd;
-  /** 기본 studio-image-utils.downscaleDataUrl. 테스트에서 입력을 그대로 반환하도록 모킹
-   *  (canvas/Image DOM 의존을 배치·스케일 계산 테스트에서 분리). */
+  /** @deprecated Kept for adapter compatibility; original layer pixels are never downscaled. */
   downscaleImpl?: (dataUrl: string, maxW: number) => Promise<string>;
   /** 기본 Canvas2D 마스크 래스터화. 테스트에서는 DOM 없이 결과를 주입한다. */
   rasterizeMaskImpl?: (
@@ -381,12 +383,9 @@ function createImportedLayerId(): string {
   return `psd-layer-${Date.now()}-${Math.random().toString(36).slice(2)}`; // NOSONAR S2245 비암호화 용도(ID 생성)
 }
 
-/** 각 임포트 이미지의 저장 해상도 상한 — downscaleImageFile/onPickImage 와 동일 관례. PSD 원본이
- *  아무리 고해상도여도 localStorage/히스토리에 그대로 쌓지 않는다. */
-const IMPORTED_LAYER_MAX_DIM = 1280;
 /** ag-psd otherwise permits up to 2GB of decoded bitmaps, which is not a safe
  * browser/mobile boundary. The source ArrayBuffer and decoded layer pixels are
- * independently bounded before editable proxies are admitted to the project. */
+ * independently bounded before original PNG layers are admitted to the project. */
 export const PSD_IMPORT_MAX_FILE_BYTES = 128 * 1024 * 1024;
 export const PSD_IMPORT_MAX_DECODED_BYTES = 128 * 1024 * 1024;
 export const PSD_IMPORT_MAX_DIMENSION_PX = 30_000;
@@ -599,7 +598,6 @@ interface PsdImportLossMetrics {
   maskPreserved: number;
   maskRasterized: number;
   maskDropped: number;
-  proxyRasterized: number;
   unsupportedBlendModes: number;
 }
 
@@ -717,15 +715,6 @@ function psdImportLossManifest(
       `픽셀 채널이 없거나 변환에 실패한 마스크 ${metrics.maskDropped.toLocaleString("ko-KR")}개는 적용하지 않습니다.`,
     ));
   }
-  if (metrics.proxyRasterized > 0) {
-    decisions.push(psdDecision(
-      "resolution",
-      "rasterized",
-      metrics.proxyRasterized,
-      `대형 레이어 ${metrics.proxyRasterized.toLocaleString("ko-KR")}개를 장변 ${IMPORTED_LAYER_MAX_DIM.toLocaleString("ko-KR")}px 표시 프록시로 변환합니다.`,
-      "원본 픽셀 편집이 필요하면 원본 PSD를 함께 보관하세요.",
-    ));
-  }
   if (metrics.unsupportedBlendModes > 0) {
     decisions.push(psdDecision(
       "blend-mode",
@@ -759,10 +748,12 @@ function psdImportLossManifest(
 export async function importPsdFile(
   file: File,
   targetWidth: number,
-  deps: PsdImportDeps = {}
+  deps: PsdImportDeps = {},
+  options: StudioPsdImportOptions = {},
 ): Promise<PsdImportResult> {
+  throwIfStudioPsdImportAborted(options.signal);
+  reportStudioPsdImportProgress(options, "read", 0, 0);
   const readPsdImpl = deps.readPsdImpl ?? readPsd;
-  const downscaleImpl = deps.downscaleImpl ?? downscaleDataUrl;
   const rasterizeMaskImpl = deps.rasterizeMaskImpl ?? rasterizePsdLayerMasks;
 
   if (/\.psb$/iu.test(file.name?.trim() ?? "")) {
@@ -787,6 +778,7 @@ export async function importPsdFile(
     throw new Error(`PSD 파일은 최대 ${PSD_IMPORT_MAX_FILE_BYTES / 1024 / 1024}MB까지 가져올 수 있어요.`);
   }
 
+  throwIfStudioPsdImportAborted(options.signal);
   let preflight: PsdImportPreflight | null = null;
   // readPsdImpl만 주입한 기존 테스트 픽스처에는 실제 26-byte 헤더가 없다. 프로덕션은 주입이
   // 없으므로 반드시 헤더 사전검사를 통과해야 디코더로 진입한다.
@@ -808,6 +800,8 @@ export async function importPsdFile(
     }
   }
 
+  reportStudioPsdImportProgress(options, "decode", 0, 0);
+  throwIfStudioPsdImportAborted(options.signal);
   let psd: Psd;
   try {
     psd = readPsdImpl(buffer, PSD_READ_OPTIONS);
@@ -815,6 +809,7 @@ export async function importPsdFile(
     throw new Error(`PSD 파일을 해석하지 못했어요: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
 
+  throwIfStudioPsdImportAborted(options.signal);
   const sourceWidth = Math.max(1, Math.round(psd.width || 0));
   const sourceHeight = Math.max(1, Math.round(psd.height || 0));
   if (
@@ -834,11 +829,17 @@ export async function importPsdFile(
     maskPreserved: 0,
     maskRasterized: 0,
     maskDropped: 0,
-    proxyRasterized: 0,
     unsupportedBlendModes: 0,
   };
 
+  let completedLayers = 0;
+  reportStudioPsdImportProgress(options, "layers", 0, flattened.length);
   for (const entry of flattened) {
+    throwIfStudioPsdImportAborted(options.signal);
+    // Let cancel/input events run between batches without reducing source quality.
+    if (completedLayers % 4 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    throwIfStudioPsdImportAborted(options.signal);
+    reportStudioPsdImportProgress(options, "layers", completedLayers++, flattened.length);
     if (entry.skipReason === "adjustment") {
       skipped.push(`${entry.name}: 조정 레이어라 제외됨`);
       continue;
@@ -862,8 +863,9 @@ export async function importPsdFile(
 
     let rawDataUrl: string;
     try {
-      rawDataUrl = canvas.toDataURL("image/png");
+      rawDataUrl = await encodeStudioLosslessCanvasSource(canvas, options.signal);
     } catch {
+      throwIfStudioPsdImportAborted(options.signal);
       skipped.push(`${entry.name}: 래스터화 실패로 건너뜀`);
       continue;
     }
@@ -872,31 +874,11 @@ export async function importPsdFile(
       continue;
     }
 
-    let src = rawDataUrl;
-    let proxyFallbackWarning: string | undefined;
-    try {
-      const candidate = await downscaleImpl(rawDataUrl, IMPORTED_LAYER_MAX_DIM);
-      if (isUsableImageDataUrl(candidate)) {
-        src = candidate;
-      } else {
-        proxyFallbackWarning = "이미지 프록시 인코딩이 비어 원본 PNG를 유지했어요.";
-      }
-    } catch {
-      proxyFallbackWarning = "이미지 프록시 변환에 실패해 원본 PNG를 유지했어요.";
-    }
+    // Store the original PNG; placement scale must never downsample document pixels.
+    const src = rawDataUrl;
     const sourcePixelWidth = canvas.width || entry.width;
     const sourcePixelHeight = canvas.height || entry.height;
-    const sourceStayedOriginal = src === rawDataUrl;
-    if (
-      !sourceStayedOriginal
-      && (sourcePixelWidth > IMPORTED_LAYER_MAX_DIM || sourcePixelHeight > IMPORTED_LAYER_MAX_DIM)
-    ) {
-      lossMetrics.proxyRasterized += 1;
-    }
-    if (sourceStayedOriginal && sourcePixelWidth > IMPORTED_LAYER_MAX_DIM && !proxyFallbackWarning) {
-      proxyFallbackWarning = "이미지 프록시 변환에 실패해 원본 PNG를 유지했어요.";
-    }
-    if (proxyFallbackWarning) skipped.push(`${entry.name}: ${proxyFallbackWarning}`);
+    throwIfStudioPsdImportAborted(options.signal);
     const placement = placementForLayer(
       { left: entry.left, top: entry.top, width: entry.width, height: entry.height },
       sourceWidth,
@@ -949,16 +931,15 @@ export async function importPsdFile(
           layerPixelHeight: sourcePixelHeight,
           masks: maskSelection.sources,
           fallbackMask: maskSelection.fallbackMask,
-          // If the source proxy fell back to the original PNG, preserve the
-          // same natural pixel dimensions instead of attaching a 1280px mask
-          // that would drift when rendered against the full-resolution source.
-          maxWidth: sourceStayedOriginal ? sourcePixelWidth : IMPORTED_LAYER_MAX_DIM,
+          // Keep masks at the same native dimensions as their original layer pixels.
+          maxWidth: sourcePixelWidth,
         });
       } catch {
         maskResult = {
           warnings: ["마스크 변환에 실패해 원본 레이어를 가리지 않고 가져왔어요."],
         };
       }
+      throwIfStudioPsdImportAborted(options.signal);
       if (maskResult.maskSrc) {
         el.maskSrc = maskResult.maskSrc;
         if (maskResult.disabled) el.maskEnabled = false;
@@ -989,11 +970,13 @@ export async function importPsdFile(
     }
   }
 
+  reportStudioPsdImportProgress(options, "complete", flattened.length, flattened.length);
   if (elements.length === 0 && skipped.length === 0) {
     skipped.push("PSD에서 가져올 레이어를 찾지 못했어요.");
   }
 
   return {
+    layerPixelStorage: "native-png",
     elements,
     sourceWidth,
     sourceHeight,

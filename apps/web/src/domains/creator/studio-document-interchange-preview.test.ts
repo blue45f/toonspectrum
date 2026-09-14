@@ -291,3 +291,18 @@ describe("studio document interchange preview adapters", () => {
     });
   });
 });
+
+
+it("distinguishes retained native PNG pixels from reduced page placement and legacy proxies", () => {
+  const preview = createStudioPsdImportLossPreview("original.psd", {
+    layerPixelStorage: "native-png", sourceWidth: 2560, sourceHeight: 1600,
+    scale: 1080 / 2560, skipped: [],
+    elements: [{ id: "native", type: "image", src: "data:image/png;base64,NATIVE", x: 0, y: 0, width: 1080, height: 675, rotation: 0 }],
+  }, OPTIONS);
+  expect(preview.proxy?.enabled).toBe(false);
+  expect(preview.proxy?.format).toBe("원본 해상도 PNG 레이어");
+  expect(preview.result.width).toBe(1080);
+  expect(preview.source.width).toBe(2560);
+  expect(preview.constraints?.some((constraint) => constraint.message.includes("원본 픽셀을 무손실 PNG"))).toBe(true);
+  expect(preview.constraints?.some((constraint) => constraint.message.includes("모든 편집 구조를 보존한다는 의미는 아닙니다"))).toBe(true);
+});

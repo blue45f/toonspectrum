@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   flattenPsdLayers,
@@ -244,7 +244,7 @@ describe("psdImportResultMessage", () => {
   });
 });
 
-describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/실파일 불필요)", () => {
+describe("importPsdFile (원본 PNG 보존, 마스크 및 손실 보고)", () => {
   function depsFor(
     psd: Psd,
     downscaleImpl?: PsdImportDeps["downscaleImpl"],
@@ -471,7 +471,7 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     expect(result.skipped).toEqual(["PSD에서 가져올 레이어를 찾지 못했어요."]);
   });
 
-  it("downscaleImpl 에 래스터화된 data URL 과 1280 상한을 그대로 전달한다", async () => {
+  it("legacy downscaleImpl을 호출하지 않고 원본 PNG를 보존한다", async () => {
     const captured: { dataUrl: string; maxW: number }[] = [];
     const psd = samplePsd([leaf({ name: "A" })]);
     const result = await importPsdFile(
@@ -482,11 +482,11 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
         return "data:image/webp;base64,DOWNSCALED";
       })
     );
-    expect(captured).toEqual([{ dataUrl: "data:image/png;base64,AAAA", maxW: 1280 }]);
-    expect(result.elements[0].src).toBe("data:image/webp;base64,DOWNSCALED");
+    expect(captured).toEqual([]);
+    expect(result.elements[0].src).toBe("data:image/png;base64,AAAA");
   });
 
-  it("고해상도 source 축소가 원본으로 fallback하면 mask도 원본 폭을 사용해 자연 크기를 맞춘다", async () => {
+  it("고해상도 source와 mask가 모두 원본 크기를 보존하며 불필요한 경고를 만들지 않는다", async () => {
     const raw = "data:image/png;base64,HIGH";
     const canvas = fakeCanvas(raw, 2_560, 1_600);
     const psd = samplePsd([
@@ -515,10 +515,10 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
       maxWidth: 2_560,
     });
     expect(result.elements[0].src).toBe(raw);
-    expect(result.skipped.join(" ")).toContain("원본 PNG를 유지");
+    expect(result.skipped).toEqual([]);
   });
 
-  it("고해상도 source가 새 1280px proxy로 변환되면 mask도 1280px 상한을 쓴다", async () => {
+  it("legacy proxy encoder가 있어도 source와 mask를 1280px로 축소하지 않는다", async () => {
     const canvas = fakeCanvas("data:image/png;base64,HIGH", 2_560, 1_600);
     const psd = samplePsd([
       leaf({
@@ -539,10 +539,10 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
       }),
     );
 
-    expect(captured?.maxWidth).toBe(1_280);
+    expect(captured?.maxWidth).toBe(2_560);
   });
 
-  it("downscale throw/empty result는 원본 PNG로 안전하게 fallback하고 경고한다", async () => {
+  it("사용하지 않는 legacy proxy encoder 실패가 원본 보존 경로에 영향을 주지 않는다", async () => {
     const psd = samplePsd([leaf({ name: "A" })]);
     const thrown = await importPsdFile(
       new File([], "t.psd"),
@@ -552,7 +552,7 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
       }),
     );
     expect(thrown.elements[0].src).toBe("data:image/png;base64,AAAA");
-    expect(thrown.skipped.join(" ")).toContain("프록시 변환에 실패");
+    expect(thrown.skipped).toEqual([]);
 
     const empty = await importPsdFile(
       new File([], "t.psd"),
@@ -560,7 +560,7 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
       depsFor(psd, async () => "data:,"),
     );
     expect(empty.elements[0].src).toBe("data:image/png;base64,AAAA");
-    expect(empty.skipped.join(" ")).toContain("프록시 인코딩이 비어");
+    expect(empty.skipped).toEqual([]);
   });
 
   it("Canvas가 빈 PNG data URL을 반환하면 손상 레이어를 생성하지 않는다", async () => {
@@ -632,5 +632,83 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     await expect(importPsdFile(brokenFile, 720, { readPsdImpl: () => samplePsd([]) })).rejects.toThrow(
       "PSD 파일을 읽지 못했어요"
     );
+  });
+});
+
+describe("PSD original-quality cancellation and progress", () => {
+  it("does not read or decode a request cancelled before it starts", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const file = new File([], "original.psd");
+    const read = vi.spyOn(file, "arrayBuffer");
+    const decode = vi.fn(() => samplePsd());
+    await expect(importPsdFile(file, 720, { readPsdImpl: decode }, {
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(read).not.toHaveBeenCalled();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("does not start decoding when cancelled during file reading", async () => {
+    const controller = new AbortController();
+    const file = new File([], "original.psd");
+    vi.spyOn(file, "arrayBuffer").mockImplementation(async () => {
+      controller.abort();
+      return new ArrayBuffer(0);
+    });
+    const decode = vi.fn(() => samplePsd());
+    await expect(importPsdFile(file, 720, { readPsdImpl: decode }, {
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("stops between layers and never reports a cancelled document complete", async () => {
+    const controller = new AbortController();
+    const encoded = vi.fn(() => "data:image/png;base64,ORIGINAL");
+    const canvas = { ...fakeCanvas(), toDataURL: encoded } as HTMLCanvasElement;
+    const psd = samplePsd([leaf({ canvas }), leaf({ canvas }), leaf({ canvas })]);
+    const stages: string[] = [];
+    await expect(importPsdFile(new File([], "original.psd"), 720, {
+      readPsdImpl: () => psd,
+    }, {
+      signal: controller.signal,
+      onProgress: (progress) => {
+        stages.push(progress.stage);
+        if (progress.stage === "layers" && progress.completedLayers === 1) controller.abort();
+      },
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(encoded).toHaveBeenCalledTimes(1);
+    expect(stages).not.toContain("complete");
+  });
+
+  it("keeps native portrait/landscape PNG pixels independently of placement size", async () => {
+    const resize = vi.fn(async () => "data:image/webp;base64,LOSSY");
+    const psd = samplePsd([
+      leaf({ canvas: fakeCanvas("data:image/png;base64,PORTRAIT", 1600, 4000) }),
+      leaf({ canvas: fakeCanvas("data:image/png;base64,LANDSCAPE", 4000, 1600) }),
+    ], { width: 4000, height: 4000 });
+    const progress: number[] = [];
+    const result = await importPsdFile(new File([], "original.psd"), 720, {
+      readPsdImpl: () => psd, downscaleImpl: resize,
+    }, { onProgress: (value) => { if (value.stage === "layers" || value.stage === "complete") progress.push(value.completedLayers); } });
+    expect(resize).not.toHaveBeenCalled();
+    expect(result.scale).toBe(0.18);
+    expect(result.elements.map((element) => element.src)).toEqual([
+      "data:image/png;base64,LANDSCAPE", "data:image/png;base64,PORTRAIT",
+    ]);
+    expect(result.lossManifest?.decisions.some((decision) =>
+      decision.feature === "resolution" && decision.disposition === "rasterized",
+    )).toBe(false);
+    expect(progress).toEqual([...progress].sort((a, b) => a - b));
+    expect(progress.at(-1)).toBe(2);
+  });
+
+  it("does not let a presentation callback failure discard successfully decoded pixels", async () => {
+    const result = await importPsdFile(new File([], "original.psd"), 720, {
+      readPsdImpl: () => samplePsd([leaf()]),
+    }, { onProgress: () => { throw new Error("view detached"); } });
+    expect(result.elements).toHaveLength(1);
+    expect(result.elements[0].src).toBe("data:image/png;base64,AAAA");
   });
 });
