@@ -6,3 +6,4 @@ export * from "./marketplace.schema";
 export * from "./admin.schema";
 export * from "./creator.schema";
 export * from "./studio-ai-comic-director.schema";
+export * from "./promotion.schema";

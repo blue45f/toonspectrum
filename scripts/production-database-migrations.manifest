@@ -43,3 +43,4 @@ apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql
 apps/api/src/db/migrations/0043_admin_runtime_schema.sql
 apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql
 apps/api/src/db/migrations/0045_studio_media_inference_jobs.sql
+apps/api/src/db/migrations/0046_creator_promotion_community.sql
