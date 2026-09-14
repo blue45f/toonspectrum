@@ -44,7 +44,7 @@ test("recruitment filters, detail and creator link", async ({ page }) => {
 });
 test("new forms require authentication and never pretend to publish", async ({ page }) => {
   await fixtures(page); await page.goto("/collaborate/new");
-  await expect(page.getByText(/로그인/u).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "로그인 / 회원가입", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "공고 공개 등록" })).toHaveCount(0);
   await page.goto("/community/promote/new");
   await expect(page.getByRole("heading", { name: "로그인 후 작품을 소개해 주세요" })).toBeVisible();

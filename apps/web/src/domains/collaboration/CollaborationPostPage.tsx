@@ -59,7 +59,7 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
           <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-accent/10 px-3 py-2 text-accent">{COLLABORATION_TYPES[post.type]}</span><span className="rounded-full bg-raised px-3 py-2 text-fg-2">{COLLABORATION_ROLES[post.role]}</span><span className="rounded-full bg-raised px-3 py-2 text-fg-2">{COLLABORATION_STATUS[post.status === "open" && post.expired ? "closed" : post.status]}</span></div>
           <h1 className="mt-5 break-words text-2xl font-bold leading-snug text-fg sm:text-4xl">{post.title}</h1>
           <p className="mt-5 text-2xl font-bold text-accent">{collaborationBudget(post)}</p>
-          <p className="mt-4 text-sm text-fg-3">{post.author.name} · {new Date(post.createdAt).toLocaleDateString("ko-KR")} 등록</p>
+          <p className="mt-4 text-sm text-fg-3"><Link href={`/u/${encodeURIComponent(post.author.id)}`} className="font-semibold text-fg-2 underline-offset-4 hover:text-accent hover:underline">{post.author.name}</Link> · {new Date(post.createdAt).toLocaleDateString("ko-KR")} 등록</p>
           {post.hidden && <div className="mt-4"><CollabNotice error>운영자가 비공개 처리한 공고입니다. 공개 목록에는 나타나지 않으며 새 지원을 받지 않아요.</CollabNotice></div>}
         </header>
         {[["작품과 작업 소개", post.details.description], ["작업 분량·납품물·일정", post.details.deliverables], ["보수·지급 조건", post.details.compensation], ["저작권·크레딧·수정 범위", post.details.terms]].map(([label, text]) => <section key={label} className="rounded-2xl border border-line bg-panel p-6"><h2 className="text-lg font-bold text-fg">{label}</h2><p className="mt-4 whitespace-pre-wrap break-words text-sm leading-8 text-fg-2">{text}</p></section>)}
