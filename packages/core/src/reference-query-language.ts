@@ -106,9 +106,9 @@ export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
   };
 }
 
-/** Only the Met adapter gets vocabulary expansion; other providers keep their contract. */
+/** Museum adapters share bounded vocabulary expansion; books keep their contract. */
 export function localizeReferenceProviderQuery(query: Record<string, unknown>): Record<string, unknown> {
-  if (query.provider !== "met" || typeof query.q !== "string") return query;
+  if (typeof query.provider !== "string" || !["met", "aic", "cleveland"].includes(query.provider) || typeof query.q !== "string") return query;
   const resolution = resolveReferenceQuery(query.q);
   return resolution.status === "translated" || resolution.status === "partial"
     ? { ...query, q: resolution.providerQuery }
