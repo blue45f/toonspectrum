@@ -1128,7 +1128,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               {(drawMode !== "eraser" || eraserPresetActive) && (
                 <div>
                   <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>{drawMode === "eraser" ? "지우기 강도" : "투명도"}</span>
+                    <span>{drawMode === "eraser" ? "지우기 강도" : "불투명도"}</span>
                     <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
@@ -1140,10 +1140,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
                       className="h-11 w-full accent-accent"
-                      aria-label={drawMode === "eraser" ? "지우기 강도 슬라이더" : "브러시 투명도 슬라이더"}
+                      aria-label={drawMode === "eraser" ? "지우기 강도 슬라이더" : "브러시 불투명도 슬라이더"}
                     />
                     <label className="sr-only" htmlFor="mobile-brush-opacity">
-                      {drawMode === "eraser" ? "지우기 강도 숫자" : "브러시 투명도 숫자"}
+                      {drawMode === "eraser" ? "지우기 강도 숫자" : "브러시 불투명도 숫자"}
                     </label>
                     <input
                       id="mobile-brush-opacity"
@@ -1167,6 +1167,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                     />
                   </div>
+                  {drawMode !== "eraser" ? (
+                    <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+                      100%는 색이 가장 또렷하고, 낮을수록 아래 색이 비쳐요.
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>

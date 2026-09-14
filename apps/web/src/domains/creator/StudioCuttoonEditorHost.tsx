@@ -1,5 +1,6 @@
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
+import { readStudioLaunchPrimaryTool } from "./studio-launch-mode";
 import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
@@ -15848,7 +15849,8 @@ const puppetWarpArmed =
     autosaveChecked,
     hasExistingContent: hasAutosave || elements.length > 0,
     primaryToolActivatedRef,
-    rememberedPrimaryTool: uiDensityMode === "focus" ? "draw" : rememberedPrimaryTool,
+    rememberedPrimaryTool,
+    requestedPrimaryTool: readStudioLaunchPrimaryTool(location.search),
     startDrawing: () => {
       activatePrimaryCanvasToolRef.current("draw");
       if (!isMobile && uiDensityMode !== "focus") openInspectorRoute({ primary: "properties" }, null);

@@ -123,9 +123,9 @@ export function studioUiDensityLabel(
     if (mode === "focus") return t("studio.settings.uiDensityMode.focus");
     return t("studio.settings.uiDensityMode.full");
   }
-  if (mode === "simple") return "표준 작업";
+  if (mode === "simple") return "기본 작업";
   if (mode === "focus") return "집중 작업";
-  return "전체 기능";
+  return "전체 도구";
 }
 
 export function studioUiDensityDescription(
@@ -138,12 +138,12 @@ export function studioUiDensityDescription(
     return t("studio.settings.uiDensityDescription.full");
   }
   if (mode === "simple") {
-    return "표준 작업 — 자주 쓰는 도구와 설정을 보여 주고 고급 실행기는 필요할 때 펼칩니다.";
+    return "자주 쓰는 도구와 설정을 보여 주고 고급 기능은 필요할 때 펼칩니다.";
   }
   if (mode === "focus") {
-    return "집중 작업 — 캔버스와 그리기·말풍선·소재 같은 핵심 도구만 남겨 작업에 집중합니다.";
+    return "캔버스와 그리기·말풍선·소재 같은 핵심 도구만 남깁니다.";
   }
-  return "전체 기능 — AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.";
+  return "AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.";
 }
 
 /** Map the existing mobile immersive flag without changing established non-immersive sessions. */

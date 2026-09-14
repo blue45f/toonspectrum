@@ -218,7 +218,7 @@ export function StudioNewIntegratedPage() {
       const result = createStudioProjectWithInitialDocument(window.localStorage, {
         title, kind, templateId, description, primaryLocale,
       }, window);
-      navigate(`${result.href}&uiMode=standard`, { replace: true });
+      navigate(`${result.href}&uiMode=basic&startTool=draw`, { replace: true });
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message

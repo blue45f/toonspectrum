@@ -896,6 +896,7 @@ export function useStudioInitialPrimaryTool(context: {
   readonly hasExistingContent: boolean;
   readonly primaryToolActivatedRef: MutableRefObject<boolean>;
   readonly rememberedPrimaryTool: StudioRememberedPrimaryTool | null;
+  readonly requestedPrimaryTool?: StudioRememberedPrimaryTool | null;
   readonly startDrawing: () => void;
   readonly uiBooleanPreferencesReady: boolean;
   readonly workHydrated: boolean;
@@ -904,6 +905,7 @@ export function useStudioInitialPrimaryTool(context: {
   const applyInitialPrimaryTool = useEffectEvent(() => {
     if (context.primaryToolActivatedRef.current) return;
     const next = resolveStudioInitialPrimaryTool({
+      requestedTool: context.requestedPrimaryTool,
       rememberedTool: context.rememberedPrimaryTool,
       hasExistingContent: context.hasExistingContent,
     });

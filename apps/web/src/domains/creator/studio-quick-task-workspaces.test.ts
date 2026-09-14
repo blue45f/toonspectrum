@@ -3,7 +3,7 @@ import { defaultStudioAppSettings } from "./studio-app-settings";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { STUDIO_CREATION_PRESETS, studioCreationPreset } from "./studio-creation-presets";
 import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
-import { readStudioLaunchDensity } from "./studio-launch-mode";
+import { readStudioLaunchDensity, readStudioLaunchPrimaryTool } from "./studio-launch-mode";
 import { createStudioProjectWithInitialDocument } from "./studio-project-creation";
 import { ensureInitialStudioProjectDocument } from "./studio-project-document-store";
 import { preserveStudioTaskToolbarPreference, projectStudioTaskAppSettings } from "./studio-task-tools";
@@ -89,10 +89,17 @@ describe("quick and task-specific studio workspaces", () => {
     expect(preserveStudioTaskToolbarPreference(stored, presented, customized)).toBe(customized);
   });
   it("distinguishes quick, standard and complete launch modes", () => {
+    expect(readStudioLaunchDensity("?uiMode=focus")).toBe("focus");
     expect(readStudioLaunchDensity("?uiMode=simple")).toBe("focus");
+    expect(readStudioLaunchDensity("?uiMode=basic")).toBe("simple");
     expect(readStudioLaunchDensity("?uiMode=standard")).toBe("simple");
+    expect(readStudioLaunchDensity("?uiMode=full")).toBe("full");
     expect(readStudioLaunchDensity("?uiMode=studio")).toBe("full");
     expect(readStudioLaunchDensity("?uiMode=unknown")).toBeNull();
     expect(readStudioLaunchDensity("?uiMode=simple&uiMode=studio")).toBeNull();
+    expect(readStudioLaunchPrimaryTool("?startTool=draw")).toBe("draw");
+    expect(readStudioLaunchPrimaryTool("?startTool=select")).toBe("select");
+    expect(readStudioLaunchPrimaryTool("?startTool=hand")).toBeNull();
+    expect(readStudioLaunchPrimaryTool("?startTool=draw&startTool=select")).toBeNull();
   });
 });

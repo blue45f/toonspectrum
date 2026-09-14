@@ -15,7 +15,7 @@
 export const STUDIO_GLOBAL_NAVIGATION = [
   { id: "work", label: "내 작업", href: "/studio" },
   { id: "create", label: "새로 만들기", href: "/studio/new" },
-  { id: "assets", label: "에셋", href: "/studio/assets" },
+  { id: "assets", label: "소재", href: "/studio/assets" },
   { id: "learn", label: "배우기", href: "/learn" },
 ] as const;
 
@@ -23,7 +23,7 @@ export const STUDIO_PROJECT_NAVIGATION = [
   { id: "overview", label: "개요" },
   { id: "story", label: "스토리" },
   { id: "production", label: "제작" },
-  { id: "assets", label: "에셋" },
+  { id: "assets", label: "소재" },
   { id: "review", label: "검토" },
   { id: "export", label: "내보내기" },
 ] as const;
@@ -124,7 +124,7 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
   },
   {
     id: "asset.library",
-    label: "에셋",
+    label: "소재",
     owner: "assets",
     primaryRoute: "/studio/assets",
     maturity: "beta",
@@ -135,7 +135,7 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
       { id: "asset-market", role: "projection" },
       { id: "studio-assets-placeholder", role: "legacy" },
     ],
-    aliases: ["내 에셋", "에셋 마켓", "소재", "library"],
+    aliases: ["에셋", "내 에셋", "에셋 마켓", "리소스", "재료", "library"],
   },
   {
     id: "brush.library",
