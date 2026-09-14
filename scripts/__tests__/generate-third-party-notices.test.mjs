@@ -107,6 +107,37 @@ describe("generated third-party notice inventory", () => {
     ).toThrow("Unreviewed production license expression");
   });
 
+  it("admits only the exact reviewed noncommercial Mixbox boundary", () => {
+    const inventory = parsePnpmLicenseInventory(
+      JSON.stringify({
+        "CC-BY-NC-4.0": [
+          {
+            name: "mixbox",
+            versions: ["2.0.0"],
+            paths: ["/tmp/mixbox"],
+            author: "Secret Weapons",
+            homepage: "https://scrtwpns.com/mixbox",
+          },
+        ],
+      }),
+    );
+
+    expect(inventory[0]).toMatchObject({
+      name: "mixbox",
+      versions: ["2.0.0"],
+      license: "CC-BY-NC-4.0",
+    });
+    for (const [name, version, license] of [
+      ["unexpected-nc-package", "2.0.0", "CC-BY-NC-4.0"],
+      ["mixbox", "2.0.1", "CC-BY-NC-4.0"],
+      ["mixbox", "2.0.0", "MIT"],
+    ]) {
+      expect(() => parsePnpmLicenseInventory(JSON.stringify({
+        [license]: [{ name, versions: [version], paths: [`/tmp/${name}`] }],
+      }))).toThrow("Unreviewed restricted production license package");
+    }
+  });
+
   it("keeps the reviewed p5.brush standalone dependency licenses auditable", () => {
     const inventory = parsePnpmLicenseInventory(
       JSON.stringify({
@@ -178,6 +209,15 @@ describe("generated third-party notice inventory", () => {
           entry.name === "@dimforge/rapier3d-deterministic-compat"
           && entry.versions.includes("0.19.3")
           && entry.license === "Apache-2.0",
+      ),
+    ).toBe(true);
+    expect(
+      inventory.some(
+        (entry) =>
+          entry.name === "mixbox"
+          && entry.versions.length === 1
+          && entry.versions[0] === "2.0.0"
+          && entry.license === "CC-BY-NC-4.0",
       ),
     ).toBe(true);
   });

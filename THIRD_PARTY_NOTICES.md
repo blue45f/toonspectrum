@@ -27,6 +27,7 @@ obscure, or claim ownership of these libraries.
 | `lazy-brush` | 2.0.2 | MIT | <https://github.com/dulnan/lazy-brush> |
 | `perfect-freehand` | 1.2.3 | MIT | <https://github.com/steveruizok/perfect-freehand> |
 | `p5.brush` standalone entry | 2.2.1 | MIT | <https://github.com/acamposuribe/p5.brush> |
+| `mixbox` | 2.0.0 | CC BY-NC 4.0 — non-commercial use only | <https://github.com/scrtwpns/mixbox> |
 | `p5` peer resolution for `p5.brush` | 2.3.1 | LGPL-2.1 | <https://github.com/processing/p5.js> |
 | `libtess` dependency of the resolved `p5` peer | 1.2.2 | SGI-B-2.0 | <https://github.com/brendankenny/libtess.js> |
 | `hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem` | 0.3.0 | MIT OR Apache-2.0 | <https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00> |
@@ -51,6 +52,16 @@ production inventory, collects the license texts that are present, adds the
 official ONNX Runtime MIT notice, includes the Apache-2.0 Comlink attribution
 shipped beside xatlas, and records the exact MPL-2.0 source location for the
 unmodified resvg executable.
+
+
+`mixbox@2.0.0` is included only for ToonSpectrum's explicitly free,
+non-commercial distribution profile. Its CC BY-NC 4.0 terms do not permit a
+commercial product build. Any commercial deployment, paid distribution, or
+commercially licensed fork must disable/remove the Mixbox provider or obtain a
+separate commercial license from Secret Weapons before release. The runtime
+marks this provider as `noncommercial`, the default Brush Studio V6 profile is
+`noncommercial-full`, and the exact package/version/license boundary is pinned
+by the release audit. See `third_party/mixbox/README.md`.
 
 ToonSpectrum imports `p5.brush/standalone`; that entry is self-contained and
 does not statically import the resolved `p5` peer. The production dependency

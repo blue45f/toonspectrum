@@ -244,6 +244,7 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "BSD-2-Clause",
   "BSD-3-Clause",
   "CC0-1.0",
+  "CC-BY-NC-4.0",
   "ISC",
   "LGPL-2.1",
   "LGPL-2.1-only",
@@ -255,6 +256,32 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "SGI-B-2.0",
   "Unlicense",
 ]);
+
+const REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES = Object.freeze({
+  mixbox: Object.freeze({
+    version: "2.0.0",
+    license: "CC-BY-NC-4.0",
+  }),
+});
+
+function validateReviewedRestrictedProductionDependency(
+  name,
+  versions,
+  license,
+) {
+  const policy = REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES[name];
+  if (!policy && license !== "CC-BY-NC-4.0") return;
+  if (
+    !policy
+    || policy.license !== license
+    || versions.length !== 1
+    || versions[0] !== policy.version
+  ) {
+    throw new Error(
+      `Unreviewed restricted production license package: ${name}@${versions.join(",") || "(missing)"} — ${license || "(missing)"}`,
+    );
+  }
+}
 
 const REVIEWED_LICENSE_FILE_DIGESTS = new Map([
   [
@@ -271,6 +298,7 @@ const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
   "@techstark/opencv-js": "5.0.0-release.1",
   harfbuzzjs: "1.4.0",
   "manifold-3d": "3.5.1",
+  mixbox: "2.0.0",
   "onnxruntime-web": "1.27.0",
   "opencascade.js": "1.1.1",
   "p5.brush": "2.2.1",
@@ -1416,6 +1444,11 @@ export function readFilesystemLicenseInventory() { // NOSONAR javascript:S3776
           `Unreviewed production license expression: ${license || "(missing)"} (${packageJson.name}@${packageJson.version})`,
         );
       }
+      validateReviewedRestrictedProductionDependency(
+        packageJson.name,
+        [packageJson.version],
+        license,
+      );
       const key = `${packageJson.name}\u0000${license}`;
       const existing = groupedPackages.get(key) ?? {
         name: packageJson.name,
@@ -1551,6 +1584,11 @@ export function parsePnpmLicenseInventory(raw) { // NOSONAR javascript:S3776
           `Malformed pnpm license inventory entry for ${String(packageRecord.name)}`,
         );
       }
+      validateReviewedRestrictedProductionDependency(
+        packageRecord.name,
+        versions,
+        licenseExpression,
+      );
       entries.push({
         name: packageRecord.name,
         versions,
@@ -1776,6 +1814,10 @@ function validateRepositoryPolicy() {
     "https://github.com/dulnan/lazy-brush",
     "https://github.com/steveruizok/perfect-freehand",
     "https://github.com/acamposuribe/p5.brush",
+    "https://github.com/scrtwpns/mixbox",
+    "mixbox@2.0.0",
+    "CC BY-NC 4.0",
+    "third_party/mixbox/README.md",
     "https://github.com/processing/p5.js",
     "https://github.com/brendankenny/libtess.js",
     "https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00",
