@@ -5,16 +5,14 @@ const IMAGE_ASSET_MODELS = {
   precision: "gpt-image-2.5-sunburst",
 } as const;
 
-const IMAGE_ASSET_SIZES = {
-  "1024x1024": { width: 1024, height: 1024 },
-  "1536x1024": { width: 1536, height: 1024 },
-  "1024x1536": { width: 1024, height: 1536 },
-  "2048x2048": { width: 2048, height: 2048 },
-  "2048x1152": { width: 2048, height: 1152 },
-  "1152x2048": { width: 1152, height: 2048 },
-} as const;
 
-export type ImageAssetSize = keyof typeof IMAGE_ASSET_SIZES;
+export type ImageAssetSize =
+  | "1024x1024"
+  | "1536x1024"
+  | "1024x1536"
+  | "2048x2048"
+  | "2048x1152"
+  | "1152x2048";
 export type ImageAssetQuality = "low" | "medium" | "high" | "xhigh" | "max" | "auto";
 export type ImageAssetModel = (typeof IMAGE_ASSET_MODELS)[keyof typeof IMAGE_ASSET_MODELS];
 

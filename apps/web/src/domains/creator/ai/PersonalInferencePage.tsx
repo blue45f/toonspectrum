@@ -1,5 +1,5 @@
 import { Box, Download, Film, Loader2, RefreshCw, Server, Square, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -56,7 +56,7 @@ export function PersonalInferencePage() {
   const [error, setError] = useState("");
   const operation = useRef<AbortController | null>(null);
 
-  const refresh = async (signal?: AbortSignal) => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!configured) {
       setCapabilities(null);
       setJobs([]);
@@ -70,7 +70,7 @@ export function PersonalInferencePage() {
       setCapabilities(nextCapabilities);
       setJobs(nextJobs);
     }
-  };
+  }, [configured]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,7 +86,7 @@ export function PersonalInferencePage() {
       globalThis.clearInterval(timer);
       operation.current?.abort();
     };
-  }, [aux.revision, configured]);
+  }, [aux.revision, configured, refresh]);
 
   const start = async () => {
     if (!file || busy || !configured) return;

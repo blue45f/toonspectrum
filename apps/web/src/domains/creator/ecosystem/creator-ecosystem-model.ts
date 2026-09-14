@@ -84,8 +84,9 @@ export function normalizeCreatorEcosystemState(value: unknown): CreatorEcosystem
   if (record.lessonSteps && typeof record.lessonSteps === "object" && !Array.isArray(record.lessonSteps)) {
     for (const lesson of GUIDED_LESSONS) {
       const raw = (record.lessonSteps as Record<string, unknown>)[lesson.id];
+      const allowedSteps: readonly string[] = lesson.steps;
       lessonSteps[lesson.id] = Array.isArray(raw)
-        ? raw.map((item) => text(item, 120)).filter((item) => lesson.steps.includes(item)).slice(0, lesson.steps.length)
+        ? raw.map((item) => text(item, 120)).filter((item) => allowedSteps.includes(item)).slice(0, lesson.steps.length)
         : [];
     }
   }
