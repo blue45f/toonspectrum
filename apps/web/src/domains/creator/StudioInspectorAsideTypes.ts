@@ -130,6 +130,7 @@ export interface StudioInspectorAsideHandlers {
   clearHealCloneSource: () => void;
   clearPolyLassoDraft: () => void;
   commit: (nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>, targetPageId?: string) => boolean;
+  commitCoalesced?: (nextElements: El[], key: string) => void;
   createEditableRasterCopyForInspector: (resumeToolId?: StudioRasterToolId) => Promise<void>;
   deleteFilterMask: () => void;
   deleteLayerMask: () => void;
@@ -163,6 +164,9 @@ export interface StudioInspectorAsideHandlers {
   openStudioLayerLift: () => void;
   openStudioFilter: (kind: StudioFilterKind) => void;
   patchEl: (id: string, patch: Partial<El>) => void;
+  patchElCoalesced?: (id: string, patch: Partial<El>, key: string) => void;
+  finishPatchElCoalescing?: () => void;
+  requestInspectorColorSample?: (applyColor: (color: string) => void) => void;
   patchPageGrade: (patch: Partial<PageGrade>) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
   regenerateTemplate: (

@@ -5,6 +5,7 @@ import {
   StudioColorPopoverContent,
   preloadStudioColorPopover,
 } from "./studio-page-lazy-ui";
+import { StudioColorTrigger } from "./StudioColorTrigger";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
@@ -21,10 +22,26 @@ function StudioColorPopoverFallback({
   label = "색상 선택",
   purpose = "generic",
   className,
+  triggerVariant = "swatch",
+  triggerNone = false,
+  triggerMixed = false,
+  disabled = false,
+  controlId,
   onWarm,
   onActivate,
   busy = false,
-}: Pick<LazyStudioColorPopoverProps, "value" | "label" | "purpose" | "className"> & {
+}: Pick<
+  LazyStudioColorPopoverProps,
+  | "value"
+  | "label"
+  | "purpose"
+  | "className"
+  | "triggerVariant"
+  | "triggerNone"
+  | "triggerMixed"
+  | "disabled"
+  | "controlId"
+> & {
   onWarm?: () => void;
   onActivate?: () => void;
   busy?: boolean;
@@ -40,16 +57,18 @@ function StudioColorPopoverFallback({
         hint={studioColorPopoverTriggerHint(label, purpose)}
         preferredSide="bottom"
       >
-        <button
-          type="button"
-          aria-label={label}
-          aria-expanded={false}
-          aria-busy={busy || undefined}
+        <StudioColorTrigger
+          value={value}
+          label={label}
+          variant={triggerVariant}
+          busy={busy}
+          disabled={disabled}
+          isNone={triggerNone}
+          mixed={triggerMixed}
+          controlId={controlId}
           onClick={onActivate}
           onFocus={warm}
           onMouseEnter={warm}
-          className="h-7 w-7 cursor-pointer rounded border border-line pointer-coarse:size-11"
-          style={{ background: value }}
         />
       </StudioToolHintTarget>
     </span>
@@ -62,6 +81,7 @@ export function LazyStudioColorPopover({
 }: LazyStudioColorPopoverProps) {
   const [activated, setActivated] = useState(false);
   const activate = () => {
+    if (props.disabled) return;
     onLoadRecentColors?.();
     setActivated(true);
   };

@@ -50,4 +50,75 @@ describe("StudioInspectorTypographySection", () => {
       textPath: { shape: "circleUp", curve: 50 },
     });
   });
+
+  it("restores the last authored outline and shadow settings when re-enabled", () => {
+    const patchEl = vi.fn();
+    const styled: TextEl = {
+      ...dummyTextEl,
+      stroke: "#123456",
+      strokeWidth: 7,
+      shadowColor: "#654321",
+      shadowBlur: 9,
+      shadowOffsetX: -4,
+      shadowOffsetY: 6,
+      shadowOpacity: 0.35,
+    };
+    const view = render(
+      <StudioInspectorTypographySection selected={styled} patchEl={patchEl} />,
+    );
+
+    if (!screen.queryByLabelText("글자 외곽선 사용")) {
+      fireEvent.click(screen.getByText("외형"));
+    }
+
+    fireEvent.click(screen.getByLabelText("글자 외곽선 사용"));
+    expect(patchEl).toHaveBeenLastCalledWith("txt-1", {
+      stroke: undefined,
+      strokeWidth: 0,
+    });
+
+    view.rerender(
+      <StudioInspectorTypographySection
+        selected={{ ...styled, stroke: undefined, strokeWidth: 0 }}
+        patchEl={patchEl}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("글자 외곽선 사용"));
+    expect(patchEl).toHaveBeenLastCalledWith("txt-1", {
+      stroke: "#123456",
+      strokeWidth: 7,
+    });
+
+    fireEvent.click(screen.getByLabelText("글자 그림자 사용"));
+    expect(patchEl).toHaveBeenLastCalledWith("txt-1", {
+      shadowColor: undefined,
+      shadowBlur: undefined,
+      shadowOffsetX: undefined,
+      shadowOffsetY: undefined,
+      shadowOpacity: undefined,
+    });
+
+    view.rerender(
+      <StudioInspectorTypographySection
+        selected={{
+          ...styled,
+          shadowColor: undefined,
+          shadowBlur: undefined,
+          shadowOffsetX: undefined,
+          shadowOffsetY: undefined,
+          shadowOpacity: undefined,
+        }}
+        patchEl={patchEl}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("글자 그림자 사용"));
+    expect(patchEl).toHaveBeenLastCalledWith("txt-1", {
+      shadowColor: "#654321",
+      shadowBlur: 9,
+      shadowOffsetX: -4,
+      shadowOffsetY: 6,
+      shadowOpacity: 0.35,
+    });
+  });
+
 });
