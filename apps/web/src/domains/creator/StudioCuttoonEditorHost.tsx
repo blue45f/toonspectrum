@@ -35,7 +35,6 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
@@ -201,8 +200,6 @@ import { useStudioTemplateLayout } from "./template/studio-template-layout-contr
 import { useStudioSelectionTransform } from "./selection/studio-selection-transform-controller";
 import { useStudioQuickComic } from "./comipo/studio-quick-comic-controller";
 import { StudioCuttoonEditorView } from "./studio-cuttoon-editor/StudioCuttoonEditorView";
-
-
 import { applyStudioBg3dAiMethodReference } from "./scene-3d/studio-3d-ai-reference-application";
 import {
   applyStudioBg3dInsertResult,
@@ -420,7 +417,6 @@ import {
   labelStudioCollaborationRole,
 } from "./studio-collaboration-lock-copy";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
-
 import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
 import {
   markAllStudioTeamCommentThreadsRead,
@@ -1300,7 +1296,6 @@ import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrche
 import { requestStudioVrmProjectArchiveUseContext } from "./vrm/StudioVrmProjectArchiveAttestationHost";
 import { useStudioLiveTransportAuth } from "./live/use-studio-live-transport-auth";
 import { useStudioBrushBaselineController } from "./brush/useStudioBrushBaselineController";
-
 import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
 import type {
@@ -1430,7 +1425,6 @@ import type {
   WorkRevisionSummary,
 } from "@/infrastructure/creator-client";
 import type Konva from "konva";
-
 import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useResizable } from "@/hooks/use-resizable";
@@ -1443,7 +1437,6 @@ import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
-
 export function StudioCuttoonEditor({
   remixId,
   studioRoute,
@@ -1805,7 +1798,6 @@ export function StudioCuttoonEditor({
     studioWorkAssetHydrator,
     workId,
   });
-
   const {
     pages,
     pagesHi,
@@ -1855,7 +1847,6 @@ export function StudioCuttoonEditor({
     retryStudioHistoryDurability,
   } = useStudioHistoryDurability();
   const comipoActionBusyRef = useRef(false);
-
   const [currentPageId, setCurrentPageIdState] = useState<string>(pages[0]?.id || "");
   const currentPageIdRef = useRef(currentPageId);
   currentPageIdRef.current = currentPageId;

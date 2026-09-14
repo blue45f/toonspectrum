@@ -25,12 +25,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(45);
+  expect(manifest).toHaveLength(47);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0045_studio_media_inference_jobs",
+    "0047_creator_collaboration_board",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(45);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(47);
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -575,6 +575,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_asset_rights_evidence",
     "creator_asset_storage_object",
     "creator_asset_upload_session",
+    "creator_collab_application",
+    "creator_collab_bookmark",
+    "creator_collab_post",
+    "creator_collab_report",
     "creator_draft_collaboration_room",
     "creator_marketplace_draft",
     "creator_marketplace_draft_revision",
@@ -588,6 +592,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_marketplace_resource",
     "creator_marketplace_resource_report",
     "creator_marketplace_resource_report_gate",
+    "creator_promotion_bookmark",
+    "creator_promotion_comment",
+    "creator_promotion_post",
+    "creator_promotion_report",
     "creator_work_asset_storage_reference",
     "creator_work_catalog_asset_binding",
     "studio_ai_comic_director_approval",

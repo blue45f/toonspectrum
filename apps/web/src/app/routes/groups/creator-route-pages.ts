@@ -170,3 +170,16 @@ export const StudioCharacterConversionPage = lazyRetry(
   })),
   "StudioCharacterConversionPage",
 );
+
+export const PersonalInferencePage = lazyRetry(
+  () => import("@/domains/creator/ai/PersonalInferencePage").then((module) => ({
+    default: module.PersonalInferencePage,
+  })),
+  "PersonalInferencePage",
+);
+export const StudioAiSettingsPage = lazyRetry(
+  () => import("@/domains/creator/ai/StudioAiSettingsPage").then((module) => ({
+    default: module.StudioAiSettingsPage,
+  })),
+  "StudioAiSettingsPage",
+);

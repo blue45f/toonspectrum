@@ -1,6 +1,49 @@
-const { mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } = require("node:fs");
+const { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } = require("node:fs");
 const path = require("node:path");
 const { titleBucket } = require("../apps/api/og-title-files.cjs");
+
+
+function readJson(file) {
+  return JSON.parse(readFileSync(file, "utf8"));
+}
+
+function loadPublicCatalog(dataDirectory) {
+  const manifestPath = path.join(dataDirectory, "catalog", "manifest.json");
+  if (existsSync(manifestPath)) {
+    const manifest = readJson(manifestPath);
+    if (!manifest || !Number.isSafeInteger(manifest.count) || !Array.isArray(manifest.shards)) {
+      throw new TypeError("Invalid public catalog shard manifest");
+    }
+    const titles = [];
+    for (const descriptor of manifest.shards) {
+      if (!descriptor || typeof descriptor.file !== "string" || !Number.isSafeInteger(descriptor.count)) {
+        throw new TypeError("Invalid public catalog shard descriptor");
+      }
+      const file = path.resolve(dataDirectory, descriptor.file);
+      const relative = path.relative(dataDirectory, file);
+      if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+        throw new TypeError("Public catalog shard escaped the data directory");
+      }
+      const shard = readJson(file);
+      if (!Array.isArray(shard) || shard.length !== descriptor.count) {
+        throw new TypeError(`Public catalog shard count mismatch: ${descriptor.file}`);
+      }
+      titles.push(...shard);
+    }
+    if (titles.length !== manifest.count) {
+      throw new TypeError("Public catalog manifest total does not match its shards");
+    }
+    return titles;
+  }
+
+  const legacyPath = path.join(dataDirectory, "catalog.json");
+  if (!existsSync(legacyPath)) {
+    throw new TypeError("Public catalog output is missing");
+  }
+  const titles = readJson(legacyPath);
+  if (!Array.isArray(titles)) throw new TypeError("Expected a public catalog array");
+  return titles;
+}
 
 function projectTitle(title) {
   if (!title || typeof title.id !== "string" || typeof title.slug !== "string" || typeof title.title !== "string") {
@@ -48,7 +91,7 @@ function buildOgTitleShards(titles, directory) {
 
 if (require.main === module) {
   const root = process.cwd();
-  const titles = JSON.parse(readFileSync(path.join(root, "dist", "data", "catalog.json"), "utf8"));
+  const titles = loadPublicCatalog(path.join(root, "dist", "data"));
   console.log("OG title metadata", buildOgTitleShards(titles, path.join(root, "dist", "og", "titles")));
 }
-module.exports = { buildOgTitleShards, projectTitle };
+module.exports = { buildOgTitleShards, loadPublicCatalog, projectTitle };

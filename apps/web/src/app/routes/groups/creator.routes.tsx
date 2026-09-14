@@ -3,11 +3,11 @@ import { Navigate } from "react-router-dom";
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
 
 import { studioRoutePath } from "@/domains/creator/studio-route-registry";
-import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import { defineAppRoutes } from "../app-route-definition";
 import {
   CharacterShaperLandingPage,
+  CreatorEcosystemPage,
   CreatorEcosystemViewerPage,
   CreatorInferencePage,
   CreateChallengesPage,
@@ -15,6 +15,8 @@ import {
   CreateSeriesPage,
   CreateWorkPage,
   LearnPage,
+  PersonalInferencePage,
+  StudioAiSettingsPage,
   StudioAssetHubPage,
   StudioBrushLabPage,
   StudioCharacterConversionPage,
@@ -32,25 +34,6 @@ import {
   StudioTemplatesPage,
   StudioRouter,
 } from "./creator-route-pages";
-
-const PersonalInferencePage = lazyRetry(
-  () => import("@/domains/creator/ai/PersonalInferencePage").then((module) => ({
-    default: module.PersonalInferencePage,
-  })),
-  "PersonalInferencePage",
-);
-const StudioAiSettingsPage = lazyRetry(
-  () => import("@/domains/creator/ai/StudioAiSettingsPage").then((module) => ({
-    default: module.StudioAiSettingsPage,
-  })),
-  "StudioAiSettingsPage",
-);
-const CreatorEcosystemPage = lazyRetry(
-  () => import("@/domains/creator/ecosystem/CreatorEcosystemPage").then((module) => ({
-    default: module.CreatorEcosystemPage,
-  })),
-  "CreatorEcosystemPage",
-);
 
 export const creatorRoutes = defineAppRoutes([
   { id: "creator-ai-settings", path: "/studio/ai-settings", element: <StudioAiSettingsPage /> },

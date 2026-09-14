@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, HttpException, NotFoundException } from "@nestjs/common";
 
 import { collaborationDeadline } from "../../../../../packages/core/src/collaboration";
 import { dbPool } from "../../db";
@@ -89,8 +89,19 @@ export class CollaborationRepository {
   }
   async create(userId: string, input: CollaborationInput): Promise<{ id: string }> {
     const id = randomUUID();
-    await this.pool.query(`INSERT INTO creator_collab_post (id,"userId",type,role,title,"payType","workMode",details,"deadlineAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    await this.transaction(async (client) => {
+      // Shared across serverless instances; deletions cannot reset the daily quota.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`collaboration:${userId}`]);
+      const counts = await client.query<{ daily: number; active: number }>(`SELECT
+        count(*) FILTER (WHERE "createdAt" >= now() - interval '24 hours')::int AS daily,
+        count(*) FILTER (WHERE "deletedAt" IS NULL)::int AS active
+        FROM creator_collab_post WHERE "userId"=$1`, [userId]);
+      if (counts.rows[0].daily >= 5 || counts.rows[0].active >= 100) {
+        throw new HttpException("공고는 최근 24시간 5개, 계정당 보관 공고 100개까지 등록할 수 있어요.", 429);
+      }
+    await client.query(`INSERT INTO creator_collab_post (id,"userId",type,role,title,"payType","workMode",details,"deadlineAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [id, userId, input.type, input.role, input.title, input.payType, input.workMode, JSON.stringify(input.details), input.details.deadline ? new Date(collaborationDeadline(input.details.deadline) ?? 0) : null]);
+    });
     return { id };
   }
   async update(id: string, userId: string, input: CollaborationInput, version: number): Promise<void> {
@@ -126,6 +137,10 @@ export class CollaborationRepository {
       if (row.hidden) throw new NotFoundException("공고를 찾을 수 없어요.");
       if (row.userId === userId) throw new ForbiddenException("내 공고에는 지원할 수 없어요.");
       if (row.status !== "open" || (row.deadlineAt && row.deadlineAt.getTime() < Date.now())) throw new ConflictException("접수가 마감된 공고예요.");
+      const existing = await client.query<{ status: string }>(`SELECT status FROM creator_collab_application WHERE "postId"=$1 AND "userId"=$2`, [id, userId]);
+      if (existing.rows[0] && existing.rows[0].status !== "withdrawn") throw new ConflictException("이미 지원했어요. 기존 지원 현황을 확인해 주세요.");
+      const capacity = await client.query<{ count: number }>(`SELECT count(*)::int AS count FROM creator_collab_application WHERE "postId"=$1 AND status<>'withdrawn'`, [id]);
+      if (capacity.rows[0].count >= 200) throw new HttpException("이 공고의 지원 정원 200명에 도달했어요.", 429);
       const result = await client.query(`INSERT INTO creator_collab_application (id,"postId","userId",message,contact,"portfolioUrl") VALUES ($1,$2,$3,$4,$5,$6)
         ON CONFLICT ("postId","userId") DO UPDATE SET message=EXCLUDED.message,contact=EXCLUDED.contact,"portfolioUrl"=EXCLUDED."portfolioUrl",status='submitted',"createdAt"=now(),"updatedAt"=now()
         WHERE creator_collab_application.status='withdrawn' RETURNING id`, [randomUUID(), id, userId, input.message, input.contact, input.portfolioUrl]);
@@ -135,7 +150,7 @@ export class CollaborationRepository {
   async applications(id: string, userId: string): Promise<CollaborationApplication[]> {
     const post = await this.get(id, userId);
     if (post.author.id !== userId) throw new ForbiddenException("지원서는 공고 작성자만 볼 수 있어요.");
-    const result = await this.pool.query<ApplicationRow>(`${selectApplications} WHERE a."postId"=$1 ORDER BY a."createdAt" DESC LIMIT 200`, [id]);
+    const result = await this.pool.query<ApplicationRow>(`${selectApplications} WHERE a."postId"=$1 ORDER BY (a.status='withdrawn') ASC, a."createdAt" DESC LIMIT 200`, [id]);
     return result.rows.map(applicationOf);
   }
   async withdraw(id: string, userId: string): Promise<void> {
@@ -154,13 +169,18 @@ export class CollaborationRepository {
     });
   }
   async bookmark(id: string, userId: string, saved: boolean): Promise<void> {
-    if (saved) {
-      // INSERT SELECT keeps deleted/hidden posts out, including concurrent deletion.
-      const result = await this.pool.query(`INSERT INTO creator_collab_bookmark ("postId","userId") SELECT id,$2 FROM creator_collab_post WHERE id=$1 AND NOT hidden AND "deletedAt" IS NULL
-        ON CONFLICT ("postId","userId") DO UPDATE SET "userId"=EXCLUDED."userId" RETURNING "postId"`, [id, userId]);
-      if (!result.rows.length) throw new NotFoundException("저장할 공고를 찾을 수 없어요.");
-    } else await this.pool.query(`DELETE FROM creator_collab_bookmark WHERE "postId"=$1 AND "userId"=$2`, [id, userId]);
+    if (!saved) {
+      await this.pool.query(`DELETE FROM creator_collab_bookmark WHERE "postId"=$1 AND "userId"=$2`, [id, userId]);
+      return;
+    }
+    await this.transaction(async (client) => {
+      const row = await this.lockPost(client, id);
+      if (row.hidden) throw new NotFoundException("저장할 공고를 찾을 수 없어요.");
+      await client.query(`INSERT INTO creator_collab_bookmark ("postId","userId") VALUES ($1,$2)
+        ON CONFLICT ("postId","userId") DO NOTHING`, [id, userId]);
+    });
   }
+
   async report(id: string, userId: string, reason: string): Promise<void> {
     await this.get(id, userId);
     await this.pool.query(`INSERT INTO creator_collab_report ("postId","userId",reason) VALUES ($1,$2,$3) ON CONFLICT ("postId","userId") DO UPDATE SET reason=EXCLUDED.reason,"createdAt"=now()`, [id, userId, reason]);

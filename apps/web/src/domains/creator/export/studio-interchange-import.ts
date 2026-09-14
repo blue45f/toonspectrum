@@ -1,10 +1,10 @@
 import { CANVAS_W } from "../studio-assets";
 import { uid } from "../studio-id";
-import { studioPsdImportProgressMessage } from "../studio-psd-import-progress";
 import { createBlankPage } from "../studio-pages";
 import { STUDIO_PROJECT_MAX_PAGES } from "../studio-project-file";
 
 import { loadStudioPsdImportModule } from "./studio-document-export-loaders";
+import { studioDocumentImportProgressMessage } from "./studio-document-import-progress-copy";
 
 import type {
   PendingStudioInterchangeImport,
@@ -290,7 +290,7 @@ export function createStudioInterchangeImportOrchestration(
         onProgress: (progress) => {
           if (!controller.signal.aborted && documentImportEpochRef.current === importEpoch
             && canApplyStudioMutation(mutationTicket)) {
-            setPsdImportStatus({ tone: "warn", text: studioPsdImportProgressMessage(progress) });
+            setPsdImportStatus({ tone: "warn", text: studioDocumentImportProgressMessage(progress) });
           }
         },
       });

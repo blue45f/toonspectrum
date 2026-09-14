@@ -31,7 +31,8 @@
       "@toonspectrum/studio-engine-skia": [
         "./apps/web/src/types/studio-engine-skia-shim.d.ts"
       ]
-    }
+    },
+    "allowImportingTsExtensions": true
   },
   "include": [
     "apps/web/src/**/*.ts",

@@ -81,9 +81,12 @@ export function promotionVideo(value: unknown): { provider: "YouTube" | "Vimeo";
 /** Browser-generated JPEG only. No SVG/HTML or external thumbnail requests. */
 export function validPromotionCover(value: unknown): value is string {
   if (value === "") return true;
-  if (typeof value !== "string" || value.length > Math.ceil(PROMOTION_COVER_MAX_BYTES / 3) * 4 + 23) return false;
+  if (typeof value !== "string") return false;
   const match = /^data:image\/jpeg;base64,(\/9j\/[A-Za-z0-9+/]*={0,2})$/u.exec(value);
-  return !!match && match[1].length % 4 === 0;
+  if (!match || match[1].length % 4 !== 0) return false;
+  const padding = match[1].endsWith("==") ? 2 : match[1].endsWith("=") ? 1 : 0;
+  const decodedBytes = (match[1].length / 4) * 3 - padding;
+  return decodedBytes <= PROMOTION_COVER_MAX_BYTES;
 }
 export function validatePromotion(input: unknown): PromotionResult<PromotionInput> {
   const body = promotionRecord(input);
@@ -111,14 +114,14 @@ export function promotionCursor(value: unknown): { date: Date; id: string } | nu
   if (typeof value !== "string" || value.length > 90) throw new Error("잘못된 페이지 커서입니다.");
   const [stamp, id, extra] = value.split("|");
   const date = new Date(stamp);
-  if (extra !== undefined || !id || !/^[a-f0-9-]{36}$/iu.test(id) || !Number.isFinite(date.getTime()) || date.toISOString() !== stamp) throw new Error("잘못된 페이지 커서입니다.");
+  if (extra !== undefined || !id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id) || !Number.isFinite(date.getTime()) || date.toISOString() !== stamp) throw new Error("잘못된 페이지 커서입니다.");
   return { date, id };
 }
 export function isPromotionPost(value: unknown): value is PromotionPost {
   const post = promotionRecord(value);
   const author = promotionRecord(post.author);
   return typeof post.id === "string"
-    && /^[a-f0-9-]{36}$/iu.test(post.id)
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(post.id)
     && typeof author.id === "string"
     && typeof author.name === "string"
     && typeof post.createdAt === "string"
