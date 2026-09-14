@@ -4,13 +4,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveStudioChromeInspectorPropertySurface } from "./studio-chrome-ia-map";
+import { resetStudioRecentColorsBridgeForTests } from "./studio-recent-colors-bridge";
 import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
 
 import type { DrawEl } from "./studio-element-model";
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
+  resetStudioRecentColorsBridgeForTests();
 });
 
 function drawSelection(overrides: Partial<DrawEl> = {}): DrawEl {
