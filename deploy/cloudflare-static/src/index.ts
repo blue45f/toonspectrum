@@ -293,6 +293,38 @@ function orderedReadOrigins(
   });
 }
 
+function removePublicReadCredentials(headers: Headers): void {
+  headers.delete("authorization");
+  headers.delete("proxy-authorization");
+  headers.delete("cookie");
+  for (const name of [...headers.keys()]) {
+    if (
+      name.startsWith("x-user-")
+      || name.startsWith("x-admin-")
+      || name.startsWith("x-csrf-")
+      || name.startsWith("x-session-")
+    ) {
+      headers.delete(name);
+    }
+  }
+}
+
+function trustedConnectingIp(request: Request): string | null {
+  const value = request.headers.get("cf-connecting-ip")?.trim();
+  if (!value || value.length > 64 || /[\u0000-\u0020\u007f]/u.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+async function cancelRetryResponse(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // A failed best-effort body cancellation must not suppress a safe replica retry.
+  }
+}
+
 export function createUpstreamApiRequest(
   request: Request,
   origin: URL,
@@ -308,10 +340,20 @@ export function createUpstreamApiRequest(
   }
 
   const headers = new Headers(request.headers);
+  const connectingIp = trustedConnectingIp(request);
   headers.delete("host");
   headers.delete("cf-connecting-ip");
   headers.delete("cf-ipcountry");
   headers.delete("cf-ray");
+  headers.delete("forwarded");
+  headers.delete("true-client-ip");
+  headers.delete("x-forwarded-for");
+  headers.delete("x-real-ip");
+  if (route === "public-read") {
+    removePublicReadCredentials(headers);
+  } else if (connectingIp) {
+    headers.set("x-forwarded-for", connectingIp);
+  }
   headers.set("x-forwarded-host", incoming.host);
   headers.set("x-forwarded-proto", "https");
   headers.set("x-toonspectrum-edge", "cloudflare-static-gateway-v2");
@@ -362,10 +404,17 @@ export function createCloudflareStaticGateway(
 
     const route = classifyDynamicRoute(request, requestUrl);
     const resolution = resolveOrigins(route, env);
+    const selfReferential = resolution.origins.some(
+      (origin) => origin.origin === requestUrl.origin,
+    );
     const origins = resolution.origins.filter(
       (origin) => origin.origin !== requestUrl.origin,
     );
-    if (resolution.invalidConfiguration || origins.length === 0) {
+    if (
+      resolution.invalidConfiguration
+      || selfReferential
+      || origins.length === 0
+    ) {
       return jsonError(503, "CORE_API_UNAVAILABLE");
     }
 
@@ -386,7 +435,10 @@ export function createCloudflareStaticGateway(
         const shouldRetry = retryableRead(request, route)
           && RETRYABLE_UPSTREAM_STATUSES.has(response.status)
           && index + 1 < orderedOrigins.length;
-        if (shouldRetry) continue;
+        if (shouldRetry) {
+          await cancelRetryResponse(response);
+          continue;
+        }
         return withSecurityHeaders(response);
       } catch {
         if (
