@@ -5,15 +5,38 @@ export interface AssetsBinding {
 export interface CloudflareStaticEnv {
   readonly ASSETS: AssetsBinding;
   readonly CORE_API_ORIGIN?: string;
+  /** Comma-separated stateless read replicas for public/catalog/search traffic. */
+  readonly PUBLIC_READ_API_ORIGINS?: string;
+  readonly SOCIAL_API_ORIGIN?: string;
+  readonly PLAYGROUND_API_ORIGIN?: string;
+  readonly ADMIN_API_ORIGIN?: string;
+  readonly REALTIME_API_ORIGIN?: string;
 }
 
 interface GatewayRuntime {
   readonly fetch: typeof globalThis.fetch;
 }
 
+type DynamicRoute =
+  | "core"
+  | "public-read"
+  | "social"
+  | "playground"
+  | "admin"
+  | "realtime";
+
+interface OriginResolution {
+  readonly origins: readonly URL[];
+  readonly invalidConfiguration: boolean;
+}
+
 const DEFAULT_RUNTIME: GatewayRuntime = {
   fetch: globalThis.fetch.bind(globalThis),
 };
+
+const RETRYABLE_READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
+const MAX_PUBLIC_READ_ORIGINS = 8;
 
 export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
@@ -35,7 +58,7 @@ function jsonError(status: number, code: string): Response {
   });
 }
 
-function coreOrigin(raw: string | undefined): URL | null {
+function validatedOrigin(raw: string | undefined): URL | null {
   if (!raw) return null;
   let url: URL;
   try {
@@ -110,7 +133,157 @@ function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
   return null;
 }
 
-export function createCoreApiRequest(request: Request, origin: URL): Request {
+function pathWithin(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function classifyDynamicRoute(request: Request, requestUrl: URL): DynamicRoute {
+  if (
+    requestUrl.pathname === "/socket.io"
+    || requestUrl.pathname.startsWith("/socket.io/")
+    || pathWithin(requestUrl.pathname, "/api/realtime")
+    || pathWithin(requestUrl.pathname, "/api/studio-live")
+  ) {
+    return "realtime";
+  }
+  if (pathWithin(requestUrl.pathname, "/api/admin")) return "admin";
+  if (
+    pathWithin(requestUrl.pathname, "/api/community")
+    || pathWithin(requestUrl.pathname, "/api/reviews")
+  ) {
+    return "social";
+  }
+  if (
+    pathWithin(requestUrl.pathname, "/api/fortune")
+    || pathWithin(requestUrl.pathname, "/api/play")
+  ) {
+    return "playground";
+  }
+  if (
+    RETRYABLE_READ_METHODS.has(request.method.toUpperCase())
+    && (
+      pathWithin(requestUrl.pathname, "/api/public")
+      || pathWithin(requestUrl.pathname, "/api/catalog")
+      || pathWithin(requestUrl.pathname, "/api/search")
+      || pathWithin(requestUrl.pathname, "/api/titles")
+      || pathWithin(requestUrl.pathname, "/api/health")
+      || pathWithin(requestUrl.pathname, "/api/cover")
+    )
+  ) {
+    return "public-read";
+  }
+  return "core";
+}
+
+function optionalOrigin(
+  raw: string | undefined,
+  fallback: URL | null,
+): OriginResolution {
+  if (raw === undefined || raw.trim() === "") {
+    return {
+      origins: fallback ? [fallback] : [],
+      invalidConfiguration: false,
+    };
+  }
+  const origin = validatedOrigin(raw.trim());
+  return origin
+    ? { origins: [origin], invalidConfiguration: false }
+    : { origins: [], invalidConfiguration: true };
+}
+
+function publicReadOrigins(
+  raw: string | undefined,
+  fallback: URL | null,
+): OriginResolution {
+  if (raw === undefined || raw.trim() === "") {
+    return {
+      origins: fallback ? [fallback] : [],
+      invalidConfiguration: false,
+    };
+  }
+  const values = raw.split(",").map((value) => value.trim());
+  if (
+    values.length === 0
+    || values.length > MAX_PUBLIC_READ_ORIGINS
+    || values.some((value) => value === "")
+  ) {
+    return { origins: [], invalidConfiguration: true };
+  }
+  const origins: URL[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const origin = validatedOrigin(value);
+    if (!origin || seen.has(origin.origin)) {
+      return { origins: [], invalidConfiguration: true };
+    }
+    origins.push(origin);
+    seen.add(origin.origin);
+  }
+  return { origins, invalidConfiguration: false };
+}
+
+function resolveOrigins(
+  route: DynamicRoute,
+  env: CloudflareStaticEnv,
+): OriginResolution {
+  const core = validatedOrigin(env.CORE_API_ORIGIN?.trim());
+  switch (route) {
+    case "public-read":
+      return publicReadOrigins(env.PUBLIC_READ_API_ORIGINS, core);
+    case "social":
+      return optionalOrigin(env.SOCIAL_API_ORIGIN, core);
+    case "playground":
+      return optionalOrigin(env.PLAYGROUND_API_ORIGIN, core);
+    case "admin":
+      return optionalOrigin(env.ADMIN_API_ORIGIN, core);
+    case "realtime":
+      return optionalOrigin(env.REALTIME_API_ORIGIN, core);
+    case "core":
+      return {
+        origins: core ? [core] : [],
+        invalidConfiguration: env.CORE_API_ORIGIN !== undefined && core === null,
+      };
+  }
+}
+
+function cyrb53(value: string): number {
+  let high = 0xdeadbeef;
+  let low = 0x41c6ce57;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    high = Math.imul(high ^ code, 2_654_435_761);
+    low = Math.imul(low ^ code, 1_597_334_677);
+  }
+  high = Math.imul(high ^ (high >>> 16), 2_246_822_507)
+    ^ Math.imul(low ^ (low >>> 13), 3_266_489_909);
+  low = Math.imul(low ^ (low >>> 16), 2_246_822_507)
+    ^ Math.imul(high ^ (high >>> 13), 3_266_489_909);
+  return 4_294_967_296 * (2_097_151 & low) + (high >>> 0);
+}
+
+function orderedReadOrigins(
+  request: Request,
+  origins: readonly URL[],
+): readonly URL[] {
+  if (origins.length <= 1) return origins;
+  const url = new URL(request.url);
+  const edgeRequestId = request.headers.get("cf-ray")?.trim();
+  const routingKey = edgeRequestId
+    ? `${edgeRequestId}:${url.pathname}:${url.search}`
+    : `${request.method}:${url.pathname}:${url.search}`;
+  return [...origins].sort((left, right) => {
+    const rightScore = cyrb53(`${routingKey}\u0000${right.origin}`);
+    const leftScore = cyrb53(`${routingKey}\u0000${left.origin}`);
+    return rightScore - leftScore || left.origin.localeCompare(right.origin);
+  });
+}
+
+export function createUpstreamApiRequest(
+  request: Request,
+  origin: URL,
+  route: DynamicRoute,
+  attempt: number,
+): Request {
   const incoming = new URL(request.url);
   const upstream = new URL(incoming.pathname + incoming.search, origin);
   const ogQuery = mapDynamicPath(incoming);
@@ -126,7 +299,9 @@ export function createCoreApiRequest(request: Request, origin: URL): Request {
   headers.delete("cf-ray");
   headers.set("x-forwarded-host", incoming.host);
   headers.set("x-forwarded-proto", "https");
-  headers.set("x-toonspectrum-edge", "cloudflare-static-gateway-v1");
+  headers.set("x-toonspectrum-edge", "cloudflare-static-gateway-v2");
+  headers.set("x-toonspectrum-edge-route", route);
+  headers.set("x-toonspectrum-edge-attempt", String(attempt));
 
   return new Request(upstream, {
     method: request.method,
@@ -135,6 +310,10 @@ export function createCoreApiRequest(request: Request, origin: URL): Request {
     redirect: "manual",
     signal: request.signal,
   });
+}
+
+export function createCoreApiRequest(request: Request, origin: URL): Request {
+  return createUpstreamApiRequest(request, origin, "core", 0);
 }
 
 function withSecurityHeaders(response: Response): Response {
@@ -149,6 +328,12 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
+function retryableRead(request: Request, route: DynamicRoute): boolean {
+  return route === "public-read"
+    && RETRYABLE_READ_METHODS.has(request.method.toUpperCase())
+    && !isWebSocketUpgrade(request);
+}
+
 export function createCloudflareStaticGateway(
   runtime: GatewayRuntime = DEFAULT_RUNTIME,
 ) {
@@ -161,21 +346,48 @@ export function createCloudflareStaticGateway(
       return env.ASSETS.fetch(request);
     }
 
-    const origin = coreOrigin(env.CORE_API_ORIGIN);
-    if (!origin || origin.origin === requestUrl.origin) {
+    const route = classifyDynamicRoute(request, requestUrl);
+    const resolution = resolveOrigins(route, env);
+    const origins = resolution.origins.filter(
+      (origin) => origin.origin !== requestUrl.origin,
+    );
+    if (resolution.invalidConfiguration || origins.length === 0) {
       return jsonError(503, "CORE_API_UNAVAILABLE");
     }
 
-    try {
-      const response = await runtime.fetch(createCoreApiRequest(request, origin));
-      // Reconstructing a WebSocket upgrade response drops the runtime-specific
-      // WebSocket handle. Security headers apply to HTTP responses; the upgrade
-      // handshake must pass through unchanged.
-      if (isWebSocketUpgrade(request) || response.status === 101) return response;
-      return withSecurityHeaders(response);
-    } catch {
-      return jsonError(502, "CORE_API_UPSTREAM_FAILED");
+    const orderedOrigins = retryableRead(request, route)
+      ? orderedReadOrigins(request, origins)
+      : origins.slice(0, 1);
+    let attempted = 0;
+    for (const [index, origin] of orderedOrigins.entries()) {
+      attempted += 1;
+      try {
+        const response = await runtime.fetch(
+          createUpstreamApiRequest(request, origin, route, index),
+        );
+        // Reconstructing a WebSocket upgrade response drops the runtime-specific
+        // WebSocket handle. Security headers apply to HTTP responses; the upgrade
+        // handshake must pass through unchanged.
+        if (isWebSocketUpgrade(request) || response.status === 101) return response;
+        const shouldRetry = retryableRead(request, route)
+          && RETRYABLE_UPSTREAM_STATUSES.has(response.status)
+          && index + 1 < orderedOrigins.length;
+        if (shouldRetry) continue;
+        return withSecurityHeaders(response);
+      } catch {
+        if (
+          retryableRead(request, route)
+          && index + 1 < orderedOrigins.length
+        ) {
+          continue;
+        }
+      }
     }
+
+    return jsonError(
+      502,
+      attempted > 0 ? "CORE_API_UPSTREAM_FAILED" : "CORE_API_UNAVAILABLE",
+    );
   };
 }
 
