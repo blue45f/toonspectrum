@@ -85,7 +85,7 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     expect(onRememberColor).toHaveBeenCalledWith("#445566");
   });
 
-  it("turns a stroke off explicitly and restores the last visible colour", () => {
+  it("hides a freehand stroke without feeding a non-hex colour to brush renderers", () => {
     const patchEl = vi.fn();
     const { rerender } = render(
       <StudioInspectorSelectionStrokeControls
@@ -95,11 +95,11 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     );
 
     fireEvent.click(screen.getByLabelText("선 없음"));
-    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "transparent" });
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { opacity: 0 });
 
     rerender(
       <StudioInspectorSelectionStrokeControls
-        selected={drawSelection({ stroke: "transparent" })}
+        selected={drawSelection({ opacity: 0 })}
         patchEl={patchEl}
       />,
     );
@@ -109,6 +109,30 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     expect(screen.getByTestId("studio-selection-stroke-preview")).toHaveAttribute(
       "aria-label",
       "선 미리보기: 선 없음",
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", {
+      stroke: "#112233",
+      opacity: 0.8,
+    });
+  });
+
+  it("removes only the outline from a filled vector shape", () => {
+    const patchEl = vi.fn();
+    const shape = drawSelection({ kind: "rect", fill: "#ffffff" });
+    const { rerender } = render(
+      <StudioInspectorSelectionStrokeControls selected={shape} patchEl={patchEl} />,
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "transparent" });
+
+    rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ kind: "rect", fill: "#ffffff", stroke: "transparent" })}
+        patchEl={patchEl}
+      />,
     );
 
     fireEvent.click(screen.getByLabelText("선 없음"));
