@@ -12,8 +12,12 @@ function getStoredWishlistIds(): string[] {
   try {
     const raw = localStorage.getItem(WISHLIST_STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as string[];
-      if (Array.isArray(parsed)) return parsed;
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return [...new Set(parsed.filter((id): id is string =>
+          typeof id === "string" && id.trim().length > 0,
+        ))];
+      }
     }
   } catch {
     // quota

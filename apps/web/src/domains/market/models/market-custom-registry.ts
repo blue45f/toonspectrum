@@ -6,8 +6,9 @@
  * and edited assets seamlessly appear in Browse, Home, My Assets, and Detail views.
  */
 
-import type {
-  CreatorMarketplaceResourceRecord,
+import {
+  CreatorMarketplaceResourceRecordSchema,
+  type CreatorMarketplaceResourceRecord,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
@@ -26,8 +27,15 @@ export function getCustomPublishedResources(): CreatorMarketplaceResourceRecord[
   try {
     const raw = localStorage.getItem(CUSTOM_REGISTRY_STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as CreatorMarketplaceResourceRecord[];
-      if (Array.isArray(parsed)) return parsed;
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const seen = new Set<string>();
+      return parsed.flatMap((candidate) => {
+        const record = CreatorMarketplaceResourceRecordSchema.safeParse(candidate);
+        if (!record.success || seen.has(record.data.id)) return [];
+        seen.add(record.data.id);
+        return [record.data];
+      });
     }
   } catch {
     // quota or parsing failure
