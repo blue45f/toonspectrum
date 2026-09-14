@@ -157,6 +157,10 @@ function serializeSqliteCheckpointList(checkpoints: readonly StudioCheckpoint[])
     version: 1,
     checkpoints: checkpoints.slice(0, STUDIO_CHECKPOINT_LIMIT),
   });
+  // Optional object fields are removed only by the explicit input mode in
+  // createCheckpointRecord. Validate before projection so generic checkpoints
+  // cannot silently lose `undefined` or any other non-JSON value.
+  if (!isJsonCheckpointValue(file)) throw createDurableStorageError();
   const jsonFile = projectStudioCheckpointJson(file);
   if (!isJsonCheckpointValue(jsonFile)) throw createDurableStorageError();
   try {
