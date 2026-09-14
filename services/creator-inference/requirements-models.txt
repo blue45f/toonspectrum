@@ -1,8 +1,9 @@
 # Install the CUDA-compatible torch/torchvision pair separately using pytorch.org.
 # This is a compatibility profile, NOT a GPU-qualified production lock file.
 -r requirements-core.txt
+# Security floor: GHSA-98h9-4798-4q5v and GHSA-7wx4-6vff-v64p.
 diffusers==0.38.0
-transformers>=5.17.0,<6
+transformers>=4.49,<5
 accelerate>=1.2,<2
 # Diffusers 0.38 requires safetensors 0.8; keep stable releases only.
 safetensors>=0.8,<1

@@ -6,6 +6,8 @@ import path from "node:path";
 
 import { chromium, expect } from "@playwright/test";
 
+import { hasExportedHttpsUrlUnderPath } from "./lib/exported-url-provenance";
+
 // Tests the actual production bundle with production global security headers.
 // Existing unrelated /api routes deliberately return a 503 fixture: this new
 // route must remain usable without a backend. No production data is written.
@@ -75,7 +77,7 @@ try {
     const mdPath = path.join(artifacts, `specification-${width}.md`);
     await specification.saveAs(mdPath);
     const markdown = await readFile(mdPath, "utf8");
-    assert(markdown.includes("https://polyhaven.com/a/") && markdown.includes("CC0 1.0"));
+    assert(hasExportedHttpsUrlUnderPath(markdown, "https://polyhaven.com", "/a/") && markdown.includes("CC0 1.0"));
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#material-note")).toHaveValue("");
     await expect(page.getByRole("button", { name: /목록에서 해제/ })).toHaveCount(2);
