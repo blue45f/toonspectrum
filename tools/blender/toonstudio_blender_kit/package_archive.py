@@ -53,6 +53,10 @@ def _runtime_paths(manifest: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     selected: dict[str, Mapping[str, Any]] = {}
     names: dict[str, str] = {}
     for role, receipt in files.items():
+        # The renderer's local HTML contact sheet is authoring evidence, not a browser-runtime
+        # package asset. Keep it out rather than treating it as a PNG preview receipt.
+        if role == "preview:index":
+            continue
         if role not in {"vrm", "glb", "qualityReport", "thumbnail"} and not role.startswith("preview:"):
             continue
         if not isinstance(receipt, dict):

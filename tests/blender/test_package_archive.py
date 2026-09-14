@@ -85,6 +85,20 @@ class PackageArchiveTests(unittest.TestCase):
         with zipfile.ZipFile(create_runtime_archive(self.root, self.manifest)) as archive:
             self.assertEqual(archive.namelist().count("preview.png"), 1)
 
+    def test_render_contact_sheet_index_is_not_a_runtime_archive_entry(self):
+        index = self.root / "previews" / "index.html"
+        index.parent.mkdir()
+        index.write_text("<html>authoring evidence</html>")
+        payload = index.read_bytes()
+        self.manifest["files"]["preview:index"] = {
+            "path": "previews/index.html",
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        with zipfile.ZipFile(create_runtime_archive(self.root, self.manifest)) as archive:
+            self.assertNotIn("previews/index.html", archive.namelist())
+            self.assertEqual(archive.namelist(), ["character-package.json", "character.glb"])
+
     def test_current_scene_export_is_separate_from_destructive_regeneration(self):
         source = (ROOT / "tools/blender/toonstudio_blender_kit/current_scene.py").read_text()
         self.assertNotIn("run_pipeline(", source)
