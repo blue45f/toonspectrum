@@ -1,5 +1,4 @@
 -r requirements-core.txt
 httpx==0.28.1
-# Security floor: GHSA-6w46-j5rx-g56g (temporary-directory handling).
 pytest==9.0.3
 playwright==1.57.0
