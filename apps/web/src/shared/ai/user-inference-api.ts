@@ -1,12 +1,13 @@
-import { requireUserAiConnection } from "./user-ai-store";
+import { getUserAiSnapshot, requireUserAiConnection } from "./user-ai-store";
 import { userAiFetch, userAiJson } from "./user-ai-transport";
 
 type Options = { signal?: AbortSignal; timeout?: number; headers?: HeadersInit };
 /** Pin a request group to one personal Creator Runtime; changing connections fails closed. */
 export function createUserInferenceApi() {
   const connection = requireUserAiConnection("inference");
+  const revision = getUserAiSnapshot().revision;
   const optionsFor = (options: Options = {}) => ({
-    signal: options.signal, connectionId: connection.id,
+    signal: options.signal, connectionId: connection.id, revision,
     headers: { ...Object.fromEntries(new Headers(options.headers)), "X-Creator-Owner": `personal:${connection.id}` },
   });
   const pathFor = (path: string) => {

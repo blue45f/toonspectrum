@@ -1,3 +1,4 @@
+import { operatorAiFundingEnabled } from "../../config/user-funded-ai-policy";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
@@ -217,7 +218,7 @@ export class Studio3dGenerationService {
 
   status() {
     return Object.freeze({
-      configured: Boolean(process.env.HYPER3D_API_KEY?.trim() || process.env.RODIN_API_KEY?.trim()),
+      configured: operatorAiFundingEnabled() && Boolean(process.env.HYPER3D_API_KEY?.trim() || process.env.RODIN_API_KEY?.trim()),
       durable: Boolean(process.env.DATABASE_URL?.trim()),
       provider: "hyper3d-rodin",
       modes: Object.freeze(["text-to-3d", "image-to-3d", "multiview-to-3d", "texture-only"]),
@@ -227,8 +228,9 @@ export class Studio3dGenerationService {
 
   #provider(providerApiKey?: string): Studio3dProviderRuntime {
     const apiKey = providerApiKey?.trim()
-      || process.env.HYPER3D_API_KEY?.trim()
-      || process.env.RODIN_API_KEY?.trim();
+      || (operatorAiFundingEnabled()
+        ? process.env.HYPER3D_API_KEY?.trim() || process.env.RODIN_API_KEY?.trim()
+        : undefined);
     if (!apiKey) throw new ServiceUnavailableException("Hyper3D/Rodin is not configured.");
     return createHyper3dRodinProvider({ apiKey }) as unknown as Studio3dProviderRuntime;
   }

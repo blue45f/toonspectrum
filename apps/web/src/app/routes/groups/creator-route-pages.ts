@@ -131,6 +131,20 @@ export const StudioRouter = lazyRetry(
   "StudioRouter",
 );
 
+
+export const CreatorEcosystemPage = lazyRetry(
+  () => import("@/domains/creator/ecosystem/CreatorEcosystemPage").then((module) => ({
+    default: module.CreatorEcosystemPage,
+  })),
+  "CreatorEcosystemPage",
+);
+export const CreatorEcosystemViewerPage = lazyRetry(
+  () => import("@/domains/creator/ecosystem/CreatorEcosystemViewerPage").then((module) => ({
+    default: module.CreatorEcosystemViewerPage,
+  })),
+  "CreatorEcosystemViewerPage",
+);
+
 export const CreatorInferencePage = lazyRetry(
   () => import("@/domains/creator/ai/CreatorInferencePage").then((module) => ({ default: module.CreatorInferencePage })),
   "CreatorInferencePage",

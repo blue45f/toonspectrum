@@ -1,4 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+
+import { useUserAi } from "@/shared/ai/user-ai-store";
 
 import { Studio3dGenerationHttpClient } from "./studio-3d-generation-client";
 import { StudioAi3dGenerationPanel } from "./StudioAi3dGenerationPanel";
@@ -18,19 +21,17 @@ export function StudioAdvancedAiTools({
   onEditGenerated3dTexture,
 }: StudioAdvancedAiToolsProps) {
   const [active, setActive] = useState<"stroke" | "three-d">("stroke");
-  const [showByok, setShowByok] = useState(false);
-  const [providerKey, setProviderKey] = useState("");
-  const providerKeyRef = useRef("");
-  providerKeyRef.current = providerKey;
+  const userAi = useUserAi();
+  const connectionId = userAi.configuration.assignments["three-d"];
+  const connection = userAi.configuration.connections.find((item) => item.id === connectionId) ?? null;
   const client = useMemo(
-    () =>
-      userId
-        ? new Studio3dGenerationHttpClient({
-            userId,
-            providerApiKey: () => providerKeyRef.current || undefined,
-          })
-        : null,
-    [userId],
+    () => userId && connection?.apiKey
+      ? new Studio3dGenerationHttpClient({
+          userId,
+          providerApiKey: () => connection.apiKey,
+        })
+      : null,
+    [connection, userId],
   );
 
   return (
@@ -69,30 +70,10 @@ export function StudioAdvancedAiTools({
         {active === "three-d" ? (
           client ? (
             <div className="grid gap-2">
-              <button
-                type="button"
-                aria-expanded={showByok}
-                onClick={() => setShowByok((value) => !value)}
-                className="min-h-11 rounded-lg border border-line px-3 text-left text-xs font-bold"
-              >
-                세션 한정 BYOK {showByok ? "접기" : "설정"}
-              </button>
-              {showByok ? (
-                <label className="grid gap-1 rounded-lg border border-line bg-card p-2 text-xs font-semibold">
-                  Hyper3D API 키
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={providerKey}
-                    onChange={(event) => setProviderKey(event.currentTarget.value.slice(0, 512))}
-                    placeholder="브라우저 메모리에만 보관"
-                    className="min-h-11 rounded-lg border border-line bg-panel px-2 font-normal"
-                  />
-                  <span className="text-[0.58rem] font-normal leading-relaxed text-fg-3">
-                    키는 이 컴포넌트의 메모리에만 존재하며 작업 기록·localStorage·서버 DB에 저장하지 않습니다.
-                  </span>
-                </label>
-              ) : null}
+              <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2">
+                <span>통합 AI 설정 · {connection?.label}</span>
+                <Link to="/settings/ai" className="font-bold text-accent">연결 관리</Link>
+              </div>
               <StudioAi3dGenerationPanel
                 client={client}
                 onInsertArtifact={
@@ -114,7 +95,7 @@ export function StudioAdvancedAiTools({
             </div>
           ) : (
             <p role="status" className="rounded-lg border border-warn/35 bg-warn/10 p-3 text-xs text-fg-2">
-              로그인한 Studio 작업에서 AI 3D 생성 작업 내역과 비용 원장을 사용할 수 있습니다.
+              로그인한 Studio 작업에서 통합 AI 설정의 Hyper3D/Rodin 사용자 키를 연결하면 사용할 수 있습니다.
             </p>
           )
         ) : null}

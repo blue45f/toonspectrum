@@ -6,7 +6,7 @@ import { EMPTY_AI_CONNECTION, USER_AI_CAPABILITIES, type UserAiConfiguration, ty
 
 const INPUT = "min-h-11 w-full rounded-lg border border-line bg-panel p-2 text-sm text-fg focus-visible:outline-2 focus-visible:outline-accent";
 const BUTTON = "min-h-11 rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40";
-const LABELS = { text: "텍스트·번역·운세·학습", image: "이미지·배경·캐릭터·채색", inference: "영상·3D 개인 추론 서버" };
+const LABELS = { text: "텍스트·번역·운세·학습", image: "이미지·배경·캐릭터·채색", inference: "영상·3D 개인 추론 서버", "three-d": "Hyper3D/Rodin 3D 생성" };
 export function UnifiedAiSettings() {
   const snapshot = useUserAi();
   return <section aria-label="통합 AI 설정" className="space-y-5 text-fg" data-unified-ai-settings="true">
@@ -52,7 +52,7 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
       onChange={event => { patch({ [name]: event.target.value, ...(name === "baseUrl" ? { apiKey: "" } : {}) }); setConsent(false); }} />
   </label>;
   return <div className="space-y-5">
-    <p className="text-sm leading-6 text-fg-2">키와 선택한 자료는 브라우저에서 지정한 제공자에게 직접 전송됩니다. API 비용은 해당 키 소유자에게 청구됩니다. 사이트 호스팅 비용과는 별개입니다.</p>
+    <p className="text-sm leading-6 text-fg-2">텍스트·이미지는 브라우저에서 제공자로, 개인 추론 작업은 등록한 서버로 직접 전송됩니다. Hyper3D/Rodin 키는 작업 중 앱 API가 일시 전달하지만 저장·로그하지 않습니다. 모든 API·GPU 비용은 연결 소유자가 부담합니다.</p>
     {error && <p role="alert" className="text-sm text-bad">{error}</p>}
     {message && <p role="status" className="text-sm text-good">{message}</p>}
     <div className="divide-y divide-line" aria-label="등록된 AI 연결">

@@ -95,7 +95,7 @@ export async function removeUserInferenceUpload(id: string): Promise<void> {
   if (!ID.test(id)) throw new Error("잘못된 업로드 ID입니다.");
   await createUserInferenceApi().delete(`${BASE}/uploads/${id}`);
 }
-export async function cleanupUnusedInferenceUploads(): Promise<number> {
+export async function cleanupUserInferenceUploads(): Promise<number> {
   const result = await createUserInferenceApi().post<{ deleted: number }>(
     `${BASE}/uploads/cleanup`,
     undefined,
@@ -107,7 +107,7 @@ export async function cleanupUnusedInferenceUploads(): Promise<number> {
   return result.deleted;
 }
 
-export async function deleteInferenceJob(id: string): Promise<void> {
+export async function deleteUserInferenceJob(id: string): Promise<void> {
   if (!ID.test(id)) throw new Error("잘못된 작업 ID입니다.");
   await createUserInferenceApi().delete(`${BASE}/jobs/${id}`, { timeout: 15_000 });
 }

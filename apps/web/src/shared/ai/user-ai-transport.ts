@@ -1,7 +1,7 @@
 import { getUserAiSnapshot, registerUserAiRequest, requireUserAiConnection } from "./user-ai-store";
 import { validateUserAiBaseUrl, validateUserAiPath, type UserAiCapability } from "./user-ai-types";
 
-export interface UserAiRequestOptions { signal?: AbortSignal; connectionId?: string; method?: string; maxBytes?: number; headers?: HeadersInit }
+export interface UserAiRequestOptions { signal?: AbortSignal; connectionId?: string; revision?: number; method?: string; maxBytes?: number; headers?: HeadersInit }
 const MAX_JSON_BYTES = 80 * 1024 * 1024;
 async function readBounded(response: Response, maximum: number): Promise<Uint8Array<ArrayBuffer>> {
   if (!response.body || Number(response.headers.get("content-length") ?? 0) > maximum) {
@@ -28,8 +28,12 @@ async function readBounded(response: Response, maximum: number): Promise<Uint8Ar
 /** Direct user-to-provider transport: no cookies, redirects, retries or operator fallback. */
 export async function userAiFetch(capability: UserAiCapability, path: string, body?: unknown, options: UserAiRequestOptions = {}): Promise<Response> {
   const connection = requireUserAiConnection(capability);
-  if (options.connectionId && connection.id !== options.connectionId) throw new Error("AI 연결이 변경되어 이전 작업을 전송하지 않았습니다.");
-  const revision = getUserAiSnapshot().revision;
+  const currentRevision = getUserAiSnapshot().revision;
+  if ((options.connectionId && connection.id !== options.connectionId)
+    || (options.revision !== undefined && options.revision !== currentRevision)) {
+    throw new Error("AI 연결이 변경되어 이전 작업을 전송하지 않았습니다.");
+  }
+  const revision = currentRevision;
   const url = `${validateUserAiBaseUrl(connection.baseUrl)}${validateUserAiPath(path)}`;
   const controller = new AbortController();
   const unregister = registerUserAiRequest(controller);

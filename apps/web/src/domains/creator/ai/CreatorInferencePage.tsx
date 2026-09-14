@@ -1,12 +1,11 @@
 import { useUserAi } from "@/shared/ai/user-ai-store";
 import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
-import { removeUserInferenceUpload } from "./creator-inference-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "@/compat/router-link";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import {
-  cancelInferenceJob, cleanupUnusedInferenceUploads, deleteInferenceJob, downloadInferenceArtifact,
-  inferenceCapabilities, listInferenceJobs, submitInferenceJob, uploadInferenceAsset,
+  cancelInferenceJob, cleanupUserInferenceUploads, deleteUserInferenceJob, downloadInferenceArtifact,
+  inferenceCapabilities, listInferenceJobs, removeUserInferenceUpload, submitInferenceJob, uploadInferenceAsset,
   type InferenceArtifact, type InferenceCapabilities, type InferenceJob, type InferenceMode, type InferenceRequest,
 } from "./creator-inference-client";
 import "./creator-inference.css";
@@ -116,11 +115,11 @@ export function CreatorInferencePage() {
       {busy && <button type="button" onClick={() => operation.current?.abort()}>전송 중지</button>}
     </form><section className="inference-results"><h2>작업과 결과</h2><p role="status" aria-live="polite">{message}</p>{busy && <progress value={progress} max={100} aria-label="파일 전송 진행률" />}{error && <p role="alert" className="inference-error">{error}</p>}
       <button type="button" onClick={() => { void refresh().catch(notifyError); }}>작업 목록 새로고침</button>
-      <button type="button" disabled={busy || uncertain} onClick={() => { if (window.confirm("사용 중인 작업을 제외한 서버 입력 파일을 삭제할까요? 생성 결과는 보존됩니다.")) void cleanupUnusedInferenceUploads().then((deleted) => { if (mounted.current) setMessage(`사용하지 않는 입력 파일 ${deleted}개를 정리했습니다.`); }).catch(notifyError); }}>사용하지 않는 서버 입력 정리</button>
+      <button type="button" disabled={busy || uncertain} onClick={() => { if (window.confirm("사용 중인 작업을 제외한 서버 입력 파일을 삭제할까요? 생성 결과는 보존됩니다.")) void cleanupUserInferenceUploads().then((deleted) => { if (mounted.current) setMessage(`사용하지 않는 입력 파일 ${deleted}개를 정리했습니다.`); }).catch(notifyError); }}>사용하지 않는 서버 입력 정리</button>
       {!jobs.length && <p className="inference-note">아직 표시할 작업이 없습니다. 로그인 후 생성 작업을 접수하면 이곳에 표시됩니다.</p>}
       {jobs.map((job) => <article key={job.id}><div className="inference-job-heading"><h3>{MODES.find((item) => item.value === job.mode)?.title}</h3><span>{STATE[job.state]}</span></div><small>{job.id.slice(0, 12)} · {job.stage}</small>{!TERMINAL.has(job.state) && <><progress value={job.progress} max={100} aria-label="생성 진행률" /><button type="button" onClick={() => { void cancel(job); }}>이 생성 작업 취소</button></>}{job.error && <p className="inference-error">{job.error}</p>}
         {job.artifacts.map((artifact) => <button key={artifact.name} type="button" disabled={busy} onClick={() => { void download(job, artifact); }}>{artifact.name} · {(artifact.bytes / 1048576).toFixed(1)}MB · 검증 후 받기</button>)}
-        {TERMINAL.has(job.state) && <button type="button" onClick={() => { if (window.confirm("서버의 생성 결과를 삭제할까요? 필요한 파일을 먼저 보관하세요.")) void deleteInferenceJob(job.id).then(() => refresh()).catch(notifyError); }}>서버 결과 삭제</button>}
+        {TERMINAL.has(job.state) && <button type="button" onClick={() => { if (window.confirm("서버의 생성 결과를 삭제할까요? 필요한 파일을 먼저 보관하세요.")) void deleteUserInferenceJob(job.id).then(() => refresh()).catch(notifyError); }}>서버 결과 삭제</button>}
       </article>)}
       {preview && <figure><figcaption>{preview.name} · 무결성 검증된 파일</figcaption>{preview.mime === "video/mp4" ? <video key={preview.url} src={preview.url} controls muted playsInline preload="metadata" aria-label={`${preview.name} · 소리 없이 재생되는 생성형 애니메이션 미리보기`} /> : preview.mime === "image/png" ? <img src={preview.url} alt="선택한 생성 작업의 결과 또는 참조 이미지" /> : <p>파일을 저장했습니다. GLB는 3D 스튜디오, PNG는 드로잉, MP4는 영상 편집에서 불러올 수 있습니다.</p>}</figure>}
     </section></div>

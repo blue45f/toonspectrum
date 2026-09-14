@@ -1,8 +1,8 @@
 import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
-import { resolveUserFundedTextTransport } from "./ai/studio-ai-client";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
 import { readStudioLaunchPrimaryTool } from "./studio-launch-mode";
+import { createOriginalSample } from "./ecosystem/ecosystem-content";
 import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
@@ -1455,6 +1455,7 @@ export function StudioCuttoonEditor({
   const location = useLocation();
   const t = useT();
   const [params] = useSearchParams();
+  const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
   // above this editor and inside the document runtime boundary. This page never parses that query.
   const {
@@ -15008,7 +15009,7 @@ const puppetWarpArmed =
       .catch(() => setServerAiStatus(null));
     return () => controller.abort();
   }, []);
-  const textAiTransport: StudioTextAiTransport = resolveUserFundedTextTransport();
+  const textAiTransport: StudioTextAiTransport = { mode: "byok" };
   const textAiConfigured = isStudioTextAiConfigured(aiSettings, textAiTransport);
   const [writerRoomAiDirection, setWriterRoomAiDirection] = useState("");
   const [writerRoomAiBusy, setWriterRoomAiBusy] = useState(false);
@@ -15320,7 +15321,11 @@ const puppetWarpArmed =
     const prompt = assetPrompt.trim();
     if (!prompt || assetGenerating) return;
     if (!studioAuthUserId) {
-      setError("AI 에셋을 생성하려면 로그인이 필요해요.");
+      setError("생성한 에셋을 라이브러리에 저장하려면 로그인이 필요해요.");
+      return;
+    }
+    if (!isStudioAiConfigured(aiSettings)) {
+      setError("통합 AI 설정에서 사용자 이미지 API 키와 모델을 연결해 주세요.");
       return;
     }
     runWithAiNotice(() => void executeGenerateAsset(prompt));
@@ -15329,52 +15334,56 @@ const puppetWarpArmed =
     if (collaborationAccessRef.current.locked) return;
     const mutationTicket = captureStudioMutationTicket();
     const insertionPlacement = nextAssetInsertionPlacement();
-    const requestProvenance = captureStudioAiGeneratedAssetProvenance(
-      { provider: "openai", model: "gpt-image-2", transport: "server" },
-      "generated"
-    );
+    const provider = studioImageAiProviderContext(aiSettings);
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
+    const size: StudioAiImageSize = assetPromptSize === "1536x1024"
+      ? "1792x1024"
+      : assetPromptSize === "1024x1536" ? "1024x1792" : "1024x1024";
+    const qualityDirection = assetPromptQuality === "low"
+      ? "Create a fast preview with a clean silhouette and restrained detail."
+      : assetPromptQuality === "high"
+        ? "Create production-ready detail with crisp edges and coherent lighting."
+        : assetPromptQuality === "medium"
+          ? "Balance production detail, clarity, and generation speed."
+          : "Choose detail appropriate for a reusable webtoon asset.";
+    const providerPrompt = `${prompt}
+
+${qualityDirection}
+No text, logo, watermark, or copyrighted character.`;
     setAssetGenerating(true);
     setError(null);
     let operationId: string | null = null;
     try {
-      const { generateAsset } = await import("@/infrastructure/creator-client");
-      if (!canApplyStudioMutation(mutationTicket)) return;
       operationId = beginTrackedStudioAiOperation("asset-image", {
         kind: "image",
         task: "image-other",
-        provider: requestProvenance.provider,
-        model: requestProvenance.model,
-        transport: requestProvenance.transport,
+        provider: provider.provider,
+        model: provider.model,
+        transport: provider.transport,
         promptVersion: 1,
-        prompt,
+        prompt: providerPrompt,
         target: { pageId: activePage.id },
-        requestedSize: parseStudioAiRequestedSize(assetPromptSize),
+        requestedSize: parseStudioAiRequestedSize(size),
         references: [],
       });
-      const generated = await generateAsset({
-        prompt,
-        name: assetPromptName.trim() || undefined,
-        size: assetPromptSize,
-        quality: assetPromptQuality,
-      });
+      const result = await generateBackgroundImage(aiSettings, providerPrompt, { size });
       if (!canApplyStudioMutation(mutationTicket)) return;
-      settleTrackedStudioAiOperation(operationId, { ok: true }, {
-        provider: "openai",
-        model: generated.model,
-        target: { pageId: activePage.id },
-      });
+      settleTrackedStudioAiOperation(operationId, result);
       operationId = null;
+      if (!result.ok) throw new Error(result.error);
+      const generatedName = assetPromptName.trim()
+        || prompt.split("\n")[0]?.trim().slice(0, 80)
+        || "AI 에셋";
       const saved = await saveStudioAssetMutation({
-        // 결과물이 생성형 AI 산출물임을 라이브러리에서도 식별할 수 있게 kind 로 표시(라벨/배지용).
-        name: generated.name,
-        dataUrl: generated.dataUrl,
-        width: generated.width,
-        height: generated.height,
+        name: generatedName,
+        dataUrl: result.data.dataUrl,
+        width: result.data.width,
+        height: result.data.height,
         kind: "ai",
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
-        model: generated.model,
+        model: provider.model,
       });
       if (!addRenderedImage(
         saved.dataUrl,
@@ -15392,9 +15401,7 @@ const puppetWarpArmed =
       setAssetPromptName("");
       setMenu(null);
     } catch (err) {
-      if (operationId) {
-        settleTrackedStudioAiOperation(operationId, { ok: false, code: "http_error" });
-      }
+      if (operationId) settleTrackedStudioAiOperation(operationId, { ok: false, code: "http_error" });
       setError(err instanceof Error ? err.message : "AI 에셋 생성 실패");
     } finally {
       setAssetGenerating(false);
@@ -16105,6 +16112,31 @@ const puppetWarpArmed =
     studioRevisionProjectGenerationRef,
     webGpuCanvasHandleRef,
   });
+  useEffect(() => {
+    const sampleId = params.get("sample");
+    if (!sampleId || ecosystemSampleImportRef.current === sampleId) return;
+    if (workId || remixId || !workHydrated || !autosaveChecked || hasAutosave || sourceHydrationPending) return;
+    if (pages.length !== 1 || elements.length > 0) return;
+    try {
+      const sample = createOriginalSample(sampleId, CANVAS_W, "final", uid);
+      if (!commitPages([sample])) return;
+      ecosystemSampleImportRef.current = sampleId;
+      setCurrentPageId(sample.id);
+      setTitle(sample.name ?? "예제 작품");
+      setQuickStartOpen(false);
+      const tutorialId = params.get("tutorial");
+      if (tutorialId) {
+        setTutorialInitialId(tutorialId);
+        setTutorialHubOpen(true);
+      }
+      setError(null);
+    } catch (cause) {
+      ecosystemSampleImportRef.current = sampleId;
+      setError(cause instanceof Error ? cause.message : "예제 작품을 불러오지 못했습니다.");
+    }
+  }, [autosaveChecked, commitPages, elements.length, hasAutosave, pages.length, params, remixId,
+    setCurrentPageId, setQuickStartOpen, setTitle, sourceHydrationPending, workHydrated, workId]);
+
   // 커밋 지연 파이프라인의 동기화/폐기 — 타이머·이벤트 핸들러가 stale 클로저 없이 최신
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
   useEffect(() => {

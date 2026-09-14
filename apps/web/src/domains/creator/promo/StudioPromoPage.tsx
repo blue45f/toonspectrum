@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { completeStudioServerText, getStudioServerAiStatus } from "../studio-server-ai-client";
+import { completeUserAiText } from "@/shared/ai/user-ai-transport";
+import { useUserAi } from "@/shared/ai/user-ai-store";
 
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
@@ -19,6 +20,9 @@ import type { PromoPanel, PromoProject } from "./promo-model";
 import "./promo-studio.css";
 
 export function StudioPromoPage() {
+  const userAi = useUserAi();
+  const configured = Boolean(userAi.configuration.assignments.text);
+  const aiStatus = configured ? "내 API 키 연결됨" : "내 API 키 미설정 · 로컬 템플릿 사용 가능";
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
   const [undo, setUndo] = useState<PromoProject[]>([]);
   const [redo, setRedo] = useState<PromoProject[]>([]);
@@ -28,8 +32,6 @@ export function StudioPromoPage() {
   const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record" | "poster">("idle");
   const [message, setMessage] = useState("컷을 추가하고 원하는 분위기를 골라보세요.");
   const [error, setError] = useState("");
-  const [configured, setConfigured] = useState(false);
-  const [aiStatus, setAiStatus] = useState("서버 AI 연결 확인 중");
   const [progress, setProgress] = useState(0);
   const [quality, setQuality] = useState<720 | 1080>(720);
   const operation = useRef<AbortController | null>(null);
@@ -38,13 +40,7 @@ export function StudioPromoPage() {
   const mime = promoRecorderMime();
   useEffect(() => {
     mounted.current = true;
-    const controller = new AbortController();
-    getStudioServerAiStatus(controller.signal).then((status) => {
-      if (controller.signal.aborted) return;
-      setConfigured(status.configured);
-      setAiStatus(status.configured ? "서버 AI 사용 가능 · 로그인 필요" : "서버 AI 미설정 · 로컬 템플릿 사용 가능");
-    }).catch(() => { if (!controller.signal.aborted) setAiStatus("AI 연결 확인 실패 · 로컬 템플릿 사용 가능"); });
-    return () => { mounted.current = false; controller.abort(); operation.current?.abort(); };
+    return () => { mounted.current = false; operation.current?.abort(); };
   }, []);
   useEffect(() => {
     if (!project.panels.length) return;
@@ -140,12 +136,11 @@ export function StudioPromoPage() {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     try {
       const prompt = promoAiPrompt(project);
-      const result = await completeStudioServerText({ task: "composition", promptVersion: 1, ...prompt, operationId: `promo-${crypto.randomUUID()}` }, controller.signal);
+      const content = await completeUserAiText(prompt.system, prompt.user, controller.signal);
       if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
-      if (!result.ok) throw new Error(result.error);
-      const panels = parsePromoAiPlan(result.data.content, project);
+      const panels = parsePromoAiPlan(content, project);
       patch({ panels });
-      setMessage(`AI 구성 적용 · ${result.data.provider} / ${result.data.model}. 컷 설명 기반 제안이며 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.`);
+      setMessage("내 API 키의 텍스트 AI 구성 적용 · 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.");
     } catch (reason) { failed(reason, controller.signal); } finally { clearTimeout(timeout); finish(controller); }
   };
   const exportVideo = async () => {
@@ -203,7 +198,7 @@ export function StudioPromoPage() {
               <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
               <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
-            <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 서버의 기존 사용량 제한이 적용됩니다.</p>
+            <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 요청 비용은 연결한 API 키 소유자에게 청구되며 운영측 유료 AI로 자동 전환하지 않습니다.</p>
             {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
             <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeekFrame={(frame) => setSeekRequest({ frame, token: Date.now() })} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
               if (project.panels.length >= PROMO_MAX_PANELS) return;
