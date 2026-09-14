@@ -29,6 +29,18 @@ export {
 } from "./creator/community-contract";
 export { ensureCreatorCommunitySchema } from "./creator/community-schema";
 export {
+  createCreatorWorkRelease,
+  listCreatorExternalPublications,
+  listCreatorWorkReleases,
+  removeCreatorExternalPublication,
+  reportCreatorWork,
+  saveCreatorExternalPublication,
+  toggleCreatorWorkBookmark,
+  type CreatorExternalPublicationPlatform,
+  type CreatorExternalPublicationStatus,
+  type CreatorWorkReportReason,
+} from "./creator/community-publishing";
+export {
   getCreatorPublicProfile,
   getFollowStats,
   toggleFollow,

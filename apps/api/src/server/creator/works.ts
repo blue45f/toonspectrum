@@ -7,14 +7,22 @@ import {
   type CreatorWorkLinked3dJsonEnvelope,
 } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
 import {
+  readCreatorCommunityMetadata,
+  type CreatorCommunityContentGroup,
+  type CreatorCommunityProvenance,
+} from "../../../../web/src/shared/lib/creator-community-publication-contract";
+import {
   creatorChallenges,
   creatorDraftCollaborationRooms,
   creatorFollows,
   creatorSeries,
   creatorWorkAssetStorageReferences,
   creatorWorkAssets,
+  creatorWorkBookmarks,
   creatorWorkComments,
   creatorWorkLikes,
+  creatorWorkPublications,
+  creatorWorkReleases,
   creatorWorkRevisions,
   creatorWorks,
   db,
@@ -34,6 +42,7 @@ import {
 import { assertJoinableChallenge } from "./challenges";
 import { parseSeriesStatus } from "./community-contract";
 import { ensureCreatorCommunitySchema } from "./community-schema";
+import { insertCreatorWorkRelease } from "./community-publishing";
 import { getOwnedSeriesOrThrow, nextEpisodeNoOf, touchSeries } from "./series";
 import {
   authorOf,
@@ -111,6 +120,10 @@ export async function listWorks(opts: {
   seriesId?: string;
   challengeId?: string;
   followedBy?: string;
+  contentType?: CreatorCommunityContentGroup;
+  portfolio?: boolean;
+  provenance?: CreatorCommunityProvenance;
+  bookmarkedBy?: string;
 } = {}): Promise<CreatorWorkSummary[]> {
   try {
     // 새 테이블·컬럼 보장(멱등, 1회). 실패해도 기본 목록은 동작해야 하므로 ready 플래그로 분기.
@@ -144,6 +157,63 @@ export async function listWorks(opts: {
         )`
       );
     }
+
+    const activePublicationCommunityExpression = sql`(
+      SELECT ${creatorWorkReleases.manifest} -> 'community'
+      FROM ${creatorWorkPublications}
+      INNER JOIN ${creatorWorkReleases}
+        ON ${creatorWorkReleases.id} = ${creatorWorkPublications.releaseId}
+      WHERE ${creatorWorkPublications.workId} = ${creatorWorks.id}
+        AND ${creatorWorkPublications.state} = 'published'
+      LIMIT 1
+    )`;
+    const legacyReleaseCommunityExpression = sql`(
+      SELECT ${creatorWorkReleases.manifest} -> 'community'
+      FROM ${creatorWorkReleases}
+      WHERE ${creatorWorkReleases.workId} = ${creatorWorks.id}
+        AND ${creatorWorkReleases.state} = 'published'
+        AND NOT EXISTS (
+          SELECT 1 FROM ${creatorWorkPublications}
+          WHERE ${creatorWorkPublications.workId} = ${creatorWorks.id}
+        )
+      ORDER BY ${creatorWorkReleases.releaseNo} DESC
+      LIMIT 1
+    )`;
+    const communityExpression = ownerView
+      ? sql`${creatorWorks.doc} -> 'community'`
+      : sql`coalesce(
+          ${activePublicationCommunityExpression},
+          ${legacyReleaseCommunityExpression},
+          ${creatorWorks.doc} -> 'community'
+        )`;
+    const kindExpression = sql<string>`coalesce(
+      (${communityExpression}) ->> 'kind',
+      CASE WHEN ${creatorWorks.format} = 'upload' THEN 'illustration' ELSE 'webtoon_episode' END
+    )`;
+    const provenanceExpression = sql<string>`coalesce(
+      (${communityExpression}) ->> 'provenance',
+      'human'
+    )`;
+    if (opts.contentType && opts.contentType !== "all") {
+      const kinds =
+        opts.contentType === "illustration"
+          ? ["illustration", "illustration_set", "art_project"]
+          : opts.contentType === "webtoon"
+            ? ["webtoon_episode", "one_shot", "page_comic", "short_comic"]
+            : ["process", "wip"];
+      addWhere(inArray(kindExpression, kinds));
+    }
+    if (opts.portfolio) {
+      addWhere(sql`(${communityExpression}) @> '{"portfolio":true}'::jsonb`);
+    }
+    if (opts.provenance) addWhere(eq(provenanceExpression, opts.provenance));
+    if (opts.bookmarkedBy) {
+      addWhere(sql`EXISTS (
+        SELECT 1 FROM ${creatorWorkBookmarks}
+        WHERE ${creatorWorkBookmarks.workId} = ${creatorWorks.id}
+          AND ${creatorWorkBookmarks.userId} = ${opts.bookmarkedBy}
+      )`);
+    }
     const tag = String(opts.tag ?? "").trim().replace(/^#/, "").toLowerCase();
     if (tag) {
       addWhere(sql`lower(${creatorWorks.tags}::text) LIKE ${jsonStringLikePattern(tag)} ESCAPE '\\'`);
@@ -161,6 +231,11 @@ export async function listWorks(opts: {
         AND ${excludeTestUserId(creatorWorkComments.userId)}
     )`;
 
+    const bookmarkCountExpr = sql<number>`(
+      SELECT count(*) FROM ${creatorWorkBookmarks}
+      WHERE ${creatorWorkBookmarks.workId} = ${creatorWorks.id}
+    )`;
+
     let q = db
       .select({
         id: creatorWorks.id,
@@ -169,6 +244,7 @@ export async function listWorks(opts: {
         cover: creatorWorks.cover,
         tags: creatorWorks.tags,
         format: creatorWorks.format,
+        doc: creatorWorks.doc,
         titleId: creatorWorks.titleId,
         status: creatorWorks.status,
         views: creatorWorks.views,
@@ -178,6 +254,7 @@ export async function listWorks(opts: {
         avatar: users.avatar,
         likes: likeCountExpr.as("likes"),
         comments: commentCountExpr.as("comments"),
+        bookmarks: bookmarkCountExpr.as("bookmarks"),
         // 스키마 미준비(ready=false) 시 컬럼 참조 대신 NULL 리터럴 — 구버전 DB에서도 쿼리가 죽지 않는다.
         seriesId: ready ? creatorWorks.seriesId : sql<string | null>`NULL`,
         episodeNo: ready ? creatorWorks.episodeNo : sql<number | null>`NULL`,
@@ -210,12 +287,30 @@ export async function listWorks(opts: {
     // 뷰어가 좋아요한 작품 집합
     const ids = rows.map((r) => r.id);
     const likedSet = new Set<string>();
+    const bookmarkedSet = new Set<string>();
     if (opts.viewerId && ids.length) {
-      const likedRows = await db
-        .select({ workId: creatorWorkLikes.workId })
-        .from(creatorWorkLikes)
-        .where(eq(creatorWorkLikes.userId, opts.viewerId));
+      const [likedRows, bookmarkedRows] = await Promise.all([
+        db
+          .select({ workId: creatorWorkLikes.workId })
+          .from(creatorWorkLikes)
+          .where(
+            and(
+              eq(creatorWorkLikes.userId, opts.viewerId),
+              inArray(creatorWorkLikes.workId, ids),
+            ),
+          ),
+        db
+          .select({ workId: creatorWorkBookmarks.workId })
+          .from(creatorWorkBookmarks)
+          .where(
+            and(
+              eq(creatorWorkBookmarks.userId, opts.viewerId),
+              inArray(creatorWorkBookmarks.workId, ids),
+            ),
+          ),
+      ]);
       for (const r of likedRows) likedSet.add(r.workId);
+      for (const r of bookmarkedRows) bookmarkedSet.add(r.workId);
     }
 
     return rows.map((r) => ({
@@ -232,6 +327,9 @@ export async function listWorks(opts: {
       comments: Number(r.comments ?? 0),
       views: Number(r.views ?? 0),
       liked: likedSet.has(r.id),
+      community: readCreatorCommunityMetadata(r.doc, { format: r.format }),
+      bookmarks: Number(r.bookmarks ?? 0),
+      bookmarked: bookmarkedSet.has(r.id),
       seriesId: r.seriesId ?? null,
       episodeNo: r.episodeNo == null ? null : Number(r.episodeNo),
       seriesTitle: r.seriesTitle ?? null,
@@ -299,14 +397,28 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
         )
       );
 
+    const [bookmarkCount] = await db
+      .select({ count: sql<number>`count(*)`.as("count") })
+      .from(creatorWorkBookmarks)
+      .where(eq(creatorWorkBookmarks.workId, id));
+
     let liked = false;
+    let bookmarked = false;
     if (viewerId) {
-      const [likedRow] = await db
-        .select({ workId: creatorWorkLikes.workId })
-        .from(creatorWorkLikes)
-        .where(and(eq(creatorWorkLikes.workId, id), eq(creatorWorkLikes.userId, viewerId)))
-        .limit(1);
-      liked = !!likedRow;
+      const [likedRows, bookmarkedRows] = await Promise.all([
+        db
+          .select({ workId: creatorWorkLikes.workId })
+          .from(creatorWorkLikes)
+          .where(and(eq(creatorWorkLikes.workId, id), eq(creatorWorkLikes.userId, viewerId)))
+          .limit(1),
+        db
+          .select({ workId: creatorWorkBookmarks.workId })
+          .from(creatorWorkBookmarks)
+          .where(and(eq(creatorWorkBookmarks.workId, id), eq(creatorWorkBookmarks.userId, viewerId)))
+          .limit(1),
+      ]);
+      liked = likedRows.length > 0;
+      bookmarked = bookmarkedRows.length > 0;
     }
 
     // 시리즈/챌린지 부가 정보(배지 + 이전화/다음화) — best-effort.
@@ -429,6 +541,9 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       comments: Number(commentCount?.count ?? 0),
       views: Number(row.views ?? 0),
       liked,
+      community: readCreatorCommunityMetadata(row.doc, { format: row.format }),
+      bookmarks: Number(bookmarkCount?.count ?? 0),
+      bookmarked,
       seriesId: row.seriesId ?? null,
       episodeNo: row.episodeNo == null ? null : Number(row.episodeNo),
       seriesTitle,
@@ -551,6 +666,13 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
       snapshot: createCreatorWorkRevisionSnapshot(values),
       createdAt: now,
     });
+    if (status === "published") {
+      await insertCreatorWorkRelease(tx, id, {
+        state: "published",
+        publishedAt: now,
+        legacyAuto: true,
+      });
+    }
   });
   if (seriesId) await touchSeries(seriesId);
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -568,6 +690,9 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     comments: 0,
     views: 0,
     liked: false,
+    community: readCreatorCommunityMetadata(doc, { format }),
+    bookmarks: 0,
+    bookmarked: false,
     seriesId,
     episodeNo,
     seriesTitle,
@@ -580,6 +705,11 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
 }
 
 export const creatorWorkSnapshotSelection = {
+  id: creatorWorks.id,
+  userId: creatorWorks.userId,
+  hidden: creatorWorks.hidden,
+  createdAt: creatorWorks.createdAt,
+  updatedAt: creatorWorks.updatedAt,
   titleId: creatorWorks.titleId,
   title: creatorWorks.title,
   description: creatorWorks.description,
@@ -769,11 +899,28 @@ export async function updateWork(
       snapshot: createCreatorWorkRevisionSnapshot(row),
       createdAt: now,
     });
+    if (row.status === "published") {
+      await insertCreatorWorkRelease(tx, row.id, {
+        state: "published",
+        publishedAt: now,
+        legacyAuto: true,
+      });
+    }
     const cutoff = creatorWorkRevisionRetentionCutoff(row.revision);
     if (cutoff !== null) {
       await tx
         .delete(creatorWorkRevisions)
-        .where(and(eq(creatorWorkRevisions.workId, id), lte(creatorWorkRevisions.revision, cutoff)));
+        .where(
+          and(
+            eq(creatorWorkRevisions.workId, id),
+            lte(creatorWorkRevisions.revision, cutoff),
+            sql`NOT EXISTS (
+              SELECT 1 FROM ${creatorWorkReleases}
+              WHERE ${creatorWorkReleases.workId} = ${creatorWorkRevisions.workId}
+                AND ${creatorWorkReleases.workRevision} = ${creatorWorkRevisions.revision}
+            )`,
+          ),
+        );
     }
     return row;
   });
