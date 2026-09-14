@@ -48,7 +48,7 @@ class SharedChannel implements StudioDocumentWindowChannel {
 }
 
 function inertInterval(): ReturnType<typeof globalThis.setInterval> {
-  return 1 as ReturnType<typeof globalThis.setInterval>;
+  return 1 as unknown as ReturnType<typeof globalThis.setInterval>;
 }
 
 function coordinator(input: {

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, PanelLeftClose, Pin, RotateCcw } from "lucide-react";
-import type { StudioFloatingSurfaceDock, StudioFloatingSurfaceLayout } from "./studio-floating-surface";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import type { StudioFloatingSurfaceDock, StudioFloatingSurfaceLayout, StudioFloatingSurfaceRect } from "./studio-floating-surface";
 import { STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { cn } from "@/shared/lib/utils";
 
@@ -13,16 +14,38 @@ export interface StudioWorkspaceRegionMenuProps {
   readonly move: (dx: number, dy: number) => void;
   readonly minWidth: number; readonly maxWidth: number;
   readonly minHeight: number; readonly maxHeight: number;
-  readonly viewport: { width: number; height: number };
+  readonly viewport: { width: number; height: number; insetTop: number };
   readonly insetTop: number;
-  readonly widthInput: string; readonly heightInput: string;
-  readonly setWidthInput: (value: string) => void; readonly setHeightInput: (value: string) => void;
-  readonly applySize: () => void; readonly attach: () => void; readonly reset: () => void;
+  readonly rect: StudioFloatingSurfaceRect;
+  readonly floating: boolean;
+  readonly compact: boolean;
+  readonly menuButtonRef: RefObject<HTMLButtonElement | null>;
+  readonly onClose: () => void;
+  readonly onResize: (width: number, height: number) => void;
+  readonly attach: () => void; readonly reset: () => void;
   readonly authority: string;
 }
 
-export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout, setLayout, changeDetached, move, minWidth, maxWidth, minHeight, maxHeight, viewport, insetTop, widthInput, heightInput, setWidthInput, setHeightInput, applySize, attach, reset, authority }: StudioWorkspaceRegionMenuProps) {
-  return (<>
+export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout, setLayout, changeDetached, move, minWidth, maxWidth, minHeight, maxHeight, viewport, insetTop, rect, floating, compact, menuButtonRef, onClose, onResize, attach, reset, authority }: StudioWorkspaceRegionMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [widthInput, setWidthInput] = useState(() => String(Math.round(rect.width)));
+  const [heightInput, setHeightInput] = useState(() => String(Math.round(rect.height)));
+  useEffect(() => {
+    const close = (event: globalThis.PointerEvent) => {
+      if (event.target instanceof Node && !menuRef.current?.contains(event.target) && !menuButtonRef.current?.contains(event.target)) onClose();
+    };
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
+  }, [menuButtonRef, onClose]);
+  function applySize() {
+    const width = Number(widthInput), height = Number(heightInput);
+    if (layout.sizeLocked || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    onResize(width, height);
+  }
+  return (<div ref={menuRef} role="group" aria-label={`${label} 배치 설정 옵션`}
+    style={floating ? { position: "fixed", right: "auto", left: Math.max(12, Math.min(rect.x, viewport.width - 276)), top: Math.max(viewport.insetTop, Math.min(rect.y + (compact ? 84 : 44), viewport.height - 440)) } : undefined}
+    className="absolute right-0 top-11 z-[70] max-h-[min(26rem,70dvh)] w-64 overflow-y-auto rounded-lg border border-line-strong bg-panel p-2 text-fg shadow-2xl"
+    onKeyDownCapture={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); menuButtonRef.current?.focus(); } }}>
         <p className="px-2 py-1 text-xs font-bold">드래그 없이 배치</p>
         <div className="flex flex-wrap gap-1">{choices.map(([dock, name]) => <button type="button" key={dock} className={buttonClass} disabled={layout.positionLocked}
           onClick={() => { setLayout({ ...layout, dock }); changeDetached(true); }}>{name}</button>)}</div>
@@ -43,5 +66,5 @@ export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout,
         <button type="button" className={cn(buttonClass, "w-full justify-start")} onClick={attach}><PanelLeftClose size={14} aria-hidden />원래 자리로 붙이기</button>
         <button type="button" className={cn(buttonClass, "w-full justify-start")} onClick={reset}><RotateCcw size={14} aria-hidden />위치·크기·잠금 초기화</button>
         <p className="px-2 py-1 text-[0.65rem] text-fg-3">{authority === "sqlite-opfs" ? "위치·크기는 기기에 저장됩니다. 분리·접기까지 보관하려면 배치 편집 → 기기에 저장을 사용하세요." : "현재 탭에서 배치를 유지합니다. 기기 저장 여부는 배치 편집에서 확인하세요."}</p>
-  </>);
+  </div>);
 }

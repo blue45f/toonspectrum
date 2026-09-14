@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
@@ -34,6 +33,7 @@ import {
 
 
 export const creatorRoutes = defineAppRoutes([
+  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <CreatorInferencePage /> },
   { id: "creator-character-convert", path: "/studio/character-convert", element: <StudioCharacterConversionPage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },

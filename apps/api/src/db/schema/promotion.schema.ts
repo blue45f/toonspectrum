@@ -1,6 +1,7 @@
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "./auth.schema";
 import type { PromotionInput } from "../../../../../packages/core/src/promotion";
+
 export const promotionPosts = pgTable("creator_promotion_post", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),

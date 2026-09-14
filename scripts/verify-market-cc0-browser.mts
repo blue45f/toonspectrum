@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
+
 import { chromium } from "playwright";
 import { createServer } from "vite";
 
-import { buildMarketCc0ReleaseManifests } from "./seed/market-cc0-release-manifests.mts";
-import type { CreatorMarketplaceResourceRecord } from "../apps/web/src/shared/lib/creator-marketplace-resource-contract";
+import { buildMarketCc0ReleaseManifests } from "./seed/market-cc0-release-manifests";
 
 const server = await createServer({ server: { host: "127.0.0.1", port: 5237, strictPort: true }, mode: "test" });
 await server.listen();
@@ -18,11 +18,12 @@ try {
   const url = "http://127.0.0.1:5237/tools/browser-harnesses/market-cc0-handoff.html";
   await page.goto(url);
   for (const manifest of buildMarketCc0ReleaseManifests()) {
-    const result = await page.evaluate(async (record) => {
+    const serializedRecord = JSON.stringify(manifest);
+    const result = await page.evaluate(async (serialized) => {
       const modulePath = "/tools/browser-harnesses/market-cc0-handoff.tsx";
       const harness = await import(/* @vite-ignore */ modulePath);
-      return harness.verifyMarketCc0BrowserCase(record);
-    }, manifest as unknown as CreatorMarketplaceResourceRecord);
+      return harness.verifyMarketCc0BrowserCase(JSON.parse(serialized));
+    }, serializedRecord) as { serializedScene?: string; reopened?: boolean; hash?: string };
     results.push(result);
     await page.screenshot({ path: `${out}/${manifest.entries[0].id}.png`, fullPage: true });
     if (manifest.kind === "3d-asset") {
@@ -31,8 +32,8 @@ try {
       const reopened = await page.evaluate(async ({ record, serialized }) => {
         const modulePath = "/tools/browser-harnesses/market-cc0-handoff.tsx";
         const harness = await import(/* @vite-ignore */ modulePath);
-        return harness.verifyMarketCc0BrowserCase(record, serialized);
-      }, { record: manifest as unknown as CreatorMarketplaceResourceRecord, serialized: result.serializedScene });
+        return harness.verifyMarketCc0BrowserCase(JSON.parse(record), serialized);
+      }, { record: serializedRecord, serialized: result.serializedScene }) as { reopened?: boolean; hash?: string };
       assert.equal(reopened.reopened, true);
       assert.equal(reopened.hash, result.hash);
       results.push(reopened);

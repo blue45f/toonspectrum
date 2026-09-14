@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Headers, HttpException, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { PromotionService } from "./promotion.service";
+
 const buckets = new Map<string, number[]>();
 function actor(userId: string | undefined, action: string): string {
   // The global sessionAuth middleware removes untrusted x-user-id and verifies the cookie/token.

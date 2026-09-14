@@ -20,9 +20,7 @@ import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
 import { sha256HexPortable } from "./studio-sha256";
-import { findStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-catalog";
 import { studioMarketplaceCc0EntrySourceMatches } from "./studio-marketplace-cc0-provenance";
-import type { StudioCommunityImageAsset } from "./studio-community-marketplace-asset";
 
 import type {
   StudioCreatorPackDefinition,
@@ -395,9 +393,7 @@ export function projectCreatorMarketplaceRecordToStudioPack(
       reason: "이 리소스의 릴리스 버전을 안전하게 해석할 수 없습니다.",
     };
   }
-  const entries = record.entries.map((entry) =>
-    studioMarketplaceCc0EntrySourceMatches(record, entry) ? projectEntry(kind, entry) : null,
-  );
+  const entries = record.entries.map((entry) => projectEntry(kind, entry));
   if (entries.some((entry) => entry === null)) {
     return {
       status: "unsupported",

@@ -1,7 +1,7 @@
 /** Portable, dependency-free contract shared by the editor and the Remotion render kit. */
 export const PROMO_FPS = 30;
 export const PROMO_MAX_PANELS = 12;
-export const PROMO_MOTIONS = ["push-in", "pull-out", "pan-left", "pan-right", "pan-up", "still", "pan-down", "drift", "orbit", "impact", "float"] as const;
+export const PROMO_MOTIONS = ["push-in", "pull-out", "pan-left", "pan-right", "pan-up", "still", "pan-down", "drift", "orbit", "impact", "float", "diagonal-reveal", "arc-left", "arc-right", "breathing", "impact-settle"] as const;
 export const PROMO_STYLES = ["cinematic", "romance", "action", "mystery"] as const;
 export type PromoMotion = (typeof PROMO_MOTIONS)[number];
 export type PromoStyle = (typeof PROMO_STYLES)[number];
@@ -56,6 +56,9 @@ export const PROMO_MOTION_LABELS: Record<PromoMotion, string> = {
   "pan-right": "오른쪽으로 이동", "pan-up": "위로 훑기", still: "정지",
   "pan-down": "아래로 훑기", drift: "대각선 드리프트", orbit: "완만한 원형 이동",
   impact: "임팩트 줌 · 감쇠 흔들림", float: "부드러운 부유",
+  "diagonal-reveal": "대각선 공개", "arc-left": "왼쪽 원호 이동",
+  "arc-right": "오른쪽 원호 이동", breathing: "잔잔한 호흡",
+  "impact-settle": "강한 진입 후 안정",
 };
 export function emptyPromoProject(): PromoProject {
   return { version: 1, title: "나의 웹툰", synopsis: "", cta: "지금 첫 화를 만나보세요", ratio: "9:16", seconds: 15, style: "cinematic", panels: [], audio: null };
@@ -103,6 +106,11 @@ export function promoMotionAt(motion: PromoMotion, progress: number): { scale: n
     case "orbit": return { scale: 1.12, x: Math.cos(t * Math.PI * 2) * 0.025, y: Math.sin(t * Math.PI * 2) * 0.025 };
     case "impact": return { scale: 1.15 - Math.exp(-t * 8) * 0.15, x: Math.sin(t * 28) * Math.exp(-t * 6) * 0.012, y: 0 };
     case "float": return { scale: 1.08, x: Math.sin(t * Math.PI * 2) * 0.015, y: Math.sin(t * Math.PI * 2) * 0.02 };
+    case "diagonal-reveal": return { scale: 1.12, x: -0.045 + eased * 0.09, y: 0.04 - eased * 0.08 };
+    case "arc-left": return { scale: 1.1, x: 0.04 - eased * 0.08, y: Math.sin(t * Math.PI) * -0.025 };
+    case "arc-right": return { scale: 1.1, x: -0.04 + eased * 0.08, y: Math.sin(t * Math.PI) * -0.025 };
+    case "breathing": return { scale: 1.035 + Math.sin(t * Math.PI * 2) * 0.018, x: 0, y: Math.sin(t * Math.PI * 2) * 0.006 };
+    case "impact-settle": return { scale: 1.18 - eased * 0.1, x: Math.sin(t * 32) * Math.exp(-t * 7) * 0.014, y: 0 };
   }
 }
 /** Absolute interpolation keeps scrubbing and offline rendering identical. */

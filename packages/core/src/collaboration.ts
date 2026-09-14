@@ -72,6 +72,13 @@ export function collaborationRecord(value: unknown): Record<string, unknown> {
 export function collaborationText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\r\n?/gu, "\n").trim() : "";
 }
+function hasCollaborationUrlControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
 export function isCollaborationKey<T extends object>(map: T, value: unknown): value is Extract<keyof T, string> {
   return typeof value === "string" && Object.hasOwn(map, value);
 }
@@ -79,7 +86,7 @@ export function isCollaborationKey<T extends object>(map: T, value: unknown): va
 export function safeCollaborationUrl(value: unknown): string | null {
   const text = collaborationText(value);
   if (!text) return "";
-  if (text.length > 500 || /[\u0000-\u0020\u007f]/u.test(text)) return null;
+  if (text.length > 500 || hasCollaborationUrlControlCharacter(text)) return null;
   try {
     const url = new URL(text);
     return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
@@ -161,4 +168,63 @@ export function collaborationBudget(post: Pick<CollaborationInput, "payType" | "
   const formatter = new Intl.NumberFormat("ko-KR");
   const range = budgetMin ? `${formatter.format(budgetMin)}원${budgetMax ? ` ~ ${formatter.format(budgetMax)}원` : "부터"}` : `${formatter.format(budgetMax ?? 0)}원 이하`;
   return `${range} / ${COLLABORATION_UNITS[budgetUnit]}`;
+}
+
+const COLLAB_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+export function collaborationCursor(value: unknown): { createdAt: string; id: string } | null {
+  if (value === undefined || value === "") return null;
+  if (typeof value !== "string" || value.length > 90) {
+    throw new Error("잘못된 페이지 주소예요.");
+  }
+  const [stamp, id, extra] = value.split("|");
+  const date = new Date(stamp);
+  if (
+    extra !== undefined
+    || !id
+    || !COLLAB_UUID.test(id)
+    || !Number.isFinite(date.getTime())
+    || date.toISOString() !== stamp
+  ) {
+    throw new Error("잘못된 페이지 주소예요.");
+  }
+  return { createdAt: stamp, id };
+}
+
+export function isCollaborationPost(value: unknown): value is CollaborationPost {
+  const post = collaborationRecord(value);
+  const author = collaborationRecord(post.author);
+  return typeof post.id === "string"
+    && COLLAB_UUID.test(post.id)
+    && typeof post.version === "number"
+    && Number.isSafeInteger(post.version)
+    && post.version > 0
+    && typeof author.id === "string"
+    && Boolean(author.id)
+    && typeof author.name === "string"
+    && isCollaborationKey(COLLABORATION_STATUS, post.status)
+    && typeof post.createdAt === "string"
+    && Number.isFinite(Date.parse(post.createdAt))
+    && typeof post.updatedAt === "string"
+    && Number.isFinite(Date.parse(post.updatedAt))
+    && typeof post.saved === "boolean"
+    && typeof post.hidden === "boolean"
+    && typeof post.expired === "boolean"
+    // Existing expired posts remain readable; deadline validation applies only to writes.
+    && Boolean(validateCollaborationInput(post, Number.NEGATIVE_INFINITY).value);
+}
+
+export function assertCollaborationList(value: unknown): asserts value is CollaborationList {
+  const page = collaborationRecord(value);
+  if (
+    !Array.isArray(page.items)
+    || page.items.some((post) => !isCollaborationPost(post))
+    || typeof page.canModerate !== "boolean"
+    || typeof page.hasMore !== "boolean"
+    || (page.nextCursor !== null && typeof page.nextCursor !== "string")
+    || (page.hasMore && !page.nextCursor)
+  ) {
+    throw new Error("공고 목록 응답을 확인하지 못했어요. 다시 불러와 주세요.");
+  }
+  if (page.nextCursor !== null) collaborationCursor(page.nextCursor);
 }

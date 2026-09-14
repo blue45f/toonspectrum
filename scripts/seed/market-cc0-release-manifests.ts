@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-import { STUDIO_MARKETPLACE_CC0_ASSETS } from "../../apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated";
 import { STUDIO_MARKETPLACE_CC0_IMAGE_PREFIX, STUDIO_MARKETPLACE_CC0_MODEL_PREFIX } from "../../apps/web/src/domains/creator/studio-marketplace-cc0-assets";
+import { STUDIO_MARKETPLACE_CC0_ASSETS } from "../../apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated";
 import {
   canonicalizeCreatorMarketplaceJson,
   CreatorMarketplaceResourceManifestSchema,

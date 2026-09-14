@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { validateBytes } from "gltf-validator";
 import { CREATOR_ESSENTIALS, ESSENTIALS_KINDS, ESSENTIALS_MAX_BYTES, essentialsEditorHref, essentialsKind, filterCreatorEssentials, isEssentialsPath } from "./creator-essentials-catalog";
-const publicRoot = new URL("../../../../../../public/", import.meta.url);
+
+const publicRoot = new URL("../../../../../public/", import.meta.url);
 
 describe("original creator essentials inventory", () => {
   it("contains 48 unique, budgeted original assets, not duplicate filenames", () => {

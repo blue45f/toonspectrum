@@ -36,6 +36,13 @@ export function promotionRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 export function promotionText(value: unknown): string { return typeof value === "string" ? value.replace(/\r\n?/gu, "\n").trim() : ""; }
+function hasPromotionUrlControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
 export function promotionKey<T extends object>(map: T, value: unknown): value is Extract<keyof T, string> {
   return typeof value === "string" && Object.hasOwn(map, value);
 }
@@ -43,7 +50,7 @@ export function promotionKey<T extends object>(map: T, value: unknown): value is
 export function safePromotionUrl(value: unknown): string | null {
   const raw = promotionText(value);
   if (!raw) return "";
-  if (raw.length > 1000 || /[\u0000-\u0020\u007f]/u.test(raw)) return null;
+  if (raw.length > 1000 || hasPromotionUrlControlCharacter(raw)) return null;
   try {
     const url = new URL(raw);
     const host = url.hostname.toLowerCase();
@@ -107,11 +114,30 @@ export function promotionCursor(value: unknown): { date: Date; id: string } | nu
   if (extra !== undefined || !id || !/^[a-f0-9-]{36}$/iu.test(id) || !Number.isFinite(date.getTime()) || date.toISOString() !== stamp) throw new Error("잘못된 페이지 커서입니다.");
   return { date, id };
 }
+export function isPromotionPost(value: unknown): value is PromotionPost {
+  const post = promotionRecord(value);
+  const author = promotionRecord(post.author);
+  return typeof post.id === "string"
+    && /^[a-f0-9-]{36}$/iu.test(post.id)
+    && typeof author.id === "string"
+    && typeof author.name === "string"
+    && typeof post.createdAt === "string"
+    && Number.isFinite(Date.parse(post.createdAt))
+    && typeof post.updatedAt === "string"
+    && Number.isFinite(Date.parse(post.updatedAt))
+    && Number.isSafeInteger(post.version)
+    && Number(post.version) > 0
+    && typeof post.hidden === "boolean"
+    && typeof post.archived === "boolean"
+    && typeof post.saved === "boolean"
+    && !validatePromotion(post).error;
+}
+
 export function assertPromotionPage(value: unknown): asserts value is PromotionPage {
   const page = promotionRecord(value);
   if (!Array.isArray(page.items) || typeof page.hasMore !== "boolean" || typeof page.canModerate !== "boolean"
     || (page.nextCursor !== null && typeof page.nextCursor !== "string") || (page.hasMore && !page.nextCursor)
-    || page.items.some((item) => { const post = promotionRecord(item); return typeof post.id !== "string" || typeof post.version !== "number" || !promotionRecord(post.author).id || !!validatePromotion(post).error; })) {
+    || page.items.some((item) => !isPromotionPost(item))) {
     throw new Error("홍보 목록 응답을 확인하지 못했어요. 다시 불러와 주세요.");
   }
 }

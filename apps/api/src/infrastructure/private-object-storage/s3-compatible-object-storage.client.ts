@@ -334,6 +334,7 @@ export class S3CompatiblePrivateObjectStoragePort
     }, this.config.timeoutMs);
 
     const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_HASH;
+    const requestBody = body ? Uint8Array.from(body).buffer : undefined;
     const headers = signedRequestHeaders(
       this.config,
       method,
@@ -346,7 +347,7 @@ export class S3CompatiblePrivateObjectStoragePort
       return await this.runtime.fetch(url, {
         method,
         headers,
-        body,
+        body: requestBody,
         cache: "no-store",
         credentials: "omit",
         redirect: "error",
@@ -408,7 +409,7 @@ export class S3CompatiblePrivateObjectStoragePort
     if (!parsed.success) {
       throw new S3CompatibleObjectStorageError("INVALID_INPUT");
     }
-    const bytes = Uint8Array.from(parsed.data.bytes);
+    const bytes = snapshotBytes(Uint8Array.from(parsed.data.bytes));
     if (bytes.byteLength === 0) {
       throw new S3CompatibleObjectStorageError("INVALID_INPUT");
     }
@@ -553,3 +554,19 @@ export class S3CompatiblePrivateObjectStoragePort
         "SOURCE_DELETE_FORBIDDEN",
       );
     }
+    const response = await this.request(
+      "DELETE",
+      this.objectUrl(object.purpose, object.objectPath),
+      {},
+      undefined,
+      options,
+    );
+    await cancelResponse(response);
+    if (
+      response.redirected
+      || ![200, 202, 204, 404].includes(response.status)
+    ) {
+      throw new S3CompatibleObjectStorageError("REMOTE_REJECTED");
+    }
+  }
+}

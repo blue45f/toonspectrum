@@ -1,4 +1,21 @@
 import { studioCreationPreset } from "./studio-creation-presets";
+import {
+  canonicalDocuments,
+  DOCUMENT_KIND_SET,
+  MAX_DOCUMENTS_PER_PROJECT,
+  readStudioProjectDocuments,
+  STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT,
+  studioProjectDocumentStorageKey,
+  validIdentity,
+  validTimestamp,
+  type CreateStudioProjectDocumentInput,
+  type StudioDocumentKind,
+  type StudioDocumentWorkspace,
+  type StudioProjectDocumentEntry,
+  type StudioProjectDocumentEventTarget,
+  type StudioProjectDocumentState,
+  type StudioProjectDocumentStorage,
+} from "./studio-project-document-reader";
 import type { StudioProjectKind } from "./studio-project-library-store";
 
 export {

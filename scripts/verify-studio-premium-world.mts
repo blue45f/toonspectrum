@@ -10,8 +10,8 @@ import { createServer } from "vite";
 
 import { DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES, validateStudioBg3dGlb } from "../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation";
 
-import type { PremiumWorldRuntime } from "../apps/web/tools/browser-harnesses/premium-world-runtime";
 import type { GltfValidatorApi } from "./types/gltf-validator";
+import type { PremiumWorldRuntime } from "../apps/web/tools/browser-harnesses/premium-world-runtime";
 
 type Candidate = { id: string; slug: string; kind: "scene" | "prop"; byteSize: number; sha256: string; bounds: number[] };
 const root = fileURLToPath(new URL("../", import.meta.url));

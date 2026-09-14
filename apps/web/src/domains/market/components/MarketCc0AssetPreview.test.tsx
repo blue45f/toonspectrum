@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { buildMarketCc0ReleaseManifests } from "../../../../../../scripts/seed/market-cc0-release-manifests.mts";
+import { buildMarketCc0ReleaseManifests } from "../../../../../../scripts/seed/market-cc0-release-manifests";
 import { MarketCc0AssetPreview } from "./MarketCc0AssetPreview";
 import { STUDIO_MARKETPLACE_CC0_ASSETS } from "@/domains/creator/studio-marketplace-cc0-catalog.generated";
 

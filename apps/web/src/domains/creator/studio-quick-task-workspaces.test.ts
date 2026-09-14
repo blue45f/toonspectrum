@@ -44,11 +44,11 @@ describe("quick and task-specific studio workspaces", () => {
     const initial = createStudioWorkspaceDefaultState(null);
     const before = JSON.stringify(initial);
     const layouts = ["draw", "comic", "design"] as const;
-    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task)).activeWorkspaceId))
+    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple")).activeWorkspaceId))
       .toEqual(["lineart", "pro-comic", "vector-design"]);
     expect(JSON.stringify(initial)).toBe(before);
-    expect(studioTaskWorkspaceId(null)).toBeNull();
-    expect(studioTaskWorkspaceId("3d")).toBeNull();
+    expect(studioTaskWorkspaceId(null, "simple")).toBeNull();
+    expect(studioTaskWorkspaceId("3d", "simple")).toBeNull();
   });
   it("preserves custom layouts and edits to the current task profile", () => {
     const initial = createStudioWorkspaceDefaultState(null);

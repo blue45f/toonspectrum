@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { OPEN_RESPONSE_BYTES, readOpenJson } from "./open-creation-transport";
+
 const signal = () => new AbortController().signal;
 test("reads bounded UTF-8 JSON", async () => {
   expect(await readOpenJson(Response.json({ title: "한복" }), signal())).toEqual({ title: "한복" });

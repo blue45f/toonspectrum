@@ -2,11 +2,11 @@ import { createRoot, type Root } from "react-dom/client";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+import { getStoredBg3dModelByHashV12 } from "../../src/domains/creator/bg3d/bg3d-model-library";
+import { parseStudioBg3dSceneDocument, serializeStudioBg3dSceneDocument } from "../../src/domains/creator/bg3d/studio-bg3d-scene-document";
 import { createStudioCommunityAssetRecord } from "../../src/domains/creator/studio-community-asset-runtime";
 import { resolveStudioMarketplaceCc0Entry, studioMarketplaceCc0EntryRef } from "../../src/domains/creator/studio-marketplace-cc0-assets";
 import { prepareStudioMarketplaceCc0ModelScene } from "../../src/domains/creator/studio-marketplace-cc0-model";
-import { getStoredBg3dModelByHashV12 } from "../../src/domains/creator/bg3d/bg3d-model-library";
-import { parseStudioBg3dSceneDocument, serializeStudioBg3dSceneDocument } from "../../src/domains/creator/bg3d/studio-bg3d-scene-document";
 import { MarketCc0AssetPreview } from "../../src/domains/market/components/MarketCc0AssetPreview";
 
 import type { CreatorMarketplaceResourceRecord } from "../../src/shared/lib/creator-marketplace-resource-contract";

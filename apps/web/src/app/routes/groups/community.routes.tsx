@@ -52,11 +52,6 @@ const CollaborationEditorPage = lazyRetry(() => import("@/domains/collaboration/
 const CollaborationPostPage = lazyRetry(() => import("@/domains/collaboration/CollaborationPostPage").then((module) => ({ default: module.CollaborationPostPage })), "CollaborationPostPage");
 const CollaborationModerationPage = lazyRetry(() => import("@/domains/collaboration/CollaborationModerationPage").then((module) => ({ default: module.CollaborationModerationPage })), "CollaborationModerationPage");
 
-const CollaborationBoardPage = lazyRetry(() => import("@/domains/collaboration/CollaborationBoardPage").then((module) => ({ default: module.CollaborationBoardPage })), "CollaborationBoardPage");
-const CollaborationEditorPage = lazyRetry(() => import("@/domains/collaboration/CollaborationEditorPage").then((module) => ({ default: module.CollaborationEditorPage })), "CollaborationEditorPage");
-const CollaborationPostPage = lazyRetry(() => import("@/domains/collaboration/CollaborationPostPage").then((module) => ({ default: module.CollaborationPostPage })), "CollaborationPostPage");
-const CollaborationModerationPage = lazyRetry(() => import("@/domains/collaboration/CollaborationModerationPage").then((module) => ({ default: module.CollaborationModerationPage })), "CollaborationModerationPage");
-
 export const communityRoutes = defineAppRoutes([
   { id: "collaboration-board", path: "/collaborate", element: <CollaborationBoardPage /> },
   { id: "collaboration-new", path: "/collaborate/new", element: <CollaborationEditorPage /> },

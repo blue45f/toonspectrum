@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { createRequire } from "node:module";
+import path from "node:path";
+
+import { validateStudioBg3dGlb, DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES } from "../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation";
+import { STUDIO_MARKETPLACE_CC0_ASSETS } from "../apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated";
 
 const { validateBytes } = createRequire(import.meta.url)("gltf-validator") as {
   validateBytes(bytes: Uint8Array, options: { uri: string; maxIssues: number }): Promise<{ issues: { numErrors: number; [key: string]: unknown } }>;
 };
-import { STUDIO_MARKETPLACE_CC0_ASSETS } from "../apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated";
-import { validateStudioBg3dGlb, DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES } from "../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation";
 
 const directory = path.resolve("apps/web/public/assets/studio/cc0-20260906");
 const results: unknown[] = [];

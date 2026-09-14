@@ -14,6 +14,10 @@ export function Market3dAssetPreview({ recipe, className }: {
 }) {
   const headingId = useId();
   const noteId = useId();
+  const reference = recipe.runtimeRef ?? recipe.recipeId;
+  if (findStudioMarketplaceCc0Asset(reference)?.kind === "model") {
+    return <MarketVerifiedAssetPreview reference={reference} />;
+  }
   return (
     <section aria-labelledby={headingId} aria-describedby={noteId} className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}>
       <h2 id={headingId} className="border-b border-line px-4 py-3 text-sm font-semibold text-fg">

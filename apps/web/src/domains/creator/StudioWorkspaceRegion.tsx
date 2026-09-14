@@ -1,4 +1,3 @@
-import { ChevronDown, ChevronUp, GripHorizontal, MoreHorizontal, PanelLeftClose, Pin } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import {
@@ -17,6 +16,7 @@ import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-la
 
 import { cn } from "@/shared/lib/utils";
 
+import type { StudioWorkspaceRegionChromeProps } from "./StudioWorkspaceRegionChrome";
 import type { StudioWorkspaceRegionMenuProps } from "./StudioWorkspaceRegionMenu";
 
 const DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = {
@@ -81,8 +81,6 @@ export function StudioWorkspaceRegion({
     return () => { cancelled = true; };
   }, [menuOpen, Menu, menuAttempt]);
   const [collapsed, setCollapsed] = useState(false);
-  const [widthInput, setWidthInput] = useState("");
-  const [heightInput, setHeightInput] = useState("");
   const [active, setActive] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -154,13 +152,6 @@ export function StudioWorkspaceRegion({
     if (edge) {
       if (!layout.sizeLocked) commit(resizeStudioFloatingSurfaceRectFromEdge(rect, ...value, edge, viewport, constraints), layout.dock);
     } else move(...value);
-  }
-  function applySize() {
-    const width = Number(widthInput);
-    const height = Number(heightInput);
-    if (layout.sizeLocked || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
-    setCollapsed(false);
-    commit({ ...rect, width, height }, layout.dock);
   }
   function begin(event: PointerEvent<HTMLButtonElement>, edge?: StudioFloatingSurfaceResizeEdge) {
     if (!available || sessionRef.current || event.isPrimary === false || event.button !== 0
@@ -256,14 +247,6 @@ export function StudioWorkspaceRegion({
   }, [insetTop]);
   useEffect(() => { if (!available) { sessionRef.current?.cancel(); setMenuOpen(false); } }, [available]);
   useLayoutEffect(() => () => { sessionRef.current?.cancel(); ghostRef.current?.remove(); guideRef.current?.remove(); }, []);
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (event: globalThis.PointerEvent) => {
-      if (event.target instanceof Node && !menuRef.current?.contains(event.target) && !menuButtonRef.current?.contains(event.target)) setMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", close, true);
-    return () => document.removeEventListener("pointerdown", close, true);
-  }, [menuOpen]);
   const buttonClass = cn("inline-flex min-h-9 min-w-9 items-center justify-center gap-1 rounded-md px-2 text-xs text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40", STUDIO_FOCUS_RING);
   const compact = floating && rect.width < 220;
   const folded = floating && collapsed;
@@ -282,41 +265,26 @@ export function StudioWorkspaceRegion({
         arranging && available && !floating && "outline outline-1 -outline-offset-1 outline-accent/60")}
       onFocusCapture={() => { if (floating) bringStudioFloatingSurfaceToFront(persistenceId); }}
       onPointerDownCapture={() => { if (floating) bringStudioFloatingSurfaceToFront(persistenceId); }}>
-      <div hidden={!available || (!floating && !arranging)}
-        className={cn("flex shrink-0 items-center border-b border-line bg-raised text-fg", compact ? "h-20 flex-wrap justify-center" : "h-10", floating ? "z-10" : "absolute inset-x-0 top-0 z-30 rounded-t-md", (!available || (!floating && !arranging)) && "hidden")}>
-        <button type="button" aria-label={`${label} 이동`} disabled={layout.positionLocked}
-          title="드래그하여 배치 · Alt+방향키 이동 · Alt+Home 복원"
-          aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Alt+Home"
-          className={cn(buttonClass, "min-w-0 touch-none cursor-grab justify-start overflow-hidden active:cursor-grabbing", compact ? "h-10 w-full flex-none" : "flex-1")}
-          onPointerDown={(event) => begin(event)} onKeyDown={(event) => moveKey(event)}>
-          {layout.positionLocked ? <Pin size={14} aria-hidden /> : <GripHorizontal size={14} aria-hidden />}
-          <span className="truncate">{label}</span>
-        </button>
-        {floating && <button type="button" className={buttonClass} aria-label={`${label} ${folded ? "펼치기" : "접기"}`} aria-expanded={!folded}
-          onClick={() => { sessionRef.current?.cancel(); setCollapsed(value => !value); }}>
-          {folded ? <ChevronDown size={16} aria-hidden /> : <ChevronUp size={16} aria-hidden />}
-        </button>}
-        <button ref={menuButtonRef} type="button" className={buttonClass} aria-label={`${label} 배치 설정`} aria-expanded={menuOpen}
-          onClick={() => { setWidthInput(String(Math.round(rect.width))); setHeightInput(String(Math.round(rect.height))); setMenuOpen((value) => !value); }}><MoreHorizontal size={16} aria-hidden /></button>
-        {floating && !compact && <button type="button" className={buttonClass} aria-label={`${label} 원래 자리로 붙이기`} onClick={attach}><PanelLeftClose size={16} aria-hidden /></button>}
-      </div>
-      {menuOpen && available && <div ref={menuRef} role="group" aria-label={`${label} 배치 설정 옵션`}
-        style={floating ? { position: "fixed", right: "auto", left: Math.max(12, Math.min(rect.x, viewport.width - 276)), top: Math.max(viewport.insetTop, Math.min(rect.y + (compact ? 84 : 44), viewport.height - 440)) } : undefined}
-        className="absolute right-0 top-11 z-[70] max-h-[min(26rem,70dvh)] w-64 overflow-y-auto rounded-lg border border-line-strong bg-panel p-2 text-fg shadow-2xl"
-        onKeyDownCapture={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); menuButtonRef.current?.focus(); } }}>
-        {Menu ? <Menu label={label} buttonClass={buttonClass} choices={choices} layout={layout} setLayout={setLayout} changeDetached={changeDetached} move={move} minWidth={minWidth} maxWidth={maxWidth} minHeight={minHeight} maxHeight={maxHeight} viewport={viewport} insetTop={insetTop} widthInput={widthInput} heightInput={heightInput} setWidthInput={setWidthInput} setHeightInput={setHeightInput} applySize={applySize} attach={attach} reset={reset} authority={authority} /> : <div role="status" className="p-2 text-xs">
+      {showChrome && (Chrome ? <Chrome label={label} buttonClass={buttonClass} floating={floating} compact={compact} folded={folded}
+        positionLocked={layout.positionLocked} sizeLocked={layout.sizeLocked} menuOpen={menuOpen} menuButtonRef={menuButtonRef}
+        onBegin={begin} onMoveKey={moveKey} onAttach={attach}
+        onToggleCollapsed={() => { sessionRef.current?.cancel(); setCollapsed(value => !value); }}
+        onToggleMenu={() => setMenuOpen(value => !value)} />
+        : <div role="status" className={cn("shrink-0 bg-raised px-2 py-1 text-xs text-fg-2", compact ? "h-20" : "h-10")}>
+          {chromeFailed ? <button type="button" className={buttonClass} onClick={() => setChromeAttempt(value => value + 1)}>패널 도구 다시 불러오기</button> : "패널 도구 여는 중…"}
+        </div>)}
+      {menuOpen && available && (Menu ? <Menu label={label} buttonClass={buttonClass} choices={choices} layout={layout} setLayout={setLayout}
+        changeDetached={changeDetached} move={move} minWidth={minWidth} maxWidth={maxWidth} minHeight={minHeight} maxHeight={maxHeight}
+        viewport={viewport} insetTop={insetTop} rect={rect} floating={floating} compact={compact} menuButtonRef={menuButtonRef}
+        onClose={() => setMenuOpen(false)} onResize={(width, height) => { setCollapsed(false); commit({ ...rect, width, height }, layout.dock); }}
+        attach={attach} reset={reset} authority={authority} /> : <div role="group" className="absolute right-0 top-11 z-[70] rounded-lg border border-line bg-panel p-2 text-xs text-fg shadow-xl"
+          onKeyDownCapture={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); menuButtonRef.current?.focus(); } }}>
           {menuFailed ? <>설정을 불러오지 못했어요. <button type="button" className={buttonClass} onClick={() => setMenuAttempt(value => value + 1)}>다시 시도</button></> : "배치 설정 여는 중…"}
-        </div>}
-      </div>}
+        </div>)}
       <div hidden={folded} inert={folded} style={folded ? { display: "none" } : undefined} className={floating
         ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto [&>[data-studio-sheet-id]]:!h-full [&>[data-studio-sheet-id]]:!w-full [&>[data-studio-sheet-id]]:!min-w-0 [&>[data-studio-sheet-id]]:!max-h-none [&_button[title='자유_배치_창으로_분리']]:hidden"
         : "contents"}>{children}</div>
-      {floating && !folded && RESIZERS.map(([edge, name, position]) => <button key={edge} type="button"
-        className={cn("absolute z-20 touch-none border-0 bg-transparent p-0 disabled:cursor-not-allowed", position, STUDIO_FOCUS_RING,
-          edge === "se" && "after:absolute after:bottom-1 after:right-1 after:size-2 after:border-b-2 after:border-r-2 after:border-fg-3")}
-        aria-label={`${label} ${name} 크기 조절`} disabled={layout.sizeLocked}
-        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight"
-        onPointerDown={(event) => begin(event, edge)} onKeyDown={(event) => moveKey(event, edge)} />)}
+
     </div>
   );
 }

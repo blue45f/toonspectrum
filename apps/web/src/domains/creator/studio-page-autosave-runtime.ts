@@ -1,4 +1,3 @@
-import { studioRecoveryDescription } from "./canvas/studio-recovery-notice-model";
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { recoverInterruptedStudioAiOperations } from "./ai/studio-ai-provenance-recorder";

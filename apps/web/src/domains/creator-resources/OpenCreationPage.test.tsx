@@ -3,10 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { OpenCreationPage } from "./OpenCreationPage";
+
 const request = vi.fn<typeof fetch>();
 const response = () => Response.json({ data: [{ id: 101, title: "Verified armor", is_public_domain: true, copyright_notice: null, credit_line: "Collection credit" }] });
 const mount = () => render(<MemoryRouter><OpenCreationPage /></MemoryRouter>);
-const search = () => fireEvent.click(screen.getByRole("button", { name: "무료 자료 검색", exact: true }));
+const search = () => fireEvent.click(screen.getByRole("button", { name: "무료 자료 검색" }));
 beforeEach(() => { localStorage.clear(); request.mockReset().mockImplementation(async () => response()); vi.stubGlobal("fetch", request); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 test("typing and picking themes do not call providers", () => {
@@ -16,7 +17,7 @@ test("typing and picking themes do not call providers", () => {
 });
 test("explicit search, local board and editable brief preserve provenance", async () => {
   mount(); fireEvent.change(screen.getByLabelText("찾을 소재"), { target: { value: "갑옷" } }); search();
-  fireEvent.click(await screen.findByRole("button", { name: "재료 보드에 저장", exact: true }));
+  fireEvent.click(await screen.findByRole("button", { name: "재료 보드에 저장" }));
   fireEvent.change(screen.getByLabelText("작가 메모 (외부 전송 안 함)"), { target: { value: "Private scene note" } });
   fireEvent.click(screen.getByRole("button", { name: "무료 제작 브리프 만들기" }));
   const output = screen.getByLabelText<HTMLTextAreaElement>("제작 브리프 (직접 수정 가능)");
@@ -42,6 +43,6 @@ test("changing the provider cancels the request and ignores a late response", as
   const activeSignal = request.mock.calls[0][1]?.signal;
   fireEvent.change(screen.getByLabelText("무료 제공처"), { target: { value: "wikipedia" } });
   expect(activeSignal?.aborted).toBe(true); finish(response());
-  await waitFor(() => expect(screen.getByRole("button", { name: "무료 자료 검색", exact: true })).has.property("disabled", false));
+  await waitFor(() => expect(screen.getByRole("button", { name: "무료 자료 검색" })).has.property("disabled", false));
   expect(screen.queryByRole("heading", { name: "Verified armor" })).toBeNull();
 });

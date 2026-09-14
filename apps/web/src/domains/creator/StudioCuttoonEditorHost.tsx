@@ -15732,10 +15732,8 @@ const puppetWarpArmed =
                 projectCreatorMarketplaceRecordToAssets,
               },
               { installStudioCreatorPackProduct },
-              {
-                browserStudioCreatorPackStorage,
-                resolveStudioCreatorBundledCatalogTarget,
-              },
+              { browserStudioCreatorPackStorage },
+              { openStudioMarketplaceCatalog },
               { createStudioMarketplaceImageRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
@@ -15744,6 +15742,7 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
+              import("./studio-marketplace-catalog-open"),
               import("./studio-marketplace-assets"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
@@ -15790,36 +15789,6 @@ const puppetWarpArmed =
                   setStudioMarketplaceCloudSyncRetry({ record, pack, issue });
                   throw caught;
                 }
-              },
-              openBundledPackCatalog: (pack) => {
-                const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
-                if (resolution.status === "unsupported") {
-                  return {
-                    status: "unsupported" as const,
-                    message: resolution.reason,
-                  };
-                }
-                if (resolution.target.kind === "scene-template-catalog") {
-                  setMenu("scene");
-                  setSceneSimilarAnchorId(resolution.target.templateId);
-                  return {
-                    status: "opened" as const,
-                    message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
-                  };
-                }
-                if (resolution.target.kind === "3d-asset-catalog") {
-                  openBackground3dFromMenu();
-                  setBg3dMarketplaceModelId(resolution.target.runtimeRef.slice("studio-3d-asset:".length));
-                  return {
-                    status: "opened" as const,
-                    message: "선택한 마켓 모델을 3D 편집기에 전달했어요. ‘선택한 마켓 모델 가져오기’로 검증 후 장면에 배치하세요.",
-                  };
-                }
-                openBackground3dFromMenu();
-                return {
-                  status: "opened" as const,
-                  message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
-                };
               },
               openBundledPackCatalog: (pack) => openStudioMarketplaceCatalog(pack, {
                 isCurrent: isCurrentOperation,
