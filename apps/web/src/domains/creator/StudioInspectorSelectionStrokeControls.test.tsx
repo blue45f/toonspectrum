@@ -8,7 +8,10 @@ import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelecti
 
 import type { DrawEl } from "./studio-element-model";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 function drawSelection(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
@@ -45,6 +48,12 @@ describe("StudioInspectorSelectionStrokeControls", () => {
 
     expect(screen.getByTestId("studio-inspector-context-selection")).toBeTruthy();
     expect(screen.getByTestId("studio-inspector-selection-stroke-controls")).toBeTruthy();
+    expect(screen.getByLabelText("선 색상")).toBeTruthy();
+    expect(screen.getByLabelText("선 없음")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("studio-selection-stroke-preview")).toHaveAttribute(
+      "aria-label",
+      "선 미리보기: #112233, 5px, 80%",
+    );
     for (const label of surface.requiredControlLabels) {
       expect(screen.getByText(label), label).toBeTruthy();
       expect(screen.getByLabelText(label), `aria ${label}`).toBeTruthy();
@@ -55,5 +64,54 @@ describe("StudioInspectorSelectionStrokeControls", () => {
 
     fireEvent.change(screen.getByLabelText("불투명도"), { target: { value: "0.5" } });
     expect(patchEl).toHaveBeenCalledWith("draw-1", { opacity: 0.5 });
+  });
+
+  it("applies a recent stroke colour immediately and records the committed colour", () => {
+    const patchEl = vi.fn();
+    const onRememberColor = vi.fn();
+
+    render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection()}
+        patchEl={patchEl}
+        recentColors={["#445566", "#778899"]}
+        onRememberColor={onRememberColor}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("최근 선 색상 1 #445566 적용"));
+
+    expect(patchEl).toHaveBeenCalledWith("draw-1", { stroke: "#445566" });
+    expect(onRememberColor).toHaveBeenCalledWith("#445566");
+  });
+
+  it("turns a stroke off explicitly and restores the last visible colour", () => {
+    const patchEl = vi.fn();
+    const { rerender } = render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection()}
+        patchEl={patchEl}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "transparent" });
+
+    rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ stroke: "transparent" })}
+        patchEl={patchEl}
+      />,
+    );
+
+    expect(screen.getByLabelText("선 없음")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("선 두께")).toBeDisabled();
+    expect(screen.getByTestId("studio-selection-stroke-preview")).toHaveAttribute(
+      "aria-label",
+      "선 미리보기: 선 없음",
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "#112233" });
   });
 });
