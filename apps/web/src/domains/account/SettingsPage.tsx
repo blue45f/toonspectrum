@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { LibraryBackupImport } from "./LibraryBackupImport";
 
+import { AppearanceSettings } from "@/shared/components/appearance/AppearanceSettings";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
@@ -176,6 +177,11 @@ export function SettingsPage() {
           {t("settings.subtitle")}
         </p>
       </header>
+
+      <section id="appearance" className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
+        <h2 id="appearance-heading" className="mb-4 text-base font-semibold">{lang.startsWith("ko") ? "디자인 테마" : "Design themes"}</h2>
+        <AppearanceSettings />
+      </section>
 
       {/* 표시 설정 */}
       <section className="rounded-2xl border border-line bg-panel/40 px-5">

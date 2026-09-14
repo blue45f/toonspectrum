@@ -108,6 +108,7 @@ import type {
 import type { StudioWriterRoomDocument } from "./studio-writer-room";
 import type { WorkDetail } from "@/infrastructure/creator-client";
 
+import { AppearanceTrigger } from "@/shared/components/appearance/AppearanceTrigger";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -1408,6 +1409,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
             {activePageLabel}
           </span>
+          <AppearanceTrigger scope="studio" showLabel className="shrink-0" />
           {displayLinkedTitleId ? (
             <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
               링크됨
@@ -1785,6 +1787,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                         : "개인 작업"}
                     </span>
                   </div>
+                  <AppearanceTrigger scope="studio" showLabel className="mt-2" />
                   <StudioProjectCenterSearch />
                 </div>
                 <StudioProjectCenterSection

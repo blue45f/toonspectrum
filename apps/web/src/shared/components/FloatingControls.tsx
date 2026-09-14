@@ -2,6 +2,8 @@ import { useFx } from "@toonspectrum/core/fx";
 import { Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { AppearanceTrigger } from "./appearance/AppearanceTrigger";
+
 import { cx } from "@/shared/lib/cx";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
@@ -171,6 +173,8 @@ export function FloatingControls({
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
       )}
+
+      {showTheme && <AppearanceTrigger className={cx(PILL, "border-line text-fg-2 hover:text-fg")} />}
 
       {/* 언어 선택 — 다국어 옵션을 전체 Google Play locale 목록에서 제공합니다. */}
       {showLang && (
