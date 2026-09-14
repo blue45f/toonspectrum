@@ -417,7 +417,8 @@ export function studioDocumentAllowsKonvaHide(
   elements: readonly El[],
   ownedDocumentIds: readonly string[],
 ): boolean {
-  if (ownedDocumentIds.length === 0) return false;
+  if (ownedDocumentIds.length === 0
+    || elements.some((element) => element.type === "image" && element.adjustmentLayer)) return false;
   const owned = new Set(ownedDocumentIds);
   for (const element of elements) {
     if (element.hidden || (element.opacity ?? 1) <= 0) continue;

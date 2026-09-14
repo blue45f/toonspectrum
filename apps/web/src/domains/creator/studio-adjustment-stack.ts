@@ -1,3 +1,4 @@
+import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./contracts/studio-adjustment-engine-ids";
 /**
  * Non-destructive smart-filter / adjustment stack (Photopea-style), pure model.
  *
@@ -62,72 +63,7 @@ const SERIALIZED_STACK_SUFFIX_BYTES = TEXT_ENCODER.encode(
   `],"version":${STUDIO_ADJUSTMENT_STACK_VERSION}}`
 ).byteLength;
 
-export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
-  "curves",
-  "levels",
-  "brightness-contrast",
-  "shadow-highlight",
-  "hue-saturation",
-  "color-balance",
-  "channel-mixer",
-  "gradient-map",
-  "blur",
-  /** Blur gallery engines (map onto blurFx). */
-  "gaussian-blur",
-  "motion-blur",
-  "spin-blur",
-  "zoom-blur",
-  "lens-blur",
-  "field-iris-blur",
-  "tilt-shift-blur",
-  "selective-gaussian-blur",
-  "tileable-blur",
-  "sharpen",
-  "smart-sharpen",
-  "median-despeckle",
-  "high-pass",
-  "noise",
-  "invert",
-  "grayscale",
-  "sepia",
-  "pixelate",
-  "posterize",
-  "ink-threshold",
-  "line-extraction",
-  "line-cleanup",
-  "screentone-removal",
-  "jpeg-artifact-reduction",
-  "edge-aware-denoise",
-  "dust-scratches",
-  "difference-of-gaussians",
-  "color-to-alpha",
-  "screentone",
-  "color-halftone",
-  "chromatic-aberration",
-  "edge-detect",
-  "emboss",
-  "solarize",
-  "oil-paint",
-  "exposure",
-  "unsharp-mask",
-  "morphology",
-  "offset",
-  "custom-convolution",
-  "clouds",
-  /** Bounded Filter Gallery composites built from the shared Worker pixel engines. */
-  "surface-blur",
-  "crystal-mosaic",
-  "pencil-sketch",
-  "crosshatch",
-  "ordered-dither",
-  "glowing-edges",
-  "cutout",
-  "retro-film",
-  "watercolor",
-  "diffuse-glow",
-  /** Deterministic geometry, material, print and light filters shared with the full Filter Gallery. */
-  ...STUDIO_FILTER_UNION_WAVE_KINDS,
-] as const;
+export { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./contracts/studio-adjustment-engine-ids";
 
 export type StudioAdjustmentEngineId = (typeof STUDIO_ADJUSTMENT_ENGINE_IDS)[number];
 

@@ -1,3 +1,4 @@
+import { canonicalizeStudioLiveAdjustmentElement } from "./contracts/studio-live-adjustment-contract";
 import { z } from "zod";
 
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
@@ -148,7 +149,7 @@ function canonicalizeVrmSceneElement(value: unknown): unknown {
 }
 
 function canonicalizeStudio3dSceneElement(value: unknown): unknown {
-  return canonicalizeVrmSceneElement(canonicalizeBg3dSceneElement(value));
+  return canonicalizeStudioLiveAdjustmentElement(canonicalizeVrmSceneElement(canonicalizeBg3dSceneElement(value)));
 }
 
 function canonicalizeBg3dSceneElements(value: unknown): unknown {

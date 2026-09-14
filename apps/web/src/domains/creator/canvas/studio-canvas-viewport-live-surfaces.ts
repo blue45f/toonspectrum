@@ -699,6 +699,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && advancedFillPreview === null
     && !webGpuPreviewAuthorized
     && studioRasterHiddenOperationIds.size === 0
+    && !canonicalDryMediaAuthoredElements.some((element) => element.type === "image" && element.adjustmentLayer)
     && canonicalDryMediaSelectedElement !== null
     && studioCanonicalDryMediaEligibilityFailure(canonicalDryMediaSelectedElement) === null
     && canonicalDryMediaSelectedElement.clipBelow !== true

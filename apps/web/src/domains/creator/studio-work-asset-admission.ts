@@ -236,6 +236,13 @@ export function createStudioWorkAssetInitialImageDescriptor(
     assetId: element.id,
     elementType: "image",
   });
+  if (element.adjustmentLayer !== undefined) {
+    // A live graph cannot silently lose its program on immutable-source admission. Leave the
+    // original local document untouched when this descriptor cannot carry the whole graph.
+    return parseStudioWorkAssetDescriptor({ version: 1, element: {
+      ...baseDescriptor.element, smartFilters: StudioWorkAssetSmartFiltersSchema.parse(element.smartFilters),
+    } }, { assetId: element.id, elementType: "image" });
+  }
   const smartFilters = StudioWorkAssetSmartFiltersSchema.safeParse(element.smartFilters);
   if (!smartFilters.success) return baseDescriptor;
 

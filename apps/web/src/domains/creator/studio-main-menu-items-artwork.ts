@@ -28,6 +28,7 @@ import {
   Layers,
   LayoutGrid,
   Scaling,
+  SlidersHorizontal,
   Square,
   SquareDashed,
   SquareStack,
@@ -99,6 +100,11 @@ export function buildStudioLayerMenuItems({
       onSelect: () => {
         ui.requestImageInsert();
       },
+    },
+    {
+      id: "adjustment", commandId: "layer.adjustment", label: "보정 레이어 만들기",
+      icon: SlidersHorizontal, disabled: !ui.createAdjustmentLayer || state.masterEditMode || state.collaborationDocumentLocked || state.saving,
+      onSelect: () => { ui.createAdjustmentLayer?.(); },
     },
     {
       ...STUDIO_EDIT_MENU_COMMANDS["bring-front"],

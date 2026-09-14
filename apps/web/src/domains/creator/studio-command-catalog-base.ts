@@ -261,7 +261,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
     // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
     // 2026-09-08: editable recent-stroke correction.
-    measuredCount: 193,
+    measuredCount: 194,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -366,6 +366,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "canvas/sticky-note",
   // layer (9) — lifted out of edit, insert and view; Mask/Clipping is Wave D's own row
   "layer/image",
+  "layer/adjustment",
   "layer/bring-front",
   "layer/bring-forward",
   "layer/send-back",
@@ -1723,6 +1724,10 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("텍스트"), en("Text")],
       aliases: [csp("텍스트"), ps("Type Tool"), krita("Text Tool")],
       origins: [menu("text/text")],
+    }),
+    defineCommand({
+      id: "layer.adjustment", labels: [ko("보정 레이어 만들기"), en("New Adjustment Layer")],
+      aliases: [ps("Adjustment Layer"), csp("색조 보정 레이어")], origins: [menu("layer/adjustment")],
     }),
     defineCommand({
       id: "insert.image",
