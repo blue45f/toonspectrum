@@ -5,6 +5,7 @@ import {
   studioDocumentHref,
   type StudioDocumentWorkspaceId,
 } from "../studio-document-workspace";
+import { readStudioLaunchDensity } from "../studio-launch-mode";
 import { StudioDocumentWindowHub } from "./StudioDocumentWindowHub";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -30,8 +31,12 @@ export function StudioDocumentWorkspaceSwitcher() {
 
   if (resolution.kind !== "document") return null;
 
-  const changeWorkspace = (workspace: StudioDocumentWorkspaceId): void => {
-    if (workspace === resolution.workspace) return;
+  const quickMode = resolution.workspace === "draw"
+    && readStudioLaunchDensity(location.search) === "focus";
+  const navigateWorkspace = (
+    workspace: StudioDocumentWorkspaceId,
+    search: string | URLSearchParams,
+  ): void => {
     navigate(studioDocumentHref({
       projectId: resolution.projectId,
       documentId: resolution.documentId,
@@ -40,8 +45,18 @@ export function StudioDocumentWorkspaceSwitcher() {
       focus: resolution.focus,
       language: resolution.language,
       version: resolution.version,
-      search: location.search,
+      search,
     }), { state: location.state });
+  };
+  const changeWorkspace = (workspace: StudioDocumentWorkspaceId): void => {
+    if (workspace === resolution.workspace) return;
+    navigateWorkspace(workspace, location.search);
+  };
+  const toggleQuickMode = (): void => {
+    const search = new URLSearchParams(location.search);
+    search.set("uiMode", quickMode ? "basic" : "focus");
+    search.set("startTool", quickMode ? "select" : "draw");
+    navigateWorkspace(resolution.workspace, search);
   };
 
   return (
@@ -49,7 +64,9 @@ export function StudioDocumentWorkspaceSwitcher() {
       locale={locale}
       resolution={resolution}
       search={location.search}
+      quickMode={quickMode}
       onChangeWorkspace={changeWorkspace}
+      onToggleQuickMode={toggleQuickMode}
     />
   );
 }

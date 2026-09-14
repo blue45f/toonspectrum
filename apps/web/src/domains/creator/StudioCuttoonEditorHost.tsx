@@ -1,6 +1,6 @@
 import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
-import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
+import { readStudioLocalCanvasSeed, studioLocalCanvasSeedPage } from "./studio-local-canvas-seed";
 import { readStudioLaunchPrimaryTool } from "./studio-launch-mode";
 import { createOriginalSample } from "./ecosystem/ecosystem-content";
 import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
@@ -1818,6 +1818,9 @@ export function StudioCuttoonEditor({
     setPagesHistoryState,
   } = useStudioPageHistorySnapshots({
     initialCanvasHeight: localCanvasSeed?.canvasH,
+    initialPage: localCanvasSeed
+      ? (pageId) => studioLocalCanvasSeedPage(localCanvasSeed, pageId)
+      : undefined,
     effectiveWorkId,
     markStudioDocumentChanged,
     workId,
