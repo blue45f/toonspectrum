@@ -17,14 +17,16 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 
 | workload | 경로 | Worker 변수 | 실패·폴백 정책 |
 |---|---|---|---|
-| core | 나머지 `/api/*`, OG crawler 경로 | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
-| public read | 안전한 `GET`/`HEAD`/`OPTIONS`의 `/api/public`, `/api/catalog`, `/api/search`, `/api/titles`, `/api/health`, `/api/cover` | `PUBLIC_READ_API_ORIGINS` | 최대 8개 동일 계약 origin에 결정적 분산, `502`/`503`/`504`와 네트워크 오류만 다음 origin 재시도 |
+| core | 나머지 `/api/*`, OG crawler 경로, `/api/catalog/*`, `/api/health/*`, `/api/config` | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
+| public read | 안전한 `GET`/`HEAD`/`OPTIONS`의 `/api/random`, `/api/home`, `/api/calendar`, `/api/insights`, `/api/ranking`, `/api/explore`, `/api/tags`, `/api/search`, `/api/titles/*`, `/api/authors/*`, `/api/kmas/book-webtoons`, `/api/cover`, `/api/public/*` | `PUBLIC_READ_API_ORIGINS` | 최대 8개 동일 계약 origin에 결정적 분산, `502`/`503`/`504`와 네트워크 오류만 다음 origin 재시도 |
 | social | `/api/community`, `/api/reviews` | `SOCIAL_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
 | realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
+
+`/api/catalog/ingest/status`, catalog refresh/run, readiness, runtime config처럼 운영 상태나 기준 권위를 나타내는 경로는 메서드가 읽기여도 공개 replica 풀에 포함하지 않는다. 공개 읽기 allowlist는 실제 API controller와 함께 검토하며, 새로운 prefix를 포괄적으로 자동 분산하지 않는다.
 
 각 upstream 요청에는 다음 관측 헤더가 추가된다.
 
@@ -61,8 +63,10 @@ pnpm run cloudflare:static:dry-run
 - 정적 요청이 Worker를 통과하지 않는지
 - core·social·playground·admin·realtime 경로 격리
 - 공개 읽기의 결정적 분산과 안전한 재시도
+- catalog ingest·readiness·runtime config가 core에 남는지
 - write 요청이 replica 풀로 전달되지 않는지
 - 잘못된·중복된·자기참조 origin fail-closed
+- POST body stream을 손상하지 않는 URL rewrite
 - OG route mapping과 WebSocket passthrough
 - Vercel과 Cloudflare 보안 헤더 계약 동기화
 
