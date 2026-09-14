@@ -47,6 +47,7 @@ import type { DocumentMaster } from "../studio-master-page";
 import type { NodeEditHandle, NodeEditTool } from "../studio-node-edit";
 import type { PageGrade } from "../studio-page-grade";
 import type { PageState } from "../studio-page-state";
+import type { StudioDuplicateSelectionOptions } from "../studio-page-clipboard-controller";
 import type { PanelSplitPreview } from "../studio-panel-split";
 import type { VanishingPoint } from "../studio-perspective-guide";
 import type { PuppetPin } from "../studio-puppet-warp";
@@ -145,7 +146,7 @@ export interface StudioCanvasViewportHandlers {
   designateHistoryBrushSource: (index: number) => void;
   dismissQuickStart: () => void;
   downloadAutosaveBackup: () => void;
-  duplicateSelected: () => void;
+  duplicateSelected: (options?: StudioDuplicateSelectionOptions) => boolean | void;
   endLiveResourceEdit: () => void;
   enterCanvasOnlyMode: () => void;
   executeGenerateTranslations: () => Promise<void>;

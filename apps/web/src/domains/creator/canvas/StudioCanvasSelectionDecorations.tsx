@@ -1,5 +1,5 @@
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
-import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
+import { Group, Rect, Text } from "react-konva/lib/ReactKonvaCore";
 
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
@@ -8,12 +8,18 @@ import { StudioDrawSelectionOverlay } from "../studio-page-lazy-ui";
 import { unionBounds } from "../studio-selection";
 import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "../studio-selection-chrome-mirror";
 import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy";
+import { StudioNaturalTransformer } from "../StudioNaturalTransformer";
+import {
+  constrainStudioTransformBox,
+  studioTransformMinimumDocumentSize,
+} from "../studio-transform-interaction";
 
 import type { Tool } from "../studio-editor-tool-model";
 import type { DrawEl, El } from "../studio-element-model";
 import type { StudioGroupUniformResizeBounds } from "../studio-group-uniform-resize";
 import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import type Konva from "konva";
+import type { Box as KonvaTransformerBox } from "konva/lib/shapes/Transformer";
 
 /**
  * Konva selection decorations for the main Studio layer — the union-bounds ghost with its label
@@ -91,6 +97,10 @@ export function renderStudioCanvasSelectionDecorations({
   tool,
   trRef,
 }: StudioCanvasSelectionDecorationsContext): ReactNode {
+  const transformerScale = Number.isFinite(effScale) && effScale > 0 ? effScale : 1;
+  const transformerMinimumSize = studioTransformMinimumDocumentSize(transformerScale);
+  const singleObjectRatioLocked =
+    selected?.type === "text" || selected?.type === "sticker" || !!selected?.lockAspect;
   return (
     <Fragment>
       {/* 그룹 및 다중 선택은 구성 타입(draw + image/text 등)이 섞여도 하나의 union bounds를
@@ -284,7 +294,7 @@ export function renderStudioCanvasSelectionDecorations({
           }}
         />
       ) : null}
-      <Transformer
+      <StudioNaturalTransformer
         ref={trRef}
         // Draw elements use the dedicated proxy Transformer above. This general Transformer has
         // nodes([]) and paints no pixels for that selection, so it cannot be treated as authored
@@ -296,31 +306,34 @@ export function renderStudioCanvasSelectionDecorations({
         // angle until the next reload. Withhold the handle rather than drop the turn, the same
         // verdict `studioGroupUniformResizeMemberCanRotate` reaches for a frame in a selection.
         rotateEnabled={selected?.type !== "frame"}
-        rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
-        rotationSnapTolerance={6}
-        keepRatio={selected?.type === "text" || selected?.type === "sticker" || !!selected?.lockAspect}
+        naturalRotationEnabled={selected?.type !== "frame"}
+        naturalRatioMode={singleObjectRatioLocked ? "always" : "shift"}
+        flipEnabled={false}
         enabledAnchors={
-          selected?.type === "text" || selected?.type === "sticker" || selected?.lockAspect
+          singleObjectRatioLocked
             ? ["top-left", "top-right", "bottom-left", "bottom-right"]
             : ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right", "top-center", "bottom-center"]
         }
         // Konva 기본 파란 사각 핸들 대신 디자인 시스템(persimmon 악센트)의 라운드 핸들.
         // 그림자를 살짝 깔아 어떤 원고 색 위에서도 핸들이 읽힌다.
-        anchorSize={11}
-        anchorCornerRadius={5.5}
+        anchorSize={11 / transformerScale}
+        anchorCornerRadius={5.5 / transformerScale}
         anchorStroke="oklch(0.72 0.185 42)"
-        anchorStrokeWidth={1.5}
+        anchorStrokeWidth={1.5 / transformerScale}
         anchorFill="oklch(0.998 0.004 85)"
         borderStroke="oklch(0.72 0.185 42 / 0.9)"
-        borderStrokeWidth={1.25}
-        rotateAnchorOffset={26}
-        anchorStyleFunc={(anchor) => {
+        borderStrokeWidth={1.25 / transformerScale}
+        rotateAnchorOffset={26 / transformerScale}
+        anchorStyleFunc={(anchor: Konva.Rect) => {
+          anchor.hitStrokeWidth(22 / transformerScale);
           anchor.shadowColor("oklch(0.08 0.01 70)");
-          anchor.shadowBlur(4);
+          anchor.shadowBlur(4 / transformerScale);
           anchor.shadowOpacity(0.35);
-          anchor.shadowOffsetY(1);
+          anchor.shadowOffsetY(1 / transformerScale);
         }}
-        boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
+        boundBoxFunc={(oldBox: KonvaTransformerBox, newBox: KonvaTransformerBox) =>
+          constrainStudioTransformBox(oldBox, newBox, transformerMinimumSize)
+        }
       />
       {/* 잠긴 선택 요소는 트랜스포머가 안 붙으므로 점선 박스로 '선택됨'을 표시(삭제·잠금해제 안내). */}
       {selected && isEffectivelyLocked(selected, groups) && marqueeIds.length === 0 && tool === "select" && !isExporting && (() => {

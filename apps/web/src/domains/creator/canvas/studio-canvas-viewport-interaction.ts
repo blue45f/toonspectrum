@@ -46,6 +46,13 @@ import type Konva from "konva";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useT } from "@/shared/lib/i18n";
 
+interface StudioDuplicateDragIntent {
+  readonly elementId: string;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly target: Konva.Node;
+}
+
 export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportProps) {
   const {
     activeGroupId,
@@ -105,6 +112,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
   const {
     commitAppSettings,
     commitPages,
+    duplicateSelected,
     onStageDragEnd,
     onStagePointerCancel,
     patchEl: patchElFromPage,
@@ -113,12 +121,37 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
   } = stableHandlers;
   const singleObjectDragLayerRef = useRef<Konva.Layer>(null);
   const singleObjectDragSessionRef = useRef<StudioSingleObjectDragLayerSession | null>(null);
+  const duplicateDragIntentRef = useRef<StudioDuplicateDragIntent | null>(null);
   function restoreSingleObjectDragLayer(): boolean {
     const session = singleObjectDragSessionRef.current;
     if (!session) return true;
     const restored = restoreStudioSingleObjectDragLayer(session);
     if (restored) singleObjectDragSessionRef.current = null;
     return restored;
+  }
+
+  function restoreDuplicateDragSource(intent: StudioDuplicateDragIntent): void {
+    intent.target.position({ x: intent.sourceX, y: intent.sourceY });
+    intent.target.getLayer()?.batchDraw();
+  }
+
+  function discardDuplicateDragIntent(): void {
+    const intent = duplicateDragIntentRef.current;
+    duplicateDragIntentRef.current = null;
+    if (intent) restoreDuplicateDragSource(intent);
+  }
+
+  function consumeDuplicateDragPatch(id: string, patch: Partial<El>): boolean {
+    const intent = duplicateDragIntentRef.current;
+    if (!intent || intent.elementId !== id) return false;
+    duplicateDragIntentRef.current = null;
+    restoreDuplicateDragSource(intent);
+    duplicateSelected({
+      placement: "in-place",
+      patch,
+      announcement: "복제하여 이동",
+    });
+    return true;
   }
 
   function patchElementAfterDragRestore(id: string, patch: Partial<El>): void {
@@ -137,6 +170,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     if (singleObjectDragSessionRef.current?.elementId === id) {
       if (!restoreSingleObjectDragLayer()) return;
     }
+    if (consumeDuplicateDragPatch(id, patch)) return;
     patchElFromPage(id, patch);
   }
 
@@ -144,12 +178,31 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     event: Konva.KonvaEventObject<DragEvent>,
   ): void {
     if (!restoreSingleObjectDragLayer()) return;
+    discardDuplicateDragIntent();
     if (!event.target.isDragging()) return;
     const selectedElement = selected?.id === selectedId ? selected : null;
+    const selectionSize = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
+    const nativeEvent = event.evt as Partial<DragEvent>;
+    const draggedElementId = studioElementIdOf(event.target);
+    if (
+      nativeEvent.altKey === true
+      && selectionSize === 1
+      && selectedElement
+      && draggedElementId === selectedElement.id
+      && !activeSurfaceReviewLocked
+      && !isEffectivelyLocked(selectedElement, groups)
+    ) {
+      duplicateDragIntentRef.current = {
+        elementId: selectedElement.id,
+        sourceX: selectedElement.type === "draw" ? 0 : selectedElement.x,
+        sourceY: selectedElement.type === "draw" ? 0 : selectedElement.y,
+        target: event.target,
+      };
+    }
     singleObjectDragSessionRef.current = beginStudioSingleObjectDragLayer({
       target: event.target,
       selectedElementId: selectedElement?.id ?? null,
-      selectionSize: marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0,
+      selectionSize,
       mainLayer: mainLayerRef.current,
       dragLayer: singleObjectDragLayerRef.current,
       transformer: trRef.current,
@@ -167,6 +220,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
 
   function finishSingleObjectDragLayer(): void {
     if (!restoreSingleObjectDragLayer()) return;
+    discardDuplicateDragIntent();
     onStageDragEnd();
   }
 
@@ -174,11 +228,13 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
   ): void {
     restoreSingleObjectDragLayer();
+    discardDuplicateDragIntent();
     onStagePointerCancel(event);
   }
 
   useLayoutEffect(() => {
     restoreSingleObjectDragLayer();
+    discardDuplicateDragIntent();
   }, [activePage.id, masterEditMode, marqueeIds.length, selectedId, tool]);
 
   useLayoutEffect(
@@ -186,6 +242,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
       const session = singleObjectDragSessionRef.current;
       singleObjectDragSessionRef.current = null;
       restoreStudioSingleObjectDragLayer(session);
+      discardDuplicateDragIntent();
     },
     [],
   );
