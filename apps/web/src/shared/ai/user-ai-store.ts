@@ -18,7 +18,7 @@ export const getUserAiSnapshot = () => snapshot;
 export function subscribeUserAi(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function useUserAi() { return useSyncExternalStore(subscribeUserAi, getUserAiSnapshot, getUserAiSnapshot); }
 export function setUserAiConfiguration(configuration: UserAiConfiguration) {
-  publish(normalizeUserAiConfiguration(configuration), "메모리에 적용했습니다. 암호화 저장 전에는 디스크에 키를 기록하지 않습니다.");
+  publish(normalizeUserAiConfiguration(configuration), "메모리에 적용했습니다. 암호화 저장 전에는 디스크에 키를 기록하지 않습니다.", false);
 }
 export function userAiConnection(capability: UserAiCapability): UserAiConnection | null {
   const id = snapshot.configuration.assignments[capability];
@@ -72,7 +72,7 @@ export function migrateLegacyUserAi(): boolean {
   if (!parsed || typeof parsed !== "object") throw new Error("기존 AI 설정을 확인할 수 없습니다.");
   const configuration = normalizeUserAiConfiguration({ version: 1,
     connections: [{ ...EMPTY_AI_CONNECTION, ...parsed, id: "migrated", label: "기존 Studio 연결" }],
-    assignments: { text: "migrated", image: "migrated", inference: null } });
+    assignments: { text: "migrated", image: "migrated", inference: null, "three-d": null } });
   publish(configuration, "이전 설정을 메모리로 가져왔습니다. 기존 평문 설정을 제거합니다.", false);
   for (const source of sources) source.removeItem(key);
   publish(configuration, "기존 평문 설정을 제거했습니다. 암호화 저장은 선택 사항입니다.", false);

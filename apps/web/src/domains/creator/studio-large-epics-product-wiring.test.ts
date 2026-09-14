@@ -37,12 +37,9 @@ describe("large Studio epic product wiring", () => {
       "apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.tsx",
     );
 
-    expect(advancedTools).toMatch(
-      /userId\s*\?\s*new\s+Studio3dGenerationHttpClient\(\{\s*userId,/u,
-    );
-    expect(advancedTools).toContain(
-      "providerApiKey: () => providerKeyRef.current || undefined",
-    );
+    expect(advancedTools).toContain("userId && connection?.apiKey");
+    expect(advancedTools).toContain('assignments["three-d"]');
+    expect(advancedTools).toContain("providerApiKey: () => connection.apiKey");
     expect(advancedTools).toContain("onInsertArtifact={");
     expect(advancedTools).toContain("onSaveArtifact={");
     expect(panel).toContain("readonly client: Studio3dGenerationHttpClient");

@@ -95,3 +95,13 @@ export async function removeUserInferenceUpload(id: string): Promise<void> {
   if (!ID.test(id)) throw new Error("잘못된 업로드 ID입니다.");
   await createUserInferenceApi().delete(`${BASE}/uploads/${id}`);
 }
+
+export async function cleanupUserInferenceUploads(): Promise<number> {
+  const result = await createUserInferenceApi().post<{ deleted: number }>(`${BASE}/uploads/cleanup`, {});
+  if (!Number.isSafeInteger(result.deleted) || result.deleted < 0) throw new Error("입력 파일 정리 응답이 올바르지 않습니다.");
+  return result.deleted;
+}
+export async function deleteUserInferenceJob(id: string): Promise<void> {
+  if (!ID.test(id)) throw new Error("잘못된 작업 ID입니다.");
+  await createUserInferenceApi().delete(`${BASE}/jobs/${id}`);
+}

@@ -3,7 +3,7 @@ import { z } from "zod";
 const id = z.string().min(1).max(200);
 const instant = z.string().datetime();
 const text = z.string().max(12_000);
-const image = z.string().max(600_000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/u);
+const image = z.string().max(600_000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/u).refine(isRasterPreview, "검증된 래스터 미리보기가 아닙니다.");
 export const TRANSLATION_SCHEMA = z.object({ id, pageId: id, elementId: id, source: text,
   locale: z.string().regex(/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/u), text,
   approved: z.boolean(), updatedAt: instant }).strict();

@@ -110,7 +110,7 @@ function addScene(elements: El[], recipe: SceneRecipe, y: number, lines: readonl
   if (recipe.pose === "sit") painter(elements, nextId).rect(120, y + 335, 560, 24, "#ae8363", "original:prop:table");
   if (recipe.pose === "give") painter(elements, nextId).rect(377, y + 290, 46, 30, "#e3c685", "world:parcel:appearance");
   for (const [index, text] of lines.entries()) {
-    elements.push({ id: nextId(), type: "bubble", variant: "round", text, x: 60 + index * 340, y: y + 18,
+    elements.push({ id: nextId(), type: "bubble", variant: "speech", text, x: 60 + index * 340, y: y + 18,
       width: 290, height: 92, fill: PAPER, textFill: INK, rotation: 0, fontSize: 24, tail: index ? "right" : "left", name: `original:dialogue:${index}` });
   }
   elements.push({ id: nextId(), type: "frame", x: 32, y, width: 736, height: 470, stroke: INK, strokeWidth: 3, name: `original:scene:${recipe.id}` });

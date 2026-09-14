@@ -1,5 +1,5 @@
 /** One configuration owns all user-funded AI connections. Never export credentials with works. */
-export type UserAiCapability = "text" | "image" | "inference";
+export type UserAiCapability = "text" | "image" | "inference" | "three-d";
 export interface UserAiConnection {
   id: string;
   label: string;
@@ -20,14 +20,14 @@ export const USER_AI_SETTINGS_HREF = "/settings/ai";
 export const USER_AI_VAULT_KEY = "toonstudio:user-ai:encrypted:v1";
 export const USER_AI_LOCK_KEY = "toonstudio:user-ai:lock:v1";
 export const EMPTY_AI_CONFIGURATION: UserAiConfiguration = {
-  version: 1, connections: [], assignments: { text: null, image: null, inference: null },
+  version: 1, connections: [], assignments: { text: null, image: null, inference: null, "three-d": null },
 };
 export const EMPTY_AI_CONNECTION: UserAiConnection = {
   id: "", label: "", baseUrl: "https://api.openai.com/v1", apiKey: "",
   textModel: "", imageModel: "", imageGenerationPath: "/images/generations",
   imageEditPath: "/images/edits", chatCompletionsPath: "/chat/completions",
 };
-export const USER_AI_CAPABILITIES: readonly UserAiCapability[] = ["text", "image", "inference"];
+export const USER_AI_CAPABILITIES: readonly UserAiCapability[] = ["text", "image", "inference", "three-d"];
 export function validateUserAiBaseUrl(value: string): string {
   const url = new URL(value.trim());
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -70,7 +70,7 @@ export function normalizeUserAiConfiguration(value: unknown): UserAiConfiguratio
   const sourceAssignments = raw.assignments as Record<string, unknown>;
   const assignments = { ...EMPTY_AI_CONFIGURATION.assignments };
   for (const capability of USER_AI_CAPABILITIES) {
-    const id = sourceAssignments[capability];
+    const id = sourceAssignments[capability] ?? null;
     if (id !== null && (typeof id !== "string" || !connections.some(item => item.id === id))) throw new Error("AI 기능의 연결 대상을 확인하세요.");
     assignments[capability] = id as string | null;
   }

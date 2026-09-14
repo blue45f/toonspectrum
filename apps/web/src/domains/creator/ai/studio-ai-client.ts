@@ -1,5 +1,3 @@
-import { userAiConnection, userAiLegacySettings, setUserAiConfiguration, lockUserAi } from "@/shared/ai/user-ai-store";
-import { userAiLegacyJson, userAiLegacyForm } from "@/shared/ai/user-ai-transport";
 /**
  * Studio AI 어시스트 — 서버 텍스트 AI + BYOK 범용 REST 클라이언트.
  *
@@ -41,6 +39,7 @@ import {
   type DialogueTranslatableItem,
 } from "../lettering/studio-dialogue-translate";
 import {
+  completeStudioServerText,
   parseStudioServerAiFailoverMetadata,
   type StudioServerAiFailoverMetadata,
   type StudioServerAiTask,
@@ -106,22 +105,83 @@ export const STUDIO_AI_DEFAULT_SETTINGS: StudioAiSettings = {
  * (studio-reference-panel.deserializeReferencePanelSettings와 동일한 "관대한" 정책 — baseUrl
  * 하나가 깨졌다고 apiKey까지 통째로 잃게 하지 않는다).
  */
-/** @deprecated Configuration is now owned by the unified memory/encrypted vault. */
-export function loadStudioAiSettings(_storage?: StudioAiStorage | null): StudioAiSettings {
-  return userAiLegacySettings();
+export function loadStudioAiSettings(storage: StudioAiStorage | null | undefined): StudioAiSettings {
+  if (!storage) return { ...STUDIO_AI_DEFAULT_SETTINGS };
+  try {
+    const raw = storage.getItem(STUDIO_AI_SETTINGS_KEY);
+    if (!raw) return { ...STUDIO_AI_DEFAULT_SETTINGS };
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return { ...STUDIO_AI_DEFAULT_SETTINGS };
+    const o = parsed as Record<string, unknown>;
+    const str = (key: keyof StudioAiSettings, allowEmpty = false): string => {
+      const v = o[key];
+      if (typeof v !== "string") return STUDIO_AI_DEFAULT_SETTINGS[key];
+      if (!allowEmpty && v.trim().length === 0) return STUDIO_AI_DEFAULT_SETTINGS[key];
+      return v;
+    };
+    return {
+      baseUrl: str("baseUrl"),
+      apiKey: str("apiKey", true), // 빈 문자열(미설정 상태)도 유효한 값이다.
+      imageModel: str("imageModel"),
+      textModel: str("textModel"),
+      imageGenerationPath: str("imageGenerationPath"),
+      imageEditPath: str("imageEditPath"),
+      chatCompletionsPath: str("chatCompletionsPath"),
+    };
+  } catch {
+    return { ...STUDIO_AI_DEFAULT_SETTINGS };
+  }
 }
-export function saveStudioAiSettings(_storage: StudioAiStorage | null | undefined, settings: StudioAiSettings): void {
-  setUserAiConfiguration({ version: 1,
-    connections: [{ ...settings, id: "studio-legacy", label: "Studio 연결" }],
-    assignments: { text: "studio-legacy", image: "studio-legacy", inference: null } });
+
+/** 저장 — 실패(쿼터 초과·시크릿 모드 등)는 조용히 무시한다(studio-brand-kit.ts persist와 동일 정책). */
+export function saveStudioAiSettings(storage: StudioAiStorage | null | undefined, settings: StudioAiSettings): void {
+  if (!storage) return;
+  try {
+    storage.setItem(STUDIO_AI_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // 무시.
+  }
 }
-export function clearStudioAiSettings(_storage?: StudioAiStorage | null): void { lockUserAi(); }
-export function loadStudioAiSessionSettings(_session?: StudioAiStorage | null, _legacy?: StudioAiStorage | null): StudioAiSettings {
-  return userAiLegacySettings();
+
+/** 민감 키가 든 설정을 제거한다. removeItem 미지원 테스트 저장소도 기본값 덮어쓰기로 키를 폐기한다. */
+export function clearStudioAiSettings(storage: StudioAiStorage | null | undefined): void {
+  if (!storage) return;
+  try {
+    if (storage.removeItem) storage.removeItem(STUDIO_AI_SETTINGS_KEY);
+    else storage.setItem(STUDIO_AI_SETTINGS_KEY, JSON.stringify(STUDIO_AI_DEFAULT_SETTINGS));
+  } catch {
+    // 저장소가 차단돼도 현재 메모리 설정은 호출부가 별도로 비운다.
+  }
 }
-export function isStudioAiConfigured(_settings: StudioAiSettings): boolean {
-  const connection = userAiConnection("image");
-  return Boolean(connection?.apiKey && connection.imageModel);
+
+/**
+ * Loads BYOK settings from the current tab session. A legacy localStorage value is migrated once
+ * for compatibility and then securely removed, so refreshing the same tab keeps the connection
+ * while closing the tab ends credential persistence.
+ */
+export function loadStudioAiSessionSettings(
+  sessionStorage: StudioAiStorage | null | undefined,
+  legacyPersistentStorage?: StudioAiStorage | null
+): StudioAiSettings {
+  let hasSessionValue = false;
+  try {
+    hasSessionValue = Boolean(sessionStorage?.getItem(STUDIO_AI_SETTINGS_KEY));
+  } catch {
+    // sessionStorage가 차단된 환경은 아래 메모리-only 경로로 폴백한다.
+  }
+  const settings = hasSessionValue
+    ? loadStudioAiSettings(sessionStorage)
+    : loadStudioAiSettings(legacyPersistentStorage);
+  if (!hasSessionValue && legacyPersistentStorage) saveStudioAiSettings(sessionStorage, settings);
+  if (legacyPersistentStorage && legacyPersistentStorage !== sessionStorage) {
+    clearStudioAiSettings(legacyPersistentStorage);
+  }
+  return settings;
+}
+
+/** baseUrl과 apiKey가 둘 다 채워져 있어야 "설정 완료"로 간주한다(모델/경로는 기본값으로도 동작). */
+export function isStudioAiConfigured(settings: StudioAiSettings): boolean {
+  return settings.baseUrl.trim().length > 0 && settings.apiKey.trim().length > 0;
 }
 
 /** 텍스트 생성만 서버 보유 Z.ai/DeepSeek를 사용할 수 있다. 이미지 생성/편집은 계속 BYOK 설정을 요구한다. */
@@ -170,11 +230,12 @@ export type StudioTextAiData<T extends object> = T & { textProvenance: StudioTex
 
 const DEFAULT_TEXT_AI_TRANSPORT: StudioTextAiTransport = { mode: "byok" };
 
-export function isStudioTextAiConfigured(_settings: StudioAiSettings, _transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT): boolean {
-  const connection = userAiConnection("text");
-  return Boolean(connection?.apiKey && connection.textModel);
+export function isStudioTextAiConfigured(
+  settings: StudioAiSettings,
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): boolean {
+  return transport.mode === "server" || isStudioAiConfigured(settings);
 }
-export function resolveUserFundedTextTransport(): StudioTextAiTransport { return { mode: "byok" }; }
 
 // ── 공통 타입 ──────────────────────────────────────────────────────────────
 
@@ -273,15 +334,88 @@ async function loadOptionalStudioAiCodec<T>(
   throw lastError;
 }
 
-async function postJson(_url: string, _apiKey: string, body: unknown, signal?: AbortSignal): Promise<StudioAiResult<unknown>> {
+async function parseHttpResponse(res: Response, signal?: AbortSignal): Promise<StudioAiResult<unknown>> {
+  let text: string;
   try {
-    const capability = body && typeof body === "object" && "messages" in body ? "text" : "image";
-    return { ok: true, data: await userAiLegacyJson(capability, body, signal) };
-  } catch (error) { return { ok: false, code: "network_error", error: networkErrorMessage(error) }; }
+    text = await res.text();
+  } catch (error) {
+    // fetch가 헤더를 받은 뒤 응답 body를 읽는 도중 취소될 수도 있다. 이 경우에도 요청 단계에서
+    // 취소된 것과 같은 network_error 계약을 유지한다(parse_error로 오인하지 않는다).
+    if (signal?.aborted || isAbortError(error)) {
+      return { ok: false, code: "network_error", error: "요청이 취소되었습니다." };
+    }
+    return { ok: false, code: "parse_error", error: "응답 본문을 읽지 못했습니다." };
+  }
+  if (!res.ok) {
+    const message = extractErrorMessage(text) ?? (res.statusText || "알 수 없는 오류");
+    return { ok: false, code: "http_error", error: `요청이 실패했습니다 (HTTP ${res.status}): ${message}` };
+  }
+  if (!text) return { ok: true, data: {} };
+  try {
+    return { ok: true, data: JSON.parse(text) };
+  } catch {
+    return { ok: false, code: "parse_error", error: "응답을 해석하지 못했습니다(JSON 형식이 아닙니다)." };
+  }
 }
-async function postForm(_url: string, _apiKey: string, form: FormData, signal?: AbortSignal): Promise<StudioAiResult<unknown>> {
-  try { return { ok: true, data: await userAiLegacyForm(form, signal) }; }
-  catch (error) { return { ok: false, code: "network_error", error: networkErrorMessage(error) }; }
+
+/** OpenAI류 에러 응답의 관례적 형태(`{ error: { message } }` 또는 `{ error: "..." }`)를 최대한 뽑아본다. */
+function extractErrorMessage(text: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === "object") {
+      const err = (parsed as Record<string, unknown>).error;
+      if (typeof err === "string") return err;
+      if (err && typeof err === "object" && typeof (err as Record<string, unknown>).message === "string") {
+        return (err as Record<string, unknown>).message as string;
+      }
+    }
+  } catch {
+    // 본문이 JSON이 아니면(HTML 에러 페이지 등) 무시하고 null.
+  }
+  return null;
+}
+
+async function postJson(
+  url: string,
+  apiKey: string,
+  body: unknown,
+  signal?: AbortSignal
+): Promise<StudioAiResult<unknown>> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      ...(signal === undefined ? {} : { signal }),
+    });
+  } catch (e) {
+    return { ok: false, code: "network_error", error: networkErrorMessage(e) };
+  }
+  return parseHttpResponse(res, signal);
+}
+
+async function postForm(
+  url: string,
+  apiKey: string,
+  form: FormData,
+  signal?: AbortSignal
+): Promise<StudioAiResult<unknown>> {
+  let res: Response;
+  try {
+    // Content-Type을 직접 지정하지 않는다 — FormData를 body로 넘기면 fetch가 boundary를 포함한
+    // multipart/form-data Content-Type을 자동으로 설정한다(직접 지정하면 boundary가 빠져 서버가
+    // 파싱하지 못한다).
+    res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      ...(signal === undefined ? {} : { signal }),
+    });
+  } catch (e) {
+    return { ok: false, code: "network_error", error: networkErrorMessage(e) };
+  }
+  return parseHttpResponse(res, signal);
 }
 
 async function postTextCompletion(
@@ -296,6 +430,32 @@ async function postTextCompletion(
   },
   transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
 ): Promise<StudioAiResult<unknown>> {
+  if (transport.mode === "server") {
+    const result = await completeStudioServerText(
+      {
+        task: request.task,
+        promptVersion: 1,
+        system: request.system,
+        user: request.user,
+        operationId: transport.operationId,
+        ...(transport.provider ? { provider: transport.provider } : {}),
+      },
+      transport.signal
+    );
+    if (!result.ok) return result;
+    // 기존 OpenAI 호환 응답 파서를 그대로 재사용할 수 있도록 최소 choices envelope로 정규화한다.
+    return {
+      ok: true,
+      data: {
+        choices: [{ message: { content: result.data.content } }],
+        provider: result.data.provider,
+        model: result.data.model,
+        requestId: result.data.requestId,
+        usage: result.data.usage,
+        failover: result.data.failover,
+      },
+    };
+  }
   const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
   return postJson(url, settings.apiKey, {
     model: settings.textModel,
@@ -345,8 +505,6 @@ function extractTextAiProvenance(
   settings: StudioAiSettings,
   transport: StudioTextAiTransport
 ): StudioTextAiProvenance {
-  settings = userAiLegacySettings();
-  transport = resolveUserFundedTextTransport();
   const record = json && typeof json === "object" && !Array.isArray(json)
     ? json as Record<string, unknown>
     : {};
