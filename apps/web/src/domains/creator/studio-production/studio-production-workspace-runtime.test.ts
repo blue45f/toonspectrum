@@ -52,7 +52,7 @@ describe("production durable document admission", () => {
   });
 
   it.each([
-    ["invalid JSON", "{"], ["array root", "[]"], ["unsupported version", stored({ schemaVersion: 3 })],
+    ["invalid JSON", "{"], ["array root", "[]"], ["unsupported version", stored({ schemaVersion: 4 })],
     ["cross scope", stored({ scopeKey: "remix:other" })], ["missing title", stored({ title: " " })],
     ["invalid time", stored({ updatedAt: "yesterday" })], ["negative revision", stored({ revision: -1 })],
     ["fractional revision", stored({ revision: 1.2 })], ["missing tasks", stored({ tasks: null })],

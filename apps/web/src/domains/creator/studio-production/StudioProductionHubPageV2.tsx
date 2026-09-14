@@ -51,6 +51,14 @@ import {
   type StudioProductionWorkspaceMode,
 } from "./studio-production-workspace";
 import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
+import { StudioProductionOperationsPanel } from "./StudioProductionOperationsPanel";
+import {
+  loadStudioServerProductionWorkspace,
+  saveStudioServerProductionWorkspace,
+  StudioProductionServerConflictError,
+  type StudioServerProductionCapabilities,
+} from "./studio-production-server-client";
+import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -95,18 +103,21 @@ function surfaceHref(surface: StudioProductionSurface, scope: ProductionScope): 
   return `/studio/${surface}${search}`;
 }
 
-function persistenceLabel(state: PersistenceState): string {
+function persistenceLabel(
+  state: PersistenceState,
+  mode: StudioProductionWorkspaceMode,
+): string {
   switch (state) {
     case "loading":
       return "불러오는 중";
     case "saving":
-      return "저장 중";
+      return mode === "server-work" ? "서버 저장 중" : "저장 중";
     case "saved":
-      return "SQLite/OPFS 저장됨";
+      return mode === "server-work" ? "서버 저장됨" : "SQLite/OPFS 저장됨";
     case "demo":
       return "데모 · 저장 안 함";
     case "error":
-      return "저장소 오류";
+      return mode === "server-work" ? "서버 저장 오류" : "저장소 오류";
   }
 }
 
@@ -306,15 +317,29 @@ function StudioProductionHubWorkspace({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const serverWorkId = useMemo(
+    () => scope.key.startsWith("work:") ? scope.key.slice(5) : null,
+    [scope.key],
+  );
   const mode = useMemo(() => resolveStudioProductionWorkspaceMode({
     scopeKey: scope.key,
     search: location.search,
-    serverBacked: false,
-  }), [location.search, scope.key]);
-  const capabilities = useMemo(
-    () => studioProductionWorkspaceCapabilities(mode),
-    [mode],
-  );
+    serverBacked: serverWorkId !== null,
+  }), [location.search, scope.key, serverWorkId]);
+  const [serverCapabilities, setServerCapabilities] = useState<
+    StudioServerProductionCapabilities | null
+  >(null);
+  const capabilities = useMemo(() => {
+    const base = studioProductionWorkspaceCapabilities(mode);
+    if (mode !== "server-work" || !serverCapabilities) return base;
+    return {
+      ...base,
+      canEdit: serverCapabilities.edit,
+      canInvite: serverCapabilities.manageLinks,
+      canApprove: serverCapabilities.approve,
+      canPublish: serverCapabilities.publish,
+    };
+  }, [mode, serverCapabilities]);
   const initial = useMemo(
     () => mode === "demo"
       ? createDemoProductionWorkspace()
@@ -343,24 +368,33 @@ function StudioProductionHubWorkspace({
   const reloadWorkspace = useCallback(async (showLoading: boolean) => {
     if (mode === "demo") {
       adoptWorkspace(createDemoProductionWorkspace());
+      setServerCapabilities(null);
       setPersistence("demo");
       setLoadError(null);
       return;
     }
     if (showLoading) setPersistence("loading");
     try {
-      const loaded = await loadStudioProductionWorkspace(scope.key);
-      adoptWorkspace(loaded ?? createEmptyProductionWorkspace(scope.key));
+      if (mode === "server-work" && serverWorkId) {
+        const loaded = await loadStudioServerProductionWorkspace(serverWorkId);
+        adoptWorkspace(loaded.document);
+        setServerCapabilities(loaded.capabilities);
+      } else {
+        const loaded = await loadStudioProductionWorkspace(scope.key);
+        adoptWorkspace(loaded ?? createEmptyProductionWorkspace(scope.key));
+        setServerCapabilities(null);
+      }
       setPersistence("saved");
       setLoadError(null);
     } catch (cause) {
       adoptWorkspace(createEmptyProductionWorkspace(scope.key));
+      setServerCapabilities(null);
       setPersistence("error");
       setLoadError(cause instanceof Error
         ? cause.message
         : "제작 운영 데이터를 불러오지 못했습니다.");
     }
-  }, [adoptWorkspace, mode, scope.key]);
+  }, [adoptWorkspace, mode, scope.key, serverWorkId]);
 
   useEffect(() => {
     void reloadWorkspace(true);
@@ -411,34 +445,57 @@ function StudioProductionHubWorkspace({
       setNotice(`${message} 데모 변경은 저장되지 않습니다.`);
       return;
     }
-    if (!capabilities.canPersistLocally) {
-      setNotice("서버 제작 운영 저장소가 연결되지 않아 변경하지 않았습니다.");
-      return;
-    }
     setPersistence("saving");
     try {
-      const next = await commitStudioProductionWorkspace(
-        scope.key,
-        workspaceRef.current,
-        update,
-      );
-      adoptWorkspace(next);
+      if (mode === "server-work" && serverWorkId) {
+        const current = workspaceRef.current;
+        const saved = await saveStudioServerProductionWorkspace(
+          serverWorkId,
+          current.revision,
+          update(current),
+        );
+        adoptWorkspace(saved.document);
+        setServerCapabilities(saved.capabilities);
+      } else if (capabilities.canPersistLocally) {
+        const next = await commitStudioProductionWorkspace(
+          scope.key,
+          workspaceRef.current,
+          update,
+        );
+        adoptWorkspace(next);
+        channelRef.current?.postMessage(createStudioProductionWorkspaceInvalidation({
+          scopeKey: scope.key,
+          revision: next.revision,
+          sourceClientId: clientIdRef.current,
+        }));
+      } else {
+        setNotice("현재 모드에서는 제작 운영 데이터를 저장할 수 없습니다.");
+        setPersistence("error");
+        return;
+      }
       setPersistence("saved");
       setNotice(message);
-      channelRef.current?.postMessage(createStudioProductionWorkspaceInvalidation({
-        scopeKey: scope.key,
-        revision: next.revision,
-        sourceClientId: clientIdRef.current,
-      }));
     } catch (cause) {
+      if (cause instanceof StudioProductionServerConflictError) {
+        setNotice(cause.message);
+        await reloadWorkspace(false);
+        return;
+      }
       setPersistence("error");
-      const messageText = cause instanceof Error
+      setNotice(cause instanceof Error
         ? cause.message
-        : "제작 운영 데이터를 저장하지 못했습니다.";
-      setLoadError(messageText);
-      setNotice(messageText);
+        : "제작 운영 데이터를 저장하지 못했습니다.");
     }
-  }, [adoptWorkspace, capabilities, loadError, mode, scope.key]);
+  }, [
+    adoptWorkspace,
+    capabilities.canEdit,
+    capabilities.canPersistLocally,
+    loadError,
+    mode,
+    reloadWorkspace,
+    scope.key,
+    serverWorkId,
+  ]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -496,6 +553,14 @@ function StudioProductionHubWorkspace({
         due: new Date().toISOString().slice(0, 10),
         progress: 0,
         status: "todo",
+        stage: "planning",
+        priority: "normal",
+        role: null,
+        hierarchyNodeId: null,
+        dependencyIds: [],
+        assigneeIds: [],
+        reviewerIds: [],
+        blockedReason: "",
       },
     ],
   }), "새 제작 작업을 추가했습니다.");
@@ -506,13 +571,17 @@ function StudioProductionHubWorkspace({
       ...current.reviews,
       {
         id: createId("review"),
-        title: "새 로컬 검수 항목",
+        title: "새 검수 항목",
         assignee: "미배정",
         severity: "minor",
         status: "open",
+        hierarchyNodeId: null,
+        pageId: null,
+        requestedByRole: null,
+        approvalRequired: false,
       },
     ],
-  }), "로컬 검수 항목을 추가했습니다.");
+  }), "검수 항목을 추가했습니다.");
 
   const toggleTask = (id: string) => void commit((current) => ({
     ...current,
@@ -536,19 +605,25 @@ function StudioProductionHubWorkspace({
     versions: [
       {
         id: createId("version"),
-        name: `로컬 체크포인트 ${current.versions.length + 1}`,
+        name: `${mode === "server-work" ? "운영" : "로컬"} 체크포인트 ${current.versions.length + 1}`,
         createdAt: new Date().toISOString(),
         tasks: current.tasks,
         reviews: current.reviews,
+        hierarchy: current.hierarchy,
+        roleAssignments: current.roleAssignments,
+        handoffs: current.handoffs,
       },
       ...current.versions,
     ],
-  }), "로컬 작업·검수 체크포인트를 저장했습니다.");
+  }), "작업·검수·역할·인계 체크포인트를 저장했습니다.");
 
   const restoreSnapshot = (snapshot: ProductionVersionSnapshot) => void commit((current) => ({
     ...current,
     tasks: snapshot.tasks,
     reviews: snapshot.reviews,
+    hierarchy: snapshot.hierarchy ?? [],
+    roleAssignments: snapshot.roleAssignments ?? [],
+    handoffs: snapshot.handoffs ?? [],
   }), `${snapshot.name} 상태를 복원했습니다.`);
 
   const addSlide = () => void commit((current) => ({
@@ -587,9 +662,9 @@ function StudioProductionHubWorkspace({
                 {studioProductionWorkspaceModeLabel(mode)} · {SURFACE_META[surface].label}
               </p>
               <Pill tone={releaseReady ? "success" : configured ? "warning" : "neutral"}>
-                {releaseReady ? "로컬 점검 완료" : configured ? "점검 필요" : "설정 필요"}
+                {releaseReady ? "운영 점검 완료" : configured ? "점검 필요" : "설정 필요"}
               </Pill>
-              <Pill>local r{workspace.revision}</Pill>
+              <Pill>{mode === "server-work" ? "server" : "local"} r{workspace.revision}</Pill>
             </div>
             <input
               key={`${workspace.scopeKey}:${workspace.title}`}
@@ -606,7 +681,7 @@ function StudioProductionHubWorkspace({
           </div>
           <div className="flex items-center gap-2 text-xs text-fg-2" role="status">
             <Save className="size-4" aria-hidden="true" />
-            {persistenceLabel(persistence)}
+            {persistenceLabel(persistence, mode)}
           </div>
           <Link
             href={scope.editorHref}
@@ -681,14 +756,14 @@ function StudioProductionHubWorkspace({
             label="제작 진척"
             value={`${progress}%`}
             detail={workspace.tasks.length === 0
-              ? "로컬 작업을 추가해 진행률을 관리하세요."
+              ? "제작 작업을 추가해 진행률을 관리하세요."
               : `${completed}/${workspace.tasks.length} 작업 완료`}
             tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
           />
           <Metric
             label="차단 작업"
             value={`${blocked}건`}
-            detail="현재 로컬 플래너 기준"
+            detail={mode === "server-work" ? "서버 제작 운영 기준" : "현재 로컬 플래너 기준"}
             tone={blocked > 0 ? "danger" : "success"}
           />
           <Metric
@@ -705,7 +780,8 @@ function StudioProductionHubWorkspace({
         </div>
 
         {surface === "projects" ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <Card
               title="제작 보드"
               description="현재 기기에 저장되는 작업 목록입니다. 서버 원고 상태와 자동으로 동일시하지 않습니다."
@@ -791,6 +867,12 @@ function StudioProductionHubWorkspace({
                 </p>
               </div>
             </Card>
+            </div>
+            <StudioProductionOperationsPanel
+              workspace={workspace}
+              canEdit={capabilities.canEdit && !loadError}
+              onCommit={(update, message) => { void commit(update, message); }}
+            />
           </div>
         ) : null}
 
@@ -912,6 +994,14 @@ function StudioProductionHubWorkspace({
         ) : null}
 
         {surface === "share" ? (
+          mode === "server-work" && serverWorkId ? (
+            <StudioReviewLinkManager
+              workId={serverWorkId}
+              workspace={workspace}
+              canManage={capabilities.canInvite && !loadError}
+              onNotice={setNotice}
+            />
+          ) : (
           <Card
             title={capabilities.canInvite ? "서버 프로젝트 공유" : "서버 공유 잠금"}
             description="초대 링크는 서버에서 난수 토큰을 발급하고 권한·만료·폐기를 검증해야 합니다."
@@ -943,6 +1033,7 @@ function StudioProductionHubWorkspace({
               </div>
             </div>
           </Card>
+          )
         ) : null}
 
         {surface === "join" ? (

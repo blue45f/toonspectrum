@@ -1389,6 +1389,7 @@ import type {
 } from "./studio-publish-preflight";
 import type { StudioQuickAccessCommandMeta, StudioQuickAccessState } from "./studio-quick-access";
 import type { StudioQuickAccessCommandAvailability } from "./studio-quick-access-integration";
+import { useStudioQuickAccessPersonalKit } from "./use-studio-quick-access-personal-kit";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
@@ -3310,6 +3311,7 @@ export function StudioCuttoonEditor({
   const [quickAccessPaletteLoading, setQuickAccessPaletteLoading] = useState(false);
   const [quickAccessState, setQuickAccessState] =
     useState<StudioQuickAccessState | null>(null);
+  const [quickAccessLocalRevision, setQuickAccessLocalRevision] = useState(0);
   const [quickAccessIntegration, setQuickAccessIntegration] =
     useState<StudioQuickAccessIntegrationModule | null>(null);
   const quickAccessIntegrationRef =
@@ -3403,6 +3405,7 @@ export function StudioCuttoonEditor({
     if (!runtime) return;
     const ownerScope = currentWorkspaceOwnerScope;
     setQuickAccessState(next);
+    setQuickAccessLocalRevision((current) => current + 1);
     void runtime.saveStudioQuickAccessState(ownerScope, next).then((status) => {
       if (quickAccessOwnerScopeRef.current !== ownerScope) return;
       if (status === "persisted") {
@@ -3418,6 +3421,32 @@ export function StudioCuttoonEditor({
     });
   }
 
+  async function adoptStudioQuickAccessPersonalKitState(
+    next: StudioQuickAccessState,
+  ): Promise<void> {
+    const runtime = quickAccessIntegrationRef.current;
+    const ownerScope = quickAccessOwnerScopeRef.current;
+    if (!runtime || quickAccessLoadedOwnerScopeRef.current !== ownerScope) return;
+    setQuickAccessState(next);
+    const status = await runtime.saveStudioQuickAccessState(ownerScope, next);
+    if (quickAccessOwnerScopeRef.current !== ownerScope) return;
+    if (status !== "persisted" && !quickAccessPersistenceWarningRef.current) {
+      quickAccessPersistenceWarningRef.current = true;
+      announceDrawingShortcut(
+        "Personal Kit 설정은 적용했지만 SQLite/OPFS에 저장하지 못했어요",
+      );
+    }
+  }
+
+  useStudioQuickAccessPersonalKit({
+    userId: studioAuthReady ? studioAuthUserId : null,
+    ownerScope: currentWorkspaceOwnerScope,
+    state: quickAccessState,
+    localRevision: quickAccessLocalRevision,
+    onAdoptRemote: adoptStudioQuickAccessPersonalKitState,
+    onStatus: announceDrawingShortcut,
+  });
+
   useEffect(() => {
     if (
       quickAccessLoadedOwnerScopeRef.current === null
@@ -3431,6 +3460,7 @@ export function StudioCuttoonEditor({
     setQuickAccessPaletteOpen(false);
     setQuickAccessPaletteLoading(false);
     setQuickAccessState(null);
+    setQuickAccessLocalRevision(0);
   }, [currentWorkspaceOwnerScope]);
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);

@@ -35,6 +35,9 @@ import {
   studioLiveSessionAuthenticatorProvider,
   studioLiveSessionRevalidatorProvider,
 } from "./studio-live.protocol";
+import { StudioProductionController } from "./studio-production.controller";
+import { studioProductionRepositoryProvider } from "./studio-production.repository";
+import { StudioProductionService } from "./studio-production.service";
 import { StudioRasterAssetController } from "./studio-raster-asset.controller";
 import { studioRasterAssetRepositoryProvider } from "./studio-raster-asset.repository";
 import { StudioRasterAssetService } from "./studio-raster-asset.service";
@@ -71,6 +74,7 @@ const privateObjectStorageModule =
     StudioLiveAuthTicketController,
     StudioRasterAssetController,
     StudioRemoteReferenceImageController,
+    StudioProductionController,
     StudioTeamCommentController,
     StudioVoiceIcePolicyController,
     StudioWorkAssetController,
@@ -89,6 +93,7 @@ const privateObjectStorageModule =
     studioRemoteReferenceDnsResolverProvider,
     studioRemoteReferenceHttpRequesterProvider,
     studioRemoteReferenceImageDeliveryLimiterProvider,
+    studioProductionRepositoryProvider,
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
@@ -96,6 +101,7 @@ const privateObjectStorageModule =
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,
+    StudioProductionService,
     StudioTeamCommentLivePublisher,
     StudioTeamCommentService,
     StudioVoiceIcePolicyService,
