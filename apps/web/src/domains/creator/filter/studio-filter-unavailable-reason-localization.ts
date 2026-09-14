@@ -15,8 +15,8 @@
  * 왜 문장 단위인가
  * ----------------
  * 사유는 한 문장이 아니라 **조립된다**. `studio-raster-edit-preparation.ts` 의
- * `fidelityReason()` 은 "화면에 보이는 그대로 만들 수 없어…" 라는 머리말 뒤에 막힌 이유별
- * 조치 문장을 최대 2개 이어 붙인다 — 조합 수가 곱으로 늘어 통문장 표로는 감당이 안 된다.
+ * `fidelityReason()` 은 원본 보존 머리말과 영향을 받은 레이어 안내 뒤에 이유별 조치 문장을
+ * 최대 2개 이어 붙인다 — 조합 수가 곱으로 늘어 통문장 표로는 감당이 안 된다.
  * 그래서 표는 **문장**을 담고, 조립된 사유는 문장으로 쪼개 각각 옮긴다.
  *
  * 왜 "하나라도 모르면 통째로 원문"인가
@@ -132,10 +132,10 @@ const STUDIO_FILTER_REASON_EN: Readonly<Record<string, string>> = {
     "The visible layer data could not be read safely, so no editable copy was made.",
   "표시 레이어 데이터가 안전 처리 한도를 넘었습니다.":
     "The visible layer data exceeds the safe processing budget.",
-  "합성된 벡터 데이터가 안전 처리 한도를 넘었습니다.":
-    "The composited vector data exceeds the safe processing budget.",
-  "페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.":
-    "Please split the page or merge some layers first.",
+  "현재 모습의 복사본 데이터가 안전 처리 한도를 넘었습니다.":
+    "The current-appearance copy exceeds the safe processing budget.",
+  "페이지를 나누거나 표시 레이어 수를 줄여 주세요.":
+    "Please split the page or reduce the number of visible layers.",
   "편집용 래스터를 준비하는 동안 페이지 내용이나 잠금 상태가 바뀌었습니다.":
     "The page content or lock state changed while the editable raster was being prepared.",
   "최신 화면에서 다시 시도해 주세요.":
@@ -145,39 +145,31 @@ const STUDIO_FILTER_REASON_EN: Readonly<Record<string, string>> = {
   "필터 합성 레이어가 현재 페이지와 일치하지 않아 원본을 변경하지 않았습니다.":
     "The filter composite layer does not match the current page, so the original was left untouched.",
 
-  // document: fidelityReason 머리말 + FIDELITY_ACTIONS / FIDELITY_FALLBACK_ACTION
-  "화면에 보이는 그대로 만들 수 없어 아무것도 바꾸지 않았습니다.":
-    "The result could not be built exactly as shown on screen, so nothing was changed.",
+  // document: fidelityReason 머리말 + 영향 레이어 + FIDELITY_ACTIONS
+  "현재 모습의 복사본을 안전하게 만들지 못해 원본은 그대로 유지했습니다.":
+    "A safe copy of the current appearance could not be made, so the original was preserved.",
   "말풍선·글상자의 글이 상자보다 길어 자동으로 줄이 바뀝니다.":
     "Text in a bubble or text box is longer than its box, so lines wrap automatically.",
   "상자를 조금 넓히거나 원하는 자리에서 엔터로 줄을 나눈 뒤 다시 시도해 주세요.":
     "Please widen the box a little, or break the lines yourself with Enter, then try again.",
-  "지우개로 지운 자국이 남은 그리기 레이어가 있습니다.":
-    "A drawing layer still carries eraser marks.",
-  "그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.":
-    "Please merge that layer into an image first, then try again.",
-  "세로쓰기 안의 영문·숫자 구간은 줄 나눔이 화면과 조금 달라질 수 있습니다.":
-    "Latin and numeric runs inside vertical text can break lines slightly differently than on screen.",
-  "해당 텍스트를 가로쓰기로 바꾸거나 이미지로 병합한 뒤 다시 시도해 주세요.":
-    "Please switch that text to horizontal writing or merge it into an image, then try again.",
+  "세로쓰기 안의 영문·숫자 배치가 달라질 수 있습니다.":
+    "Latin and numeric content inside vertical text can be laid out differently.",
+  "해당 텍스트를 가로쓰기로 바꾸거나 줄을 직접 나눈 뒤 다시 시도해 주세요.":
+    "Switch that text to horizontal writing or insert the line breaks yourself, then try again.",
   "인터넷 주소로 연결된 이미지가 있습니다.":
     "An image is linked by internet address.",
-  "그 이미지를 작업 파일에 넣어 두거나(다시 올리기) 잠시 숨긴 뒤 다시 시도해 주세요.":
-    "Please embed that image in the document (re-upload it) or hide it for now, then try again.",
-  "혼합 모드나 아래 레이어로 자르기가 걸린 레이어가 있습니다.":
-    "A layer uses a blend mode or clips to the layer below.",
-  "그 레이어를 먼저 아래 레이어와 병합한 뒤 다시 시도해 주세요.":
-    "Please merge that layer with the one below it first, then try again.",
-  "이미 색보정이 걸려 있는 이미지 레이어가 있습니다.":
-    "An image layer already has a color adjustment applied.",
-  "그 보정을 레이어에 먼저 적용(병합)한 뒤 다시 시도해 주세요.":
-    "Please apply (merge) that adjustment into the layer first, then try again.",
-  "레이어 구조가 어긋난 요소가 있습니다.":
-    "An element has an inconsistent layer structure.",
-  "문제 레이어를 그룹에서 꺼내거나 지운 뒤 다시 시도해 주세요.":
-    "Please move the offending layer out of its group or delete it, then try again.",
-  "화면과 똑같이 합칠 수 없는 레이어가 있습니다.":
-    "A layer cannot be flattened exactly as shown on screen.",
+  "이미지를 작업 파일에 다시 넣거나 해당 레이어를 잠시 숨긴 뒤 다시 시도해 주세요.":
+    "Add the image to the document again or temporarily hide that layer, then try again.",
+  "지원되지 않는 혼합 모드 또는 아래 레이어로 자르기 설정을 잠시 끈 뒤 다시 시도해 주세요.":
+    "Temporarily turn off the unsupported blend mode or clip-to-layer-below setting, then try again.",
+  "기존 색보정 효과를 확정하거나 잠시 끈 뒤 다시 시도해 주세요.":
+    "Commit the existing color adjustment or temporarily turn it off, then try again.",
+  "레이어 구조가 올바르지 않습니다.":
+    "The layer structure is invalid.",
+  "해당 레이어를 그룹에서 꺼내거나 복제한 새 레이어로 교체한 뒤 다시 시도해 주세요.":
+    "Move that layer out of its group or replace it with a duplicated layer, then try again.",
+  "지원되지 않는 효과나 레이어 설정을 잠시 끄거나 해당 레이어를 숨긴 뒤 다시 시도해 주세요.":
+    "Temporarily turn off unsupported effects or layer settings, or hide that layer, then try again.",
 
   // 필터 메뉴의 일반 문구(구체적 사유를 못 구했을 때) — studio-main-menu-items-filter.ts
   "현재 편집 상태에서는 필터를 적용할 수 없습니다.":
@@ -192,6 +184,10 @@ const STUDIO_FILTER_REASON_PATTERNS: readonly {
   readonly match: RegExp;
   readonly en: (groups: RegExpMatchArray) => string;
 }[] = [
+  {
+    match: /^확인이 필요한 레이어: (.+)\.$/u,
+    en: (m) => `Layers to check: ${m[1]}.`,
+  },
   {
     match: /^현재 페이지는 (.+?)픽셀로 필터 허용치 (.+?)픽셀을 넘습니다\.$/u,
     en: (m) => `This page is ${m[1]} pixels, over the ${m[2]}-pixel filter budget.`,

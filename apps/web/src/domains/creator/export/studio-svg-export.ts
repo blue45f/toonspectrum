@@ -17,7 +17,8 @@
  *
  * 정직성 규약: 완벽 재현이 불가한 것은 그리지 않거나 근사하고, 전부 skipped 목록으로
  * 집계해 반환한다(콜러가 사용자에게 고지). 예: 픽셀 필터/보정(제외 아님, 원본 이미지로
- * 근사), 지우개 합성(destination-out — 제외), 아래 레이어 클리핑(근사), 자동 줄바꿈(근사).
+ * 근사), 아래 레이어 클리핑(근사), 자동 줄바꿈(근사). 지우개는 그 시점 이전 콘텐츠에만
+ * 적용되는 causal luminance mask로 destination-out 순서와 투명도를 보존한다.
  * 말풍선 그룹 그림자는 캔버스에서도 그려지지 않으므로(Konva 컨테이너 그림자는 cache 필요)
  * 내보내지 않는다 — 화면과 동일.
  *
@@ -59,7 +60,7 @@ import {
 } from "../studio-vertical-text";
 
 import { addSkip, gradientDef, shadowFilterDef } from "./studio-svg-export-defs";
-import { serializeDraw } from "./studio-svg-export-draw";
+import { serializeDraw, serializeEraserMaskDraw } from "./studio-svg-export-draw";
 import {
   CSS_BLEND_MODES,
   containingPanel,
@@ -792,7 +793,13 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
     seq: 0,
   };
   const groups: LayerGroup[] = [...(input.groups ?? [])];
-  const body: string[] = [];
+  const backgroundBody: string[] = [];
+  // Each eraser masks only the content that precedes it. Keeping one segment per effective eraser
+  // lets us emit the nested causal groups in O(elements + erasers) instead of repeatedly copying
+  // an ever-growing SVG string.
+  const contentSegments: string[][] = [[]];
+  const causalEraserMaskIds: string[] = [];
+  let hasSerializedContent = false;
 
   // 배경 — 캔버스 bg 레이어와 동일(그라데이션은 세로 2색).
   if (!input.transparentBg) {
@@ -802,9 +809,9 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
       ctx.defs.push(
         `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${fmt(input.height)}"><stop offset="0%" stop-color="${escapeXml(grad[0])}"/><stop offset="100%" stop-color="${escapeXml(grad[1])}"/></linearGradient>`
       );
-      body.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="url(#${id})"/>`);
+      backgroundBody.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="url(#${id})"/>`);
     } else {
-      body.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="${escapeXml(input.bg ?? "#ffffff")}"/>`);
+      backgroundBody.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="${escapeXml(input.bg ?? "#ffffff")}"/>`);
     }
   }
 
@@ -812,6 +819,47 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
   for (const el of input.elements) {
     if (isEffectivelyHidden(el, groups)) continue; // 숨긴 레이어/그룹은 캔버스 내보내기와 동일하게 제외
     elementCount += 1;
+
+    if (el.type === "draw" && el.mode === "eraser") {
+      // destination-out is causal: it subtracts only pixels already accumulated in the document
+      // content layer. The page background lives on its own layer and must remain untouched.
+      if (!hasSerializedContent) continue;
+      let eraserMarkup = serializeEraserMaskDraw(ctx, el);
+      if (!eraserMarkup) continue;
+
+      if (el.clipBelow) {
+        addSkip(ctx, el, "approximated", "아래 레이어로 자르기(클리핑 마스크)는 SVG에서 지원되지 않아 자르지 않고 표시돼요.");
+      }
+      const panel = !el.noClip ? containingPanel(el, input.elements) : null;
+      if (panel) {
+        const clipId = nextId(ctx, "sec");
+        ctx.defs.push(
+          `<clipPath id="${clipId}"><rect x="${fmt(panel.x)}" y="${fmt(panel.y)}" width="${fmt(panel.width)}" height="${fmt(panel.height)}"/></clipPath>`
+        );
+        eraserMarkup = `<g clip-path="url(#${clipId})">${eraserMarkup}</g>`;
+      }
+
+      // The coverage serializer may contain arbitrary authored colours or texture images. This
+      // filter forces RGB to black while retaining alpha byte-for-byte. Black painted over the
+      // mask's opaque white base produces luminance (1 - sourceAlpha), exactly the Porter-Duff
+      // destination-out factor used by the Canvas renderer.
+      const blackAlphaFilterId = nextId(ctx, "sef");
+      ctx.defs.push(
+        `<filter id="${blackAlphaFilterId}" filterUnits="userSpaceOnUse" x="0" y="0" width="${fmt(input.width)}" height="${fmt(input.height)}" color-interpolation-filters="sRGB">`
+          + `<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/>`
+          + `</filter>`
+      );
+      const maskId = nextId(ctx, "sem");
+      ctx.defs.push(
+        `<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="${fmt(input.width)}" height="${fmt(input.height)}" style="mask-type:luminance">`
+          + `<rect x="0" y="0" width="${fmt(input.width)}" height="${fmt(input.height)}" fill="#ffffff"/>`
+          + `<g filter="url(#${blackAlphaFilterId})">${eraserMarkup}</g>`
+          + `</mask>`
+      );
+      causalEraserMaskIds.push(maskId);
+      contentSegments.push([]);
+      continue;
+    }
 
     let markup = "";
     switch (el.type) {
@@ -867,7 +915,17 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
     } else if (blendStyle) {
       markup = `<g${blendStyle}>${markup}</g>`;
     }
-    body.push(markup);
+    contentSegments[contentSegments.length - 1]!.push(markup);
+    hasSerializedContent = true;
+  }
+
+  const causalContent: string[] = [];
+  for (let index = causalEraserMaskIds.length - 1; index >= 0; index -= 1) {
+    causalContent.push(`<g mask="url(#${causalEraserMaskIds[index]})">`);
+  }
+  causalContent.push(contentSegments[0]!.join(""));
+  for (let index = 0; index < causalEraserMaskIds.length; index += 1) {
+    causalContent.push(`</g>`, contentSegments[index + 1]!.join(""));
   }
 
   const caveats: string[] = [];
@@ -879,7 +937,8 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(input.width)}" height="${fmt(input.height)}" viewBox="0 0 ${fmt(input.width)} ${fmt(input.height)}">` +
     defsMarkup +
-    body.join("") +
+    backgroundBody.join("") +
+    causalContent.join("") +
     `</svg>`;
 
   return {

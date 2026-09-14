@@ -57,16 +57,16 @@ describe("filter unavailable reason localization", () => {
     );
   });
 
-  it("localizes an assembled fidelity reason (헤드라인 + 조치 문장들)", () => {
+  it("localizes an assembled fidelity reason (원본 보존 + 영향 레이어 + 조치)", () => {
     // studio-raster-edit-preparation.ts fidelityReason() 이 실제로 조립하는 모양.
     const reason =
-      "화면에 보이는 그대로 만들 수 없어 아무것도 바꾸지 않았습니다."
-      + " 지우개로 지운 자국이 남은 그리기 레이어가 있습니다."
-      + " 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.";
+      "현재 모습의 복사본을 안전하게 만들지 못해 원본은 그대로 유지했습니다."
+      + " 확인이 필요한 레이어: ‘클립 선화’ · ‘색보정’."
+      + " 지원되지 않는 혼합 모드 또는 아래 레이어로 자르기 설정을 잠시 끈 뒤 다시 시도해 주세요.";
     expect(localizeStudioFilterUnavailableReason(reason, englishT)).toBe(
-      "The result could not be built exactly as shown on screen, so nothing was changed."
-      + " A drawing layer still carries eraser marks."
-      + " Please merge that layer into an image first, then try again.",
+      "A safe copy of the current appearance could not be made, so the original was preserved."
+      + " Layers to check: ‘클립 선화’ · ‘색보정’."
+      + " Temporarily turn off the unsupported blend mode or clip-to-layer-below setting, then try again.",
     );
   });
 

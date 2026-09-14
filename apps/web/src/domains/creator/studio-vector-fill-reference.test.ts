@@ -199,17 +199,19 @@ describe("planStudioAdvancedFillVectorTarget", () => {
     expect(second.target.sourceFingerprint).not.toBe(first.target.sourceFingerprint);
   });
 
-  it("fails closed when the shared SVG path cannot reproduce an eraser exactly", () => {
+  it("plans an exact reference when an eraser removes earlier ink", () => {
     const plan = planStudioAdvancedFillVectorTarget(input([
       draw("ink"),
       draw("erase", { mode: "eraser" }),
     ]));
-    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity", insertionIndex: 0 });
+    expect(plan).toMatchObject({ ok: true });
+    if (!plan.ok) return;
+    expect(plan.target.sourceElementCount).toBe(2);
+    expect(plan.target.insertionIndex).toBe(0);
   });
 
-  // 아래 세 건은 "지우개 획이 있다" 와 "지우개가 화면을 바꾼다" 를 가르는 회귀다.
-  // 예전에는 지우개가 하나라도 있으면 채우기 진입 자체가 막히고 "지우개 벡터 획은 선화 참조
-  // 이미지에서 …" 배너가 떴다 — 잉크에 닿지도 않은 획까지 그랬다.
+  // 무해한 지우개는 렌더 예산 최적화로 제외하고, 실제로 잉크를 지운 지우개는 causal mask로
+  // 보존한다. 어느 경우에도 사용자가 레이어를 직접 병합할 필요가 없다.
   it("proceeds when an eraser stroke never overlaps any ink", () => {
     const plan = planStudioAdvancedFillVectorTarget(input([
       draw("ink"),
@@ -234,13 +236,15 @@ describe("planStudioAdvancedFillVectorTarget", () => {
     expect(plan).toMatchObject({ ok: false, code: "no-visible-vector-draw" });
   });
 
-  it("still fails closed when one eraser is inert but another really erases ink", () => {
+  it("drops an inert eraser but retains an active eraser in the exact source", () => {
     const plan = planStudioAdvancedFillVectorTarget(input([
       draw("ink"),
       draw("erase-elsewhere", { mode: "eraser", points: [600, 800, 620, 820] }),
       draw("erase-the-ink", { mode: "eraser" }),
     ]));
-    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity" });
+    expect(plan).toMatchObject({ ok: true });
+    if (!plan.ok) return;
+    expect(plan.target.sourceElementCount).toBe(2);
   });
 
   it("keeps inert erasers out of the serialized source so the SVG matches the screen", async () => {
@@ -261,6 +265,26 @@ describe("planStudioAdvancedFillVectorTarget", () => {
       ),
     ).resolves.toMatchObject({ elementCount: 1 });
     expect(svgs).toHaveLength(1);
+  });
+
+  it("serializes an active eraser as an exact causal mask for the reference PNG", async () => {
+    const svgs: string[] = [];
+    await expect(
+      renderStudioAdvancedFillVectorReference(
+        input([
+          draw("ink"),
+          draw("erase-the-ink", { mode: "eraser" }),
+        ]),
+        {
+          workerFactory: null,
+          rasterExecutionBackend: "custom",
+          rasterize: rasterizer((svg) => svgs.push(svg)),
+        },
+      ),
+    ).resolves.toMatchObject({ elementCount: 2 });
+    expect(svgs).toHaveLength(1);
+    expect(svgs[0]).toContain('style="mask-type:luminance"');
+    expect(svgs[0]).toContain('<g mask="url(#sem');
   });
 
   it("reports dimension and byte-budget failures before raster allocation", () => {
@@ -289,7 +313,6 @@ describe("describeStudioAdvancedFillVectorReferenceExclusion", () => {
 
   it("names both what was dropped and the plan's own reason for every other failure", () => {
     const failures = [
-      planStudioAdvancedFillVectorTarget(input([draw("ink"), draw("erase", { mode: "eraser" })])),
       planStudioAdvancedFillVectorTarget(input([draw("line")], { width: 0 })),
       planStudioAdvancedFillVectorTarget(input([draw("line")], { budgets: { maxSourceBytes: 8 } })),
       planStudioAdvancedFillVectorTarget(input([draw("line")], { budgets: { maxSvgBytes: 8 } })),
@@ -305,16 +328,12 @@ describe("describeStudioAdvancedFillVectorReferenceExclusion", () => {
     }
   });
 
-  it("degrades the eraser-fidelity failure that used to abort an unrelated raster fill", () => {
+  it("does not create an exclusion notice for an exactly supported eraser composition", () => {
     const plan = planStudioAdvancedFillVectorTarget(input([
       draw("ink"),
       draw("erase-the-ink", { mode: "eraser" }),
     ]));
-    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity" });
-    if (plan.ok) return;
-    expect(describeStudioAdvancedFillVectorReferenceExclusion(plan)).toContain(
-      "지우개 벡터 획은 선화 참조 이미지에서 원본 합성을 정확히 재현할 수 없습니다.",
-    );
+    expect(plan.ok).toBe(true);
   });
 });
 

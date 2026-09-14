@@ -430,7 +430,7 @@ function resolveEntryGate(
   const hasUnsupportedSource = (context.unsupportedVisibleCount ?? 0) > 0;
   if (hasUnsupportedSource) {
     return blocked(
-      "표시 레이어 중 일부를 화면과 똑같이 래스터 복사본으로 만들 수 없습니다. 지원되지 않는 합성·지우개 획을 먼저 정리하세요.",
+      "표시 레이어 중 일부의 현재 모습을 안전한 복사본으로 만들 수 없습니다. 지원되지 않는 효과나 레이어 설정을 잠시 끄거나 해당 레이어를 숨긴 뒤 다시 시도하세요.",
       null,
     );
   }
