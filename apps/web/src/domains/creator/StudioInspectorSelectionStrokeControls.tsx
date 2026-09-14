@@ -3,30 +3,25 @@
  * Kept as a leaf so context-property tests can drive the shipped control path
  * without mounting the full StudioInspectorAside graph.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import {
   normalizeHexColor,
   normalizeRecentColors,
-  pushRecentColor,
-  readRecentColors,
-  storeRecentColors,
 } from "./studio-color-utils";
+import {
+  ensureSharedStudioRecentColorsLoaded,
+  getStudioRecentColorsServerSnapshot,
+  getStudioRecentColorsSnapshot,
+  rememberSharedStudioRecentColor,
+  subscribeStudioRecentColors,
+} from "./studio-recent-colors-bridge";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 
 import type { DrawEl, El } from "./studio-element-model";
 
 const DEFAULT_STROKE_COLOR = "#16100c";
 const TRANSPARENT_STROKE_VALUES = new Set(["", "none", "transparent"]);
-
-function readLocalRecentColors(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return readRecentColors(window.localStorage);
-  } catch {
-    return [];
-  }
-}
 
 function isTransparentStroke(value: string): boolean {
   return TRANSPARENT_STROKE_VALUES.has(value.trim().toLowerCase());
@@ -40,7 +35,7 @@ function clampOpacity(value: number): number {
 export interface StudioInspectorSelectionStrokeControlsProps {
   readonly selected: DrawEl;
   readonly patchEl: (id: string, patch: Partial<El>) => void;
-  /** Shared Studio history when the parent surface owns it; local storage is the safe fallback. */
+  /** Explicit values remain useful for isolated surfaces and tests; the page owner is the default. */
   readonly recentColors?: readonly string[];
   readonly onEnsureRecentColorsLoaded?: () => void;
   readonly onRememberColor?: (color: string) => void;
@@ -53,6 +48,12 @@ export function StudioInspectorSelectionStrokeControls({
   onEnsureRecentColorsLoaded,
   onRememberColor,
 }: StudioInspectorSelectionStrokeControlsProps) {
+  const sharedRecentColors = useSyncExternalStore(
+    subscribeStudioRecentColors,
+    getStudioRecentColorsSnapshot,
+    getStudioRecentColorsServerSnapshot,
+  );
+  const availableRecentColors = recentColors ?? sharedRecentColors;
   const normalizedSelectedStroke = normalizeHexColor(selected.stroke);
   const freehandStrokeOnly = (selected.kind ?? "freehand") === "freehand";
   const selectedOpacity = Number.isFinite(selected.opacity) ? (selected.opacity ?? 1) : 1;
@@ -62,7 +63,11 @@ export function StudioInspectorSelectionStrokeControls({
   const lastVisibleOpacityRef = useRef(
     selectedOpacity > 0 ? clampOpacity(selectedOpacity) : 1,
   );
-  const [localRecentColors, setLocalRecentColors] = useState<string[]>(readLocalRecentColors);
+
+  useEffect(() => {
+    if (onEnsureRecentColorsLoaded) onEnsureRecentColorsLoaded();
+    else ensureSharedStudioRecentColorsLoaded();
+  }, [onEnsureRecentColorsLoaded]);
 
   useEffect(() => {
     if (normalizedSelectedStroke) lastVisibleStrokeRef.current = normalizedSelectedStroke;
@@ -74,7 +79,7 @@ export function StudioInspectorSelectionStrokeControls({
 
   const activeColor = normalizedSelectedStroke ?? lastVisibleStrokeRef.current;
   const displayedRecentColors = normalizeRecentColors(
-    recentColors ?? localRecentColors,
+    availableRecentColors,
     5,
   );
   const width = Math.max(1, Math.min(48, selected.strokeWidth ?? 3));
@@ -86,20 +91,8 @@ export function StudioInspectorSelectionStrokeControls({
     const color = normalizeHexColor(rawColor);
     if (!color) return null;
     lastVisibleStrokeRef.current = color;
-    onRememberColor?.(color);
-    if (recentColors === undefined) {
-      setLocalRecentColors((current) => {
-        const next = pushRecentColor([...current], color);
-        if (typeof window !== "undefined") {
-          try {
-            storeRecentColors(window.localStorage, next);
-          } catch {
-            // Recent colours are an enhancement; selection editing must stay available.
-          }
-        }
-        return next;
-      });
-    }
+    if (onRememberColor) onRememberColor(color);
+    else rememberSharedStudioRecentColor(color);
     return color;
   };
 
@@ -232,8 +225,10 @@ export function StudioInspectorSelectionStrokeControls({
           <LazyStudioColorPopover
             value={activeColor}
             onChange={applyColor}
-            recentColors={recentColors ?? localRecentColors}
-            onLoadRecentColors={onEnsureRecentColorsLoaded}
+            recentColors={availableRecentColors}
+            onLoadRecentColors={
+              onEnsureRecentColorsLoaded ?? ensureSharedStudioRecentColorsLoaded
+            }
             label="선 색상"
             purpose="generic"
             className="absolute inset-0 z-10 block h-full w-full [&>*]:block [&>*]:h-full [&>*]:w-full [&_button]:h-full [&_button]:w-full [&_button]:rounded-xl [&_button]:opacity-0"
