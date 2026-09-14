@@ -1,6 +1,7 @@
 // 창작 작품(웹툰/컷툰) 공개 계약 — 타입과 순수 파서. feedback.ts 패턴을 따른다.
 import { clampText } from "./shared";
 
+import type { CreatorCommunityMetadata } from "../../../../web/src/shared/lib/creator-community-publication-contract";
 import type { CreatorSeriesStatus } from "./community-contract";
 import type { CreatorWorkRevisionComparisonSnapshot, CreatorWorkRevisionSnapshot } from "../creator-work-revisions";
 
@@ -28,6 +29,9 @@ export interface CreatorWorkSummary {
   comments: number;
   views: number;
   liked: boolean;
+  community?: CreatorCommunityMetadata;
+  bookmarks?: number;
+  bookmarked?: boolean;
   // 연재 시리즈/챌린지 연결(스키마 미준비 환경에선 항상 null — 하위호환)
   seriesId: string | null;
   episodeNo: number | null;
