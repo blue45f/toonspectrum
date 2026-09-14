@@ -84,7 +84,8 @@ export function planBrushStudioV6ProviderRuntime(
     const providerId = providerIdForNode(node);
     const manifest = providerId ? brushStudioV6ProviderManifestById(providerId) : null;
     if (
-      !manifest
+      !providerId
+      || !manifest
       || manifest.integration !== "connected"
       || !brushStudioV6LicenseProfileAllows(licenseProfile, manifest.rights)
     ) {

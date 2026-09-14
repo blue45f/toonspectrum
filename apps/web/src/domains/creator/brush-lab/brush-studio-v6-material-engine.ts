@@ -2,7 +2,10 @@ import { BrushStudioV6MaterialPaletteCache } from "./brush-studio-v6-material-pa
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import { createBrushStudioV6TopologyStroke } from "./brush-studio-v6-topology-engine";
 import { brushStudioV6TopologyActiveTuning, brushStudioV6TopologyStep, paintBrushStudioV6TopologyPrimitive } from "./brush-studio-v6-topology-material";
-import { normalizeStudioBrushMaterialProgramContract } from "../../../shared/lib/studio-brush-material-program-contract";
+import {
+  normalizeStudioBrushMaterialProgramContract,
+  type StudioBrushMaterialRuntimeContract,
+} from "../../../shared/lib/studio-brush-material-program-contract";
 import {
   brushStudioV6PigmentProviderForNode,
   createBrushStudioV6PigmentPalette,
@@ -11,8 +14,21 @@ import {
 import type { BrushStudioV6InputPolicy, BrushStudioV6Program, BrushStudioV6Tuning } from "./brush-studio-v6-engine";
 
 /** Portable contact solver. It neither loads graph providers nor reads the canvas. */
-export type BrushStudioV6MaterialProgram = Pick<BrushStudioV6Program, "seed" | "slots" | "tuning" | "input">;
-export type BrushStudioV6MaterialConfig = BrushStudioV6MaterialProgram & { readonly version: 1 };
+type BrushStudioV6MaterialProgramCore = Pick<
+  BrushStudioV6Program,
+  "seed" | "slots" | "tuning" | "input"
+>;
+
+export type BrushStudioV6MaterialProgram = BrushStudioV6MaterialProgramCore & {
+  /** Omitted means a newly authored in-memory program; persisted receipts always specify a version. */
+  readonly version?: 1 | 2;
+  readonly runtime?: StudioBrushMaterialRuntimeContract;
+};
+
+export type BrushStudioV6MaterialConfig = BrushStudioV6MaterialProgramCore & (
+  | { readonly version: 1; readonly runtime?: never }
+  | { readonly version: 2; readonly runtime: StudioBrushMaterialRuntimeContract }
+);
 export const BRUSH_STUDIO_V6_MATERIAL_ENGINE = Object.freeze({
   id: "cpu-contact-v2",
   backend: "cpu",
@@ -32,6 +48,13 @@ export function normalizeBrushStudioV6MaterialConfig(raw: unknown): BrushStudioV
   return normalizeStudioBrushMaterialProgramContract(raw) as unknown as BrushStudioV6MaterialConfig | null;
 }
 
+function usesEnhancedMaterialAdapters(program: BrushStudioV6MaterialProgram): boolean {
+  // V1 receipts predate the dual-tip and stroke-local smudge adapters. Replaying those receipts
+  // through the newer adapters would alter already-saved artwork. Omitted versions are live/new
+  // authoring programs; persisted V2 receipts explicitly opt into the enhanced provider behavior.
+  return program.version !== 1;
+}
+
 function contactMode(program: BrushStudioV6MaterialProgram): "bristle" | "particle" | "grain" | "relief" | "wet" | "ink" {
   const physics = program.slots.physics;
   if (physics.includes("physics-bristle")) return "bristle";
@@ -48,8 +71,9 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
   if (topologyKeys) return topologyKeys;
   const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor"]);
   const mode = contactMode(program);
+  const enhancedAdapters = usesEnhancedMaterialAdapters(program);
   const pickupEnabled = program.slots.pickup === "pickup-pigment-reservoir"
-    || program.slots.pickup === "pickup-krita-smudge";
+    || (enhancedAdapters && program.slots.pickup === "pickup-krita-smudge");
   const bristlePickup = mode === "bristle" && pickupEnabled;
   const pattern = program.slots.pattern !== "pattern-none";
   const gridUsesOnlyPrimary = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(program.slots.pattern);
@@ -220,12 +244,13 @@ export function createBrushStudioV6MaterialStroke(
   options: { readonly maxMarksPerPush?: number } = {},
 ): BrushStudioV6MaterialStroke {
   const t = program.tuning;
-  // The compatibility smudge adapter is explicit and persisted; it never impersonates canvas pickup.
+  const enhancedAdapters = usesEnhancedMaterialAdapters(program);
+  // The V2 compatibility smudge adapter is explicit and persisted; it never impersonates canvas pickup.
   const pickup = program.slots.pickup === "pickup-pigment-reservoir"
-    || program.slots.pickup === "pickup-krita-smudge"
+    || (enhancedAdapters && program.slots.pickup === "pickup-krita-smudge")
     ? unit(t.pickup)
     : 0;
-  const smudgeAdapter = program.slots.pickup === "pickup-krita-smudge";
+  const smudgeAdapter = enhancedAdapters && program.slots.pickup === "pickup-krita-smudge";
   const size = bounded(t.size, 1, 240);
   const mode = contactMode(program);
   const spacing = mode === "relief" && t.spacing <= 0.3 ? Math.min(t.spacing, 0.035) : t.spacing;
@@ -238,7 +263,7 @@ export function createBrushStudioV6MaterialStroke(
   const knife = mode === "relief";
   const particles = mode === "particle";
   const chisel = program.slots.tip === "tip-chisel-sdf";
-  const dualTip = program.slots.tip === "tip-krita-dual";
+  const dualTip = enhancedAdapters && program.slots.tip === "tip-krita-dual";
   const patternId = program.slots.pattern;
   const laneCount = Math.round(bounded(t.bristleStrands, 8, 128));
   const maxPatternMarks = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(patternId) ? 169 : patternId === "pattern-weave" ? 338 : patternId === "pattern-stitch" ? 1 : 6;

@@ -300,7 +300,10 @@ describe("portable V6 material contacts", () => {
     };
     const dualMarks = render(dual);
     const singleMarks = render(single);
+    const legacyStroke = createBrushStudioV6MaterialStroke({ ...dual, version: 1 });
+    const legacyMarks = line(24).flatMap((point) => legacyStroke.push(point));
     expect(dualMarks.length).toBeGreaterThan(singleMarks.length);
+    expect(dualMarks.length).toBeGreaterThan(legacyMarks.length);
     expect(render(dual)).toEqual(dualMarks);
     const noSmudge = render({
       ...dual,
