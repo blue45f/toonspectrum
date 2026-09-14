@@ -191,7 +191,8 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
     expectInOrder(remove, [
       "const thumbnailLeaseReleased = invalidateModelThumbnailCaptures()",
       "if (thumbnailLeaseReleased) await thumbnailLeaseReleased",
-      "if (!isModalAssetSessionCurrent(session) || captureInFlightRef.current) return",
+      "if (!isModalAssetSessionCurrent(session)) return",
+      "if (captureInFlightRef.current || sceneRestoreAbortRef.current !== null)",
       "preflightAndDeleteStudioBg3dPersistedModel({",
     ]);
     expect(source).toContain("modelThumbnailCaptureControllerRef.current?.invalidate()");
