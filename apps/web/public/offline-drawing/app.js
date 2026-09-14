@@ -225,6 +225,9 @@ async function activeWorkerSupportsRescue() {
 }
 async function initialize() {
   renderLayers(); render(true); message('바로 그릴 수 있어요. 저장소 상태를 확인하고 있습니다.');
+  // Drawing handlers and the first retained frame are live before storage/service-worker checks.
+  // Keep this readiness signal shared with the portable and outage regression harnesses.
+  document.documentElement.dataset.localDrawingReady = 'true';
   try {
     database = await openDrawingDatabase(); const all = await listDocuments(database);
     const portable = $('portable-document');

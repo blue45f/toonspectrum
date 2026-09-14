@@ -83,7 +83,7 @@ jobs:
         run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Compare all 32 materials in the real Canvas2D renderer at DPR 1, 2 and 3
+      - name: Compare all shipped materials in the real Canvas2D renderer at DPR 1, 2 and 3
         env:
           TOONSPECTRUM_MATERIAL_VERIFY_DIR: ${{ runner.temp }}/studio-material-morphology
         run: node scripts/verify-studio-material-morphology.mjs
