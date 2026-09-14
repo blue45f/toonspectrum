@@ -5,8 +5,7 @@
  * loaded by one explicit dynamic import. Keep every Babylon import inside that static closure.
  */
 
-import { Camera } from "@babylonjs/core/Cameras/camera";
-import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import type { Camera } from "@babylonjs/core/Cameras/camera";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
@@ -69,7 +68,7 @@ import {
   StudioBg3dBabylonTexturePreflightError,
   type StudioBg3dBabylonTexturePlan,
 } from "./studio-bg3d-babylon-texture-preflight";
-import { resolveStudioBg3dCameraNearClip, resolveStudioBg3dCameraUpVector } from "./studio-bg3d-camera-orientation";
+import { createStudioBg3dBabylonCaptureCamera } from "./studio-bg3d-babylon-camera-projection";
 import { parseStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 
 import type { StudioBg3dStableIdDescriptor } from "./studio-bg3d-babylon-stable-id-packing";
@@ -114,7 +113,6 @@ const GLTF_NODE_POINTER_PATTERN = /^\/nodes\/(0|[1-9]\d*)$/;
 const GLTF_PRIMITIVE_POINTER_PATTERN =
   /^\/meshes\/(0|[1-9]\d*)\/primitives\/(0|[1-9]\d*)$/;
 const GLTF_MATERIAL_POINTER_PATTERN = /^\/materials\/(0|[1-9]\d*)$/;
-const CAMERA_FAR_CLIP = 200;
 const MODEL_AUTO_FIT_SIZE = 2;
 const FLOAT_TOLERANCE = 1e-5;
 const STABLE_ID_LEGEND_LABEL_MAX_LENGTH = 160;
@@ -728,10 +726,8 @@ function hasUnsupportedRigState(node: StudioBg3dModelNode): boolean {
 }
 
 function assertSupportedDocument(document: StudioBg3dSceneDocument): void {
-  const lensShift = document.camera.lensShift;
   if (
     document.camera.projection === "orthographic" ||
-    (lensShift && (lensShift[0] !== 0 || lensShift[1] !== 0)) ||
     (document.background.mode === "sky-preset" && document.background.skyPresetId !== "blank") ||
     document.nodes.some((node) => node.kind === "model" && hasUnsupportedRigState(node))
   ) {
@@ -2146,11 +2142,11 @@ function rgbaRowsTopDown(
   return output;
 }
 
-function depthRowsTopDown(
+/** Depth RTTs are bottom-up on both WebGL2 and WebGPU, unlike the WebGPU swapchain. */
+export function readStudioBg3dBabylonDepthTopDown(
   source: ArrayBufferView,
   width: number,
   height: number,
-  flipY: boolean,
 ): Float32Array {
   const pixels = width * height;
   if (
@@ -2162,7 +2158,7 @@ function depthRowsTopDown(
   const channels = source.length === pixels ? 1 : 4;
   const output = new Float32Array(pixels);
   for (let y = 0; y < height; y += 1) {
-    const sourceY = flipY ? height - 1 - y : y;
+    const sourceY = height - 1 - y;
     for (let x = 0; x < width; x += 1) {
       const sample = source[(sourceY * width + x) * channels];
       if (
@@ -2549,37 +2545,6 @@ async function populateScene(
   });
 }
 
-function setupCamera(
-  document: StudioBg3dSceneDocument,
-  width: number,
-  height: number,
-  scene: Scene,
-): FreeCamera {
-  const cameraSettings = document.camera;
-  const camera = new FreeCamera(
-    "studio-capture-camera",
-    new Vector3(...cameraSettings.position),
-    scene,
-  );
-  camera.minZ = resolveStudioBg3dCameraNearClip(cameraSettings.nearClip);
-  camera.maxZ = CAMERA_FAR_CLIP;
-  const zoom = cameraSettings.zoom ?? 1;
-  camera.fov = 2 * Math.atan(Math.tan((cameraSettings.fovDegrees * Math.PI) / 360) / zoom);
-  camera.fovMode = Camera.FOVMODE_VERTICAL_FIXED;
-  const up = resolveStudioBg3dCameraUpVector(cameraSettings);
-  camera.upVector.copyFromFloats(...up);
-  camera.setTarget(new Vector3(...cameraSettings.target));
-  camera.viewport.width = 1;
-  camera.viewport.height = 1;
-  camera.viewport.x = 0;
-  camera.viewport.y = 0;
-  // Force projection creation at the requested aspect before shader compilation/readback.
-  void width;
-  void height;
-  scene.activeCamera = camera;
-  return camera;
-}
-
 function setupScenePresentation(
   document: StudioBg3dSceneDocument,
   scene: Scene,
@@ -2788,7 +2753,7 @@ async function renderStudioBg3dBabylonCapture(
     throw captureError("renderer-unavailable");
   }
   setupScenePresentation(plan.document, scene);
-  const camera = setupCamera(plan.document, plan.width, plan.height, scene);
+  const camera = createStudioBg3dBabylonCaptureCamera(plan.document.camera, plan.width, plan.height, scene);
   const populated = await populateScene(context, plan, scene);
   setupLightingAndShadows(
     plan.document,
@@ -2858,7 +2823,7 @@ async function renderStudioBg3dBabylonCapture(
         : {}),
       ...(activeDepthRenderer
         ? {
-          depth: async () => depthRowsTopDown(
+          depth: async () => readStudioBg3dBabylonDepthTopDown(
             await (
               activeDepthRenderer.getDepthMap().readPixels(
                 0,
@@ -2874,7 +2839,6 @@ async function renderStudioBg3dBabylonCapture(
             ),
             plan.width,
             plan.height,
-            flipY,
           ),
         }
         : {}),

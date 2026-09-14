@@ -1,7 +1,8 @@
 /** Pure PSD assembly: no scene, renderer, DOM canvas, or capture code is imported. */
 import { writePsd, type BlendMode, type Layer, type Psd } from "ag-psd";
 
-import { isEmptyPass, maskMultiply } from "./character-shaper-image-math";
+import { isEmptyPass } from "./character-shaper-image-math";
+import { partitionCharacterPsdCoverage } from "./character-shaper-psd-coverage";
 import { validateCharacterPsdPasses, CHARACTER_PSD_MAX_OUTPUT_BYTES } from "./character-shaper-psd-worker-protocol";
 
 import type { CharacterPsdExportReceipt, CharacterSemanticPass, CharacterSemanticPassId } from "./character-shaper-contract";
@@ -47,6 +48,7 @@ export const CHARACTER_SEMANTIC_MASK_LABELS: Readonly<Record<CharacterSemanticMa
 
 /** Group names, and the single layer each non-mask group starts with. */
 export const CHARACTER_PSD_GROUP_NAMES = Object.freeze({
+  character: "캐릭터",
   flats: "밑색",
   shadow: "음영",
   highlight: "하이라이트",
@@ -132,7 +134,10 @@ function firstVisibleRaster(layers: readonly Layer[]): Layer["imageData"] {
 
 /**
  * Assemble the passes into one PSD in the order a colourist expects to find them:
- * 주선 → 표면 드로잉 → 하이라이트 → 음영 → 밑색 → 미리보기, top to bottom.
+ * Hidden extraction references → isolated character (highlight → shadow → flats) → hidden Beauty.
+ * Colour layers are opaque within their owned regions; a parent raster mask applies Beauty alpha
+ * once. Normal isolated groups and byte/sRGB Multiply/Screen follow W3C Compositing Level 1.
+ * https://www.w3.org/TR/compositing-1/ — sections 6, 8 and 10.
  *
  * `ag-psd` writes `children[0]` as the topmost layer, so this array is already in panel order — no
  * reversal. Passes that never arrived, and masks that came back empty, are added to the receipt's
@@ -164,7 +169,7 @@ export function buildCharacterSemanticPsd(
   const flat = byId.get("flat") ?? null;
   const base = flat ?? beauty;
 
-  const flatChildren: Layer[] = [];
+  const semanticMasks: { id: CharacterSemanticMaskId; rgba: Uint8ClampedArray }[] = [];
   for (const mask of CHARACTER_SEMANTIC_MASK_ORDER) {
     const pass = byId.get(mask);
     if (!pass) continue;
@@ -172,47 +177,59 @@ export function buildCharacterSemanticPsd(
       note(mask, `${CHARACTER_SEMANTIC_MASK_LABELS[mask]} 마스크가 비어 있어 레이어를 만들지 않았습니다.`);
       continue;
     }
-    const data = base ? maskMultiply(base.rgba, pass.rgba) : pass.rgba;
-    flatChildren.push(rasterLayer(CHARACTER_SEMANTIC_MASK_LABELS[mask], width, height, data));
+    semanticMasks.push({ id: mask, rgba: pass.rgba });
+  }
+
+  const coverage = base
+    ? partitionCharacterPsdCoverage(base.rgba, (beauty ?? base).rgba, semanticMasks.map((mask) => mask.rgba)) : null;
+  const flatChildren = semanticMasks.map((mask, index) => rasterLayer(
+    CHARACTER_SEMANTIC_MASK_LABELS[mask.id], width, height, coverage ? coverage.parts[index] : mask.rgba,
+  ));
+  if (coverage?.remainder) {
+    flatChildren.push(rasterLayer(semanticMasks.length > 0 ? "미분류 영역" : CHARACTER_PSD_CHILD_NAMES.flatsWhole,
+      width, height, coverage.remainder));
+    note("flat", semanticMasks.length > 0
+      ? "부위 마스크 밖의 색을 미분류 영역에 보존했습니다."
+      : "부위별 마스크를 분리하지 못해 밑색을 한 장으로 저장했습니다.");
   }
 
   const children: Layer[] = [];
+  const colourGroups: Layer[] = [];
+  const extractedGroup = (name: string, child: Layer): Layer => ({
+    ...group(base ? `${name} (추출 참고 · 기본 숨김)` : name, "normal", [child]), hidden: Boolean(base),
+  });
   const line = byId.get("line");
   if (line) {
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.line, "normal", [
-      rasterLayer(CHARACTER_PSD_CHILD_NAMES.line, width, height, line.rgba),
-    ]));
+    children.push(extractedGroup(CHARACTER_PSD_GROUP_NAMES.line,
+      rasterLayer(CHARACTER_PSD_CHILD_NAMES.line, width, height, line.rgba)));
   }
   const paint = byId.get("surface-paint");
   if (paint) {
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.paint, "normal", [
-      rasterLayer(CHARACTER_PSD_CHILD_NAMES.paint, width, height, paint.rgba),
-    ]));
+    children.push(extractedGroup(CHARACTER_PSD_GROUP_NAMES.paint,
+      rasterLayer(CHARACTER_PSD_CHILD_NAMES.paint, width, height, paint.rgba)));
   }
   const highlight = byId.get("highlight");
   if (highlight) {
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.highlight, "screen", [
-      rasterLayer(CHARACTER_PSD_CHILD_NAMES.highlight, width, height, highlight.rgba, {
-        blendMode: "screen",
-      }),
+    colourGroups.push(group(CHARACTER_PSD_GROUP_NAMES.highlight, "screen", [
+      rasterLayer(CHARACTER_PSD_CHILD_NAMES.highlight, width, height, highlight.rgba),
     ]));
   }
   const shadow = byId.get("shadow");
   if (shadow) {
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.shadow, "multiply", [
-      rasterLayer(CHARACTER_PSD_CHILD_NAMES.shadow, width, height, shadow.rgba, {
-        blendMode: "multiply",
-      }),
+    colourGroups.push(group(CHARACTER_PSD_GROUP_NAMES.shadow, "multiply", [
+      rasterLayer(CHARACTER_PSD_CHILD_NAMES.shadow, width, height, shadow.rgba),
     ]));
   }
   if (flatChildren.length > 0) {
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.flats, "normal", flatChildren));
-  } else if (base) {
-    // No mask separated cleanly — ship the un-split flat instead of an empty group, and say so.
-    note("flat", "부위별 마스크를 분리하지 못해 밑색을 한 장으로 저장했습니다.");
-    children.push(group(CHARACTER_PSD_GROUP_NAMES.flats, "normal", [
-      rasterLayer(CHARACTER_PSD_CHILD_NAMES.flatsWhole, width, height, base.rgba),
-    ]));
+    colourGroups.push(group(CHARACTER_PSD_GROUP_NAMES.flats, "normal", flatChildren));
+  }
+  if (coverage) {
+    children.push({ ...group(CHARACTER_PSD_GROUP_NAMES.character, "normal", colourGroups),
+      mask: { top: 0, left: 0, bottom: height, right: width, defaultColor: 0,
+        imageData: { width, height, data: coverage.silhouette } },
+    });
+  } else {
+    children.push(...colourGroups);
   }
   if (beauty) {
     children.push(rasterLayer(CHARACTER_PSD_PREVIEW_LAYER_NAME, width, height, beauty.rgba, {
@@ -226,8 +243,8 @@ export function buildCharacterSemanticPsd(
     height,
     children,
     // ag-psd does not composite layers and otherwise writes an opaque black merged image.
-    // Store the actual captured appearance as the file preview; the editable semantic layers
-    // retain their own masks/blend modes. This is not a claim of exact layer-stack equivalence.
+    // Store the captured appearance as the preview. Independent layer-composition tests verify
+    // the default colour stack in byte/sRGB space; Photoshop/CSP colour preferences are separate.
     imageData: beauty ? { width, height, data: beauty.rgba }
       : flat ? { width, height, data: flat.rgba } : firstVisibleRaster(children),
     imageResources: { xmpMetadata: titleXmp(options.title) },

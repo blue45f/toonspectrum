@@ -178,12 +178,24 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts \
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts \
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-camera-projection.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-readback.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-normal-capture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-body-profile.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-contact-projection.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-surface-contact.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-waist-clearance.test.ts \
+            apps/web/src/domains/creator/vrm/StudioVrmXpbdSkirtAttachment.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts \
             apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx \
             apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts \
             apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts \
             apps/web/src/app/studio-cross-origin-isolation.test.ts \
-            scripts/verify-studio-3d-console.test.ts
+            scripts/verify-studio-3d-console.test.ts \
+            scripts/lib/character-psd-reference-compositor.test.mjs
       - name: Production menu entry point regressions
         run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 

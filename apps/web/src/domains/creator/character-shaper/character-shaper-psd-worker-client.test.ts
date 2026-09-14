@@ -150,9 +150,13 @@ describe("character PSD worker contract", () => {
     const { blob, receipt } = await pending;
     const psd = readPsd(await blob.arrayBuffer(), { useImageData: true, skipCompositeImageData: true });
     expect([psd.width, psd.height]).toEqual([4, 1]);
-    expect(psd.children?.find((layer) => layer.name === "음영")?.blendMode).toBe("multiply");
-    const pixels = psd.children?.find((layer) => layer.name === "밑색")?.children?.[0]?.imageData?.data;
+    const character = psd.children?.find((layer) => layer.name === "캐릭터");
+    expect(character?.children?.find((layer) => layer.name === "음영")?.blendMode).toBe("multiply");
+    const pixels = character?.children?.find((layer) => layer.name === "밑색")?.children?.[0]?.imageData?.data;
     expect(Array.from(pixels ?? [])).toEqual([80, 120, 160, 128, 200, 80, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(Array.from(character?.mask?.imageData?.data ?? [])).toEqual([
+      255, 255, 255, 255, 128, 128, 128, 255, 0, 0, 0, 255, 0, 0, 0, 255,
+    ]);
     expect(receipt.layerNames).toContain("피부");
     expect(psd.imageResources?.xmpMetadata).toContain("캐릭터 &amp; test");
     clean(worker);

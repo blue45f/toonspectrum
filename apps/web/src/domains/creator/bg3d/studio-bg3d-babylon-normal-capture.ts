@@ -386,7 +386,8 @@ export async function captureStudioBg3dBabylonNormals(
         width: input.width,
         height: input.height,
         unsigned: readback.unsigned,
-        flipY: input.backend === "webgl2",
+        // G-buffer RTT rows are bottom-up on both engines, matching depth and stable IDs.
+        flipY: true,
         swapRedBlue: false,
         depth: input.depth,
       });
