@@ -68,3 +68,14 @@
 @media (min-width: 1100px) { .promo-output { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; } }
 @media (max-width: 540px) { .promo-template-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .promo-studio *, .promo-studio *::before, .promo-studio *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.promo-camera-editor { margin: 12px 0; padding: 12px; background: #f6f3fd; border: 1px solid #dcd3ed; border-radius: 12px; }
+.promo-camera-poses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.promo-camera-poses fieldset { min-width: 0; border: 1px solid var(--promo-border); border-radius: 9px; padding: 10px; margin: 0; }
+.promo-camera-poses legend { color: #4c36ae; }
+.promo-preflight ul { padding: 0; margin: 0; display: grid; gap: 10px; list-style: none; }
+.promo-preflight li { display: grid; gap: 8px; padding: 12px; border: 1px solid #eadcb3; background: #fffbef; border-radius: 10px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.promo-preflight li[data-severity=error] { border-color: #efb7b7; background: #fff1f1; }
+.promo-preflight li button { justify-self: start; }
+.promo-scene-strip button[aria-pressed=true] { border-color: #baa6ff; background: #ebe4ff; color: #402477; }
+@media (max-width: 540px) { .promo-camera-poses { grid-template-columns: 1fr; } }

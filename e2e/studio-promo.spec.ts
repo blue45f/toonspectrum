@@ -125,6 +125,8 @@ test("director templates, layered parallax, narration, assets and local draft su
   await page.locator('input[id^="focus-x-"]').first().fill("0.8");
   await page.locator('input[id^="foreground-"]').first().setInputFiles({ name: "actor.png", mimeType: "image/png", buffer: Buffer.from(artwork.foreground, "base64") });
   await expect(page.getByRole("button", { name: "전경 제거" })).toBeVisible();
+  await page.locator('select[id^="camera-mode-"]').first().selectOption("custom");
+  await page.locator('input[id^="camera-to-zoom-"]').first().fill("1.5");
   await page.getByRole("button", { name: "컷 1 복제", exact: true }).click();
   await expect(page.locator(".promo-shot")).toHaveCount(4);
   await page.getByRole("button", { name: "실행 취소", exact: true }).click();

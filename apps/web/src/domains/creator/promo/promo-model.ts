@@ -6,6 +6,9 @@ export const PROMO_STYLES = ["cinematic", "romance", "action", "mystery"] as con
 export type PromoMotion = (typeof PROMO_MOTIONS)[number];
 export type PromoStyle = (typeof PROMO_STYLES)[number];
 export type PromoRatio = "9:16" | "16:9" | "1:1";
+export const PROMO_CAMERA_EASINGS = { linear: "일정한 속도", smooth: "부드러운 시작과 끝", accelerate: "점점 빠르게", decelerate: "점점 느리게" } as const;
+export interface PromoCameraPose { x: number; y: number; zoom: number }
+export interface PromoCamera { from: PromoCameraPose; to: PromoCameraPose; easing: keyof typeof PROMO_CAMERA_EASINGS }
 export interface PromoPanel {
   id: string;
   src: string;
@@ -21,6 +24,8 @@ export interface PromoPanel {
   intensity?: number;
   /** User-supplied transparent artwork, never an inferred depth map. */
   foregroundSrc?: string;
+  /** Explicit normalized framing takes precedence over motion presets. */
+  camera?: PromoCamera;
 }
 export interface PromoProject {
   version: 1;
@@ -99,6 +104,23 @@ export function promoMotionAt(motion: PromoMotion, progress: number): { scale: n
     case "impact": return { scale: 1.15 - Math.exp(-t * 8) * 0.15, x: Math.sin(t * 28) * Math.exp(-t * 6) * 0.012, y: 0 };
     case "float": return { scale: 1.08, x: Math.sin(t * Math.PI * 2) * 0.015, y: Math.sin(t * Math.PI * 2) * 0.02 };
   }
+}
+/** Absolute interpolation keeps scrubbing and offline rendering identical. */
+export function promoCameraAt(camera: PromoCamera, progress: number, reducedMotion = false): PromoCameraPose {
+  const t = reducedMotion || !Number.isFinite(progress) ? 0 : Math.max(0, Math.min(1, progress));
+  const eased = camera.easing === "smooth" ? t * t * (3 - 2 * t)
+    : camera.easing === "accelerate" ? t * t : camera.easing === "decelerate" ? 1 - (1 - t) ** 2 : t;
+  return { x: camera.from.x + (camera.to.x - camera.from.x) * eased,
+    y: camera.from.y + (camera.to.y - camera.from.y) * eased,
+    zoom: camera.from.zoom + (camera.to.zoom - camera.from.zoom) * eased };
+}
+function parsePromoCamera(value: unknown): PromoCamera {
+  const camera = record(value);
+  const pose = (input: unknown): PromoCameraPose => {
+    const point = record(input);
+    return { x: numberIn(point.x, 0, 1), y: numberIn(point.y, 0, 1), zoom: numberIn(point.zoom, 1, 3) };
+  };
+  return { from: pose(camera.from), to: pose(camera.to), easing: member(camera.easing, ["linear", "smooth", "accelerate", "decelerate"]) };
 }
 export function promoAudioGain(frame: number, total: number, volume: number): number {
   if (![frame, total, volume].every(Number.isFinite) || total <= 0) return 0;
@@ -205,6 +227,7 @@ export const PROMO_DEFAULT_PRESENTATION: NonNullable<PromoProject["presentation"
 };
 function parsePromoDirection(panel: Record<string, unknown>): Partial<PromoPanel> {
   return {
+    ...(panel.camera === undefined ? {} : { camera: parsePromoCamera(panel.camera) }),
     ...(panel.transition === undefined ? {} : { transition: member(panel.transition, ["fade", "dissolve", "wipe", "cut"] as const) }),
     ...(panel.effect === undefined ? {} : { effect: member(panel.effect, ["none", "rain", "snow", "embers", "speedlines"] as const) }),
     ...(panel.focusX === undefined ? {} : { focusX: numberIn(panel.focusX, 0, 1) }),
@@ -273,7 +296,7 @@ export function promoVtt(project: PromoProject): string {
 }
 export function promoShotList(project: PromoProject): string {
   return JSON.stringify({ format: "toonstudio-shot-list", version: 1, fps: PROMO_FPS, seconds: project.seconds, title: project.title,
-    scenes: promoTimeline(project).map(({ panel, from, duration }) => ({ id: panel.id, startFrame: from, durationFrames: duration, caption: panel.caption, description: panel.description, motion: panel.motion, transition: panel.transition ?? "fade", effect: panel.effect ?? "none" })),
+    scenes: promoTimeline(project).map(({ panel, from, duration }) => ({ id: panel.id, startFrame: from, durationFrames: duration, caption: panel.caption, description: panel.description, motion: panel.motion, camera: panel.camera, fit: panel.fit, focusX: panel.focusX ?? 0.5, focusY: panel.focusY ?? 0.5, transition: panel.transition ?? "fade", effect: panel.effect ?? "none" })),
     ending: { startFrame: promoFrameCount(project) - 2 * PROMO_FPS, durationFrames: 2 * PROMO_FPS, caption: project.cta },
   }, null, 2);
 }

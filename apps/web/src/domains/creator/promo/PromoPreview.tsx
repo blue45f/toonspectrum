@@ -128,7 +128,12 @@ export function PromoPreview({ project, disabled, seekRequest }: { project: Prom
         <input id="promo-seek" type="range" min={0} max={total - 1} value={frame} disabled={disabled || playing} onChange={(event) => setFrame(Number(event.target.value))} />
         <output>{(frame / PROMO_FPS).toFixed(1)} / {project.seconds}초</output>
       </div>
-      <div className="promo-scene-strip" aria-label="장면 타임라인">{promoTimeline(project).map((scene, index) => <button type="button" key={scene.panel.id} disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(scene.from); }}>컷 {index + 1}<br />{(scene.from / PROMO_FPS).toFixed(1)}초</button>)}</div>
+      <div className="promo-button-row">
+        <button type="button" disabled={disabled || playing || preparingAudio || frame === 0} onClick={() => setFrame((value) => Math.max(0, value - 1))}>이전 프레임</button>
+        <button type="button" disabled={disabled || playing || preparingAudio || frame >= total - 1} onClick={() => setFrame((value) => Math.min(total - 1, value + 1))}>다음 프레임</button>
+        <button type="button" disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(total - PROMO_FPS); }}>마지막 카드 확인</button>
+      </div>
+      <div className="promo-scene-strip" aria-label="장면 타임라인">{promoTimeline(project).map((scene, index) => <button type="button" key={scene.panel.id} aria-pressed={frame >= scene.from && frame < scene.from + scene.duration} disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(scene.from); }}>컷 {index + 1}<br />{(scene.from / PROMO_FPS).toFixed(1)}초</button>)}</div>
       {preparingAudio ? <button type="button" onClick={() => { voiceOperation.current?.abort(); setPreparingAudio(false); }}>오디오 준비 취소</button> : null}
       {loading ? <p role="status">컷을 준비하고 있어요.</p> : null}
       {error ? <p role="alert">{error}</p> : null}
