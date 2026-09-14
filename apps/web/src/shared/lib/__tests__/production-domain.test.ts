@@ -74,18 +74,9 @@ describe("toonstudio.cloud production domain", () => {
   });
 
   it("keeps full API origins canonical while Render stays a least-privilege realtime host", () => {
-    const deployment = read("deploy/oci/.env.example");
     const production = read(".env.production.example");
     const render = read("render.yaml");
-    expect(deployment).toContain(
-      "API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud"
-    );
-    expect(deployment).toContain(
-      "OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud"
-    );
-    expect(deployment).toContain("WEB_APP_BASE_URL=https://www.toonstudio.cloud");
-    expect(deployment).toContain("CANONICAL_HOST=www.toonstudio.cloud");
-
+    const cloudflareGateway = read("deploy/cloudflare-static/wrangler.jsonc");
     expect(production).toContain(
       "API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud"
     );
@@ -108,5 +99,8 @@ describe("toonstudio.cloud production domain", () => {
     expect(render).not.toMatch(
       /key: (?:AUTH_STATE_SECRET|OAUTH_REDIRECT_BASE_URL|WEB_APP_BASE_URL|CANONICAL_HOST|GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_SECRET)/u
     );
+    expect(cloudflareGateway).toContain('"/api/*"');
+    expect(cloudflareGateway).toContain('"/socket.io/*"');
+    expect(cloudflareGateway).toContain('"not_found_handling": "single-page-application"');
   });
 });

@@ -7,11 +7,11 @@ const config = JSON.parse(
 );
 
 describe("Vercel Git deployment policy", () => {
-  it("creates Git deployments only for main, including slash-named branches", () => {
+  it("disables every Git-triggered deployment, including main", () => {
     expect(config.ignoreCommand).toBeUndefined();
     expect(config.git?.deploymentEnabled).toEqual({
       "**": false,
-      main: true,
     });
+    expect(Object.values(config.git?.deploymentEnabled ?? {})).not.toContain(true);
   });
 });

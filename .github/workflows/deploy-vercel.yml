@@ -1,6 +1,6 @@
-# Production pushes are normally deployed by Vercel Git Integration.
-# This manual fallback builds on the GitHub runner and uploads immutable prebuilt output so a
-# Vercel remote-build quota incident cannot block an emergency production recovery.
+# Retained only as an explicitly dispatched emergency fallback during the Cloudflare cutover.
+# Git-triggered Vercel deployments are disabled. This workflow builds on the GitHub runner and
+# uploads immutable prebuilt output only after a production-environment reviewer approves it.
 name: Vercel CLI fallback deploy
 
 on:
