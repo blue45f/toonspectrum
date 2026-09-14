@@ -8,6 +8,7 @@
  * The verifier's menu, rail, popover, workspace and export assertions remain unchanged.
  */
 import { chromium } from "playwright";
+import { fileURLToPath } from "node:url";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const STUDIO_ROOT_SELECTOR =
@@ -119,4 +120,8 @@ Object.defineProperty(chromium, "launch", {
   },
 });
 
-await import("./verify-studio-menus.mts");
+// The verifier is this bootstrap's delegated CLI entry. Preserve its direct-entry
+// guard as well as older auto-running modules, without bypassing browser setup.
+const verifierUrl = new URL("./verify-studio-menus.mts", import.meta.url);
+process.argv[1] = fileURLToPath(verifierUrl);
+await import(verifierUrl.href);

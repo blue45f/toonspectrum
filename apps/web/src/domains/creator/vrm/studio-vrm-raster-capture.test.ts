@@ -6,6 +6,7 @@ import { StudioBg3dShotPngWorkerError } from "../bg3d/studio-bg3d-shot-png-worke
 
 import {
   captureStudioVrmRgba,
+  captureStudioVrmRgbaCooperatively,
   encodeStudioVrmCapturePngBlob,
   encodeStudioVrmCapturePngDataUrl,
   encodeStudioVrmCapturePngOnMainThread,
@@ -384,6 +385,161 @@ describe("Studio VRM raster capture", () => {
       worldOutline.dispose();
       geometry.dispose();
     }
+  });
+
+  it("yields actual tasks between 2K tiles with restored viewport state and exact seam pixels", async () => {
+    const width = 2050;
+    const height = 1030;
+    const camera = new THREE.PerspectiveCamera(43, width / height);
+    camera.zoom = 1.4;
+    camera.setViewOffset(width, height, 83, -31, width, height);
+    const projection = camera.projectionMatrix.clone();
+    const inverse = camera.projectionMatrixInverse.clone();
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#fedcba");
+    const material = new MToonMaterial({ outlineWidthMode: "screenCoordinates", outlineWidthFactor: 0.002, isOutline: true });
+    const geometry = new THREE.BoxGeometry();
+    scene.add(new THREE.Mesh(geometry, material));
+    const renderer = new TiledFakeRenderer(scene, camera, width, height);
+    let eventTurns = 0;
+    const progress: number[] = [];
+    try {
+      const rgba = await captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+        scene, camera, { width, height }, {}, {
+          onProgress: ({ completedTiles, totalTiles }) => {
+            expect(totalTiles).toBe(6);
+            expect(eventTurns).toBe(completedTiles - 1);
+            expect(camera.projectionMatrix.equals(projection)).toBe(true);
+            expect(camera.projectionMatrixInverse.equals(inverse)).toBe(true);
+            expect(material.outlineWidthFactor).toBe(0.002);
+            expect(renderer.clearColor.getHexString()).toBe("234567");
+            expect(renderer.clearAlpha).toBe(0.75);
+            expect((scene.background as THREE.Color).getHexString()).toBe("fedcba");
+            progress.push(completedTiles);
+            if (completedTiles < totalTiles) setTimeout(() => { eventTurns += 1; }, 0);
+          },
+        });
+      expect(progress).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(renderer.windows.every(({ width: w, height: h }) => w <= 1024 && h <= 1024)).toBe(true);
+      for (const y of [0, 1023, 1024, height - 1]) {
+        for (const x of [0, 1023, 1024, 2047, 2048, width - 1]) {
+          const offset = (y * width + x) * 4;
+          expect([...rgba.subarray(offset, offset + 4)]).toEqual([
+            x % 251, y % 251, (Math.floor(x / 251) + Math.floor(y / 251)) % 256, 255,
+          ]);
+        }
+      }
+    } finally {
+      material.dispose();
+      geometry.dispose();
+    }
+  });
+
+  it.each(["abort", "revision", "context", "progress"])("stops after one tile and disposes targets on %s without pending GPU work", async (failure) => {
+    const camera = new THREE.PerspectiveCamera(43, 2);
+    const projection = camera.projectionMatrix.clone();
+    const scene = new THREE.Scene();
+    const renderer = new TiledFakeRenderer(scene, camera, 2048, 1024);
+    const controller = new AbortController();
+    let stale = false;
+    let lost = false;
+    Object.assign(renderer, { getContext: () => ({ isContextLost: () => lost }) });
+    const disposed: THREE.WebGLRenderTarget[] = [];
+    const job = captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+      scene, camera, { width: 2048, height: 1024 }, {}, {
+        signal: controller.signal,
+        assertCurrent: () => { if (stale) throw new Error("stale snapshot"); },
+        onProgress: () => {
+          for (const target of new Set(renderer.captureTargets)) {
+            target.addEventListener("dispose", () => { disposed.push(target); });
+          }
+          if (failure === "progress") throw new Error("progress callback failed");
+          setTimeout(() => {
+            if (failure === "abort") controller.abort();
+            if (failure === "revision") stale = true;
+            if (failure === "context") lost = true;
+          }, 0);
+        },
+      });
+    await expect(job).rejects.toThrow(failure === "abort" ? /취소/u
+      : failure === "revision" ? "stale snapshot"
+      : failure === "context" ? /화면 연결/u : "progress callback failed");
+    expect(renderer.windows).toHaveLength(1);
+    expect(new Set(disposed).size).toBe(2);
+    expect(disposed).toHaveLength(2);
+    expect(camera.projectionMatrix.equals(projection)).toBe(true);
+    expect(renderer.clearColor.getHexString()).toBe("234567");
+    expect(renderer.clearAlpha).toBe(0.75);
+  });
+
+  it("does not allocate or render a pre-cancelled capture", async () => {
+    const renderer = new FakeRenderer();
+    const controller = new AbortController();
+    controller.abort();
+    await expect(captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+      new THREE.Scene(), new THREE.PerspectiveCamera(), { width: 4096, height: 4096 }, {}, { signal: controller.signal }))
+      .rejects.toMatchObject({ name: "AbortError" });
+    expect(renderer.calls).toEqual([]);
+  });
+
+  it("honors cancellation during the initial yield before allocating render targets", async () => {
+    const renderer = new FakeRenderer();
+    const controller = new AbortController();
+    const capture = captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+      new THREE.Scene(), new THREE.PerspectiveCamera(), { width: 4096, height: 4096 }, {}, { signal: controller.signal });
+    controller.abort();
+    await expect(capture).rejects.toMatchObject({ name: "AbortError" });
+    expect(renderer.calls).toEqual([]);
+  });
+
+  it("preserves a viewport render target and clear state changed between capture tiles", async () => {
+    const camera = new THREE.PerspectiveCamera(43, 2);
+    const scene = new THREE.Scene();
+    const renderer = new TiledFakeRenderer(scene, camera, 2048, 1024);
+    const interactiveTarget = new THREE.WebGLRenderTarget(8, 8);
+    let bound: THREE.WebGLRenderTarget | null = null;
+    renderer.getRenderTarget = () => bound;
+    const setTarget = renderer.setRenderTarget.bind(renderer);
+    renderer.setRenderTarget = (target, cubeFace, mipLevel) => {
+      bound = target;
+      setTarget(target, cubeFace, mipLevel);
+    };
+    try {
+      await captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+        scene, camera, { width: 2048, height: 1024 }, {}, {
+          onProgress: ({ completedTiles }) => {
+            if (completedTiles === 1) {
+              setTimeout(() => {
+                renderer.setRenderTarget(interactiveTarget);
+                renderer.setClearColor("#abcdef", 0.25);
+              }, 0);
+            } else {
+              expect(bound).toBe(interactiveTarget);
+              expect(renderer.clearColor.getHexString()).toBe("abcdef");
+              expect(renderer.clearAlpha).toBe(0.25);
+            }
+          },
+        });
+      expect(bound).toBe(interactiveTarget);
+      expect(renderer.clearColor.getHexString()).toBe("abcdef");
+    } finally {
+      interactiveTarget.dispose();
+    }
+  });
+
+  it("restores state after a later cooperative readback failure and permits a new capture", async () => {
+    const camera = new THREE.PerspectiveCamera(43, 2);
+    const scene = new THREE.Scene();
+    const renderer = new TiledFakeRenderer(scene, camera, 2048, 1024);
+    renderer.failOnTile = 2;
+    await expect(captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+      scene, camera, { width: 2048, height: 1024 })).rejects.toThrow("tile readback failed");
+    renderer.failOnTile = Number.POSITIVE_INFINITY;
+    renderer.windows.length = 0;
+    await expect(captureStudioVrmRgbaCooperatively(renderer as unknown as THREE.WebGLRenderer,
+      scene, camera, { width: 2048, height: 1024 })).resolves.toHaveLength(2048 * 1024 * 4);
+    expect(renderer.windows).toHaveLength(2);
+    expect(renderer.clearColor.getHexString()).toBe("234567");
   });
 
   it("encodes exactly one color layer in the Worker without mutating caller pixels", async () => {

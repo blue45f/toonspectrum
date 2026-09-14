@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
+import { createBrushStudioV6Program } from "./brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "./brush-lab/brush-studio-v6-product-bridge";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { openStudioLocalDatabase } from "./studio-local-database";
 import {
@@ -171,6 +173,55 @@ describe("studio tool operation memory normalization", () => {
 });
 
 describe("studio tool operation memory SQLite controller", () => {
+  it("preserves a requested material brush when startup hydration completes before its React render", async () => {
+    const initialMemory = normalizeStudioToolOperationMemory(null);
+    const storedMemory = rememberStudioToolOperationSnapshot(
+      rememberStudioToolOperationSnapshot(initialMemory, "paint", paint(42)),
+      "erase",
+      kneadedEraser(37),
+    );
+    const delayedRead = deferred<string | null>();
+    const persistence = createStudioToolOperationMemoryController({
+      load: () => delayedRead.promise,
+      save: async () => undefined,
+    });
+    const selection = {
+      activeSnapshot: initialMemory.paint,
+      touched: false,
+    };
+    const mergedHydration = persistence.hydrate().then((hydratedMemory) => (
+      mergeHydratedStudioToolOperationMemory({
+        hydratedMemory,
+        initialMemory,
+        activeOperation: "paint",
+        activeSnapshot: selection.activeSnapshot,
+        operationTransitionTouched: selection.touched,
+      })
+    ));
+    const program = createBrushStudioV6Program("oil-hair-mixer");
+    const saved = createBrushStudioV6ProductBrush(program);
+    let renderedSnapshot = initialMemory.paint;
+    const queuedRender = () => { renderedSnapshot = saved; };
+
+    // Saved paint -> paint selection has no operation transition. Its synchronous
+    // refs must be visible to the in-flight read before React commits the setters.
+    selection.touched = true;
+    selection.activeSnapshot = saved;
+    delayedRead.resolve(serializeStudioToolOperationMemory(storedMemory));
+    const merged = await mergedHydration;
+
+    expect(renderedSnapshot).toBe(initialMemory.paint);
+    expect(merged.shouldApplyHydratedActiveSnapshot).toBe(false);
+    expect(merged.memory.paint).toMatchObject({
+      strokeWidth: saved.strokeWidth,
+      brushOpacity: saved.brushOpacity,
+      enginePrograms: saved.enginePrograms,
+    });
+    expect(merged.memory.erase).toEqual(storedMemory.erase);
+    queuedRender();
+    expect(renderedSnapshot.enginePrograms?.material).toEqual(saved.enginePrograms?.material);
+  });
+
   it("preserves a fast active paint edit while accepting the hydrated erase slot", () => {
     const initialMemory = normalizeStudioToolOperationMemory(null);
     const hydratedMemory = rememberStudioToolOperationSnapshot(
@@ -672,6 +723,27 @@ describe("studio tool operation memory SQLite controller", () => {
     expect(pageSource).toContain(
       "toolOperationMemoryDirty: toolOperationMemoryPersistenceDirty",
     );
+  });
+
+  it("records saved selection synchronously before any operation activation or queued React state", () => {
+    const pageSource = readStudioCuttoonEditorSource();
+    const start = pageSource.indexOf("function applySavedBrush");
+    const end = pageSource.indexOf("function applyStudioBrushCatalogSelection", start);
+    const savedSelection = pageSource.slice(start, end);
+    const touched = savedSelection.indexOf("toolOperationMemoryTouchedRef.current = true");
+    const snapshot = savedSelection.indexOf("currentBrushSnapshotRef.current = saved");
+    const activation = savedSelection.indexOf("activatePrimaryCanvasTool(");
+    const baseline = savedSelection.indexOf("brushBaselineController.select(");
+
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(touched).toBeGreaterThan(-1);
+    expect(snapshot).toBeGreaterThan(-1);
+    expect(touched).toBeLessThan(baseline);
+    expect(snapshot).toBeLessThan(baseline);
+    expect(touched).toBeLessThan(activation);
+    expect(snapshot).toBeLessThan(activation);
+    expect(snapshot).toBeLessThan(savedSelection.indexOf("setStrokeWidth("));
   });
 });
 

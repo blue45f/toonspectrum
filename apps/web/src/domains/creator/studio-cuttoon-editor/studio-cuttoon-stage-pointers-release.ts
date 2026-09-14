@@ -658,6 +658,7 @@ export function bindStudioCuttoonStagePointersRelease(
         dispatchedPressureOverride: pointerEvent.pointerType === "pen"
           ? resolveStudioBrushReleasePressure({
               brushId: drawingRef.current.brush,
+              rawMaterialPressure: drawingRef.current.mode === "pen" && Boolean(drawingRef.current.brushEnginePrograms?.material),
               pointerType: "pen",
               rawPressure: pointerEvent.pressure,
               lastContactPressure: releaseLastContactPressure,

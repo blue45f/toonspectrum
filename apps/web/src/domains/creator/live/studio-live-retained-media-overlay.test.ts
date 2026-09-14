@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 
 import {
   StudioLiveRetainedMediaOverlayRenderer,
@@ -38,6 +40,10 @@ function mockCanvas(width = 256, height = 128) {
   let fillCalls = 0;
   let drawImageCalls = 0;
   const paintColors: string[] = [];
+  const transforms: number[][] = [];
+  const translations: number[][] = [];
+  const rotations: number[] = [];
+  const paintOperations: { kind: "fill" | "stroke" | "image"; composite: GlobalCompositeOperation }[] = [];
   const context = {
     canvas: { width, height },
     globalAlpha: 1,
@@ -53,16 +59,24 @@ function mockCanvas(width = 256, height = 128) {
     closePath() {},
     moveTo() {},
     lineTo() {},
+    translate(...values: number[]) { translations.push(values); },
+    rotate(value: number) { rotations.push(value); },
+    ellipse() {},
+    roundRect() {},
+    fillRect() { fillCalls += 1; },
+    transform(...values: number[]) { transforms.push(values); },
     arc() {},
     fill() {
       fillCalls += 1;
       paintColors.push(context.fillStyle);
+      paintOperations.push({ kind: "fill", composite: context.globalCompositeOperation });
     },
     stroke() {
       strokeCalls += 1;
       paintColors.push(context.strokeStyle);
+      paintOperations.push({ kind: "stroke", composite: context.globalCompositeOperation });
     },
-    drawImage() { drawImageCalls += 1; },
+    drawImage() { drawImageCalls += 1; paintOperations.push({ kind: "image", composite: context.globalCompositeOperation }); },
     setTransform() {},
     getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     clearRect() {
@@ -84,6 +98,10 @@ function mockCanvas(width = 256, height = 128) {
     canvas,
     context,
     paintColors,
+    transforms,
+    translations,
+    rotations,
+    paintOperations,
     stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls, drawImageCalls }),
   };
 }
@@ -153,6 +171,92 @@ describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
 });
 
 describe("StudioLiveRetainedMediaOverlayRenderer", () => {
+  it.each(["resize", "pan", "zoom", "reattach"] as const)(
+    "rebuilds active material ink after %s and continues only the new suffix through commit",
+    (change) => {
+      const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program("oil-hair-mixer"));
+      const first = drawElement("material-lifecycle", "pencil", [20, 35, 45, 40, 70, 50], {
+        brush: "brush", strokeWidth: brush.strokeWidth, stroke: brush.color,
+        brushEnginePrograms: brush.enginePrograms!,
+      });
+      const extended = { ...first, points: [...first.points, 90, 45, 115, 35], pressures: [0.6, 0.6, 0.6, 0.8, 0.4] };
+      const { renderer, active, settled, surface } = attachedRenderer();
+      const reference = attachedRenderer();
+      expect(renderer.begin(first).status).toBe("started");
+      expect(reference.renderer.begin(first).status).toBe("started");
+      const initialPaint = [...active.translations];
+      expect(initialPaint.length).toBeGreaterThan(0);
+      active.translations.length = 0;
+      const destination = change === "reattach" ? mockCanvas() : active;
+      if (change === "reattach") {
+        renderer.attach(null);
+        renderer.attach({ activeCanvas: destination.canvas, settledCanvas: settled.canvas });
+      } else {
+        renderer.setSurface({ ...surface, ...(change === "resize" ? { width: 320, height: 160 }
+          : change === "pan" ? { left: 15, top: 8 } : { documentScale: 1.5 }) });
+      }
+      expect(destination.stats().clearCalls).toBeGreaterThan(0);
+      expect(destination.translations).toEqual(initialPaint);
+      destination.translations.length = 0;
+      expect(renderer.appendFrom(first)).toEqual({ status: "noop" });
+      expect(destination.translations).toEqual([]);
+      reference.active.translations.length = 0;
+      expect(renderer.appendFrom(extended).status).toBe("appended");
+      expect(reference.renderer.appendFrom(extended).status).toBe("appended");
+      expect(destination.translations).toEqual(reference.active.translations);
+      const issuedSuffix = destination.translations.length;
+      expect(issuedSuffix).toBeGreaterThan(0);
+      expect(renderer.end(extended)).toEqual({ status: "settled" });
+      expect(destination.translations).toHaveLength(issuedSuffix);
+      expect(renderer.settledStrokeCount).toBe(1);
+      expect(settled.paintOperations.at(-1)).toEqual({ kind: "image", composite: "source-over" });
+    },
+  );
+
+  it("keeps highlighter multiply over replayed material ink and clears that ownership when hidden", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program("natural-calligraphy"));
+    const material = drawElement("material-underlay", "pencil", [20, 35, 80, 40], {
+      brush: "brush", strokeWidth: brush.strokeWidth, stroke: brush.color,
+      brushEnginePrograms: brush.enginePrograms!,
+    });
+    const highlighter = drawElement("highlight-over-material", "pencil", [20, 35, 80, 40], {
+      brush: "highlighter", stroke: "#ffff00", strokeWidth: 30, opacity: 0.5,
+    });
+    const { renderer, settled, surface } = attachedRenderer();
+    renderer.begin(material);
+    renderer.end(material);
+    renderer.setSurface({ ...surface, left: 10 });
+    settled.paintOperations.length = 0;
+    expect(renderer.begin(highlighter).status).toBe("started");
+    expect(renderer.end(highlighter).status).toBe("settled");
+    expect(settled.paintOperations.at(-1)).toEqual({ kind: "image", composite: "multiply" });
+    settled.paintOperations.length = 0;
+    renderer.setSurface({ ...surface, left: 20 });
+    expect(settled.paintOperations.at(-1)).toEqual({ kind: "fill", composite: "multiply" });
+    settled.paintOperations.length = 0;
+    renderer.hideSettledPixels([material.id]);
+    expect(settled.paintOperations.length).toBeGreaterThan(0);
+    expect(settled.paintOperations.every(operation => operation.composite === "source-over")).toBe(true);
+  });
+
+  it("owns material symmetry natively and transforms the completed nib contacts", () => {
+    const brush = createBrushStudioV6ProductBrush(createBrushStudioV6Program("natural-calligraphy"));
+    const element = drawElement("material-mirror", "pencil", [20, 30, 40, 30], {
+      brush: "brush", strokeWidth: brush.strokeWidth, stroke: brush.color,
+      brushEnginePrograms: brush.enginePrograms!,
+      symmetry: { type: "vertical", centerX: 100, centerY: 0 },
+    });
+    const { renderer, active } = attachedRenderer();
+    expect(studioLiveRetainedMediaOverlaySupportsElement(element)).toBe(true);
+    expect(renderer.begin(element)).toEqual({ status: "started", kind: "material" });
+    expect(active.translations).toContainEqual([20, 30]);
+    expect(active.translations).toContainEqual([180, 30]);
+    expect(active.rotations).toContain(Math.PI / 4);
+    expect(active.rotations).toContain(Math.PI * 3 / 4);
+    expect(active.stats().fillCalls).toBeGreaterThan(0);
+    expect(renderer.end(element)).toEqual({ status: "settled" });
+  });
+
   it("distinguishes rejected sources from an unavailable selected surface", () => {
     const detached = new StudioLiveRetainedMediaOverlayRenderer();
     expect(detached.begin(drawElement("detached", "pencil", [12, 20]))).toEqual({

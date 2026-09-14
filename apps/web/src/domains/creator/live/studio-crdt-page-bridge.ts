@@ -1,3 +1,5 @@
+import type { StudioBrushEngineProgramSet } from "../brush/studio-brush-engine-program-set";
+import { hasValidStudioBrushEngineProgramExtension, STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION } from "../../../shared/lib/studio-brush-material-program-contract";
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
@@ -164,6 +166,9 @@ export function studioCrdtStrokeToDrawElement(
     throw new Error("지원하지 않는 획 페이로드 버전입니다.");
   }
   const extensions = payload.extensions ?? {};
+  if (!hasValidStudioBrushEngineProgramExtension(payload.version, extensions.brushEnginePrograms)) {
+    throw new Error("브러시 엔진 프로그램과 획 페이로드 버전이 호환되지 않습니다.");
+  }
   const result: StudioCrdtCompatibleDrawElement = {
     id: record.id,
     type: "draw",
@@ -214,6 +219,9 @@ export function studioCrdtStrokeToDrawElement(
     const value = extensions[key];
     if (value !== undefined) Object.assign(result, { [key]: value });
   }
+  if (extensions.brushEnginePrograms !== undefined) {
+    result.brushEnginePrograms = structuredClone(extensions.brushEnginePrograms) as unknown as StudioBrushEngineProgramSet;
+  }
   const pressureModel = extensions.pressureModel;
   if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
   const paperModel = extensions.paperModel;
@@ -240,6 +248,7 @@ export function studioCrdtStrokeToDrawElement(
   if (
     payload.brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
     && payload.version !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    && payload.version !== STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION
   ) {
     throw new Error("테이퍼 간격 브러시는 획 페이로드 v5가 필요합니다.");
   }

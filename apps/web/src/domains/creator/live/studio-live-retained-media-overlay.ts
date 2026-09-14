@@ -1,3 +1,4 @@
+import { StudioMaterialBrushPlanner, renderStudioMaterialBrushMarks } from "../brush/studio-material-brush-runtime";
 /**
  * Append-only live canvas for oil and pencil.
  *
@@ -74,6 +75,7 @@ import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 
 export type StudioLiveRetainedMediaKind =
+  | "material"
   | "oil"
   | "pencil"
   | "calligraphy"
@@ -123,6 +125,7 @@ export function studioLiveRetainedMediaOverlaySupportsElement(
   if (element.mode === "eraser") return true;
   if ((element.mode ?? "pen") !== "pen") return false;
   if (element.fill !== undefined && element.fill !== null) return false;
+  if (element.brushEnginePrograms?.material) return true;
   // bounded-flow-v2 다이내믹 획은 다이내믹 오버레이가 커밋과 동일한 dab 플랜으로 그린다.
   // 이 오버레이가 패밀리만 보고 가로채면 라이브가 일반 캐리어(균일 실선)로 그려져 커밋과
   // 갈라진다 — 장경로 실측: erodible-pencil energy 0.35 붕괴 + 79px 라이브 전용 시작원,
@@ -138,6 +141,7 @@ export function studioLiveRetainedMediaOverlaySupportsElement(
 
 function retainedKind(element: DrawEl): StudioLiveRetainedMediaKind | null {
   if (element.mode === "eraser") return "eraser";
+  if (element.brushEnginePrograms?.material) return "material";
   const family = resolveStudioBrushRenderFamily(element.brush ?? "pen");
   return family === "oil"
     || family === "pencil"
@@ -291,6 +295,7 @@ function oilDabPoints(
 const OIL_REPAINT_DUTY_DIVISOR = 3;
 
 interface ActiveRetainedStroke {
+  materialPlanner?: StudioMaterialBrushPlanner;
   readonly id: string;
   readonly kind: StudioLiveRetainedMediaKind;
   element: DrawEl;
@@ -679,6 +684,24 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     /** Pointer-up. The active canvas is about to be sealed into settled, so nothing is deferred. */
     finalize = false,
   ): boolean {
+    if (active.kind === "material") {
+      const context = this.prepared(target);
+      if (!context) return false;
+      try {
+        const planner = active.materialPlanner ??= new StudioMaterialBrushPlanner();
+        context.globalAlpha = 1;
+        const result = planner.appendBatches(element, (marks) => {
+          renderStudioMaterialBrushMarks(context, marks, element.symmetry);
+          if (marks.length > 0) this.markSettledPaint(active, context);
+        }, finalize, () => {
+          if (target === this.activeContext) this.clearCanvas(this.activeContext, this.activeCanvas);
+        });
+        active.paintedDabs += result.totalMarks;
+        return true;
+      } finally {
+        context.restore();
+      }
+    }
     if (active.kind === "oil") return this.paintOilSuffix(active, element, target, finalize);
     if (active.kind === "pencil") {
       return this.paintPencilSuffix(active, element, target, finalize);
@@ -1305,6 +1328,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     }
     const replayActive: ActiveRetainedStroke = {
       ...this.active,
+      materialPlanner: undefined,
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilPoints: null,
@@ -1314,10 +1338,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
-    // A replay repaints from zero onto a cleared surface; it keeps the live planner so the next
-    // append still reuses a verified prefix rather than paying a full replan for the resize.
+    // Material planners consume their emitted prefix. A cleared canvas needs a new planner;
+    // retain that rebuilt planner below so the next input emits only its new suffix.
 
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
+    this.active.materialPlanner = replayActive.materialPlanner;
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
     this.active.paintedOilPoints = replayActive.paintedOilPoints;

@@ -90,6 +90,14 @@ const requiredRegressions = Object.freeze([
   "apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts",
   "apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts",
   "apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts",
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts",
+  "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx",
+  "apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts",
+  "apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts",
+  "apps/web/src/app/studio-cross-origin-isolation.test.ts",
   "scripts/verify-studio-3d-console.test.ts",
   "scripts/verify-studio-menus.test.ts",
 ]);
@@ -168,6 +176,7 @@ test("core retains all executing main checks without a bypass", () => {
     "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
     "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
   for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {

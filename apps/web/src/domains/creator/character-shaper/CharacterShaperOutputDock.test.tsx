@@ -17,7 +17,7 @@ import type { CharacterShaperBinding, CharacterShaperDrawerMode } from "./charac
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 
 const exportCharacterSemanticPsd = vi.hoisted(() => vi.fn());
-const captureStudioVrmRgba = vi.hoisted(() => vi.fn(() => new Uint8ClampedArray(4)));
+const captureStudioVrmRgbaCooperatively = vi.hoisted(() => vi.fn(async () => new Uint8ClampedArray(4)));
 const encodeStudioVrmCapturePngBlob = vi.hoisted(() => vi.fn(async () => new Blob(["png"])));
 
 vi.mock("./character-shaper-semantic-psd", () => ({
@@ -26,7 +26,7 @@ vi.mock("./character-shaper-semantic-psd", () => ({
 }));
 
 vi.mock("../vrm/studio-vrm-raster-capture", () => ({
-  captureStudioVrmRgba,
+  captureStudioVrmRgbaCooperatively,
   encodeStudioVrmCapturePngBlob,
 }));
 
@@ -210,7 +210,7 @@ describe("CharacterShaperOutputDock", () => {
     fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
 
     expect(await screen.findByText(/PNG를 저장했습니다/u)).toBeTruthy();
-    expect(captureStudioVrmRgba).toHaveBeenCalledTimes(1);
+    expect(captureStudioVrmRgbaCooperatively).toHaveBeenCalledTimes(1);
     expect(h.acquireVrmCaptureHelperLease).toHaveBeenCalledWith({ subjectOnly: true });
     expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledTimes(1);
     expect(encodeStudioVrmCapturePngBlob).toHaveBeenCalledWith(expect.any(Uint8ClampedArray), {
@@ -240,11 +240,31 @@ describe("CharacterShaperOutputDock", () => {
   });
 
   it("restores viewport helpers when PNG capture fails", async () => {
-    captureStudioVrmRgba.mockImplementationOnce(() => { throw new Error("readback failed"); });
+    captureStudioVrmRgbaCooperatively.mockImplementationOnce(() => { throw new Error("readback failed"); });
     const { h } = renderDock();
     fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
     expect(await screen.findByText("PNG를 저장하지 못했습니다.")).toBeTruthy();
     expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores helpers before PSD worker assembly while retaining export authority", async () => {
+    let finish!: () => void;
+    exportCharacterSemanticPsd.mockImplementationOnce((input: { onCaptured: () => void }) => {
+      input.onCaptured();
+      return new Promise((resolve) => {
+        finish = () => resolve({ blob: new Blob(["psd"]), receipt: { layerNames: ["피부"], skipped: [] } });
+      });
+    });
+    const { h } = renderDock();
+    fireEvent.click(screen.getByRole("button", { name: "PSD 내보내기" }));
+    expect(await screen.findByText("PSD 파일 만드는 중")).toBeTruthy();
+    expect(h.captureOperationRef.current).toBe("export");
+    const release = vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value;
+    expect(release).toHaveBeenCalledOnce();
+    await act(async () => { finish(); });
+    expect(h.captureOperationRef.current).toBeNull();
+    expect(release).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/PSD 레이어 1개 저장/u)).toBeTruthy();
   });
 
   it("says so when the scene is not ready instead of exporting", () => {
@@ -285,8 +305,24 @@ describe("CharacterShaperOutputDock", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "파일 내보내기 해상도" }), { target: { value: "4096" } });
     fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
     expect(await screen.findByText(/3277×4096/u)).toBeTruthy();
-    expect(captureStudioVrmRgba).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
-      { width: 3277, height: 4096 }, { alpha: 0 });
+    expect(captureStudioVrmRgbaCooperatively).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
+      { width: 3277, height: 4096 }, { alpha: 0 }, { signal: expect.any(AbortSignal), assertCurrent: expect.any(Function), onProgress: expect.any(Function) });
+  });
+
+  it("cancels during pixel capture before encoding and only releases authority after capture settles", async () => {
+    let finish!: (pixels: Uint8ClampedArray<ArrayBuffer>) => void;
+    captureStudioVrmRgbaCooperatively.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const { h } = renderDock();
+    fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
+    await waitFor(() => expect(captureStudioVrmRgbaCooperatively).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "내보내기 취소" }));
+    expect(h.captureOperationRef.current).toBe("export");
+    await act(async () => { finish(new Uint8ClampedArray(4)); });
+    expect(encodeStudioVrmCapturePngBlob).not.toHaveBeenCalled();
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+    expect(h.captureOperationRef.current).toBeNull();
+    expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(await screen.findByText("내보내기를 취소했습니다.")).toBeTruthy();
   });
 
   it("cancels an encoding export without downloading or leaving a capture lock", async () => {

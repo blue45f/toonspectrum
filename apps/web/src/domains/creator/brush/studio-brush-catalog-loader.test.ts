@@ -5,6 +5,7 @@ import {
   loadStudioFullBrushCatalogItems,
   loadStudioListedBrushCatalogItems,
 } from "./studio-brush-catalog-loader";
+import { STUDIO_BRUSH_QUALITY_PORTFOLIO } from "./studio-brush-quality-portfolio";
 import { STUDIO_BRUSH_QUARANTINED_PRESET_IDS } from "./studio-brush-quarantine";
 
 describe("studio brush catalog loader lanes", () => {
@@ -32,18 +33,37 @@ describe("studio brush catalog loader lanes", () => {
     }
   });
 
-  it("keeps non-quarantined listings byte-identical to the unfiltered SSOT", async () => {
+  it("lists the curated quality portfolio in its explicit order using original registry objects", async () => {
+    const [full, listed] = await Promise.all([
+      loadStudioFullBrushCatalogItems(),
+      loadStudioListedBrushCatalogItems(),
+    ]);
+    const expected = STUDIO_BRUSH_QUALITY_PORTFOLIO.map(({ id }) => {
+      const item = full.find((candidate) => candidate.id === id);
+      expect(item, `${id}: portfolio entry missing from the full registry`).toBeDefined();
+      return item;
+    });
+    expect(listed.map((item) => item.id)).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO.map(({ id }) => id));
+    expect(listed).toHaveLength(expected.length);
+    // Product curation changes exposure and order, never a saved brush's registry identity.
+    listed.forEach((item, index) => {
+      expect(item).toBe(expected[index]);
+    });
+  });
+
+  it("resolves saved non-quarantined brushes excluded by product curation without relisting them", async () => {
     const [full, listed] = await Promise.all([
       loadStudioFullBrushCatalogItems(),
       loadStudioListedBrushCatalogItems(),
     ]);
     const quarantined = new Set(STUDIO_BRUSH_QUARANTINED_PRESET_IDS);
-    const expected = full.filter((item) => !quarantined.has(item.id));
-    expect(listed).toHaveLength(expected.length);
-    // Same frozen item objects in SSOT order — the listing filter must not clone, reorder, or
-    // reshape a single non-quarantined row.
-    listed.forEach((item, index) => {
-      expect(item).toBe(expected[index]);
-    });
+    const portfolioIds = new Set<string>(STUDIO_BRUSH_QUALITY_PORTFOLIO.map(({ id }) => id));
+    const hidden = full.filter((item) => !quarantined.has(item.id) && !portfolioIds.has(item.id));
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const item of hidden) {
+      expect(listed.some((candidate) => candidate.id === item.id), item.id).toBe(false);
+      expect(await loadStudioBrushCatalogItemById(item.id), `${item.id}: saved identity lost`).toBe(item);
+    }
   });
+
 });

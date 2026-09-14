@@ -326,7 +326,10 @@ describe("studio draw rendering ownership boundary", () => {
     expect(usePatternFillImage).toContain("active = false;");
     expect(usePatternFillImage).toContain("}, [loaded, tileSrc]);");
     expect(usePatternFillImage).toContain("return image;");
-    expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind");
+    expect(drawNode.source).toContain(
+      'const materialOwnsSymmetry = kind === "freehand" && !isEraserOperation && Boolean(runtimeEnginePrograms?.material);',
+    );
+    expect(drawNode.source).toContain("const symmetricVariations = materialOwnsSymmetry || stampBrushKind || dynamicBrushId");
     expect(drawNode.source).toContain("<StudioStampDrawShape");
     expect(drawNode.valueImports).toContain("../StudioStampDrawShape");
     expect(stampShape.source).toContain('el.stampPipeline === "causal-walker-v2"');
@@ -351,7 +354,7 @@ describe("studio draw rendering ownership boundary", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
     const renderPlan = moduleEdges("../studio-dynamic-brush-render-plan.ts");
 
-    expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind || dynamicBrushId");
+    expect(drawNode.source).toContain("const symmetricVariations = materialOwnsSymmetry || stampBrushKind || dynamicBrushId");
     expect(drawNode.valueImports).toContain("../studio-dynamic-brush-render-plan");
     expect(drawNode.source).toContain("planStudioDynamicBrushRender(");
     expect(drawNode.source).not.toContain("planNormalizedStudioDynamicBrushDabs(");

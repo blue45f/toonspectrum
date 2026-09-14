@@ -14,6 +14,7 @@ import {
   type CSSProperties,
   type ReactNode,
   type RefObject,
+  type SyntheticEvent,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -86,6 +87,7 @@ export interface StudioDrawingPaletteOverlayController {
   readonly toggleInlineOptions: () => void;
   readonly close: (restoreTriggerFocus?: boolean) => void;
   readonly dismiss: () => void;
+  readonly captureDescendantPortalEvent: (event: SyntheticEvent) => void;
   readonly overlayStyle: StudioDrawingPaletteOverlayStyle | null;
 }
 
@@ -252,6 +254,7 @@ function PaletteOptions({
 
 export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayController {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const descendantPortalEventsRef = useRef(new WeakSet<Event>());
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [openOverlay, setOpenOverlay] =
     useState<StudioDrawingPaletteOverlay | null>(null);
@@ -274,6 +277,7 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
       setInlineOptionsOpen(false);
     };
     const onPointerDown = (event: PointerEvent): void => {
+      if (descendantPortalEventsRef.current.has(event)) return;
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (overlayRef.current?.contains(target)) return;
@@ -282,6 +286,7 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
     };
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (descendantPortalEventsRef.current.has(event)) return;
       if (
         openOverlay.kind === "palette"
         && (
@@ -358,6 +363,13 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
     },
     close,
     dismiss,
+    captureDescendantPortalEvent(event) {
+      // React capture follows our child portals even when their DOM lives under body.
+      // Claim only that event; an unrelated dialog or a later outside click still dismisses.
+      if (event.target instanceof Node && !overlayRef.current?.contains(event.target)) {
+        descendantPortalEventsRef.current.add(event.nativeEvent);
+      }
+    },
   };
 }
 
@@ -407,6 +419,7 @@ export function StudioDrawingPaletteOverlayPortal({
         options={options}
         onToggleOptions={toggleInlineOptions}
         onClose={() => close(true)}
+        onDescendantPortalEventCapture={controller.captureDescendantPortalEvent}
       >
         {paletteBody(openOverlay.id, subTools, toolProperties)}
       </StudioDrawingPaletteFloatingSurface>,

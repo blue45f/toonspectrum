@@ -97,7 +97,7 @@ describe("live wet-ink product boundary", () => {
     const beginStart = studioPageSource.indexOf("const wetInkOverlayStarted =");
     const beginEnd = studioPageSource.indexOf("const retainedMediaDirect =", beginStart);
     const begin = studioPageSource.slice(beginStart, beginEnd);
-    expect(begin).toContain("if (wetMediaSelected && !wetInkOverlayStarted)");
+    expect(begin).toContain("if ((selectedMedia.kind === \"wet\") && !wetInkOverlayStarted)");
     expect(begin).toContain('return rejectSelectedSurface("습식 매체"');
 
     const finishStart = studioPageSource.indexOf("function finishDrawingPointer(");
