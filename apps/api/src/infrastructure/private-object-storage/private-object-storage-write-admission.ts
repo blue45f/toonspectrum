@@ -5,7 +5,7 @@ import {
   type InfrastructureProviderPolicy,
   type InfrastructureProviderSnapshot,
   type InfrastructureWorkloadPolicy,
-} from "@toonspectrum/core/infrastructure-fabric";
+} from "../../../../../packages/core/src/infrastructure-fabric";
 
 import type {
   PrivateObjectPurpose,
