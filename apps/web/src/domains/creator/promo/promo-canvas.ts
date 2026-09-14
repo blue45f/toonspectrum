@@ -1,4 +1,4 @@
-import { PROMO_DEFAULT_PRESENTATION, PROMO_FPS, promoFrameCount, promoMotionAt, promoTimeline } from "./promo-model";
+import { PROMO_DEFAULT_PRESENTATION, PROMO_FPS, promoFrameCount, promoMotionAt, promoCameraAt, promoTimeline } from "./promo-model";
 
 import type { PromoProject, PromoScene } from "./promo-model";
 
@@ -151,13 +151,15 @@ function drawSceneArtwork(ctx: CanvasRenderingContext2D, scene: PromoScene, loca
   if (!image) return;
   const reduced = project.presentation?.reducedMotion;
   const intensity = reduced ? 0 : scene.panel.intensity ?? 1;
-  const motion = promoMotionAt(reduced ? "still" : scene.panel.motion, local / Math.max(1, scene.duration - 1));
+  const progress = local / Math.max(1, scene.duration - 1);
+  const camera = scene.panel.camera ? promoCameraAt(scene.panel.camera, progress, reduced) : undefined;
+  const motion = camera ? { scale: camera.zoom, x: 0, y: 0 } : promoMotionAt(reduced ? "still" : scene.panel.motion, progress);
   const fit = scene.panel.fit === "cover" ? Math.max(width / image.naturalWidth, height / image.naturalHeight) : Math.min(width / image.naturalWidth, height / image.naturalHeight);
-  const scale = 1 + (motion.scale - 1) * intensity;
+  const scale = camera?.zoom ?? 1 + (motion.scale - 1) * intensity;
   const iw = image.naturalWidth * fit * scale;
   const ih = image.naturalHeight * fit * scale;
-  const focusX = scene.panel.fit === "cover" ? scene.panel.focusX ?? 0.5 : 0.5;
-  const focusY = scene.panel.fit === "cover" ? scene.panel.focusY ?? 0.5 : 0.5;
+  const focusX = camera?.x ?? (scene.panel.fit === "cover" ? scene.panel.focusX ?? 0.5 : 0.5);
+  const focusY = camera?.y ?? (scene.panel.fit === "cover" ? scene.panel.focusY ?? 0.5 : 0.5);
   const clamp = (value: number, extent: number, viewport: number) => extent >= viewport ? Math.max(viewport - extent, Math.min(0, value)) : value;
   ctx.drawImage(image, clamp((width - iw) * focusX + width * motion.x * intensity, iw, width), clamp((height - ih) * focusY + height * motion.y * intensity, ih, height), iw, ih);
   const foreground = images.get(`${scene.panel.id}:foreground`);
@@ -166,7 +168,7 @@ function drawSceneArtwork(ctx: CanvasRenderingContext2D, scene: PromoScene, loca
     const fw = foreground.naturalWidth * foregroundFit * (1 + (scale - 1) * 1.8);
     const fh = foreground.naturalHeight * foregroundFit * (1 + (scale - 1) * 1.8);
     const float = reduced ? 0 : Math.sin(local / PROMO_FPS * 1.5) * height * 0.006 * intensity;
-    ctx.drawImage(foreground, (width - fw) / 2 - width * motion.x * 1.8 * intensity, (height - fh) / 2 - height * motion.y * 1.8 * intensity + float, fw, fh);
+    ctx.drawImage(foreground, (width - fw) * (camera?.x ?? 0.5) - width * motion.x * 1.8 * intensity, (height - fh) * (camera?.y ?? 0.5) - height * motion.y * 1.8 * intensity + float, fw, fh);
   }
 }
 /** Deterministic analytic particles; seek/export never depend on previously rendered frames. */

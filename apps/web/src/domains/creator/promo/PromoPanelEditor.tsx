@@ -1,9 +1,11 @@
+import { PromoCameraEditor } from "./PromoCameraEditor";
 import { PROMO_EFFECTS, PROMO_MOTIONS, PROMO_MOTION_LABELS, PROMO_TRANSITIONS, PROMO_MAX_PANELS } from "./promo-model";
 
 import type { PromoPanel, PromoScene } from "./promo-model";
 
-export function PromoPanelEditor({ scene, index, count, disabled, onChange, onMove, onRemove, onDuplicate, onSeek, onForeground }: {
+export function PromoPanelEditor({ scene, index, count, disabled, onChange, onMove, onRemove, onDuplicate, onSeek, onSeekFrame, onForeground }: {
   scene: PromoScene; index: number; count: number; disabled: boolean;
+  onSeekFrame?: (frame: number) => void;
   onDuplicate?: () => void; onSeek?: () => void; onForeground?: (file: File) => void;
   onChange: (patch: Partial<PromoPanel>) => void; onMove: (direction: -1 | 1) => void; onRemove: () => void;
 }) {
@@ -23,7 +25,8 @@ export function PromoPanelEditor({ scene, index, count, disabled, onChange, onMo
           <label htmlFor={`weight-${panel.id}`}>상대 길이<select id={`weight-${panel.id}`} value={panel.weight} onChange={(event) => onChange({ weight: Number(event.target.value) })}>{[0.5, 1, 1.5, 2, 3].map((weight) => <option key={weight} value={weight}>{weight}배</option>)}{![0.5, 1, 1.5, 2, 3].includes(panel.weight) ? <option value={panel.weight}>{panel.weight}배 (AI)</option> : null}</select></label>
         </div>
         <details className="promo-shot-direction">
-          <summary>전환 · 효과 · 초점 · 2.5D 전경</summary>
+          <summary>키프레임 · 전환 · 효과 · 초점 · 2.5D 전경</summary>
+          <PromoCameraEditor scene={scene} onChange={onChange} onSeek={onSeekFrame} />
           <div className="promo-inline-grid">
             <label htmlFor={`transition-${panel.id}`}>장면 전환<select id={`transition-${panel.id}`} value={panel.transition ?? "fade"} onChange={(event) => onChange({ transition: event.target.value as PromoPanel["transition"] })}>{Object.entries(PROMO_TRANSITIONS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label htmlFor={`effect-${panel.id}`}>분위기 효과<select id={`effect-${panel.id}`} value={panel.effect ?? "none"} onChange={(event) => onChange({ effect: event.target.value as PromoPanel["effect"] })}>{Object.entries(PROMO_EFFECTS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

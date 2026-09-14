@@ -165,6 +165,8 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
           const frame = Math.floor((performance.now() - started) * PROMO_FPS / 1000);
           if (frame !== lastFrame) {
             drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
+            // Request every new frame: detached canvases may miss compositor paints.
+            videoTrack.requestFrame?.();
             lastFrame = frame;
           }
           if (audioGain && audioContext) audioGain.gain.setValueAtTime(promoMusicGain(project, Math.min(total - 1, frame)), audioContext.currentTime);
@@ -173,7 +175,6 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
           if (frame >= total) {
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
-            videoTrack.requestFrame?.();
             // Stop audio at the timeline boundary. Only video needs this extra
             // paint/encoder flush; keeping audio alive would append a silent tail.
             stream?.getAudioTracks?.().forEach((track) => track.stop());

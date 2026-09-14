@@ -208,13 +208,13 @@ test("default recording uses opaque canvas and lower-latency VP8", async () => {
   const { blob } = await context.result();
   assert.equal(blob.type, "video/webm;codecs=vp8,opus");
   assert.equal(context.contextOptions[0].alpha, false);
-  assert.equal(context.frameRequests(), 1);
+  assert.equal(context.frameRequests(), 2);
   context.cleaned();
 });
 test("the final canvas frame gets a paint opportunity before native stop", async () => {
   const context = await recording(); context.data(); context.tick(15_000);
   assert.equal(context.recorder.state, "recording");
-  assert.equal(context.frameRequests(), 1);
+  assert.equal(context.frameRequests(), 2);
   context.tick(15_020);
   assert.equal(context.recorder.state, "recording");
   context.tick(15_040);
@@ -262,4 +262,19 @@ test("cancellation during the browser final-frame timer releases audio and clear
   context.controller.abort(); context.stopEvent();
   await rejectsRecording(context, /취소/u);
   assert.equal(context.audioStoppedAt(), 15_000);
+});
+
+test("every newly rendered timeline frame is requested once, including detached canvases", async () => {
+  const context = await recording();
+  assert.equal(context.frameRequests(), 1, "the first frame must be explicitly requested");
+  context.tick(10);
+  assert.equal(context.frameRequests(), 1, "do not recapture an unchanged frame");
+  context.tick(34);
+  assert.equal(context.frameRequests(), 2);
+  context.tick(67);
+  assert.equal(context.frameRequests(), 3);
+  context.end(); context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  assert.equal(context.frameRequests(), 4);
+  context.cleaned();
 });
