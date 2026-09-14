@@ -334,7 +334,7 @@ describe("editable raster copy planning", () => {
       frame: { x: 0, y: 0, width: 320, height: 480, rotation: 0 },
       sourceBounds: { x: 0, y: 0, width: 100, height: 100 },
       orderedVisibleSourceIds: ["visible", "eraser", "image"],
-      exactRenderableSourceIds: ["visible", "image"],
+      exactRenderableSourceIds: ["visible", "eraser", "image"],
       lockedVisibleSourceIds: ["image"],
       visibleContentCount: 3,
       hiddenContentCount: 1,
@@ -343,8 +343,8 @@ describe("editable raster copy planning", () => {
       visibleVectorDrawCount: 1,
       visibleCompositeVectorCount: 1,
       visibleLinked3dPreviewCount: 0,
-      exactRenderableVisibleCount: 2,
-      unsupportedVisibleCount: 1,
+      exactRenderableVisibleCount: 3,
+      unsupportedVisibleCount: 0,
       hasPageBackground: true,
     });
   });
@@ -712,14 +712,30 @@ describe("editable raster copy planning", () => {
     })).toMatchObject({ ok: false, code: "no-visible-source" });
   });
 
-  it("fails closed for eraser/approximated fidelity and document locks", () => {
+  it("preserves active erasers but still fails closed for unsupported fidelity and document locks", () => {
     expect(planStudioEditableRasterCopy({
       pageId: "page-1",
       width: 320,
       height: 480,
-      elements: [line("eraser", { mode: "eraser" })],
+      elements: [line("ink"), line("eraser", { mode: "eraser" })],
       includeBackground: false,
-    })).toMatchObject({ ok: false, code: "unsupported-fidelity" });
+    })).toMatchObject({
+      ok: true,
+      plan: { sourceIds: ["ink", "eraser"], sourceElementCount: 2 },
+    });
+
+    const unsupported = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line("clipped", { name: "클립 선화", clipBelow: true })],
+      includeBackground: false,
+    });
+    expect(unsupported).toMatchObject({ ok: false, code: "unsupported-fidelity" });
+    expect(unsupported.ok ? "" : unsupported.reason).toContain("원본은 그대로 유지했습니다");
+    expect(unsupported.ok ? "" : unsupported.reason).toContain("‘클립 선화’");
+    expect(unsupported.ok ? "" : unsupported.reason).not.toContain("병합");
+
     expect(planStudioEditableRasterCopy({
       pageId: "page-1",
       width: 320,
@@ -889,7 +905,7 @@ describe("Worker-fused editable raster preparation", () => {
         id: "line",
         type: "draw",
         mode: "approximated",
-        label: "지우개 합성은 SVG에 없어 근사됩니다.",
+        label: "아래 레이어로 자르기는 현재 모습과 다를 수 있습니다.",
       }],
     });
     const render = vi.fn(async () => renderedPreparedVectorExport(prepared));
@@ -897,12 +913,14 @@ describe("Worker-fused editable raster preparation", () => {
       pageId: "page-1",
       width: 320,
       height: 480,
-      elements: [line()],
+      elements: [line("line", { name: "클립 선화" })],
       includeBackground: false,
     }, async () => prepared, render);
 
     expect(result).toMatchObject({ ok: false, code: "unsupported-fidelity" });
-    expect(result.ok ? "" : result.reason).toMatch(/지우개/u);
+    expect(result.ok ? "" : result.reason).toContain("‘클립 선화’");
+    expect(result.ok ? "" : result.reason).toContain("원본은 그대로 유지했습니다");
+    expect(result.ok ? "" : result.reason).not.toMatch(/지우개|병합/u);
     expect(render).not.toHaveBeenCalled();
   });
 
