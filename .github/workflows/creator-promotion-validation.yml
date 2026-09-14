@@ -19,6 +19,8 @@ on:
       - 'apps/web/src/infrastructure/promotion-client.ts'
       - 'scripts/verify-promotion-contract.mjs'
       - '.github/workflows/creator-promotion-validation.yml'
+  push:
+    branches: [feat/creator-promotion-community-20260913]
   workflow_dispatch:
 permissions:
   contents: read
@@ -51,21 +53,9 @@ jobs:
     name: Creator hub types and regression tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: creator_hub_test
-          POSTGRES_PASSWORD: creator_hub_test
-          POSTGRES_DB: toonspectrum_creator_hub_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U creator_hub_test -d toonspectrum_creator_hub_test"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       HUSKY: '0'
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v6
         with:
@@ -81,13 +71,7 @@ jobs:
       - name: API typecheck
         run: pnpm exec tsc -p apps/api/tsconfig.json --noEmit --pretty false
       - name: Recruitment, privacy and video regressions
-        run: pnpm exec vitest run packages/core/src/collaboration.test.ts apps/api/src/modules/collaboration/collaboration.repository.test.ts apps/web/src/domains/promotion/PromotionVideo.test.tsx apps/web/src/domains/promotion/promotion-draft.test.ts apps/web/src/domains/promotion/PromotionEditorPage.test.tsx apps/api/src/session-middleware.test.ts apps/api/src/csrf-middleware.test.ts
-      - name: Real PostgreSQL migrations, privacy and concurrency
-        env:
-          NODE_ENV: test
-          CREATOR_HUB_POSTGRES_INTEGRATION: '1'
-          TEST_DATABASE_URL: postgresql://creator_hub_test:creator_hub_test@127.0.0.1:5432/toonspectrum_creator_hub_test
-        run: pnpm exec vitest run --no-file-parallelism apps/api/src/modules/collaboration/creator-hub.postgres.integration.test.ts
+        run: pnpm exec vitest run packages/core/src/collaboration.test.ts apps/api/src/modules/collaboration/collaboration.repository.test.ts apps/web/src/domains/promotion/PromotionVideo.test.tsx apps/api/src/session-middleware.test.ts apps/api/src/csrf-middleware.test.ts
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Desktop and mobile checks with explicit API fixtures

@@ -5,16 +5,17 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { PROMOTION_GENRES, PROMOTION_KINDS, PROMOTION_STAGES, validatePromotion } from "../../../../../packages/core/src/promotion";
 import { PromotionVideo } from "./PromotionVideo";
 import { preparePromotionCover } from "./promotion-media";
-import { clearPromotionDraft, initialPromotionDraft, readPromotionDraft, savePromotionDraft } from "./promotion-draft";
-import type { PromotionDraft as Draft } from "./promotion-draft";
 import "./promotion-community.css";
 
+import type { PromotionInput } from "../../../../../packages/core/src/promotion";
 
 import { promotionClient } from "@/infrastructure/promotion-client";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
+type Draft = Omit<PromotionInput, "rightsConfirmed"> & { rightsConfirmed: boolean };
+const initialDraft = (): Draft => ({ kind: "series", stage: "amateur", genre: "판타지", title: "", seriesTitle: "", description: "", readingUrl: "", videoUrl: "", cover: "", tags: [], contentWarning: "", rightsConfirmed: false });
 export function PromotionEditorPage() {
   const { id } = useParams(), userId = useApp((state) => state.userId), hydrated = useHydrated();
   useDocumentTitle(id ? "작품 소개 수정 · ToonStudio" : "내 작품 소개하기 · ToonStudio");
@@ -22,26 +23,11 @@ export function PromotionEditorPage() {
   return <PromotionEditor key={`${userId}:${id ?? "new"}`} id={id} userId={userId} />;
 }
 function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
-  const [recovery] = useState(() => id ? null : readPromotionDraft(userId));
-  const [draft, setDraft] = useState<Draft>(() => recovery?.status === "restored" ? recovery.value.draft : initialPromotionDraft());
-  const [tags, setTags] = useState(() => recovery?.status === "restored" ? recovery.value.tags : "");
-  const [draftStatus, setDraftStatus] = useState("이 탭에 초안을 자동 임시 저장합니다. 탭을 닫으면 없어질 수 있어요.");
-  const published = useRef(false);
+  const [draft, setDraft] = useState<Draft>(initialDraft), [tags, setTags] = useState("");
   const [version, setVersion] = useState<number | null>(null), [loading, setLoading] = useState(!!id);
   const [error, setError] = useState(""), [sending, setSending] = useState(false), [coverBusy, setCoverBusy] = useState(false);
   const busy = useRef(false), live = useRef(true), imageGeneration = useRef(0);
   const navigate = useNavigate();
-  useEffect(() => {
-    if (id) return;
-    const save = () => {
-      if (published.current || useApp.getState().userId !== userId) return;
-      const result = savePromotionDraft(userId, { draft, tags });
-      setDraftStatus(result === "unavailable" ? "이 브라우저에서는 임시 저장하지 못했어요. 화면을 닫기 전에 입력 내용을 복사해 주세요." : result === "saved" ? "이 탭에 초안 저장됨 · 아직 공개되지 않았어요. 탭을 닫으면 없어질 수 있어요." : "이 탭에 초안을 자동 임시 저장합니다. 탭을 닫으면 없어질 수 있어요.");
-    };
-    const timer = window.setTimeout(save, 300);
-    window.addEventListener("pagehide", save);
-    return () => { window.clearTimeout(timer); window.removeEventListener("pagehide", save); };
-  }, [draft, tags, id, userId]);
   useEffect(() => { live.current = true; return () => { live.current = false; imageGeneration.current += 1; }; }, []);
   useEffect(() => {
     if (!id) return;
@@ -75,16 +61,11 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       let targetId = id;
       if (id && version !== null) await promotionClient.update(id, parsed.value, version);
       else targetId = (await promotionClient.create(parsed.value)).id;
-      if (live.current && useApp.getState().userId === userId && targetId) {
-        published.current = true;
-        if (!id) clearPromotionDraft(userId);
-        navigate(`/community/promote/${encodeURIComponent(targetId)}`);
-      }
+      if (live.current && useApp.getState().userId === userId && targetId) navigate(`/community/promote/${encodeURIComponent(targetId)}`);
     } catch (cause) { const message = await getApiErrorMessage(cause, "등록하지 못했어요. 입력 내용은 유지됩니다."); if (live.current) setError(message); }
     finally { busy.current = false; if (live.current) setSending(false); }
   };
   return <main className="pc-shell pc-narrow"><Link to={id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote"}>← {id ? "게시물로 돌아가기" : "홍보 커뮤니티"}</Link><header className="pc-editor-heading"><p className="pc-eyebrow">YOUR STORY STARTS HERE</p><h1>{id ? "작품 소개 수정" : "내 작품 소개하기"}</h1><p>첫 독자에게 작품의 매력과 만나러 갈 곳을 알려주세요.</p></header>
-    {!id && <aside className="pc-notice" aria-label="홍보 초안 저장 안내">{recovery?.status === "restored" && <p>이 탭에 임시 저장한 초안을 불러왔어요. 게시 권한은 공개 전에 다시 확인해 주세요.</p>}<p role="status">{draftStatus}</p></aside>}
     {error && <p className="pc-error" role="alert">{error}</p>}{loading && <p role="status">기존 내용을 불러오고 있어요.</p>}
     {!loading && (!id || version !== null) && <form className="pc-form" onSubmit={(event) => void submit(event)}><fieldset disabled={sending}><legend className="sr-only">작품 소개 작성</legend>
       <div className="pc-form-row"><label>소개 유형<select value={draft.kind} onChange={(event) => field("kind", event.target.value as Draft["kind"])}>{Object.entries(PROMOTION_KINDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>활동 단계<select value={draft.stage} onChange={(event) => field("stage", event.target.value as Draft["stage"])}>{Object.entries(PROMOTION_STAGES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>장르<select value={draft.genre} onChange={(event) => field("genre", event.target.value as Draft["genre"])}>{PROMOTION_GENRES.map((genre) => <option key={genre}>{genre}</option>)}</select></label></div>
