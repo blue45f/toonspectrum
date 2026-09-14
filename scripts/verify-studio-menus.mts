@@ -362,6 +362,8 @@ export const MENU_DRIVEN_POPOVERS: {
   /** Prefer unique headers so menubar labels are not false positives. */
   expectVisible: string[];
   expectDialogName?: string;
+  /** Require the loaded feature body in addition to its surrounding popover chrome. */
+  expectSelector?: string;
   /** A shared word such as “배경” must belong to the loaded editor, not surrounding chrome. */
   contentSelector?: string;
 }[] = [
@@ -375,6 +377,7 @@ export const MENU_DRIVEN_POPOVERS: {
     item: "배경 · 톤",
     expectVisible: ["배경"],
     contentSelector: '[data-studio-background-panel="true"]',
+    expectSelector: '[data-studio-background-panel="true"] [role="tablist"][aria-label="배경 편집 탭"]',
   },
   {
     groupId: "brush",
@@ -782,6 +785,9 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
       if (entry.expectDialogName) {
         const dialog = page.getByRole("dialog", { name: entry.expectDialogName });
         await dialog.waitFor({ state: "visible", timeout: 5000 });
+      }
+      if (entry.expectSelector) {
+        await page.locator(entry.expectSelector).waitFor({ state: "visible", timeout: 5000 });
       }
 
       const content = entry.contentSelector ? page.locator(entry.contentSelector) : page;

@@ -615,6 +615,8 @@ export function StudioInspectorSelectedImageTools({
                           operation={pixelCombine}
                           imageSource={selectedReadableImageSource ?? null}
                           scopeKey={selected.id}
+                          displayWidth={selected.width}
+                          displayHeight={selected.height}
                           aspect={selected.width > 0 ? selected.height / selected.width : 1}
                           flipX={selected.flipped === true}
                           flipY={selected.flippedY === true}
@@ -623,7 +625,7 @@ export function StudioInspectorSelectedImageTools({
                             clearPolyLassoDraft();
                             commitPixelSelectionState(
                               next,
-                              intent === "smooth"
+                              intent === "smooth" || intent === "border"
                                 ? "transform"
                                 : intent === "restore-saved"
                                   ? "other"

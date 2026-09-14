@@ -70,7 +70,7 @@ describe("StudioDraftSaveCenter", () => {
     expect(screen.getByText("3개")).not.toBeNull();
   });
 
-  it("delegates manual save, version history and project backup to existing authorities", () => {
+  it("delegates manual save, version history and project backup to existing authorities", async () => {
     setOnline(true);
     const actions = renderCenter();
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 서버 r7 확인" }));
@@ -78,7 +78,8 @@ describe("StudioDraftSaveCenter", () => {
     fireEvent.click(screen.getByRole("button", { name: "지금 서버에 저장" }));
     fireEvent.click(screen.getByRole("button", { name: "버전·체크포인트" }));
 
-    expect(actions.onSaveDraft).toHaveBeenCalledTimes(1);
+    // The save adapter owns an in-flight Promise before invoking the authority.
+    await waitFor(() => expect(actions.onSaveDraft).toHaveBeenCalledTimes(1));
     expect(actions.onOpenVersions).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 서버 r7 확인" }));
@@ -170,7 +171,12 @@ describe("StudioDraftSaveCenter", () => {
     expect(screen.getByRole("button", { name: "저장 상태: 복구 저장 확인" })).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 복구 저장 확인" }));
     expect(screen.getByText("이 기기 복구 저장 확인 필요")).not.toBeNull();
-    expect(screen.getByText(/탭을 닫기 전에 프로젝트 백업을 내려받아 주세요/u)).not.toBeNull();
+    const dialog = screen.getByRole("dialog", { name: "초안 저장 센터" });
+    const descriptionId = dialog.getAttribute("aria-describedby");
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)?.textContent).toContain(
+      "탭을 닫기 전에 프로젝트 백업을 내려받아 주세요",
+    );
   });
 
   it("closes with Escape and restores focus to the status trigger", () => {

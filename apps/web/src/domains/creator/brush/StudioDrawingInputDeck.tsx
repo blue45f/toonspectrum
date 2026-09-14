@@ -79,7 +79,9 @@ export function StudioDrawingInputDeck(
         data-studio-drawing-input-deck-trigger="true"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[72] inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-strong bg-card/95 px-3 text-[0.68rem] font-bold text-fg shadow-[0_10px_30px_oklch(0.08_0.01_70/0.32)] backdrop-blur-xl",
+          "fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-strong bg-card/95 px-3 text-[0.68rem] font-bold text-fg shadow-[0_10px_30px_oklch(0.08_0.01_70/0.32)] backdrop-blur-xl",
+          // A closed launcher must yield to mobile tool sheets (z53–55).
+          props.mobile && !open ? "z-[52]" : "z-[72]",
           "hover:border-accent/45 hover:bg-raised active:scale-[0.98]",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
