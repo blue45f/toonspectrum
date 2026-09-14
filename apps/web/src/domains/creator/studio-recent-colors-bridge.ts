@@ -11,6 +11,7 @@ export interface StudioRecentColorsOwner {
 }
 
 type StudioRecentColorsIntent =
+  | Readonly<{ type: "load" }>
   | Readonly<{ type: "remember"; color: string }>
   | Readonly<{ type: "clear" }>;
 
@@ -38,7 +39,8 @@ function dispatchIntent(
   target: StudioRecentColorsOwner,
   intent: StudioRecentColorsIntent,
 ): void {
-  if (intent.type === "remember") target.rememberColor(intent.color);
+  if (intent.type === "load") target.ensureRecentColorsLoaded();
+  else if (intent.type === "remember") target.rememberColor(intent.color);
   else target.clearRecentColors();
 }
 
@@ -79,7 +81,13 @@ export function getStudioRecentColorsServerSnapshot(): readonly string[] {
 }
 
 export function ensureSharedStudioRecentColorsLoaded(): void {
-  owner?.value.ensureRecentColorsLoaded();
+  if (owner) {
+    owner.value.ensureRecentColorsLoaded();
+    return;
+  }
+  if (!pendingIntents.some((intent) => intent.type === "load")) {
+    pendingIntents.push(Object.freeze({ type: "load" } as const));
+  }
 }
 
 /**
@@ -100,4 +108,12 @@ export function clearSharedStudioRecentColors(): void {
   const intent = Object.freeze({ type: "clear" } as const);
   if (owner) dispatchIntent(owner.value, intent);
   else pendingIntents.push(intent);
+}
+
+/** Test-only isolation for module state shared by multiple jsdom hook/component suites. */
+export function resetStudioRecentColorsBridgeForTests(): void {
+  snapshot = EMPTY_RECENT_COLORS;
+  owner = null;
+  pendingIntents = [];
+  listeners.clear();
 }
