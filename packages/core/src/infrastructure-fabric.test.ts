@@ -88,6 +88,35 @@ describe("infrastructure fabric placement", () => {
     });
   });
 
+  it("rejects replica fallback for authoritative reads", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["neon-core", provider("neon-core", ["ledger-read"])],
+      ["read-replica", provider("read-replica", ["ledger-read"])],
+    ]);
+    const decision = decideInfrastructurePlacement({
+      workload: workload({
+        workloadId: "core-ledger-read",
+        consistency: "authoritative",
+        authority: "neon-core",
+        candidates: ["neon-core", "read-replica"],
+        requiredRoles: ["ledger-read"],
+        allowReadFallback: true,
+      }),
+      providers,
+      snapshots: new Map([
+        ["neon-core", snapshot("neon-core", 0.4)],
+        ["read-replica", snapshot("read-replica", 0.1)],
+      ]),
+      nowEpochMs: now,
+    });
+
+    expect(decision).toEqual({
+      outcome: "rejected",
+      reason: "POLICY_INVALID",
+      rejectedProviders: ["neon-core", "read-replica"],
+    });
+  });
+
   it("routes a derived read to the healthy replica with the most free headroom", () => {
     const providers = new Map<string, InfrastructureProviderPolicy>([
       ["turso", provider("turso", ["catalog-read"])],
@@ -419,6 +448,50 @@ describe("infrastructure fabric placement", () => {
         ...plan.retries.map(({ providerId }) => providerId),
       ])).toEqual(new Set(["d1", "static"]));
     }
+  });
+
+  it("accepts empty exclusion and quota-impact maps from generic callers", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["turso", provider("turso", ["catalog-read"], 0.8, "hard-stop-free")],
+      ["d1", provider("d1", ["catalog-read"], 0.8, "hard-stop-free")],
+    ]);
+    const decision = decideInfrastructurePlacement({
+      workload: workload(),
+      providers,
+      snapshots: new Map(),
+      nowEpochMs: now,
+      estimatedQuotaImpactByDimension: {},
+      excludedProviderIds: [],
+    });
+
+    expect(decision).toMatchObject({ outcome: "selected" });
+  });
+
+  it("never emits automatic retry targets for write workloads", () => {
+    const providers = new Map<string, InfrastructureProviderPolicy>([
+      ["r2", provider("r2", ["thumbnail-write"])],
+      ["imagekit", provider("imagekit", ["thumbnail-write"])],
+    ]);
+    const plan = planInfrastructurePlacement({
+      workload: workload({
+        workloadId: "thumbnail-write",
+        operation: "write",
+        consistency: "derived",
+        authority: "r2",
+        candidates: ["r2", "imagekit"],
+        requiredRoles: ["thumbnail-write"],
+        allowReadFallback: false,
+      }),
+      providers,
+      snapshots: new Map([
+        ["r2", snapshot("r2", 0.2)],
+        ["imagekit", snapshot("imagekit", 0.3)],
+      ]),
+      nowEpochMs: now,
+    });
+
+    expect(plan.outcome).toBe("selected");
+    if (plan.outcome === "selected") expect(plan.retries).toEqual([]);
   });
 
   it("fails closed when a declared quota dimension is missing from telemetry", () => {
