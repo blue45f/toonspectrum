@@ -35,8 +35,8 @@ describe("studio workspace routes", () => {
     ["/studio/3d/dcc/sculpt", "", "dcc", null, "sculpt", "/studio/3d/dcc/sculpt"],
     ["/studio/work/work-1/3d", "", "dcc", "work-1", "model", "/studio/work/work-1/3d/dcc/model"],
     ["/studio/work/work-1/3d/dcc/shot", "", "dcc", "work-1", "shot", "/studio/work/work-1/3d/dcc/shot"],
-    ["/studio/p/project-1/d/document-1", "?workspace=comic", "comic", "document-1", null, "/studio/p/project-1/d/document-1"],
-    ["/studio/p/project-1/d/document-1", "?workspace=3d", "bg3d", "document-1", null, "/studio/p/project-1/d/document-1"],
+    ["/studio/p/project-1/d/document-1", "?workspace=comic", "comic", null, null, "/studio/p/project-1/d/document-1"],
+    ["/studio/p/project-1/d/document-1", "?workspace=3d", "bg3d", null, null, "/studio/p/project-1/d/document-1"],
     ["/studio/draft/draft-1", "?workspace=slides", "canvas", null, null, "/studio/draft/draft-1"],
   ] as const)(
     "parses %s as a durable %s workspace route",
@@ -63,7 +63,7 @@ describe("studio workspace routes", () => {
       documentId: "document-2",
       draftId: null,
       documentWorkspace: "localization",
-      workId: "document-2",
+      workId: null,
       surface: "comic",
     });
     expect(parseStudioWorkspaceRoute({
