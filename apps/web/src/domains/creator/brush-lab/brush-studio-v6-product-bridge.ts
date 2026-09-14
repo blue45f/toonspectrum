@@ -6,13 +6,44 @@ import {
 import { studioBrushEngineProgramSetFromMaterial } from "../brush/studio-brush-engine-program-set";
 import { loadStudioBrushLibrarySqliteRepository } from "../studio-page-editor-runtime-loaders";
 import { normalizeBrushStudioV6MaterialConfig } from "./brush-studio-v6-material-engine";
-
-import type { BrushStudioV6Program } from "./brush-studio-v6-engine";
+import {
+  BRUSH_STUDIO_V6_DEFAULT_LICENSE_PROFILE,
+  type BrushStudioV6LicenseProfile,
+} from "./brush-studio-v6-license-profile";
+import { planBrushStudioV6ProviderRuntime } from "./brush-studio-v6-provider-runtime";
+import { brushStudioV6ActiveNodes, type BrushStudioV6Program } from "./brush-studio-v6-engine";
 
 /** A real brush-library snapshot, consumed by the same pointer-start path as every saved brush. */
-export function createBrushStudioV6ProductBrush(program: BrushStudioV6Program): StudioSavedBrush {
+export function createBrushStudioV6ProductBrush(
+  program: BrushStudioV6Program,
+  licenseProfile: BrushStudioV6LicenseProfile = BRUSH_STUDIO_V6_DEFAULT_LICENSE_PROFILE,
+): StudioSavedBrush {
   const material = normalizeBrushStudioV6MaterialConfig(program);
   if (!material) throw new Error("브러시 재질 설정을 읽을 수 없어요.");
+  const providerPlan = planBrushStudioV6ProviderRuntime(
+    brushStudioV6ActiveNodes(program),
+    licenseProfile,
+  );
+  if (!providerPlan.valid) {
+    throw new Error(`무폴백 브러시 엔진을 실행할 수 없어요: ${providerPlan.blockedNodeIds.join(", ")}`);
+  }
+  const persistedMaterial = {
+    ...material,
+    version: 2 as const,
+    runtime: {
+      version: 1 as const,
+      fallbackPolicy: "none" as const,
+      licenseProfile: providerPlan.licenseProfile,
+      bindings: providerPlan.bindings.map((binding) => ({
+        providerId: binding.providerId,
+        version: binding.version,
+        license: binding.license,
+        rights: binding.rights,
+        execution: binding.execution,
+        nodeIds: binding.nodeIds,
+      })),
+    },
+  };
   return createBrush(program.name, {
     ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
     brushId: "brush",
@@ -27,7 +58,7 @@ export function createBrushStudioV6ProductBrush(program: BrushStudioV6Program): 
     tiltEnabled: material.input.tiltEnabled,
     stabilizer: 0,
     postCorrection: 0,
-    enginePrograms: studioBrushEngineProgramSetFromMaterial(material),
+    enginePrograms: studioBrushEngineProgramSetFromMaterial(persistedMaterial),
   });
 }
 
@@ -40,7 +71,10 @@ export async function saveBrushStudioV6ProductBrush(program: BrushStudioV6Progra
   }
   const stored = await product.repository.put(brush);
   const verified = await product.repository.getById(stored.id);
-  if (!verified?.enginePrograms?.material) throw new Error("저장된 브러시를 다시 읽지 못했어요.");
+  if (verified?.enginePrograms?.material?.version !== 2
+    || verified.enginePrograms.material.runtime?.fallbackPolicy !== "none") {
+    throw new Error("저장된 무폴백 브러시 실행 영수증을 다시 읽지 못했어요.");
+  }
   return verified;
 }
 
