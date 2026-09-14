@@ -25,6 +25,8 @@ const fixtureKeys = [
   "PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER",
   "PRIVATE_OBJECT_STORAGE_EXPORT_PROVIDER",
   "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT",
+  "PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED",
+  "PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON",
   "SUPABASE_OBJECT_STORAGE_ENABLED",
   "SUPABASE_OBJECT_STORAGE_URL",
   "SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY",
@@ -177,15 +179,26 @@ describe("production reconciliation runtime authority", () => {
       "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE",
       `sha256:${"a".repeat(64)}`,
     );
+    vi.stubEnv("PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED_VALUE", "true");
+    vi.stubEnv(
+      "PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON_VALUE",
+      '{"version":"toonspectrum.private-object-storage-quota.v1","providers":{}}',
+    );
     vi.stubEnv("R2_OBJECT_STORAGE_ENDPOINT_VALUE", "https://account.r2.example");
 
     const report = await reconcile();
 
     expect(posted("PRIVATE_OBJECT_STORAGE_ENABLED")?.value).toBe("true");
     expect(posted("PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER")?.value).toBe("cloudflare-r2");
+    expect(posted("PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED")?.value).toBe("true");
+    expect(posted("PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON")?.value).toContain(
+      "toonspectrum.private-object-storage-quota.v1",
+    );
     expect(posted("R2_OBJECT_STORAGE_ENDPOINT")?.value).toBe("https://account.r2.example");
     expect(report.planned).toEqual(expect.arrayContaining([
       "PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT",
+      "PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED",
+      "PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON",
       "R2_OBJECT_STORAGE_ENDPOINT",
     ]));
   });
@@ -297,6 +310,12 @@ describe("production readiness workflow", () => {
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_STATE_SECRET_VALUE).toBe("${{ secrets.AUTH_STATE_SECRET }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE).toBe(
       "${{ secrets.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT }}",
+    );
+    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED_VALUE).toBe(
+      "${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED }}",
+    );
+    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON_VALUE).toBe(
+      "${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON }}",
     );
     expect(workflow.jobs["reconcile-and-deploy"].env.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE).toBe(
       "${{ secrets.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY }}",

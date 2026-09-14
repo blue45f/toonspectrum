@@ -137,6 +137,29 @@ transaction과 outbox를 완료한 뒤 idempotent consumer가 파생 데이터�
 `free-allowance-with-app-cap` 공급자는 공급자 청구서가 한도를 알려주기 전에 애플리케이션에서
 더 낮은 hard cap을 적용한다. 알림은 과금 차단이 아니므로 자동 유료 failover를 허용하지 않는다.
 
+### Private object storage 쓰기 admission
+
+목적별 R2/Supabase/B2 라우팅은 객체 위치의 권위다. 현재 v1 객체 참조에는 provider locator가
+없으므로 quota 부족 시 다른 공급자로 자동 write failover하지 않는다. 대신 선택된 공급자에
+바이트를 보내기 전에 `FreeTierPrivateObjectStorageWriteAdmission`이 다음을 검증한다.
+
+- 공급자 상태가 `healthy`인지
+- 측정 시각과 `staleAfterMs` 기준으로 사용량 스냅샷이 신선한지
+- `max(usedBytes, forecastBytes) + uploadBytes`가 `capacityBytes × applicationHardCapRatio` 이하인지
+- source 원본은 단일 authority에만 쓰이는지
+
+운영에서 활성화할 때는 다음 값을 함께 설정한다.
+
+```dotenv
+PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED=true
+PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON={"version":"toonspectrum.private-object-storage-quota.v1","providers":{"cloudflare-r2":{"capacityBytes":10737418240,"applicationHardCapRatio":0.8,"billingBoundary":"free-allowance-with-app-cap","health":"healthy","usedBytes":0,"forecastBytes":0,"observedAtEpochMs":1800000000000,"staleAfterMs":86400000}}}
+```
+
+JSON에는 실제 라우팅에서 선택한 모든 공급자(`cloudflare-r2`, `supabase`, `backblaze-b2`)가
+포함되어야 한다. 정적 환경 스냅샷은 만료되면 안전하게 쓰기를 중단한다. 이후 KV/D1 기반
+실시간 수집기를 연결할 때는 `PrivateObjectStorageRuntimes.writeAdmission`으로 snapshot source를
+주입하고 라우팅·객체 wire contract는 변경하지 않는다.
+
 ## 배포 절차
 
 ### 로컬 검증
