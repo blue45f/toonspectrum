@@ -1,14 +1,14 @@
 import { Navigate } from "react-router-dom";
 
-import { CreatorEcosystemPage } from "@/domains/creator/ecosystem/CreatorEcosystemPage";
+import { PersonalInferencePage } from "@/domains/creator/ai/PersonalInferencePage";
 import { StudioAiSettingsPage } from "@/domains/creator/ai/StudioAiSettingsPage";
+import { CreatorEcosystemPage } from "@/domains/creator/ecosystem/CreatorEcosystemPage";
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
 import { studioRoutePath } from "@/domains/creator/studio-route-registry";
 
 import { defineAppRoutes } from "../app-route-definition";
 import {
   CharacterShaperLandingPage,
-  CreatorInferencePage,
   CreateChallengesPage,
   CreateGalleryPage,
   CreateSeriesPage,
@@ -33,7 +33,7 @@ import {
 export const creatorRoutes = defineAppRoutes([
   { id: "creator-ai-settings", path: "/studio/ai-settings", element: <StudioAiSettingsPage /> },
   { id: "creator-ecosystem", path: "/studio/ecosystem", element: <CreatorEcosystemPage /> },
-  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <CreatorInferencePage /> },
+  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <PersonalInferencePage /> },
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
   { id: "creator-studio-generative", path: "/studio/generate", element: <StudioGenerativePage /> },
   { id: "creator-spatial-reader", path: "/read/spatial", element: <StudioSpatialReaderPage /> },
