@@ -4,11 +4,15 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveStudioChromeInspectorPropertySurface } from "./studio-chrome-ia-map";
+import { resetStudioRecentColorsBridgeForTests } from "./studio-recent-colors-bridge";
 import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
 
 import type { DrawEl } from "./studio-element-model";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetStudioRecentColorsBridgeForTests();
+});
 
 function drawSelection(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
@@ -45,6 +49,11 @@ describe("StudioInspectorSelectionStrokeControls", () => {
 
     expect(screen.getByTestId("studio-inspector-context-selection")).toBeTruthy();
     expect(screen.getByTestId("studio-inspector-selection-stroke-controls")).toBeTruthy();
+    expect(screen.getByLabelText("선 색상")).toBeTruthy();
+    expect(screen.getByLabelText("선 없음").getAttribute("aria-pressed")).toBe("false");
+    expect(
+      screen.getByTestId("studio-selection-stroke-preview").getAttribute("aria-label"),
+    ).toBe("선 미리보기: #112233, 5px, 80%");
     for (const label of surface.requiredControlLabels) {
       expect(screen.getByText(label), label).toBeTruthy();
       expect(screen.getByLabelText(label), `aria ${label}`).toBeTruthy();
@@ -55,5 +64,77 @@ describe("StudioInspectorSelectionStrokeControls", () => {
 
     fireEvent.change(screen.getByLabelText("불투명도"), { target: { value: "0.5" } });
     expect(patchEl).toHaveBeenCalledWith("draw-1", { opacity: 0.5 });
+  });
+
+  it("applies a recent stroke colour immediately and records the committed colour", () => {
+    const patchEl = vi.fn();
+    const onRememberColor = vi.fn();
+
+    render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection()}
+        patchEl={patchEl}
+        recentColors={["#445566", "#778899"]}
+        onRememberColor={onRememberColor}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("최근 선 색상 1 #445566 적용"));
+
+    expect(patchEl).toHaveBeenCalledWith("draw-1", { stroke: "#445566" });
+    expect(onRememberColor).toHaveBeenCalledWith("#445566");
+  });
+
+  it("hides a freehand stroke without feeding a non-hex colour to brush renderers", () => {
+    const patchEl = vi.fn();
+    const { rerender } = render(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection()}
+        patchEl={patchEl}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { opacity: 0 });
+
+    rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ opacity: 0 })}
+        patchEl={patchEl}
+      />,
+    );
+
+    expect(screen.getByLabelText("선 없음").getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByLabelText("선 두께") as HTMLInputElement).disabled).toBe(true);
+    expect(
+      screen.getByTestId("studio-selection-stroke-preview").getAttribute("aria-label"),
+    ).toBe("선 미리보기: 선 없음");
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", {
+      stroke: "#112233",
+      opacity: 0.8,
+    });
+  });
+
+  it("removes only the outline from a filled vector shape", () => {
+    const patchEl = vi.fn();
+    const shape = drawSelection({ kind: "rect", fill: "#ffffff" });
+    const { rerender } = render(
+      <StudioInspectorSelectionStrokeControls selected={shape} patchEl={patchEl} />,
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "transparent" });
+
+    rerender(
+      <StudioInspectorSelectionStrokeControls
+        selected={drawSelection({ kind: "rect", fill: "#ffffff", stroke: "transparent" })}
+        patchEl={patchEl}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("선 없음"));
+    expect(patchEl).toHaveBeenLastCalledWith("draw-1", { stroke: "#112233" });
   });
 });
