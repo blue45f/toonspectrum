@@ -22,6 +22,16 @@ import {
   type StudioServiceWorkerCacheBucket,
   type StudioServiceWorkerRouteClass,
 } from "./studio-service-worker-policy";
+import {
+  boundedNavigationResponse,
+  cachedLocalDrawingRescue,
+  clearLocalDrawingCaches,
+  installLocalDrawingRescue,
+  isLocalDrawingRequest,
+  isNavigationOutage,
+  localDrawingResponse,
+  localDrawingRescueReady,
+} from "./studio-local-drawing-rescue";
 
 import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
 
@@ -157,6 +167,17 @@ function shellRequest(url: string): Request {
   });
 }
 
+async function readStudioRescueDrawing(): Promise<Response | undefined> {
+  try {
+    // An HTML entry alone is insufficient: every dependency must be available.
+    if (await localDrawingRescueReady()) {
+      const rescue = await cachedLocalDrawingRescue();
+      if (rescue) return rescue;
+    }
+  } catch { /* Try the independently prepared portable drawing cache next. */ }
+  return readEmergencyDrawing();
+}
+
 async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWorkerRouteClass): Promise<Response> {
   if (routeClass === "studio-navigation") event.waitUntil(warmStudioPayload());
   try {
@@ -171,13 +192,13 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
       refreshShell: (response) => persist("precache", shellRequest(pathname), response),
       waitUntil: (promise) => event.waitUntil(promise),
     });
-    if (routeClass === "studio-navigation" && (response.status === 408 || response.status >= 500)) {
-      return (await readEmergencyDrawing()) ?? response;
+    if (routeClass === "studio-navigation" && isNavigationOutage(response.status)) {
+      return (await readStudioRescueDrawing()) ?? response;
     }
     return response;
   } catch (error) {
     if (routeClass === "studio-navigation") {
-      const emergency = await readEmergencyDrawing();
+      const emergency = await readStudioRescueDrawing();
       if (emergency) return emergency;
     }
     throw error;
@@ -186,6 +207,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
 
 scope.addEventListener("install", (event) => {
   event.waitUntil((async () => {
+    await installLocalDrawingRescue();
     const cache = await caches.open(cacheNames.precache);
     // addAll is atomic: a broken deploy cannot replace a working critical cache.
     await cache.addAll(manifest.criticalUrls.map((url) => new Request(url)));
@@ -211,6 +233,10 @@ scope.addEventListener("fetch", (event) => {
     return;
   }
   const { request } = event;
+  if (isLocalDrawingRequest(request, scope.location.origin)) {
+    event.respondWith(localDrawingResponse(request));
+    return;
+  }
   const routeClass = classifyStudioServiceWorkerRequest({
     url: request.url, origin: scope.location.origin, method: request.method,
     mode: request.mode, destination: request.destination, rangeHeader: request.headers.get("range"),
@@ -229,6 +255,7 @@ async function killStudioServiceWorker(): Promise<void> {
   const doomed = [...staleStudioServiceWorkerCacheNames(existing, "__none__"),
     ...legacyStudioServiceWorkerCacheNames(existing), ...Object.values(cacheNames)];
   await Promise.all([...new Set(doomed)].map((name) => caches.delete(name)));
+  await clearLocalDrawingCaches();
   await scope.registration.unregister();
 }
 
@@ -283,6 +310,13 @@ scope.addEventListener("message", (event) => {
     const url = new URL(source.url);
     if (url.origin !== scope.location.origin || !(url.pathname === "/studio" || url.pathname.startsWith("/studio/"))) return;
     event.waitUntil(prepareOffline(data.urls).then(reply, () => reply({ ok: false, error: "offline-preparation-failed" })));
+    return;
+  }
+  if (data && typeof data === "object" && "type" in data && data.type === "toonstudio-local-drawing:inspect") {
+    event.waitUntil(localDrawingRescueReady().then(
+      (ready) => event.ports[0]?.postMessage({ type: "toonstudio-local-drawing:ready", ready }),
+      () => event.ports[0]?.postMessage({ type: "toonstudio-local-drawing:ready", ready: false }),
+    ));
     return;
   }
   if (!isStudioServiceWorkerMessage(data)) return;
