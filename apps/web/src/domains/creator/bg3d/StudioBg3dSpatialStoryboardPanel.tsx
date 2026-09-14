@@ -1,3 +1,4 @@
+import { SPATIAL_AUTHORING_PRESETS, spatialAuthoringPresetId, spatialAuthoringMetrics, serializeSpatialStoryboardCsv } from "./studio-spatial-authoring-presets";
 import { SpatialWebtoonReaderLauncher } from "../spatial/SpatialWebtoonReaderLauncher";
 /**
  * Spatial editorial plan, not an immersive player. SVG is an explicitly labelled top-down map.
@@ -77,6 +78,8 @@ export default function StudioBg3dSpatialStoryboardPanel() {
   // Invalidate delayed file reads on capture/restore locks and on unmount; no stale state writes.
   useEffect(() => () => { importEpoch.current += 1; }, [enabled]);
   const plan = buildSpatialStoryboardPlan(runtime?.productionShots ?? [], settings);
+  const presetId = spatialAuthoringPresetId(settings);
+  const metrics = spatialAuthoringMetrics(plan);
   const active = plan.panels.find((panel) => panel.shotId === selectedId) ?? plan.panels[0];
   const activeIndex = active ? plan.panels.indexOf(active) : -1;
   const page = active?.page ?? 0;
@@ -108,18 +111,18 @@ export default function StudioBg3dSpatialStoryboardPanel() {
       if (epoch === importEpoch.current) setError("올바른 공간 콘티 계획 v1 JSON 파일(256KB 이하)을 선택하세요.");
     }
   }
-  function download() {
+  function download(format: "json" | "csv") {
     if (!enabled || !plan.panels.length) return;
     let url: string | null = null;
     const anchor = document.createElement("a");
     try {
-      url = URL.createObjectURL(new Blob([serializeSpatialStoryboardPlan(plan)], { type: "application/json" }));
+      url = URL.createObjectURL(new Blob([format === "csv" ? serializeSpatialStoryboardCsv(plan) : serializeSpatialStoryboardPlan(plan)], { type: format === "csv" ? "text/csv;charset=utf-8" : "application/json" }));
       anchor.href = url;
-      anchor.download = "toonstudio-spatial-storyboard.json";
+      anchor.download = `toonstudio-spatial-storyboard.${format}`;
       document.body.append(anchor);
       anchor.click();
       setError("");
-      setMessage("계획 JSON 다운로드를 요청했습니다. 헤드셋 재생 파일이나 장면 백업은 아닙니다.");
+      setMessage(`${format === "csv" ? "컷 배치표 CSV" : "계획 JSON"} 다운로드를 요청했습니다. 헤드셋 재생 파일이나 장면 백업은 아닙니다.`);
     } catch { setError("계획 파일 다운로드를 시작하지 못했습니다."); }
     finally {
       anchor.remove();
@@ -132,6 +135,13 @@ export default function StudioBg3dSpatialStoryboardPanel() {
       <p className="text-xs leading-relaxed text-fg-3">저장된 3D 샷을 공간에 놓는 <strong className="text-fg">배치 계획</strong>입니다. 컷 이미지를 렌더링하거나 VR·AR 장면에 자동 배치하지 않습니다.</p>
       <PlanMap panels={visiblePanels} selectedId={active?.shotId ?? null} />
       <p className="text-xs text-fg-3">{plan.panels.length}컷 · {plan.pageCount ? page + 1 : 0}/{plan.pageCount}페이지 · 실제 크기의 비율로 표시한 평면도</p>
+      <p className="text-xs leading-relaxed text-fg-3" aria-label="공간 배치 검토 요약">정면 컷 각도: 가로 {metrics.horizontalDegrees}° · 세로 {metrics.verticalDegrees}° · 페이지당 최대 {metrics.maxPanelsPerPage}컷. 헤드셋 시야각이나 글자 가독성 판정이 아닙니다.</p>
+      {plan.pageCount > 1 ? <label className="block space-y-1 text-xs text-fg-2">배치 페이지 바로 이동
+        <select className={FIELD} value={page} disabled={!enabled} onChange={(event) => {
+          const first = plan.panels.find((panel) => panel.page === Number(event.target.value));
+          if (first && enabled) setSelectedId(first.shotId);
+        }}>{Array.from({ length: plan.pageCount }, (_, index) => <option key={index} value={index}>{index + 1} / {plan.pageCount} 페이지</option>)}</select>
+      </label> : null}
       {!plan.panels.length ? <p className="rounded-lg border border-line p-3 text-xs text-fg-2">현재 구도를 컷으로 저장하거나 기존 카메라 도구에서 샷을 추가하세요.</p> : (
         <>
           <div className="grid grid-cols-2 gap-2">
@@ -159,6 +169,12 @@ export default function StudioBg3dSpatialStoryboardPanel() {
       <p className="text-xs leading-relaxed text-fg-3">컷 선택만으로 카메라가 움직이지 않습니다. 위 적용 버튼은 저장된 샷의 구도와 표시 설정을 바꿉니다. 헤드셋 검토는 아래 기존 AR·VR 미리보기를 사용하세요.</p>
       <fieldset disabled={!enabled} className="grid grid-cols-2 gap-3 disabled:opacity-50">
         <legend className="mb-2 text-xs font-bold text-fg">공간 배치 설정</legend>
+        <div className="col-span-2 grid grid-cols-2 gap-2" role="group" aria-label="공간 콘티 시작 설정">
+          {SPATIAL_AUTHORING_PRESETS.map((preset) => (
+            <button key={preset.id} type="button" className={`${BUTTON} aria-pressed:border-accent aria-pressed:bg-accent-soft`} disabled={!enabled} aria-pressed={presetId === preset.id} title={preset.hint} onClick={() => edit(preset.settings)}>{preset.label}</button>
+          ))}
+          <p className="col-span-2 text-xs leading-relaxed text-fg-3">읽기 방향과 저장된 샷은 유지됩니다. 프리셋은 배치 시작점이며 실제 기기에서 검토해야 합니다.</p>
+        </div>
         <label className="min-w-0 space-y-1 text-xs text-fg-2">배치 방식
           <select className={FIELD} value={settings.layout} onChange={(event) => edit({ layout: event.target.value as SpatialStoryboardSettings["layout"] })}>
             <option value="focus">한 컷 집중</option><option value="arc">곡면 배치</option><option value="wall">평면 벽 배치</option>
@@ -181,7 +197,8 @@ export default function StudioBg3dSpatialStoryboardPanel() {
       {plan.warnings.length ? <ul className="space-y-1 rounded-lg border border-line p-3 text-xs text-fg-2" aria-label="배치 검토 안내">{plan.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
       <p className="text-xs leading-relaxed text-fg-3">치수 경고는 편집 참고값이며 기기 호환성·가독성·안전 인증이 아닙니다. 설정은 도구를 닫으면 초기화됩니다. 유지하려면 계획 파일로 내보내세요.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={download}>계획 JSON 내보내기</button>
+        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("json")}>계획 JSON 내보내기</button>
+        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("csv")}>컷 배치표 CSV 내보내기</button>
         <button type="button" className={BUTTON} disabled={!enabled} onClick={() => fileInput.current?.click()}>계획 설정 가져오기</button>
         <button type="button" className={BUTTON} disabled={!enabled} onClick={() => edit(SPATIAL_STORYBOARD_DEFAULTS)}>설정 초기화</button>
         <input ref={fileInput} type="file" accept=".json,application/json" aria-label="공간 콘티 계획 파일" className="hidden" disabled={!enabled} onChange={(event) => {

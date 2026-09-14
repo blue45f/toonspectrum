@@ -21,6 +21,8 @@ export const STUDIO_MATERIAL_TIP_PROGRAMS = [
   "contour-isoline", "aurora-curtain", "coral-polyp", "fern-frond",
   "ginkgo-fan", "maple-leaf", "rose-rosette", "dandelion-seedhead",
   "herringbone-twill", "guilloche-rosette", "fish-scale", "sequin-paillettes",
+  "sakura-petal", "bamboo-joint", "feather-quill", "lightning-fork",
+  "zipper-teeth", "cobblestone-joints", "knit-cable", "wave-seigaiha",
 ] as const;
 export type StudioMaterialTipProgram = (typeof STUDIO_MATERIAL_TIP_PROGRAMS)[number];
 const PROGRAMS: ReadonlySet<string> = new Set(STUDIO_MATERIAL_TIP_PROGRAMS);
@@ -385,6 +387,70 @@ export function createStudioMaterialTipField(
         const arc = ring(Math.hypot(localX, localY), 0.61, 0.032);
         const ribs = edge(periodicDistance(Math.atan2(localY, localX) * 3) - 0.08, 0.10) * 0.25;
         return Math.max(arc, ribs * edge(Math.hypot(localX, localY) - 0.6)) * disc;
+      }
+      case "sakura-petal": {
+        const body = ellipse(x, y + 0.04, 0.49 * (1 - y * 0.34), 0.81);
+        const notch = 1 - edge(Math.abs(x) - (-y - 0.49) * 0.38, 0.018) * edge(y + 0.49);
+        const vein = line(x, y, 0, 0.70, -0.015, -0.44, 0.013);
+        return body * notch * (0.5 + 0.5 * Math.max(vein, clamp01((x + 0.5) * 0.9)));
+      }
+      case "bamboo-joint": {
+        const stalk = edge(Math.abs(x) - 0.22) * edge(Math.abs(y) - 0.87);
+        const node = ellipse(x, y + 0.17, 0.28, 0.056);
+        const fiber = edge(periodicDistance(x * 23 + Math.sin(y * 3) * 0.1) - 0.08, 0.07);
+        const leafA = ellipse((x - 0.40) * 0.7 + (y + 0.45) * 0.7, (y + 0.45) * 0.7 - (x - 0.40) * 0.7, 0.35, 0.06);
+        const leafB = ellipse((x + 0.38) * 0.8 - (y + 0.38) * 0.6, (y + 0.38) * 0.8 + (x + 0.38) * 0.6, 0.31, 0.055);
+        return Math.max(stalk * (0.45 + fiber * 0.35), node, leafA, leafB);
+      }
+      case "feather-quill": {
+        const spine = line(x, y, -0.06, 0.92, 0.08, -0.88, 0.02);
+        const axis = x - 0.05 + y * 0.065;
+        const envelope = ellipse(axis, y + 0.12, 0.48, 0.68);
+        const barbs = edge(periodicDistance((y + Math.abs(axis) * 0.7) * 15) - 0.13, 0.09);
+        return Math.max(spine, envelope * barbs * (0.6 + 0.4 * (1 - Math.abs(axis))));
+      }
+      case "lightning-fork": {
+        const main = Math.max(line(x,y,0.3,-0.88,-0.14,-0.22,0.036),
+          line(x,y,-0.14,-0.22,0.17,-0.3,0.036), line(x,y,0.17,-0.3,-0.32,0.85,0.024));
+        const fork = Math.max(line(x,y,-0.05,0.12,0.42,0.22,0.016),
+          line(x,y,0.42,0.22,0.65,0.66,0.01), line(x,y,-0.1,-0.28,-0.55,-0.12,0.012));
+        return Math.max(main, fork * 0.72);
+      }
+      case "zipper-teeth": {
+        const pitch = 0.23;
+        const right = x >= 0;
+        const row = Math.floor((y + 1) / pitch + (right ? 0.5 : 0));
+        const cy = (row + 0.5 - (right ? 0.5 : 0)) * pitch - 1;
+        const tooth = edge(Math.max(Math.abs(x) - 0.48, Math.abs(y - cy) - 0.065))
+          * edge(0.05 - Math.abs(x));
+        const tape = edge(Math.abs(Math.abs(x) - 0.60) - 0.028);
+        return Math.max(tooth, tape * 0.58) * edge(Math.abs(y) - 0.89);
+      }
+      case "cobblestone-joints": {
+        cellular(x * 3.3 + 10, y * 3.3 + 10, stableSeed, cell);
+        const mortar = edge((cell[1]! - cell[0]!) - 0.075, 0.07);
+        const bevel = edge((cell[1]! - cell[0]!) - 0.17, 0.07) * 0.32;
+        return Math.max(mortar, bevel) * edge(Math.max(Math.abs(x),Math.abs(y)) - 0.91, 0.05);
+      }
+      case "knit-cable": {
+        const wave = Math.sin(y * Math.PI * 2.4) * 0.30;
+        const a = edge(Math.abs(x - wave) - 0.07, 0.03);
+        const b = edge(Math.abs(x + wave) - 0.07, 0.03);
+        const front = Math.cos(y * Math.PI * 2.4) > 0;
+        const weave = Math.max(a * (front ? 1 : 0.45), b * (front ? 0.45 : 1));
+        const fiber = 0.68 + 0.32 * noise(x * 51, y * 23, stableSeed);
+        return weave * fiber * edge(Math.abs(y) - 0.9, 0.05);
+      }
+      case "wave-seigaiha": {
+        const gy = (y + 1) * 2.5;
+        const row = Math.floor(gy);
+        const gx = (x + 1) * 2.5 + ((row % 2) + 2) % 2 * 0.5;
+        const lx = gx - Math.floor(gx) - 0.5;
+        const ly = gy - row;
+        const radius = Math.hypot(lx, ly);
+        let waves = 0;
+        for (let band = 1; band <= 4; band++) waves = Math.max(waves, ring(radius, band * 0.22, 0.025));
+        return waves * edge(Math.max(Math.abs(x), Math.abs(y)) - 0.92, 0.04);
       }
       case "sequin-paillettes": {
         const gy = (y + 1) * 3.2;

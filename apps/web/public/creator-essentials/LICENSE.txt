@@ -1,0 +1,8 @@
+SPDX-License-Identifier: CC0-1.0
+
+To the extent possible under law, the authors of these original generated construction assets waive copyright and related rights under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+This dedication applies only to the generated SVG and GLB assets in this folder, not to the generator, application code, dependencies, or any third-party content. No external artwork or character designs were used.
+
+Models are construction references with named mesh components, not rigged/skinned characters, medical anatomy, automatic reconstruction, or safety-certified environments.
