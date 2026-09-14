@@ -1,3 +1,4 @@
+import { rejectOperatorFundedAi } from "../../config/user-funded-ai-policy";
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException, HttpException, HttpStatus } from "@nestjs/common";
 import { buildMediaInferenceGraph, DEFAULT_MEDIA_MODELS, mediaGraphAvailability, parseMediaInferenceInput, record, type MediaInferenceKind } from "./studio-media-inference-graph";
@@ -47,6 +48,7 @@ function publicJob(job: MediaJob) {
 export class StudioMediaInferenceService {
   private store: MediaInferenceStore | undefined;
   private configuration() {
+    rejectOperatorFundedAi();
     const value = process.env.STUDIO_COMFYUI_URL?.trim();
     if (!value || !process.env.DATABASE_URL) throw new ServiceUnavailableException("자체 GPU 추론 서버와 작업 저장소가 아직 설정되지 않았어요.");
     let origin: string;

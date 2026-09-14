@@ -1,4 +1,7 @@
-import { api, apiPath } from "@/infrastructure/api";
+import { createUserInferenceApi } from "@/shared/ai/user-inference-api";
+import { userAiConnection } from "@/shared/ai/user-ai-store";
+
+const apiPath = (path: string) => path;
 
 export type InferenceMode = "image-to-video" | "image-to-3d" | "model-to-2d";
 export interface InferenceArtifact { name: string; bytes: number; mime: string; sha256: string }
@@ -27,6 +30,7 @@ function base64(bytes: Uint8Array): string {
   return btoa(text);
 }
 export async function uploadInferenceAsset(file: File, signal: AbortSignal, onProgress: (percent: number) => void): Promise<string> {
+  const api = createUserInferenceApi();
   const mime = file.name.toLowerCase().endsWith(".glb") ? "model/gltf-binary" : file.type;
   if (!["image/png", "image/jpeg", "image/webp", "model/gltf-binary"].includes(mime) || !file.size || file.size > (mime === "model/gltf-binary" ? 32 : 8) * CHUNK) throw new Error("이미지는 8MB, GLB는 32MB 이하를 선택하세요.");
   const sha256 = await hash(await file.arrayBuffer());
@@ -48,24 +52,30 @@ export async function uploadInferenceAsset(file: File, signal: AbortSignal, onPr
   }
 }
 export async function inferenceCapabilities(signal?: AbortSignal): Promise<InferenceCapabilities> {
+  if (!userAiConnection("inference")) return { enabled: false, engines: {}, reason: "통합 AI 설정에서 개인 Creator Runtime 주소와 토큰을 등록하세요." };
+  const api = createUserInferenceApi();
   const value = await api.get<InferenceCapabilities>(`${BASE}/status`, { signal, timeout: 15_000 });
   if (!value || typeof value.enabled !== "boolean" || !value.engines || typeof value.engines !== "object") throw new Error("추론 서버 설정 응답이 올바르지 않습니다.");
   for (const engine of Object.values(value.engines)) if (!engine || typeof engine.configured !== "boolean" || typeof engine.model !== "string") throw new Error("추론 모델 설정이 올바르지 않습니다.");
   return value;
 }
 export async function listInferenceJobs(signal?: AbortSignal): Promise<InferenceJob[]> {
+  const api = createUserInferenceApi();
   const value = await api.get<{ jobs: unknown[] }>(`${BASE}/jobs`, { signal, timeout: 15_000 });
   if (!Array.isArray(value.jobs) || value.jobs.length > 40) throw new Error("작업 목록이 올바르지 않습니다.");
   return value.jobs.map(validateInferenceJob);
 }
 export async function submitInferenceJob(body: InferenceRequest, key: string, signal: AbortSignal): Promise<InferenceJob> {
+  const api = createUserInferenceApi();
   return validateInferenceJob(await api.post(`${BASE}/jobs`, body, { headers: { "Idempotency-Key": key }, signal, timeout: 30_000 }));
 }
 export async function cancelInferenceJob(id: string): Promise<void> {
+  const api = createUserInferenceApi();
   if (!ID.test(id)) throw new Error("잘못된 작업 ID입니다.");
   await api.post(`${BASE}/jobs/${id}/cancel`, undefined, { timeout: 15_000 });
 }
 export async function downloadInferenceArtifact(job: InferenceJob, artifact: InferenceArtifact, signal: AbortSignal, onProgress: (percent: number) => void): Promise<Blob> {
+  const api = createUserInferenceApi();
   validateInferenceJob(job);
   if (job.state !== "succeeded" || !job.artifacts.some((entry) => entry.name === artifact.name && entry.sha256 === artifact.sha256 && entry.bytes === artifact.bytes)) throw new Error("확인되지 않은 결과 파일입니다.");
   const data = new Uint8Array(artifact.bytes);
@@ -79,4 +89,9 @@ export async function downloadInferenceArtifact(job: InferenceJob, artifact: Inf
   }
   if (await hash(data.buffer) !== artifact.sha256) throw new Error("결과 파일 무결성 검사에 실패했습니다. 파일을 사용하지 마세요.");
   return new Blob([data], { type: artifact.mime });
+}
+
+export async function removeUserInferenceUpload(id: string): Promise<void> {
+  if (!ID.test(id)) throw new Error("잘못된 업로드 ID입니다.");
+  await createUserInferenceApi().delete(`${BASE}/uploads/${id}`);
 }

@@ -1,3 +1,4 @@
+import { operatorAiFundingEnabled, rejectOperatorFundedAi } from "../../config/user-funded-ai-policy";
 import { createHmac } from "node:crypto";
 
 import {
@@ -407,6 +408,11 @@ export class StudioAiService {
   ) {}
 
   status() {
+    if (!operatorAiFundingEnabled()) return {
+      configured: false, provider: "none" as const, model: "", providers: [],
+      selection: { default: "auto" as const, order: [], fallback: false },
+      capabilities: [], requiresAuth: false, operatorFunded: false, settingsHref: "/settings/ai",
+    };
     const limits = resolveStudioAiQuotaLimits();
     const providers = studioAiProviderStatuses();
     const configuredProviders = resolveStudioAiProviders("auto");
@@ -443,6 +449,7 @@ export class StudioAiService {
     idempotencyKeyInput: string | undefined,
     clientSignal?: AbortSignal
   ) {
+    rejectOperatorFundedAi();
     let idempotencyKey: string;
     try {
       idempotencyKey = parseStudioAiIdempotencyKey(idempotencyKeyInput);

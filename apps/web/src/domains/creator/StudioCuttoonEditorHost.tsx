@@ -1,3 +1,5 @@
+import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
+import { resolveUserFundedTextTransport } from "./ai/studio-ai-client";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
 import { resolvePixelSelectionSceneTarget } from "./studio-pixel-selection-scene-target";
@@ -49,7 +51,6 @@ import {
   generateStudioWriterRoomDraft,
   isStudioAiConfigured,
   isStudioTextAiConfigured,
-  loadStudioAiSessionSettings,
   saveStudioAiSettings,
   studioTextAiTransportForOperation,
   suggestColorPalette,
@@ -14965,9 +14966,8 @@ const puppetWarpArmed =
   // 키를 배경 생성 패널이 못 보는 stale-read 문제가 생긴다(둘 다 menu==="aiAssist"가 될 때 함께
   // 마운트되므로, prop 갱신만이 유일하게 신뢰할 수 있는 전파 경로다). BYOK 비밀은 탭 세션에만
   // 유지하고, 과거 localStorage 값은 한 번 읽은 뒤 즉시 제거한다.
-  const [aiSettings, setAiSettings] = useState<StudioAiSettings>(() =>
-    loadStudioAiSessionSettings(globalThis.sessionStorage, globalThis.localStorage)
-  );
+  const unifiedAi = useUserAi();
+  const aiSettings: StudioAiSettings = userAiLegacySettings(unifiedAi.configuration);
   const [serverAiStatus, setServerAiStatus] = useState<StudioServerAiStatus | null>(null);
   const [serverAiProvider, setServerAiProviderState] =
     useState<StudioServerAiProviderPreference>("auto");
@@ -15002,10 +15002,7 @@ const puppetWarpArmed =
       .catch(() => setServerAiStatus(null));
     return () => controller.abort();
   }, []);
-  const textAiTransport: StudioTextAiTransport =
-    serverAiStatus?.configured && studioAuthUserId
-      ? { mode: "server", provider: serverAiProvider }
-      : { mode: "byok" };
+  const textAiTransport: StudioTextAiTransport = resolveUserFundedTextTransport();
   const textAiConfigured = isStudioTextAiConfigured(aiSettings, textAiTransport);
   const [writerRoomAiDirection, setWriterRoomAiDirection] = useState("");
   const [writerRoomAiBusy, setWriterRoomAiBusy] = useState(false);
@@ -15037,8 +15034,7 @@ const puppetWarpArmed =
       .catch(() => setAppSettingsPersistenceState("session-only"));
   }
   function updateAiSettings(next: StudioAiSettings) {
-    setAiSettings(next);
-    saveStudioAiSettings(globalThis.sessionStorage, next);
+    saveStudioAiSettings(undefined, next);
   }
   const aiOperationSequenceRef = useRef(0);
   function nextStudioAiOperationId(scope: string): string {

@@ -1,6 +1,9 @@
+import { useUserAi } from "@/shared/ai/user-ai-store";
+import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
+import { removeUserInferenceUpload } from "./creator-inference-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "@/compat/router-link";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/infrastructure/api";
 import {
   cancelInferenceJob, downloadInferenceArtifact, inferenceCapabilities, listInferenceJobs,
   submitInferenceJob, uploadInferenceAsset,
@@ -16,6 +19,7 @@ const MODES: { value: InferenceMode; title: string; description: string }[] = [
 const STATE = { queued: "대기 중", running: "생성 중", succeeded: "결과 준비됨", failed: "생성 실패", cancelled: "취소됨", interrupted: "서버 재시작으로 중단됨" };
 const TERMINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 export function CreatorInferencePage() {
+  const userAi = useUserAi();
   const [mode, setMode] = useState<InferenceMode>("image-to-video");
   const [files, setFiles] = useState<File[]>([]);
   const [prompt, setPrompt] = useState("캐릭터가 자연스럽게 눈을 깜빡이고 머리카락과 옷자락이 바람에 움직입니다. 원본 디자인과 색상을 유지하세요.");
@@ -34,19 +38,20 @@ export function CreatorInferencePage() {
     if (mounted.current && !signal?.aborted) setJobs(next);
   }, []);
   useEffect(() => {
+    pending.current = null; setUncertain(false); setJobs([]);
     mounted.current = true; const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     void inferenceCapabilities(controller.signal).then((status) => {
       if (!mounted.current) return;
-      setCaps(status); setMessage(status.enabled ? "자체 호스팅 추론 서버 · 생성에는 로그인과 준비된 모델이 필요합니다." : status.reason ?? "추론 서버 또는 모델이 활성화되지 않았습니다. 로컬 드로잉과 공간형 감상은 별도로 사용할 수 있습니다.");
+      setCaps(status); setMessage(status.enabled ? "개인 추론 서버 연결됨 · 사용자 서버의 준비된 모델이 필요합니다." : status.reason ?? "추론 서버 또는 모델이 활성화되지 않았습니다. 로컬 드로잉과 공간형 감상은 별도로 사용할 수 있습니다.");
     }).catch((reason: unknown) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "추론 상태 확인 실패"); });
     const poll = async () => {
       try { if (!document.hidden) await refresh(controller.signal); }
       catch (reason) { if (!controller.signal.aborted && mounted.current) setError(await getApiErrorMessage(reason, "작업 목록을 보려면 로그인과 서버 연결이 필요합니다.")); }
       finally { if (!controller.signal.aborted) timer = setTimeout(() => { void poll(); }, 4_000); }
     };
-    void poll();
+    if (userAi.configuration.assignments.inference) void poll();
     return () => { mounted.current = false; controller.abort(); clearTimeout(timer); operation.current?.abort(); if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); };
-  }, [refresh]);
+  }, [refresh, userAi.revision, userAi.configuration.assignments.inference]);
   const notifyError = async (reason: unknown) => { const text = await getApiErrorMessage(reason, "작업을 완료하지 못했습니다."); if (mounted.current) setError(text); };
   const run = async () => {
     if (operation.current) return;
@@ -67,7 +72,7 @@ export function CreatorInferencePage() {
       setMessage("작업을 접수했습니다. 아래에서 상태를 확인하고 필요하면 취소할 수 있습니다. 원본은 보존됩니다.");
     } catch (reason) {
       if (pending.current) setUncertain(true);
-      else for (const id of uploaded) void api.delete(`/studio-ai/inference/uploads/${id}`, { timeout: 10_000 }).catch(() => undefined);
+      else for (const id of uploaded) void removeUserInferenceUpload(id).catch(() => undefined);
       if (controller.signal.aborted && mounted.current) setMessage("전송을 중지했습니다. 이미 접수된 생성 작업은 목록에서 별도로 취소하세요.");
       else await notifyError(reason);
     } finally { operation.current = null; if (mounted.current) setBusy(false); }
@@ -89,6 +94,7 @@ export function CreatorInferencePage() {
   return <main className="creator-inference-page">
     <nav aria-label="제작실 이동"><Link href="/studio">← 스튜디오</Link><Link href="/showcase/promo">컷 기반 홍보 영상</Link><a href="/spatial-reader/">공간형 감상</a><a href="/offline-draw/">서버 없는 로컬 드로잉</a></nav>
     <header><p className="inference-kicker">SELF-HOSTED CREATIVE ENGINES</p><h1>그림에서 움직임으로.<br />입체에서 새로운 그림으로.</h1><p>실제 모델 추론으로 만드는 제작실입니다. 모델과 GPU가 준비되지 않으면 생성 성공으로 표시하지 않습니다.</p></header>
+    <details className="my-6 rounded-xl border border-line p-4"><summary className="min-h-11 cursor-pointer font-semibold">통합 AI 설정 · 개인 서버 연결</summary><UnifiedAiSettings /></details>
     <section className="inference-modes" aria-label="추론 방식">{MODES.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} disabled={busy || uncertain} onClick={() => { setMode(option.value); setFiles([]); setPrompt(option.value === "image-to-video" ? "The character blinks naturally. Hair and clothes move gently in the breeze. Preserve the original character design and colors." : "Clean Korean webtoon character illustration, faithful silhouette, expressive eyes, refined cel shading."); }}><strong>{option.title}</strong><span>{option.description}</span><small>{caps?.enabled && caps.engines[option.value]?.configured ? "모델 설정 확인됨 · 실제 품질은 결과 검토 필요" : "모델 준비 필요"}</small></button>)}</section>
     <div className="inference-layout"><form onSubmit={(event) => { event.preventDefault(); void run(); }}>
       <h2>생성 설정</h2><fieldset disabled={busy || uncertain}>
@@ -104,7 +110,7 @@ export function CreatorInferencePage() {
           {mode === "model-to-2d" && <><label>스타일 변화 강도<input type="range" min={.15} max={.85} step={.05} value={strength} onChange={(event) => setStrength(Number(event.target.value))} /><output>{strength}</output></label><label>모델 시점<input type="range" min={-180} max={180} step={15} value={yaw} onChange={(event) => setYaw(Number(event.target.value))} /><output>{yaw}°</output></label></>}
         </details>
       </fieldset>
-      <p className="inference-note">생성을 누르면 선택한 파일이 자체 추론 서버로 업로드됩니다. 저장된 모델·GPU 운영 비용은 배포 운영자가 부담하며, 외부 유료 API를 자동 호출하지 않습니다.</p>
+      <p className="inference-note">생성을 누르면 선택한 파일이 자체 추론 서버로 업로드됩니다. 모델·GPU 비용은 통합 설정에 등록한 개인 서버 소유자가 부담합니다. ToonStudio 운영측 GPU나 유료 키로 전환하지 않습니다.</p>
       <button className="inference-primary" type="submit" disabled={busy || (!uncertain && (!caps?.enabled || !caps.engines[mode]?.configured || !files.length))}>{uncertain ? "같은 요청으로 접수 여부 다시 확인" : "생성 시작"}</button>
       {uncertain && <button type="button" disabled={busy} onClick={() => { if (window.confirm("이전 요청이 이미 접수됐을 수 있습니다. 작업 목록을 확인했으며 새 요청을 만들까요?")) { pending.current = null; setUncertain(false); } }}>새 요청으로 전환</button>}
       {busy && <button type="button" onClick={() => operation.current?.abort()}>전송 중지</button>}

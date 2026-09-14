@@ -6,6 +6,8 @@ import asyncio, fcntl, hashlib, hmac, json, math, os, re, shutil, signal, sqlite
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from urllib.parse import urlsplit
 from fastapi.responses import FileResponse, JSONResponse, Response
 from contracts import CHUNK_SIZE, MAX_UPLOAD, identifier, validate_upload, decode_chunk, validate_job, validate_glb, normalize_image, fingerprint
 
@@ -219,6 +221,17 @@ def create_app(runtime: Runtime):
     async def lifespan(_app):
         runtime.start();yield;runtime.close()
     app=FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
+    origins = [entry.strip() for entry in os.environ.get('CREATOR_BROWSER_ORIGINS', '').split(',') if entry.strip()]
+    for origin in origins:
+        parsed = urlsplit(origin)
+        if parsed.scheme not in {'https', 'http'} or not parsed.netloc or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment or '*' in origin:
+            raise ValueError('CREATOR_BROWSER_ORIGINS requires exact browser origins')
+        if parsed.scheme == 'http' and parsed.hostname not in {'localhost', '127.0.0.1', '::1'}:
+            raise ValueError('Non-local browser origins require HTTPS')
+    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
+        allow_methods=['GET', 'POST', 'PUT', 'DELETE'],
+        allow_headers=['Authorization', 'Content-Type', 'X-Creator-Owner', 'Idempotency-Key'],
+        expose_headers=['X-Content-SHA256', 'Content-Length'])
     @app.exception_handler(ValueError)
     async def invalid(_request,error):return JSONResponse({'detail':str(error)},status_code=400)
     @app.middleware('http')
