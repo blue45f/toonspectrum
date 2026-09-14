@@ -1,3 +1,4 @@
+import { StudioColorProofLauncher } from "./color/StudioColorProofContext";
 // 페이지 전체 색보정 패널 — 페이지 그레이드(밝기/대비/채도/색조/세피아/흑백/비네트)
 // 슬라이더 + 무드 프리셋 칩. 표시 전용(로컬 상태 없음): 값은 grade로 받고 변경은 콜백으로 위임한다.
 import { RotateCcw } from "lucide-react";
@@ -50,6 +51,7 @@ export function StudioPageGradePanel({
 
   return (
     <div className="space-y-3">
+      <StudioColorProofLauncher />
       {/* 헤더 + 초기화(기본값일 땐 비활성) */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">페이지 색보정 (전체 톤)</p>

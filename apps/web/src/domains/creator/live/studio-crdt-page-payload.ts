@@ -1,3 +1,4 @@
+import { parseStudioColorProofDocument, type StudioColorProofDocument } from "../color/studio-color-proof-document";
 import { parseStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import { PAPER_GRAIN_KINDS } from "../brush/studio-paper-texture";
 import { parseStudioLayerComps } from "../layer/studio-layer-comps-document";
@@ -24,7 +25,7 @@ import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stag
 
 const PAGE_PAYLOAD_KEYS = [
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
-  "drawingAssist", "paperSurface", "paperGrainVisible", "layerComps",
+  "drawingAssist", "paperSurface", "paperGrainVisible", "layerComps", "colorProof",
 ] as const;
 
 export const STUDIO_CRDT_PAGE_PAYLOAD_VERSION = 1 as const;
@@ -59,6 +60,7 @@ export interface StudioCrdtCompatibleOrderedPage<
   paperSurface?: StudioPaperSurfaceSettings;
   paperGrainVisible?: boolean;
   layerComps?: readonly StudioLayerComp[];
+  colorProof?: StudioColorProofDocument;
   /** Synchronized through the dedicated per-stage CRDT sidecar, never the 8 KiB page envelope. */
   shared3dStage?: StudioShared3dStagePersistedState;
   groups?: StudioCrdtCompatibleLayerGroup[];
@@ -190,6 +192,11 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
     if (!layerComps) throw new Error("페이지 레이어 콤프가 올바르지 않습니다.");
     // The document parser returns detached, finite JSON values and drops unknown fields.
     props.layerComps = layerComps as unknown as StudioCrdtJsonValue;
+  }
+  if ("colorProof" in props) {
+    const proof = parseStudioColorProofDocument(props.colorProof);
+    if (!proof) throw new Error("페이지 ICC 색상 설정이 올바르지 않습니다.");
+    props.colorProof = proof as unknown as StudioCrdtJsonValue;
   }
   if ("drawingAssist" in props) props.drawingAssist = normalizeDrawingAssist(props.drawingAssist);
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >

@@ -1,3 +1,4 @@
+import { parseStudioColorProofDocument } from "./color/studio-color-proof-document";
 import { z } from "zod";
 
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
@@ -171,6 +172,8 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.drawingAssist !== undefined && !drawingAssist) {
       throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
     }
+    const colorProof = page.colorProof === undefined ? undefined : parseStudioColorProofDocument(page.colorProof);
+    if (colorProof === null) throw new Error("페이지 ICC 설정이 손상되었거나 지원하지 않는 버전입니다.");
     const layerComps = page.layerComps === undefined ? undefined : parseStudioLayerComps(page.layerComps);
     if (layerComps === null) throw new Error("페이지 레이어 콤프가 손상되었거나 허용 범위를 벗어났습니다.");
     const shared3dStage = page.shared3dStage === undefined
@@ -208,10 +211,11 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
       elements,
       ...(drawingAssist ? { drawingAssist } : {}),
       ...(layerComps ? { layerComps } : {}),
+      ...(colorProof ? { colorProof } : {}),
       ...(shared3dStage ? { shared3dStage } : {}),
       ...(linked3dRender ? { linked3dRender } : {}),
     };
-    if (layerComps !== undefined) {
+    if (layerComps !== undefined || colorProof !== undefined) {
       try {
         // Use the same normalized, aggregate page envelope as collaboration.
         studioPageToCrdtPage(canonicalPage);
