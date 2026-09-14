@@ -38,7 +38,7 @@ ALTER TABLE public.creator_asset_storage_object
 ALTER TABLE public.creator_asset_storage_object
   VALIDATE CONSTRAINT creator_asset_storage_object_provider_check;
 
-CREATE TABLE public.creator_asset_storage_replica (
+CREATE TABLE IF NOT EXISTS public.creator_asset_storage_replica (
   "purpose" text NOT NULL,
   "objectDigest" text NOT NULL,
   "providerId" text NOT NULL,
@@ -89,11 +89,11 @@ CREATE TABLE public.creator_asset_storage_replica (
     )
 );
 
-CREATE UNIQUE INDEX creator_asset_storage_replica_path_unique
+CREATE UNIQUE INDEX IF NOT EXISTS creator_asset_storage_replica_path_unique
   ON public.creator_asset_storage_replica
   ("providerId", "purpose", "objectPath");
 
-CREATE INDEX idx_creator_asset_storage_replica_state
+CREATE INDEX IF NOT EXISTS idx_creator_asset_storage_replica_state
   ON public.creator_asset_storage_replica
   ("providerId", "state", "updatedAt");
 
@@ -144,6 +144,9 @@ $creator_asset_storage_replica_validate$;
 REVOKE ALL ON FUNCTION
   public.creator_asset_storage_replica_validate()
 FROM PUBLIC;
+
+DROP TRIGGER IF EXISTS creator_asset_storage_replica_validate_trigger
+ON public.creator_asset_storage_replica;
 
 CREATE TRIGGER creator_asset_storage_replica_validate_trigger
 BEFORE INSERT OR UPDATE OF
