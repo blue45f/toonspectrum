@@ -159,10 +159,10 @@ const STUDIO_RASTER_REASON_EN: Readonly<Record<string, string>> = {
     "A non-destructive color layer is prepared under the visible vector line art.",
   "채울 래스터 이미지나 표시 중인 벡터 선화가 없습니다.":
     "There is no raster image to fill and no visible vector line art.",
-  "표시 레이어 중 일부를 화면과 똑같이 래스터 복사본으로 만들 수 없습니다.":
-    "Some visible layers cannot be copied to raster exactly as shown on screen.",
-  "지원되지 않는 합성·지우개 획을 먼저 정리하세요.":
-    "Please clear the unsupported compositing and eraser strokes first.",
+  "표시 레이어 중 일부의 현재 모습을 안전한 복사본으로 만들 수 없습니다.":
+    "A safe copy of the current appearance cannot be made for some visible layers.",
+  "지원되지 않는 효과나 레이어 설정을 잠시 끄거나 해당 레이어를 숨긴 뒤 다시 시도하세요.":
+    "Temporarily turn off unsupported effects or layer settings, or hide the affected layer, then try again.",
   "페이지의 콘텐츠가 모두 숨겨져 있습니다.": "Every piece of content on the page is hidden.",
   "필요한 레이어를 표시한 뒤 다시 시도하세요.":
     "Please show the layers you need, then try again.",

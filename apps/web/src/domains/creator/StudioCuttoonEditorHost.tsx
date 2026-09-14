@@ -22172,10 +22172,10 @@ No text, logo, watermark, or copyrighted character.`;
             fillReference: true,
           });
         } else if (!vectorPlan.ok) {
-          // 여기서 벡터 선화 참조는 래스터 경계 위에 얹는 추가 경계일 뿐이다. 못 만든다고
-          // 채우기 전체를 막으면 페이지 어딘가의 지우개 획 하나가 무관한 래스터 레이어의
-          // 채우기까지 못 하게 한다. 참조만 빼고 진행하고 무엇을 왜 뺐는지 결과에 붙인다 —
-          // 적용 전까지는 미리보기라 경계 하나 빠진 결과를 눈으로 확인할 수 있다.
+          // 여기서 벡터 선화 참조는 래스터 경계 위에 얹는 추가 경계일 뿐이다. 구조 손상,
+          // 미지원 합성 또는 예산 초과로 참조를 못 만든 경우에도 채우기 전체를 막지 않는다.
+          // 참조만 빼고 진행하고 무엇을 왜 뺐는지 결과에 붙인다. 적용 전까지는 미리보기라
+          // 경계 하나 빠진 결과를 눈으로 확인할 수 있다.
           vectorReferenceExclusion = describeStudioAdvancedFillVectorReferenceExclusion(vectorPlan);
         }
         const scopedRasterReferences = collectOverlappingStudioFillReferenceLayers(

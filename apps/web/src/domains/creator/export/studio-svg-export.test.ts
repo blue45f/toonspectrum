@@ -3017,11 +3017,67 @@ describe("도형 직렬화", () => {
     expect((svg.match(/<circle /g) ?? []).length).toBe(expected);
   });
 
-  it("지우개 자국은 그리지 않고 skipped로 정직하게 집계한다", () => {
-    const eraser = rectEl({ id: "e1", kind: "freehand", mode: "eraser", points: [0, 0, 10, 0, 20, 10] });
-    const result = exportPageToSvg(page([eraser]));
-    expect(result.svg).not.toContain("<path");
-    expect(result.skipped).toEqual([{ id: "e1", type: "draw", mode: "skipped", label: "지우개 자국은 벡터로 재현할 수 없어 제외했어요." }]);
+  it("지우개를 이전 콘텐츠에만 적용하는 causal luminance mask로 보존한다", () => {
+    const result = exportPageToSvg(page([
+      rectEl({ id: "ink", fill: "#ff0000" }),
+      rectEl({
+        id: "erase",
+        kind: "freehand",
+        mode: "eraser",
+        points: [0, 50, 140, 50],
+        fill: undefined,
+        stroke: "#00ff00",
+        strokeWidth: 20,
+      }),
+      rectEl({ id: "repaint", points: [40, 40, 60, 60], fill: "#0000ff" }),
+    ]));
+
+    expect(result.skipped).toEqual([]);
+    expect(result.svg).toContain('style="mask-type:luminance"');
+    expect(result.svg).toContain('<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/>');
+    const contentMask = result.svg.lastIndexOf('<g mask="url(#sem');
+    const ink = result.svg.indexOf('fill="#ff0000"', contentMask);
+    const causalClose = result.svg.indexOf("</g>", ink);
+    const repaint = result.svg.indexOf('fill="#0000ff"', causalClose);
+    const background = result.svg.indexOf('fill="#ffffff"/>', result.svg.indexOf("</defs>"));
+    expect(contentMask).toBeGreaterThan(background);
+    expect(ink).toBeGreaterThan(contentMask);
+    expect(causalClose).toBeGreaterThan(ink);
+    expect(repaint).toBeGreaterThan(causalClose);
+  });
+
+  it("여러 지우개는 각 시점 이전 구간만 감싸는 순서로 중첩한다", () => {
+    const result = exportPageToSvg(page([
+      rectEl({ id: "bottom", fill: "#110000" }),
+      rectEl({ id: "erase-a", kind: "freehand", mode: "eraser", points: [0, 30, 140, 30], fill: undefined }),
+      rectEl({ id: "middle", fill: "#220000" }),
+      rectEl({ id: "erase-b", kind: "freehand", mode: "eraser", points: [0, 60, 140, 60], fill: undefined }),
+      rectEl({ id: "top", fill: "#330000" }),
+    ]));
+
+    expect(result.skipped).toEqual([]);
+    expect((result.svg.match(/<mask id="sem/g) ?? [])).toHaveLength(2);
+    const outer = result.svg.indexOf('<g mask="url(#sem', result.svg.indexOf("</defs>"));
+    const inner = result.svg.indexOf('<g mask="url(#sem', outer + 1);
+    const bottom = result.svg.indexOf('fill="#110000"', inner);
+    const innerClose = result.svg.indexOf("</g>", bottom);
+    const middle = result.svg.indexOf('fill="#220000"', innerClose);
+    const outerClose = result.svg.indexOf("</g>", middle);
+    const top = result.svg.indexOf('fill="#330000"', outerClose);
+    expect(inner).toBeGreaterThan(outer);
+    expect(bottom).toBeGreaterThan(inner);
+    expect(middle).toBeGreaterThan(innerClose);
+    expect(top).toBeGreaterThan(outerClose);
+  });
+
+  it("아직 지울 콘텐츠가 없는 지우개는 빈 마스크를 만들지 않는다", () => {
+    const result = exportPageToSvg(page([
+      rectEl({ id: "erase-first", kind: "freehand", mode: "eraser", points: [0, 50, 140, 50], fill: undefined }),
+      rectEl({ id: "ink-after", fill: "#123456" }),
+    ]));
+    expect(result.skipped).toEqual([]);
+    expect(result.svg).not.toContain("<mask");
+    expect(result.svg).toContain('fill="#123456"');
   });
 
   it("대칭 드로잉 — 세로 대칭이면 미러 사본까지 두 개를 그린다", () => {
@@ -3932,7 +3988,7 @@ describe("결과 메타·헬퍼", () => {
         { id: "i2", type: "image", src: "data:image/png;base64,AAA", x: 0, y: 0, width: 10, height: 10, rotation: 0, brightness: 0.4 },
       ])
     );
-    expect(svgExportResultMessage(mixed)).toBe("SVG 저장 완료 — 요소 2개 벡터 변환 · 제외 1개 · 근사 1개");
+    expect(svgExportResultMessage(mixed)).toBe("SVG 저장 완료 — 요소 2개 벡터 변환 · 근사 1개");
   });
 
   it("svgExportFileName — 래스터 내보내기와 같은 제목 규칙(.svg)", () => {
@@ -3948,9 +4004,12 @@ describe("결과 메타·헬퍼", () => {
     expect(SVG_EXPORT_MIME).toBe("image/svg+xml;charset=utf-8");
   });
 
-  it("결과 타입 — 스킵 항목은 id/type/mode/label을 갖춘다", () => {
-    const result: SvgExportResult = exportPageToSvg(page([rectEl({ id: "e1", kind: "freehand", mode: "eraser", points: [0, 0, 10, 0, 20, 10] })]));
-    expect(result.skipped[0]).toMatchObject({ id: "e1", type: "draw", mode: "skipped" });
-    expect(result.elementCount).toBe(1);
+  it("결과 타입 — 지우개도 요소 수에 포함되지만 손실 항목으로 보고하지 않는다", () => {
+    const result: SvgExportResult = exportPageToSvg(page([
+      rectEl({ id: "ink" }),
+      rectEl({ id: "e1", kind: "freehand", mode: "eraser", points: [0, 0, 10, 0, 20, 10], fill: undefined }),
+    ]));
+    expect(result.skipped).toEqual([]);
+    expect(result.elementCount).toBe(2);
   });
 });
