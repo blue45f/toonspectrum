@@ -19,8 +19,6 @@ on:
       - 'apps/web/src/infrastructure/promotion-client.ts'
       - 'scripts/verify-promotion-contract.mjs'
       - '.github/workflows/creator-promotion-validation.yml'
-  push:
-    branches: [feat/creator-promotion-community-20260913]
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,7 +53,7 @@ jobs:
     timeout-minutes: 25
     env:
       HUSKY: '0'
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
@@ -71,7 +69,7 @@ jobs:
       - name: API typecheck
         run: pnpm exec tsc -p apps/api/tsconfig.json --noEmit --pretty false
       - name: Recruitment, privacy and video regressions
-        run: pnpm exec vitest run packages/core/src/collaboration.test.ts apps/api/src/modules/collaboration/collaboration.repository.test.ts apps/web/src/domains/promotion/PromotionVideo.test.tsx apps/api/src/session-middleware.test.ts apps/api/src/csrf-middleware.test.ts
+        run: pnpm exec vitest run packages/core/src/collaboration.test.ts apps/api/src/modules/collaboration/collaboration.repository.test.ts apps/web/src/domains/promotion/PromotionVideo.test.tsx apps/web/src/domains/promotion/promotion-draft.test.ts apps/web/src/domains/promotion/PromotionEditorPage.test.tsx apps/api/src/session-middleware.test.ts apps/api/src/csrf-middleware.test.ts
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Desktop and mobile checks with explicit API fixtures
