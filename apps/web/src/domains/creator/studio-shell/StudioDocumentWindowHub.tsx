@@ -33,6 +33,15 @@ import {
   studioRecommendedCompanionWorkspaces,
 } from "./studio-document-window-presets";
 
+const WORKSPACE_FAMILIES = [
+  { id: "visual", ko: "그리기·이미지", en: "Drawing & image" },
+  { id: "layout", ko: "디자인·발표", en: "Design & presentation" },
+  { id: "story", ko: "스토리·콘티", en: "Story & storyboard" },
+  { id: "spatial", ko: "3D", en: "3D" },
+  { id: "time", ko: "애니메이션·오디오", en: "Animation & audio" },
+  { id: "delivery", ko: "현지화·검토", en: "Localization & review" },
+] as const;
+
 type StudioDocumentResolution = Extract<
   StudioDocumentRouteResolution,
   { readonly kind: "document" }
@@ -190,9 +199,13 @@ export function StudioDocumentWindowHub({
   const copyCurrentLink = async (): Promise<void> => {
     const copied = await copyText(absoluteStudioHref(workspaceHref(resolution.workspace)));
     setNotice(copied
-      ? locale === "ko"
-        ? "다른 브라우저에서 열 수 있는 현재 작업공간 링크를 복사했습니다."
-        : "Copied a link that can be opened in another browser."
+      ? resolution.scope === "draft"
+        ? locale === "ko"
+          ? "초안 링크를 복사했습니다. 다른 브라우저에서 계속하려면 먼저 프로젝트에 저장하거나 협업 방을 연결해 주세요."
+          : "Copied the draft link. Save it to a project or connect a collaboration room before continuing in another browser."
+        : locale === "ko"
+          ? "다른 브라우저에서 열 수 있는 현재 작업공간 링크를 복사했습니다."
+          : "Copied a link that can be opened in another browser."
       : locale === "ko"
         ? "링크를 복사하지 못했습니다. 브라우저 클립보드 권한을 확인해 주세요."
         : "The link could not be copied. Check browser clipboard permission.");
@@ -266,10 +279,16 @@ export function StudioDocumentWindowHub({
               title={locale === "ko" ? currentWorkspace.descriptionKo : currentWorkspace.descriptionEn}
               onChange={(event) => onChangeWorkspace(event.target.value as StudioDocumentWorkspaceId)}
             >
-              {STUDIO_DOCUMENT_WORKSPACES.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>
-                  {locale === "ko" ? workspace.labelKo : workspace.labelEn}
-                </option>
+              {WORKSPACE_FAMILIES.map((family) => (
+                <optgroup key={family.id} label={locale === "ko" ? family.ko : family.en}>
+                  {STUDIO_DOCUMENT_WORKSPACES
+                    .filter((workspace) => workspace.family === family.id)
+                    .map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {locale === "ko" ? workspace.labelKo : workspace.labelEn}
+                      </option>
+                    ))}
+                </optgroup>
               ))}
             </select>
             <p className="hidden truncate px-2 text-[0.62rem] font-medium text-fg-3 sm:block">

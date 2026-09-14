@@ -41,10 +41,7 @@ export function StudioDocumentWorkspaceSwitcher() {
       language: resolution.language,
       version: resolution.version,
       search: location.search,
-    }), {
-      replace: true,
-      state: location.state,
-    });
+    }), { state: location.state });
   };
 
   return (

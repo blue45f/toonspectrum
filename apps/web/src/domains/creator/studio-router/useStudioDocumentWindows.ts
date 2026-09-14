@@ -16,15 +16,21 @@ function focusRequestedStudioWindow(): void {
   if (typeof window === "undefined" || typeof document === "undefined") return;
   const previousTitle = document.title;
   const attentionTitle = `● ${previousTitle.replace(/^●\s*/u, "")}`;
-  if (!document.hasFocus()) document.title = attentionTitle;
+  const restoreTitle = () => {
+    if (document.title === attentionTitle) document.title = previousTitle;
+  };
+  if (!document.hasFocus()) {
+    document.title = attentionTitle;
+    window.addEventListener("focus", restoreTitle, { once: true });
+  }
   try {
     window.focus();
-  } finally {
-    globalThis.setTimeout(() => {
-      if (document.title === attentionTitle) document.title = previousTitle;
-    }, 4_500);
+  } catch {
+    // Background-focus policy can reject activation; the title remains the fallback cue.
   }
+  globalThis.setTimeout(restoreTitle, 4_500);
 }
+
 export function useStudioDocumentWindows(input: {
   readonly documentKey: string;
   readonly workspace: StudioDocumentWorkspaceId;

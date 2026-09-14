@@ -175,4 +175,32 @@ describe("Studio document window coordination", () => {
     expect(parseStudioDocumentWindowMessage(null)).toBeNull();
     runtime.dispose();
   });
+
+  it("falls back to bounded storage signals when BroadcastChannel is unavailable", () => {
+    const storage = {
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    const runtime = createStudioDocumentWindowCoordinator({
+      documentKey: "project:project-1:document:document-1",
+      workspace: "draw",
+      instanceId: "studio-window-storage-1234",
+      openedAt: 10_000,
+      channelFactory: null,
+      storage,
+      windowTarget: null,
+      documentTarget: null,
+      readVisibility: () => "visible",
+      readFocus: () => true,
+      now: () => 10_000,
+      setInterval: inertInterval,
+      clearInterval: vi.fn(),
+    });
+
+    runtime.start();
+    expect(runtime.getSnapshot().transport).toBe("storage");
+    expect(storage.setItem).toHaveBeenCalledOnce();
+    expect(storage.removeItem).toHaveBeenCalledOnce();
+    runtime.dispose();
+  });
 });

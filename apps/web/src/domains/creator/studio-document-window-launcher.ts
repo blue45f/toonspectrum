@@ -98,15 +98,48 @@ export function studioDocumentWindowFeatures(input: {
 function defaultOpenWindow(url: string, target: string, features: string): Window | null {
   return window.open(url, target, features);
 }
+
+function normalizeStudioLaunchHref(href: string): string | null {
+  if (typeof window === "undefined") {
+    return href.startsWith("/studio") ? href : null;
+  }
+  try {
+    const url = new URL(href, window.location.origin);
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/studio")) {
+      return null;
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function navigateReservedWindow(opened: Window, href: string): boolean {
+  try {
+    opened.location.replace(href);
+    return true;
+  } catch {
+    try {
+      opened.location.href = href;
+      return true;
+    } catch {
+      try { opened.close(); } catch { /* The browser already discarded it. */ }
+      return false;
+    }
+  }
+}
+
 export function openStudioDocumentWorkspace(
   input: OpenStudioDocumentWorkspaceInput,
 ): StudioDocumentWindowOpenStatus {
+  const launchHref = normalizeStudioLaunchHref(input.href);
+  if (!launchHref) return "blocked";
   const openWindow = input.openWindow ?? defaultOpenWindow;
   const target = input.mode === "tab"
     ? "_blank"
     : studioDocumentWindowName(input.documentKey, input.workspace);
   const features = input.mode === "tab"
-    ? "noopener,noreferrer"
+    ? ""
     : studioDocumentWindowFeatures({
         index: input.index,
         total: input.total,
@@ -114,7 +147,9 @@ export function openStudioDocumentWorkspace(
       });
   let opened: Window | null;
   try {
-    opened = openWindow(input.href, target, features);
+    // Reserve synchronously so popup blockers see one direct user gesture, then sever opener before
+    // navigation. Unlike `noopener`, this keeps a reliable handle and avoids false blocked notices.
+    opened = openWindow("", target, features);
   } catch {
     return "blocked";
   }
@@ -124,6 +159,7 @@ export function openStudioDocumentWorkspace(
   } catch {
     // Cross-browser popup implementations can expose a read-only opener.
   }
+  if (!navigateReservedWindow(opened, launchHref)) return "blocked";
   try {
     opened.focus();
   } catch {
