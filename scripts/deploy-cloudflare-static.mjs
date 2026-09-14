@@ -85,12 +85,27 @@ if (mode === "production") {
   if (status !== "") fail("production deploy requires a clean worktree");
 }
 
+const staticCatalogSource = process.env.VITE_CATALOG_SOURCE?.trim() || "static";
+if (staticCatalogSource !== "static" && staticCatalogSource !== "api") {
+  fail("VITE_CATALOG_SOURCE must be static or api");
+}
+
 for (const command of [
-  ["pnpm", ["run", "generate:cloudflare-static-rules", "--", "--check"]],
-  ["pnpm", ["run", "build"]],
-  [
-    "pnpm",
-    [
+  {
+    executable: "pnpm",
+    args: ["run", "generate:cloudflare-static-rules", "--", "--check"],
+  },
+  {
+    executable: "pnpm",
+    args: ["run", "build"],
+    environment: {
+      ...process.env,
+      VITE_CATALOG_SOURCE: staticCatalogSource,
+    },
+  },
+  {
+    executable: "pnpm",
+    args: [
       "exec",
       "wrangler",
       "deploy",
@@ -99,8 +114,11 @@ for (const command of [
       "deploy/cloudflare-static/wrangler.jsonc",
       ...routeVariables,
     ],
-  ],
+  },
 ]) {
-  const result = spawnSync(command[0], command[1], { stdio: "inherit" });
+  const result = spawnSync(command.executable, command.args, {
+    stdio: "inherit",
+    env: command.environment ?? process.env,
+  });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
