@@ -4723,6 +4723,7 @@ export function StudioCuttoonEditor({
     (snapshot: StudioBrushSnapshot) => void
   >(() => undefined);
   const [color, setColor] = useState(initialToolOperationMemory.paint.color);
+  const inspectorColorSampleApplyRef = useRef<((color: string) => void) | null>(null);
   const [pixelArtMode, setPixelArtMode] = useState<StudioPixelArtModeState>(() => createStudioPixelArtMode());
   const [silkGenerativeSpec, setSilkGenerativeSpec] = useState<StudioSilkGenerativeSpec>(
     () => DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
@@ -4738,6 +4739,12 @@ export function StudioCuttoonEditor({
     }
   }, [pixelArtMode.enabled, pixelArtMode.gridSnap, pixelArtMode.pixelPencil]);
   function applyStudioDrawingColor(next: string) {
+    const applyInspectorSample = inspectorColorSampleApplyRef.current;
+    if (applyInspectorSample) {
+      inspectorColorSampleApplyRef.current = null;
+      applyInspectorSample(next);
+      return;
+    }
     setColor(admitStudioPixelArtStrokeColor(next, pixelArtMode));
   }
   function insertStudioStickyNote(presetId: import("./studio-sticky-note").StudioStickyNotePresetId) {
@@ -16608,6 +16615,7 @@ No text, logo, watermark, or copyrighted character.`;
     setHealCloneTool(null);
     healCloneDragRef.current = null;
     clearHealCloneDragPreview();
+    inspectorColorSampleApplyRef.current = null;
     setEyedropperActive(false);
     setBubbleAnchorPickActive(false);
     setColorRangePickActive(false); // ← 추가(샘플/허용량은 유지 — healClone "모드는 유지" 정책과 동일)
@@ -16633,6 +16641,13 @@ No text, logo, watermark, or copyrighted character.`;
     stopStudioCommentPlacementSession(); // ← 추가(자유 위치 댓글 핀 세션 해제)
   }
   disarmAllPixelToolsRef.current = disarmAllPixelTools;
+
+  function requestInspectorColorSample(applyColor: (color: string) => void): void {
+    disarmAllPixelTools();
+    inspectorColorSampleApplyRef.current = applyColor;
+    setEyedropperActive(true);
+    announceDrawingShortcut("캔버스에서 적용할 색을 클릭하세요 · Esc로 취소");
+  }
 
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
   function finishPolyLassoSession() {
@@ -16876,6 +16891,12 @@ No text, logo, watermark, or copyrighted character.`;
     const target = elementById.get(id);
     if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
     commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
+  }
+
+  // Inspector scrubbers/color previews deliberately keep one coalescing key while the gesture is
+  // active. Close/cancel must sever that chain so a later popup session receives its own undo step.
+  function finishPatchElCoalescing(): void {
+    coalesceKeyRef.current = null;
   }
 
   /**
@@ -27069,6 +27090,7 @@ function clearSelectionForEdit() {
     clearHealCloneSource,
     clearPolyLassoDraft,
     commit,
+    commitCoalesced,
     createEditableRasterCopyForInspector,
     deleteFilterMask,
     deleteLayerMask,
@@ -27111,6 +27133,9 @@ function clearSelectionForEdit() {
     openStudioLayerLift,
     openStudioFilter,
     patchEl,
+    patchElCoalesced,
+    finishPatchElCoalescing,
+    requestInspectorColorSample,
     patchPageGrade,
     queueBrushDelete,
     regenerateTemplate,

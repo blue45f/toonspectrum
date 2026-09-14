@@ -1,8 +1,9 @@
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 
 import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./lettering/studio-bubble-path";
 import { localizeStudioRasterToolAvailability } from "./render/studio-raster-tool-reason-localization";
+import { collectStudioDocumentColors } from "./studio-document-colors";
 import { containingPanel } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
 import { executeStudioInspectorArmedToggle } from "./studio-inspector-tool-transition";
@@ -13,6 +14,7 @@ import {
   StudioExtendedBlendPanel,
 } from "./studio-page-lazy-ui";
 import { normalizeSkewPatch } from "./studio-skew";
+import { StudioColorField } from "./StudioColorField";
 import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
 import { StudioInspectorBubbleShapeControls } from "./StudioInspectorBubbleShapeControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
@@ -92,6 +94,9 @@ export function StudioInspectorSelectionSection({
     paperVectorRefinementBusy,
     paperVectorRefinementUnavailableReason,
     patchEl,
+    patchElCoalesced,
+    finishPatchElCoalescing,
+    requestInspectorColorSample,
     rasterAvailabilityForTab,
     recentColors,
     rememberColor,
@@ -126,6 +131,14 @@ export function StudioInspectorSelectionSection({
     t,
     toggleBubbleAnchorPick,
   } = model;
+  const inspectorDocumentColors = useMemo(
+    () => collectStudioDocumentColors(elements),
+    [elements],
+  );
+  const previewColorPatch = (id: string, patch: Partial<El>, key: string): void => {
+    if (patchElCoalesced) patchElCoalesced(id, patch, key);
+    else patchEl(id, patch);
+  };
   return (
     <>
           {inspectorContentMode === "selection" && selected && (
@@ -192,19 +205,56 @@ export function StudioInspectorSelectionSection({
                   applyPaperVectorRefinement={applyPaperVectorRefinement}
                   cancelPaperVectorRefinement={cancelPaperVectorRefinement}
                   replaceDrawWithHokusaiNaturalMedia={replaceDrawWithHokusaiNaturalMedia}
+                  recentColors={recentColors}
+                  documentColors={inspectorDocumentColors}
+                  ensureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  rememberColor={rememberColor}
+                  previewColorPatch={previewColorPatch}
+                  onFinishColorPreview={finishPatchElCoalescing}
+                  onRequestColorSample={requestInspectorColorSample}
                 />
               )}
 
               {(selected.type === "text" || selected.type === "bubble") && (
-                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  글자색
-                  <input
-                    type="color"
-                    value={(selected.type === "text" ? selected.fill : selected.textFill) || "#16100c"}
-                    onChange={(e) => patchEl(selected.id, (selected.type === "text" ? { fill: e.target.value } : { textFill: e.target.value }) as Partial<El>)}
-                    className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                  />
-                </label>
+                <StudioColorField
+                  label="글자색"
+                  value={selected.type === "text" ? selected.fill : selected.textFill}
+                  purpose="text"
+                  recentColors={recentColors}
+                  documentColors={inspectorDocumentColors}
+                  onChange={(color) =>
+                    patchEl(
+                      selected.id,
+                      (selected.type === "text"
+                        ? { fill: color ?? "#16100c" }
+                        : { textFill: color ?? "#16100c" }) as Partial<El>,
+                    )
+                  }
+                  onPreview={(color) =>
+                    previewColorPatch(
+                      selected.id,
+                      (selected.type === "text" ? { fill: color } : { textFill: color }) as Partial<El>,
+                      `color:${selected.id}:text`,
+                    )
+                  }
+                  onUseColor={rememberColor}
+                  onLoadRecentColors={ensureRecentColorsLoaded}
+                  onInteractionEnd={finishPatchElCoalescing}
+                  onRequestCanvasEyedropper={
+                    requestInspectorColorSample
+                      ? () =>
+                          requestInspectorColorSample((color) => {
+                            patchEl(
+                              selected.id,
+                              (selected.type === "text"
+                                ? { fill: color }
+                                : { textFill: color }) as Partial<El>,
+                            );
+                            rememberColor(color);
+                          })
+                      : undefined
+                  }
+                />
               )}
 
               {selected.type === "text" && (
@@ -218,10 +268,16 @@ export function StudioInspectorSelectionSection({
               {selected.type === "bubble" && (
                 <StudioInspectorBubbleAppearanceControls
                   recentColors={recentColors}
+                  documentColors={inspectorDocumentColors}
                   selected={selected}
                   webtoonTheme={webtoonTheme}
                   onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
                   onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  onPreviewPatch={(patch, key) =>
+                    previewColorPatch(selected.id, patch as Partial<El>, key)
+                  }
+                  onFinishColorPreview={finishPatchElCoalescing}
+                  onRequestColorSample={requestInspectorColorSample}
                   onRememberColor={rememberColor}
                 />
               )}
@@ -294,6 +350,13 @@ export function StudioInspectorSelectionSection({
                 <StudioInspectorTypographySection
                   selected={selected}
                   patchEl={patchEl}
+                  recentColors={recentColors}
+                  documentColors={inspectorDocumentColors}
+                  onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  onRememberColor={rememberColor}
+                  previewColorPatch={previewColorPatch}
+                  onFinishColorPreview={finishPatchElCoalescing}
+                  onRequestColorSample={requestInspectorColorSample}
                 />
               )}
               {/* 안이 전부 비면 헤더만 남으므로, 하나라도 그려질 때만 섹션을 낸다. */}

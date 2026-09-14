@@ -124,6 +124,90 @@ describe("StudioColorPopover", () => {
     await vi.dynamicImportSettled();
   });
 
+  it("previews a quick adjustment and restores the opening color on Escape", () => {
+    const onChange = vi.fn();
+    const onPreviewColor = vi.fn();
+    const onCancelColor = vi.fn();
+    const onInteractionEnd = vi.fn();
+    render(
+      <StudioColorPopover
+        value="#123456"
+        onChange={onChange}
+        onPreviewColor={onPreviewColor}
+        onCancelColor={onCancelColor}
+        onInteractionEnd={onInteractionEnd}
+        recentColors={[]}
+        initialOpen
+        initialTab="quick"
+        label="선 색상"
+      />
+    );
+
+    fireEvent.keyDown(screen.getByRole("slider", { name: "채도와 명도" }), {
+      key: "ArrowLeft",
+    });
+    expect(onPreviewColor).toHaveBeenCalled();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onPreviewColor).toHaveBeenLastCalledWith("#123456");
+    expect(onCancelColor).toHaveBeenCalledWith("#123456");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onInteractionEnd).toHaveBeenCalledOnce();
+  });
+
+  it("commits one preview when the popup is dismissed outside", () => {
+    const onPreviewColor = vi.fn();
+    const onCommitColor = vi.fn();
+    const onUseColor = vi.fn();
+    const onInteractionEnd = vi.fn();
+    render(
+      <>
+        <StudioColorPopover
+          value="#123456"
+          onChange={vi.fn()}
+          onPreviewColor={onPreviewColor}
+          onCommitColor={onCommitColor}
+          onUseColor={onUseColor}
+          onInteractionEnd={onInteractionEnd}
+          recentColors={[]}
+          initialOpen
+          initialTab="quick"
+          label="선 색상"
+        />
+        <button type="button">바깥 닫기</button>
+      </>
+    );
+
+    fireEvent.keyDown(screen.getByRole("slider", { name: "채도와 명도" }), {
+      key: "ArrowLeft",
+    });
+    const previewed = vi.mocked(onPreviewColor).mock.calls.at(-1)?.[0];
+    expect(previewed).toBeTruthy();
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "바깥 닫기" }));
+    expect(onCommitColor).toHaveBeenCalledOnce();
+    expect(onCommitColor).toHaveBeenCalledWith(previewed);
+    expect(onUseColor).toHaveBeenCalledWith(previewed);
+    expect(onInteractionEnd).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog", { name: "선 색상 선택" })).toBeNull();
+  });
+
+  it("offers deduplicated document colors from the quick picker", () => {
+    render(
+      <StudioColorPopover
+        value="#123456"
+        onChange={vi.fn()}
+        recentColors={[]}
+        documentColors={["#abcdef", "#ABCDEF", "#654321"]}
+        initialOpen
+        initialTab="quick"
+      />
+    );
+
+    expect(screen.getByRole("radio", { name: "원고 색상 #abcdef 선택" })).toBeTruthy();
+    expect(screen.getAllByRole("radio", { name: /원고 색상/ })).toHaveLength(2);
+  });
+
   it("keeps the portaled popup inside a short mobile viewport and dismisses outside", async () => {
     const widthDescriptor = Object.getOwnPropertyDescriptor(window, "innerWidth");
     const heightDescriptor = Object.getOwnPropertyDescriptor(window, "innerHeight");
@@ -176,6 +260,10 @@ describe("StudioColorPopover", () => {
       expect(top).toBeGreaterThanOrEqual(8);
       expect(left + width).toBeLessThanOrEqual(382);
       expect(top + maxHeight).toBeLessThanOrEqual(836);
+      expect(dialog.getAttribute("data-layout")).toBe("sheet");
+      expect(document.activeElement).not.toBe(
+        screen.getByRole("textbox", { name: "헥스 색상 코드" }),
+      );
 
       fireEvent.pointerDown(screen.getByRole("button", { name: "바깥" }));
       expect(screen.queryByRole("dialog", { name: "모바일 색상 선택" })).toBeNull();
@@ -189,4 +277,28 @@ describe("StudioColorPopover", () => {
       }
     }
   });
+
+  it("records only the final legacy selection when the popup session closes", () => {
+    const onChange = vi.fn();
+    const onUseColor = vi.fn();
+    render(
+      <StudioColorPopover
+        value="#123456"
+        onChange={onChange}
+        onUseColor={onUseColor}
+        recentColors={["#654321"]}
+        initialOpen
+        label="레거시 색상"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "최근 색상 #654321 선택" }));
+    expect(onChange).toHaveBeenCalledWith("#654321");
+    expect(onUseColor).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(onUseColor).toHaveBeenCalledOnce();
+    expect(onUseColor).toHaveBeenCalledWith("#654321");
+  });
+
 });

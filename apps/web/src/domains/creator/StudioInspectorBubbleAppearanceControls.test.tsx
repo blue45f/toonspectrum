@@ -30,9 +30,16 @@ vi.mock("./StudioLazyColorPopover", () => ({
     onLoadRecentColors: () => void;
     onUseColor: (color: string) => void;
     label: string;
-  }) => (
+  }) => {
+    const nextColor =
+      label === "테두리 색상"
+        ? "#654321"
+        : label === "그림자 색상"
+          ? "#222222"
+          : "#223344";
+    return (
     <div>
-      <button type="button" onClick={() => onChange("#223344")}>
+      <button type="button" aria-label={label} onClick={() => onChange(nextColor)}>
         {label}
       </button>
       <button type="button" onClick={onLoadRecentColors}>
@@ -42,7 +49,8 @@ vi.mock("./StudioLazyColorPopover", () => ({
         최근 색상 기억
       </button>
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("./studio-page-lazy-ui", () => ({
@@ -230,9 +238,7 @@ describe("StudioInspectorBubbleAppearanceControls", () => {
         selected={{ ...BUBBLE, stroke: "#123456", strokeWidth: 4 }}
       />
     );
-    fireEvent.change(screen.getByLabelText("테두리 색상"), {
-      target: { value: "#654321" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "테두리 색상" }));
     expect(props.onPatch).toHaveBeenLastCalledWith({ stroke: "#654321" });
     fireEvent.change(screen.getByRole("slider", { name: "테두리 두께" }), {
       target: { value: "6.5" },
@@ -279,9 +285,7 @@ describe("StudioInspectorBubbleAppearanceControls", () => {
         }}
       />
     );
-    fireEvent.change(screen.getByLabelText("그림자 색상"), {
-      target: { value: "#222222" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "그림자 색상" }));
     expect(props.onPatch).toHaveBeenLastCalledWith({ shadowColor: "#222222" });
     fireEvent.change(screen.getByRole("slider", { name: "흐림 정도 (Blur)" }), {
       target: { value: "12" },

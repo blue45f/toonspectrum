@@ -13,7 +13,7 @@
  * block, which is where "typography" starts.
  */
 import { Bold, Italic } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 
 import { normalizeTextPath, type TextPathConfig } from "./lettering/studio-text-path";
 import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
@@ -24,6 +24,7 @@ import {
 } from "./studio-page-lazy-ui";
 import { StudioCircularTextPanel } from "./text/StudioCircularTextPanel";
 import { StudioPresetFontPreload } from "./studio-preset-font-loading";
+import { StudioColorField } from "./StudioColorField";
 import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
@@ -34,6 +35,13 @@ import { cn } from "@/shared/lib/utils";
 interface StudioInspectorTypographySectionProps {
   selected: TextEl | BubbleEl;
   patchEl: (id: string, patch: Partial<El>) => void;
+  recentColors?: readonly string[];
+  documentColors?: readonly string[];
+  onEnsureRecentColorsLoaded?: () => void;
+  onRememberColor?: (color: string) => void;
+  previewColorPatch?: (id: string, patch: Partial<El>, key: string) => void;
+  onFinishColorPreview?: () => void;
+  onRequestColorSample?: (applyColor: (color: string) => void) => void;
 }
 
 const SLIDER_CLASS = "w-24 accent-accent cursor-pointer sm:w-28 h-2";
@@ -45,12 +53,53 @@ function countActiveAppearance(selected: TextEl): number {
 export function StudioInspectorTypographySection({
   selected,
   patchEl,
+  recentColors = [],
+  documentColors = [],
+  onEnsureRecentColorsLoaded,
+  onRememberColor,
+  previewColorPatch,
+  onFinishColorPreview,
+  onRequestColorSample,
 }: StudioInspectorTypographySectionProps) {
   const fontSize = selected.type === "text" ? selected.fontSize : selected.fontSize ?? 24;
   const fsVal = selected.fontStyle ?? "bold";
   const isBold = fsVal.includes("bold");
   const isItalic = fsVal.includes("italic");
   const text = selected.type === "text" ? selected : null;
+  const lastStrokeRef = useRef({
+    color: text?.stroke || "#ffffff",
+    width: text?.strokeWidth && text.strokeWidth > 0 ? text.strokeWidth : 3,
+  });
+  const lastShadowRef = useRef({
+    color: text?.shadowColor || "#000000",
+    blur: text?.shadowBlur ?? 5,
+    offsetX: text?.shadowOffsetX ?? 3,
+    offsetY: text?.shadowOffsetY ?? 3,
+    opacity: text?.shadowOpacity ?? 0.6,
+  });
+  useEffect(() => {
+    if (!text?.stroke) return;
+    lastStrokeRef.current = {
+      color: text.stroke,
+      width: text.strokeWidth && text.strokeWidth > 0 ? text.strokeWidth : 3,
+    };
+  }, [text?.stroke, text?.strokeWidth]);
+  useEffect(() => {
+    if (!text?.shadowColor) return;
+    lastShadowRef.current = {
+      color: text.shadowColor,
+      blur: text.shadowBlur ?? 5,
+      offsetX: text.shadowOffsetX ?? 3,
+      offsetY: text.shadowOffsetY ?? 3,
+      opacity: text.shadowOpacity ?? 0.6,
+    };
+  }, [
+    text?.shadowBlur,
+    text?.shadowColor,
+    text?.shadowOffsetX,
+    text?.shadowOffsetY,
+    text?.shadowOpacity,
+  ]);
 
   return (
     <>
@@ -178,9 +227,18 @@ export function StudioInspectorTypographySection({
                 data-inspector-control-id="typography.stroke"
                 onChange={(e) => {
                   const hasStroke = e.target.checked;
+                  if (!hasStroke && text.stroke) {
+                    lastStrokeRef.current = {
+                      color: text.stroke,
+                      width:
+                        text.strokeWidth && text.strokeWidth > 0
+                          ? text.strokeWidth
+                          : 3,
+                    };
+                  }
                   patchEl(text.id, {
-                    stroke: hasStroke ? (text.stroke || "#ffffff") : undefined,
-                    strokeWidth: hasStroke ? (text.strokeWidth || 3) : 0,
+                    stroke: hasStroke ? lastStrokeRef.current.color : undefined,
+                    strokeWidth: hasStroke ? lastStrokeRef.current.width : 0,
                   } as Partial<El>);
                 }}
                 className="size-4 accent-accent cursor-pointer"
@@ -189,17 +247,41 @@ export function StudioInspectorTypographySection({
 
             {!!text.stroke && (
               <>
-                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  외곽선 색상
-                  <input
-                    type="color"
-                    value={text.stroke || "#ffffff"}
-                    data-inspector-priority="advanced"
-                    data-inspector-control-id="typography.stroke.color"
-                    onChange={(e) => patchEl(text.id, { stroke: e.target.value } as Partial<El>)}
-                    className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                  />
-                </label>
+                <StudioColorField
+                  label="외곽선 색상"
+                  value={text.stroke ?? null}
+                  fallbackColor="#ffffff"
+                  purpose="stroke"
+                  recentColors={recentColors}
+                  documentColors={documentColors}
+                  controlId="typography.stroke.color"
+                  onChange={(color) =>
+                    patchEl(text.id, {
+                      stroke: color ?? undefined,
+                      strokeWidth: color ? text.strokeWidth || 3 : 0,
+                    } as Partial<El>)
+                  }
+                  onPreview={(color) => {
+                    const patch = { stroke: color } as Partial<El>;
+                    if (previewColorPatch) {
+                      previewColorPatch(text.id, patch, `color:${text.id}:stroke`);
+                    } else {
+                      patchEl(text.id, patch);
+                    }
+                  }}
+                  onUseColor={onRememberColor}
+                  onLoadRecentColors={onEnsureRecentColorsLoaded}
+                  onInteractionEnd={onFinishColorPreview}
+                  onRequestCanvasEyedropper={
+                    onRequestColorSample
+                      ? () =>
+                          onRequestColorSample((color) => {
+                            patchEl(text.id, { stroke: color } as Partial<El>);
+                            onRememberColor?.(color);
+                          })
+                      : undefined
+                  }
+                />
 
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
                   외곽선 두께
@@ -235,12 +317,21 @@ export function StudioInspectorTypographySection({
                 data-inspector-control-id="typography.shadow"
                 onChange={(e) => {
                   const hasShadow = e.target.checked;
+                  if (!hasShadow && text.shadowColor) {
+                    lastShadowRef.current = {
+                      color: text.shadowColor,
+                      blur: text.shadowBlur ?? 5,
+                      offsetX: text.shadowOffsetX ?? 3,
+                      offsetY: text.shadowOffsetY ?? 3,
+                      opacity: text.shadowOpacity ?? 0.6,
+                    };
+                  }
                   patchEl(text.id, {
-                    shadowColor: hasShadow ? (text.shadowColor || "#000000") : undefined,
-                    shadowBlur: hasShadow ? (text.shadowBlur || 5) : undefined,
-                    shadowOffsetX: hasShadow ? (text.shadowOffsetX || 3) : undefined,
-                    shadowOffsetY: hasShadow ? (text.shadowOffsetY || 3) : undefined,
-                    shadowOpacity: hasShadow ? (text.shadowOpacity || 0.6) : undefined,
+                    shadowColor: hasShadow ? lastShadowRef.current.color : undefined,
+                    shadowBlur: hasShadow ? lastShadowRef.current.blur : undefined,
+                    shadowOffsetX: hasShadow ? lastShadowRef.current.offsetX : undefined,
+                    shadowOffsetY: hasShadow ? lastShadowRef.current.offsetY : undefined,
+                    shadowOpacity: hasShadow ? lastShadowRef.current.opacity : undefined,
                   } as Partial<El>);
                 }}
                 className="size-4 accent-accent cursor-pointer"
@@ -249,17 +340,38 @@ export function StudioInspectorTypographySection({
 
             {!!text.shadowColor && (
               <>
-                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  그림자 색상
-                  <input
-                    type="color"
-                    value={text.shadowColor || "#000000"}
-                    data-inspector-priority="advanced"
-                    data-inspector-control-id="typography.shadow.color"
-                    onChange={(e) => patchEl(text.id, { shadowColor: e.target.value } as Partial<El>)}
-                    className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                  />
-                </label>
+                <StudioColorField
+                  label="그림자 색상"
+                  value={text.shadowColor ?? null}
+                  fallbackColor="#000000"
+                  purpose="shadow"
+                  recentColors={recentColors}
+                  documentColors={documentColors}
+                  controlId="typography.shadow.color"
+                  onChange={(color) =>
+                    patchEl(text.id, { shadowColor: color ?? undefined } as Partial<El>)
+                  }
+                  onPreview={(color) => {
+                    const patch = { shadowColor: color } as Partial<El>;
+                    if (previewColorPatch) {
+                      previewColorPatch(text.id, patch, `color:${text.id}:shadow`);
+                    } else {
+                      patchEl(text.id, patch);
+                    }
+                  }}
+                  onUseColor={onRememberColor}
+                  onLoadRecentColors={onEnsureRecentColorsLoaded}
+                  onInteractionEnd={onFinishColorPreview}
+                  onRequestCanvasEyedropper={
+                    onRequestColorSample
+                      ? () =>
+                          onRequestColorSample((color) => {
+                            patchEl(text.id, { shadowColor: color } as Partial<El>);
+                            onRememberColor?.(color);
+                          })
+                      : undefined
+                  }
+                />
 
                 {([
                   ["흐림 정도 (Blur)", "shadowBlur", 0, 20, 1, text.shadowBlur ?? 5, "px"],

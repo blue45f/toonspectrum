@@ -44,6 +44,9 @@ describe("Studio inspector multi-selection scope", () => {
       "<StudioInspectorMultiSelectionSection model={model} />",
     );
     expect(multiSelectionSource).toContain("<StudioInspectorSelectionActions");
+    expect(multiSelectionSource).toContain("<StudioColorField");
+    expect(multiSelectionSource).toContain("mixed={strokeColorState.mixed}");
+    expect(multiSelectionSource).toContain("commitCoalesced(next, strokeColorHistoryKey)");
     expect(multiSelectionSource).toContain(
       'data-testid="studio-inspector-context-multi-selection"',
     );
