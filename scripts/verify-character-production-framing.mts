@@ -69,16 +69,24 @@ try {
     await frame.waitFor();
     await page.waitForFunction((expectedRatio) => {
       const element = document.querySelector<HTMLElement>("[data-character-output-frame]");
-      if (!element) return false;
+      const viewport = document.querySelector<HTMLCanvasElement>(
+        '[data-character-shaper="true"] [data-character-shaper-viewport] canvas',
+      );
+      if (!element || !viewport) return false;
       const bounds = element.getBoundingClientRect();
-      return bounds.height > 0 && Math.abs(bounds.width / bounds.height - expectedRatio) < 0.01;
+      const viewportBounds = viewport.getBoundingClientRect();
+      return bounds.height > 0
+        && viewportBounds.height > 0
+        && Math.abs(bounds.width / bounds.height - expectedRatio) < 0.01
+        && Math.abs(bounds.x + bounds.width / 2 - viewportBounds.x - viewportBounds.width / 2) < 2
+        && Math.abs(bounds.y + bounds.height / 2 - viewportBounds.y - viewportBounds.height / 2) < 2;
     }, width / height);
     const box = await frame.boundingBox();
     const viewport = await canvas.boundingBox();
     assert(Boolean(box && viewport), "missing frame bounds");
     assert(Math.abs(box!.width / box!.height - width / height) < 0.01, `wrong overlay aspect: ${aspect}`);
-    assert(Math.abs(box!.x + box!.width / 2 - viewport!.x - viewport!.width / 2) < 2, "frame not horizontally centered");
-    assert(Math.abs(box!.y + box!.height / 2 - viewport!.y - viewport!.height / 2) < 2, "frame not vertically centered");
+    assert(Math.abs(box!.x + box!.width / 2 - viewport!.x - viewport!.width / 2) < 2, `frame not horizontally centered: ${aspect} ${JSON.stringify({ box, viewport })}`);
+    assert(Math.abs(box!.y + box!.height / 2 - viewport!.y - viewport!.height / 2) < 2, `frame not vertically centered: ${aspect} ${JSON.stringify({ box, viewport })}`);
     const item = await download("PNG 저장", `${aspect}.png`);
     assert(item.bytes.readUInt32BE(16) === width && item.bytes.readUInt32BE(20) === height, `wrong PNG dimensions: ${aspect}`);
     captures.push({ aspect, width, height, bytes: item.bytes.length, milliseconds: item.milliseconds });
