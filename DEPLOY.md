@@ -169,7 +169,7 @@ DB의 전체 연결 예산도 확인합니다. 초기화 실패는 해당 인스
 ### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
 
 일반 `api/index.js` 진입점은 PostgreSQL Socket.IO adapter를 장착하지 않습니다.
-별도 호스트를 선택하면 SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 OCI/Render/Fly의 Nest
+별도 호스트를 선택하면 SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 Render/Fly 등 승인된 장기 실행 Nest
 서버로 보낼 수 있도록 프런트 빌드에 별도 origin을 지정합니다.
 
 ```env
@@ -244,27 +244,59 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
 `drizzle-kit push`를 실행하지 않습니다.
 
-### 운영 배포 승인과 DB 변경 순서 — 2026-09-14 정책
+프로덕션 배포는 `origin/main` push와 분리합니다. `vercel.json`은 모든 Git branch 배포를
+비활성화하고, 정적 웹의 기본 권위는 `deploy/cloudflare-static`의 Cloudflare Static Assets입니다.
+PR 생성, main merge, scheduled catalog commit은 배포를 만들지 않습니다. 검토된 운영자가 clean
+`main`에서 명시적 approval 문자열을 제공한 수동 명령만 실행할 수 있습니다.
 
-`origin/main` push와 PR merge는 더 이상 Vercel 배포를 시작하지 않습니다. `[deploy]` 메시지도
-승인이 아닙니다. `AGENTS.md`와 최소 비용 배포 정책에 따라 사용자가 승인한 하나의 정확한
-40자리 SHA를 수동 prebuilt 경로로만 배포합니다. PR 전용 main과 기존 `core`, `verify`,
-보안·runtime 검증은 유지하며 관리자 우회나 테스트 약화로 배포를 진행하지 않습니다.
+```bash
+pnpm run validate:architecture
+pnpm run verify:free-infrastructure
+pnpm run verify:cloudflare-static
+pnpm run cloudflare:static:dry-run
 
-migration workflow의 exact main ancestry, manifest/checksum, DDL 전용 role, required reviewer,
-writer drain, capability 검증은 그대로 유지합니다. merge가 더 이상 runtime 전환이 아니므로
-reviewed main SHA로 migration을 검토·승인한 후 새 runtime을 배포하는 순서를 선택할 수 있습니다.
-다만 현재 운영 중인 이전 runtime과의 호환성은 반드시 보존합니다.
+export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
+pnpm run cloudflare:static:deploy
+```
 
-1. expand 변경을 PR로 검증·병합합니다. 구 runtime과 새 schema가 함께 동작해야 합니다.
-2. 기존 DB upgrade의 승인·writer drain·NO-STUDIO-WRITERS 등 기존 migration 전제조건을 확인합니다.
-3. merge된 정확한 SHA로 수동 adoption/apply와 capability 검증을 수행합니다. 이는 별도 DB 변경 승인입니다.
-4. 사용자 배포 승인을 받은 같은 SHA를 한 번 빌드하고 prebuilt로 업로드합니다. realtime canary도 확인합니다.
-5. 구 binary가 모두 사라진 뒤에만 contract 변경을 별도 PR·승인·배포로 진행합니다.
+`main`은 브랜치 보호로 PR 전용이며 CI의 `core` 체크(lint·typecheck·마이그레이션 채택·전체
+Vitest·빌드 게이트) 성공이 머지 조건입니다. `core`는 병렬 잡 `lint`·`typecheck`·`build`·
+`test (1/3..3/3)`·`test (serial lane)`의 결과를 합칩니다. 릴리스 체크 `verify`는 같은 잡들과
+`studio-3d-runtime`을 합칩니다. 관리자 우회는 배포 우회가 아니며, 우회 커밋 역시 별도 수동
+릴리스 전에는 운영에 반영되지 않습니다. 우회 이유는 PR이나 커밋 본문에 기록하고 다음 PR에서
+필수 검증을 다시 녹색으로 돌립니다.
 
-expand가 불가능한 변경은 별도 유지보수/롤백 계획과 승인이 필요합니다. 순수 프론트엔드 변경도
-merge만으로 출시되지 않으며, 여러 변경을 모아 승인된 최종 SHA를 한 번 배포합니다.
-Render의 `autoDeployTrigger: off`와 외부 호스트의 기존 안전 경계를 유지합니다.
+`.github/workflows/deploy-vercel.yml`은 Cloudflare 전환 기간의 수동 비상 fallback만 담당합니다.
+`workflow_dispatch` 외 trigger가 없고 current main ancestry·production environment review·고정 CLI·
+prebuilt artifact 검증을 모두 요구합니다. 일반 릴리스, preview, data refresh가 이 workflow를 자동
+호출해서는 안 됩니다.
+
+migration을 동반하는 release는 expand/contract 두 번의 reviewed merge로 나눕니다. 자동 배포가
+없어졌으므로 migration과 runtime 순서를 명시적으로 제어할 수 있지만, release migration workflow는
+release SHA가 이미 `origin/main`의 ancestor일 것을 요구합니다. 기존 runtime이 migration 동안 계속
+서비스하므로 expand migration은 구 runtime과도 호환되어야 합니다.
+
+migration을 동반하는 수동 release 순서는 다음과 같습니다. Render는 `autoDeployTrigger: off`를
+유지합니다.
+
+1. backward-compatible expand runtime과 migration을 포함한 reviewed commit을 `main`에 merge합니다.
+   merge만으로 어떤 공급자에도 배포되지 않습니다.
+2. 현재 runtime과 새 runtime이 모두 사용할 수 있는 add-only migration인지 다시 확인합니다. 삭제,
+   rename, stricter constraint처럼 구 runtime을 깨는 변경은 이 단계에 포함하지 않습니다.
+3. 필요한 Studio writer drain과 운영 승인 후
+   `production-database-migrations.yml`을 merge된 정확한 SHA로 실행합니다. 최초 원장 채택은
+   `adopt`, 이후는 `apply`를 선택하고, 요구되는 writer 확인 문구를 입력합니다.
+4. migration과 full capability verification이 녹색이면 Cloudflare static dry-run, Core API canary,
+   realtime canary를 같은 SHA 기준으로 실행합니다.
+5. 정적 웹과 Core API의 변경된 배포 단위만 수동 배포하고 health, 로그인 cookie, OAuth callback,
+   asset upload, Socket.IO/DO reconnect, OG crawler HTML을 검사합니다.
+6. 직전 release로 rollback할 수 있는 상태를 유지한 채 관찰한 다음, 구 schema 호환 경로 제거와
+   destructive DDL은 별도 contract release로 진행합니다. 구 binary가 완전히 사라진 뒤에만 안전합니다.
+
+migration·realtime 계약을 건드리지 않는 순수 프론트엔드 release도 자동 배포되지 않습니다. 검증된
+SHA를 수동 정적 배포하여 비용과 릴리스 횟수를 통제합니다. exact 명령, quota 정책, custom-domain
+전환과 rollback은 [`docs/FREE_INFRASTRUCTURE.md`](docs/FREE_INFRASTRUCTURE.md)를 따릅니다.
 
 PostgreSQL adapter는 listener와 publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler`
 호스트나 PgBouncer transaction endpoint는 사용할 수 없습니다. 원격/운영 URL은

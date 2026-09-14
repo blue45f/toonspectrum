@@ -1,6 +1,6 @@
-# Owner policy 2026-09-14: Git auto-deploy is disconnected; main merges never deploy.
-# This is the sole approved Vercel deployment workflow: explicit approval, one Linux build,
-# one immutable prebuilt upload. See docs/operations/minimum-cost-deployment-policy.md.
+# Retained only as an explicitly dispatched emergency fallback during the Cloudflare cutover.
+# Git-triggered Vercel deployments are disabled. This workflow builds on the GitHub runner and
+# uploads immutable prebuilt output only after a production-environment reviewer approves it.
 name: Vercel CLI fallback deploy
 
 on:

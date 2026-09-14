@@ -30,7 +30,6 @@ deploy/cloudflare-realtime/*
 !deploy/cloudflare-realtime/src
 !deploy/cloudflare-realtime/src/**
 deploy/coturn/
-deploy/oci/
 
 # Test-only sources are verified in CI and are not production build inputs.
 **/*.test.*

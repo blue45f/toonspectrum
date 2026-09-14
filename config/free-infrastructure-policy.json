@@ -1,0 +1,85 @@
+{
+  "version": "toonspectrum.free-infrastructure.v1",
+  "mode": "free-strict",
+  "automaticDeployments": false,
+  "automaticPaidFailover": false,
+  "defaultProjectStorage": "local-or-byos",
+  "forbiddenProviders": ["oracle", "oci"],
+  "quotaThresholds": {
+    "warn": 0.6,
+    "forecast": 0.7,
+    "redirectNewLargeWrites": 0.8,
+    "stopCentralPersonalWrites": 0.85,
+    "critical": 0.95
+  },
+  "authorities": {
+    "staticWeb": "cloudflare-static-assets",
+    "edgeGateway": "cloudflare-workers",
+    "transactionalDatabase": "neon-postgres",
+    "realtimeCoordination": "cloudflare-durable-objects",
+    "publicAssets": "cloudflare-r2",
+    "backupArchive": "backblaze-b2",
+    "localProjects": "local-opfs",
+    "userOwnedProjects": "user-owned-storage",
+    "email": "resend"
+  },
+  "providers": {
+    "cloudflare-static-assets": {
+      "roles": ["static-web"],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 1
+    },
+    "cloudflare-workers": {
+      "roles": ["edge-gateway", "lightweight-api"],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.85
+    },
+    "cloudflare-durable-objects": {
+      "roles": ["realtime-coordination"],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.85
+    },
+    "cloudflare-r2": {
+      "roles": ["public-assets", "published-artifacts"],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8
+    },
+    "neon-postgres": {
+      "roles": ["transactional-database"],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "backblaze-b2": {
+      "roles": ["backup-archive"],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8
+    },
+    "local-opfs": {
+      "roles": ["local-projects", "local-rendering"],
+      "billingBoundary": "device-owned",
+      "applicationHardCapRatio": 0.95
+    },
+    "user-owned-storage": {
+      "roles": ["personal-projects", "large-private-assets"],
+      "billingBoundary": "user-owned",
+      "applicationHardCapRatio": 0.95
+    },
+    "resend": {
+      "roles": ["transactional-email"],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "cloud-run-compatibility": {
+      "roles": ["legacy-nest-api"],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "supabase-compatibility": {
+      "roles": ["legacy-private-object-storage"],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    }
+  }
+}

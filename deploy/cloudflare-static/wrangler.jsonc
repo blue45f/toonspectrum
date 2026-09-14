@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "toonspectrum-web",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-14",
+  "workers_dev": false,
+  "assets": {
+    "directory": "../../dist",
+    "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/socket.io",
+      "/socket.io/*",
+      "/title/*",
+      "/market",
+      "/market/*"
+    ]
+  }
+}

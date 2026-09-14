@@ -2,7 +2,7 @@
 
 This directory is an **opt-in, single-node Linux deployment scaffold** for Studio voice relay.
 The Nest API remains the credential control plane; coturn carries encrypted WebRTC packets when
-the browser cannot establish a direct path. The stack does not start as part of `deploy/oci` and
+the browser cannot establish a direct path. The stack is independent from the core API deployment and
 does not change local development.
 
 The configuration matches `StudioVoiceIcePolicyService`: coturn REST credentials use a
@@ -188,7 +188,7 @@ credential refresh, coturn restart, certificate renewal, and Wi-Fi/mobile networ
 - One VM is not highly available. A second independent TURN node, distinct failure domain, DNS
   routing, capacity admission, and per-node observation are required before claiming HA.
 - This scaffold is IPv4-only and TLS uses 5349. A dedicated host can additionally offer TLS on 443,
-  but ToonSpectrum's combined OCI host already reserves 443 for Caddy and cannot share that socket.
+  but a shared application host may already reserve 443 and cannot share that socket.
 - The health/smoke scripts intentionally do not pass a temporary password to `turnutils_uclient`,
   because command arguments and CI logs can expose credentials. Authenticated relay is verified in
   a browser using the API-issued short-lived policy.

@@ -9,8 +9,8 @@ name: related-info-update
 #    고품질 갱신은 로컬에서 `pnpm related:update`(크롤 + catalog:gen) 후 커밋하는 것이 primary 다.
 #    변경이 있을 때만 커밋하며, 없으면 조용히 종료한다.
 #
-# main 푸시는 배포하지 않는다(2026-09-14 최소 비용 정책). 별도 hook/CLI를 호출하지
-# 않아 중복 빌드와 러너 비용을 막는다.
+# main 커밋은 배포를 만들지 않는다. 데이터 갱신은 다음 검토된 수동 Cloudflare 정적
+# 릴리스에 포함하며, 이 워크플로에서 deploy hook/CLI를 호출하지 않아 빌드·배포 비용을 막는다.
 
 on:
   schedule:
