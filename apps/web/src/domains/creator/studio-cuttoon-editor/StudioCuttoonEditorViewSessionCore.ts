@@ -111,6 +111,7 @@ export type StudioCuttoonEditorViewSessionCore = {
   bg3dInitialScene: any;
   bg3dOpen: any;
   bg3dSeedPrimitiveKind: any;
+  bg3dMarketplaceModelId?: string | null;
   bg3dSeedTemplateId: any;
   bg3dTargetBundleId: any;
   bgGrad: any;

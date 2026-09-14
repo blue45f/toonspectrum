@@ -39,6 +39,7 @@ import {
   type StudioNamedPalette,
 } from "./studio-palette-library";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
+import { resolveStudioMarketplaceCc0Model } from "./studio-marketplace-cc0-registry";
 
 import type {
   StudioCreatorPackDefinition,
@@ -349,6 +350,10 @@ function validateBuiltinEntry(entry: StudioCreatorPackEntry): string[] {
     return SCENE_TEMPLATES.some((template) => template.id === templateId)
       ? []
       : ["알 수 없는 내장 장면 템플릿 참조입니다."];
+  }
+  if (entry.kind === "3d-asset") {
+    const approvedModel = resolveStudioMarketplaceCc0Model(entry.delivery.runtimeRef);
+    return approvedModel ? [] : ["검증된 내장 3D 에셋 참조가 아닙니다."];
   }
   if (entry.kind === "3d-preset") {
     return entry.delivery.runtimeRef === STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID

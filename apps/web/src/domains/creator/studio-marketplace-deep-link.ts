@@ -95,7 +95,7 @@ export interface StudioMarketplaceDeepLinkDependencies<TPack, TAsset> {
   readonly projectAssets: (
     record: CreatorMarketplaceResourceRecord,
   ) => AssetProjection<TAsset>;
-  readonly insertAsset: (asset: TAsset) => boolean;
+  readonly insertAsset: (asset: TAsset) => boolean | Promise<boolean>;
 }
 
 export interface StudioMarketplaceDeepLinkOperation<TPack, TAsset> {

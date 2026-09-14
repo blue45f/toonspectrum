@@ -6036,6 +6036,7 @@ export function StudioCuttoonEditor({
   /** Elements 3D rail → VRM poser one-shot prop seed (cleared after consume). */
   const [poserSeedPropId, setPoserSeedPropId] = useState<string | null>(null);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  const [bg3dMarketplaceModelId, setBg3dMarketplaceModelId] = useState<string | null>(null);
   function openVrmPoserFromMenu() {
     // 두 VRM 표면이 같은 문서 위에 동시에 서지 않게 한다. 셰이퍼에서 레거시 빌더로 무손실
     // 전환하는 길은 셰이퍼 안의 「고급 편집」이다.
@@ -6049,6 +6050,7 @@ export function StudioCuttoonEditor({
     navigateStudio2dSurface("character");
   }
   function openBackground3dFromMenu() {
+    setBg3dMarketplaceModelId(null);
     setBg3dSeedTemplateId(null);
     setBg3dSeedPrimitiveKind(null);
     setBg3dInitialDataUrl(undefined);
@@ -6085,6 +6087,7 @@ export function StudioCuttoonEditor({
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!bg3dOpen) {
+      setBg3dMarketplaceModelId(null);
       bg3dDccSourceRef.current = null;
       bg3dDccShotMappingsRef.current = [];
       // Every close path (dialog, route Back, DCC admission, rail toggle) retires the edit target.
@@ -15755,7 +15758,7 @@ const puppetWarpArmed =
                 browserStudioCreatorPackStorage,
                 resolveStudioCreatorBundledCatalogTarget,
               },
-              { createStudioOriginalFreeAssetRecord },
+              { createStudioMarketplaceImageRecord },
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
@@ -15763,7 +15766,7 @@ const puppetWarpArmed =
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
-              import("./studio-original-free-asset-packs"),
+              import("./studio-marketplace-assets"),
               import("./studio-marketplace-runtime-compatibility"),
               import("./studio-community-marketplace-cloud-sync"),
             ]);
@@ -15828,9 +15831,10 @@ const puppetWarpArmed =
                 }
                 if (resolution.target.kind === "3d-asset-catalog") {
                   openBackground3dFromMenu();
+                  setBg3dMarketplaceModelId(resolution.target.runtimeRef.slice("studio-3d-asset:".length));
                   return {
                     status: "opened" as const,
-                    message: "3D 에셋 카탈로그를 열었어요. 3D 모델·소품을 선택해 캔버스 장면에 배치하세요.",
+                    message: "선택한 마켓 모델을 3D 편집기에 전달했어요. ‘선택한 마켓 모델 가져오기’로 검증 후 장면에 배치하세요.",
                   };
                 }
                 openBackground3dFromMenu();
@@ -15844,16 +15848,18 @@ const puppetWarpArmed =
                   record,
                   compatibilityContext,
                 ),
-              insertAsset: (projectedAsset) => {
-                if (!isStudioPasteScopeCurrent({
+              insertAsset: async (projectedAsset) => {
+                const isInsertCurrent = () => isCurrentOperation() && isStudioPasteScopeCurrent({
                   mutationAllowed: canApplyStudioMutation(mutationTicket),
                   reviewLocked: activeSurfaceReviewLockedRef.current,
                   targetPageId,
                   currentPageId: currentPageIdRef.current,
                   targetMasterEditMode,
                   currentMasterEditMode: masterEditModeRef.current,
-                })) return false;
-                const asset = createStudioOriginalFreeAssetRecord(projectedAsset);
+                });
+                if (!isInsertCurrent()) return false;
+                const asset = await createStudioMarketplaceImageRecord(projectedAsset);
+                if (!isInsertCurrent()) return false;
                 return addRenderedImage(asset.dataUrl, asset.width, asset.height);
               },
             };
@@ -28455,6 +28461,7 @@ function clearSelectionForEdit() {
       bg3dInitialScene={bg3dInitialScene}
       bg3dOpen={bg3dOpen}
       bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
+      bg3dMarketplaceModelId={bg3dMarketplaceModelId}
       bg3dSeedTemplateId={bg3dSeedTemplateId}
       bg3dTargetBundleId={bg3dTargetBundleId}
       bgGrad={bgGrad}

@@ -17,7 +17,7 @@ const modelImportActionsSource = readFileSync(
   "utf8",
 );
 const MODEL_IMPORT_ACTIONS_TAIL =
-  "return { handleDeleteModelFromLibrary, handleUploadModelFiles };";
+  "return { handleDeleteModelFromLibrary, handleUploadModelFiles, importModelFiles };";
 
 function sourceBetweenIn(haystack: string, startNeedle: string, endNeedle: string): string {
   const start = haystack.indexOf(startNeedle);

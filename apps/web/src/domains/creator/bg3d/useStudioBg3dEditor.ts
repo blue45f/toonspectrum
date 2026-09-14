@@ -58,6 +58,8 @@ export function useStudioBg3dEditor(props) {
   });
   h.handleDeleteModelFromLibrary = actions.handleDeleteModelFromLibrary;
   h.handleUploadModelFiles = actions.handleUploadModelFiles;
+  h.importMarketplaceModelFiles = actions.importModelFiles;
+  h.marketplaceModelId = props.marketplaceModelId;
   bindStudioBg3dEditorSceneGraph(h);
   useStudioBg3dEditorEffects(h);
   useStudioBg3dEditorRestoreEffects(h);

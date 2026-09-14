@@ -87,6 +87,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "bg3dBatchRecoveryScope"
   | "validateRecoveryAccess"
   | "bg3dOpen"
+  | "bg3dMarketplaceModelId"
   | "bg3dSeedTemplateId"
   | "bg3dSeedPrimitiveKind"
   | "onSeedObjectInsertConsumed"
@@ -252,6 +253,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
+  bg3dMarketplaceModelId = null,
   bg3dSeedTemplateId = null,
   bg3dSeedPrimitiveKind = null,
   onSeedObjectInsertConsumed,
@@ -429,6 +431,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
       open={bg3dOpen}
       initialDataUrl={bg3dInitialDataUrl}
       initialScene={bg3dInitialScene}
+      marketplaceModelId={bg3dMarketplaceModelId}
       seedSceneTemplateId={bg3dSeedTemplateId}
       seedPrimitiveKind={asBgPrimitiveKindOrNull(bg3dSeedPrimitiveKind)}
       onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}

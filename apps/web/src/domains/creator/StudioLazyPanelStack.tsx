@@ -243,6 +243,7 @@ export interface StudioLazyPanelStackProps {
   ) => Promise<boolean>;
   bg3dOpen: boolean;
   /** Elements 3D rail one-shot seeds for BG3D (cleared after consume). */
+  bg3dMarketplaceModelId?: string | null;
   bg3dSeedTemplateId: string | null;
   bg3dSeedPrimitiveKind: string | null;
   onSeedObjectInsertConsumed: () => void;
@@ -455,6 +456,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
+  bg3dMarketplaceModelId,
   bg3dSeedTemplateId,
   bg3dSeedPrimitiveKind,
   onSeedObjectInsertConsumed,
@@ -672,6 +674,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
         validateRecoveryAccess={validateRecoveryAccess}
         bg3dOpen={bg3dOpen}
+        bg3dMarketplaceModelId={bg3dMarketplaceModelId}
         bg3dSeedTemplateId={bg3dSeedTemplateId}
         bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
         onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
