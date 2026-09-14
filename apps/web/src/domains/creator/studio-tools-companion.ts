@@ -2103,6 +2103,8 @@ export type StudioCompanionChannel = {
   onmessage: ((ev: MessageEvent) => void) | null;
 };
 
+export type StudioCompanionChannelFactory = (sessionId: string) => StudioCompanionChannel | null;
+
 export function createStudioCompanionChannel(
   sessionId: string,
   factory?: (name: string) => StudioCompanionChannel
@@ -2252,13 +2254,16 @@ export function startStudioCompanionPrimaryRuntime(input: {
   onControl?: (control: StudioCompanionReviewControl) => void;
   onReferenceControl?: (control: StudioCompanionReferenceControl) => void;
   onReferenceDemandChange?: (active: boolean) => void;
+  channelFactory?: StudioCompanionChannelFactory;
 }): StudioCompanionPrimaryRuntime | null {
   const sessionId = parseStudioCompanionSessionId(input.search) ?? createStudioCompanionSessionId();
   const primaryInstanceId = createStudioCompanionInstanceId();
   if (!sessionId || !primaryInstanceId) return null;
 
   const binding = new StudioCompanionPrimaryBinding();
-  const channel = createStudioCompanionChannel(sessionId);
+  const channel = input.channelFactory
+    ? input.channelFactory(sessionId)
+    : createStudioCompanionChannel(sessionId);
   if (!channel) return null;
   const referenceChannel: StudioCompanionChannel = channel;
 
