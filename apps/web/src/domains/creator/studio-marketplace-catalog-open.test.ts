@@ -12,20 +12,23 @@ const actions = () => ({ isCurrent: () => true, canMutate: () => true,
 describe("market catalog opening", () => {
   it("opens the exact prepared model scene", async () => {
     mocks.resolve.mockReturnValue({ status: "supported", target: { kind: "3d-asset-catalog", runtimeRef: "registered" } });
-    const prepared = { name: "Model", scene: createDefaultStudioBg3dSceneDocument(), cancel: vi.fn() };
+    const prepared = createDefaultStudioBg3dSceneDocument();
     mocks.prepare.mockResolvedValue(prepared);
     const ports = actions();
     expect((await openStudioMarketplaceCatalog(pack, ports)).status).toBe("opened");
-    expect(ports.openBackground3d).toHaveBeenCalledOnce(); expect(ports.setInitialScene).toHaveBeenCalledWith(prepared.scene);
-    expect(prepared.cancel).not.toHaveBeenCalled();
+    expect(ports.openBackground3d).toHaveBeenCalledOnce();
+    expect(ports.setInitialScene).toHaveBeenCalledWith(prepared);
   });
   it("compensates a stale prepared model without opening the editor", async () => {
     mocks.resolve.mockReturnValue({ status: "supported", target: { kind: "3d-asset-catalog", runtimeRef: "registered" } });
-    let current = true; const cancel = vi.fn(async () => true);
-    mocks.prepare.mockImplementation(async () => { current = false; return { name: "Model", scene: createDefaultStudioBg3dSceneDocument(), cancel }; });
+    let current = true;
+    mocks.prepare.mockImplementation(async () => {
+      current = false;
+      return createDefaultStudioBg3dSceneDocument();
+    });
     const ports = { ...actions(), isCurrent: () => current };
     expect((await openStudioMarketplaceCatalog(pack, ports)).status).toBe("unsupported");
-    expect(cancel).toHaveBeenCalledOnce(); expect(ports.openBackground3d).not.toHaveBeenCalled();
+    expect(ports.openBackground3d).not.toHaveBeenCalled();
   });
   it("preserves the exact template identity", async () => {
     mocks.resolve.mockReturnValue({ status: "supported", target: { kind: "scene-template-catalog", templateId: "confession" } });

@@ -21,6 +21,7 @@ import {
 } from "./studio-scene-templates";
 import { sha256HexPortable } from "./studio-sha256";
 import { studioMarketplaceCc0EntrySourceMatches } from "./studio-marketplace-cc0-provenance";
+import { resolveStudioMarketplaceCc0Entry } from "./studio-marketplace-cc0-assets";
 
 import type {
   StudioCreatorPackDefinition,
@@ -393,6 +394,18 @@ export function projectCreatorMarketplaceRecordToStudioPack(
       reason: "이 리소스의 릴리스 버전을 안전하게 해석할 수 없습니다.",
     };
   }
+  if (
+    record.kind === "3d-asset"
+    && !record.entries.every((entry) =>
+      resolveStudioMarketplaceCc0Entry(record, entry) !== null
+    )
+  ) {
+    return {
+      status: "unsupported",
+      pack: null,
+      reason: "검증된 CC0 3D 모델 참조와 원본 출처가 일치하지 않습니다.",
+    };
+  }
   const entries = record.entries.map((entry) => projectEntry(kind, entry));
   if (entries.some((entry) => entry === null)) {
     return {
@@ -495,7 +508,8 @@ export function projectCreatorMarketplaceRecordToAssets(
       continue;
     }
     const assetId = originalAssetIdFromEntry(entry);
-    const asset = assetId ? findStudioMarketplaceImageAsset(assetId) : null;
+    const asset = (assetId ? findStudioMarketplaceImageAsset(assetId) : null)
+      ?? resolveStudioMarketplaceCc0Entry(record, entry);
     if (!asset) {
       unsupportedCount += 1;
       continue;

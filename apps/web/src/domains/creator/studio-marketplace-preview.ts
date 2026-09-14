@@ -1,4 +1,5 @@
 import { studioCc0AssetUrl } from "./studio-cc0-asset-delivery";
+import { findStudioMarketplaceCc0Asset as findRegisteredStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-assets";
 import { findStudioMarketplaceCc0Asset, resolveStudioMarketplaceCc0Model } from "./studio-marketplace-cc0-registry";
 import { createStudioOriginalFreeAssetRecord, findStudioOriginalFreeAsset } from "./studio-original-free-asset-packs";
 
@@ -13,6 +14,11 @@ export function resolveStudioMarketplaceAssetPreview(runtimeRef: string): Studio
   if (model?.previewPath) return {
     src: studioCc0AssetUrl(model.previewPath), name: model.name,
     caption: "해당 GLB의 렌더 미리보기입니다. 실제 회전·확대와 모델 배치는 Studio에서 확인하세요.",
+  };
+  const registeredCc0 = findRegisteredStudioMarketplaceCc0Asset(runtimeRef);
+  if (registeredCc0 && registeredCc0.kind !== "model") return {
+    src: studioCc0AssetUrl(registeredCc0.path), name: registeredCc0.name,
+    caption: `${registeredCc0.width}×${registeredCc0.height}px 실제 원본 · ${registeredCc0.provider} · CC0`,
   };
   const id = runtimeRef.startsWith("studio-asset:") ? runtimeRef.slice("studio-asset:".length) : runtimeRef;
   const original = findStudioOriginalFreeAsset(id);

@@ -11,7 +11,7 @@ export function StudioMarketplaceModelImport({ modelId, scopeKey, disabled, onIm
   readonly disabled: boolean;
   readonly onImport: StudioBg3dModelImportActions["importModelFiles"];
 }) {
-  const asset = resolveStudioMarketplaceCc0Model(`studio-3d-asset:${modelId ?? ""}`);
+  const asset = resolveStudioMarketplaceCc0Model(`studio-3d-asset:cc0/${modelId ?? ""}`);
   const controllerRef = useRef<AbortController | null>(null);
   const latestRef = useRef({ disabled, onImport });
   const [pending, setPending] = useState(false);

@@ -255,7 +255,7 @@ export async function createStudioCc0ImageRecord(asset: StudioCc0Asset, signal?:
 export async function createStudioCc0ModelFile(asset: StudioCc0Asset, signal?: AbortSignal): Promise<File> {
   signal?.throwIfAborted();
   if (asset.kind !== "model" || !asset.path.endsWith(".glb")) throw new TypeError("3D 모델 참조가 아닙니다.");
-  const bytes = await boundedBytes(studioCc0AssetUrl(asset.path), 64 * 1024 * 1024, signal);
+  const bytes = await boundedBytes(studioCc0AssetUrl(asset.path), asset.bytes, signal);
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), byte => byte.toString(16).padStart(2, "0")).join("");
   if (bytes.byteLength !== asset.bytes || hash !== asset.sha256) throw new Error("3D 에셋 무결성 검증에 실패했습니다.");
   if (bytes.byteLength < 20) throw new Error("GLB 헤더가 올바르지 않습니다.");

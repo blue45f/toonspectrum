@@ -10,8 +10,14 @@ export function findStudioMarketplaceCc0Asset(id: string): StudioCc0Asset | null
 }
 
 export function resolveStudioMarketplaceCc0Model(runtimeRef: string): StudioCc0Asset | null {
-  const prefix = "studio-3d-asset:";
-  if (!runtimeRef.startsWith(prefix)) return null;
-  const asset = findStudioMarketplaceCc0Asset(runtimeRef.slice(prefix.length));
+  const canonicalPrefix = "studio-3d-asset:cc0/";
+  const legacyPrefix = "studio-3d-asset:";
+  const id = runtimeRef.startsWith(canonicalPrefix)
+    ? runtimeRef.slice(canonicalPrefix.length)
+    : runtimeRef.startsWith(legacyPrefix)
+      ? runtimeRef.slice(legacyPrefix.length)
+      : "";
+  if (!id || id.includes("/") || id.includes("..")) return null;
+  const asset = findStudioMarketplaceCc0Asset(id);
   return asset?.kind === "model" ? asset : null;
 }
