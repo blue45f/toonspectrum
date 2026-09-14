@@ -18,13 +18,30 @@ function normalized(point: BrushStudioV6MaterialPoint): BrushStudioV6MaterialPoi
   });
 }
 
-function moved(
-  source: BrushStudioV6MaterialPoint,
-  x: number,
-  y: number,
-): BrushStudioV6MaterialPoint {
+function moved(source: BrushStudioV6MaterialPoint, x: number, y: number): BrushStudioV6MaterialPoint {
   return Object.freeze({ ...source, x, y });
 }
+
+/** Exact first-order response to a target moving linearly over arc length. */
+function advanceDistanceLag(input: {
+  readonly output: BrushStudioV6MaterialPoint;
+  readonly target: BrushStudioV6MaterialPoint;
+  readonly point: BrushStudioV6MaterialPoint;
+  readonly distance: number;
+  readonly unitX: number;
+  readonly unitY: number;
+  readonly responseLength: number;
+}): BrushStudioV6MaterialPoint {
+  const decay = Math.exp(-input.distance / input.responseLength);
+  const errorX = input.output.x - input.target.x;
+  const errorY = input.output.y - input.target.y;
+  const nextErrorX = (errorX + input.responseLength * input.unitX) * decay
+    - input.responseLength * input.unitX;
+  const nextErrorY = (errorY + input.responseLength * input.unitY) * decay
+    - input.responseLength * input.unitY;
+  return moved(input.point, input.point.x + nextErrorX, input.point.y + nextErrorY);
+}
+
 export function createBrushStudioV6MotionFilter(input: {
   readonly motionId: string;
   readonly stabilization: number;
@@ -36,49 +53,90 @@ export function createBrushStudioV6MotionFilter(input: {
   const friction = clamp(input.friction, 0, 1);
   let output: BrushStudioV6MaterialPoint | null = null;
   let target: BrushStudioV6MaterialPoint | null = null;
-  let velocityX = 0;
-  let velocityY = 0;
+  let springDerivativeX = 0;
+  let springDerivativeY = 0;
 
   const direct = (point: BrushStudioV6MaterialPoint): BrushStudioV6MaterialPoint => {
     output = point;
     target = point;
+    springDerivativeX = 0;
+    springDerivativeY = 0;
     return point;
   };
 
   const reset = (): void => {
     output = null;
     target = null;
-    velocityX = 0;
-    velocityY = 0;
+    springDerivativeX = 0;
+    springDerivativeY = 0;
   };
 
   return {
     push(inputPoint): BrushStudioV6MaterialPoint {
       const point = normalized(inputPoint);
       if (!output || !target || input.motionId === "motion-direct") return direct(point);
-      const dx = point.x - output.x;
-      const dy = point.y - output.y;
-      const distance = Math.hypot(dx, dy);
+      const targetDx = point.x - target.x;
+      const targetDy = point.y - target.y;
+      const distance = Math.hypot(targetDx, targetDy);
+      if (distance < 1e-9) {
+        target = point;
+        return moved(point, output.x, output.y);
+      }
+      const unitX = targetDx / distance;
+      const unitY = targetDy / distance;
+      // Teleports and severely sparse samples are explicit discontinuities. Keeping a
+      // smoothing tail here would repaint behind the already committed bounded segment.
+      if (distance > size * 64) return direct(point);
 
       if (input.motionId === "motion-adaptive-ema") {
-        const velocityFollow = Math.min(0.82, distance / Math.max(1, size * 0.45));
-        const alpha = clamp((1 - strength) * 0.55 + velocityFollow * 0.7, 0.06, 0.94);
-        output = moved(point, output.x + dx * alpha, output.y + dy * alpha);
-      } else if (input.motionId === "motion-spring") {
-        const stiffness = 0.08 + (1 - strength) * 0.24;
-        const damping = 0.42 + strength * 0.42;
-        velocityX = velocityX * damping + dx * stiffness;
-        velocityY = velocityY * damping + dy * stiffness;
-        output = moved(point, output.x + velocityX, output.y + velocityY);
+        output = advanceDistanceLag({
+          output,
+          target,
+          point,
+          distance,
+          unitX,
+          unitY,
+          responseLength: Math.max(0.35, size * (0.035 + strength * 0.28)),
+        });
       } else if (input.motionId === "motion-brush-inertia") {
-        const responseLength = size * (0.08 + friction * 0.42 + strength * 0.32);
-        const alpha = clamp(1 - Math.exp(-Math.max(0.01, distance) / responseLength), 0.04, 0.92);
-        output = moved(point, output.x + dx * alpha, output.y + dy * alpha);
+        output = advanceDistanceLag({
+          output,
+          target,
+          point,
+          distance,
+          unitX,
+          unitY,
+          responseLength: Math.max(0.5, size * (0.08 + friction * 0.32 + strength * 0.24)),
+        });
+      } else if (input.motionId === "motion-spring") {
+        const responseLength = Math.max(0.6, size * (0.07 + strength * 0.2));
+        const omega = 1 / responseLength;
+        const decay = Math.exp(-omega * distance);
+        const errorX = output.x - target.x;
+        const errorY = output.y - target.y;
+        const derivativeErrorX = springDerivativeX - unitX;
+        const derivativeErrorY = springDerivativeY - unitY;
+        const coefficientX = derivativeErrorX + omega * errorX;
+        const coefficientY = derivativeErrorY + omega * errorY;
+        const nextErrorX = (errorX + coefficientX * distance) * decay;
+        const nextErrorY = (errorY + coefficientY * distance) * decay;
+        const nextDerivativeErrorX = (
+          coefficientX - omega * (errorX + coefficientX * distance)
+        ) * decay;
+        const nextDerivativeErrorY = (
+          coefficientY - omega * (errorY + coefficientY * distance)
+        ) * decay;
+        output = moved(point, point.x + nextErrorX, point.y + nextErrorY);
+        springDerivativeX = unitX + nextDerivativeErrorX;
+        springDerivativeY = unitY + nextDerivativeErrorY;
       } else if (input.motionId === "motion-lazy-leash") {
+        const outputDx = point.x - output.x;
+        const outputDy = point.y - output.y;
+        const outputDistance = Math.hypot(outputDx, outputDy);
         const radius = size * (0.12 + strength * 0.82);
-        if (distance > radius) {
-          const ratio = (distance - radius) / distance;
-          output = moved(point, output.x + dx * ratio, output.y + dy * ratio);
+        if (outputDistance > radius) {
+          const ratio = (outputDistance - radius) / outputDistance;
+          output = moved(point, output.x + outputDx * ratio, output.y + outputDy * ratio);
         } else {
           output = moved(point, output.x, output.y);
         }

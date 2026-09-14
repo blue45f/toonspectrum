@@ -53,7 +53,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it.each([
     ["impasto-knife", true, "강모 조합에서만 적용 · 현재 재료에서는 사용하지 않음"],
-    ["oil-hair-mixer", false, "공통 재료 계산기에 연결됨"],
+    ["oil-hair-mixer", false, "공통 재료 계산기에 네이티브 연결됨"],
   ] as const)("describes retained reservoir pickup according to the %s material", (recipe, inactive, status) => {
     const original = createBrushStudioV6Program(recipe);
     localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(original));
@@ -243,6 +243,35 @@ describe("V6 brush experiments in the workbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "Physics" }));
     const bristle = screen.getByRole("button", { name: /Bristle Dynamics/u }) as HTMLButtonElement;
     expect(bristle.disabled).toBe(true);
+  });
+
+  it("shows pinned provider identities and noncommercial/GPL adapter boundaries", () => {
+    localStorage.setItem(
+      "toonspectrum.brush-program-v6:test",
+      JSON.stringify(createBrushStudioV6Program("mixbox-oil-bristle")),
+    );
+    render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "Runtime" }));
+    const plan = screen.getByRole("region", { name: "무폴백 브러시 엔진 바인딩" });
+    expect(within(plan).getByText(/fallback none/u)).toBeTruthy();
+    expect(within(plan).getByText("Mixbox")).toBeTruthy();
+    expect(within(plan).getByText("mixbox-js-v2@2.0.0")).toBeTruthy();
+    expect(within(plan).getAllByText("명시적 호환 어댑터").length).toBeGreaterThan(0);
+  });
+
+  it("disables product save when a selected engine has no exact product path", () => {
+    const base = createBrushStudioV6Program("clean-ink");
+    localStorage.setItem(
+      "toonspectrum.brush-program-v6:test",
+      JSON.stringify({ ...base, slots: { ...base.slots, pigment: "pigment-painter-lut" } }),
+    );
+    render(<StudioBrushV6Workbench scope="test" />);
+    const button = screen.getByRole("button", { name: "스튜디오에 브러시 저장" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Runtime" }));
+    expect(screen.getByRole("alert").textContent).toContain("Pigment Painter LUT");
   });
 
 });

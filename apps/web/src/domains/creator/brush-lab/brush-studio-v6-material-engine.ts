@@ -72,9 +72,10 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
   const result = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor"]);
   const mode = contactMode(program);
   const enhancedAdapters = usesEnhancedMaterialAdapters(program);
-  const pickupEnabled = program.slots.pickup === "pickup-pigment-reservoir"
-    || (enhancedAdapters && program.slots.pickup === "pickup-krita-smudge");
-  const bristlePickup = mode === "bristle" && pickupEnabled;
+  const reservoirPickup = program.slots.pickup === "pickup-pigment-reservoir";
+  const smudgePickup = enhancedAdapters && program.slots.pickup === "pickup-krita-smudge";
+  const bristlePickup = mode === "bristle" && (reservoirPickup || smudgePickup);
+  const pickupActive = bristlePickup || smudgePickup;
   const pattern = program.slots.pattern !== "pattern-none";
   const gridUsesOnlyPrimary = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(program.slots.pattern);
   const secondaryInBase = mode === "particle" || mode === "bristle" && bristlePickup && program.tuning.pickup > 0
@@ -82,7 +83,7 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
     || mode === "wet" && (program.tuning.wetness > 0 || program.tuning.granulation > 0);
   if (program.slots.finish.includes("finish-neon") || program.slots.physics.includes("physics-thin-film")
     || (pattern ? !gridUsesOnlyPrimary || mode === "particle" : secondaryInBase)) result.add("secondaryColor");
-  if (pickupEnabled) {
+  if (pickupActive) {
     result.add("pickup");
     result.add("secondaryColor");
   }
@@ -182,21 +183,23 @@ export function sampleBrushStudioV6PaperContact(surface: string, x: number, y: n
 export type BrushStudioV6MaterialNodeExecution = "native" | "adapter" | "unavailable";
 
 const MATERIAL_NATIVE_NODES = new Set([
-  "input-pointer-v3", "motion-direct", "carrier-webgpu-centerline", "carrier-perfect-outline",
+  "input-pointer-v3", "motion-direct", "motion-adaptive-ema", "motion-spring",
+  "motion-brush-inertia", "motion-lazy-leash", "carrier-webgpu-centerline",
   "carrier-webgpu-ribbon", "carrier-webgpu-particles", "tip-round-sdf", "tip-chisel-sdf",
   "tip-grain-exemplar", "surface-smooth", "surface-kent", "surface-coldpress",
   "surface-printmaking", "surface-linen", "surface-porous", "deposit-ink", "deposit-marker",
-  "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "pickup-none",
+  "deposit-dry", "deposit-wet", "deposit-oil", "deposit-particles", "deposit-light", "pickup-none",
   "pickup-pigment-reservoir", "pigment-rgb", "pigment-spectral", "pigment-mixbox",
   "pigment-open-km", "pigment-inkwash-density", "physics-dry-contact", "physics-inkwash",
   "physics-thin-film", "physics-bristle", "physics-particles", "physics-reaction",
   "physics-height", "pattern-none", "pattern-dot-tone", "pattern-cross-hatch",
   "pattern-weave", "pattern-brick", "pattern-foliage", "pattern-stitch", "pattern-kaleido",
-  "finish-edge-bloom", "finish-grain", "finish-relief", "finish-neon",
+  "pattern-rainbow", "tip-motif-atlas", "finish-edge-bloom", "finish-wet-sheen",
+  "finish-grain", "finish-relief", "finish-neon", "finish-chroma",
   "output-contact-canvas-svg",
 ]);
 const MATERIAL_ADAPTER_NODES = new Set([
-  "carrier-libmypaint-dabs", "carrier-hokusai-dabs", "carrier-krita-hairy",
+  "carrier-perfect-outline", "carrier-libmypaint-dabs", "carrier-hokusai-dabs", "carrier-krita-hairy",
   "tip-krita-dual", "tip-pigment-normal", "surface-realbrush", "pickup-krita-smudge",
   "physics-porous-paper",
 ]);
@@ -264,12 +267,16 @@ export function createBrushStudioV6MaterialStroke(
   const particles = mode === "particle";
   const chisel = program.slots.tip === "tip-chisel-sdf";
   const dualTip = enhancedAdapters && program.slots.tip === "tip-krita-dual";
+  const motifTip = enhancedAdapters && program.slots.tip === "tip-motif-atlas";
+  const luminousDeposit = enhancedAdapters && program.slots.deposition === "deposit-light";
+  const wetSheen = enhancedAdapters && program.slots.finish.includes("finish-wet-sheen");
+  const chromaFringe = enhancedAdapters && program.slots.finish.includes("finish-chroma");
   const patternId = program.slots.pattern;
   const laneCount = Math.round(bounded(t.bristleStrands, 8, 128));
   const maxPatternMarks = ["pattern-dot-tone", "pattern-cross-hatch", "pattern-brick"].includes(patternId) ? 169 : patternId === "pattern-weave" ? 338 : patternId === "pattern-stitch" ? 1 : 6;
   const topology = createBrushStudioV6TopologyStroke(program, step);
   const baseMarksPerDab = topology ? topology.maxPrimitivesPerDab * 3 : (patternId !== "pattern-none" ? maxPatternMarks + (particles ? 36 : 0) : bristle ? laneCount : mode === "grain" ? 36 : particles ? 36 : 6) + 4;
-  const marksPerDab = baseMarksPerDab * (dualTip ? 2 : 1);
+  const marksPerDab = baseMarksPerDab * (1 + (dualTip ? 1 : 0) + (motifTip ? 1 : 0));
   const pigmentProvider = brushStudioV6PigmentProviderForNode(program.slots.pigment);
   if (!pigmentProvider) {
     throw new Error(`안료 노드 ${program.slots.pigment}는 제품 재료 엔진에 연결되지 않았습니다.`);
@@ -325,6 +332,20 @@ export function createBrushStudioV6MaterialStroke(
         const gathered = unit(sourceMix + random(37, 0x534d5544) * 0.28);
         smudgeMix = unit(smudgeMix * (0.86 + (1 - pickup) * 0.1) + gathered * pickup * 0.08);
       }
+      if (motifTip && kind !== "pattern") {
+        pushMark(
+          "pattern",
+          x,
+          y,
+          rx * 0.55,
+          Math.max(0.12, ry * 0.16),
+          rotation + Math.PI / 4,
+          opacity * 0.72,
+          unit(resolvedMix * 0.55 + 0.2),
+          height * 0.6,
+          "rect",
+        );
+      }
       if (!dualTip || kind === "pattern") return;
       const offset = Math.max(0.2, Math.min(Math.abs(rx), Math.abs(ry)) * 0.42);
       const secondaryRotation = rotation + 0.28;
@@ -342,9 +363,10 @@ export function createBrushStudioV6MaterialStroke(
       return;
     }
 
-    if (program.slots.finish.includes("finish-neon")) {
-      emit("ink", point.x, point.y, radius * 1.7, radius * 1.7, angle, alpha * 0.09, 1);
-      emit("ink", point.x, point.y, radius * 1.3, radius * 1.3, angle, alpha * 0.15, 0.7);
+    if (program.slots.finish.includes("finish-neon") || luminousDeposit) {
+      const lightScale = luminousDeposit ? 1.18 : 1;
+      emit("ink", point.x, point.y, radius * 1.7, radius * 1.7, angle, alpha * 0.09 * lightScale, 1);
+      emit("ink", point.x, point.y, radius * 1.3, radius * 1.3, angle, alpha * 0.15 * lightScale, 0.7);
     }
     if (physics.has("physics-thin-film") && index % 12 === 0) {
       const length = radius * unit(t.wetness) * Math.abs(t.gravity) * (1 + 3 * (1 - t.viscosity));
@@ -479,10 +501,51 @@ export function createBrushStudioV6MaterialStroke(
       const tooth = sampleBrushStudioV6PaperContact(program.slots.surface, Math.floor(point.x / 2) * 2, Math.floor(point.y / 2) * 2, seed);
       const resist = physics.has("physics-dry-contact") ? unit((tooth - t.surfaceTooth * 0.5) * 3) : 1;
       emit("wet", point.x, point.y, radius, radius * (chisel ? 0.38 : 1), angle, alpha * (0.55 + tooth * t.granulation * 0.5) * resist, t.granulation * tooth * 0.35);
+      const normalX = -Math.sin(direction);
+      const normalY = Math.cos(direction);
+      if (wetSheen) {
+        emit(
+          "wet",
+          point.x - normalX * radius * 0.16,
+          point.y - normalY * radius * 0.16,
+          radius * 0.72,
+          Math.max(0.16, radius * 0.16),
+          direction,
+          alpha * unit(t.wetness) * 0.2,
+          0.82,
+          0,
+          "ellipse",
+        );
+      }
+      if (chromaFringe && directional) {
+        const fringe = radius * spread * (0.08 + unit(t.diffusion) * 0.12);
+        emit(
+          "wet",
+          point.x + normalX * fringe,
+          point.y + normalY * fringe,
+          radius * 1.05,
+          Math.max(0.18, radius * 0.2),
+          direction,
+          alpha * 0.13,
+          1,
+          0,
+          "capsule",
+        );
+        emit(
+          "wet",
+          point.x - normalX * fringe,
+          point.y - normalY * fringe,
+          radius,
+          Math.max(0.18, radius * 0.16),
+          direction,
+          alpha * 0.08,
+          0.42,
+          0,
+          "capsule",
+        );
+      }
       if (program.slots.finish.includes("finish-edge-bloom")
         && t.edgeDarkening > 0 && directional) {
-        const normalX = -Math.sin(direction);
-        const normalY = Math.cos(direction);
         const edgeRadius = radius * spread * (0.96 + tooth * 0.06);
         const thickness = Math.max(0.18, radius * (0.025 + t.granulation * 0.025));
         for (let side = 0; side < 2; side++) {
