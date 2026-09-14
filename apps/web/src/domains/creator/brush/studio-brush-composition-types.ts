@@ -7,6 +7,7 @@ export type StudioBrushCompositionIntegration =
 export type StudioBrushCompositionRights =
   | "permissive"
   | "copyleft"
+  | "noncommercial"
   | "private-grant";
 export type StudioBrushCompositionCost = "light" | "balanced" | "intensive";
 

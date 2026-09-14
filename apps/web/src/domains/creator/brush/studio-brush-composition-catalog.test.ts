@@ -128,7 +128,7 @@ describe("Brush Studio V5 composition catalog", () => {
       .toBe(true);
   });
 
-  it("computes combined GPL and private-grant rights closure", () => {
+  it("computes combined GPL and noncommercial rights closure", () => {
     const baseline = createStudioBrushCompositionBaseline("oil", "oil");
     const plan = planStudioBrushComposition({
       brushId: "oil",
@@ -141,8 +141,9 @@ describe("Brush Studio V5 composition catalog", () => {
     });
     expect(plan.rights).toMatchObject({
       copyleft: true,
-      privateGrant: true,
-      label: "GPL·허가 혼합",
+      noncommercial: true,
+      privateGrant: false,
+      label: "GPL·비상업",
     });
   });
 

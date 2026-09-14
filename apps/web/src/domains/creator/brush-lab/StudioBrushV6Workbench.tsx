@@ -19,7 +19,7 @@ import {
 } from "./brush-studio-v6-experiments";
 import {
   brushStudioV6MaterialActiveTuningKeys,
-  isBrushStudioV6MaterialNodeImplemented,
+  brushStudioV6MaterialNodeExecution,
   mapBrushStudioV6Pressure,
 } from "./brush-studio-v6-material-engine";
 import {
@@ -115,7 +115,10 @@ function materialNodeStatus(id: string, activeTuning: ReadonlySet<keyof BrushStu
   if (id === "pickup-pigment-reservoir" && !activeTuning.has("pickup")) {
     return "강모 조합에서만 적용 · 현재 재료에서는 사용하지 않음";
   }
-  return isBrushStudioV6MaterialNodeImplemented(id) ? "공통 재료 계산기에 연결됨" : "설계 기록 · 현재 획에는 적용되지 않음";
+  const execution = brushStudioV6MaterialNodeExecution(id);
+  if (execution === "native") return "공통 재료 계산기에 네이티브 연결됨";
+  if (execution === "adapter") return "명시적 호환 어댑터로 연결됨 · 원본 엔진과 구분해 저장";
+  return "설계 기록 · 현재 획에는 적용되지 않음";
 }
 
 function readProgram(key: string): BrushStudioV6Program {
@@ -198,11 +201,18 @@ function Select({ id, label, value, options, onChange }: { readonly id: string; 
 }
 
 function ToggleNode({ node, selected, onChange, topology = false }: { readonly node: BrushStudioV6NodeDescriptor; readonly selected: boolean; readonly onChange: () => void; readonly topology?: boolean }) {
-  const connected = isBrushStudioV6MaterialNodeImplemented(node.id) && (!topology || isBrushStudioV6TopologyNodeCompatible(node.id));
+  const execution = brushStudioV6MaterialNodeExecution(node.id);
+  const connected = execution !== "unavailable" && (!topology || isBrushStudioV6TopologyNodeCompatible(node.id));
+  const badge = execution === "native" ? "네이티브" : execution === "adapter" ? "호환 어댑터" : "설계 기록";
+  const detail = execution === "native"
+    ? "공통 접촉 계산에 직접 적용합니다. 관련 재료·촉 조합에 따라 표현이 달라집니다."
+    : execution === "adapter"
+      ? "외부 엔진의 선택 의미를 보존한 명시적 호환 경로입니다. 네이티브 실행과 구분해 저장합니다."
+      : "현재 획에는 적용되지 않습니다. 가져온 설정은 보관합니다.";
   return (
     <button type="button" aria-pressed={selected} disabled={!connected && !selected} onClick={onChange} className={`${SUB} min-h-[92px] text-left transition-colors disabled:opacity-50 ${selected ? "border-accent/60 bg-accent/10" : "hover:border-line-strong"} ${STUDIO_FOCUS_RING}`}>
-      <span className="flex items-start justify-between gap-2"><span className="text-sm font-black text-fg">{node.label}</span><span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[0.62rem] font-black text-accent">{connected ? "재료 획 연결" : "설계 기록"}</span></span>
-      <span className="mt-1 block text-xs leading-relaxed text-fg-3">{connected ? "공통 접촉 계산에 적용합니다. 관련 재료·촉 조합에 따라 표현이 달라집니다." : "현재 획에는 적용되지 않습니다. 가져온 설정은 보관합니다."}</span>
+      <span className="flex items-start justify-between gap-2"><span className="text-sm font-black text-fg">{node.label}</span><span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[0.62rem] font-black text-accent">{badge}</span></span>
+      <span className="mt-1 block text-xs leading-relaxed text-fg-3">{detail}</span>
     </button>
   );
 }
@@ -217,9 +227,12 @@ function Issue({ issue }: { readonly issue: BrushStudioV6Issue }) {
 }
 
 function nodeOptions(slot: BrushStudioV6Slot, topology = false): readonly { id: string; label: string; disabled: boolean }[] {
-  return brushStudioV6NodesForSlot(slot).map((node) => ({ id: node.id,
-    label: `${node.label}${isBrushStudioV6MaterialNodeImplemented(node.id) ? "" : " · 설계 기록"}`,
-    disabled: !isBrushStudioV6MaterialNodeImplemented(node.id) || topology && slot !== "carrier" && !isBrushStudioV6TopologyNodeCompatible(node.id) }));
+  return brushStudioV6NodesForSlot(slot).map((node) => {
+    const execution = brushStudioV6MaterialNodeExecution(node.id);
+    const suffix = execution === "adapter" ? " · 호환 어댑터" : execution === "unavailable" ? " · 설계 기록" : "";
+    return { id: node.id, label: `${node.label}${suffix}`,
+      disabled: execution === "unavailable" || topology && slot !== "carrier" && !isBrushStudioV6TopologyNodeCompatible(node.id) };
+  });
 }
 
 function capabilityRows(capabilities: BrushStudioV6Capabilities): readonly { label: string; enabled: boolean }[] {

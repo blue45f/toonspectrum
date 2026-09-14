@@ -212,8 +212,15 @@ export interface StudioBrushCompositionPlan {
   readonly rights: Readonly<{
     permissive: boolean;
     copyleft: boolean;
+    noncommercial: boolean;
     privateGrant: boolean;
-    label: "상업 안전" | "GPL 포함" | "허가 필요" | "GPL·허가 혼합";
+    label:
+      | "상업 안전"
+      | "GPL 포함"
+      | "비상업 한정"
+      | "GPL·비상업"
+      | "허가 필요"
+      | "GPL·허가 혼합";
   }>;
   readonly canSave: boolean;
   readonly canRunConnectedPath: boolean;
@@ -261,7 +268,12 @@ export function planStudioBrushComposition(input: {
     "adapter-ready": 0,
     lab: 0,
   };
-  const rightsFlags = { permissive: false, copyleft: false, privateGrant: false };
+  const rightsFlags = {
+    permissive: false,
+    copyleft: false,
+    noncommercial: false,
+    privateGrant: false,
+  };
   const costWeight: Record<StudioBrushCompositionCost, number> = {
     light: 1,
     balanced: 2,
@@ -285,6 +297,7 @@ export function planStudioBrushComposition(input: {
     costScore += costWeight[selected.cost];
     rightsFlags.permissive ||= selected.rights === "permissive";
     rightsFlags.copyleft ||= selected.rights === "copyleft";
+    rightsFlags.noncommercial ||= selected.rights === "noncommercial";
     rightsFlags.privateGrant ||= selected.rights === "private-grant";
     if (!supportsFamily(selected, input.family)) {
       issues.push(issue(`family-${slot}`, "warning", "현재 캐리어와 실험적 조합", `${selected.label}은 ${input.family} 계열의 기본 검증 범위 밖입니다.`));
@@ -326,12 +339,12 @@ export function planStudioBrushComposition(input: {
     issues.push(issue("rgb-pickup", "info", "픽업은 되지만 안료 혼색은 RGB", "회화형 혼색이 필요하면 Spectral·K/S·LUT를 선택하세요."));
   }
 
-  const rightsLabel = rightsFlags.copyleft && rightsFlags.privateGrant
-    ? "GPL·허가 혼합"
-    : rightsFlags.copyleft
-      ? "GPL 포함"
-      : rightsFlags.privateGrant
-        ? "허가 필요"
+  const rightsLabel = rightsFlags.privateGrant
+    ? rightsFlags.copyleft ? "GPL·허가 혼합" : "허가 필요"
+    : rightsFlags.noncommercial
+      ? rightsFlags.copyleft ? "GPL·비상업" : "비상업 한정"
+      : rightsFlags.copyleft
+        ? "GPL 포함"
         : "상업 안전";
   const complexity = costScore <= 14 ? "light" : costScore <= 25 ? "balanced" : "intensive";
   const hasError = issues.some((entry) => entry.severity === "error");

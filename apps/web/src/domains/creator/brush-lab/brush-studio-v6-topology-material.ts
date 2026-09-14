@@ -38,10 +38,10 @@ export function brushStudioV6TopologyStep(program: BrushStudioV6MaterialProgram,
 /** Context-sensitive allow-list; disabled nodes never impersonate running providers. */
 export function isBrushStudioV6TopologyNodeCompatible(id: string): boolean {
   return Boolean(brushStudioV6Topology(id)) || [
-    "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar",
+    "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "tip-krita-dual",
     "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous",
     "deposit-ink", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-marker",
-    "pickup-none", "pigment-rgb", "pigment-spectral", "pattern-none", "finish-neon", "output-contact-canvas-svg",
+    "pickup-none", "pickup-krita-smudge", "pigment-rgb", "pigment-spectral", "pigment-mixbox", "pattern-none", "finish-neon", "output-contact-canvas-svg",
   ].includes(id);
 }
 type Emit = (kind: BrushStudioV6MaterialMark["kind"], x: number, y: number, rx: number, ry: number,

@@ -222,6 +222,7 @@
     "lazy-brush": "^2.0.2",
     "lucide-react": "^1.17.0",
     "manifold-3d": "3.5.1",
+    "mixbox": "2.0.0",
     "motion": "^12.40.0",
     "onnxruntime-web": "1.27.0",
     "opencascade.js": "1.1.1",
