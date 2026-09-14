@@ -18,17 +18,10 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  ensureInitialStudioProjectDocument,
-  studioProjectDocumentHref,
-} from "../studio-project-document-store";
-import {
-  createStudioProject,
-  markStudioProjectOpened,
-  permanentlyDeleteStudioProject,
-  trashStudioProject,
-  type StudioProjectKind,
-} from "../studio-project-library-store";
+import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
+import type { StudioProjectKind } from "../studio-project-library-store";
+import { studioProjectStartPreset } from "../studio-project-start-presets";
+import { StudioQuickCreateActions } from "./StudioQuickCreateActions";
 
 type Locale = "ko" | "en";
 
@@ -208,6 +201,7 @@ export function StudioNewIntegratedPage() {
     [showMore],
   );
   const templates = TEMPLATE_OPTIONS[kind];
+  const startPreset = studioProjectStartPreset(kind, templateId);
 
   const selectKind = (next: ProjectKindOption) => {
     setKind(next.id);
@@ -220,41 +214,12 @@ export function StudioNewIntegratedPage() {
     if (typeof window === "undefined" || creating) return;
     setCreating(true);
     setError(null);
-    let projectId: string | null = null;
     try {
-      const createdAt = new Date().toISOString();
-      const project = createStudioProject(window.localStorage, {
-        title,
-        kind,
-        templateId,
-        description,
-        primaryLocale,
-        createdAt,
-      }, { target: window });
-      projectId = project.id;
-      const document = ensureInitialStudioProjectDocument(window.localStorage, {
-        projectId: project.id,
-        projectTitle: project.title,
-        projectKind: project.kind,
-        createdAt,
-        target: window,
-      });
-      markStudioProjectOpened(
-        window.localStorage,
-        project.id,
-        document.id,
-        { at: createdAt, target: window },
-      );
-      navigate(studioProjectDocumentHref(document), { replace: true });
+      const created = createStudioProjectWithInitialDocument(window.localStorage, {
+        title, kind, templateId, description, primaryLocale,
+      }, window);
+      navigate(created.href, { replace: true });
     } catch (cause) {
-      if (projectId) {
-        try {
-          trashStudioProject(window.localStorage, projectId, { target: window });
-          permanentlyDeleteStudioProject(window.localStorage, projectId, { target: window });
-        } catch {
-          // Keep the recoverable project entry when rollback is not possible.
-        }
-      }
       setError(cause instanceof Error
         ? cause.message
         : locale === "ko"
@@ -286,6 +251,8 @@ export function StudioNewIntegratedPage() {
               {locale === "ko" ? "파일 가져오기" : "Import a file"}
             </Link>
           </div>
+
+          <StudioQuickCreateActions locale={locale} />
 
           <section className="mt-7" aria-labelledby="project-kind-title">
             <h2 id="project-kind-title" className="text-sm font-black text-fg">
@@ -367,6 +334,11 @@ export function StudioNewIntegratedPage() {
                 </select>
               </label>
             </div>
+
+            <p className="mt-4 rounded-xl border border-accent/20 bg-accent-soft/20 p-3 text-sm text-fg-2" aria-live="polite" data-studio-start-preset={kind}>
+              <b>{startPreset.width} × {startPreset.height}</b>
+              {" · "}{locale === "ko" ? startPreset.descriptionKo : startPreset.descriptionEn}
+            </p>
 
             <details className="mt-4 rounded-2xl border border-line bg-panel/50 p-4">
               <summary className="min-h-10 cursor-pointer text-sm font-bold text-fg">

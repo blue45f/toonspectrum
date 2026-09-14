@@ -96,6 +96,7 @@ export function createStudioProjectWithInitialDocument(
         projectId: project.id,
         projectTitle: project.title,
         projectKind: project.kind,
+        templateId: project.templateId,
         createdAt,
         target,
       });

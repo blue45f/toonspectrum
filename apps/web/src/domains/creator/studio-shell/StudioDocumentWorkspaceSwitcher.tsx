@@ -1,4 +1,4 @@
-import { PanelsTopLeft } from "lucide-react";
+import { PanelsTopLeft, Zap } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -41,8 +41,11 @@ export function StudioDocumentWorkspaceSwitcher() {
   if (resolution.kind !== "document") return null;
 
   const current = studioDocumentWorkspaceById(resolution.workspace);
+  const quick = resolution.workspace === "draw" && new URLSearchParams(location.search).get("quick") === "1";
   const changeWorkspace = (workspace: StudioDocumentWorkspaceId) => {
     if (workspace === resolution.workspace) return;
+    const search = new URLSearchParams(location.search);
+    if (workspace !== "draw") search.delete("quick");
     const nextHref = studioDocumentHref({
       projectId: resolution.projectId,
       documentId: resolution.documentId,
@@ -51,15 +54,28 @@ export function StudioDocumentWorkspaceSwitcher() {
       focus: resolution.focus,
       language: resolution.language,
       version: resolution.version,
-      search: location.search,
+      search,
     });
     navigate(nextHref, { state: location.state });
+  };
+
+  const toggleQuickMode = () => {
+    const search = new URLSearchParams(location.search);
+    if (quick) search.delete("quick");
+    else search.set("quick", "1");
+    navigate(studioDocumentHref({
+      projectId: resolution.projectId, documentId: resolution.documentId,
+      draftId: resolution.draftId, workspace: resolution.workspace,
+      focus: resolution.focus, language: resolution.language, version: resolution.version,
+      search,
+    }), { state: location.state });
   };
 
   return (
     <div
       className="pointer-events-none fixed left-1/2 top-2 z-[120] w-[min(92vw,28rem)] -translate-x-1/2 print:hidden"
       data-studio-document-workspace-switcher={resolution.workspace}
+      data-studio-quick-mode={quick}
     >
       <div className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur-xl">
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -93,6 +109,16 @@ export function StudioDocumentWorkspaceSwitcher() {
             {locale === "ko" ? current.descriptionKo : current.descriptionEn}
           </p>
         </div>
+        {resolution.workspace === "draw" ? (
+          <button type="button" aria-pressed={quick}
+            aria-label={locale === "ko" ? "퀵모드 전환" : "Toggle quick mode"}
+            title={locale === "ko" ? "그림은 유지하고 패널 배치만 바꿉니다" : "Keep your artwork and change only the panel layout"}
+            onClick={toggleQuickMode}
+            className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-xl border border-line px-2 text-xs font-bold text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+            <Zap size={14} aria-hidden="true" />
+            {quick ? (locale === "ko" ? "일반 모드" : "Full mode") : (locale === "ko" ? "퀵모드" : "Quick mode")}
+          </button>
+        ) : null}
       </div>
     </div>
   );

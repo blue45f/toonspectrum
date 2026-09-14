@@ -1,3 +1,4 @@
+import { applyStudioDocumentTaskWorkspace, hydrateStudioDocumentTaskWorkspace } from "./studio-document-task-workspace";
 import {
   useCallback,
   useEffect,
@@ -43,6 +44,7 @@ import type {
  * 컴파일 경계 밖(모듈 함수)에서 수행한다 — live/studio-collaboration-wiring.ts와 같은 패턴.
  */
 export interface StudioPageWorkspacePersistenceContext {
+  readonly initialWorkspaceId?: StudioWorkspaceId | null;
   readonly applyStudioWorkspaceLayout: (
     layout: StudioWorkspaceLayout,
     workspaceId?: StudioWorkspaceId,
@@ -244,7 +246,9 @@ function runStudioWorkspaceOwnerHydration(
   workspaceRuntimeRef.current?.close();
   workspaceRuntimeRef.current = null;
 
-  const defaultState = createStudioWorkspaceDefaultState(studioAuthUserId);
+  const defaultState = applyStudioDocumentTaskWorkspace(
+    createStudioWorkspaceDefaultState(studioAuthUserId), context.initialWorkspaceId,
+  );
   const initialPersistence: StudioWorkspaceLoadResult = {
     state: defaultState,
     ownerScope,
@@ -317,16 +321,19 @@ function runStudioWorkspaceOwnerHydration(
       return;
     }
     workspaceSyncBaseStateRef.current = result.state;
+    const hydratedState = hydrateStudioDocumentTaskWorkspace(
+      result.state, context.initialWorkspaceId, workspaceDirtyRevisionRef.current,
+    );
     updateWorkspacePersistenceSnapshot({
-      state: result.state,
+      state: hydratedState,
       ownerScope: result.ownerScope,
       source: result.source,
       status: result.status,
       failure: result.failure,
     });
     applyStudioWorkspaceLayoutFromEffect(
-      result.state.liveLayout,
-      result.state.activeWorkspaceId,
+      hydratedState.liveLayout,
+      hydratedState.activeWorkspaceId,
       "owner-scope-change",
       false,
     );
@@ -887,6 +894,7 @@ export function useStudioInitialPrimaryTool(context: {
   readonly hasExistingContent: boolean;
   readonly primaryToolActivatedRef: MutableRefObject<boolean>;
   readonly rememberedPrimaryTool: StudioRememberedPrimaryTool | null;
+  readonly preferDrawing?: boolean;
   readonly startDrawing: () => void;
   readonly uiBooleanPreferencesReady: boolean;
   readonly workHydrated: boolean;
@@ -894,7 +902,7 @@ export function useStudioInitialPrimaryTool(context: {
   const { autosaveChecked, uiBooleanPreferencesReady, workHydrated } = context;
   const applyInitialPrimaryTool = useEffectEvent(() => {
     if (context.primaryToolActivatedRef.current) return;
-    const next = resolveStudioInitialPrimaryTool({
+    const next = context.preferDrawing ? "draw" : resolveStudioInitialPrimaryTool({
       rememberedTool: context.rememberedPrimaryTool,
       hasExistingContent: context.hasExistingContent,
     });

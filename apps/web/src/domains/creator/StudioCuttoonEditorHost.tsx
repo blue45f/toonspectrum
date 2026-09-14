@@ -1,3 +1,5 @@
+import { applyStudioDocumentTaskWorkspace, studioDocumentTaskWorkspaceId } from "./studio-document-task-workspace";
+import { studioLocalDocumentPageSeed } from "./studio-local-document-page-seed";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
@@ -1451,6 +1453,8 @@ export function StudioCuttoonEditor({
   const location = useLocation();
   const t = useT();
   const [params] = useSearchParams();
+  const quickCanvasMode = studioRoute.documentWorkspace === "draw" && params.get("quick") === "1";
+  const documentTaskWorkspaceId = studioDocumentTaskWorkspaceId(studioRoute.documentWorkspace, quickCanvasMode);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
   // above this editor and inside the document runtime boundary. This page never parses that query.
   const {
@@ -1810,6 +1814,7 @@ export function StudioCuttoonEditor({
     setPagesHistory,
     setPagesHistoryState,
   } = useStudioPageHistorySnapshots({
+    initialPage: (pageId) => studioLocalDocumentPageSeed(studioRoute, pageId),
     effectiveWorkId,
     markStudioDocumentChanged,
     workId,
@@ -2748,7 +2753,8 @@ export function StudioCuttoonEditor({
       setTimelinePlaying(false);
       setTimelineOpen(true);
     } else if (studioRoute.surface === "comic") {
-      setStoryboardGridOpen(true);
+      // A webtoon document opens its drawing canvas, not a second setup grid.
+      if (studioRoute.documentWorkspace !== "comic") setStoryboardGridOpen(true);
     } else if (studioRoute.surface === "canvas") {
       // 라우트가 canvas 로 돌아오면(뒤로가기·소유 표면 닫힘) 직전에 URL 을 소유했던 표면의
       // 패널만 닫는다 — URL 이 보이는 표면의 단일 진실이 되는 대칭의 나머지 절반. 함께 열려
@@ -2760,7 +2766,7 @@ export function StudioCuttoonEditor({
       else if (previousSurface === "poser") setPoserVrmOpen(false);
       else if (previousSurface === "character") setCharacterShaperOpen(false);
     }
-  }, [studioRoute.surface]);
+  }, [studioRoute.surface, studioRoute.documentWorkspace]);
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
   const {
     flushHybridDccWorkspacePersistence,
@@ -3149,7 +3155,7 @@ export function StudioCuttoonEditor({
   // 아래 dirty revision fence가 보존하므로 늦은 load가 사용자의 새 배치를 덮지 않는다.
   const currentWorkspaceOwnerScope = studioWorkspaceOwnerScope(studioAuthUserId);
   const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() => ({
-    state: createStudioWorkspaceDefaultState(studioAuthUserId),
+    state: applyStudioDocumentTaskWorkspace(createStudioWorkspaceDefaultState(studioAuthUserId), documentTaskWorkspaceId),
     ownerScope: currentWorkspaceOwnerScope,
     source: "default",
     status: "session-only",
@@ -3857,11 +3863,14 @@ export function StudioCuttoonEditor({
     setMobileSheet(null);
     setQuickActionsOpen(false);
     closeStudioMenusForWorkspace(source);
-    if (workspaceId) applyStudioWorkspaceLaunchSurface(workspaceId);
+    if (workspaceId && !(source === "owner-scope-change" && primaryToolActivatedRef.current)) {
+      applyStudioWorkspaceLaunchSurface(workspaceId);
+    }
     if (clearSyncNotice) setWorkspaceSyncNotice(null);
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
   const { persistStudioWorkspaceState } = useStudioPageWorkspacePersistence({
+    initialWorkspaceId: documentTaskWorkspaceId,
     applyStudioWorkspaceLayout,
     currentWorkspaceOwnerScope,
     drawingPaletteDragging,
@@ -4048,7 +4057,7 @@ export function StudioCuttoonEditor({
 
   // hydration 전에는 기억된 도구도 문서 내용도 모른다 — 시작값은 `select`, 부팅 뒤
   // `useStudioInitialPrimaryTool` 이 한 번만 갈아탄다(ref 는 사용자가 먼저 고른 경우의 방어).
-  const [tool, setTool] = useState<Tool>("select");
+  const [tool, setTool] = useState<Tool>(quickCanvasMode ? "draw" : "select");
   const primaryToolActivatedRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [studioLayerLiftUi, setStudioLayerLiftUi] =
@@ -14461,7 +14470,8 @@ const puppetWarpArmed =
   // 만들고, 비모달 카드는 그리기와 공존한다(첫 pointerdown 에 스스로 비킨다).
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
-    (uiBooleanPreferencesReady
+    (!documentTaskWorkspaceId
+      && uiBooleanPreferencesReady
       && workHydrated
       && autosaveChecked
       && !hasAutosave
@@ -15872,13 +15882,30 @@ const puppetWarpArmed =
     hasExistingContent: hasAutosave || elements.length > 0,
     primaryToolActivatedRef,
     rememberedPrimaryTool,
+    preferDrawing: quickCanvasMode || documentTaskWorkspaceId === "lineart" || documentTaskWorkspaceId === "pro-comic",
     startDrawing: () => {
-      activatePrimaryCanvasToolRef.current("draw");
-      if (!isMobile) openInspectorRoute({ primary: "properties" }, null);
+      activatePrimaryCanvasToolRef.current("draw", documentTaskWorkspaceId ? "pen" : undefined);
+      if (!isMobile && !quickCanvasMode) openInspectorRoute({ primary: "properties" }, null);
     },
     uiBooleanPreferencesReady,
     workHydrated,
   });
+
+  const lastDocumentTaskWorkspaceRef = useRef(documentTaskWorkspaceId);
+  const applyDocumentTaskWorkspaceFromRoute = useEffectEvent(() => {
+    if (!documentTaskWorkspaceId) return;
+    const next = applyStudioDocumentTaskWorkspace(workspacePersistenceRef.current.state, documentTaskWorkspaceId);
+    persistStudioWorkspaceState(next);
+    applyStudioWorkspaceLayout(next.liveLayout, next.activeWorkspaceId);
+    if (documentTaskWorkspaceId === "quick-sketch" || documentTaskWorkspaceId === "lineart" || documentTaskWorkspaceId === "pro-comic") {
+      activatePrimaryCanvasTool("draw", "pen");
+    }
+  });
+  useEffect(() => {
+    if (lastDocumentTaskWorkspaceRef.current === documentTaskWorkspaceId) return;
+    lastDocumentTaskWorkspaceRef.current = documentTaskWorkspaceId;
+    applyDocumentTaskWorkspaceFromRoute();
+  }, [documentTaskWorkspaceId]);
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {

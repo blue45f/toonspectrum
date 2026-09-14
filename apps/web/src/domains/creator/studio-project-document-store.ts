@@ -1,3 +1,4 @@
+import { studioProjectStartPreset } from "./studio-project-start-presets";
 import type { StudioProjectKind } from "./studio-project-library-store";
 
 export const STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT =
@@ -407,6 +408,7 @@ export function ensureInitialStudioProjectDocument(
     readonly projectId: string;
     readonly projectTitle: string;
     readonly projectKind: StudioProjectKind;
+    readonly templateId?: string | null;
     readonly createdAt?: string;
     readonly target?: StudioProjectDocumentEventTarget;
   },
@@ -415,6 +417,7 @@ export function ensureInitialStudioProjectDocument(
   const existing = current.documents.find((document) => document.status === "active");
   if (existing) return existing;
   const kind = studioDefaultDocumentKindForProject(input.projectKind);
+  const preset = studioProjectStartPreset(input.projectKind, input.templateId);
   const title = input.projectKind === "webtoon"
     ? "EP01 원고"
     : input.projectKind === "slides"
@@ -424,8 +427,8 @@ export function ensureInitialStudioProjectDocument(
     title,
     kind,
     createdAt: input.createdAt,
-    width: kind === "webtoon" ? 1_080 : kind === "slides" ? 1_920 : 2_048,
-    height: kind === "webtoon" ? 8_000 : kind === "slides" ? 1_080 : 2_048,
+    width: preset.width,
+    height: preset.height,
   }, { target: input.target });
 }
 
