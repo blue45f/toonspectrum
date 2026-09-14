@@ -28,6 +28,15 @@ describe("studio initial primary tool", () => {
     ).toBe("draw");
   });
 
+  it("honors an explicit one-shot launch tool over a remembered tool", () => {
+    expect(resolveStudioInitialPrimaryTool({
+      requestedTool: "draw", rememberedTool: "select", hasExistingContent: true,
+    })).toBe("draw");
+    expect(resolveStudioInitialPrimaryTool({
+      requestedTool: "select", rememberedTool: "draw", hasExistingContent: false,
+    })).toBe("select");
+  });
+
   it("normalizes only the two primary tools and never the hand tool", () => {
     expect(normalizeStudioRememberedPrimaryTool("select")).toBe("select");
     expect(normalizeStudioRememberedPrimaryTool("draw")).toBe("draw");

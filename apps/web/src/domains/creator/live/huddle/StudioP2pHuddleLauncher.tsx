@@ -63,12 +63,11 @@ export default function StudioP2pHuddleLauncher() {
   }
   if (!room || !live.canChat) return null;
   const canJoin = Boolean(room.direct && live.availability === "ready");
-  const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
-  return <aside className="fixed bottom-3 right-3 z-[65] max-w-[calc(100vw-1.5rem)]" aria-label="P2P 협업 대화">
+  return <aside className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+env(safe-area-inset-bottom)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3" aria-label="협업 대화">
     <section hidden={!open} className="mb-2 w-[360px] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
       <header className="flex items-center justify-between border-b border-line p-3">
-        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">P2P 채팅·화상통화</h3>
+        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">채팅·화상통화</h3>
           <p className="text-[11px] text-fg-3">2–4인 작업팀 · TURN 중계 없음</p></div>
         <button type="button" className={controlClass} aria-label="대화 패널 접기" onClick={() => setOpen(false)}><X size={16} /></button>
       </header>
@@ -134,7 +133,7 @@ export default function StudioP2pHuddleLauncher() {
     </section>
     <button type="button" aria-expanded={open} className="ml-auto flex min-h-11 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       onClick={() => setOpen((value) => !value)}>
-      <MessageCircle size={16} />{active ? `P2P 대화 중 · ${(snapshot?.peers.length ?? 0) + 1}명` : "P2P 채팅·통화"}
+      <MessageCircle size={16} />{active ? `P2P 대화 중 · ${(snapshot?.peers.length ?? 0) + 1}명` : "채팅·통화"}
       {active && <span className="size-2 rounded-full bg-good" aria-label="대화 참여 중" />}
     </button>
   </aside>;

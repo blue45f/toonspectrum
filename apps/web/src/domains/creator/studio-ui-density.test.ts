@@ -19,8 +19,8 @@ describe("studio ui density modes", () => {
     expect(normalizeStudioUiDensityMode("simple")).toBe("simple");
     expect(studioUiDensityFromImmersive(true)).toBe("focus");
     expect(studioUiDensityLabel("focus")).toBe("집중 작업");
-    expect(studioUiDensityLabel("simple")).toBe("표준 작업");
-    expect(studioUiDensityLabel("full")).toBe("전체 기능");
+    expect(studioUiDensityLabel("simple")).toBe("기본 작업");
+    expect(studioUiDensityLabel("full")).toBe("전체 도구");
   });
 
   it("folds AI in standard work but honors reference tools users explicitly expose", () => {

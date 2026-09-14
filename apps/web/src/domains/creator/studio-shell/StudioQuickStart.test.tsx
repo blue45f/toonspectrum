@@ -36,7 +36,7 @@ describe("StudioQuickStart", () => {
     const document = readStudioProjectDocuments(window.localStorage, projects[0]!.id).documents[0]!;
     expect(document).toMatchObject({ width: 1600, height: 1200, defaultWorkspace: "draw" });
     expect(screen.getByLabelText("location").textContent)
-      .toBe(`/studio/p/${projects[0]!.id}/d/${document.id}?workspace=draw&uiMode=simple`);
+      .toBe(`/studio/p/${projects[0]!.id}/d/${document.id}?workspace=draw&uiMode=focus&startTool=draw`);
   });
   it("shows a retryable error when storage is blocked without navigating", () => {
     mountQuickStart("en");

@@ -23,7 +23,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
         templateId: "quick-sketch",
         primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
       }, window);
-      navigate(`${result.href}&uiMode=simple`, { replace: false });
+      navigate(`${result.href}&uiMode=focus&startTool=draw`, { replace: false });
     } catch {
       starting.current = false;
       setBusy(false);
@@ -33,7 +33,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
     }
   }
   return (
-    <section className="mt-6 border-y border-accent/30 bg-accent-soft/20 px-4 py-5 sm:px-6" aria-label={locale === "ko" ? "퀵모드" : "Quick mode"} data-studio-quick-start="true">
+    <section id="quick-draw" className="mt-6 border-y border-accent/30 bg-accent-soft/20 px-4 py-5 sm:px-6" aria-label={locale === "ko" ? "퀵모드" : "Quick mode"} data-studio-quick-start="true">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-xs font-black text-accent"><Zap size={15} aria-hidden="true" />{locale === "ko" ? "설정 없이, 바로 한 획" : "Skip setup. Make your first mark."}</p>

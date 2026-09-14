@@ -126,7 +126,7 @@ function localizeText(
   const translated = t(key);
   // 한국어 팩에 남은 이전 `임시저장` 번역만 새 서버 초안 용어로 승격한다. 다른 언어의
   // Save draft 번역은 건드리지 않고, 팩이 갱신되면 이 분기는 자연스럽게 타지 않는다.
-  if (fallback === "초안 저장" && translated === "임시저장") return fallback;
+  if (fallback === "작업 저장" && translated === "임시저장") return fallback;
   return translated === key ? fallback : translated;
 }
 
@@ -164,10 +164,10 @@ const MENUBAR_HINTS = {
   },
   assets: {
     id: "menubar-assets",
-    title: "템플릿·에셋",
-    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 에셋 라이브러리를 엽니다.",
+    title: "템플릿·소재",
+    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 소재를 엽니다.",
     preview: "assets",
-    tip: "자주 쓰는 소재는 내 에셋에 모아 반복 작업 시간을 줄여보세요.",
+    tip: "자주 쓰는 소재는 내 소재에 모아 반복 작업 시간을 줄여보세요.",
   },
   bubbles: {
     id: "menubar-bubbles",
@@ -184,7 +184,7 @@ const MENUBAR_HINTS = {
   },
   download: {
     id: "menubar-download",
-    title: "현재 페이지 다운로드",
+    title: "현재 페이지를 이미지로 저장",
     description: "현재 페이지를 선택한 배율과 이미지 형식으로 즉시 내보냅니다.",
     preview: "export",
     tip: "인쇄·후편집은 고배율, 빠른 검토 공유는 1×를 권장해요.",
@@ -197,7 +197,7 @@ const MENUBAR_HINTS = {
   },
   project: {
     id: "menubar-project",
-    title: "프로젝트 센터",
+    title: "내 작업",
     description: "백업, 기획, 버전, 검수와 게시 도구를 한곳에서 검색해 엽니다.",
     preview: "project",
     tip: "장기 보관이나 다른 기기로 옮길 때는 자산이 포함된 아카이브 백업을 사용하세요.",
@@ -218,14 +218,14 @@ const MENUBAR_HINTS = {
   },
   draft: {
     id: "menubar-save-draft",
-    title: "초안 저장",
+    title: "작업 저장",
     description: "현재 원고와 편집 상태를 게시하지 않고 서버 초안으로 저장합니다.",
     shortcut: "⌘S",
     preview: "save",
   },
   publish: {
     id: "menubar-publish",
-    title: "게시하기",
+    title: "작품 공개",
     description: "현재 원고를 게시 상태로 저장합니다. 게시 전 사전검사에서 구조와 고지를 확인할 수 있어요.",
     preview: "publish",
   },
@@ -1296,7 +1296,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
         : "현재 저장 작업이 끝난 뒤 다시 시도하세요.",
     },
     publish: {
-      label: workId ? "수정 게시" : COMMAND_BAR_COMMAND_LABELS.publish,
+      label: workId ? "공개 수정" : COMMAND_BAR_COMMAND_LABELS.publish,
       labelKey: workId
         ? "studio.mainMenu.item.file.publish.has-work"
         : "studio.commandBar.command.publish",
@@ -1467,7 +1467,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 preloadStudioAssetMenuPanel();
                 setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
               }}
-              aria-label="템플릿·에셋"
+              aria-label="템플릿·소재"
               aria-haspopup="menu"
               aria-expanded={activeToolbarGroup === "assetGroup"}
               className={cn(
@@ -1519,7 +1519,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
             // Immersive pill is content-width only — keep a real 4px gap so buttons never
-            // paint under each other (the old sticky canvas ring used to cover "초안 저장").
+            // paint under each other (the old sticky canvas ring used to cover "작업 저장").
             mobileImmersive && "min-w-0 gap-1"
           )}
         >
@@ -1610,7 +1610,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 type="button"
                 onClick={() => handleDownload()}
                 data-studio-primary-action="export"
-                aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
+                aria-label={`이미지로 저장 · ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
                   // 모바일 도크의 '내보내기' 가 같은 핸들러다. 메뉴바에는 배율·포맷을 고르는
@@ -1618,7 +1618,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   isMobile && "hidden"
                 )}
               >
-                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
+                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">이미지로 저장</span>
                 {" "}
                 <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
                   {exportScale}× {exportFormat.toUpperCase()}
@@ -1712,7 +1712,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   setExportMenuOpen(false);
                   setProjectActionsOpen((open) => !open);
                 }}
-                aria-label="프로젝트 센터"
+                aria-label="내 작업"
                 aria-haspopup="dialog"
                 aria-expanded={projectActionsOpen}
                 aria-controls="studio-project-actions-menu"
@@ -1724,7 +1724,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
-                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트 센터</span>
+                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">내 작업</span>
                 {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
                     320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
                     (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
@@ -1745,7 +1745,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 id="studio-project-actions-menu"
                 data-studio-project-actions-menu="true"
                 role="dialog"
-                aria-label="프로젝트 센터"
+                aria-label="내 작업"
                 onClickCapture={(event) => {
                   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
                   if (button && !button.dataset.projectKeepOpen) {
@@ -1757,14 +1757,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <div className="sticky top-0 z-20 col-span-full -mx-2.5 -mt-2.5 border-b border-line/70 bg-panel/95 px-3 pb-3 pt-2.5 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="block text-sm font-bold tracking-tight text-fg">프로젝트 센터</span>
+                      <span className="block text-sm font-bold tracking-tight text-fg">내 작업</span>
                       <span className="mt-0.5 block text-[0.67rem] leading-relaxed text-fg-3">백업 · 기획 · 제작 · 검수 · 게시</span>
                     </span>
                     <button
                       type="button"
                       data-project-center-control="true"
                       onClick={() => setProjectActionsOpen(false)}
-                      aria-label="프로젝트 센터 닫기"
+                      aria-label="내 작업 닫기"
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       <X size={17} aria-hidden />
@@ -2199,7 +2199,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <StudioToolHintTarget
             hint={{
               ...MENUBAR_HINTS.draft,
-              title: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장",
+              title: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "작업 저장",
             }}
             disabled={saving || collaborationDocumentLocked}
             unavailableReason={
@@ -2215,7 +2215,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               type="button"
               onClick={() => handleSave("draft")}
               disabled={saving || collaborationDocumentLocked}
-              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
+              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "작업 저장"}
               className={cn(
                 buttonClass({
                   size: "sm",
@@ -2233,7 +2233,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <Save size={14} className="hidden max-[429px]:block" aria-hidden />
               )}
               <span className="max-[429px]:sr-only">
-                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
+                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "작업 저장"}
               </span>
             </button>
           </StudioToolHintTarget>
@@ -2241,7 +2241,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <StudioToolHintTarget
               hint={{
                 ...MENUBAR_HINTS.publish,
-                title: workId ? "수정 게시" : "게시하기",
+                title: workId ? "공개 수정" : "작품 공개",
               }}
               disabled={saving || collaborationDocumentLocked}
               unavailableReason={
@@ -2258,7 +2258,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 data-testid="studio-publish"
                 onClick={() => handleSave("published")}
                 disabled={saving || collaborationDocumentLocked}
-                aria-label={workId ? "수정 게시" : "게시하기"}
+                aria-label={workId ? "공개 수정" : "작품 공개"}
                 className={cn(
                   buttonClass({
                     size: "sm",
@@ -2276,7 +2276,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   <Send size={14} className="hidden max-[429px]:block" aria-hidden />
                 )}
                 <span className="max-[429px]:sr-only">
-                  {workId ? "수정 게시" : "게시하기"}
+                  {workId ? "공개 수정" : "작품 공개"}
                 </span>
               </button>
             </StudioToolHintTarget>

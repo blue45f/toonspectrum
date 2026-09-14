@@ -765,7 +765,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 className="min-h-11 min-w-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:px-1.5 lg:text-[10px]"
                 title="현재 페이지의 색보정을 모든 페이지에 적용"
               >
-                그레이드 전체
+                색보정 전체 적용
               </button>
               <button
                 type="button"

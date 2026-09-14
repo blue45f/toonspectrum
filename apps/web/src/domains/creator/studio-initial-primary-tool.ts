@@ -21,12 +21,16 @@ export function normalizeStudioRememberedPrimaryTool(
 }
 
 export function resolveStudioInitialPrimaryTool({
+  requestedTool = null,
   rememberedTool,
   hasExistingContent,
 }: {
+  /** One-shot route intent for a newly created canvas. It is never persisted here. */
+  readonly requestedTool?: StudioRememberedPrimaryTool | null;
   readonly rememberedTool: StudioRememberedPrimaryTool | null;
   readonly hasExistingContent: boolean;
 }): Tool {
+  if (requestedTool !== null) return requestedTool;
   if (rememberedTool !== null) return rememberedTool;
   return hasExistingContent ? "select" : "draw";
 }
