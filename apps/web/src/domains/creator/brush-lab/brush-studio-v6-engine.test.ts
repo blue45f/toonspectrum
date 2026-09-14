@@ -66,11 +66,42 @@ describe("Brush Studio V6 quality authority", () => {
     expect(analysis.issues.some((entry) => entry.id === "prediction-authority")).toBe(true);
   });
 
-  it("requires a valid Mixbox distinctiveness receipt", () => {
-    const mixbox = replaceBrushStudioV6Slot(createBrushStudioV6Program(), "pigment", "pigment-mixbox");
+  it("keeps Mixbox active while treating optional comparison evidence as information", () => {
+    const mixbox = replaceBrushStudioV6Slot(
+      createBrushStudioV6Program(),
+      "pigment",
+      "pigment-mixbox",
+    );
     const analysis = analyzeBrushStudioV6Program(mixbox, BRUSH_STUDIO_V6_FULL_CAPABILITIES);
-    expect(analysis.valid).toBe(false);
-    expect(analysis.issues.some((entry) => entry.id === "mixbox-distinctiveness")).toBe(true);
+    expect(analysis.valid).toBe(true);
+    expect(analysis.rightsProfile).toBe("noncommercial");
+    expect(analysis.issues.some((entry) =>
+      entry.id === "mixbox-quality-evidence" && entry.severity === "info"
+    )).toBe(true);
+  });
+
+  it("enforces permissive, source-available and noncommercial license profiles", () => {
+    const mixbox = createBrushStudioV6Program("mixbox-watercolor-bloom");
+    const permissive = analyzeBrushStudioV6Program(
+      mixbox,
+      BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+      "permissive-only",
+    );
+    expect(permissive.valid).toBe(false);
+    expect(permissive.issues.some((entry) => entry.id === "license-pigment-mixbox"))
+      .toBe(true);
+    const sourceAvailable = analyzeBrushStudioV6Program(
+      createBrushStudioV6Program("oil-hair-mixer"),
+      BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+      "source-available",
+    );
+    expect(sourceAvailable.valid).toBe(true);
+    expect(sourceAvailable.rightsProfile).toBe("copyleft-distribution");
+    expect(analyzeBrushStudioV6Program(
+      mixbox,
+      BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+      "noncommercial-full",
+    ).valid).toBe(true);
   });
 
   it("requires Inkwash or height input for thin-film physics", () => {
@@ -137,9 +168,16 @@ describe("Brush Studio V6 quality authority", () => {
     expect(withoutSharedMemory.input.transport).toBe("raw-coalesced");
   });
 
-  it("downgrades unverified Mixbox to Spectral during optimization", () => {
-    const mixbox = replaceBrushStudioV6Slot(createBrushStudioV6Program(), "pigment", "pigment-mixbox");
-    expect(optimizeBrushStudioV6Program(mixbox, BRUSH_STUDIO_V6_FULL_CAPABILITIES).slots.pigment).toBe("pigment-spectral");
+  it("never substitutes the selected Mixbox provider during optimization", () => {
+    const mixbox = replaceBrushStudioV6Slot(
+      createBrushStudioV6Program(),
+      "pigment",
+      "pigment-mixbox",
+    );
+    expect(optimizeBrushStudioV6Program(
+      mixbox,
+      BRUSH_STUDIO_V6_FULL_CAPABILITIES,
+    ).slots.pigment).toBe("pigment-mixbox");
   });
 
   it("preserves deterministic recipe output", () => {
