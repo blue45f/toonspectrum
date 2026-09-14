@@ -43,7 +43,7 @@ export function promotionKey<T extends object>(map: T, value: unknown): value is
 export function safePromotionUrl(value: unknown): string | null {
   const raw = promotionText(value);
   if (!raw) return "";
-  if (raw.length > 1000 || [...raw].some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127)) return null;
+  if (raw.length > 1000 || /[\u0000-\u0020\u007f]/u.test(raw)) return null;
   try {
     const url = new URL(raw);
     const host = url.hostname.toLowerCase();
@@ -76,9 +76,7 @@ export function validPromotionCover(value: unknown): value is string {
   if (value === "") return true;
   if (typeof value !== "string" || value.length > Math.ceil(PROMOTION_COVER_MAX_BYTES / 3) * 4 + 23) return false;
   const match = /^data:image\/jpeg;base64,(\/9j\/[A-Za-z0-9+/]*={0,2})$/u.exec(value);
-  if (!match || match[1].length % 4 !== 0) return false;
-  const padding = match[1].endsWith("==") ? 2 : match[1].endsWith("=") ? 1 : 0;
-  return match[1].length / 4 * 3 - padding <= PROMOTION_COVER_MAX_BYTES;
+  return !!match && match[1].length % 4 === 0;
 }
 export function validatePromotion(input: unknown): PromotionResult<PromotionInput> {
   const body = promotionRecord(input);
@@ -101,27 +99,19 @@ export function validatePromotion(input: unknown): PromotionResult<PromotionInpu
   return { value: { kind: body.kind, stage: body.stage, genre: body.genre as PromotionInput["genre"], title, seriesTitle, description, readingUrl,
     videoUrl: video?.url ?? "", cover: body.cover, tags: [...new Set(body.tags.map((tag: string) => tag.trim().replace(/^#/u, "")))].filter(Boolean), contentWarning, rightsConfirmed: true } };
 }
-const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu;
 export function promotionCursor(value: unknown): { date: Date; id: string } | null {
   if (value === undefined || value === "") return null;
   if (typeof value !== "string" || value.length > 90) throw new Error("잘못된 페이지 커서입니다.");
   const [stamp, id, extra] = value.split("|");
   const date = new Date(stamp);
-  if (extra !== undefined || !id || !UUID.test(id) || !Number.isFinite(date.getTime()) || date.toISOString() !== stamp) throw new Error("잘못된 페이지 커서입니다.");
+  if (extra !== undefined || !id || !/^[a-f0-9-]{36}$/iu.test(id) || !Number.isFinite(date.getTime()) || date.toISOString() !== stamp) throw new Error("잘못된 페이지 커서입니다.");
   return { date, id };
-}
-export function isPromotionPost(value: unknown): value is PromotionPost {
-  const post = promotionRecord(value), author = promotionRecord(post.author);
-  return typeof post.id === "string" && UUID.test(post.id) && typeof post.version === "number" && Number.isSafeInteger(post.version) && post.version > 0
-    && typeof author.id === "string" && !!author.id && typeof author.name === "string"
-    && typeof post.createdAt === "string" && Number.isFinite(Date.parse(post.createdAt))
-    && typeof post.updatedAt === "string" && Number.isFinite(Date.parse(post.updatedAt))
-    && typeof post.hidden === "boolean" && typeof post.archived === "boolean" && typeof post.saved === "boolean" && !validatePromotion(post).error;
 }
 export function assertPromotionPage(value: unknown): asserts value is PromotionPage {
   const page = promotionRecord(value);
   if (!Array.isArray(page.items) || typeof page.hasMore !== "boolean" || typeof page.canModerate !== "boolean"
     || (page.nextCursor !== null && typeof page.nextCursor !== "string") || (page.hasMore && !page.nextCursor)
-    || page.items.some((item) => !isPromotionPost(item))) throw new Error("홍보 목록 응답을 확인하지 못했어요. 다시 불러와 주세요.");
-  if (page.nextCursor) promotionCursor(page.nextCursor);
+    || page.items.some((item) => { const post = promotionRecord(item); return typeof post.id !== "string" || typeof post.version !== "number" || !promotionRecord(post.author).id || !!validatePromotion(post).error; })) {
+    throw new Error("홍보 목록 응답을 확인하지 못했어요. 다시 불러와 주세요.");
+  }
 }

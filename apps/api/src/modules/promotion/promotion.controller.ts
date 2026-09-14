@@ -1,10 +1,8 @@
 import { Body, Controller, Delete, Get, Header, Headers, HttpException, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
-
 import { PromotionService } from "./promotion.service";
-
 const buckets = new Map<string, number[]>();
 function actor(userId: string | undefined, action: string): string {
-  // The global sessionAuth middleware verifies the cookie/token and rewrites this internal header.
+  // The global sessionAuth middleware removes untrusted x-user-id and verifies the cookie/token.
   if (!userId) throw new UnauthorizedException("로그인이 필요해요.");
   const key = `${action}:${userId}`, now = Date.now(), recent = (buckets.get(key) ?? []).filter((time) => now - time < 600000);
   if (recent.length >= 30) throw new HttpException("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.", 429);
@@ -15,6 +13,7 @@ function actor(userId: string | undefined, action: string): string {
 async function boundary<T>(work: () => Promise<T>): Promise<T> {
   try { return await work(); } catch (error) {
     if (error instanceof HttpException) throw error;
+    // A database outage is NOT a successful empty feed or a successful publish.
     throw new ServiceUnavailableException("홍보 커뮤니티 저장소에 연결하지 못했어요. 작성 내용을 유지하고 다시 시도해 주세요.");
   }
 }

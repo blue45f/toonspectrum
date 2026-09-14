@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { PromotionModule } from "../promotion/promotion.module";
 
 import { CollaborationModule } from "../collaboration/collaboration.module";
 
@@ -7,7 +8,7 @@ import { CommunityService } from "./community.service";
 import { PromotionModule } from "../promotion/promotion.module";
 
 @Module({
-  imports: [CollaborationModule],
+  imports: [PromotionModule],
   controllers: [CommunityController],
   providers: [CommunityService],
 })
