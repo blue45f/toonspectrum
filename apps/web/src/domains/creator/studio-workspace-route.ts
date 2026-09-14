@@ -495,7 +495,7 @@ export function parseStudioWorkspaceRoute({
       remixSourceWorkId: null,
       surface: studioDocumentWorkspaceToLegacySurface(documentRoute.workspace),
       valid: true,
-      workId: null,
+      workId: documentRoute.documentId,
     });
   }
 
