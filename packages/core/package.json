@@ -35,6 +35,7 @@
       "types": "./src/carousel/index.ts",
       "import": "./src/carousel/index.ts",
       "default": "./src/carousel/index.ts"
-    }
+    },
+    "./collaboration": "./src/collaboration.ts"
   }
 }

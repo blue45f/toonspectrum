@@ -13,6 +13,7 @@ export function shouldAppRouterOwnDocumentTitle({
   pathname,
   search = "",
 }: AppRouteTitleLocation): boolean {
+  if (pathname === "/collaborate" || pathname.startsWith("/collaborate/")) return false;
   if (pathname.startsWith("/title/")) return false;
   if (pathname.startsWith("/create/")) return false;
   if (pathname === "/learn" || pathname.startsWith("/learn/")) return false;

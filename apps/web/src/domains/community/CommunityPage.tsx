@@ -37,7 +37,7 @@ export function CommunityPage() {
       >
         <div className="flex flex-wrap gap-3">
           <Link href="/showcase" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2">창작자 갤러리<ArrowRight size={16} aria-hidden="true" /></Link>
-          <Link href="/reviews" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><MessageCircle size={16} aria-hidden="true" />작품 리뷰 읽기</Link>
+          <Link href="/collaborate" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><MessageCircle size={16} aria-hidden="true" />웹툰 구인·의뢰</Link>
         </div>
       </PublicStoryHero>
 

@@ -31,7 +31,17 @@ const PencafePage = lazyRetry(
   "PencafePage",
 );
 
+const CollaborationBoardPage = lazyRetry(() => import("@/domains/collaboration/CollaborationBoardPage").then((module) => ({ default: module.CollaborationBoardPage })), "CollaborationBoardPage");
+const CollaborationEditorPage = lazyRetry(() => import("@/domains/collaboration/CollaborationEditorPage").then((module) => ({ default: module.CollaborationEditorPage })), "CollaborationEditorPage");
+const CollaborationPostPage = lazyRetry(() => import("@/domains/collaboration/CollaborationPostPage").then((module) => ({ default: module.CollaborationPostPage })), "CollaborationPostPage");
+const CollaborationModerationPage = lazyRetry(() => import("@/domains/collaboration/CollaborationModerationPage").then((module) => ({ default: module.CollaborationModerationPage })), "CollaborationModerationPage");
+
 export const communityRoutes = defineAppRoutes([
+  { id: "collaboration-board", path: "/collaborate", element: <CollaborationBoardPage /> },
+  { id: "collaboration-new", path: "/collaborate/new", element: <CollaborationEditorPage /> },
+  { id: "collaboration-moderation", path: "/collaborate/moderation", element: <CollaborationModerationPage /> },
+  { id: "collaboration-edit", path: "/collaborate/:id/edit", element: <CollaborationEditorPage /> },
+  { id: "collaboration-post", path: "/collaborate/:id", element: <CollaborationPostPage /> },
   { id: "community-reviews", path: "/reviews", element: <ReviewsPage /> },
   { id: "community-home", path: "/community", element: <CommunityPage /> },
   { id: "community-cafes", path: "/community/cafes", element: <CafesPage /> },
