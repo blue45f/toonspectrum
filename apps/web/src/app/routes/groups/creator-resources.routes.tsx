@@ -50,10 +50,6 @@ const SourcesPage = lazyRetry(
   "SourcesPage",
 );
 
-const MaterialAtlasPage = lazyRetry(
-  () => import("@/domains/creator-resources/MaterialAtlasPage").then((module) => ({ default: module.MaterialAtlasPage })),
-  "MaterialAtlasPage",
-);
 const ContentPacksPage = lazyRetry(
   () => import("@/domains/creator-resources/ContentPacksPage").then((module) => ({ default: module.ContentPacksPage })),
   "ContentPacksPage",
@@ -71,7 +67,6 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "research-catalog-notebook", path: "/research/catalog/notebook", element: <CatalogResearchPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
-  { id: "research-materials", path: "/research/materials", element: <MaterialAtlasPage /> },
   { id: "research-content-packs", path: "/research/packs", element: <ContentPacksPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
   { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },
