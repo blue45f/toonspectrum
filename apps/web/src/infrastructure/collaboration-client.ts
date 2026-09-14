@@ -1,4 +1,3 @@
-import { assertCollaborationList, isCollaborationPost } from "../../../../packages/core/src/collaboration";
 import { api } from "./api";
 
 import type {
@@ -12,12 +11,12 @@ const options = { timeout: 20_000 };
 export const collaborationClient = {
   async list(params: Record<string, string>, signal?: AbortSignal): Promise<CollaborationList> {
     const data = await api.get<CollaborationList>(`${root}/posts`, { ...options, params, signal });
-    assertCollaborationList(data);
+    if (!data || !Array.isArray(data.items) || typeof data.hasMore !== "boolean") throw new Error("목록 응답을 확인하지 못했어요. 다시 불러와 주세요.");
     return data;
   },
   async detail(id: string, signal?: AbortSignal): Promise<CollaborationDetail> {
     const data = await api.get<CollaborationDetail>(path(id), { ...options, signal });
-    if (!data || !isCollaborationPost(data.post) || typeof data.canManage !== "boolean" || typeof data.canModerate !== "boolean") throw new Error("공고 응답을 확인하지 못했어요.");
+    if (!data?.post?.id || !data.post.details || typeof data.canManage !== "boolean") throw new Error("공고 응답을 확인하지 못했어요.");
     return data;
   },
   create: (input: CollaborationInput) => api.post<{ id: string }>(`${root}/posts`, input, options),

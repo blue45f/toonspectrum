@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, Injectable, Logger, ServiceUnavaila
 
 import {
   APPLICATION_STATUS, COLLABORATION_MODES, COLLABORATION_PAY, COLLABORATION_ROLES,
-  COLLABORATION_STATUS, COLLABORATION_TYPES, collaborationCursor, collaborationRecord, collaborationText,
+  COLLABORATION_STATUS, COLLABORATION_TYPES, collaborationRecord, collaborationText,
   isCollaborationKey, validateCollaborationApplication, validateCollaborationInput,
 } from "../../../../../packages/core/src/collaboration";
 
@@ -33,9 +33,13 @@ export function parseCollaborationQuery(raw: Record<string, unknown>, userId?: s
   if (view !== "all" && view !== "mine" && view !== "saved" && view !== "applied") throw new BadRequestException("목록 범위를 확인해 주세요.");
   if (view !== "all") requireCollaborationUser(userId);
   if (raw.q !== undefined && (typeof raw.q !== "string" || raw.q.length > 100)) throw new BadRequestException("검색어는 100자 이내로 입력해 주세요.");
-  let cursor: CollaborationQuery["cursor"];
-  try { cursor = collaborationCursor(raw.cursor); }
-  catch { throw new BadRequestException("페이지 주소를 확인해 주세요."); }
+  let cursor: CollaborationQuery["cursor"] = null;
+  if (raw.cursor) {
+    if (typeof raw.cursor !== "string" || raw.cursor.length > 100) throw new BadRequestException("페이지 주소를 확인해 주세요.");
+    const parts = raw.cursor.split("|");
+    if (parts.length !== 2 || !/^\d{4}-\d{2}-\d{2}T/u.test(parts[0]) || !Number.isFinite(Date.parse(parts[0])) || !uuidPattern.test(parts[1])) throw new BadRequestException("페이지 주소를 확인해 주세요.");
+    cursor = { createdAt: new Date(parts[0]).toISOString(), id: parts[1] };
+  }
   return { view, q: collaborationText(raw.q), cursor, type: filter(COLLABORATION_TYPES, raw.type),
     role: filter(COLLABORATION_ROLES, raw.role), payType: filter(COLLABORATION_PAY, raw.payType),
     workMode: filter(COLLABORATION_MODES, raw.workMode), status: filter(COLLABORATION_STATUS, raw.status, view === "all" ? "open" : "all") };

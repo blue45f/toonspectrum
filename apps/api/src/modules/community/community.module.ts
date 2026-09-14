@@ -7,7 +7,7 @@ import { CommunityService } from "./community.service";
 import { PromotionModule } from "../promotion/promotion.module";
 
 @Module({
-  imports: [PromotionModule, CollaborationModule],
+  imports: [CollaborationModule],
   controllers: [CommunityController],
   providers: [CommunityService],
 })
