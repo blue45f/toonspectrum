@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
