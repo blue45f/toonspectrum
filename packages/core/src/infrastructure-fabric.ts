@@ -212,8 +212,13 @@ function uniqueIdentifiers(values: readonly string[]): boolean {
     && new Set(values).size === values.length;
 }
 
-function optionalUniqueIdentifiers(values: readonly string[] | undefined): boolean {
-  return values === undefined || uniqueIdentifiers(values);
+function optionalUniqueIdentifiers(
+  values: readonly string[] | undefined,
+  allowEmpty = false,
+): boolean {
+  if (values === undefined) return true;
+  if (values.length === 0) return allowEmpty;
+  return values.every(validIdentifier) && new Set(values).size === values.length;
 }
 
 function validEstimatedQuotaDimensions(
@@ -221,9 +226,8 @@ function validEstimatedQuotaDimensions(
 ): boolean {
   if (dimensions === undefined) return true;
   const entries = Object.entries(dimensions);
-  return entries.length > 0
-    && entries.every(([dimension, impact]) =>
-      validIdentifier(dimension) && validRatio(impact));
+  return entries.every(([dimension, impact]) =>
+    validIdentifier(dimension) && validRatio(impact));
 }
 
 export function validateInfrastructureProviderPolicy(
@@ -290,6 +294,11 @@ export function validateInfrastructureWorkloadPolicy(
   }
   if (workload.operation !== "read" && workload.allowReadFallback) {
     issues.push("allowReadFallback is valid only for reads");
+  }
+  if (workload.consistency === "authoritative"
+    && workload.operation === "read"
+    && workload.allowReadFallback) {
+    issues.push("authoritative reads must not allow fallback");
   }
   if (
     workload.operation === "write"
@@ -643,7 +652,7 @@ function requestIsValid(request: InfrastructurePlacementRequest): boolean {
     )
     && (request.routingKey === undefined
       || validRoutingKey(request.routingKey))
-    && optionalUniqueIdentifiers(request.excludedProviderIds)
+    && optionalUniqueIdentifiers(request.excludedProviderIds, true)
     && ![...request.snapshots.entries()].some(([providerId, snapshot]) =>
       !validProviderSnapshot(providerId, snapshot, request.nowEpochMs));
 }
@@ -727,8 +736,11 @@ export function planInfrastructurePlacement(
   return {
     outcome: "selected",
     primary: candidateDecision(primary, request.workload.authority),
-    retries: eligible.slice(1).map((candidate) =>
-      candidateDecision(candidate, request.workload.authority)),
+    retries: request.workload.operation === "read"
+      && request.workload.allowReadFallback
+      ? eligible.slice(1).map((candidate) =>
+        candidateDecision(candidate, request.workload.authority))
+      : [],
     rejectedProviders: evaluations
       .filter((candidate) => !candidate.eligible)
       .map((candidate) => candidate.providerId),
