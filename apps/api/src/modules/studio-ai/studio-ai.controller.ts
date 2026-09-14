@@ -1,70 +1,41 @@
 import {
-  Body,
   Controller,
   Get,
   Header,
-  Headers,
   HttpCode,
   HttpStatus,
-  Inject,
   Post,
-  Req,
-  Res,
-  UnauthorizedException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 
-import { StudioAiChatDto } from "./studio-ai.dto";
-import { StudioAiService } from "./studio-ai.service";
-
-import type { Request, Response } from "express";
+const USER_AI_REQUIRED = Object.freeze({
+  code: "USER_AI_CONNECTION_REQUIRED",
+  message: "운영측 텍스트 AI는 비활성화되어 있습니다. 통합 AI 설정에서 본인 키를 연결하세요.",
+  settingsHref: "/studio/ai-settings",
+  operatorFunded: false,
+});
 
 @Controller("studio-ai")
 export class StudioAiController {
-  // `tsx watch` does not emit Nest's design:paramtypes metadata, so use an
-  // explicit token to keep development and compiled production behavior equal.
-  constructor(@Inject(StudioAiService) private readonly studioAiService: StudioAiService) {}
-
   @Get("status")
   @Header("Cache-Control", "no-store, max-age=0")
   status() {
-    return this.studioAiService.status();
+    return {
+      configured: false,
+      provider: "none",
+      model: "",
+      providers: [],
+      selection: { default: "auto", order: [], fallback: false },
+      capabilities: [],
+      requiresAuth: false,
+      operatorFunded: false,
+      settingsHref: USER_AI_REQUIRED.settingsHref,
+    };
   }
 
   @Post("chat")
-  @HttpCode(HttpStatus.OK)
-  async chat(
-    @Headers("x-user-id") userId: string | undefined,
-    @Headers("idempotency-key") idempotencyKey: string | undefined,
-    @Body() body: StudioAiChatDto,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response
-  ) {
-    if (!userId) throw new UnauthorizedException("서버 AI를 사용하려면 로그인이 필요해요.");
-
-    const clientController = new AbortController();
-    const abortForClientDisconnect = () => {
-      if (!clientController.signal.aborted) clientController.abort();
-    };
-    const abortForResponseClose = () => {
-      // A normal response can emit `close` after it has been fully written. Only
-      // an early close means the caller went away while the upstream request was active.
-      if (!response.writableEnded) abortForClientDisconnect();
-    };
-
-    request.once("aborted", abortForClientDisconnect);
-    response.once("close", abortForResponseClose);
-    if (request.aborted || response.destroyed) abortForClientDisconnect();
-
-    try {
-      return await this.studioAiService.complete(
-        userId,
-        body,
-        idempotencyKey,
-        clientController.signal
-      );
-    } finally {
-      request.off("aborted", abortForClientDisconnect);
-      response.off("close", abortForResponseClose);
-    }
+  @HttpCode(HttpStatus.SERVICE_UNAVAILABLE)
+  chat(): never {
+    throw new ServiceUnavailableException(USER_AI_REQUIRED);
   }
 }
