@@ -38,12 +38,12 @@ const EXTENDED_MEDIA_IDS = [
 ] as const;
 
 describe("procedural brush pack catalogue", () => {
-  it("describes all 192 ids with unique Korean labels and searchable preview metadata", () => {
-    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(192);
+  it("describes all 200 ids with unique Korean labels and searchable preview metadata", () => {
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(200);
     expect(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
-    expect(new Set(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogName)).size).toBe(192);
+    expect(new Set(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogName)).size).toBe(200);
 
     for (const descriptor of STUDIO_BRUSH_PACK_DESCRIPTORS) {
       expect(descriptor.catalogName).toMatch(/[가-힣]/);

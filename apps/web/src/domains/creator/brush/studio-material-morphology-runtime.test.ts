@@ -28,8 +28,8 @@ const input = {
 };
 
 describe("material brushes in the actual product selection contract", () => {
-  it("exposes 32 new tools in the public picker, not only an internal registry", () => {
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(80);
+  it("exposes 40 new tools in the public picker, not only an internal registry", () => {
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(88);
     for (const id of STUDIO_MATERIAL_BRUSH_IDS) {
       expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.some((row) => row.id === id), id).toBe(true);
       expect(studioBrushCatalogItemById(id)?.source, id).toBe("pro");

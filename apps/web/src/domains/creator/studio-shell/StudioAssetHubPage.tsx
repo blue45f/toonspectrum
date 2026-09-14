@@ -1,5 +1,5 @@
 import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-react";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
@@ -19,9 +19,12 @@ import {
   type AssetHubView,
 } from "./studio-asset-hub-view";
 
+const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
+
 type Locale = "ko" | "en";
 
 const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>>>> = {
+  essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
   overview: { ko: "에셋 홈", en: "Asset home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
   library: { ko: "내 에셋", en: "My assets" },
@@ -32,6 +35,7 @@ const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>
 
 const VIEW_ICONS = {
   overview: Boxes,
+  essentials: Boxes,
   "series-kit": Palette,
   library: Library,
   market: Search,
@@ -154,6 +158,7 @@ export function StudioAssetHubPage() {
       </div>
 
       {view === "overview" ? <StudioAssetsPage /> : null}
+      {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{locale === "ko" ? "제작 소재 준비 중…" : "Loading creator essentials…"}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
           <StudioSeriesKitPanel projectId={projectId} locale={locale} />

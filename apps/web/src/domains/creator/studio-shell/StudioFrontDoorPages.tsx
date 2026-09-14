@@ -165,6 +165,12 @@ const NEW_DOCUMENTS: readonly FrontDoorCard[] = [
 
 const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
+    href: "/studio/assets?view=essentials", icon: Boxes,
+    title: { ko: "무료 제작 소재 48종", en: "48 free creator essentials" },
+    description: { ko: "말풍선·효과·2D 포즈 시트와 3D 데생 인형·소품을 원본 파일로 저장합니다.", en: "Download original balloons, effects, 2D pose sheets, 3D mannequins and props." },
+    badge: { ko: "CC0 · 무료", en: "CC0 · Free" },
+  },
+  {
     href: "/studio/brushes",
     icon: Brush,
     title: { ko: "브러시", en: "Brushes" },
