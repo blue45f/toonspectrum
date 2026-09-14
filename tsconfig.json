@@ -30,6 +30,9 @@
       ],
       "@toonspectrum/studio-engine-skia": [
         "./apps/web/src/types/studio-engine-skia-shim.d.ts"
+      ],
+      "mixbox": [
+        "./apps/web/src/types/mixbox.d.ts"
       ]
     },
     "allowImportingTsExtensions": true

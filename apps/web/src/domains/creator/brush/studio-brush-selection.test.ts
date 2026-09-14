@@ -200,10 +200,10 @@ describe("studio brush catalogue selection", () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_BRUSH_CATALOG_COUNTS.total);
     expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
       core: BRUSH_PRESETS.length,
-      pro: 192,
-      total: BRUSH_PRESETS.length + 192,
+      pro: 200,
+      total: BRUSH_PRESETS.length + 200,
       erase: 2,
-      paint: BRUSH_PRESETS.length - 2 + 192,
+      paint: BRUSH_PRESETS.length - 2 + 200,
     });
     expect(STUDIO_BRUSH_CATALOG_COUNTS.core).toBeGreaterThanOrEqual(99);
 

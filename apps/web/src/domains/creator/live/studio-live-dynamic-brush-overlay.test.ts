@@ -830,7 +830,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
   });
 
   it("streams every authored brush pack from only the prior sample plus unseen suffix", () => {
-    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(192);
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(200);
     let dryMediaCount = 0;
     const prefixPointCount = 24;
     const completePointCount = 48;

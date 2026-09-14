@@ -52,8 +52,8 @@ describe("studio-draw-ux", () => {
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
     });
     const pro = all.filter((item) => isStudioBrushPackCatalogId(item.id));
-    expect(pro).toHaveLength(192);
-    expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 192);
+    expect(pro).toHaveLength(200);
+    expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 200);
     for (const item of pro) {
       const tabItems = filterStudioBrushLibraryItems({
         category: item.mediaGroup,
