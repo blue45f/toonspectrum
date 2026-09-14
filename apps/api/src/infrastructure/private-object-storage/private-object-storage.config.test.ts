@@ -35,16 +35,12 @@ const routedEnvironment = {
   R2_OBJECT_STORAGE_ACCESS_KEY_ID: "r2-access-key",
   R2_OBJECT_STORAGE_SECRET_ACCESS_KEY: "r2-secret-key-with-enough-length",
   R2_OBJECT_STORAGE_SOURCE_BUCKET: "r2-source-assets",
-  R2_OBJECT_STORAGE_DERIVED_BUCKET: "r2-derived-assets",
-  R2_OBJECT_STORAGE_EXPORT_BUCKET: "r2-export-assets",
   R2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED: "true",
   B2_OBJECT_STORAGE_ENABLED: "true",
   B2_OBJECT_STORAGE_ENDPOINT: "https://s3.us-west.example/",
   B2_OBJECT_STORAGE_REGION: "us-west-004",
   B2_OBJECT_STORAGE_ACCESS_KEY_ID: "b2-access-key",
   B2_OBJECT_STORAGE_SECRET_ACCESS_KEY: "b2-secret-key-with-enough-length",
-  B2_OBJECT_STORAGE_SOURCE_BUCKET: "b2-source-assets",
-  B2_OBJECT_STORAGE_DERIVED_BUCKET: "b2-derived-assets",
   B2_OBJECT_STORAGE_EXPORT_BUCKET: "b2-export-assets",
   B2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED: "true",
 } as const;
@@ -107,6 +103,10 @@ describe("private object storage configuration", () => {
     {
       ...routedEnvironment,
       B2_OBJECT_STORAGE_ENABLED: "false",
+    },
+    {
+      ...routedEnvironment,
+      R2_OBJECT_STORAGE_SOURCE_BUCKET: undefined,
     },
     {
       ...routedEnvironment,

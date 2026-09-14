@@ -4,23 +4,31 @@
 > 승인한 main SHA를 외부에서 한 번 빌드하고 prebuilt로 한 번 업로드합니다.
 > [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)이 이전 자동 배포 지침을 대체합니다.
 
-현재 운영 환경은 작업 유형별로 권위를 분리합니다. Vercel은 정적 SPA와 제한된 NestJS HTTP API를, Neon/호환 PostgreSQL은 동적 데이터와 migration 원장을, Cloudflare Durable Objects는 Studio의 임시 실시간 상태를, Upstash는 분산 제한·조정을, Supabase 비공개 Storage는 원본·파생·내보내기 객체를 담당합니다.
-한 제공자가 다른 제공자의 전체 폴백이 되지는 않으며, 각 제공자가 같은 목적의 전체 계약을 충족하는지 반드시 증명해야 합니다.
+기본 운영 권위는 무료 우선으로 분리합니다. Cloudflare Static Assets가 SPA와 정적 카탈로그를
+직접 제공하고, 최소 Worker gateway는 API·Socket.IO·OG crawler 경로만 검토된 Core API origin으로
+전달합니다. Neon/호환 PostgreSQL은 동적 원장, Cloudflare Durable Objects는 Studio의 임시 실시간
+상태, Upstash는 선택형 분산 제한·조정, 목적별 R2/B2/Supabase private storage는 파일 data plane을
+담당합니다. Vercel은 전환 기간의 수동 비상 fallback이며 Git 자동 배포 권위가 아닙니다.
+
+한 제공자가 다른 제공자의 전체 폴백이 되지는 않습니다. 각 workload는 하나의 authority를 가지며,
+동등 계약·quota snapshot·복구 절차가 검증되지 않은 공급자에는 자동으로 쓰지 않습니다.
 
 | 레이어 | 스택 | 기본 호스트 | 배포 산출물 |
 | --- | --- | --- | --- |
-| 프론트 | Vite + React SPA | Vercel | `dist/` |
-| 카탈로그 | 정적 스냅샷 | Vercel CDN | `public/data/*.json` |
-| API | NestJS serverless | Vercel Functions | `api/index.js` → `apps/api/dist/.../serverless` |
+| 프론트 | Vite + React SPA | Cloudflare Static Assets | `dist/` |
+| 카탈로그 | 정적 스냅샷 | Cloudflare Static Assets | `public/data/*.json` |
+| Edge gateway | Cloudflare Worker | Cloudflare | 동적 경로만 Core API로 전달 |
+| Core API | NestJS | 검토된 HTTPS origin | 인증·ACL·거래·원장 transaction |
 | DB | PostgreSQL | Neon/호환 Postgres | 동적 데이터 + checksum migration 원장 |
-| Studio realtime | Durable Objects | Cloudflare `workers.dev` | presence·comment invalidation·screen-share signaling |
-| 분산 제한/조정 | Redis | Upstash | auth rate-limit·lease·coordination |
-| object storage | private buckets | Supabase Storage | source·derived·export |
+| Studio realtime | Durable Objects | Cloudflare | presence·comment invalidation·screen-share signaling |
+| 분산 제한/조정 | Redis | Upstash(선택) | auth rate-limit·lease·coordination |
+| private object storage | 목적별 private buckets | Supabase/R2/B2 | source·derived·export 고정 라우팅 |
+| 개인 프로젝트 | OPFS/로컬/BYOS | 사용자 기기·저장소 | 운영자 중앙 저장 최소화 |
 
 `render.yaml`은 Studio Socket.IO 연결을 검증하기 위한 **선택형 폴백** Blueprint입니다.
 `API_RUNTIME_ROLE=studio-live`는 health probe와 Socket.IO만 허용하므로 일반 HTTP API의 대체
-호스트가 아닙니다. 현재 `vercel.json`은 `/api/*`를 Vercel 함수로 라우팅하며 이 경계는
-Render를 사용해도 유지합니다.
+호스트가 아닙니다. 정적 gateway의 `CORE_API_ORIGIN`은 현재 검증된 Core API를 명시해야 하며,
+Render 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
 
 ### 운영 검증 스냅샷 (2026-08-02)
 
@@ -33,7 +41,8 @@ Render를 사용해도 유지합니다.
 ## 0. 준비물
 
 - Node 24.16+와 pnpm 11 (`corepack enable` 권장)
-- Vercel 계정
+- Cloudflare 계정과 수동 배포 권한
+- Core API를 실행할 검토된 호스트(전환기 Vercel 비상 fallback은 선택)
 - Neon 또는 호환 PostgreSQL `DATABASE_URL`
 - 소셜 로그인 실연동 시 Google Cloud / Kakao Developers 앱
 
@@ -47,36 +56,34 @@ pnpm run verify
 
 `pnpm catalog:gen`은 `apps/api/data/catalog.json.gz`를 읽어 `public/data/*.json`과 `public/data/ranking/*.json`을 만듭니다. 이 산출물은 빌드 시 다시 생성되며, 랭킹 기본 뷰는 `disableLive=true` 스냅샷 산식으로 사전 계산됩니다.
 
-## 2. Vercel 배포
+## 2. 정적 웹과 Core API 배포
 
-1. 기존 Vercel 프로젝트를 유지하고 Git 연결을 해제한 상태로 둡니다. 새 프로젝트 생성·Git 재연결은 하지 않습니다.
-2. 사용자 승인 후 수동 prebuilt 배포에서 `vercel.json`을 사용합니다(`git.deploymentEnabled: false`).
-   - `buildCommand`: `pnpm --filter @webtoon-nest/api build && pnpm run build`
-   - `outputDirectory`: `dist`
-   - `/api/:path*` → `/api/index`
-   - `/title/:slug` → `/api/og?slug=:slug`
-3. 환경변수를 설정합니다.
-   - `DATABASE_URL`: 동적 API가 사용할 PostgreSQL 연결 문자열.
-   - `AUTH_STATE_SECRET`: OAuth state 서명 키. 상용은 고정값 필수.
-   - `CANONICAL_HOST=www.toonstudio.cloud`: OG/JSON-LD 정본 hostname.
-   - `API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud`: 운영 웹 origin exact allowlist.
-   - `OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud`: OAuth callback 기준 URL.
-   - `WEB_APP_BASE_URL=https://www.toonstudio.cloud`: 로그인 완료 후 복귀 URL.
-   - `WEBDEX_SITE_URL=https://www.toonstudio.cloud`: 알림 스크립트의 기존 호환 키(링크 기준 URL).
-   - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`: 선택.
-   - `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`: 선택.
-   - `ADMIN_EMAILS`: 선택.
-   - `CATALOG_INGEST_TRIGGER_TOKEN`: 원격 수동 ingest를 쓸 때만.
-   - `CATALOG_INGEST_MODE=off`: 기본 권장.
+정적 웹은 Git push로 자동 배포하지 않습니다. 검토된 `main`의 clean worktree에서 다음 순서로
+번들·헤더·라우팅을 확인한 뒤 수동 승인 배포합니다.
 
-프론트가 상대경로 `/api/...`를 호출하므로 일반 HTTP API는 같은 origin으로 동작합니다.
-`API_CORS_ALLOWED_ORIGINS`는 apex에서 정본으로 전환되는 도중의 preflight와, 별도 장기 실행
-Socket.IO 서버의 HTTP/WebSocket origin 검사를 동일하게 유지하기 위한 exact allowlist입니다.
-와일드카드나 임의 Vercel preview origin은 운영 기본값에 포함하지 않습니다.
+```bash
+pnpm run verify:free-infrastructure
+pnpm run verify:cloudflare-static
+pnpm run cloudflare:static:dry-run
+
+export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
+pnpm run cloudflare:static:deploy
+```
+
+Core API에는 `.env.production.example`의 PostgreSQL·인증·CORS·목적별 object storage 설정을
+주입합니다. `CORE_API_ORIGIN`은 credential, path, query가 없는 별도 HTTPS origin이어야 합니다.
+프런트의 상대경로 `/api/...`는 Cloudflare gateway를 통해 동일 origin 경험을 유지합니다.
+`/market/library`, `/market/publish` 같은 SPA 화면은 Worker를 실행하지 않고 Static Assets가
+처리하며, `/market`, `/market/browse`, `/market/resource/:id`의 crawler HTML만 OG endpoint로 갑니다.
+
+Vercel을 Core API 또는 긴급 정적 fallback으로 유지하는 동안에도 `vercel.json`의 Git 배포는 모든
+branch에서 비활성입니다. `.github/workflows/deploy-vercel.yml`은 production reviewer가 승인한
+current-main ancestor만 prebuilt로 올리는 수동 비상 절차이며 일반 릴리스 경로가 아닙니다.
 
 ## 3. OAuth 콜백
 
-운영 정본은 `https://www.toonstudio.cloud`입니다. 아래 값을 Vercel 환경변수와 각 OAuth
+운영 정본은 `https://www.toonstudio.cloud`입니다. 아래 값을 Core API 환경변수와 각 OAuth
 콘솔에 동일하게 등록합니다.
 
 ```env
@@ -102,7 +109,7 @@ Google Identity Services의 승인된 JavaScript origin에는
 
 1. 크롤러가 새 `apps/api/data/catalog.json.gz`를 만든다.
 2. `pnpm catalog:gen`이 `public/data/*.json`을 생성한다.
-3. Vercel 재배포로 CDN 스냅샷이 갱신된다.
+3. 검토된 다음 Cloudflare 정적 수동 배포에 새 CDN 스냅샷을 포함한다.
 
 로컬 또는 운영 API 폴백 경로에서 DB 스냅샷을 직접 갱신하려면 `pnpm ingest` 또는 `POST /api/catalog/ingest/run`을 사용할 수 있습니다. 운영에서 자동 수집을 켜기 전에는 플랫폼별 robots.txt, 이용약관, API 약관, 호출량 제한, 저장 필드 범위를 별도로 검토해야 합니다.
 

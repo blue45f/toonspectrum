@@ -16,7 +16,8 @@
       "/socket.io/*",
       "/title/*",
       "/market",
-      "/market/*"
+      "/market/browse",
+      "/market/resource/*"
     ]
   }
 }

@@ -6,11 +6,14 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 
 - `/api`, `/api/*`
 - `/socket.io`, `/socket.io/*`
-- `/title/*`
-- `/market`, `/market/*`
+- 정확히 한 slug를 가진 `/title/:slug`
+- `/market`, `/market/browse`, 정확히 한 ID를 가진 `/market/resource/:resourceId`
 
 동적 요청은 `CORE_API_ORIGIN`의 기존 NestJS API로 프록시한다. API origin을 구성하지 않았거나
-HTTPS origin 검증에 실패하면 SPA HTML로 폴백하지 않고 `503 CORE_API_UNAVAILABLE`로 닫힌다.
+HTTPS origin 검증에 실패하거나 정적 origin 자신을 가리키면 SPA HTML/재귀 프록시로 폴백하지
+않고 `503 CORE_API_UNAVAILABLE`로 닫힌다. `/market/library`, `/market/publish` 같은 앱 화면은
+Static Assets의 SPA fallback이 처리한다. WebSocket upgrade 응답은 runtime handle을 보존하도록
+재구성하지 않고 그대로 전달한다.
 
 ## 검증
 

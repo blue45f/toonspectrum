@@ -56,14 +56,28 @@ function coreOrigin(raw: string | undefined): URL | null {
   return url;
 }
 
+function hasExactlyOneEncodedSegment(
+  pathname: string,
+  prefix: string,
+): boolean {
+  if (!pathname.startsWith(prefix)) return false;
+  const segment = pathname.slice(prefix.length);
+  return segment.length > 0 && !segment.includes("/");
+}
+
 function isDynamicPath(pathname: string): boolean {
   return pathname === "/api"
     || pathname.startsWith("/api/")
     || pathname === "/socket.io"
     || pathname.startsWith("/socket.io/")
-    || pathname.startsWith("/title/")
+    || hasExactlyOneEncodedSegment(pathname, "/title/")
     || pathname === "/market"
-    || pathname.startsWith("/market/");
+    || pathname === "/market/browse"
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+}
+
+function isWebSocketUpgrade(request: Request): boolean {
+  return request.headers.get("upgrade")?.toLowerCase() === "websocket";
 }
 
 function decodePathSegment(value: string): string | null {
@@ -148,10 +162,16 @@ export function createCloudflareStaticGateway(
     }
 
     const origin = coreOrigin(env.CORE_API_ORIGIN);
-    if (!origin) return jsonError(503, "CORE_API_UNAVAILABLE");
+    if (!origin || origin.origin === requestUrl.origin) {
+      return jsonError(503, "CORE_API_UNAVAILABLE");
+    }
 
     try {
       const response = await runtime.fetch(createCoreApiRequest(request, origin));
+      // Reconstructing a WebSocket upgrade response drops the runtime-specific
+      // WebSocket handle. Security headers apply to HTTP responses; the upgrade
+      // handshake must pass through unchanged.
+      if (isWebSocketUpgrade(request) || response.status === 101) return response;
       return withSecurityHeaders(response);
     } catch {
       return jsonError(502, "CORE_API_UPSTREAM_FAILED");
