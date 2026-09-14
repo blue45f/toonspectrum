@@ -184,3 +184,23 @@ def test_deleted_receipt_erases_private_payload_and_files(client, runtime):
     assert receipt['artifacts'] == '[]'
     assert receipt['error'] is None
     assert not (runtime.root / job).exists()
+
+
+@pytest.mark.parametrize(('manifest', 'package', 'patched', 'vulnerable'), [
+    ('requirements-models.txt', 'diffusers', '0.38.0', '0.37.0'),
+    ('requirements-models.txt', 'safetensors', '0.8.0', '0.7.0'),
+    ('requirements-test.txt', 'pytest', '9.0.3', '9.0.2'),
+])
+def test_dependency_security_floor(manifest, package, patched, vulnerable):
+    """Keep patched constraints without installing GPU packages or downloading models."""
+    from packaging.requirements import Requirement
+
+    requirements = [
+        Requirement(line.strip())
+        for line in Path(__file__).with_name(manifest).read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith(('#', '-'))
+    ]
+    matches = [requirement for requirement in requirements if requirement.name == package]
+    assert len(matches) == 1, f'{manifest} must declare {package} exactly once'
+    assert patched in matches[0].specifier
+    assert vulnerable not in matches[0].specifier
