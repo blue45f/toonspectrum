@@ -18,17 +18,10 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  ensureInitialStudioProjectDocument,
-  studioProjectDocumentHref,
-} from "../studio-project-document-store";
-import {
-  createStudioProject,
-  markStudioProjectOpened,
-  permanentlyDeleteStudioProject,
-  trashStudioProject,
-  type StudioProjectKind,
-} from "../studio-project-library-store";
+import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
+import { studioCreationPreset, STUDIO_CREATION_WORKFLOW_COPY } from "../studio-creation-presets";
+import type { StudioProjectKind } from "../studio-project-library-store";
+import { StudioQuickStart } from "./StudioQuickStart";
 
 type Locale = "ko" | "en";
 
@@ -208,6 +201,7 @@ export function StudioNewIntegratedPage() {
     [showMore],
   );
   const templates = TEMPLATE_OPTIONS[kind];
+  const canvasPreset = studioCreationPreset(kind, templateId);
 
   const selectKind = (next: ProjectKindOption) => {
     setKind(next.id);
@@ -220,41 +214,12 @@ export function StudioNewIntegratedPage() {
     if (typeof window === "undefined" || creating) return;
     setCreating(true);
     setError(null);
-    let projectId: string | null = null;
     try {
-      const createdAt = new Date().toISOString();
-      const project = createStudioProject(window.localStorage, {
-        title,
-        kind,
-        templateId,
-        description,
-        primaryLocale,
-        createdAt,
-      }, { target: window });
-      projectId = project.id;
-      const document = ensureInitialStudioProjectDocument(window.localStorage, {
-        projectId: project.id,
-        projectTitle: project.title,
-        projectKind: project.kind,
-        createdAt,
-        target: window,
-      });
-      markStudioProjectOpened(
-        window.localStorage,
-        project.id,
-        document.id,
-        { at: createdAt, target: window },
-      );
-      navigate(studioProjectDocumentHref(document), { replace: true });
+      const result = createStudioProjectWithInitialDocument(window.localStorage, {
+        title, kind, templateId, description, primaryLocale,
+      }, window);
+      navigate(result.href, { replace: true });
     } catch (cause) {
-      if (projectId) {
-        try {
-          trashStudioProject(window.localStorage, projectId, { target: window });
-          permanentlyDeleteStudioProject(window.localStorage, projectId, { target: window });
-        } catch {
-          // Keep the recoverable project entry when rollback is not possible.
-        }
-      }
       setError(cause instanceof Error
         ? cause.message
         : locale === "ko"
@@ -286,6 +251,8 @@ export function StudioNewIntegratedPage() {
               {locale === "ko" ? "파일 가져오기" : "Import a file"}
             </Link>
           </div>
+
+          <StudioQuickStart locale={locale} />
 
           <section className="mt-7" aria-labelledby="project-kind-title">
             <h2 id="project-kind-title" className="text-sm font-black text-fg">
@@ -366,6 +333,13 @@ export function StudioNewIntegratedPage() {
                   ))}
                 </select>
               </label>
+            </div>
+
+            <div className="mt-4 border-l-2 border-accent py-2 pl-4" data-studio-creation-preview={kind} aria-live="polite">
+              <p className="text-sm font-bold text-fg">{STUDIO_CREATION_WORKFLOW_COPY[kind][locale]}</p>
+              <p className="mt-1 text-xs text-fg-2">
+                {canvasPreset.width} × {canvasPreset.height} · {locale === "ko" ? "이 비율의 캔버스와 작업별 도구 배치로 시작합니다. 화면을 바꿔도 그림은 유지됩니다." : "Start with this canvas ratio and task-specific tools. Switching views keeps your artwork."}
+              </p>
             </div>
 
             <details className="mt-4 rounded-2xl border border-line bg-panel/50 p-4">

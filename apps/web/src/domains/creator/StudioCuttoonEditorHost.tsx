@@ -1,3 +1,5 @@
+import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
+import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
 import { selectStudioLiveStrokeMedia, studioHokusaiLiveStrokeSelected } from "./live/studio-live-stroke-media-selection";
 import { useStudioMaterialBrushRequest } from "./brush/useStudioMaterialBrushRequest";
 import { createStudioAutosaveSnapshotFence } from "./studio-autosave-snapshot-fence";
@@ -1458,6 +1460,7 @@ export function StudioCuttoonEditor({
   } = useStudioDocumentLayout();
   const { data: session, ready: studioAuthReady } = useSession();
   const workId = studioRoute.workId;
+  const [localCanvasSeed] = useState(() => readStudioLocalCanvasSeed(studioRoute));
   const linked3dCloudSaveRecoveryNotice = studioLinked3dCloudSaveRecoveryNotice(
     location.state,
     workId,
@@ -1809,6 +1812,7 @@ export function StudioCuttoonEditor({
     setPagesHistory,
     setPagesHistoryState,
   } = useStudioPageHistorySnapshots({
+    initialCanvasHeight: localCanvasSeed?.canvasH,
     effectiveWorkId,
     markStudioDocumentChanged,
     workId,
@@ -3146,9 +3150,10 @@ export function StudioCuttoonEditor({
   // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 첫 페인트는 안전한 기본값으로
   // 시작하고, owner-scoped SQLite/OPFS snapshot을 비동기로 hydration한다. 그 사이의 UI 편집은
   // 아래 dirty revision fence가 보존하므로 늦은 load가 사용자의 새 배치를 덮지 않는다.
+  const taskWorkspaceId = studioTaskWorkspaceId(studioRoute.documentWorkspace, uiDensityMode);
   const currentWorkspaceOwnerScope = studioWorkspaceOwnerScope(studioAuthUserId);
   const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() => ({
-    state: createStudioWorkspaceDefaultState(studioAuthUserId),
+    state: applyStudioTaskWorkspace(createStudioWorkspaceDefaultState(studioAuthUserId), taskWorkspaceId),
     ownerScope: currentWorkspaceOwnerScope,
     source: "default",
     status: "session-only",
@@ -3861,6 +3866,7 @@ export function StudioCuttoonEditor({
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
   const { persistStudioWorkspaceState } = useStudioPageWorkspacePersistence({
+    taskWorkspaceId,
     applyStudioWorkspaceLayout,
     currentWorkspaceOwnerScope,
     drawingPaletteDragging,
@@ -6612,7 +6618,7 @@ export function StudioCuttoonEditor({
     uiBooleanPreferenceRevisionsRef,
   });
 
-  const [title, setTitleState] = useState("");
+  const [title, setTitleState] = useState(localCanvasSeed?.title ?? "");
   const [pendingSaveIntent, setPendingSaveIntent] = useState<"draft" | "published" | null>(null);
   const setTitle = useStudioDocumentMutationSetter(title, setTitleState, {
     markStudioDocumentChanged, onAcceptedMutation: invalidatePendingRetainedRedo,
@@ -14458,6 +14464,7 @@ const puppetWarpArmed =
       && workHydrated
       && autosaveChecked
       && !hasAutosave
+      && uiDensityMode !== "focus"
       && !quickStartDismissed
       && !menu
       && elements.length === 0)
@@ -15864,10 +15871,10 @@ const puppetWarpArmed =
     autosaveChecked,
     hasExistingContent: hasAutosave || elements.length > 0,
     primaryToolActivatedRef,
-    rememberedPrimaryTool,
+    rememberedPrimaryTool: uiDensityMode === "focus" ? "draw" : rememberedPrimaryTool,
     startDrawing: () => {
       activatePrimaryCanvasToolRef.current("draw");
-      if (!isMobile) openInspectorRoute({ primary: "properties" }, null);
+      if (!isMobile && uiDensityMode !== "focus") openInspectorRoute({ primary: "properties" }, null);
     },
     uiBooleanPreferencesReady,
     workHydrated,

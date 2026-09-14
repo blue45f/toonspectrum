@@ -1,3 +1,4 @@
+import { applyStudioTaskWorkspace } from "./studio-task-workspace";
 import {
   useCallback,
   useEffect,
@@ -18,6 +19,7 @@ import {
   createStudioWorkspaceDefaultState,
   normalizeStudioWorkspaceStateForOwner,
   updateStudioWorkspaceLiveLayout,
+  type StudioDefaultWorkspaceId,
   type StudioWorkspaceId,
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
@@ -43,6 +45,7 @@ import type {
  * 컴파일 경계 밖(모듈 함수)에서 수행한다 — live/studio-collaboration-wiring.ts와 같은 패턴.
  */
 export interface StudioPageWorkspacePersistenceContext {
+  readonly taskWorkspaceId?: StudioDefaultWorkspaceId | null;
   readonly applyStudioWorkspaceLayout: (
     layout: StudioWorkspaceLayout,
     workspaceId?: StudioWorkspaceId,
@@ -244,7 +247,9 @@ function runStudioWorkspaceOwnerHydration(
   workspaceRuntimeRef.current?.close();
   workspaceRuntimeRef.current = null;
 
-  const defaultState = createStudioWorkspaceDefaultState(studioAuthUserId);
+  const defaultState = applyStudioTaskWorkspace(
+    createStudioWorkspaceDefaultState(studioAuthUserId), context.taskWorkspaceId,
+  );
   const initialPersistence: StudioWorkspaceLoadResult = {
     state: defaultState,
     ownerScope,
@@ -317,16 +322,19 @@ function runStudioWorkspaceOwnerHydration(
       return;
     }
     workspaceSyncBaseStateRef.current = result.state;
+    const hydratedState = workspaceDirtyRevisionRef.current === 0
+      ? applyStudioTaskWorkspace(result.state, context.taskWorkspaceId)
+      : result.state;
     updateWorkspacePersistenceSnapshot({
-      state: result.state,
+      state: hydratedState,
       ownerScope: result.ownerScope,
       source: result.source,
       status: result.status,
       failure: result.failure,
     });
     applyStudioWorkspaceLayoutFromEffect(
-      result.state.liveLayout,
-      result.state.activeWorkspaceId,
+      hydratedState.liveLayout,
+      hydratedState.activeWorkspaceId,
       "owner-scope-change",
       false,
     );
@@ -534,6 +542,7 @@ export function useStudioPageWorkspacePersistence(
     pendingExternalWorkspaceSync,
     rightResize,
     studioAuthUserId,
+    taskWorkspaceId,
     workspaceSyncRetryEpoch,
   } = context;
   const applyStudioWorkspaceLayoutFromEffect = useEffectEvent(applyStudioWorkspaceLayout);
@@ -550,7 +559,7 @@ export function useStudioPageWorkspacePersistence(
   );
   useEffect(
     () => runStudioWorkspaceOwnerHydrationFromEffect(),
-    [currentWorkspaceOwnerScope, studioAuthUserId],
+    [currentWorkspaceOwnerScope, studioAuthUserId, taskWorkspaceId],
   );
   useEffect(
     () => replayStudioPendingExternalWorkspaceSyncFromEffect(),
