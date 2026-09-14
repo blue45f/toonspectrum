@@ -1,5 +1,6 @@
 import { studioMaterialBrushToSvg } from "../brush/studio-material-brush-runtime";
 import {
+  isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
   resolveStudioBrushAliasPencilPasses,
   studioBrushAliasEffectiveDiameter,
@@ -247,11 +248,17 @@ export function serializeFreehand(
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
   // Mirrors StudioDrawNode's engine decision exactly (shared captured resolver, no fallback).
-  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el);
+  const dynamicsPresetId = el.mode === "eraser"
+    ? null
+    : resolveStudioCapturedBrushDynamicsPresetId(el);
   const dynamicBrush = dynamicsPresetId !== null;
-  const stampKind = resolveStudioStampBrushKind(brush);
+  const stampKind = el.mode === "eraser" ? null : resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
-  const aliasStrokeWidth = studioBrushAliasEffectiveDiameter(brush, strokeWidth);
+  const aliasProfileEnabled =
+    el.mode !== "eraser" || isStudioBrushEraserAliasId(brush);
+  const aliasStrokeWidth = aliasProfileEnabled
+    ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
+    : strokeWidth;
   const singlePointRoute = resolveStudioBrushSinglePointRoute({
     brushId: brush,
     mode: el.mode,
