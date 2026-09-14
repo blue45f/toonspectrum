@@ -6,6 +6,7 @@ import {
   type PrivateObjectReference,
 } from "./private-object-storage.contract";
 import type { PrivateObjectStoragePort } from "./private-object-storage.port";
+import type { PrivateObjectStorageWriteAdmission } from "./private-object-storage-write-admission";
 import {
   PurposeRoutedPrivateObjectStoragePort,
   type PrivateObjectStorageProviderId,
@@ -119,6 +120,68 @@ describe("purpose-routed private object storage", () => {
       { object: derived },
       {},
     );
+    expect(supabase.uploadImmutable).not.toHaveBeenCalled();
+  });
+
+  it("runs write admission before sending bytes to the routed provider", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const admission: PrivateObjectStorageWriteAdmission = {
+      assertUploadAllowed: vi.fn(async () => undefined),
+    };
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+      admission,
+    );
+    const sourceUpload = {
+      purpose: "source" as const,
+      contentType: "image/png" as const,
+      bytes: new Uint8Array([1, 2, 3]),
+      controlMetadata: {
+        documentId: "work:1",
+        operationId: "upload:admission",
+      },
+    };
+
+    await client.uploadImmutable(sourceUpload);
+
+    expect(admission.assertUploadAllowed).toHaveBeenCalledWith(
+      "cloudflare-r2",
+      sourceUpload,
+    );
+    expect(r2.uploadImmutable).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call a provider when write admission rejects the upload", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const admission: PrivateObjectStorageWriteAdmission = {
+      assertUploadAllowed: vi.fn(async () => {
+        throw new Error("quota rejected");
+      }),
+    };
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+      admission,
+    );
+
+    await expect(client.uploadImmutable({
+      purpose: "derived",
+      contentType: "image/png",
+      bytes: new Uint8Array([1, 2, 3]),
+      controlMetadata: {
+        documentId: "work:1",
+        operationId: "upload:rejected",
+      },
+    })).rejects.toThrow("quota rejected");
     expect(supabase.uploadImmutable).not.toHaveBeenCalled();
   });
 

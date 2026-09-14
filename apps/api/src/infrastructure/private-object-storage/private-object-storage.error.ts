@@ -10,6 +10,10 @@ export type PrivateObjectStorageFailureCode =
   | "BUCKET_POLICY_INVALID"
   | "SOURCE_DELETE_FORBIDDEN"
   | "PROVIDER_NOT_CONFIGURED"
+  | "PROVIDER_UNAVAILABLE"
+  | "QUOTA_POLICY_INVALID"
+  | "QUOTA_SNAPSHOT_REQUIRED"
+  | "QUOTA_EXHAUSTED"
   | "ROUTING_INVALID";
 
 export class PrivateObjectStorageError extends Error {

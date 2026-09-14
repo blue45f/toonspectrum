@@ -9,6 +9,8 @@ import {
   type UploadPrivateObject,
 } from "./private-object-storage.contract";
 
+import type { PrivateObjectStorageWriteAdmission } from "./private-object-storage-write-admission";
+
 import type {
   PrivateObjectStorageCallOptions,
   PrivateObjectStoragePort,
@@ -48,6 +50,7 @@ export class PurposeRoutedPrivateObjectStoragePort
       PrivateObjectStorageProviderId,
       PrivateObjectStoragePort
     >,
+    private readonly writeAdmission?: PrivateObjectStorageWriteAdmission,
   ) {
     for (const purpose of ALL_PURPOSES) {
       const providerId = routing[purpose];
@@ -102,11 +105,13 @@ export class PurposeRoutedPrivateObjectStoragePort
     return { ready: true, privatePurposeBuckets: verified };
   }
 
-  uploadImmutable(
+  async uploadImmutable(
     input: UploadPrivateObject,
     options: PrivateObjectStorageCallOptions = {},
   ): Promise<PrivateObjectReference> {
-    return this.providerFor(input.purpose).uploadImmutable(input, options);
+    const providerId = this.providerIdFor(input.purpose);
+    await this.writeAdmission?.assertUploadAllowed(providerId, input);
+    return this.requireProvider(providerId).uploadImmutable(input, options);
   }
 
   createSignedReadUrl(
@@ -131,8 +136,14 @@ export class PurposeRoutedPrivateObjectStoragePort
   private providerFor(
     purposeValue: PrivateObjectPurpose,
   ): PrivateObjectStoragePort {
+    return this.requireProvider(this.providerIdFor(purposeValue));
+  }
+
+  private providerIdFor(
+    purposeValue: PrivateObjectPurpose,
+  ): PrivateObjectStorageProviderId {
     const purpose = PrivateObjectPurposeSchema.parse(purposeValue);
-    return this.requireProvider(this.routing[purpose]);
+    return this.routing[purpose];
   }
 
   private requireProvider(
