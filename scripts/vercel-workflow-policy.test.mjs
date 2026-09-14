@@ -24,6 +24,56 @@ describe("Vercel fallback workflow policy", () => {
     expect(validateVercelFallbackWorkflow(fallback)).toEqual([]);
   });
 
+  it("rejects optional or renamed approval inputs and a weakened production boundary", () => {
+    const optionalRef = mutate(
+      fallback,
+      "      ref:\n        description: Explicitly approved full 40-character commit SHA already contained in main\n        required: true\n        type: string",
+      "      ref:\n        description: Explicitly approved full 40-character commit SHA already contained in main\n        required: false\n        type: string",
+    );
+    expect(validateVercelFallbackWorkflow(optionalRef)).toContain(
+      "Vercel fallback must require the ref string input",
+    );
+
+    const renamedConfirmation = mutate(fallback, "      confirm:\n", "      approval:\n");
+    expect(validateVercelFallbackWorkflow(renamedConfirmation)).toContain(
+      "Vercel fallback must require the confirm string input",
+    );
+
+    const cancellable = mutate(fallback, "  cancel-in-progress: false", "  cancel-in-progress: true");
+    expect(validateVercelFallbackWorkflow(cancellable)).toContain(
+      "Vercel fallback must serialize production deployments without cancellation",
+    );
+    const unprotected = mutate(fallback, "    environment: production", "    environment: staging");
+    expect(validateVercelFallbackWorkflow(unprotected)).toContain(
+      "Vercel fallback must require the production environment approval boundary",
+    );
+  });
+
+  it("rejects approval input rebinding, a weak SHA guard, and checkout fallback", () => {
+    const rebound = mutate(
+      fallback,
+      "          REQUESTED_REF: ${{ inputs.ref }}",
+      "          REQUESTED_REF: ${{ github.sha }}",
+    );
+    expect(validateVercelFallbackWorkflow(rebound)).toContain(
+      "Vercel fallback preflight must bind the exact approval inputs and workflow ref",
+    );
+
+    const weakSha = mutate(fallback, "^[0-9a-f]{40}$", ".+");
+    expect(validateVercelFallbackWorkflow(weakSha)).toContain(
+      "Vercel fallback preflight must require main dispatch, owner confirmation, and an exact SHA",
+    );
+
+    const checkoutFallback = mutate(
+      fallback,
+      "        with:\n          ref: ${{ inputs.ref }}",
+      "        with:\n          ref: ${{ inputs.ref || github.sha }}",
+    );
+    expect(validateVercelFallbackWorkflow(checkoutFallback)).toContain(
+      "Vercel fallback checkout must use only the explicitly approved SHA input",
+    );
+  });
+
   it("rejects automatic triggers and commented-out project bindings", () => {
     const automatic = mutate(
       fallback,

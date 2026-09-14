@@ -49,6 +49,21 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   if (triggers.length !== 1 || triggers[0] !== "workflow_dispatch") {
     issues.push("Vercel CLI fallback must expose workflow_dispatch as its only trigger");
   }
+  const workflowDispatch = isRecord(workflow.on)
+    && isRecord(workflow.on.workflow_dispatch)
+    ? workflow.on.workflow_dispatch
+    : null;
+  const dispatchInputs = workflowDispatch && isRecord(workflowDispatch.inputs)
+    ? workflowDispatch.inputs
+    : null;
+  for (const inputName of ["ref", "confirm"]) {
+    const input = dispatchInputs && isRecord(dispatchInputs[inputName])
+      ? dispatchInputs[inputName]
+      : null;
+    if (!input || input.required !== true || input.type !== "string") {
+      issues.push(`Vercel fallback must require the ${inputName} string input`);
+    }
+  }
   const permissions = isRecord(workflow.permissions) ? workflow.permissions : null;
   if (
     !permissions ||
@@ -63,6 +78,17 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   if (!deployJob) {
     issues.push("Vercel fallback workflow is missing jobs.deploy");
     return issues;
+  }
+  const concurrency = isRecord(workflow.concurrency) ? workflow.concurrency : null;
+  if (
+    !concurrency
+    || concurrency.group !== "vercel-production-fallback"
+    || concurrency["cancel-in-progress"] !== false
+  ) {
+    issues.push("Vercel fallback must serialize production deployments without cancellation");
+  }
+  if (deployJob.environment !== "production") {
+    issues.push("Vercel fallback must require the production environment approval boundary");
   }
 
   const env = isRecord(deployJob.env) ? deployJob.env : {};
@@ -116,6 +142,28 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   if (preflight?.shell !== "bash") {
     issues.push("Vercel fallback configuration preflight must use bash");
   }
+  const preflightEnv = preflight && isRecord(preflight.env) ? preflight.env : {};
+  const expectedPreflightEnv = {
+    REQUESTED_REF: "${{ inputs.ref }}",
+    DEPLOY_CONFIRMATION: "${{ inputs.confirm }}",
+    WORKFLOW_REF: "${{ github.ref }}",
+  };
+  if (
+    Object.keys(preflightEnv).length !== Object.keys(expectedPreflightEnv).length
+    || Object.entries(expectedPreflightEnv).some(([name, value]) => preflightEnv[name] !== value)
+  ) {
+    issues.push("Vercel fallback preflight must bind the exact approval inputs and workflow ref");
+  }
+  requireRunFragments(
+    preflightRun,
+    [
+      "refs/heads/main",
+      "DEPLOY-TOONSPECTRUM-PREBUILT",
+      "^[0-9a-f]{40}$",
+    ],
+    "Vercel fallback preflight must require main dispatch, owner confirmation, and an exact SHA",
+    issues,
+  );
   for (const secretName of ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"]) {
     if (!preflightRun.includes(`-z "\${${secretName}:-}"`)) {
       issues.push(`Vercel fallback preflight must reject an empty ${secretName}`);
@@ -134,8 +182,8 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
     issues.push("Vercel fallback workflow must checkout the requested Git revision");
   }
   const checkoutWith = checkout && isRecord(checkout.with) ? checkout.with : {};
-  if (checkoutWith.ref !== "${{ inputs.ref || github.sha }}") {
-    issues.push("Vercel fallback checkout must use the requested ref or triggering SHA");
+  if (checkoutWith.ref !== "${{ inputs.ref }}") {
+    issues.push("Vercel fallback checkout must use only the explicitly approved SHA input");
   }
   if (checkoutWith["persist-credentials"] !== false) {
     issues.push("Vercel fallback checkout must not persist repository credentials");
