@@ -1,7 +1,7 @@
 # Cloudflare Static Assets gateway
 
-이 배포 단위는 ToonSpectrum 웹 앱을 정적 에셋 우선으로 제공한다. 정적 HTML, JS, CSS,
-카탈로그, 브러시 manifest는 Static Assets가 직접 처리하고 Worker 호출량을 사용하지 않는다.
+이 배포 단위는 ToonSpectrum 웹 앱을 **정적 에셋 우선**으로 제공하고, 동적 요청만 기능별 무료 인프라 권위로 전달한다. 정적 HTML, JS, CSS, 카탈로그, 브러시 manifest는 Static Assets가 직접 처리하므로 Worker 호출량을 사용하지 않는다.
+
 Worker는 다음 동적 경로에만 먼저 실행된다.
 
 - `/api`, `/api/*`
@@ -9,11 +9,45 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 - 정확히 한 slug를 가진 `/title/:slug`
 - `/market`, `/market/browse`, 정확히 한 ID를 가진 `/market/resource/:resourceId`
 
-동적 요청은 `CORE_API_ORIGIN`의 기존 NestJS API로 프록시한다. API origin을 구성하지 않았거나
-HTTPS origin 검증에 실패하거나 정적 origin 자신을 가리키면 SPA HTML/재귀 프록시로 폴백하지
-않고 `503 CORE_API_UNAVAILABLE`로 닫힌다. `/market/library`, `/market/publish` 같은 앱 화면은
-Static Assets의 SPA fallback이 처리한다. WebSocket upgrade 응답은 runtime handle을 보존하도록
-재구성하지 않고 그대로 전달한다.
+`/market/library`, `/market/publish` 같은 앱 화면은 Static Assets의 SPA fallback이 처리한다. Worker-first 범위를 넓혀 정적 트래픽을 유료·제한형 실행 요청으로 바꾸지 않는다.
+
+## 무료 인프라 연합 라우팅
+
+동적 요청은 경로와 메서드에 따라 다음 권위로 분리한다.
+
+| workload | 경로 | Worker 변수 | 실패·폴백 정책 |
+|---|---|---|---|
+| core | 나머지 `/api/*`, OG crawler 경로 | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
+| public read | 안전한 `GET`/`HEAD`/`OPTIONS`의 `/api/public`, `/api/catalog`, `/api/search`, `/api/titles`, `/api/health`, `/api/cover` | `PUBLIC_READ_API_ORIGINS` | 최대 8개 동일 계약 origin에 결정적 분산, `502`/`503`/`504`와 네트워크 오류만 다음 origin 재시도 |
+| social | `/api/community`, `/api/reviews` | `SOCIAL_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
+| playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
+| admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
+| realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
+
+공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
+
+각 upstream 요청에는 다음 관측 헤더가 추가된다.
+
+- `x-toonspectrum-edge: cloudflare-static-gateway-v2`
+- `x-toonspectrum-edge-route: core | public-read | social | playground | admin | realtime`
+- `x-toonspectrum-edge-attempt: 0..n`
+
+Cloudflare가 제공한 IP·ray 헤더는 upstream으로 그대로 전달하지 않으며, 사용자 credential을 Worker 변수에 저장하지 않는다.
+
+## Origin 설정 계약
+
+모든 origin은 다음 조건을 만족해야 한다.
+
+- 절대 `https://` origin
+- username/password 없음
+- path, query, fragment 없음
+- 공개 읽기 풀에서는 중복 origin 금지
+- 공개 읽기 풀 최대 8개
+- 현재 정적 gateway 자신을 가리키는 origin 금지
+
+`CORE_API_ORIGIN`은 필수 호환 권위다. 나머지 도메인 origin이 비어 있으면 해당 요청은 core로 유지되므로 기능을 한 번에 모두 이전하지 않고 단계적으로 분리할 수 있다. 반대로 변수가 존재하지만 유효하지 않으면 조용히 core로 우회하지 않고 `503 CORE_API_UNAVAILABLE`로 닫힌다.
+
+예시는 [`.env.example`](./.env.example)을 참고한다.
 
 ## 검증
 
@@ -22,8 +56,17 @@ pnpm run verify:cloudflare-static
 pnpm run cloudflare:static:dry-run
 ```
 
-`dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성을 검사하지만 원격에
-배포하지 않는다.
+검증 범위에는 다음이 포함된다.
+
+- 정적 요청이 Worker를 통과하지 않는지
+- core·social·playground·admin·realtime 경로 격리
+- 공개 읽기의 결정적 분산과 안전한 재시도
+- write 요청이 replica 풀로 전달되지 않는지
+- 잘못된·중복된·자기참조 origin fail-closed
+- OG route mapping과 WebSocket passthrough
+- Vercel과 Cloudflare 보안 헤더 계약 동기화
+
+`dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성과 모든 origin 변수를 검사하지만 원격에 배포하지 않는다.
 
 ## 수동 운영 배포
 
@@ -31,37 +74,38 @@ pnpm run cloudflare:static:dry-run
 
 ```bash
 export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+export CLOUDFLARE_PUBLIC_READ_API_ORIGINS=https://<read-a>,https://<read-b>
+export CLOUDFLARE_SOCIAL_API_ORIGIN=https://<social-origin>
+export CLOUDFLARE_PLAYGROUND_API_ORIGIN=https://<playground-origin>
+export CLOUDFLARE_ADMIN_API_ORIGIN=https://<admin-origin>
+export CLOUDFLARE_REALTIME_API_ORIGIN=https://<realtime-origin>
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```
 
-Wrangler 인증은 로컬 로그인 또는 별도 운영 secret으로 제공한다. `CORE_API_ORIGIN`은 공개 origin이며
-credential, path, query를 포함할 수 없다. API credential은 Worker 변수에 넣지 않는다.
+분리하지 않은 선택 origin은 설정하지 않는다. 배포 스크립트가 모든 값을 HTTPS origin으로 정규화한 뒤 Wrangler `--var`로 전달한다. Wrangler 인증은 로컬 로그인 또는 별도 운영 secret으로 제공한다.
 
 ## 커스텀 도메인 전환
 
-`workers_dev`는 비활성이다. 최초 운영 전환은 Cloudflare 계정에서 검토자가 직접
-`www.toonstudio.cloud` 커스텀 도메인을 연결한 후 canary URL로 검증한다. Apex
-`toonstudio.cloud`는 Bulk Redirect 또는 Redirect Rule로 `https://www.toonstudio.cloud/:path`에
-영구 리다이렉트한다. `_redirects` 파일은 domain-level redirect를 지원하지 않으므로 이 규칙을
-애플리케이션 코드로 흉내 내지 않는다.
+`workers_dev`는 비활성이다. 최초 운영 전환은 Cloudflare 계정에서 검토자가 직접 `www.toonstudio.cloud` 커스텀 도메인을 연결한 후 canary URL로 검증한다. Apex `toonstudio.cloud`는 Bulk Redirect 또는 Redirect Rule로 `https://www.toonstudio.cloud/:path`에 영구 리다이렉트한다. `_redirects` 파일은 domain-level redirect를 지원하지 않으므로 이 규칙을 애플리케이션 코드로 흉내 내지 않는다.
 
 ## 헤더 계약
 
-`apps/web/public/_headers`는 `vercel.json`의 기존 보안·캐시 헤더로부터 생성한다. Vite가 이를
-`dist/_headers`로 복사하고 Static Assets가 정적 응답에 적용한다.
+`apps/web/public/_headers`는 `vercel.json`의 기존 보안·캐시 헤더로부터 생성한다. Vite가 이를 `dist/_headers`로 복사하고 Static Assets가 정적 응답에 적용한다.
 
 ```bash
 pnpm run generate:cloudflare-static-rules
 pnpm run generate:cloudflare-static-rules -- --check
 ```
 
-동적 Worker 응답에는 동일한 공통 보안 헤더를 직접 추가한다. 헤더가 바뀌면 생성 파일과 Worker
-테스트가 함께 실패하도록 유지한다.
+동적 Worker 응답에는 동일한 공통 보안 헤더를 직접 추가한다. 헤더가 바뀌면 생성 파일과 Worker 테스트가 함께 실패하도록 유지한다.
 
-## 롤백
+## 롤백과 장애 격리
 
 - 정적 릴리스는 직전 검증 SHA로 다시 수동 배포한다.
-- API 문제는 `CORE_API_ORIGIN`을 임의의 다른 공급자로 자동 전환하지 않는다.
+- 공개 읽기 replica 장애는 안전한 읽기 요청 안에서만 다른 replica를 시도한다.
+- core·social·playground·admin·realtime 권위는 임의의 다른 공급자로 자동 write failover하지 않는다.
+- 특정 기능 권위가 중단되어도 정적 앱과 로컬 OPFS 프로젝트는 계속 사용할 수 있어야 한다.
 - Vercel 수동 fallback은 Cloudflare 전환 기간의 비상 경로일 뿐 자동 배포 권위가 아니다.
 - 사용자 프로젝트 원본은 이 정적 배포 단위에 저장하지 않는다.
+- Oracle/OCI는 운영·fallback·복구 경로에 포함하지 않는다.
