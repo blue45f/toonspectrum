@@ -309,9 +309,21 @@ function removePublicReadCredentials(headers: Headers): void {
   }
 }
 
+function containsForbiddenForwardedIpCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.charCodeAt(index);
+    if (codePoint <= 0x20 || codePoint === 0x7f) return true;
+  }
+  return false;
+}
+
 function trustedConnectingIp(request: Request): string | null {
   const value = request.headers.get("cf-connecting-ip")?.trim();
-  if (!value || value.length > 64 || /[\u0000-\u0020\u007f]/u.test(value)) {
+  if (
+    !value
+    || value.length > 64
+    || containsForbiddenForwardedIpCharacter(value)
+  ) {
     return null;
   }
   return value;

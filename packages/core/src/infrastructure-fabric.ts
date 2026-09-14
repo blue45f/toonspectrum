@@ -163,11 +163,19 @@ function validIdentifier(value: string): boolean {
   return /^[a-z0-9][a-z0-9-]*$/u.test(value);
 }
 
+function containsAsciiControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.charCodeAt(index);
+    if (codePoint <= 0x1f || codePoint === 0x7f) return true;
+  }
+  return false;
+}
+
 function validRoutingKey(value: string): boolean {
   return value.length > 0
     && value.length <= 256
     && value.trim() === value
-    && !/[\u0000-\u001f\u007f]/u.test(value);
+    && !containsAsciiControlCharacter(value);
 }
 
 function validQuotaDimensionSnapshot(
