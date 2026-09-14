@@ -22,13 +22,7 @@ export function resolvePixelSelectionSceneTarget(
     if (element.type !== "image") continue;
     candidates.push({
       id: element.id,
-      frame: {
-        x: element.x,
-        y: element.y,
-        width: element.width,
-        height: element.height,
-        rotation: element.rotation,
-      },
+      frame: element,
       hidden: isEffectivelyHidden(element, groups),
       locked: isEffectivelyLocked(element, groups),
     });
