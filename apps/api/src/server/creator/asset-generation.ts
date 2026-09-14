@@ -1,3 +1,4 @@
+import { rejectOperatorFundedAi } from "../../config/user-funded-ai-policy";
 // AI 이미지 에셋 생성 — OpenAI 이미지 API 프록시와 프롬프트/사이즈 정규화.
 import { clampText, normalizeMultiline } from "./shared";
 import { MAX_ASSET_NAME } from "./shared-assets";
@@ -88,6 +89,7 @@ function openAiImageErrorMessage(status: number, payload: unknown): string {
 export async function generateImageAsset(
   input: { prompt?: unknown; name?: unknown; size?: unknown; quality?: unknown }
 ): Promise<GeneratedCreatorAsset> {
+  rejectOperatorFundedAi();
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY가 설정되어 있지 않습니다.");
 

@@ -33,7 +33,10 @@ const AuthCallbackPage = lazyRetry(
   "AuthCallbackPage",
 );
 
+const AiSettingsPage = lazyRetry(() => import("@/domains/account/AiSettingsPage").then(module => ({ default: module.AiSettingsPage })), "AiSettingsPage");
+
 export const accountRoutes = defineAppRoutes([
+  { id: "account-ai-settings", path: "/settings/ai", element: <AiSettingsPage /> },
   { id: "account-my-space", path: "/my", element: <MySpaceHubPage /> },
   { id: "account-me", path: "/me", element: <AccountPage /> },
   { id: "account-profile", path: "/u/:userId", element: <UserProfilePage /> },

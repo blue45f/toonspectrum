@@ -1,3 +1,4 @@
+import { rejectOperatorFundedAi } from "../../config/user-funded-ai-policy";
 // apps/api/src/modules/fortune/fortune.service.ts
 //
 // 운세 계산·명리·타로·별자리·콘티 파싱의 순수 엔진은 @toonspectrum/core/fortune 로
@@ -72,6 +73,7 @@ export class FortuneService {
     dataText: string,
     character: FortuneCharacter,
   ): Promise<string> => {
+    rejectOperatorFundedAi(); // Keep the core deterministic explanation; never spend an operator key.
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("No Gemini API key configured.");
