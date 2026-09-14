@@ -131,21 +131,6 @@ export const StudioRouter = lazyRetry(
   "StudioRouter",
 );
 
-export const CreatorInferencePage = lazyRetry(
-  () => import("@/domains/creator/ai/CreatorInferencePage").then((module) => ({ default: module.CreatorInferencePage })),
-  "CreatorInferencePage",
-);
-
-export const StudioGenerativePage = lazyRetry(
-  () => import("@/domains/creator/generative/StudioGenerativePage").then((module) => ({ default: module.StudioGenerativePage })),
-  "StudioGenerativePage",
-);
-
-export const StudioSpatialReaderPage = lazyRetry(
-  () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
-  "StudioSpatialReaderPage",
-);
-
 export const StudioCharacterConversionPage = lazyRetry(
   () => import("@/domains/creator/character-conversion/StudioCharacterConversionPage").then((module) => ({
     default: module.StudioCharacterConversionPage,
