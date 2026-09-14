@@ -81,6 +81,7 @@ import {
   StudioCompanionWindowLayoutControls,
   type StudioCompanionWindowLayoutPersistenceStatus,
 } from "./StudioCompanionWindowLayoutControls";
+import { studioBrowserWorkspaceEditorHref, type StudioBrowserOpenSurfaces, type StudioCompanionOpenMode } from "./studio-companion-browser-workspace";
 import { StudioCompanionWindowManager } from "./StudioCompanionWindowManager";
 import {
   StudioCompanionWorkspacePresets,
@@ -214,6 +215,7 @@ export function StudioToolsCompanionPage() {
         : "draft"
     : null;
   const effectiveSurface: StudioCompanionSurface = surface ?? "workspace";
+  const browserTab = new URLSearchParams(location.search).get("display") === "tab";
   const channelRef = useRef<ReturnType<typeof createStudioCompanionChannel>>(null);
   const companionIdentityRef = useRef<{ scope: string; instanceId: string } | null>(null);
   const companionInstanceIdRef = useRef<string | null>(null);
@@ -313,7 +315,7 @@ export function StudioToolsCompanionPage() {
     : ({} as const);
   const companionWindowLayout = useStudioCompanionWindowLayout({
     surface: effectiveSurface,
-    enabled: sessionId !== null,
+    enabled: sessionId !== null && !browserTab,
     interactionReady,
     onRestored: () => {
       setScreenPlacementStatus({
@@ -1211,7 +1213,7 @@ export function StudioToolsCompanionPage() {
     }
   }
 
-  function openDedicatedSurface(nextSurface: DedicatedCompanionSurface): boolean {
+  function openDedicatedSurface(nextSurface: DedicatedCompanionSurface, openMode: StudioCompanionOpenMode = "window"): boolean {
     if (!sessionId || companionDocumentScopeKey === null || surface !== "workspace") return false;
     // This must remain synchronous so the user activation reaches window.open before it expires.
     const companionWindow = openStudioCompanionSurfaceWindow(
@@ -1220,10 +1222,34 @@ export function StudioToolsCompanionPage() {
       dedicatedWindowRefs.current[nextSurface],
       undefined,
       companionWorkId,
+      openMode,
     );
     if (!companionWindow) return false;
     dedicatedWindowRefs.current[nextSurface] = companionWindow;
     return true;
+  }
+
+  function getOpenDedicatedSurfaces(): StudioBrowserOpenSurfaces {
+    const result: StudioBrowserOpenSurfaces = {};
+    if (!sessionId) return result;
+    for (const role of ["navigator", "review", "reference"] as const) {
+      const candidate = dedicatedWindowRefs.current[role];
+      if (!isStudioToolsCompanionWindowReusable(sessionId, candidate, role, companionWorkId)) continue;
+      try { result[role] = new URL(candidate.location.href).searchParams.get("display") === "tab" ? "tab" : "window"; }
+      catch { /* A navigated-away window is not an owned companion. */ }
+    }
+    return result;
+  }
+  function closeDedicatedSurface(role: DedicatedCompanionSurface): boolean {
+    if (!sessionId) return false;
+    const candidate = dedicatedWindowRefs.current[role];
+    if (!isStudioToolsCompanionWindowReusable(sessionId, candidate, role, companionWorkId)) return false;
+    try {
+      candidate.close();
+      if (!candidate.closed) return false;
+      dedicatedWindowRefs.current[role] = null;
+      return true;
+    } catch { return false; }
   }
 
   const activeWorkspacePreset: StudioCompanionWorkspacePresetId | null = !interactionReady
@@ -1413,6 +1439,17 @@ export function StudioToolsCompanionPage() {
             </span>
           </p>
           </div>
+          {effectiveSurface === "workspace" ? <button type="button" aria-label="탭·창 관리로 이동"
+            onClick={() => {
+              setMode("tools");
+              requestAnimationFrame(() => {
+                const heading = document.querySelector<HTMLElement>("[data-studio-browser-workspace] h2");
+                heading?.focus({ preventScroll: true });
+                heading?.scrollIntoView({ block: "nearest" });
+              });
+            }} className="min-h-11 rounded-xl border border-line bg-card px-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+            탭·창 관리
+          </button> : null}
           <button
             type="button"
             disabled={!sessionId}
@@ -1439,7 +1476,7 @@ export function StudioToolsCompanionPage() {
           </button>
           <button
             type="button"
-            disabled={screenPlacementBusy}
+            disabled={screenPlacementBusy || browserTab}
             aria-busy={screenPlacementBusy}
             aria-label={screenPlacementBusy
               ? t("studio.toolsCompanion.layoutSettings.moveBusy")
@@ -1666,6 +1703,9 @@ export function StudioToolsCompanionPage() {
             <StudioCompanionWindowManager
               disabled={!sessionId || surface !== "workspace"}
               onOpenSurface={openDedicatedSurface}
+              getOpenSurfaces={getOpenDedicatedSurfaces}
+              onCloseSurface={closeDedicatedSurface}
+              editorHref={studioBrowserWorkspaceEditorHref(companionWorkId, window.location.origin)}
             />
           </div>
         ) : null}

@@ -779,7 +779,7 @@ describe("StudioToolsCompanionPage", () => {
       ));
     expect(discoveryHellos?.length).toBeGreaterThanOrEqual(2);
     const reconnect = screen.getByRole("link", { name: "스튜디오 다시 연결" });
-    expect(reconnect.getAttribute("href")).toBe(`http://localhost:3000/studio?session=${sessionId}`);
+    expect(reconnect.getAttribute("href")).toBe(`http://localhost:3000/studio/canvas?session=${sessionId}`);
     expect(reconnect.getAttribute("target")).toBe("_blank");
 
     act(() => {
@@ -1107,7 +1107,7 @@ describe("StudioToolsCompanionPage", () => {
     expect(screen.getByRole("button", { name: "현재 위치 저장" }).hasAttribute("disabled"))
       .toBe(true);
     expect(screen.getByRole("link", { name: "스튜디오 다시 연결" }).getAttribute("href")).toBe(
-      `http://localhost:3000/studio?session=${sessionId}&remix=source-456`
+      `http://localhost:3000/studio/canvas?session=${sessionId}&remix=source-456`
     );
     const toolsTab = screen.getByRole("tab", { name: "도구" });
     fireEvent.keyDown(toolsTab, { key: "ArrowRight" });
