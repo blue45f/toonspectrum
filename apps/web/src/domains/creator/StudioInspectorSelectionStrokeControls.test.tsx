@@ -49,11 +49,10 @@ describe("StudioInspectorSelectionStrokeControls", () => {
     expect(screen.getByTestId("studio-inspector-context-selection")).toBeTruthy();
     expect(screen.getByTestId("studio-inspector-selection-stroke-controls")).toBeTruthy();
     expect(screen.getByLabelText("선 색상")).toBeTruthy();
-    expect(screen.getByLabelText("선 없음")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("studio-selection-stroke-preview")).toHaveAttribute(
-      "aria-label",
-      "선 미리보기: #112233, 5px, 80%",
-    );
+    expect(screen.getByLabelText("선 없음").getAttribute("aria-pressed")).toBe("false");
+    expect(
+      screen.getByTestId("studio-selection-stroke-preview").getAttribute("aria-label"),
+    ).toBe("선 미리보기: #112233, 5px, 80%");
     for (const label of surface.requiredControlLabels) {
       expect(screen.getByText(label), label).toBeTruthy();
       expect(screen.getByLabelText(label), `aria ${label}`).toBeTruthy();
@@ -104,12 +103,11 @@ describe("StudioInspectorSelectionStrokeControls", () => {
       />,
     );
 
-    expect(screen.getByLabelText("선 없음")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText("선 두께")).toBeDisabled();
-    expect(screen.getByTestId("studio-selection-stroke-preview")).toHaveAttribute(
-      "aria-label",
-      "선 미리보기: 선 없음",
-    );
+    expect(screen.getByLabelText("선 없음").getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByLabelText("선 두께") as HTMLInputElement).disabled).toBe(true);
+    expect(
+      screen.getByTestId("studio-selection-stroke-preview").getAttribute("aria-label"),
+    ).toBe("선 미리보기: 선 없음");
 
     fireEvent.click(screen.getByLabelText("선 없음"));
     expect(patchEl).toHaveBeenLastCalledWith("draw-1", {
