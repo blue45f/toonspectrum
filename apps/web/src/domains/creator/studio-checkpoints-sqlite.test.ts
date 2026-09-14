@@ -149,10 +149,12 @@ describe("V12 SQLite named checkpoints", () => {
     })).rejects.toThrow(/안전한 복구 지점/);
     expect(sqlite.values.size).toBe(0);
   });
-  it("persists canonical optional fields before recovery replaces the canvas", async () => {
+  it("persists opt-in canonical optional fields before recovery replaces the canvas", async () => {
     const source = { version: 12, linkedTitleId: undefined, master: undefined,
       pagesList: [{ id: "page-1", review: undefined, elements: [] }] };
-    await createDurableStudioCheckpoint(undefined, "local-recovery", { name: "복구 전", payload: source });
+    await createDurableStudioCheckpoint(undefined, "local-recovery", {
+      name: "복구 전", payload: source, omitUndefinedObjectFields: true,
+    });
     const reopened = await listDurableStudioCheckpoints(undefined, "local-recovery");
     expect(reopened[0].payload).toEqual({ version: 12, pagesList: [{ id: "page-1", elements: [] }] });
     expect(Object.hasOwn(source, "master")).toBe(true);

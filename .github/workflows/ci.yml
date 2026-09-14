@@ -99,7 +99,7 @@ jobs:
             apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
       - name: Engine preview entry and evidence regressions
         run: |
-          pnpm exec vitest run apps/web/src/app/app-floating-controls-startup.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
+          pnpm exec vitest run apps/web/src/app/app-floating-controls-startup.test.ts apps/web/src/domains/creator/studio-editor-document-source.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
       - name: Studio home and production route regressions
         run: |
           set -euo pipefail
