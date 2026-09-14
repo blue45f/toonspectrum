@@ -755,6 +755,8 @@ export function createStudioEditablePageRasterContext(
 interface StudioRasterPreparationAnalysis {
   readonly summary: StudioRasterPreparationSourceSummary;
   readonly exported: SvgExportResult | null;
+  /** Visible source ids that prevent an exact current-appearance copy. */
+  readonly unsupportedSourceIds: readonly string[];
 }
 
 function analyzeStudioRasterPreparationSources(
@@ -806,6 +808,7 @@ function analyzeStudioRasterPreparationSources(
         hasPageBackground: input.hasPageBackground ?? true,
       },
       exported: null,
+      unsupportedSourceIds: orderedVisibleSourceIds,
     };
   }
 
@@ -878,6 +881,7 @@ function analyzeStudioRasterPreparationSources(
       hasPageBackground: input.hasPageBackground ?? true,
     },
     exported,
+    unsupportedSourceIds: [...unsupportedIds],
   };
 }
 
@@ -892,12 +896,9 @@ export function summarizeStudioRasterPreparationSources(
 }
 
 /**
- * The preflight's loss labels are authored for the SVG export dialog ("…는 SVG에 없어…"), which is
- * the wrong vocabulary the moment the same label surfaces on a filter: an artist reading it learns
- * nothing about what to do next. Fail-closed is right — a filter must never quietly produce
- * something other than what is on screen — so the copy, not the gate, is what changes here. Each
- * known blocker maps to the edit that clears it; anything unmapped falls back to the one action
- * that always works (bake that layer to an image first).
+ * Converts renderer-oriented fidelity receipts into artist-facing recovery guidance. Exact
+ * compositing stays fail-closed, but the message names affected layers, confirms that the original
+ * document was preserved, and never exposes an internal SVG or destructive merge requirement.
  */
 const FIDELITY_ACTIONS: readonly { readonly match: RegExp; readonly action: string }[] = [
   {
@@ -906,49 +907,68 @@ const FIDELITY_ACTIONS: readonly { readonly match: RegExp; readonly action: stri
       "말풍선·글상자의 글이 상자보다 길어 자동으로 줄이 바뀝니다. 상자를 조금 넓히거나 원하는 자리에서 엔터로 줄을 나눈 뒤 다시 시도해 주세요.",
   },
   {
-    match: /지우개/u,
-    action:
-      "지우개로 지운 자국이 남은 그리기 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.",
-  },
-  {
     match: /세로쓰기/u,
     action:
-      "세로쓰기 안의 영문·숫자 구간은 줄 나눔이 화면과 조금 달라질 수 있습니다. 해당 텍스트를 가로쓰기로 바꾸거나 이미지로 병합한 뒤 다시 시도해 주세요.",
+      "세로쓰기 안의 영문·숫자 배치가 달라질 수 있습니다. 해당 텍스트를 가로쓰기로 바꾸거나 줄을 직접 나눈 뒤 다시 시도해 주세요.",
   },
   {
     match: /외부 주소/u,
     action:
-      "인터넷 주소로 연결된 이미지가 있습니다. 그 이미지를 작업 파일에 넣어 두거나(다시 올리기) 잠시 숨긴 뒤 다시 시도해 주세요.",
+      "인터넷 주소로 연결된 이미지가 있습니다. 이미지를 작업 파일에 다시 넣거나 해당 레이어를 잠시 숨긴 뒤 다시 시도해 주세요.",
   },
   {
     match: /혼합 모드|클리핑 마스크|아래 레이어로 자르기/u,
     action:
-      "혼합 모드나 아래 레이어로 자르기가 걸린 레이어가 있습니다. 그 레이어를 먼저 아래 레이어와 병합한 뒤 다시 시도해 주세요.",
+      "지원되지 않는 혼합 모드 또는 아래 레이어로 자르기 설정을 잠시 끈 뒤 다시 시도해 주세요.",
   },
   {
     match: /픽셀 필터·색보정/u,
     action:
-      "이미 색보정이 걸려 있는 이미지 레이어가 있습니다. 그 보정을 레이어에 먼저 적용(병합)한 뒤 다시 시도해 주세요.",
+      "기존 색보정 효과를 확정하거나 잠시 끈 뒤 다시 시도해 주세요.",
   },
   {
     match: /중복 요소 id|연결되지 않은 레이어 그룹|레이어 그룹 변형|올바르지 않습니다/u,
     action:
-      "레이어 구조가 어긋난 요소가 있습니다. 문제 레이어를 그룹에서 꺼내거나 지운 뒤 다시 시도해 주세요.",
+      "레이어 구조가 올바르지 않습니다. 해당 레이어를 그룹에서 꺼내거나 복제한 새 레이어로 교체한 뒤 다시 시도해 주세요.",
   },
 ];
 
 const FIDELITY_FALLBACK_ACTION =
-  "화면과 똑같이 합칠 수 없는 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.";
+  "지원되지 않는 효과나 레이어 설정을 잠시 끄거나 해당 레이어를 숨긴 뒤 다시 시도해 주세요.";
 
 function fidelityAction(label: string): string {
   return FIDELITY_ACTIONS.find((entry) => entry.match.test(label))?.action
     ?? FIDELITY_FALLBACK_ACTION;
 }
 
-function fidelityReason(labels: readonly string[]): string {
+function fidelityLayerLabel(element: El): string {
+  const raw = element.name?.trim() || element.id.trim() || "이름 없는 레이어";
+  return raw.replace(/\s+/gu, " ").slice(0, 48);
+}
+
+function affectedLayerDetail(
+  sourceElements: readonly El[],
+  unsupportedSourceIds: readonly string[],
+): string {
+  const byId = new Map(sourceElements.map((element) => [element.id, element] as const));
+  const labels = [...new Set(unsupportedSourceIds)]
+    .map((id) => byId.get(id))
+    .filter((element): element is El => element !== undefined)
+    .map(fidelityLayerLabel);
+  if (labels.length === 0) return "";
+  const shown = labels.slice(0, 3).map((label) => `‘${label}’`).join(" · ");
+  const remainder = labels.length > 3 ? ` 외 ${labels.length - 3}개` : "";
+  return ` 확인이 필요한 레이어: ${shown}${remainder}.`;
+}
+
+function fidelityReason(
+  labels: readonly string[],
+  sourceElements: readonly El[],
+  unsupportedSourceIds: readonly string[],
+): string {
   const actions = [...new Set(labels.map(fidelityAction))].slice(0, 2);
   const detail = actions.length > 0 ? ` ${actions.join(" ")}` : ` ${FIDELITY_FALLBACK_ACTION}`;
-  return `화면에 보이는 그대로 만들 수 없어 아무것도 바꾸지 않았습니다.${detail}`;
+  return `현재 모습의 복사본을 안전하게 만들지 못해 원본은 그대로 유지했습니다.${affectedLayerDetail(sourceElements, unsupportedSourceIds)}${detail}`;
 }
 
 interface StudioEditableRasterCopyCandidate {
@@ -1093,7 +1113,7 @@ function preflightStudioEditableRasterCopy(
     return {
       ok: false,
       code: "source-budget-exceeded",
-      reason: "표시 레이어 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.",
+      reason: "표시 레이어 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 표시 레이어 수를 줄여 주세요.",
     };
   }
   return {
@@ -1138,7 +1158,11 @@ function finalizeStudioEditableRasterCopyPlan(
     return {
       ok: false,
       code: "unsupported-fidelity",
-      reason: fidelityReason(sourceSummary.unsupportedReasons),
+      reason: fidelityReason(
+        sourceSummary.unsupportedReasons,
+        candidate.sourceElements,
+        sourceAnalysis.unsupportedSourceIds,
+      ),
     };
   }
   const exported = sourceAnalysis.exported;
@@ -1153,7 +1177,11 @@ function finalizeStudioEditableRasterCopyPlan(
     return {
       ok: false,
       code: "unsupported-fidelity",
-      reason: fidelityReason(exported.skipped.map((skip) => skip.label)),
+      reason: fidelityReason(
+        exported.skipped.map((skip) => skip.label),
+        candidate.sourceElements,
+        exported.skipped.map((skip) => skip.id),
+      ),
     };
   }
   if (utf8ByteLength(exported.svg) > boundedByteBudget(
@@ -1163,7 +1191,7 @@ function finalizeStudioEditableRasterCopyPlan(
     return {
       ok: false,
       code: "svg-budget-exceeded",
-      reason: "합성된 벡터 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.",
+      reason: "현재 모습의 복사본 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 표시 레이어 수를 줄여 주세요.",
     };
   }
   return {
