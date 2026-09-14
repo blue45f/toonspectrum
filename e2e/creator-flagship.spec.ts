@@ -17,7 +17,7 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(home).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    const comparison = home.getByRole("slider");
+    const comparison = home.getByRole("slider", { name: "일러스트의 명암과 컬러 비교" });
     // Read native layout dimensions; offscreen CDP quads round a 44px box to 43.999px.
     const comparisonBounds = await comparison.evaluate((element) => ({ width: element.clientWidth, height: element.clientHeight }));
     expect(comparisonBounds.height).toBeGreaterThanOrEqual(44);
