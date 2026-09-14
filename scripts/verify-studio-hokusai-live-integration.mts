@@ -1186,15 +1186,8 @@ async function restoreAutosaveAfterReload(page: Page): Promise<void> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
   const banner = page.locator("[data-studio-recovery-notice]");
   await banner.waitFor({ state: "visible", timeout: 10_000 });
-  await banner.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-  try {
-    await banner.waitFor({ state: "detached", timeout: 10_000 });
-  } catch (cause) {
-    const detail = await page.locator('[data-studio-sheet-id="props"], [data-studio-recovery-notice], [role="alert"]').allTextContents();
-    await page.screenshot({ path: join(SCRATCH, "explicit-inspector-restore-failed.png"), animations: "disabled" });
-    writeFileSync(join(SCRATCH, "explicit-inspector-restore-failed.json"), JSON.stringify({ detail }, null, 2));
-    throw new Error(`Recovery UI did not complete: ${detail.join(" | ")}`, { cause });
-  }
+  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
+  await banner.waitFor({ state: "detached", timeout: 10_000 });
 }
 
 async function runDefaultShelfScenario(

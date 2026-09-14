@@ -7721,25 +7721,28 @@ export function StudioCuttoonEditor({
     });
   }
 
+  function clearAutosaveRecord(canClearAutosave: () => boolean) {
+    return clearStudioAutosaveRecord({
+      canClearAutosave,
+      autosaveKey,
+      autosaveRecoveryCandidateRef,
+      clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
+        autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
+      }),
+      remixId,
+      setAutosaveRestoreBlockedReason,
+      setHasAutosave,
+      workId,
+    });
+  }
+
   /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
     const ticket = captureStudioMutationTicket();
-    const canClearAutosave = () => canApplyStudioMutation(ticket);
     await requestStudioAutosaveClear({
-      canClearAutosave,
+      canClearAutosave: () => canApplyStudioMutation(ticket),
       autosaveRecoveryCandidateRef,
-      clearAutosaveRecord: () => clearStudioAutosaveRecord({
-        canClearAutosave,
-        autosaveKey,
-        autosaveRecoveryCandidateRef,
-        clearAutosaveDurableAuthority: () => persistStudioAutosaveDeletion({
-          autosaveKey, autosaveOpfsSessionRef, autosaveSqliteStoreRef,
-        }),
-        remixId,
-        setAutosaveRestoreBlockedReason,
-        setHasAutosave,
-        workId,
-      }),
+      clearAutosaveRecord: () => clearAutosaveRecord(() => canApplyStudioMutation(ticket)),
     });
   }
 

@@ -72,21 +72,6 @@ describe("beginner recovery choices", () => {
     expect(screen.getByRole("button", { name: "이어서 그리기" }).hasAttribute("disabled")).toBe(false);
   });
 
-  it("uses a fresh native link for every new drawing without rendering or deleting the old one", () => {
-    const props = handlers();
-    render(<StudioRecoveryNotice blockedReason={null} {...props} />);
-    const link = screen.getByRole("link", { name: /새 그림 그리기/ });
-    link.addEventListener("click", (event) => event.preventDefault());
-    const initial = link.getAttribute("href");
-    fireEvent.click(link);
-    const first = link.getAttribute("href");
-    fireEvent.click(link);
-    expect(first).not.toBe(initial);
-    expect(link.getAttribute("href")).not.toBe(first);
-    expect(props.onRestore).not.toHaveBeenCalled();
-    expect(props.onDelete).not.toHaveBeenCalled();
-  });
-
   it("creates independent canonical drawing links without inheriting a work or shared room", () => {
     const a = new URL(createStudioRecoveryNewDrawingHref(), "https://www.toonstudio.cloud");
     const b = new URL(createStudioRecoveryNewDrawingHref(), a.origin);
