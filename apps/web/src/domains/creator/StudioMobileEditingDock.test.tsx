@@ -888,12 +888,12 @@ describe("StudioMobileEditingDock", () => {
     expect(modifiedRestore.textContent).toContain("기본값 복원");
     expect(
       within(drawSheet).getByRole<HTMLInputElement>("slider", {
-        name: "브러시 투명도 슬라이더",
+        name: "브러시 불투명도 슬라이더",
       }).step,
     ).toBe("1");
     expect(
       within(drawSheet).getByRole<HTMLInputElement>("spinbutton", {
-        name: "브러시 투명도 숫자",
+        name: "브러시 불투명도 숫자",
       }).step,
     ).toBe("1");
     expect(within(drawSheet).queryByRole("button", {
@@ -1803,7 +1803,7 @@ describe("StudioMobileEditingDock", () => {
 
     const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
     const size = within(sheet).getByLabelText("브러시 굵기 슬라이더");
-    const opacity = within(sheet).getByLabelText("브러시 투명도 슬라이더");
+    const opacity = within(sheet).getByLabelText("브러시 불투명도 슬라이더");
     const modeSwitch = within(sheet).getByRole("group", { name: "그리기 모드" });
 
     const follows = Node.DOCUMENT_POSITION_FOLLOWING;
