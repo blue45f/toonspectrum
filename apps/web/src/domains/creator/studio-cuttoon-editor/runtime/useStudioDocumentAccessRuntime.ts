@@ -69,10 +69,11 @@ export function useStudioDocumentAccessRuntime({
   const layout = useContext(StudioDocumentLayoutContext);
   const persistenceWorkId = studioDocumentPersistenceWorkId({
     workId,
-    documentLayout?.projectId,
-    documentLayout?.documentId,
-    documentLayout?.draftId,
-  );
+    remixId,
+    projectId: layout?.projectId,
+    documentId: layout?.documentId,
+    draftId: layout?.draftId,
+  });
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId: persistenceWorkId, remixId });
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocumentState] =

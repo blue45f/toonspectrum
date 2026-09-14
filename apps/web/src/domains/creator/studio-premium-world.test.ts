@@ -42,7 +42,7 @@ describe("premium world delivered assets", () => {
   it("registers 16 real 3D props and 24 explicitly derived 2D images", () => {
     expect(additions).toHaveLength(40);
     expect(additions.filter((asset) => asset.kind === "model")).toHaveLength(16);
-    expect(additions.filter((asset) => asset.kind === "illustration")).toHaveLength(24);
+    expect(additions.filter((asset) => asset.kind === "background" || asset.kind === "prop-image")).toHaveLength(24);
     expect(curateStudioCc0Selection(additions)).toHaveLength(40);
     expect(curateStudioCc0Selection(additions, { style: "detailed" })).toHaveLength(40);
   });
@@ -50,9 +50,12 @@ describe("premium world delivered assets", () => {
   it("offers Korean and English lookup and distinguishes illustration labels", () => {
     expect(filterStudioCc0Assets(additions, "정류장").length).toBeGreaterThan(0);
     expect(filterStudioCc0Assets(additions, "bus stop").length).toBeGreaterThan(0);
-    const illustration = additions.find((asset) => asset.kind === "illustration");
-    expect(illustration).toBeDefined();
-    expect(studioCc0StyleLabel(illustration!)).toBe("2D 배경 · 투명 소품");
+    const background = additions.find((asset) => asset.kind === "background");
+    const propImage = additions.find((asset) => asset.kind === "prop-image");
+    expect(background).toBeDefined();
+    expect(propImage).toBeDefined();
+    expect(studioCc0StyleLabel(background!)).toContain("배경");
+    expect(studioCc0StyleLabel(propImage!)).toBe("투명 2D 소품 · 3D 원본의 렌더");
   });
 
   it("binds each delivered model and image to its actual bytes", () => {

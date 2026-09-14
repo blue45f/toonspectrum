@@ -175,3 +175,4 @@ describe("Studio document window coordination", () => {
     expect(parseStudioDocumentWindowMessage(null)).toBeNull();
     runtime.dispose();
   });
+});
