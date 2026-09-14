@@ -141,6 +141,11 @@ export const StudioGenerativePage = lazyRetry(
   "StudioGenerativePage",
 );
 
+export const StudioImmersiveHubPage = lazyRetry(
+  () => import("@/domains/creator/spatial/StudioImmersiveHubPage").then((module) => ({ default: module.StudioImmersiveHubPage })),
+  "StudioImmersiveHubPage",
+);
+
 export const StudioSpatialReaderPage = lazyRetry(
   () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
   "StudioSpatialReaderPage",

@@ -209,7 +209,7 @@ export function SiteHeader() {
           <Link
             href={brandHref}
             aria-label={`${brandName} · ${siteNavigationText(brandDescription, locale)}`}
-            className="group flex min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap pr-1 sm:pr-3"
+            className="group flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap pr-1 sm:pr-3"
           >
             <span className="relative grid size-9 shrink-0 place-items-center rounded-xl border border-line/70 bg-panel/85 shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-[1.03]">
               <ToonSpectrumMark className="size-7" />

@@ -6,6 +6,7 @@ import {
   Copy,
   FileImage,
   FolderOpen,
+  Glasses,
   Images,
   LayoutTemplate,
   MoreHorizontal,
@@ -15,6 +16,7 @@ import {
   Presentation,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -383,10 +385,19 @@ export function StudioProjectLibraryPage({
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
-        <nav className="mb-5 flex flex-wrap gap-3 text-sm font-semibold text-accent" aria-label={locale === "ko" ? "확장 제작실" : "Extended studio"}>
-          <a href="/offline-draw/">{locale === "ko" ? "로컬 드로잉" : "Local drawing"}</a>
-          <Link href="/studio/ai-lab">{locale === "ko" ? "생성형 애니메이션 · 2D↔3D" : "Generative animation · 2D/3D"}</Link>
-          <a href="/spatial-reader/">{locale === "ko" ? "공간형 웹툰 감상" : "Spatial webtoon reader"}</a>
+        <nav className="mb-6 grid gap-2 sm:grid-cols-3" aria-label={locale === "ko" ? "확장 제작실" : "Extended studio"}>
+          <a href="/offline-draw/" className="group flex min-h-16 items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-md">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><PenTool size={18} aria-hidden /></span>
+            <span><strong className="block text-sm text-fg">{locale === "ko" ? "로컬 드로잉" : "Local drawing"}</strong><small className="mt-0.5 block text-[0.68rem] text-fg-3">{locale === "ko" ? "서버 없이 바로 그리기" : "Draw without a server"}</small></span>
+          </a>
+          <Link href="/studio/ai-lab" className="group flex min-h-16 items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-md">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Sparkles size={18} aria-hidden /></span>
+            <span><strong className="block text-sm text-fg">{locale === "ko" ? "생성형 애니메이션" : "Generative animation"}</strong><small className="mt-0.5 block text-[0.68rem] text-fg-3">{locale === "ko" ? "AI 키를 직접 연결하는 2D↔3D" : "Bring-your-own-key 2D/3D"}</small></span>
+          </Link>
+          <Link href="/studio/immersive" className="group flex min-h-16 items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-md">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Glasses size={18} aria-hidden /></span>
+            <span><strong className="block text-sm text-fg">{locale === "ko" ? "공간 웹툰·AR/VR" : "Spatial webtoon · AR/VR"}</strong><small className="mt-0.5 block text-[0.68rem] text-fg-3">{locale === "ko" ? "2D·3D 제작부터 몰입형 검수" : "Create in 2D/3D, review in XR"}</small></span>
+          </Link>
         </nav>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
