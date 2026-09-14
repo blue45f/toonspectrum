@@ -36,7 +36,7 @@ function AuthMenuFallback({ onClick }: { onClick: () => void }) {
         onClick={onClick}
         onMouseEnter={preloadAuthMenu}
         onFocus={preloadAuthMenu}
-        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
+        className="grid size-11 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label="계정 메뉴"
       >
         {initial}
@@ -51,7 +51,7 @@ function AuthMenuFallback({ onClick }: { onClick: () => void }) {
       onMouseEnter={preloadAuthMenu}
       onFocus={preloadAuthMenu}
       aria-label={t("nav.login")}
-      className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
+      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
     >
       <UserRound size={16} className="shrink-0" />
       <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">

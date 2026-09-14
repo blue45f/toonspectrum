@@ -20,6 +20,7 @@ import {
   StudioDocumentWorkspaceRoute,
   StudioHomePage,
   StudioImportPage,
+  StudioImmersiveHubPage,
   StudioManualPage,
   StudioMusicPage,
   StudioNewPage,
@@ -37,6 +38,7 @@ export const creatorRoutes = defineAppRoutes([
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
   { id: "creator-studio-generative", path: "/studio/generate", element: <StudioGenerativePage /> },
+  { id: "creator-studio-immersive", path: studioRoutePath("immersive"), element: <StudioImmersiveHubPage /> },
   { id: "creator-spatial-reader", path: "/read/spatial", element: <StudioSpatialReaderPage /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },
   { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },

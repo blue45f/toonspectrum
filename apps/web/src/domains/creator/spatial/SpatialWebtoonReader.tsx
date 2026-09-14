@@ -168,7 +168,11 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
               </div>}
           </section>
           <canvas ref={canvasRef} className="spatial-reader-xr-canvas" aria-hidden="true" />
-          <div ref={overlayRef} className="spatial-reader-overlay">
+          <div
+            ref={overlayRef}
+            className="spatial-reader-overlay"
+            data-xr-presenting={presenting || undefined}
+          >
             <div className="spatial-reader-toolbar" data-spatial-xr-controls>
               <nav aria-label="공간 웹툰 읽기 조작" className="spatial-reader-navigation">
                 <button type="button" onKeyDown={onReaderKeyDown} disabled={!imageReady || first || closing} onClick={() => command("previous")}>이전 구간</button>

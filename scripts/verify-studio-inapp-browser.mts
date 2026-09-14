@@ -108,6 +108,7 @@ const VALID_COMPANION_SESSION = "studio-inapp-verify-session-0001";
  */
 const ROUTES: readonly RouteProbe[] = Object.freeze([
   { id: "home", path: "/studio", readySelector: "h1" },
+  { id: "immersive", path: "/studio/immersive", readySelector: '[data-studio-immersive-hub="true"]' },
   { id: "editor", path: "/studio/canvas", readySelector: '[data-studio-mobile-editing-dock="true"]' },
   { id: "comic", path: "/studio/comic", readySelector: '[data-studio-mobile-editing-dock="true"]' },
   { id: "animation", path: "/studio/animation", readySelector: '[data-studio-mobile-editing-dock="true"]' },
