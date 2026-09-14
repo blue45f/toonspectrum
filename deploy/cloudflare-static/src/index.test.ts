@@ -123,9 +123,129 @@ describe("Cloudflare static gateway", () => {
     );
     expect((proxied as Request).headers.get("cookie")).toBe("session=opaque");
     expect((proxied as Request).headers.get("x-forwarded-host")).toBe("www.toonstudio.cloud");
+    expect((proxied as Request).headers.get("x-toonspectrum-edge-route")).toBe("core");
     expect(response.headers.get("content-security-policy")).toBe(
       COMMON_SECURITY_HEADERS["Content-Security-Policy"],
     );
+  });
+
+  it("routes social, playground, admin, and realtime traffic to isolated authorities", async () => {
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      const proxied = request as Request;
+      return new Response(JSON.stringify({
+        host: new URL(proxied.url).host,
+        route: proxied.headers.get("x-toonspectrum-edge-route"),
+      }));
+    });
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const env = environment({
+      SOCIAL_API_ORIGIN: "https://social.example.test",
+      PLAYGROUND_API_ORIGIN: "https://playground.example.test",
+      ADMIN_API_ORIGIN: "https://admin.example.test",
+      REALTIME_API_ORIGIN: "https://realtime.example.test",
+    });
+
+    const cases = [
+      ["/api/community/posts", "social.example.test", "social"],
+      ["/api/reviews", "social.example.test", "social"],
+      ["/api/fortune/today", "playground.example.test", "playground"],
+      ["/api/play/session", "playground.example.test", "playground"],
+      ["/api/admin/community/posts", "admin.example.test", "admin"],
+      ["/socket.io/?EIO=4&transport=polling", "realtime.example.test", "realtime"],
+    ] as const;
+
+    for (const [pathname, host, route] of cases) {
+      const response = await gateway(
+        new Request(`https://www.toonstudio.cloud${pathname}`),
+        env,
+      );
+      await expect(response.json()).resolves.toEqual({ host, route });
+    }
+  });
+
+  it("falls back to the core authority while a domain-specific service is not configured", async () => {
+    const upstream = vi.fn<typeof fetch>(async (request) => new Response(
+      new URL((request as Request).url).host,
+    ));
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/community/posts"),
+      environment(),
+    );
+
+    expect(await response.text()).toBe("core.example.test");
+    const proxied = upstream.mock.calls[0]?.[0] as Request;
+    expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("social");
+  });
+
+  it("distributes public reads deterministically and retries only safe transient failures", async () => {
+    const attempts: Request[] = [];
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      const proxied = request as Request;
+      attempts.push(proxied);
+      if (attempts.length === 1) return new Response("busy", { status: 503 });
+      return new Response(new URL(proxied.url).host, { status: 200 });
+    });
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const env = environment({
+      PUBLIC_READ_API_ORIGINS:
+        "https://catalog-a.example.test,https://catalog-b.example.test",
+    });
+    const request = new Request(
+      "https://www.toonstudio.cloud/api/catalog/titles?genre=fantasy",
+      { headers: { "cf-ray": "stable-ray-id" } },
+    );
+
+    const response = await gateway(request, env);
+
+    expect(response.status).toBe(200);
+    expect(attempts).toHaveLength(2);
+    expect(new URL(attempts[0].url).origin).not.toBe(
+      new URL(attempts[1].url).origin,
+    );
+    expect(attempts.map((attempt) =>
+      attempt.headers.get("x-toonspectrum-edge-attempt"))).toEqual(["0", "1"]);
+    expect(attempts.every((attempt) =>
+      attempt.headers.get("x-toonspectrum-edge-route") === "public-read")).toBe(true);
+  });
+
+  it("keeps public writes on the core authority instead of replica failover", async () => {
+    const upstream = vi.fn<typeof fetch>(async () =>
+      new Response("core-write", { status: 503 }));
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/catalog/rebuild", {
+        method: "POST",
+        body: "{}",
+        headers: { "content-type": "application/json" },
+      }),
+      environment({
+        PUBLIC_READ_API_ORIGINS:
+          "https://catalog-a.example.test,https://catalog-b.example.test",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(upstream).toHaveBeenCalledOnce();
+    const proxied = upstream.mock.calls[0]?.[0] as Request;
+    expect(new URL(proxied.url).origin).toBe("https://core.example.test");
+    expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("core");
+  });
+
+  it("fails closed for an explicitly configured invalid domain authority", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/community/posts"),
+      environment({ SOCIAL_API_ORIGIN: "http://social.example.test" }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "CORE_API_UNAVAILABLE",
+    });
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("maps crawler routes to the existing OG endpoint", () => {
