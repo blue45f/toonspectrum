@@ -45,6 +45,8 @@ export interface StudioVrmCaptureProgress {
 }
 
 export interface StudioVrmCooperativeCaptureOptions {
+  /** Full-frame crop correction, restored before every event-loop yield. */
+  readonly screenOutlineScale?: number;
   readonly signal?: AbortSignal;
   /** The caller owns the frozen scene and must reject a changed model/pose/appearance. */
   readonly assertCurrent?: () => void;
@@ -169,6 +171,7 @@ function* captureStudioVrmRgbaTiles(
   background: StudioVrmRasterCaptureBackground = {},
   cooperative = false,
   prepareTile?: () => (() => void),
+  screenOutlineScale = 1,
 ): Generator<StudioVrmCaptureProgress, Uint8ClampedArray | undefined, void> {
   const { width, height } = assertDimensions(dimensions);
   const clearAlpha = typeof background.alpha === "number" && Number.isFinite(background.alpha)
@@ -262,7 +265,7 @@ function* captureStudioVrmRgbaTiles(
             // its original width, including the final partial tile. Material.update(0) retains
             // this public uniform value; no shader or persistent preset is replaced.
             for (const [material, factor] of screenOutlineFactors) {
-              material.outlineWidthFactor = factor * scaleY;
+              material.outlineWidthFactor = factor * scaleY * screenOutlineScale;
               material.uniformsNeedUpdate = true;
             }
           }
@@ -361,6 +364,10 @@ export async function captureStudioVrmRgbaCooperatively(
   options: StudioVrmCooperativeCaptureOptions = {},
 ): Promise<Uint8ClampedArray> {
   assertDimensions(dimensions);
+  const outlineScale = options.screenOutlineScale ?? 1;
+  if (!Number.isFinite(outlineScale) || outlineScale <= 0 || outlineScale > 100) {
+    throw new RangeError("원고 프레임 선폭 보정값이 올바르지 않습니다.");
+  }
   const assertCurrent = () => {
     if (options.signal?.aborted) throw abortError();
     options.assertCurrent?.();
@@ -370,7 +377,7 @@ export async function captureStudioVrmRgbaCooperatively(
   };
   assertCurrent();
   await yieldStudioVrmCapture(options.signal);
-  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background, true, options.prepareTile);
+  const tiles = captureStudioVrmRgbaTiles(renderer, scene, camera, dimensions, background, true, options.prepareTile, outlineScale);
   try {
     for (;;) {
       assertCurrent();

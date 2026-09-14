@@ -23,6 +23,8 @@ import {
   pushCharacterShaperKeyLayer,
   reduceCharacterShaperUiState,
 } from "./character-shaper-ui-model";
+import { DEFAULT_CHARACTER_OUTPUT_FRAMING } from "./character-shaper-framing";
+import { CharacterShaperCompositionGuide } from "./CharacterShaperCompositionGuide";
 import { CharacterShaperCameraControls } from "./CharacterShaperCameraControls";
 import { CharacterShaperInspector } from "./CharacterShaperInspector";
 import { CharacterShaperMobileSheet } from "./CharacterShaperMobileSheet";
@@ -82,6 +84,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const isTablet = useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
   const layout: CharacterShaperLayout = isDesktop ? "desktop" : isTablet ? "tablet" : "mobile";
   const [ui, dispatch] = useReducer(reduceCharacterShaperUiState, undefined, () => createCharacterShaperUiState());
+  const [outputFraming, setOutputFraming] = useState(DEFAULT_CHARACTER_OUTPUT_FRAMING);
   const [mobileTab, setMobileTab] = useState<MobileSheetTab>("shelf");
   const [commitNotice, setCommitNotice] = useState<string | null>(null);
   const fallbackTitleId = useId();
@@ -409,6 +412,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     const viewport = (
     <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, layout === "mobile" ? "flex-1" : className)}>
       <StudioVrmPoserViewport h={h} presentation="shaper" />
+      <CharacterShaperCompositionGuide framing={outputFraming} />
       <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} />
       {paintActive ? (
         <div className="pointer-events-none absolute inset-x-2 bottom-2 z-30 flex justify-center [&>*]:pointer-events-auto">
@@ -469,6 +473,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
 
   const dock = (
     <CharacterShaperOutputDock
+      framing={outputFraming}
+      onFramingChange={setOutputFraming}
       h={h}
       binding={binding}
       drawer={ui.drawer}

@@ -10,6 +10,7 @@ export function characterExportSize(width: number, height: number, edge: Charact
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new RangeError("내보낼 화면 크기를 읽지 못했습니다.");
   }
+  if (!CHARACTER_EXPORT_EDGES.includes(edge)) throw new RangeError("지원하지 않는 내보내기 해상도입니다.");
   const scale = edge / Math.max(width, height);
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
