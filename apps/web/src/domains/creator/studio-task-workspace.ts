@@ -1,4 +1,5 @@
 import type { StudioDocumentWorkspaceId } from "./studio-document-workspace";
+import type { StudioUiDensityMode } from "./studio-ui-density";
 import { switchStudioWorkspace, type StudioDefaultWorkspaceId, type StudioWorkspaceState } from "./studio-workspaces";
 
 const TASK_LAYOUTS: Partial<Record<StudioDocumentWorkspaceId, StudioDefaultWorkspaceId>> = {
@@ -8,19 +9,21 @@ const TASK_LAYOUTS: Partial<Record<StudioDocumentWorkspaceId, StudioDefaultWorks
   localization: "lettering", review: "review",
 };
 
-/** Density is a temporary presentation: changing it must not reset a customized layout. */
 export function studioTaskWorkspaceId(
   workspace: StudioDocumentWorkspaceId | null,
+  density: StudioUiDensityMode,
 ): StudioDefaultWorkspaceId | null {
-  return workspace ? TASK_LAYOUTS[workspace] ?? null : null;
+  if (!workspace) return null;
+  if (density === "focus" && ["draw", "comic", "image", "design"].includes(workspace)) return "quick-sketch";
+  return TASK_LAYOUTS[workspace] ?? null;
 }
 
-/** UI only. Preserve explicit custom workspaces and edits to the already-selected profile. */
+/** Layout only: no pages, strokes, history, dimensions or document mutators. */
 export function applyStudioTaskWorkspace(
   state: StudioWorkspaceState,
   workspaceId: StudioDefaultWorkspaceId | null | undefined,
 ): StudioWorkspaceState {
-  if (!workspaceId || state.activeWorkspaceId === workspaceId
-    || state.customWorkspaces.some((workspace) => workspace.id === state.activeWorkspaceId)) return state;
-  return switchStudioWorkspace(state, workspaceId);
+  return !workspaceId || state.activeWorkspaceId === workspaceId
+    ? state
+    : switchStudioWorkspace(state, workspaceId);
 }
