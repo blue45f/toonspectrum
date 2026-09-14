@@ -176,7 +176,6 @@ export function StudioPromoPage() {
         <span className="promo-badge">15 / 30 / 60초</span>
       </header>
       <p className="promo-draft-status" role="status">{draft.status}</p>
-      <nav className="promo-button-row" aria-label="확장 제작실"><a href="/studio/ai-lab">실제 프레임을 생성하는 AI 애니메이션 제작실 →</a><a href="/read/spatial">공간형 웹툰 감상 →</a></nav>
       <div className="promo-workspace">
         <div className="promo-editing">
           <fieldset className="promo-card" disabled={busy}>

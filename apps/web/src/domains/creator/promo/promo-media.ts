@@ -1,9 +1,7 @@
 import { finalizeStudioAnimaticRecordedWebm } from "../animatic/studio-animatic-recorded-webm";
 
-import { drawPromoFrame, loadPromoImages, releasePromoTextCache } from "./promo-canvas";
-import { PROMO_FPS, promoDataUrl, promoFrameCount, promoSize } from "./promo-model";
-
-import { schedulePromoRecordingGains } from "./promo-recording-audio";
+import { drawPromoFrame, loadPromoImages } from "./promo-canvas";
+import { PROMO_FPS, promoDataUrl, promoFrameCount, promoMusicGain, promoSize, promoVoiceGain } from "./promo-model";
 
 import type { PromoPanel, PromoProject } from "./promo-model";
 
@@ -119,7 +117,6 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       let failure: Error | null = null;
       let started = 0;
       let lastFrame = -1;
-      let lastProgressAt = Number.NEGATIVE_INFINITY;
       const cleanup = () => {
         cancelAnimationFrame(raf);
         clearTimeout(watchdog);
@@ -165,17 +162,14 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       const tick = () => {
         if (finished) return;
         try {
-          const now = performance.now();
-          const frame = Math.floor((now - started) * PROMO_FPS / 1000);
+          const frame = Math.floor((performance.now() - started) * PROMO_FPS / 1000);
           if (frame !== lastFrame) {
             drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
             lastFrame = frame;
           }
-          // Rendering every frame must not rerender the entire React editor at 30Hz.
-          if (now - lastProgressAt >= 200 || frame >= total) {
-            lastProgressAt = now;
-            onProgress(Math.min(0.99, frame / total));
-          }
+          if (audioGain && audioContext) audioGain.gain.setValueAtTime(promoMusicGain(project, Math.min(total - 1, frame)), audioContext.currentTime);
+          if (voiceGain && audioContext) voiceGain.gain.setValueAtTime(promoVoiceGain(project, Math.min(total - 1, frame)), audioContext.currentTime);
+          onProgress(Math.min(0.99, frame / total));
           if (frame >= total) {
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
@@ -209,15 +203,10 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       activeRecorder.onstop = settle;
       activeRecorder.onerror = () => finish(new Error("브라우저 영상 인코딩에 실패했어요."));
       try {
-        const audioStart = audioContext?.currentTime ?? 0;
-        schedulePromoRecordingGains(project, audioGain?.gain ?? null, voiceGain?.gain ?? null, audioStart);
         started = performance.now();
         activeRecorder.start(250);
-        if (audioSource) { audioSource.start(audioStart); audioSource.stop(audioStart + project.seconds); }
-        if (voiceSource && project.voiceover && project.voiceover.startSec < project.seconds) {
-          voiceSource.start(audioStart + project.voiceover.startSec);
-          voiceSource.stop(audioStart + project.seconds);
-        }
+        audioSource?.start();
+        if (voiceSource && audioContext && project.voiceover) voiceSource.start(audioContext.currentTime + project.voiceover.startSec);
         if (signal.aborted || document.hidden) { abort(); return; }
         tick();
       } catch { finish(new Error("영상 녹화를 시작하지 못했어요.")); }

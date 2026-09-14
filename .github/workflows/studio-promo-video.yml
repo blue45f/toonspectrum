@@ -58,7 +58,7 @@ jobs:
           node tools/verify-studio-promo-preview.mjs
           python3 tools/verify-studio-promo-output.py --self-test
       - run: pnpm exec vitest run apps/web/src/domains/creator/promo
-      - run: pnpm exec eslint apps/web/src/domains/creator/promo apps/web/src/app/routes/groups/creator.routes.tsx apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx e2e/studio-promo*.spec.ts tools/serve-studio-promo-e2e.mjs --max-warnings=0
+      - run: pnpm exec eslint apps/web/src/domains/creator/promo apps/web/src/app/routes/groups/creator.routes.tsx apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx e2e/studio-promo.spec.ts --max-warnings=0
       - run: pnpm exec playwright install --with-deps chromium
       - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk ffmpeg
       - run: pnpm exec playwright test --config playwright.promo.config.ts --project=chromium

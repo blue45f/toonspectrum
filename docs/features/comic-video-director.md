@@ -33,54 +33,9 @@ node tools/verify-studio-promo-preview.mjs
 python3 tools/verify-studio-promo-output.py --self-test
 python3 tools/verify-studio-promo-director-output.py --results test-results --remotion /path/to/director/out/promo.mp4
 pnpm exec eslint apps/web/src/domains/creator/promo e2e/studio-promo.spec.ts --max-warnings=0
-pnpm exec playwright test --config playwright.promo.config.ts --project=chromium
+pnpm exec playwright test e2e/studio-promo.spec.ts --project=chromium
 ```
 
 Local verification used an isolated worktree, its own Vite cache/port and installed Chrome. Unit tests: 59 passed. Recorder/preview lifecycle tests: 17 + 5 passed. The two browser scenarios use production UI, real canvas, real local audio and real native encoding; only the optional text-AI HTTP responses are fixtures. They exercise split import, templates, foregrounds, history, narration, captions, exports, local draft restoration, mobile overflow and offline-after-load recording.
 
 The browser-exported enhanced Remotion ZIP was installed separately and actually rendered at quarter scale: H.264, 450 video frames, 30fps, 15-second video track, AAC audio. Native output: 720×1280, VP8/Opus, 30fps. Audio analysis detected the scheduled test narration at 2 seconds and BGM attenuation near 28% in both encoded outputs. Poster output was 1080×1920; the four-scene contact sheet was 720×852. Machine/font/codec differences can affect rendering and encoder padding.
-
-## Recording-quality follow-up (2026-09-13)
-
-The failed hosted video gate produced only 146 native frames in its enhanced
-15-second fixture. The 338-frame minimum remains unchanged. This follow-up
-addresses product rendering overhead and separates video testing from the 3D
-suite's forced SwiftShader flags; it does not waive video or audio checks.
-
-- Bounded text raster tiles avoid repeating text shaping and shadow rendering.
-  Per-canvas LRU caches are limited to 16 tiles / 2,000,000 pixels, and are
-  released on preview unmount and recording cleanup. Typography is preserved.
-- Recording progress updates at most five times per second rather than
-  rerendering the editor on every frame. Capture still requests 30fps.
-- Music fades and narration ducking use linear ramps scheduled on the Web
-  Audio clock. Source nodes stop at the timeline boundary, independent of UI.
-- `playwright.promo.config.ts` uses an isolated cache/port and fresh browser,
-  without unrelated 3D renderer flags. Both full editor workflows and the new
-  raster-quality scenario remain mandatory alongside real encoded-media tests.
-
-Run browser verification with:
-
-```sh
-pnpm exec playwright test --config playwright.promo.config.ts --project=chromium
-```
-
-Local validation of this follow-up:
-
-- 62 unit tests (project/model/director/audio automation/shared WebM finalizer).
-- 19 recording-lifecycle and 5 preview-lifecycle regression tests.
-- Two full browser workflows passed. A third real browser test compares
-  cached versus uncached text in 45 combinations of ratio, style, frame and
-  nonsequential seek, and checks 150 edits, bounded cache size and cleanup.
-- Actual native output: basic 443 frames, director 452 frames (including the
-  final capture flush), VP8/Opus, finalized duration 15 seconds. These are
-  local measurements, not an exact frame-count guarantee on every device.
-- Both newly exported Remotion kits were installed and rendered independently.
-  Enhanced H.264/AAC output: exactly 450 video frames at 30fps / 15 seconds.
-- Encoded-audio analysis verified narration at 2 seconds and BGM attenuation
-  ratios of 0.295 (native) / 0.296 (Remotion). The basic output also passed
-  audio/video timing and visible title/CTA ending-card validation.
-
-No new application dependency, hosted renderer, paid API, database operation,
-neural character animation, voice cloning or artwork upload is introduced.
-Repository CI and production deployment status must be checked separately
-from these local measurements.

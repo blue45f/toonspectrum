@@ -79,9 +79,8 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   };
   const scheduledGains = [];
   const mocks = {
-    "./promo-recording-audio": { schedulePromoRecordingGains: (...args) => scheduledGains.push(args) },
     "../animatic/studio-animatic-recorded-webm": { finalizeStudioAnimaticRecordedWebm: async (blob) => blob },
-    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map(), releasePromoTextCache: () => {} },
+    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
     "./promo-model": {
       PROMO_FPS: 30,
       promoMusicGain: () => 0,

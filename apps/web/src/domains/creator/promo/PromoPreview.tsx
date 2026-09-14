@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { preparePromoVoicePreview } from "./promo-audio";
-import { drawPromoFrame, loadPromoImages, releasePromoTextCache } from "./promo-canvas";
+import { drawPromoFrame, loadPromoImages } from "./promo-canvas";
 import { PROMO_FPS, promoFrameCount, promoMusicGain, promoSize, promoTimeline } from "./promo-model";
 
 import type { PromoImages } from "./promo-canvas";
@@ -43,13 +43,7 @@ export function PromoPreview({ project, disabled, seekRequest }: { project: Prom
     setPlaying(false); setFrame(0); voiceOperation.current?.abort(); voicePreview.current?.stop();
     setPreparingAudio(false);
   }, [project, disabled]);
-  useEffect(() => {
-    const context = canvasRef.current?.getContext("2d");
-    return () => {
-      voiceOperation.current?.abort(); voicePreview.current?.stop();
-      if (context) releasePromoTextCache(context);
-    };
-  }, []);
+  useEffect(() => () => { voiceOperation.current?.abort(); voicePreview.current?.stop(); }, []);
   useEffect(() => {
     if (!seekRequest) return;
     setPlaying(false); setFrame(Math.max(0, Math.min(total - 1, seekRequest.frame)));
