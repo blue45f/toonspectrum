@@ -177,7 +177,7 @@ jobs:
       - name: Verify engine browser entry contracts
         run: |
           pnpm exec vitest run scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts
-      - name: Build exact production Studio bundle for extended browser probes
+      - name: Build exact production bundle for engine integration
         run: pnpm run build:bundle
       - name: Hokusai, living ink and hybrid DCC
         run: |
