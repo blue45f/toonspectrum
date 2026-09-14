@@ -170,6 +170,7 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-work-metadata.ts")
       || id.endsWith("/src/domains/creator/studio-page-review.ts")
       || id.endsWith("/src/domains/creator/studio-frame-animation-timing.ts")
+      || id.endsWith("/src/domains/creator/studio-live-adjustment-visibility.ts")
     ) {
       // These pure document models have no runtime dependencies. Review status and frame
       // timing are already needed by the editor and reused by the lazy quality inspector;

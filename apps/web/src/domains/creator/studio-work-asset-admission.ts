@@ -237,11 +237,17 @@ export function createStudioWorkAssetInitialImageDescriptor(
     elementType: "image",
   });
   if (element.adjustmentLayer !== undefined) {
-    // A live graph cannot silently lose its program on immutable-source admission. Leave the
-    // original local document untouched when this descriptor cannot carry the whole graph.
-    return parseStudioWorkAssetDescriptor({ version: 1, element: {
-      ...baseDescriptor.element, smartFilters: StudioWorkAssetSmartFiltersSchema.parse(element.smartFilters),
-    } }, { assetId: element.id, elementType: "image" });
+    // Validate the whole graph even when it cannot fit the immutable image descriptor.
+    // Admission rewrites only src; the complete graph is then published in the authoritative
+    // CRDT reference-edit envelope and remains in every local history snapshot.
+    const smartFilters = StudioWorkAssetSmartFiltersSchema.parse(element.smartFilters);
+    try {
+      return parseStudioWorkAssetDescriptor({ version: 1, element: {
+        ...baseDescriptor.element, smartFilters,
+      } }, { assetId: element.id, elementType: "image" });
+    } catch {
+      return baseDescriptor;
+    }
   }
   const smartFilters = StudioWorkAssetSmartFiltersSchema.safeParse(element.smartFilters);
   if (!smartFilters.success) return baseDescriptor;

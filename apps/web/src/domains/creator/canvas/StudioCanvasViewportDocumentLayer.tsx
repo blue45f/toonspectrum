@@ -853,6 +853,7 @@ export function StudioCanvasViewportDocumentLayer({
                     canonicalDryMediaHiddenElementId,
                   )) return null;
                   const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
+                  const adjustmentBase = base ? adjustmentNodes.get(base.id) : undefined;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
                   const maskOn = el.type === "image" && shouldApplyLayerMask(el as ImageEl);
@@ -939,10 +940,13 @@ export function StudioCanvasViewportDocumentLayer({
                       (el as { rotation?: number }).rotation ?? 0,
                       (base as { rotation?: number }).rotation ?? 0,
                       maskOn ? ((el as El).maskSrc ?? "") : "", // 마스크가 캐시 키에도 반영되게.
+                      adjustmentBase ? JSON.stringify([adjustmentBase, masterRenderEls]) : "",
                     ].join("|");
                     return (
                       <ClipMaskGroup key={el.id} cacheKey={ck}>
-                        {renderEl(base, idx - 1, { asMask: true })}
+                        {adjustmentBase
+                          ? renderAdjustmentTree(adjustmentBase, true, `${maskKey ?? ""}_${el.id}`)
+                          : renderEl(base, idx - 1, { asMask: true })}
                         {renderWithOwnMask({ compositeOverride: "source-in" })}
                       </ClipMaskGroup>
                     );
