@@ -1,5 +1,5 @@
 /** Selection stroke properties for freehand and shape elements. */
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import {
   normalizeHexColor,
@@ -12,6 +12,10 @@ import {
   rememberSharedStudioRecentColor,
   subscribeStudioRecentColors,
 } from "./studio-recent-colors-bridge";
+import {
+  readStudioStrokeVisibilityBackup,
+  rememberStudioStrokeVisibilityBackup,
+} from "./studio-stroke-visibility-memory";
 import { StudioColorField } from "./StudioColorField";
 
 import type { DrawEl, El } from "./studio-element-model";
@@ -68,60 +72,63 @@ export function StudioInspectorSelectionStrokeControls({
   const selectedOpacity = Number.isFinite(selected.opacity) ? (selected.opacity ?? 1) : 1;
   const strokeDisabled =
     isTransparentStroke(selected.stroke) || (freehandStrokeOnly && selectedOpacity <= 0);
-  const lastVisibleStroke = useRef(
-    normalizedSelectedStroke ?? displayedRecentColors[0] ?? DEFAULT_STROKE_COLOR,
-  );
-  const lastVisibleOpacity = useRef(
-    selectedOpacity > 0 ? clampOpacity(selectedOpacity) : 1,
-  );
+  const visibilityBackup = readStudioStrokeVisibilityBackup(selected.id);
+  const lastVisibleStroke =
+    normalizedSelectedStroke ??
+    visibilityBackup?.stroke ??
+    displayedRecentColors[0] ??
+    DEFAULT_STROKE_COLOR;
+  const lastVisibleOpacity =
+    selectedOpacity > 0
+      ? clampOpacity(selectedOpacity)
+      : visibilityBackup?.opacity ?? 1;
 
   useEffect(() => {
     requestRecentColors?.();
   }, [requestRecentColors]);
 
   useEffect(() => {
-    if (normalizedSelectedStroke) lastVisibleStroke.current = normalizedSelectedStroke;
-  }, [normalizedSelectedStroke]);
+    if (!normalizedSelectedStroke && selectedOpacity <= 0) return;
+    rememberStudioStrokeVisibilityBackup(selected.id, {
+      ...(normalizedSelectedStroke ? { stroke: normalizedSelectedStroke } : {}),
+      ...(selectedOpacity > 0 ? { opacity: clampOpacity(selectedOpacity) } : {}),
+    });
+  }, [normalizedSelectedStroke, selected.id, selectedOpacity]);
 
-  useEffect(() => {
-    if (selectedOpacity > 0) lastVisibleOpacity.current = clampOpacity(selectedOpacity);
-  }, [selectedOpacity]);
-
-  const activeColor = normalizedSelectedStroke ?? lastVisibleStroke.current;
+  const activeColor = lastVisibleStroke;
   const strokeWidth = Math.max(1, Math.min(48, selected.strokeWidth ?? 3));
-  const opacity =
-    selectedOpacity > 0 ? clampOpacity(selectedOpacity) : lastVisibleOpacity.current;
+  const opacity = lastVisibleOpacity;
   const previewWidth = Math.max(1, Math.min(12, strokeWidth));
 
   const visiblePatch = (color: string): Partial<El> => ({
     stroke: color,
     ...(freehandStrokeOnly && selectedOpacity <= 0
-      ? { opacity: lastVisibleOpacity.current }
+      ? { opacity: lastVisibleOpacity }
       : {}),
   } as Partial<El>);
 
   const hiddenPatch = (): Partial<El> => {
-    if (freehandStrokeOnly) {
-      lastVisibleOpacity.current = opacity;
-      return { opacity: 0 } as Partial<El>;
-    }
-    return { stroke: "transparent" } as Partial<El>;
+    rememberStudioStrokeVisibilityBackup(selected.id, {
+      stroke: normalizedSelectedStroke ?? lastVisibleStroke,
+      opacity,
+    });
+    return freehandStrokeOnly
+      ? ({ opacity: 0 } as Partial<El>)
+      : ({ stroke: "transparent" } as Partial<El>);
   };
 
   const patchStroke = (color: string | null) => {
     if (color === null) {
-      if (normalizedSelectedStroke) lastVisibleStroke.current = normalizedSelectedStroke;
       patchEl(selected.id, hiddenPatch());
       return;
     }
     const normalized = normalizeHexColor(color) ?? color;
-    lastVisibleStroke.current = normalized;
+    rememberStudioStrokeVisibilityBackup(selected.id, { stroke: normalized });
     patchEl(selected.id, visiblePatch(normalized));
   };
 
   const previewStroke = (color: string) => {
     const normalized = normalizeHexColor(color) ?? color;
-    lastVisibleStroke.current = normalized;
     const patch = visiblePatch(normalized);
     if (previewPatch) previewPatch(selected.id, patch, `color:${selected.id}:stroke`);
     else patchEl(selected.id, patch);
@@ -130,9 +137,9 @@ export function StudioInspectorSelectionStrokeControls({
   const rememberStroke = (rawColor: string) => {
     const color = normalizeHexColor(rawColor);
     if (!color) return;
-    lastVisibleStroke.current = color;
+    rememberStudioStrokeVisibilityBackup(selected.id, { stroke: color });
     if (onRememberColor) onRememberColor(color);
-    else rememberSharedStudioRecentColor(color);
+    else if (recentColors === undefined) rememberSharedStudioRecentColor(color);
   };
 
   return (
@@ -140,7 +147,7 @@ export function StudioInspectorSelectionStrokeControls({
       <StudioColorField
         label="선 색상"
         value={strokeDisabled ? null : activeColor}
-        fallbackColor={lastVisibleStroke.current}
+        fallbackColor={lastVisibleStroke}
         purpose="stroke"
         recentColors={availableRecentColors}
         documentColors={documentColors}
