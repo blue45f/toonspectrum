@@ -12,6 +12,9 @@ on:
       - "scripts/import-blender-character-package.mts"
       - "scripts/setup-toonstudio-blender-pipeline.mts"
       - "scripts/verify-blender-character-pipeline.mjs"
+      - "scripts/verify-blender-package-roundtrip.mts"
+      - "apps/web/src/domains/creator/vrm/studio-vrm-blender-package-import*"
+      - "apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage*"
       - "apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package*"
       - "tests/blender/**"
       - "tools/blender/toonstudio_blender_kit/**"
@@ -24,6 +27,9 @@ on:
       - "scripts/import-blender-character-package.mts"
       - "scripts/setup-toonstudio-blender-pipeline.mts"
       - "scripts/verify-blender-character-pipeline.mjs"
+      - "scripts/verify-blender-package-roundtrip.mts"
+      - "apps/web/src/domains/creator/vrm/studio-vrm-blender-package-import*"
+      - "apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage*"
       - "apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package*"
       - "tests/blender/**"
       - "tools/blender/toonstudio_blender_kit/**"
@@ -79,6 +85,11 @@ jobs:
           scripts/import-blender-character-package.mts
           scripts/setup-toonstudio-blender-pipeline.mts
           scripts/verify-blender-character-pipeline.mjs
+          scripts/verify-blender-package-roundtrip.mts
+          apps/web/src/domains/creator/vrm/studio-vrm-blender-package-import.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-blender-package-import.test.ts
+          apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage.tsx
+          apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage.workflow.test.tsx
           apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package.ts
           apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
 
@@ -86,6 +97,9 @@ jobs:
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-blender-package-import.test.ts
+          apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage.test.tsx
+          apps/web/src/domains/creator/character-shaper/CharacterShaperBlenderPackage.workflow.test.tsx
 
       - name: Type-check the web workspace
         run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
@@ -170,6 +184,12 @@ jobs:
         run: >-
           "$BLENDER_PATH" --background --python-exit-code 1
           --python tests/blender/blender_quality_regressions.py
+
+      - name: Verify edited-scene packages through Blender and the web loader
+        run: |
+          "$BLENDER_PATH" --background --factory-startup --python-exit-code 1 \
+            --python tests/blender/blender_current_scene_smoke.py
+          node --import tsx scripts/verify-blender-package-roundtrip.mts
 
       - name: Generate the strict reference character package
         run: >-

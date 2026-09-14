@@ -13,6 +13,7 @@ import bpy
 
 from .contracts import MCP_ALLOWED_COMMANDS, ContractError, load_config
 from .face import create_semantic_face_shape_keys, detect_face_meshes
+from .current_scene import export_current_character_package
 from .geometry import build_authored_hair, infer_head_frame, parent_hair_to_head
 from .pipeline import PipelineFailure, run_pipeline
 from .quality import audit_character
@@ -77,6 +78,14 @@ def dispatch(command: str, payload: Mapping[str, Any] | None = None) -> dict[str
         )
     source = _payload(payload)
     try:
+        if command == "export_current_character_package":
+            root, config = _load_request_config(source)
+            execution = export_current_character_package(config, project_root=root)
+            return {
+                "ok": execution.report.passed, "command": command,
+                "outputDir": str(execution.output_dir), "manifest": execution.package_manifest,
+                "archive": str(execution.output_dir / f"{config.character_id}.toonchar.zip"),
+            }
         if command == "run_pipeline":
             root, config = _load_request_config(source)
             execution = run_pipeline(config, project_root=root, clear_before_import=True)

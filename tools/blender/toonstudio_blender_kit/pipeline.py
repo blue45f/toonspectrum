@@ -35,6 +35,7 @@ from .geometry import (
     parent_hair_to_head,
 )
 from .materials import create_outline_material, create_skin_material, create_toon_material
+from .package_archive import create_runtime_archive
 from .quality import QualityAudit, audit_character
 from .render import RenderResult, render_quality_views
 from .vrm import VrmExpressionBindingResult, bind_semantic_vrm1_expressions
@@ -277,6 +278,7 @@ def _annotate_scene(config: PipelineConfig, source: Path | None) -> None:
 
 def _selection_export(objects: Sequence[bpy.types.Object], callback: Any) -> set[str]:
     state = [(obj, obj.hide_get(), obj.hide_viewport, obj.select_get()) for obj in bpy.context.scene.objects]
+    original_active = bpy.context.view_layer.objects.active
     try:
         bpy.ops.object.select_all(action="DESELECT")
         active: bpy.types.Object | None = None
@@ -300,6 +302,7 @@ def _selection_export(objects: Sequence[bpy.types.Object], callback: Any) -> set
             obj.hide_set(hidden)
             obj.hide_viewport = hide_viewport
             obj.select_set(selected)
+        bpy.context.view_layer.objects.active = original_active
 
 
 def _character_export_objects(
@@ -662,4 +665,6 @@ def run_pipeline( # NOSONAR python:S3776
             f"character package failed quality gate with score {report.score}: "
             + ("; ".join(errors[:5]) or "minimum score was not reached")
         )
+    if report.passed:
+        create_runtime_archive(output_dir, manifest)
     return PipelineExecution(report, manifest, output_dir)
