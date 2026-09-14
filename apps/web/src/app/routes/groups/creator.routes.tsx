@@ -14,6 +14,7 @@ import {
   LearnPage,
   StudioAssetHubPage,
   StudioBrushLabPage,
+  StudioCharacterConversionPage,
   StudioDocumentWorkspaceRoute,
   StudioHomePage,
   StudioImportPage,
@@ -27,6 +28,7 @@ import {
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
+  { id: "creator-character-convert", path: "/studio/character-convert", element: <StudioCharacterConversionPage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
   { id: "creator-studio-new", path: studioRoutePath("new"), element: <StudioNewPage /> },

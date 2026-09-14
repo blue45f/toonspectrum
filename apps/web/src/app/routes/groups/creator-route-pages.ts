@@ -130,3 +130,10 @@ export const StudioRouter = lazyRetry(
   },
   "StudioRouter",
 );
+
+export const StudioCharacterConversionPage = lazyRetry(
+  () => import("@/domains/creator/character-conversion/StudioCharacterConversionPage").then((module) => ({
+    default: module.StudioCharacterConversionPage,
+  })),
+  "StudioCharacterConversionPage",
+);
