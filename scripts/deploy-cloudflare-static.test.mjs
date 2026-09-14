@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -21,8 +22,7 @@ function createFakePnpm() {
   temporaryDirectories.push(directory);
   const binDirectory = join(directory, "bin");
   const commandLog = join(directory, "commands.ndjson");
-  const mkdirResult = spawnSync("mkdir", ["-p", binDirectory]);
-  if (mkdirResult.status !== 0) throw new Error("failed to create fake bin directory");
+  mkdirSync(binDirectory, { recursive: true });
   const executable = join(binDirectory, "pnpm");
   writeFileSync(
     executable,
