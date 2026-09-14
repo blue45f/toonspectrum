@@ -54,6 +54,9 @@ export function StudioInspectorSelectionStrokeControls({
     getStudioRecentColorsServerSnapshot,
   );
   const availableRecentColors = recentColors ?? sharedRecentColors;
+  const requestRecentColors =
+    onEnsureRecentColorsLoaded ??
+    (recentColors === undefined ? ensureSharedStudioRecentColorsLoaded : undefined);
   const normalizedSelectedStroke = normalizeHexColor(selected.stroke);
   const freehandStrokeOnly = (selected.kind ?? "freehand") === "freehand";
   const selectedOpacity = Number.isFinite(selected.opacity) ? (selected.opacity ?? 1) : 1;
@@ -65,9 +68,8 @@ export function StudioInspectorSelectionStrokeControls({
   );
 
   useEffect(() => {
-    if (onEnsureRecentColorsLoaded) onEnsureRecentColorsLoaded();
-    else ensureSharedStudioRecentColorsLoaded();
-  }, [onEnsureRecentColorsLoaded]);
+    requestRecentColors?.();
+  }, [requestRecentColors]);
 
   useEffect(() => {
     if (normalizedSelectedStroke) lastVisibleStrokeRef.current = normalizedSelectedStroke;
@@ -226,9 +228,7 @@ export function StudioInspectorSelectionStrokeControls({
             value={activeColor}
             onChange={applyColor}
             recentColors={availableRecentColors}
-            onLoadRecentColors={
-              onEnsureRecentColorsLoaded ?? ensureSharedStudioRecentColorsLoaded
-            }
+            onLoadRecentColors={requestRecentColors}
             label="선 색상"
             purpose="generic"
             className="absolute inset-0 z-10 block h-full w-full [&>*]:block [&>*]:h-full [&>*]:w-full [&_button]:h-full [&_button]:w-full [&_button]:rounded-xl [&_button]:opacity-0"
