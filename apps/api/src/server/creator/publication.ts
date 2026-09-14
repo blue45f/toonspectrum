@@ -15,6 +15,15 @@ import {
   type CreatorPublicationDirective,
   type CreatorPublicationValidationIssue,
 } from "../../../../web/src/shared/lib/creator-publication-contract";
+import type {
+  CreatorCommunityContentGroup,
+  CreatorCommunityProvenance,
+} from "../../../../web/src/shared/lib/creator-community-publication-contract";
+import {
+  projectCreatorWorkDetailWithRelease,
+  projectCreatorWorkListWithReleases,
+  promoteDueCreatorCommunityPublications,
+} from "./community-publishing";
 import { creatorWorks, db } from "../../db";
 import {
   CREATOR_WORK_REVISION_MAX,
@@ -219,6 +228,10 @@ export interface CreatorPublicationListOptions {
   seriesId?: string;
   challengeId?: string;
   followedBy?: string;
+  contentType?: CreatorCommunityContentGroup;
+  portfolio?: boolean;
+  provenance?: CreatorCommunityProvenance;
+  bookmarkedBy?: string;
 }
 
 async function documentsByWorkId(
@@ -271,7 +284,8 @@ export async function listWorks(
     options.userId === options.viewerId;
   if (ownerView || options.includeHidden || works.length === 0) return works;
   try {
-    return await listableWorkSummaries(works);
+    const visible = await listableWorkSummaries(works);
+    return await projectCreatorWorkListWithReleases(visible);
   } catch {
     // Discovery fails closed so a transient metadata read cannot leak an unlisted work.
     return [];
@@ -353,17 +367,21 @@ export async function getWork(
       publicationAwareNeighbors(work, viewerId),
       publicationAwareRemixRelations(work),
     ]);
-    return { ...work, ...neighbors, ...remixRelations };
+    return await projectCreatorWorkDetailWithRelease({
+      ...work,
+      ...neighbors,
+      ...remixRelations,
+    });
   } catch {
     // Exact-link access remains available, but related discovery fails closed.
-    return {
+    return projectCreatorWorkDetailWithRelease({
       ...work,
       prevEpisode: null,
       nextEpisode: null,
       remixFromId: null,
       remixFromTitle: null,
       remixedChildren: [],
-    };
+    });
   }
 }
 
@@ -559,6 +577,7 @@ export async function promoteDueCreatorPublications(
   const now = options.now ?? new Date();
   const nowIso = now.toISOString();
   const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 50)));
+  const explicitlyPromoted = await promoteDueCreatorCommunityPublications(now, limit);
   const candidates = await db
     .select({
       id: creatorWorks.id,
@@ -584,7 +603,7 @@ export async function promoteDueCreatorPublications(
     )
     .limit(limit);
 
-  const workIds: string[] = [];
+  const workIds: string[] = [...explicitlyPromoted];
   let skipped = 0;
   for (const candidate of candidates) {
     const directive = readCreatorPublicationDirective(candidate.doc);
