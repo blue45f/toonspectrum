@@ -63,7 +63,7 @@ export function prepareCloudflareStaticAssets(
 
   for (const file of oversizedFiles) {
     console.log(
-      `Cloudflare large-asset passthrough: ${file.relativePath} (${file.bytes} bytes)`,
+      `Cloudflare R2 large asset excluded from Static Assets: ${file.relativePath} (${file.bytes} bytes)`,
     );
   }
   console.log(`Wrote ${ignorePath}`);

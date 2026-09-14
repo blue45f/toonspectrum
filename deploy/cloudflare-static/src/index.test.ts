@@ -7,6 +7,7 @@ import {
   createCloudflareStaticGateway,
   createCoreApiRequest,
   type CloudflareStaticEnv,
+  type R2ObjectBodyBinding,
 } from "./index";
 
 function environment(overrides: Partial<CloudflareStaticEnv> = {}): CloudflareStaticEnv {
@@ -16,6 +17,25 @@ function environment(overrides: Partial<CloudflareStaticEnv> = {}): CloudflareSt
     },
     CORE_API_ORIGIN: "https://core.example.test",
     ...overrides,
+  };
+}
+
+function r2Object(
+  bodyText: string,
+  options: {
+    readonly size?: number;
+    readonly range?: { readonly offset: number; readonly length: number };
+    readonly etag?: string;
+  } = {},
+): R2ObjectBodyBinding {
+  return {
+    size: options.size ?? new TextEncoder().encode(bodyText).byteLength,
+    httpEtag: options.etag ?? '"r2-etag"',
+    range: options.range,
+    body: new Response(bodyText).body!,
+    writeHttpMetadata(headers) {
+      headers.set("content-disposition", "inline");
+    },
   };
 }
 
@@ -44,6 +64,11 @@ describe("Cloudflare static gateway", () => {
       readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     ) as {
       assets?: { run_worker_first?: string[] };
+      r2_buckets?: Array<{
+        binding?: string;
+        bucket_name?: string;
+        preview_bucket_name?: string;
+      }>;
     };
 
     expect((wrangler as { workers_dev?: boolean }).workers_dev).toBe(true);
@@ -60,6 +85,11 @@ describe("Cloudflare static gateway", () => {
       "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
     ]);
     expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
+    expect(wrangler.r2_buckets).toEqual([{
+      binding: "LARGE_ASSETS",
+      bucket_name: "toonspectrum-public-assets",
+      preview_bucket_name: "toonspectrum-public-assets",
+    }]);
   });
 
   it("leaves static traffic on the free Static Assets path", async () => {
@@ -166,7 +196,63 @@ describe("Cloudflare static gateway", () => {
     }
   });
 
-  it("proxies oversized immutable assets without forwarding session credentials", async () => {
+  it("serves oversized immutable assets from R2 before the origin", async () => {
+    const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => r2Object("r2-wasm"));
+    const head = vi.fn(async (_key: string) => null);
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request(
+        "https://www.toonstudio.cloud/assets/opencascade.wasm-build123.wasm",
+        { headers: { authorization: "Bearer private", cookie: "session=private" } },
+      ),
+      environment({ LARGE_ASSETS: { get, head } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("r2-wasm");
+    expect(response.headers.get("content-type")).toBe("application/wasm");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    expect(response.headers.get("x-toonspectrum-large-asset-source")).toBe("r2");
+    expect(response.headers.get("etag")).toBe('"r2-etag"');
+    expect(get).toHaveBeenCalledWith(
+      "assets/opencascade.wasm-build123.wasm",
+      undefined,
+    );
+    expect(head).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("preserves byte ranges while serving R2 large assets", async () => {
+    const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => r2Object("part", {
+      size: 65_864_037,
+      range: { offset: 0, length: 4 },
+    }));
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request(
+        "https://www.toonstudio.cloud/assets/opencascade.wasm-build123.wasm",
+        { headers: { range: "bytes=0-3" } },
+      ),
+      environment({ LARGE_ASSETS: { get, head: vi.fn(async (_key: string) => null) } }),
+    );
+
+    expect(response.status).toBe(206);
+    expect(await response.text()).toBe("part");
+    expect(response.headers.get("content-range")).toBe(
+      "bytes 0-3/65864037",
+    );
+    expect(response.headers.get("content-length")).toBe("4");
+    const options = get.mock.calls[0]?.[1];
+    expect(options?.range?.get("range")).toBe("bytes=0-3");
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the immutable origin when R2 misses", async () => {
+    const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => null);
     const upstream = vi.fn<typeof fetch>(async (request) => {
       const proxied = request as Request;
       return new Response(JSON.stringify({
@@ -189,7 +275,10 @@ describe("Cloudflare static gateway", () => {
           },
         },
       ),
-      environment({ LARGE_ASSET_ORIGIN: "https://large-assets.example.test" }),
+      environment({
+        LARGE_ASSETS: { get, head: vi.fn(async (_key: string) => null) },
+        LARGE_ASSET_ORIGIN: "https://large-assets.example.test",
+      }),
     );
 
     await expect(response.json()).resolves.toEqual({
@@ -199,6 +288,7 @@ describe("Cloudflare static gateway", () => {
       authorization: null,
       cookie: null,
     });
+    expect(get).toHaveBeenCalledOnce();
     expect(upstream).toHaveBeenCalledOnce();
   });
 

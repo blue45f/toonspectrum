@@ -74,10 +74,11 @@ describe("Cloudflare static deployment origin contract", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(commands).toHaveLength(4);
+    expect(commands).toHaveLength(5);
     expect(commands[1]).toMatchObject({ catalogSource: "static" });
     expect(commands[2].args).toEqual(["run", "prepare:cloudflare-static-assets"]);
-    expect(commands[3].args).toEqual(expect.arrayContaining([
+    expect(commands[3].args).toEqual(["run", "sync:cloudflare-r2-assets:dry-run"]);
+    expect(commands[4].args).toEqual(expect.arrayContaining([
       "exec",
       "wrangler",
       "deploy",

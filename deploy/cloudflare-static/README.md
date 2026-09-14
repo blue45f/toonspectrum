@@ -25,7 +25,7 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 | playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
 | realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
-| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | `LARGE_ASSET_ORIGIN` | 세션·사용자 헤더 제거 후 단일 불변 파일 권위로 전달 |
+| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | R2 `LARGE_ASSETS` binding | R2 직접 스트리밍·Range 지원, 객체 누락/장애 시 선택적 `LARGE_ASSET_ORIGIN`으로 안전하게 폴백 |
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
 
@@ -46,6 +46,7 @@ core·social·playground·admin·realtime 요청의 전달 IP는 클라이언트
 - `x-toonspectrum-edge: cloudflare-static-gateway-v2`
 - `x-toonspectrum-edge-route: core | public-read | social | playground | admin | realtime | large-asset`
 - `x-toonspectrum-edge-attempt: 0..n`
+- R2 대형 파일 응답의 `x-toonspectrum-large-asset-source: r2`
 
 사용자 credential을 Worker 변수에 저장하지 않는다.
 
@@ -86,12 +87,17 @@ pnpm run cloudflare:static:dry-run
 - POST body stream을 손상하지 않는 URL rewrite
 - OG route mapping과 WebSocket passthrough
 - Vercel과 Cloudflare 보안 헤더 계약 동기화
+- R2 대형 파일의 전체·HEAD·Range·ETag 응답과 원본 fallback
 
 `dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성과 모든 origin 변수를 검사하지만 원격에 배포하지 않는다.
 
 ### 25 MiB 초과 정적 파일
 
-Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB만 `.assetsignore`에 기록한다. 다른 파일이 한도를 넘으면 배포는 실패한다. 무시된 경로는 Worker가 `LARGE_ASSET_ORIGIN`에서 동일 URL로 가져오며 Authorization, Cookie, 사용자·관리자·세션 헤더를 전달하지 않는다. R2가 계정에서 활성화되면 이 임시 origin을 R2 binding으로 대체한다.
+Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB만 `.assetsignore`에 기록한다. 다른 파일이 한도를 넘으면 배포는 실패한다.
+
+두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. 전체 GET, HEAD, byte Range와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. R2 객체가 없거나 일시적으로 읽히지 않을 때만 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다.
+
+`sync:cloudflare-r2-assets:dry-run`은 빌드 산출물과 허용 목록을 검증하고 원격 쓰기를 하지 않는다. 운영 배포에서는 `sync:cloudflare-r2-assets`가 승인된 초과 파일을 R2에 먼저 업로드한 뒤 Worker를 배포한다.
 
 ## 수동 운영 배포
 
@@ -104,6 +110,8 @@ export CLOUDFLARE_SOCIAL_API_ORIGIN=https://<social-origin>
 export CLOUDFLARE_PLAYGROUND_API_ORIGIN=https://<playground-origin>
 export CLOUDFLARE_ADMIN_API_ORIGIN=https://<admin-origin>
 export CLOUDFLARE_REALTIME_API_ORIGIN=https://<realtime-origin>
+# 선택적 R2 장애 fallback
+export CLOUDFLARE_LARGE_ASSET_ORIGIN=https://<immutable-origin>
 export VITE_CATALOG_SOURCE=static
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
@@ -115,7 +123,7 @@ pnpm run cloudflare:static:deploy
 
 ## 커스텀 도메인 전환
 
-`workers_dev`는 비활성이다. 최초 운영 전환은 Cloudflare 계정에서 검토자가 직접 `www.toonstudio.cloud` 커스텀 도메인을 연결한 후 canary URL로 검증한다. Apex `toonstudio.cloud`는 Bulk Redirect 또는 Redirect Rule로 `https://www.toonstudio.cloud/:path`에 영구 리다이렉트한다. `_redirects` 파일은 domain-level redirect를 지원하지 않으므로 이 규칙을 애플리케이션 코드로 흉내 내지 않는다.
+`workers_dev` URL은 배포 후 독립 canary로 유지한다. 운영 트래픽은 Cloudflare 영역 라우트 `toonstudio.cloud/*`, `www.toonstudio.cloud/*`가 이 Worker를 실행하며 실패 모드는 fail-open이다. `origin.toonstudio.cloud`는 DNS-only Vercel 원본으로 남겨 API와 R2 fallback의 재귀 프록시를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
 
 ## 헤더 계약
 

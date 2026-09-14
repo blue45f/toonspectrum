@@ -1,11 +1,36 @@
-import { isCloudflareOversizedAssetPath } from "./large-static-assets";
+import {
+  CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
+  cloudflareLargeAssetDescriptor,
+  cloudflareLargeAssetKey,
+  isCloudflareOversizedAssetPath,
+} from "./large-static-assets";
 
 export interface AssetsBinding {
   fetch(request: Request): Promise<Response>;
 }
 
+export interface R2ObjectBinding {
+  readonly size: number;
+  readonly httpEtag: string;
+  readonly range?: { readonly offset: number; readonly length: number };
+  writeHttpMetadata(headers: Headers): void;
+}
+
+export interface R2ObjectBodyBinding extends R2ObjectBinding {
+  readonly body: ReadableStream<Uint8Array>;
+}
+
+export interface R2BucketBinding {
+  get(
+    key: string,
+    options?: { readonly range?: Headers },
+  ): Promise<R2ObjectBodyBinding | null>;
+  head(key: string): Promise<R2ObjectBinding | null>;
+}
+
 export interface CloudflareStaticEnv {
   readonly ASSETS: AssetsBinding;
+  readonly LARGE_ASSETS?: R2BucketBinding;
   readonly CORE_API_ORIGIN?: string;
   /** Comma-separated stateless read replicas for public/catalog/search traffic. */
   readonly PUBLIC_READ_API_ORIGINS?: string;
@@ -412,6 +437,96 @@ function retryableRead(request: Request, route: DynamicRoute): boolean {
     && !isWebSocketUpgrade(request);
 }
 
+function matchesIfNoneMatch(request: Request, httpEtag: string): boolean {
+  const raw = request.headers.get("if-none-match");
+  if (!raw) return false;
+  const target = httpEtag.startsWith("W/") ? httpEtag.slice(2) : httpEtag;
+  return raw.split(",").some((candidate) => {
+    const value = candidate.trim();
+    if (value === "*") return true;
+    return (value.startsWith("W/") ? value.slice(2) : value) === target;
+  });
+}
+
+function r2LargeAssetHeaders(
+  object: R2ObjectBinding,
+  contentType: string,
+): Headers {
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("content-type", contentType);
+  headers.set("cache-control", CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL);
+  headers.set("etag", object.httpEtag);
+  headers.set("accept-ranges", "bytes");
+  headers.set("access-control-allow-origin", "*");
+  headers.set("x-toonspectrum-large-asset-source", "r2");
+  if (object.range) {
+    const end = object.range.offset + object.range.length - 1;
+    headers.set(
+      "content-range",
+      `bytes ${object.range.offset}-${end}/${object.size}`,
+    );
+    headers.set("content-length", String(object.range.length));
+  } else {
+    headers.set("content-length", String(object.size));
+  }
+  return headers;
+}
+
+async function serveR2LargeAsset(
+  request: Request,
+  env: CloudflareStaticEnv,
+): Promise<Response | null> {
+  const requestUrl = new URL(request.url);
+  const descriptor = cloudflareLargeAssetDescriptor(requestUrl.pathname);
+  const key = cloudflareLargeAssetKey(requestUrl.pathname);
+  if (!descriptor || !key || !env.LARGE_ASSETS) return null;
+
+  const method = request.method.toUpperCase();
+  if (method === "OPTIONS") {
+    return withSecurityHeaders(new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, HEAD, OPTIONS",
+        "access-control-allow-headers": "Range, If-None-Match",
+        "access-control-max-age": "86400",
+      },
+    }));
+  }
+  if (method !== "GET" && method !== "HEAD") {
+    return withSecurityHeaders(new Response(null, {
+      status: 405,
+      headers: { allow: "GET, HEAD, OPTIONS" },
+    }));
+  }
+
+  try {
+    const object = method === "HEAD"
+      ? await env.LARGE_ASSETS.head(key)
+      : await env.LARGE_ASSETS.get(
+        key,
+        request.headers.has("range") ? { range: request.headers } : undefined,
+      );
+    if (!object) return null;
+
+    const headers = r2LargeAssetHeaders(object, descriptor.contentType);
+    if (matchesIfNoneMatch(request, object.httpEtag)) {
+      headers.delete("content-length");
+      headers.delete("content-range");
+      return withSecurityHeaders(new Response(null, { status: 304, headers }));
+    }
+
+    const status = object.range ? 206 : 200;
+    const body = method === "HEAD"
+      ? null
+      : (object as R2ObjectBodyBinding).body;
+    return withSecurityHeaders(new Response(body, { status, headers }));
+  } catch {
+    return null;
+  }
+}
+
 export function createCloudflareStaticGateway(
   runtime: GatewayRuntime = DEFAULT_RUNTIME,
 ) {
@@ -425,6 +540,11 @@ export function createCloudflareStaticGateway(
     }
 
     const route = classifyDynamicRoute(request, requestUrl);
+    if (route === "large-asset") {
+      const r2Response = await serveR2LargeAsset(request, env);
+      if (r2Response) return r2Response;
+    }
+
     const resolution = resolveOrigins(route, env);
     const selfReferential = resolution.origins.some(
       (origin) => origin.origin === requestUrl.origin,

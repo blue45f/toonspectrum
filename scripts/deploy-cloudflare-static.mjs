@@ -111,6 +111,15 @@ for (const command of [
   {
     executable: "pnpm",
     args: [
+      "run",
+      mode === "production"
+        ? "sync:cloudflare-r2-assets"
+        : "sync:cloudflare-r2-assets:dry-run",
+    ],
+  },
+  {
+    executable: "pnpm",
+    args: [
       "exec",
       "wrangler",
       "deploy",

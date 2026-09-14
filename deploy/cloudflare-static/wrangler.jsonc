@@ -21,5 +21,12 @@
       "/assets/opencascade.wasm-*.wasm",
       "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb"
     ]
-  }
+  },
+  "r2_buckets": [
+    {
+      "binding": "LARGE_ASSETS",
+      "bucket_name": "toonspectrum-public-assets",
+      "preview_bucket_name": "toonspectrum-public-assets"
+    }
+  ]
 }
