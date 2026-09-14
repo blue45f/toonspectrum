@@ -82,6 +82,7 @@ export interface StudioBg3dProSuiteRuntimeValue {
   readonly onMoveProductionShot: (shotId: string, targetIndex: number) => void;
   readonly onRemoveProductionShot: (shotId: string) => void;
   readonly onUseCurrentFrameAsAiReference: (() => void) | undefined;
+  readonly onOpenPrecisionModeler?: () => void;
   readonly aiReferenceBusy: boolean;
   readonly aiReferenceDisabled: boolean;
 }

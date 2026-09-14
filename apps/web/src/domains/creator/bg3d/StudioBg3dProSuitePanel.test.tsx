@@ -20,8 +20,19 @@ function runtime(overrides: Partial<StudioBg3dProSuiteRuntimeValue> = {}): Studi
     ...overrides,
   };
 }
-function workbench(value: StudioBg3dProSuiteRuntimeValue, disabled = false) {
-  return <StudioBg3dProSuiteRuntimeContext.Provider value={value}><StudioBg3dProSuitePanel disabled={disabled} /></StudioBg3dProSuiteRuntimeContext.Provider>;
+function workbench(
+  value: StudioBg3dProSuiteRuntimeValue,
+  disabled = false,
+  onOpenPrecisionModeler?: () => void,
+) {
+  return (
+    <StudioBg3dProSuiteRuntimeContext.Provider value={value}>
+      <StudioBg3dProSuitePanel
+        disabled={disabled}
+        onOpenPrecisionModeler={onOpenPrecisionModeler}
+      />
+    </StudioBg3dProSuiteRuntimeContext.Provider>
+  );
 }
 
 afterEach(cleanup);
@@ -52,6 +63,35 @@ describe("production workbench scene integration", () => {
     expect(value.onApplyCameraView).not.toHaveBeenCalled();
     expect(value.onComposeLens).not.toHaveBeenCalled();
     expect(value.onCaptureCurrentShot).not.toHaveBeenCalled();
+  });
+  it("opens the precision mesh and CAD workspace from the production workbench", () => {
+    const openPrecisionModeler = vi.fn();
+    render(workbench(runtime(), false, openPrecisionModeler));
+
+    const launcher = screen.getByRole("button", {
+      name: "정밀 모델링 워크스페이스 열기",
+    });
+    expect((launcher as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(launcher);
+    expect(openPrecisionModeler).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/현재 BG3D 장면을 복구 가능한 원본으로/)).toBeDefined();
+    expect(screen.getByText(/CAD 형상으로 자동 변환하지 않습니다/)).toBeDefined();
+  });
+  it("fails closed when the precision modeler bridge is unavailable or the scene is locked", () => {
+    const openPrecisionModeler = vi.fn();
+    const view = render(workbench(runtime()));
+    expect((screen.getByRole("button", {
+      name: "정밀 모델링 워크스페이스 열기",
+    }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/문서 편집기에서 3D 장면을 열면/)).toBeDefined();
+
+    view.rerender(workbench(runtime(), true, openPrecisionModeler));
+    const lockedLauncher = screen.getByRole("button", {
+      name: "정밀 모델링 워크스페이스 열기",
+    }) as HTMLButtonElement;
+    expect(lockedLauncher.disabled).toBe(true);
+    fireEvent.click(lockedLauncher);
+    expect(openPrecisionModeler).not.toHaveBeenCalled();
   });
   it("does not offer successful fake scene actions without a scene", () => {
     render(<StudioBg3dProSuitePanel />);

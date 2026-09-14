@@ -247,6 +247,7 @@ export interface StudioLazyPanelStackProps {
   bg3dSeedTemplateId: string | null;
   bg3dSeedPrimitiveKind: string | null;
   onSeedObjectInsertConsumed: () => void;
+  onOpenPrecisionModeler?: (scene: StudioBg3dSceneDocument) => void;
   characterBible: StudioCharacterBible;
   characterBibleOpen: boolean;
   checkpointError: string | null;
@@ -460,6 +461,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   bg3dSeedTemplateId,
   bg3dSeedPrimitiveKind,
   onSeedObjectInsertConsumed,
+  onOpenPrecisionModeler,
   characterBible,
   characterBibleOpen,
   checkpointError,
@@ -678,6 +680,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         bg3dSeedTemplateId={bg3dSeedTemplateId}
         bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
         onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
+        onOpenPrecisionModeler={onOpenPrecisionModeler}
         composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
         currentPageId={currentPageId}
         elementById={elementById}
