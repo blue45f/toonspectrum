@@ -1,3 +1,4 @@
+import { StudioBrushV6ProviderPlan } from "./StudioBrushV6ProviderPlan";
 import { StudioBrushV6RecipeShelf } from "./StudioBrushV6RecipeShelf";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import { isBrushStudioV6TopologyNodeCompatible } from "./brush-studio-v6-topology-material";
@@ -347,7 +348,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
     setStatus(type === "undo" ? "이전 브러시 설정으로 되돌렸습니다." : "브러시 설정 변경을 다시 적용했습니다.");
   };
   const saveToStudio = async () => {
-    if (saving) return;
+    if (saving || !analysis.valid) return;
     const generation = editGenerationRef.current;
     setSaving(true);
     try {
@@ -378,7 +379,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             <p className="mt-1 text-xs leading-relaxed text-fg-3">{BRUSH_STUDIO_V6_RECIPES.length}개 시그니처 레시피에서 시작해 재료와 물리를 조절하세요. 같은 궤적으로 비교하고, 실제 입력 패드에서 손맛을 확인할 수 있습니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "스튜디오에 브러시 저장"}</button>
+            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving || !analysis.valid} title={analysis.valid ? undefined : "실행할 수 없는 엔진 조합은 저장하지 않습니다."} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "스튜디오에 브러시 저장"}</button>
             {savedHref ? <a href={savedHref} className={PRIMARY}>원고에서 사용하기</a> : null}
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.past.length} onClick={() => moveHistory("undo")} title="실행 취소 (⌘/Ctrl+Z)">실행 취소</button>
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.future.length} onClick={() => moveHistory("redo")} title="다시 실행 (⌘/Ctrl+Shift+Z)">다시 실행</button>
@@ -424,7 +425,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
 
           {tab === "pattern" ? <><Panel title="패턴·문양" description="반복 토폴로지와 문서 위상이 다른 패턴은 독립 브러시 정체성으로 유지합니다."><Select id="brush-v6-pattern" label="패턴 프로그램" value={program.slots.pattern} options={nodeOptions("pattern", Boolean(topology))} onChange={(id) => choose("pattern", id)} /><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{PATTERN.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div><p className="mt-3 text-xs leading-5 text-fg-3">같은 개성 시드와 접촉 간격은 저장·다시 열기·내보내기에도 보존됩니다.</p></Panel></> : null}
 
-          {tab === "runtime" ? <><Panel title="실행 패스" description="선택한 그래프의 실행 설계입니다. 아래 비용과 백엔드는 설계 추정이며 측정된 실행 결과가 아닙니다."><div className="space-y-2">{analysis.passes.map((pass) => <article key={pass.id} className={SUB}><div className="flex flex-wrap justify-between gap-2"><h3 className="text-xs font-black text-fg">{pass.label}</h3><span className="text-[0.65rem] font-black text-accent">{pass.phase} · {pass.domain} · {pass.budgetMs.toFixed(2)}ms</span></div><p className="mt-1 text-[0.68rem] text-fg-3">{pass.nodeIds.map((id) => brushStudioV6Node(id).provider).filter((value, index, values) => values.indexOf(value) === index).join(" + ")} · {pass.nodeIds.join(" → ") || "presentation"}</p></article>)}</div></Panel><Panel title="설계상 리소스 추정" description="그래프 모델에서 산출한 예상 필드와 메모리입니다. 현재 브라우저가 실제 할당한 메모리와 다를 수 있습니다."><div className="grid gap-2 sm:grid-cols-2">{analysis.resources.map((resource) => <div key={resource.id} className={SUB}><div className="flex justify-between text-xs font-black text-fg"><span>{resource.id}</span><span>{resource.format}</span></div><p className="mt-1 text-xs text-fg-3">{resource.owner} · scale {resource.scale}</p><p className="mt-1 text-[0.68rem] font-bold text-fg-2">약 {resource.estimatedMb.toFixed(1)}MB</p></div>)}</div></Panel><Panel title="브라우저 능력" description="브라우저가 제공하는 API 유무입니다. API 지원이 개별 외부 엔진의 연결이나 실행을 보장하지는 않습니다."><div className="flex flex-wrap gap-2">{capabilityRows(capabilities).map((item) => <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[0.68rem] font-bold ${item.enabled ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-bg-2 text-fg-3"}`}>{item.label} · {item.enabled ? "YES" : "NO"}</span>)}</div></Panel></> : null}
+          {tab === "runtime" ? <><StudioBrushV6ProviderPlan plan={analysis.providerPlan} /><Panel title="실행 패스" description="선택한 그래프의 실행 설계입니다. 아래 비용과 백엔드는 설계 추정이며 측정된 실행 결과가 아닙니다."><div className="space-y-2">{analysis.passes.map((pass) => <article key={pass.id} className={SUB}><div className="flex flex-wrap justify-between gap-2"><h3 className="text-xs font-black text-fg">{pass.label}</h3><span className="text-[0.65rem] font-black text-accent">{pass.phase} · {pass.domain} · {pass.budgetMs.toFixed(2)}ms</span></div><p className="mt-1 text-[0.68rem] text-fg-3">{pass.nodeIds.map((id) => brushStudioV6Node(id).provider).filter((value, index, values) => values.indexOf(value) === index).join(" + ")} · {pass.nodeIds.join(" → ") || "presentation"}</p></article>)}</div></Panel><Panel title="설계상 리소스 추정" description="그래프 모델에서 산출한 예상 필드와 메모리입니다. 현재 브라우저가 실제 할당한 메모리와 다를 수 있습니다."><div className="grid gap-2 sm:grid-cols-2">{analysis.resources.map((resource) => <div key={resource.id} className={SUB}><div className="flex justify-between text-xs font-black text-fg"><span>{resource.id}</span><span>{resource.format}</span></div><p className="mt-1 text-xs text-fg-3">{resource.owner} · scale {resource.scale}</p><p className="mt-1 text-[0.68rem] font-bold text-fg-2">약 {resource.estimatedMb.toFixed(1)}MB</p></div>)}</div></Panel><Panel title="브라우저 능력" description="브라우저가 제공하는 API 유무입니다. API 지원이 개별 외부 엔진의 연결이나 실행을 보장하지는 않습니다."><div className="flex flex-wrap gap-2">{capabilityRows(capabilities).map((item) => <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[0.68rem] font-bold ${item.enabled ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-bg-2 text-fg-3"}`}>{item.label} · {item.enabled ? "YES" : "NO"}</span>)}</div></Panel></> : null}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">

@@ -38,10 +38,19 @@ describe("Brush Studio V6 quality authority", () => {
     }
   });
 
-  it("compiles every signature recipe under the full capability profile", () => {
+  it("compiles connected recipes and fails unavailable providers closed without fallback", () => {
     for (const recipe of BRUSH_STUDIO_V6_RECIPES) {
       const analysis = analyzeBrushStudioV6Program(recipe.create(), BRUSH_STUDIO_V6_FULL_CAPABILITIES);
-      expect(analysis.valid, `${recipe.id}: ${analysis.issues.map((entry) => entry.id).join(", ")}`).toBe(true);
+      if (analysis.providerPlan.valid) {
+        expect(analysis.valid, `${recipe.id}: ${analysis.issues.map((entry) => entry.id).join(", ")}`).toBe(true);
+      } else {
+        expect(analysis.valid).toBe(false);
+        expect(analysis.providerPlan.fallbackPolicy).toBe("none");
+        expect(analysis.providerPlan.blockedNodeIds.length).toBeGreaterThan(0);
+        expect(analysis.providerPlan.blockedNodeIds.every((id) =>
+          analysis.issues.some((entry) => entry.id === `provider-${id}`)
+        )).toBe(true);
+      }
       expect(analysis.passes.some((entry) => entry.phase === "commit")).toBe(true);
       expect(analysis.passes.some((entry) => entry.phase === "export")).toBe(true);
     }
