@@ -3963,7 +3963,9 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
     const hud = page.getByRole("toolbar", { name: "캔버스 확대 및 축소 보기 도구", exact: true });
     const step = hud.getByRole("button", { name: zoomAction, exact: true });
     for (let count = 0; count < 30 && await step.getAttribute("aria-disabled") !== "true"; count += 1) {
-      await step.click();
+      // This is a state-only toolbar button. Do not let an unrelated in-flight document reload turn
+      // an already completed click into a false navigation timeout on a busy Linux runner.
+      await step.click({ noWaitAfter: true });
     }
     invariant(await step.getAttribute("aria-disabled") === "true", "Smart Shape edge audit did not reach the real zoom limit");
     const zoomValue = await hud.getByRole("textbox", { name: "캔버스 확대율 입력", exact: true }).inputValue();
