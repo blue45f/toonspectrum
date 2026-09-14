@@ -193,6 +193,7 @@ const hasFlag = (flagName, envName) =>
 const updateBaselineRequested = hasFlag("--update-baseline", "UPDATE_BUNDLE_BASELINE");
 const tightenBaselineRequested = hasFlag("--tighten", "TIGHTEN_BUNDLE_BASELINE");
 const runtimeProbeRequested = hasFlag("--runtime", "STUDIO_BUNDLE_RUNTIME");
+const runtimeProbePath = "/studio/canvas";
 const verboseReportRequested = hasFlag("--verbose", "STUDIO_BUNDLE_VERBOSE");
 
 // Byte metrics drift by a few hundred bytes on pure codegen churn, so a flat 2%
@@ -1003,6 +1004,7 @@ function loadBaseline() {
 }
 
 function writeBaseline({ previous, runtimeReport, tightenOnly }) { // NOSONAR javascript:S3776
+  const recordedAt = new Date().toISOString();
   const nextStatic = { ...(previous?.static ?? {}) };
   let changed = 0;
   for (const measurement of measurements) {
@@ -1024,7 +1026,7 @@ function writeBaseline({ previous, runtimeReport, tightenOnly }) { // NOSONAR ja
       runtimeMetrics[metric.key] = metric.value;
     }
     nextRuntime = {
-      recordedAt: new Date().toISOString(),
+      recordedAt,
       probe: runtimeReport.probe,
       metrics: runtimeMetrics,
       // Hash-free module identities, so the list survives rebuilds and a diff
@@ -1048,7 +1050,7 @@ function writeBaseline({ previous, runtimeReport, tightenOnly }) { // NOSONAR ja
 
   const next = {
     schema: baselineSchema,
-    recordedAt: new Date().toISOString(),
+    recordedAt,
     note: authoredNote ? `${generatedNote} ${authoredNote}` : generatedNote,
     policy: {
       ...ratchetPolicy,
@@ -1380,7 +1382,7 @@ async function waitForPreviewServer(baseUrl, child, timeoutMs) {
 async function warmUpReturningUser(context, baseUrl) {
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}/studio`, { waitUntil: "commit", timeout: 180_000 });
+    await page.goto(`${baseUrl}${runtimeProbePath}`, { waitUntil: "commit", timeout: 180_000 });
     await page.waitForSelector(".konvajs-content, canvas", { state: "attached", timeout: 120_000 });
     // The coach does not appear at first paint: its gate waits for the UI preference, work and
     // autosave hydrations, all of which resolve after the SQLite worker is up. Dismissing on the
@@ -1464,7 +1466,7 @@ async function probeRuntimeStartup(staticClosureFileNames) {
       await warmUpReturningUser(context, baseUrl);
       const page = await context.newPage();
       const startedAt = Date.now();
-      await page.goto(`${baseUrl}/studio`, { waitUntil: "commit", timeout: 180_000 });
+      await page.goto(`${baseUrl}${runtimeProbePath}`, { waitUntil: "commit", timeout: 180_000 });
       let interactiveMs = null;
       try {
         await page.waitForSelector(".konvajs-content, canvas", {
@@ -1520,7 +1522,7 @@ async function probeRuntimeStartup(staticClosureFileNames) {
       }
       return {
         probe: {
-          url: "/studio",
+          url: runtimeProbePath,
           settleMs,
           viewport: "1440x900",
           interactiveMs,
