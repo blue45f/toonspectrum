@@ -667,7 +667,7 @@ describe("studio-tools-companion protocol", () => {
       "https://example.com/studio/tools-companion?session=primary-a-1234"
     );
     expect(studioCompanionPrimaryUrl(sessionA, "https://example.com")).toBe(
-      "https://example.com/studio?session=primary-a-1234"
+      "https://example.com/studio/canvas?session=primary-a-1234"
     );
     expect(studioCompanionUrl(
       sessionA,
@@ -687,7 +687,7 @@ describe("studio-tools-companion protocol", () => {
       sessionA,
       "https://example.com",
       "?session=primary-a-1234&remix=source-456"
-    )).toBe("https://example.com/studio?session=primary-a-1234&remix=source-456");
+    )).toBe("https://example.com/studio/canvas?session=primary-a-1234&remix=source-456");
     expect(studioCompanionPrimaryUrl(
       sessionA,
       "https://example.com",
