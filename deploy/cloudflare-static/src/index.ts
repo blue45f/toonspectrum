@@ -137,6 +137,28 @@ function pathWithin(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+const PUBLIC_READ_EXACT_PATHS = new Set([
+  "/api/random",
+  "/api/home",
+  "/api/calendar",
+  "/api/insights",
+  "/api/ranking",
+  "/api/explore",
+  "/api/tags",
+  "/api/authors",
+  "/api/search",
+  "/api/titles",
+  "/api/kmas/book-webtoons",
+  "/api/cover",
+]);
+
+function isPublicReadPath(pathname: string): boolean {
+  return PUBLIC_READ_EXACT_PATHS.has(pathname)
+    || pathWithin(pathname, "/api/public")
+    || pathWithin(pathname, "/api/titles")
+    || pathWithin(pathname, "/api/authors");
+}
+
 function classifyDynamicRoute(request: Request, requestUrl: URL): DynamicRoute {
   if (
     requestUrl.pathname === "/socket.io"
@@ -161,14 +183,7 @@ function classifyDynamicRoute(request: Request, requestUrl: URL): DynamicRoute {
   }
   if (
     RETRYABLE_READ_METHODS.has(request.method.toUpperCase())
-    && (
-      pathWithin(requestUrl.pathname, "/api/public")
-      || pathWithin(requestUrl.pathname, "/api/catalog")
-      || pathWithin(requestUrl.pathname, "/api/search")
-      || pathWithin(requestUrl.pathname, "/api/titles")
-      || pathWithin(requestUrl.pathname, "/api/health")
-      || pathWithin(requestUrl.pathname, "/api/cover")
-    )
+    && isPublicReadPath(requestUrl.pathname)
   ) {
     return "public-read";
   }
