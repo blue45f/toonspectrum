@@ -12,7 +12,7 @@ import {
 } from "../../modules/studio-ai/studio-ai-provider";
 import { STUDIO_AI_BILLING_FAILOVER_REASON, studioAiProviderRequestId } from "../../modules/studio-ai/studio-ai-provider";
 import { StudioAiTaskSchema, type StudioAiProviderPreference } from "../../modules/studio-ai/studio-ai.dto";
-import { SupabaseObjectReferenceSchema } from "../supabase-object-storage/supabase-object-storage.contract";
+import { PrivateObjectReferenceSchema } from "../private-object-storage/private-object-storage.contract";
 
 import {
   BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
@@ -182,7 +182,7 @@ const ThumbnailPayloadSchema = z
     operation: z.literal("thumbnail.render"),
     tenantId: z.string().min(1).max(256),
     sourceAssetId: z.string().min(1).max(256),
-    sourceObject: SupabaseObjectReferenceSchema.optional(),
+    sourceObject: PrivateObjectReferenceSchema.optional(),
     format: z.enum(["webp", "png", "jpeg"]).optional(),
     maxWidth: z.number().int().positive().max(8_192).optional(),
     maxHeight: z.number().int().positive().max(8_192).optional(),

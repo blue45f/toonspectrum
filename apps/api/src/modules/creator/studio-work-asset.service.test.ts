@@ -132,7 +132,8 @@ function storageObject(
 ) {
   const digest = sha256(bytes);
   return {
-    contractVersion: "toonspectrum.supabase-object-storage.v1" as const,
+    contractVersion: "toonspectrum.private-object-storage.v2" as const,
+    providerId: "supabase" as const,
     purpose,
     digest: `sha256:${digest}` as const,
     objectPath: `sha256/${digest.slice(0, 2)}/${digest}` as const,

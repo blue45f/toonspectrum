@@ -3,7 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import {
   CreatePrivateSignedReadUrlSchema,
   DeletePrivateObjectSchema,
-  PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION,
+  PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
   PrivateObjectControlMetadataSchema,
   PrivateObjectPurposeSchema,
   PrivateObjectReferenceSchema,
@@ -432,7 +432,7 @@ export class S3CompatiblePrivateObjectStoragePort
     }
     const hash = sha256Hex(bytes);
     const object = PrivateObjectReferenceSchema.parse({
-      contractVersion: PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION,
+      contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
       purpose: parsed.data.purpose,
       digest: `sha256:${hash}`,
       objectPath: `sha256/${hash.slice(0, 2)}/${hash}`,

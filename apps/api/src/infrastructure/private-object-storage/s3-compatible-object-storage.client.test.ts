@@ -7,7 +7,7 @@ import {
   S3CompatiblePrivateObjectStoragePort,
   type S3CompatibleObjectStorageRuntime,
 } from "./s3-compatible-object-storage.client";
-import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "./private-object-storage.contract";
+import { PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION } from "./private-object-storage.contract";
 
 import type { S3CompatibleObjectStorageConfig } from "./private-object-storage.config";
 import type { PrivateObjectReference } from "./private-object-storage.contract";
@@ -53,7 +53,7 @@ function objectReference(  purpose: "source" | "derived" | "export" = "derived",
   contentType = "image/webp",
 ): PrivateObjectReference {
   return {
-    contractVersion: PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION,
+    contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
     purpose,
     digest: `sha256:${hash}`,
     objectPath: `sha256/${hash.slice(0, 2)}/${hash}`,

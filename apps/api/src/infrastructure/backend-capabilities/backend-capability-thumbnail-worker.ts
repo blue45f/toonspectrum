@@ -3,12 +3,10 @@ import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { decode, encodeJpeg, encodePng } from "image-js";
 
-import {
-  SupabaseObjectStorageError,
-} from "../supabase-object-storage/supabase-object-storage.client";
+import { PrivateObjectStorageError } from "../private-object-storage/private-object-storage.error";
+import type { PrivateObjectStoragePort } from "../private-object-storage/private-object-storage.port";
 import {
   SUPABASE_OBJECT_STORAGE_PORT,
-  type SupabaseObjectStoragePort,
 } from "../supabase-object-storage/supabase-object-storage.port";
 
 import { canonicalJsonStringify } from "./backend-capability-gateway-contract";
@@ -198,7 +196,7 @@ export class SupabaseThumbnailCapabilityWorker
     @Inject(BACKEND_CAPABILITY_WORKER_RUNTIME)
     private readonly runtime: BackendCapabilityWorkerRuntime,
     @Inject(SUPABASE_OBJECT_STORAGE_PORT)
-    private readonly storage: SupabaseObjectStoragePort,
+    private readonly storage: PrivateObjectStoragePort,
   ) {}
 
   async verifyReadiness(
@@ -415,7 +413,7 @@ export class SupabaseThumbnailCapabilityWorker
       if (options.signal?.aborted) {
         return rejected("THUMBNAIL_EXECUTION_ABORTED", true);
       }
-      if (error instanceof SupabaseObjectStorageError) {
+      if (error instanceof PrivateObjectStorageError) {
         return rejected("THUMBNAIL_OBJECT_STORAGE_UNAVAILABLE", true);
       }
       return rejected("THUMBNAIL_EXECUTION_FAILED", true);

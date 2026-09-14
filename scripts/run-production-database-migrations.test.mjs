@@ -25,12 +25,36 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(45);
+  expect(manifest).toHaveLength(48);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0045_studio_media_inference_jobs",
+    "0048_creator_asset_storage_locations",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(45);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(48);
+});
+
+test("creator storage location migration pins primaries and inventories verified replicas", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0048_creator_asset_storage_locations",
+  );
+  expect(migration?.id).toBe("0048_creator_asset_storage_locations");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "providerId" text',
+    "coalesce(\"providerId\", 'supabase')",
+    "toonspectrum.private-object-storage.v2",
+    "creator_asset_storage_object_provider_check",
+    "CREATE TABLE public.creator_asset_storage_replica",
+    "creator_asset_storage_replica_object_fkey",
+    "creator_asset_storage_replica_path_unique",
+    "creator_asset_storage_replica_validate_trigger",
+    "storage replica cannot duplicate the primary provider",
+    "storage replica metadata differs from the primary object",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toContain("REVOKE ALL ON TABLE public.creator_asset_storage_replica FROM PUBLIC");
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -311,6 +335,7 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
   for (const immutableColumn of [
     "purpose",
     "digest",
+    "providerId",
     "objectPath",
     "byteLength",
     "contentType",
@@ -329,6 +354,7 @@ test("creator object-storage grants and verification share one exact SQL contrac
   );
   for (const requiredColumn of [
     "contractVersion",
+    "providerId",
     "objectPath",
     "byteLength",
     "contentType",
@@ -574,6 +600,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_asset_qa_report",
     "creator_asset_rights_evidence",
     "creator_asset_storage_object",
+    "creator_asset_storage_replica",
     "creator_asset_upload_session",
     "creator_draft_collaboration_room",
     "creator_marketplace_draft",
