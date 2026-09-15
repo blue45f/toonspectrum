@@ -1,0 +1,73 @@
+name: One-shot PR Actions queue cleanup
+
+on:
+  push:
+    branches:
+      - fix/ci-preserve-explicit-reruns-20260916
+    paths:
+      - ".github/workflows/pr-actions-queue-cleanup.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: pr-actions-queue-cleanup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    name: Cancel superseded runs for this PR branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Preserve the newest run of each workflow and cancel older active runs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const headBranch = context.ref.replace(/^refs\/heads\//u, "");
+            const currentRunId = Number(context.runId);
+            const activeStatuses = new Set([
+              "queued",
+              "in_progress",
+              "pending",
+              "requested",
+              "waiting",
+            ]);
+
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, branch: headBranch, per_page: 100 },
+            );
+            const groups = new Map();
+            for (const run of runs) {
+              if (run.id === currentRunId || !activeStatuses.has(run.status)) continue;
+              const key = `${run.workflow_id}:${run.event}:${run.head_branch}`;
+              const entries = groups.get(key) ?? [];
+              entries.push(run);
+              groups.set(key, entries);
+            }
+
+            const cancelled = [];
+            const preserved = [];
+            for (const entries of groups.values()) {
+              entries.sort((left, right) => right.id - left.id);
+              const [latest, ...obsolete] = entries;
+              if (latest) preserved.push(latest.id);
+              for (const run of obsolete) {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                cancelled.push(run.id);
+              }
+            }
+
+            core.summary
+              .addHeading("PR Actions queue cleanup")
+              .addRaw(`Branch: ${headBranch}\n`)
+              .addRaw(`Preserved latest active runs: ${preserved.join(", ") || "none"}\n`)
+              .addRaw(`Cancelled superseded runs: ${cancelled.join(", ") || "none"}\n`)
+              .write();
