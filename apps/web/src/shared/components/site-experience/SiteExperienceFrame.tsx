@@ -8,6 +8,24 @@ import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/brow
 import "./site-experience.css";
 import "./site-art-direction.css";
 
+
+function SiteThemeAmbientArt() {
+  return (
+    <div className="site-experience-ambient" aria-hidden="true">
+      <span className="site-theme-art site-theme-art--ribbon"><i /><i /><i /></span>
+      <span className="site-theme-art site-theme-art--petals"><i /><i /><i /><i /><i /><i /></span>
+      <span className="site-theme-art site-theme-art--orbit"><i /><i /><i /></span>
+      <span className="site-theme-art site-theme-art--paper"><i /><i /><i /></span>
+      <span className="site-theme-art site-theme-art--ink"><i /><i /></span>
+      <svg className="site-theme-art site-theme-art--constellation" viewBox="0 0 520 300" preserveAspectRatio="none">
+        <path d="M38 206 126 92l91 73 84-121 85 109 96-76" />
+        <path d="m126 92 51-49 40 122 93 69 76-81" />
+        <g><circle cx="38" cy="206" r="3" /><circle cx="126" cy="92" r="4" /><circle cx="177" cy="43" r="3" /><circle cx="217" cy="165" r="5" /><circle cx="301" cy="44" r="4" /><circle cx="310" cy="234" r="3" /><circle cx="386" cy="153" r="5" /><circle cx="482" cy="77" r="3" /></g>
+      </svg>
+    </div>
+  );
+}
+
 /** No root/body mutations: unmounting the web frame removes every visual effect. */
 function ActiveSiteExperienceFrame({ children }: { children: ReactNode }) {
   const [mode, updateMode] = useState<ExperienceMode>(() => parseExperienceMode(
@@ -29,7 +47,7 @@ function ActiveSiteExperienceFrame({ children }: { children: ReactNode }) {
   return (
     <SiteExperienceContext.Provider value={settings}>
       <div data-site-experience={mode}>
-        <div className="site-experience-ambient" aria-hidden="true" />
+        <SiteThemeAmbientArt />
         {children}
       </div>
     </SiteExperienceContext.Provider>

@@ -6,14 +6,17 @@ import { CreatorArtworkStudy } from "./CreatorArtworkStudy";
 import { CreatorBrandFilm } from "./CreatorHomePage";
 import { CreatorLaunchpad } from "./CreatorLaunchpad";
 import { CreatorReferenceSearch } from "./CreatorReferenceSearch";
+import { creatorToolAsset, getCreatorThemeArt } from "./creator-theme-art";
 import { CreatorWorkspaceReadiness } from "./CreatorWorkspaceReadiness";
 import { HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 import { bindCreatorSectionNavigation, creatorWorkflowIndex, focusCreatorSection, isPlainCreatorJump } from "./creator-home-navigation";
 import "./creator-home-experience.css";
 import "./creator-flagship.css";
+import "./creator-theme-gallery.css";
 
 import { AtelierWorkbenchDemo } from "@/shared/components/site-experience/AtelierWorkbenchDemo";
 import { useI18n } from "@/shared/lib/i18n";
+import { useTheme } from "@/shared/lib/theme";
 import Link from "@/compat/router-link";
 
 const COPY = {
@@ -89,6 +92,18 @@ const COPY = {
   },
 } as const;
 const TOOL_ICONS = [Brush, LayoutGrid, Box, Clapperboard, Layers, Search] as const;
+const ART_ALT = {
+  ko: {
+    world: "인물과 건축, 빛의 방향으로 깊이를 표현한 판타지 웹툰 세계관 콘셉트 아트",
+    process: "스케치와 채색을 거쳐 완성 장면으로 이어지는 웹툰 창작 과정 콘셉트 아트",
+    materials: "붓과 안료, 종이와 다양한 표면 질감을 조합한 창작 재료 콘셉트 아트",
+  },
+  en: {
+    world: "Fantasy webtoon world-building concept art shaped by characters, architecture and directional light",
+    process: "Webtoon workflow concept art progressing from sketch and color to a finished scene",
+    materials: "Creative material concept art combining brushes, pigment, paper and varied surface textures",
+  },
+} as const;
 const SECTIONS = ["creator-toolkit-title", "creator-process-title", "creator-desk-title", "creator-offline-title", "creator-faq-title"] as const;
 
 function focusExperienceSection(event: MouseEvent<HTMLAnchorElement>) {
@@ -102,6 +117,8 @@ export function CreatorHomeExperience() {
   const locale = creatorHomeLocale(language);
   const copy = HOME_COPY[locale];
   const text = COPY[locale];
+  const resolvedTheme = useTheme((state) => state.resolvedTheme);
+  const artDirection = getCreatorThemeArt(resolvedTheme);
   const [stage, setStage] = useState(0);
   const selectedStage = copy.stages[stage];
   useEffect(() => bindCreatorSectionNavigation({
@@ -120,7 +137,7 @@ export function CreatorHomeExperience() {
     event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button").item(next).focus({ preventScroll: true });
   };
   return (
-    <div className="creator-home creator-experience creator-flagship" lang={locale} data-creator-home="studio-first" data-creator-experience="v4">
+    <div className="creator-home creator-experience creator-flagship" lang={locale} data-creator-home="studio-first" data-creator-experience="v4" data-theme-art={resolvedTheme}>
       <div className="cf-shell">
         <section className="cf-hero" aria-labelledby="creator-home-title">
           <div className="cf-hero-copy">
@@ -133,7 +150,15 @@ export function CreatorHomeExperience() {
             <div className="cf-hero-signature"><span aria-hidden="true">T/s.</span><p>{text.signature}</p><a href="#creator-toolkit-title" onClick={focusExperienceSection} aria-label={text.jumpLabels[0]}><ArrowDown size={18} aria-hidden="true" /></a></div>
           </div>
           <div className="cf-hero-visual">
-            <CreatorArtworkStudy locale={locale} stage={stage} />
+            <div className="cf-theme-collage" aria-hidden="true">
+              {artDirection.companions.map((asset, index) => (
+                <figure className={`cf-theme-collage-card cf-theme-collage-card--${index + 1}`} key={asset.id} data-art-asset={asset.id}>
+                  <img src={asset.src} srcSet={asset.srcSet} sizes="(max-width: 820px) 32vw, 14vw" width={1536} height={1024} alt="" />
+                </figure>
+              ))}
+              <span className="cf-theme-ribbon"><i /><i /><i /></span>
+            </div>
+            <CreatorArtworkStudy locale={locale} stage={stage} image={artDirection.hero} />
             <div className="cf-stage-switcher" role="group" aria-label={text.stageLabel}>{copy.stages.map((item, index) => <button type="button" key={item.id} aria-pressed={stage === index} aria-controls="creator-stage-description" data-creator-stage={item.id} onClick={() => setStage(index)} onKeyDown={(event) => moveStage(event, index)}><span>0{index + 1}</span>{item.label.replace(/^\d+\s*/, "")}<ArrowRight size={14} aria-hidden="true" /></button>)}</div>
             <div className="cf-stage-description" id="creator-stage-description" data-creator-stage={selectedStage.id} aria-live="polite"><div><strong>{selectedStage.title}</strong><p>{selectedStage.body}</p></div><Link href={selectedStage.href} aria-label={selectedStage.action}><ArrowRight size={20} aria-hidden="true" /></Link></div>
           </div>
@@ -144,16 +169,16 @@ export function CreatorHomeExperience() {
         <section className="cf-toolkit" id="creator-start" aria-labelledby="creator-toolkit-title">
           <div className="cf-section-heading"><div><p className="cf-kicker">A TOOLKIT FOR YOUR SIGNATURE</p><h2 id="creator-toolkit-title" tabIndex={-1}>{text.toolkit}</h2></div><p>{text.toolkitBody}</p></div>
           <div className="cf-capability-demo"><AtelierWorkbenchDemo locale={locale} /></div>
-          <div className="cf-tool-grid">{text.tools.map((tool, index) => { const Icon = TOOL_ICONS[index]; return <article className={`cf-tool-card cf-tool-${tool.visual}`} key={tool.tag}><div className="cf-tool-art"><img src={tool.image} width={1536} height={1024} loading="lazy" alt={tool.alt} /><span className="cf-tool-symbol" aria-hidden="true"><Icon size={25} strokeWidth={1.4} /></span>{tool.visual === "comic" && <div className="cf-comic-guides" aria-hidden="true"><i /><i /><i /></div>}{tool.visual === "motion" && <span className="cf-motion-track" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>}</div><div className="cf-tool-body"><div className="cf-tool-top"><span>{tool.tag}</span><ArrowRight size={18} aria-hidden="true" /></div><h3>{tool.title}</h3><p>{tool.body}</p><div className="cf-tool-bottom"><small>{tool.note}</small><Link className="cf-link" href={tool.href}>{tool.action}<ArrowRight size={17} aria-hidden="true" /></Link></div></div></article>; })}</div>
+          <div className="cf-tool-grid">{text.tools.map((tool, index) => { const Icon = TOOL_ICONS[index]; return <article className={`cf-tool-card cf-tool-${tool.visual}`} key={tool.tag}><div className="cf-tool-art"><img src={creatorToolAsset(artDirection, index).src} srcSet={creatorToolAsset(artDirection, index).srcSet} sizes="(max-width: 720px) 92vw, (max-width: 1100px) 46vw, 24vw" width={1536} height={1024} loading="lazy" alt={ART_ALT[locale][creatorToolAsset(artDirection, index).id]} data-art-asset={creatorToolAsset(artDirection, index).id} /><span className="cf-tool-symbol" aria-hidden="true"><Icon size={25} strokeWidth={1.4} /></span>{tool.visual === "comic" && <div className="cf-comic-guides" aria-hidden="true"><i /><i /><i /></div>}{tool.visual === "motion" && <span className="cf-motion-track" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>}</div><div className="cf-tool-body"><div className="cf-tool-top"><span>{tool.tag}</span><ArrowRight size={18} aria-hidden="true" /></div><h3>{tool.title}</h3><p>{tool.body}</p><div className="cf-tool-bottom"><small>{tool.note}</small><Link className="cf-link" href={tool.href}>{tool.action}<ArrowRight size={17} aria-hidden="true" /></Link></div></div></article>; })}</div>
         </section>
-        <section className="cf-flow" id="creator-flow" aria-labelledby="creator-process-title"><div className="cf-section-heading"><div><p className="cf-kicker">ONE IDEA. EVERY NEXT STEP.</p><h2 id="creator-process-title" tabIndex={-1}>{text.flow}</h2></div><p>{text.flowBody}</p></div><figure className="cf-process-art"><img src="/brand/atelier-process.webp" width={1536} height={1024} loading="lazy" alt={text.processAlt} /><figcaption><span>{text.processCaption}</span><span>{text.processNote}</span></figcaption></figure><ol>{text.flowSteps.map((item, index) => <li key={item.href}><div className="cf-flow-step"><span>0{index + 1}</span><span>{item.tag}</span><ArrowRight size={20} aria-hidden="true" /></div><h3>{item.title}</h3><p>{item.body}</p><Link href={item.href}>{item.action}<ArrowRight size={15} aria-hidden="true" /></Link></li>)}</ol></section>
+        <section className="cf-flow" id="creator-flow" aria-labelledby="creator-process-title"><div className="cf-section-heading"><div><p className="cf-kicker">ONE IDEA. EVERY NEXT STEP.</p><h2 id="creator-process-title" tabIndex={-1}>{text.flow}</h2></div><p>{text.flowBody}</p></div><figure className="cf-process-art" data-art-asset={artDirection.process.id}><img src={artDirection.process.src} srcSet={artDirection.process.srcSet} sizes="(max-width: 720px) 92vw, 86vw" width={1536} height={1024} loading="lazy" alt={ART_ALT[locale][artDirection.process.id]} /><span className="cf-process-insets" aria-hidden="true">{artDirection.companions.map((asset) => <img key={asset.id} src={asset.src} srcSet={asset.srcSet} sizes="18vw" width={1536} height={1024} loading="lazy" alt="" data-art-asset={asset.id} />)}</span><figcaption><span>{text.processCaption}</span><span>{text.processNote}</span></figcaption></figure><ol>{text.flowSteps.map((item, index) => <li key={item.href}><div className="cf-flow-step"><span>0{index + 1}</span><span>{item.tag}</span><ArrowRight size={20} aria-hidden="true" /></div><h3>{item.title}</h3><p>{item.body}</p><Link href={item.href}>{item.action}<ArrowRight size={15} aria-hidden="true" /></Link></li>)}</ol></section>
         <section id="creator-desk" aria-labelledby="creator-desk-title"><CreatorReferenceSearch locale={locale} /></section>
         <CreatorWorkspaceReadiness locale={locale} />
         <details className="cf-planner"><summary><Sparkles size={19} aria-hidden="true" />{text.planner}</summary><CreatorLaunchpad locale={locale} /></details>
         <CreatorBrandFilm copy={copy} locale={locale} />
         <section className="cf-discover" aria-labelledby="creator-discover-title"><div className="cf-section-heading"><div><p className="cf-kicker">A LIFE AROUND MAKING</p><h2 id="creator-discover-title" tabIndex={-1}>{text.explore}</h2></div><p>{text.exploreBody}</p></div><div className="cf-destinations">{text.destinations.map((item) => <Link href={item.href} key={item.href}><span>{item.tag}</span><strong>{item.title}</strong><p>{item.body}</p><ArrowRight size={21} aria-hidden="true" /></Link>)}</div></section>
         <section className="cf-faq" aria-labelledby="creator-faq-title"><div><p className="cf-kicker">GOOD TO KNOW</p><h2 id="creator-faq-title" tabIndex={-1}>{text.questions}</h2></div><div>{copy.faqs.map((faq) => <details key={faq.q}><summary>{faq.q}<span aria-hidden="true">+</span></summary><p>{faq.a}</p></details>)}</div></section>
-        <section className="cf-closing" aria-labelledby="creator-closing-title"><img src="/brand/atelier-world.webp" width={1536} height={1024} loading="lazy" alt="" aria-hidden="true" /><div><p className="cf-kicker">THE CANVAS IS YOURS</p><h2 id="creator-closing-title" tabIndex={-1}>{text.closing}</h2><p>{text.closingBody}</p><div className="cf-actions"><Link href="/studio" className="cf-button cf-primary">{text.start}<ArrowRight size={19} aria-hidden="true" /></Link><Link href="/research" className="cf-button cf-secondary">{text.flowSteps[0].action}</Link></div></div><span className="cf-closing-wordmark" aria-hidden="true">ToonStudio.</span></section>
+        <section className="cf-closing" aria-labelledby="creator-closing-title" data-art-asset={artDirection.closing.id}><img src={artDirection.closing.src} srcSet={artDirection.closing.srcSet} sizes="(max-width: 720px) 100vw, 72vw" width={1536} height={1024} loading="lazy" alt="" aria-hidden="true" /><div><p className="cf-kicker">THE CANVAS IS YOURS</p><h2 id="creator-closing-title" tabIndex={-1}>{text.closing}</h2><p>{text.closingBody}</p><div className="cf-actions"><Link href="/studio" className="cf-button cf-primary">{text.start}<ArrowRight size={19} aria-hidden="true" /></Link><Link href="/research" className="cf-button cf-secondary">{text.flowSteps[0].action}</Link></div></div><span className="cf-closing-wordmark" aria-hidden="true">ToonStudio.</span></section>
       </div>
     </div>
   );
