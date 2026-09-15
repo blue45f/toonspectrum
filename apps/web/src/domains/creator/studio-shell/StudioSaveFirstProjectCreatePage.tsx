@@ -26,6 +26,7 @@ import { cn } from "@/shared/lib/utils";
 
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 import type { StudioProjectKind } from "../studio-project-library-store";
+import { PERSONAL_CLOUD_PROVIDER_IDS } from "../save-first/personal-cloud-client";
 import {
   STUDIO_PROJECT_CREATE_KINDS,
   STUDIO_PROJECT_CREATE_STORAGE,
@@ -177,6 +178,16 @@ export function StudioSaveFirstProjectCreatePage() {
             console.warn("Initial ToonStudio package save failed; the browser copy remains available.", cause);
           }
         }
+      }
+
+      if (PERSONAL_CLOUD_PROVIDER_IDS.includes(
+        storageProvider as (typeof PERSONAL_CLOUD_PROVIDER_IDS)[number],
+      )) {
+        navigate(
+          `/studio?view=storage&project=${encodeURIComponent(result.project.id)}&sync=${storageProvider}`,
+          { replace: true },
+        );
+        return;
       }
 
       navigate(`${result.href}&uiMode=basic&startTool=draw`, { replace: true });

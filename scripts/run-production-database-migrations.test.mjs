@@ -13,6 +13,8 @@ import {
   buildHistoricalAdoptionVerificationSql,
   buildMigrationLedgerRuntimeAclSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildPersonalCloudRuntimeAclSql,
+  buildPersonalCloudRuntimeAclViolationSql,
   buildRepairLockTakeoverSql,
   buildRuntimeCutoverLedgerAclSql,
   buildRuntimeCutoverLedgerAclViolationSql,
@@ -27,12 +29,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(50);
+  expect(manifest).toHaveLength(51);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0050_studio_production_workspace_review_links_personal_kit",
+    "0051_personal_cloud_connections",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(50);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(51);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {
@@ -58,6 +60,20 @@ test("creator community publishing migration separates immutable releases from d
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("personal cloud runtime ACL grants only bounded credential DML", () => {
+  const grant = buildPersonalCloudRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildPersonalCloudRuntimeAclViolationSql("toonspectrum_runtime");
+
+  expect(grant).toContain("REVOKE ALL ON TABLE public.personal_cloud_connection FROM PUBLIC");
+  expect(grant).toContain("SELECT, INSERT, UPDATE, DELETE");
+  expect(grant).not.toContain("TRUNCATE");
+  expect(violation).toContain("personal_cloud_connection");
+  expect(violation).toContain("TRUNCATE");
+  expect(violation).toContain("REFERENCES");
+  expect(violation).toContain("TRIGGER");
+  expect(violation).toContain("'PUBLIC'");
 });
 
 test("creator storage location migration pins primaries and inventories verified replicas", () => {
@@ -759,6 +775,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_work_report",
     "creator_work_review_feedback",
     "creator_work_review_link",
+    "personal_cloud_connection",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",
@@ -980,4 +997,27 @@ test("an exact checksum with the wrong provenance is rejected", () => {
       adoptionMarkerPresent: true,
     }),
   ).toThrow(/provenance drift/u);
+});
+
+
+test("personal cloud migration persists only encrypted account credentials", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0051_personal_cloud_connections",
+  );
+  expect(migration?.id).toBe("0051_personal_cloud_connections");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "CREATE TABLE IF NOT EXISTS public.personal_cloud_connection",
+    'PRIMARY KEY ("userId", "provider")',
+    "personal_cloud_connection_user_fkey",
+    "personal_cloud_connection_provider_check",
+    '"encryptedAccessToken" text NOT NULL',
+    '"encryptedRefreshToken" text NOT NULL',
+    "idx_personal_cloud_connection_updated",
+    "REVOKE ALL ON TABLE public.personal_cloud_connection FROM PUBLIC",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/\b(?:access|refresh)_token\b/iu);
 });

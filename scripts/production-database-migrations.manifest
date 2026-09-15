@@ -48,3 +48,4 @@ apps/api/src/db/migrations/0047_creator_collaboration_board.sql
 apps/api/src/db/migrations/0048_creator_asset_storage_locations.sql
 apps/api/src/db/migrations/0049_creator_community_publishing.sql
 apps/api/src/db/migrations/0050_studio_production_workspace_review_links_personal_kit.sql
+apps/api/src/db/migrations/0051_personal_cloud_connections.sql

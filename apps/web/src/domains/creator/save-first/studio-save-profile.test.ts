@@ -85,6 +85,24 @@ describe("studio save profile", () => {
     expect(privateAgain.distributionState).toBe("exported");
   });
 
+  it("drops unsafe remote links from persisted storage metadata", () => {
+    const storage = new MemoryStorage();
+    ensureStudioSaveProfile(storage, "project-1", {
+      now: "2026-09-15T00:00:00.000Z",
+    });
+    const profile = upsertStudioStorageBinding(storage, "project-1", {
+      provider: "google-drive",
+      role: "backup",
+      connectionRequired: false,
+      syncState: "synced",
+      lastSyncedAt: "2026-09-15T00:01:00.000Z",
+      webUrl: "javascript:alert(1)",
+    }, { now: "2026-09-15T00:01:00.000Z" });
+
+    expect(profile.bindings.find((binding) => binding.provider === "google-drive")?.webUrl)
+      .toBeNull();
+  });
+
   it("recovers safely from malformed persisted data", () => {
     const storage = new MemoryStorage();
     storage.setItem("toonstudio.save-profiles.v1", "{broken");

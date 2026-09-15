@@ -11,6 +11,7 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
@@ -33,6 +34,7 @@ test("loads the runtime health readiness relation and cutover contract", () => {
   ]) {
     expect(contract.relationNames).toContain(relation);
   }
+  expect(contract.relationNames).toContain("personal_cloud_connection");
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
     "0025_auth_lifecycle_contract",
@@ -43,6 +45,7 @@ test("loads the runtime health readiness relation and cutover contract", () => {
     "0032_creator_marketplace_release_lifecycle",
     "0033_creator_marketplace_cloud_library",
     "0034_creator_marketplace_package_moderation",
+    "0051_personal_cloud_connections",
   ]);
 });
 
@@ -56,6 +59,9 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildStudioProductionRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildPersonalCloudRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildRuntimeCutoverLedgerAclViolationSql("webdex_runtime"),

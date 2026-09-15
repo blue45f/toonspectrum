@@ -52,6 +52,12 @@ export interface StudioStorageBinding {
   readonly syncState: StudioStorageSyncState;
   readonly connectionRequired: boolean;
   readonly remotePath: string | null;
+  readonly remoteId: string | null;
+  readonly remoteVersion: string | null;
+  readonly contentHash: string | null;
+  readonly remoteModifiedAt: string | null;
+  readonly webUrl: string | null;
+  readonly byteLength: number | null;
   readonly lastSyncedAt: string | null;
   readonly lastSyncedRevision: number | null;
   readonly error: string | null;
@@ -176,6 +182,17 @@ function nullableString(value: unknown, max = 1_000): string | null {
     : null;
 }
 
+function nullableHttpsUrl(value: unknown): string | null {
+  const candidate = nullableString(value, 2_000);
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function providerLabel(provider: StudioStorageProvider): string {
   switch (provider) {
     case "browser": return "이 브라우저";
@@ -208,6 +225,12 @@ export function createStudioStorageBinding(input: {
   readonly syncState?: StudioStorageSyncState;
   readonly connectionRequired?: boolean;
   readonly remotePath?: string | null;
+  readonly remoteId?: string | null;
+  readonly remoteVersion?: string | null;
+  readonly contentHash?: string | null;
+  readonly remoteModifiedAt?: string | null;
+  readonly webUrl?: string | null;
+  readonly byteLength?: number | null;
   readonly lastSyncedAt?: string | null;
   readonly lastSyncedRevision?: number | null;
   readonly error?: string | null;
@@ -228,6 +251,14 @@ export function createStudioStorageBinding(input: {
     syncState,
     connectionRequired,
     remotePath: nullableString(input.remotePath, 2_000),
+    remoteId: nullableString(input.remoteId, 1_000),
+    remoteVersion: nullableString(input.remoteVersion, 1_000),
+    contentHash: nullableString(input.contentHash, 256),
+    remoteModifiedAt: nullableTimestamp(input.remoteModifiedAt),
+    webUrl: nullableHttpsUrl(input.webUrl),
+    byteLength: Number.isSafeInteger(input.byteLength) && Number(input.byteLength) >= 0
+      ? Number(input.byteLength)
+      : null,
     lastSyncedAt: connectedAt,
     lastSyncedRevision: Number.isSafeInteger(input.lastSyncedRevision)
       && Number(input.lastSyncedRevision) >= 0
@@ -251,6 +282,12 @@ function normalizeBinding(value: unknown): StudioStorageBinding | null {
     syncState: value.syncState as StudioStorageSyncState,
     connectionRequired: value.connectionRequired === true,
     remotePath: nullableString(value.remotePath, 2_000),
+    remoteId: nullableString(value.remoteId, 1_000),
+    remoteVersion: nullableString(value.remoteVersion, 1_000),
+    contentHash: nullableString(value.contentHash, 256),
+    remoteModifiedAt: nullableTimestamp(value.remoteModifiedAt),
+    webUrl: nullableHttpsUrl(value.webUrl),
+    byteLength: typeof value.byteLength === "number" ? value.byteLength : null,
     lastSyncedAt: nullableTimestamp(value.lastSyncedAt),
     lastSyncedRevision: typeof value.lastSyncedRevision === "number"
       ? value.lastSyncedRevision
@@ -470,11 +507,26 @@ export function removeStudioStorageBinding(
   }, options);
 }
 
-export function markStudioStorageBindingSynced(
+export interface StudioStorageBindingStatusUpdate {
+  readonly syncState: StudioStorageSyncState;
+  readonly connectionRequired?: boolean;
+  readonly remotePath?: string | null;
+  readonly remoteId?: string | null;
+  readonly remoteVersion?: string | null;
+  readonly contentHash?: string | null;
+  readonly remoteModifiedAt?: string | null;
+  readonly webUrl?: string | null;
+  readonly byteLength?: number | null;
+  readonly lastSyncedAt?: string | null;
+  readonly lastSyncedRevision?: number | null;
+  readonly error?: string | null;
+}
+
+export function updateStudioStorageBindingStatus(
   storage: StudioSaveProfileStorage,
   projectId: string,
   bindingId: string,
-  input: { readonly remotePath?: string | null; readonly revision?: number } = {},
+  input: StudioStorageBindingStatusUpdate,
   options: { readonly now?: string; readonly target?: StudioSaveProfileEventTarget } = {},
 ): StudioSaveProfile {
   return updateProfile(storage, projectId, (profile, now) => Object.freeze({
@@ -482,16 +534,39 @@ export function markStudioStorageBindingSynced(
     bindings: Object.freeze(profile.bindings.map((binding) => binding.id === bindingId
       ? createStudioStorageBinding({
         ...binding,
-        syncState: "synced",
-        connectionRequired: false,
-        remotePath: input.remotePath ?? binding.remotePath,
-        lastSyncedAt: now,
-        lastSyncedRevision: input.revision ?? profile.revision,
-        error: null,
+        ...input,
+        connectionRequired: input.connectionRequired ?? binding.connectionRequired,
+        lastSyncedAt: input.lastSyncedAt === undefined ? binding.lastSyncedAt : input.lastSyncedAt,
+        lastSyncedRevision: input.lastSyncedRevision === undefined
+          ? binding.lastSyncedRevision
+          : input.lastSyncedRevision,
+        error: input.error === undefined ? binding.error : input.error,
       })
       : binding)),
     updatedAt: now,
   }), options);
+}
+
+export function markStudioStorageBindingSynced(
+  storage: StudioSaveProfileStorage,
+  projectId: string,
+  bindingId: string,
+  input: Omit<StudioStorageBindingStatusUpdate, "syncState" | "connectionRequired" | "lastSyncedAt" | "lastSyncedRevision" | "error"> & {
+    readonly revision?: number;
+  } = {},
+  options: { readonly now?: string; readonly target?: StudioSaveProfileEventTarget } = {},
+): StudioSaveProfile {
+  const now = options.now ?? new Date().toISOString();
+  const profile = readStudioSaveProfiles(storage).profiles[projectId]
+    ?? createDefaultStudioSaveProfile(projectId, { now });
+  return updateStudioStorageBindingStatus(storage, projectId, bindingId, {
+    ...input,
+    syncState: "synced",
+    connectionRequired: false,
+    lastSyncedAt: now,
+    lastSyncedRevision: input.revision ?? profile.revision,
+    error: null,
+  }, { ...options, now });
 }
 
 export function recordStudioManualSave(

@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { readStudioProjectDocuments } from "../studio-project-document-store";
 import { readStudioProjectLibrary } from "../studio-project-library-store";
+import { readStudioSaveProfiles } from "../save-first/studio-save-profile";
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 
 function LocationProbe() {
@@ -55,6 +56,35 @@ describe("StudioProjectCreatePage", () => {
       kind: "webtoon",
       defaultWorkspace: "comic",
     });
+  });
+
+  it("routes personal Drive creation through storage connection and first sync", async () => {
+    render(
+      <MemoryRouter initialEntries={["/studio/new"]}>
+        <StudioProjectCreatePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다른 원격 저장소 보기|Show more remote storage/u }));
+    fireEvent.click(screen.getByRole("radio", { name: /Google Drive/u }));
+    fireEvent.click(screen.getByRole("button", { name: /웹툰 시작|Start Webtoon/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toMatch(
+        /^\/studio\?view=storage&project=[^&]+&sync=google-drive$/u,
+      );
+    });
+
+    const project = readStudioProjectLibrary(window.localStorage).projects[0]!;
+    const profile = readStudioSaveProfiles(window.localStorage).profiles[project.id]!;
+    expect(profile.accessMode).toBe("owner-only");
+    expect(profile.distributionState).toBe("none");
+    expect(profile.bindings).toContainEqual(expect.objectContaining({
+      provider: "google-drive",
+      syncState: "pending",
+      connectionRequired: true,
+    }));
   });
 
   it("switches project type and prepares the matching template choices", () => {

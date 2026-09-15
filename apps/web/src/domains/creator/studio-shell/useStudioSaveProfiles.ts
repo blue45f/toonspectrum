@@ -14,36 +14,63 @@ import {
   removeStudioSaveProfile,
   removeStudioStorageBinding,
   setStudioSavePreferences,
+  updateStudioStorageBindingStatus,
   upsertStudioStorageBinding,
   type StudioAccessMode,
   type StudioSaveProfile,
   type StudioSaveProfileState,
+  type StudioStorageBindingStatusUpdate,
   type StudioStorageProvider,
 } from "../save-first/studio-save-profile";
+
+interface EnsureOptions {
+  readonly provider?: StudioStorageProvider;
+  readonly autoSave?: boolean;
+  readonly createVersions?: boolean;
+}
+type SyncedInput = Omit<
+  StudioStorageBindingStatusUpdate,
+  "syncState" | "connectionRequired" | "lastSyncedAt" | "lastSyncedRevision" | "error"
+> & { readonly revision?: number };
 
 export interface StudioSaveProfilesController {
   readonly state: StudioSaveProfileState | null;
   readonly error: string | null;
   readonly profileFor: (projectId: string) => StudioSaveProfile;
-  readonly ensure: (
-    projectId: string,
-    options?: { readonly provider?: StudioStorageProvider; readonly autoSave?: boolean; readonly createVersions?: boolean },
-  ) => StudioSaveProfile | null;
+  readonly ensure: (projectId: string, options?: EnsureOptions) => StudioSaveProfile | null;
   readonly setPreferences: (
     projectId: string,
-    input: { readonly autoSave?: boolean; readonly createVersions?: boolean; readonly accessMode?: StudioAccessMode },
+    input: {
+      readonly autoSave?: boolean;
+      readonly createVersions?: boolean;
+      readonly accessMode?: StudioAccessMode;
+    },
   ) => StudioSaveProfile | null;
-  readonly addProvider: (projectId: string, provider: StudioStorageProvider) => StudioSaveProfile | null;
-  readonly removeProvider: (projectId: string, bindingId: string) => StudioSaveProfile | null;
+  readonly addProvider: (
+    projectId: string,
+    provider: StudioStorageProvider,
+  ) => StudioSaveProfile | null;
+  readonly removeProvider: (
+    projectId: string,
+    bindingId: string,
+  ) => StudioSaveProfile | null;
   readonly markSynced: (
     projectId: string,
     bindingId: string,
-    input?: { readonly remotePath?: string | null; readonly revision?: number },
+    input?: SyncedInput,
+  ) => StudioSaveProfile | null;
+  readonly updateBindingStatus: (
+    projectId: string,
+    bindingId: string,
+    input: StudioStorageBindingStatusUpdate,
   ) => StudioSaveProfile | null;
   readonly recordSave: (projectId: string) => StudioSaveProfile | null;
   readonly recordExport: (projectId: string) => StudioSaveProfile | null;
   readonly recordSubmission: (projectId: string) => StudioSaveProfile | null;
-  readonly recordPublication: (projectId: string, published: boolean) => StudioSaveProfile | null;
+  readonly recordPublication: (
+    projectId: string,
+    published: boolean,
+  ) => StudioSaveProfile | null;
   readonly remove: (projectId: string) => void;
   readonly reload: () => void;
 }
@@ -61,7 +88,6 @@ export function useStudioSaveProfiles(): StudioSaveProfilesController {
       setError("저장 위치 정보를 읽지 못했습니다.");
     }
   }, []);
-
   useEffect(() => {
     reload();
     if (typeof window === "undefined") return undefined;
@@ -91,7 +117,6 @@ export function useStudioSaveProfiles(): StudioSaveProfilesController {
       return null;
     }
   }, []);
-
   const profileFor = useCallback((projectId: string) => (
     state?.profiles[projectId]
     ?? createDefaultStudioSaveProfile(projectId, { now: new Date(0).toISOString() })
@@ -101,59 +126,86 @@ export function useStudioSaveProfiles(): StudioSaveProfilesController {
     state,
     error,
     profileFor,
-    ensure: (projectId, options = {}) => run(() => ensureStudioSaveProfile(
-      window.localStorage,
-      projectId,
-      { ...options, target: window },
+    ensure: (projectId: string, options: EnsureOptions = {}) => run(() => (
+      ensureStudioSaveProfile(window.localStorage, projectId, {
+        ...options,
+        target: window,
+      })
     )),
-    setPreferences: (projectId, input) => run(() => setStudioSavePreferences(
+    setPreferences: (
+      projectId: string,
+      input: Parameters<StudioSaveProfilesController["setPreferences"]>[1],
+    ) => run(() => setStudioSavePreferences(
       window.localStorage,
       projectId,
       input,
       { target: window },
     )),
-    addProvider: (projectId, provider) => run(() => upsertStudioStorageBinding(
-      window.localStorage,
-      projectId,
-      { provider, role: provider === "browser" ? "working-copy" : "backup" },
-      { target: window },
+    addProvider: (projectId: string, provider: StudioStorageProvider) => run(() => (
+      upsertStudioStorageBinding(window.localStorage, projectId, {
+        provider,
+        role: provider === "browser" ? "working-copy" : "backup",
+      }, { target: window })
     )),
-    removeProvider: (projectId, bindingId) => run(() => removeStudioStorageBinding(
-      window.localStorage,
-      projectId,
-      bindingId,
-      { target: window },
+    removeProvider: (projectId: string, bindingId: string) => run(() => (
+      removeStudioStorageBinding(
+        window.localStorage,
+        projectId,
+        bindingId,
+        { target: window },
+      )
     )),
-    markSynced: (projectId, bindingId, input = {}) => run(() => markStudioStorageBindingSynced(
+    markSynced: (
+      projectId: string,
+      bindingId: string,
+      input: SyncedInput = {},
+    ) => run(() => markStudioStorageBindingSynced(
       window.localStorage,
       projectId,
       bindingId,
       input,
       { target: window },
     )),
-    recordSave: (projectId) => run(() => recordStudioManualSave(
+    updateBindingStatus: (
+      projectId: string,
+      bindingId: string,
+      input: StudioStorageBindingStatusUpdate,
+    ) => run(() => updateStudioStorageBindingStatus(
+      window.localStorage,
+      projectId,
+      bindingId,
+      input,
+      { target: window },
+    )),
+    recordSave: (projectId: string) => run(() => recordStudioManualSave(
       window.localStorage,
       projectId,
       { target: window },
     )),
-    recordExport: (projectId) => run(() => recordStudioExport(
+    recordExport: (projectId: string) => run(() => recordStudioExport(
       window.localStorage,
       projectId,
       { target: window },
     )),
-    recordSubmission: (projectId) => run(() => recordStudioSubmission(
+    recordSubmission: (projectId: string) => run(() => recordStudioSubmission(
       window.localStorage,
       projectId,
       { target: window },
     )),
-    recordPublication: (projectId, published) => run(() => recordStudioPublication(
-      window.localStorage,
-      projectId,
-      published,
-      { target: window },
+    recordPublication: (projectId: string, published: boolean) => run(() => (
+      recordStudioPublication(
+        window.localStorage,
+        projectId,
+        published,
+        { target: window },
+      )
     )),
-    remove: (projectId) => {
-      run(() => removeStudioSaveProfile(window.localStorage, projectId, { target: window }));
+    remove: (projectId: string) => {
+      run(() => removeStudioSaveProfile(
+        window.localStorage,
+        projectId,
+        { target: window },
+      ));
     },
     reload,
   };

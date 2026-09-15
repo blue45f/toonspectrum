@@ -37,6 +37,7 @@ function completeSchemaCatalog() {
     authAccountConstraintsReady: true,
     authAccountUserIndexReady: true,
     authRuntimeDmlReady: true,
+    personalCloudConnectionAclReady: true,
     marketplaceResourceAclReady: true,
     marketplaceCloudLibraryAclReady: true,
     marketplaceCloudLibraryTriggerReady: true,
@@ -153,6 +154,7 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain("user_status_check");
     expect(catalogQuery).toContain("user_session_version_check");
     expect(catalogQuery).toContain("authRuntimeDmlReady");
+    expect(catalogQuery).toContain("personalCloudConnectionAclReady");
     expect(catalogQuery).toContain("marketplaceResourceAclReady");
     expect(catalogQuery).toContain("marketplaceCloudLibraryAclReady");
     expect(catalogQuery).toContain("marketplaceCloudLibraryTriggerReady");
@@ -280,6 +282,7 @@ describe("PostgresHealthReadinessRepository", () => {
     "authAccountConstraintsReady",
     "authAccountUserIndexReady",
     "authRuntimeDmlReady",
+    "personalCloudConnectionAclReady",
     "marketplaceResourceAclReady",
     "marketplaceCloudLibraryAclReady",
     "marketplaceCloudLibraryTriggerReady",
