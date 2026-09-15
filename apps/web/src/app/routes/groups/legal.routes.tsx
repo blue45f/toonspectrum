@@ -95,16 +95,8 @@ const FeedbackPage = lazyRetry(
 
 export const legalRoutes = defineAppRoutes([
   { id: "legal-about", path: "/about", element: <AboutPage /> },
-  {
-    id: "legal-about-workflow",
-    path: "/about/workflow",
-    element: <WebtoonWorkflowPage />,
-  },
-  {
-    id: "legal-about-technology",
-    path: "/about/technology",
-    element: <TechnologyPage />,
-  },
+  { id: "legal-about-workflow", path: "/about/workflow", element: <WebtoonWorkflowPage /> },
+  { id: "legal-about-technology", path: "/about/technology", element: <TechnologyPage /> },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-accessibility", path: "/accessibility", element: <AccessibilityPage /> },
   { id: "legal-data-sources", path: "/about/data", element: <DataSourcesPage /> },
