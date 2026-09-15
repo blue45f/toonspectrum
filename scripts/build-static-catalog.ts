@@ -107,7 +107,7 @@ const OUT = path.join(ROOT, "apps", "web", "public", "data");
 
 function loadTitles(): Title[] {
   if (!existsSync(SRC_GZ)) {
-    throw new Error(`catalog gz not found: ${SRC_GZ} (먼저 pnpm catalog:update 로 생성)`);
+    throw new Error(`catalog gz not found: ${SRC_GZ} (먼저 pnpm catalog:update:manual 로 생성)`);
   }
   const raw = gunzipSync(readFileSync(SRC_GZ)).toString("utf8");
   const parsed = JSON.parse(raw) as unknown;

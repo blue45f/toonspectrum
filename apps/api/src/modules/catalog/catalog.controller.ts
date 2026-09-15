@@ -2,7 +2,6 @@ import {
   Body,
   BadRequestException,
   Controller,
-  Headers,
   HttpCode,
   Inject,
   Get,
@@ -59,12 +58,6 @@ interface SearchQuery {
   yearMax?: string;
   freeOnly?: string;
   adaptedOnly?: string;
-}
-
-interface CatalogIngestPayload {
-  token?: unknown;
-  requestedBy?: unknown;
-  force?: unknown;
 }
 
 interface KmasBookAndWebtoonQuery {
@@ -183,29 +176,6 @@ export class CatalogController {
     return this.catalogService.getRankingData(normalizeQueryMap(query));
   }
 
-  @Get("/catalog/ingest/status")
-  @Header("Cache-Control", "no-store, max-age=0")
-  async getCatalogIngestStatus() {
-    return this.catalogService.getCatalogIngestStatus();
-  }
-
-  @Post("/catalog/ingest/run")
-  @Header("Cache-Control", "no-store, max-age=0")
-  async runCatalogIngest(
-    @Req() req: Request,
-    @Body() body: CatalogIngestPayload,
-    @Headers("x-catalog-ingest-token") token?: string,
-    @Headers("x-user-id") userId?: string
-  ) {
-    return this.catalogService.runCatalogIngest(body ?? {}, token, userId, clientKeyFromRequest(req));
-  }
-
-  @Post("/catalog/refresh")
-  @Header("Cache-Control", "no-store, max-age=0")
-  async refreshCatalog(@Req() req: Request, @Headers("x-catalog-ingest-token") token?: string) {
-    return this.catalogService.refreshCatalog(token, clientKeyFromRequest(req));
-  }
-
   @Get("/explore")
   @Header("Cache-Control", "no-store")
   async getExplore(@Query() query: QueryMap) {
@@ -314,15 +284,6 @@ export class CatalogController {
     const finalUrl = buildAffiliateUrl(platformId, destination);
     res.redirect(302, finalUrl);
   }
-}
-
-// 레이트리밋 키용 클라이언트 식별자. 주의: x-forwarded-for 맨 왼쪽은 위조 가능(베이스라인 한계,
-// lib/rate-limit.ts 의 clientIp와 동일한 전제) — 신뢰 프록시 뒤에서는 플랫폼 보장 IP로 교체할 것.
-function clientKeyFromRequest(req: Request): string {
-  const xff = req.headers["x-forwarded-for"];
-  const first = Array.isArray(xff) ? xff[0] : xff;
-  if (typeof first === "string" && first.trim()) return first.split(",")[0].trim();
-  return req.socket?.remoteAddress ?? "unknown";
 }
 
 function normalizeQueryMap(query: QueryMap): Record<string, string> {

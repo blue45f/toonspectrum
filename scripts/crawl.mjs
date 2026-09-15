@@ -1,6 +1,6 @@
-// ToonSpectrum 실데이터 크롤러 — 네이버 웹툰/시리즈/카카오웹툰/레진 공개 카탈로그 벤치마킹
-// 운영 실행: node scripts/crawl.mjs --json --no-file → ingest(runCatalogIngest/scripts/ingest.mjs)가
-// 검증 후 catalog.json.gz 파일로 저장(카탈로그는 파일 전용 — DB catalog_snapshot 은 레거시 FORCE_DB 모드)
+// ToonSpectrum 로컬 수동 카탈로그 수집기 — 배포 런타임에서는 import하거나 실행하지 않는다.
+// 원시 결과만 확인하려면 `pnpm --silent catalog:crawl:manual > out.json`, 검토 가능한 스냅샷과 정적 산출물을
+// 함께 갱신하려면 `pnpm catalog:update:manual`을 사용한다. 결과는 커밋·재배포 전 반드시 검토한다.
 // 웹툰: 제목·작가·별점·조회·관심·장르·시놉시스·태그·연재요일·연령등급·연재시작연도·표지썸네일 (실수집)
 // 웹소설: 웹툰 원작정보(novelOriginAuthors)로 실제 원작 엔트리+어댑테이션 연결 / 네이버 시리즈 베스트에포트 보강
 import { buildLezhinCoverImage, decodeHtmlEntities, extractRemoteImageUrl, proxiedCoverUrl } from "./crawl-helpers.mjs";
@@ -101,8 +101,8 @@ const MIN_CRAWL_DELAY_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_DELAY_MS) ?
 
 // ── 소프트 데드라인 ───────────────────────────────────────────
 // 외부 타임아웃(SIGTERM)에 걸려 출력 없이 죽는 대신, 그 전에 각 루프를 정리하고 (부분 결과라도)
-// 정상 emit 하기 위한 전역 예산(ms). 미설정=무제한(직접 실행용). catalog-ingest 가 실행 시
-// (execFile 타임아웃 - 여유)로 WEBDEX_CRAWL_BUDGET_MS 를 주입한다.
+// 정상 emit 하기 위한 수동 실행 예산(ms). 미설정이면 무제한이며,
+// 필요할 때 WEBDEX_CRAWL_BUDGET_MS 로 상한을 직접 지정한다.
 const CRAWL_BUDGET_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_BUDGET_MS);
 const START_TS = Date.now();
 const overBudget = () => CRAWL_BUDGET_MS != null && Date.now() - START_TS >= CRAWL_BUDGET_MS;
