@@ -9,3 +9,4 @@ export * from "./studio-ai-comic-director.schema";
 export * from "./promotion.schema";
 export * from "./personal-cloud.schema";
 export * from "./production.schema";
+export * from "./messaging.schema";

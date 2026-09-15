@@ -255,11 +255,21 @@ async testBannedWords(userId: string, text: string) {
     };
   }
 
-async getContentReports(userId: string, query: { status?: string; limit?: number | string } = {}) {
+  async getContentReports(
+    userId: string,
+    query: { status?: string; limit?: number | string } = {},
+  ) {
     await requireAdminUser(userId);
     await ensureAdminSchema();
     const limit = parsePositiveInt(query.limit, 50, 1, 200);
-    const statusFilter = String(query.status ?? "pending").trim();
+    const requestedStatus = String(query.status ?? "pending").trim();
+    const statusFilter = ["pending", "resolved", "dismissed", "all"].includes(
+      requestedStatus,
+    )
+      ? requestedStatus
+      : "pending";
+    const items: Record<string, unknown>[] = [];
+
     try {
       let sqlQuery = `SELECT r.id, r."reporterId", u.name AS "reporterName", u.email AS "reporterEmail", r."targetType", r."targetId", r.reason, r.status, r."resolutionNote", r."createdAt" FROM admin_content_reports r LEFT JOIN "user" u ON r."reporterId" = u.id WHERE 1=1`;
       const args: unknown[] = [];
@@ -269,21 +279,114 @@ async getContentReports(userId: string, query: { status?: string; limit?: number
       }
       sqlQuery += ` ORDER BY r."createdAt" DESC LIMIT ${limit}`;
       const result = await dbClient.execute({ sql: sqlQuery, args });
-      return { items: result.rows };
+      items.push(...result.rows);
     } catch {
-      return { items: [] };
+      // The legacy report table is optional in freshly bootstrapped environments.
     }
+
+    try {
+      let sqlQuery = `
+        SELECT
+          r.id,
+          r."reporterId",
+          reporter.name AS "reporterName",
+          reporter.email AS "reporterEmail",
+          r."messageId",
+          r.reason,
+          r.details,
+          r.status,
+          r."resolutionNote",
+          r."evidenceSnapshot",
+          r."createdAt"
+        FROM public."member_message_report" AS r
+        LEFT JOIN public."user" AS reporter ON reporter.id = r."reporterId"
+        WHERE 1 = 1
+      `;
+      const args: unknown[] = [];
+      if (statusFilter === "pending") {
+        sqlQuery += ` AND r.status IN ('open', 'reviewing')`;
+      } else if (statusFilter !== "all") {
+        sqlQuery += ` AND r.status = ?`;
+        args.push(statusFilter);
+      }
+      sqlQuery += ` ORDER BY r."createdAt" DESC LIMIT ${limit}`;
+      const result = await dbClient.execute({ sql: sqlQuery, args });
+      items.push(
+        ...result.rows.map((row) => ({
+          id: `message:${String(row.id ?? "")}`,
+          reporterId: row.reporterId,
+          reporterName: row.reporterName,
+          reporterEmail: row.reporterEmail,
+          targetType: "member_message",
+          targetId: row.messageId,
+          reason: row.reason,
+          details: row.details,
+          status:
+            row.status === "open" || row.status === "reviewing"
+              ? "pending"
+              : row.status,
+          resolutionNote: row.resolutionNote,
+          evidenceSnapshot: row.evidenceSnapshot,
+          createdAt: row.createdAt,
+        })),
+      );
+    } catch (error) {
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : "";
+      if (code !== "42P01") throw error;
+    }
+
+    items.sort(
+      (left, right) =>
+        new Date(String(right.createdAt ?? 0)).getTime() -
+        new Date(String(left.createdAt ?? 0)).getTime(),
+    );
+    return { items: items.slice(0, limit) };
   }
 
-async resolveContentReport(userId: string, reportId: string, action: "resolve" | "dismiss", note?: string) {
+  async resolveContentReport(
+    userId: string,
+    reportId: string,
+    action: "resolve" | "dismiss",
+    note?: string,
+  ) {
     const admin = await requireAdminUser(userId);
     await ensureAdminSchema();
     const status = action === "resolve" ? "resolved" : "dismissed";
+    const normalizedNote = String(note ?? "").trim().slice(0, 500);
+
+    if (reportId.startsWith("message:")) {
+      const messageReportId = reportId.slice("message:".length).trim();
+      if (!messageReportId) {
+        throw new BadRequestException({ error: "신고 식별자가 올바르지 않습니다." });
+      }
+      const result = await dbClient.execute({
+        sql: `UPDATE public."member_message_report" SET status = ?, "reviewedBy" = ?, "reviewedAt" = now(), "resolutionNote" = ? WHERE id = ?`,
+        args: [status, admin.id, normalizedNote, messageReportId],
+      });
+      if (result.rowsAffected === 0) {
+        throw new BadRequestException({ error: "메시지 신고를 찾을 수 없습니다." });
+      }
+      void logAuditAction(
+        userId,
+        "MESSAGE_REPORT_RESOLVE",
+        "message_report",
+        messageReportId,
+        { status, note: normalizedNote },
+      );
+      return { ok: true, reportId, status };
+    }
+
     await dbClient.execute({
       sql: `UPDATE admin_content_reports SET status = ?, "resolvedBy" = ?, "resolvedAt" = now(), "resolutionNote" = ? WHERE id = ?`,
-      args: [status, admin.id, note ?? "", reportId],
+      args: [status, admin.id, normalizedNote, reportId],
     });
-    void logAuditAction(userId, "CONTENT_REPORT_RESOLVE", "report", reportId, { status, note });
+    void logAuditAction(userId, "CONTENT_REPORT_RESOLVE", "report", reportId, {
+      status,
+      note: normalizedNote,
+    });
     return { ok: true, reportId, status };
   }
 }

@@ -14,6 +14,7 @@ import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { MeModule } from "./modules/me/me.module";
+import { MessagingModule } from "./modules/messaging/messaging.module";
 import { PersonalCloudModule } from "./modules/personal-cloud/personal-cloud.module";
 import { ProductionCollaborationModule } from "./modules/production-collaboration/production-collaboration.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
@@ -30,6 +31,7 @@ const studioRealtimeTicketModule =
     BackendCapabilitiesModule,
     AuthModule,
     MeModule,
+    MessagingModule,
     PersonalCloudModule,
     CommunityModule,
     CatalogModule,

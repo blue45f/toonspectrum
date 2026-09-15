@@ -5,6 +5,7 @@ import {
   Images,
   Layers,
   Library,
+  Mail,
   Settings,
   Store,
   UserRound,
@@ -47,6 +48,7 @@ const COPY = {
       ["내 에셋", "설치·보관한 Studio 리소스와 관심 에셋", "/market/library"],
       ["내 활동", "리뷰, 읽기 상태, 컬렉션 등 활동 요약", "/me?tab=activity"],
       ["프로필", "이름, 소개, 아바타와 공개 프로필", "/me?tab=profile"],
+      ["메시지", "작품 피드백, 협업 제안과 비공개 문의", "/messages"],
       ["설정", "언어, 기록, 필터, 데이터 가져오기·내보내기", "/settings"],
       ["알림 확인", "연재 알림은 서재에서, 협업·프로젝트 알림은 해당 작업공간에서 확인", "/library?tab=alerts"],
     ],
@@ -76,13 +78,14 @@ const COPY = {
       ["My assets", "Installed and saved Studio resources plus bookmarked assets", "/market/library"],
       ["My activity", "Reviews, reading states, collections and activity summary", "/me?tab=activity"],
       ["Profile", "Name, bio, avatar and public profile", "/me?tab=profile"],
+      ["Messages", "Private feedback, collaboration proposals and inquiries", "/messages"],
       ["Settings", "Language, history, filters and data import/export", "/settings"],
       ["Notifications", "Release alerts live in Library; collaboration and project alerts stay with their workspace", "/library?tab=alerts"],
     ],
   },
 } as const;
 
-const ICONS = [Layers, Images, Library, Store, BookOpen, UserRound, Settings, BellRing] as const;
+const ICONS = [Layers, Images, Library, Store, BookOpen, UserRound, Mail, Settings, BellRing] as const;
 
 export function MySpaceHubPage() {
   const language = useI18n((state) => state.lang);
