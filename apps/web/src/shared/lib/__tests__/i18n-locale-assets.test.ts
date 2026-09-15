@@ -157,10 +157,15 @@ describe("measured translation coverage", () => {
     }
   });
 
-  it("measures ratios from the assets rather than from a hand-maintained list", () => {
-    const reference = readAsset(REFERENCE_LOCALE);
+  it("measures ratios from the namespaced runtime assets rather than a hand-maintained list", () => {
+    const dictionaries = readAppLocaleDictionaries();
+    const reference = dictionaries.get(REFERENCE_LOCALE);
+    expect(reference).toBeDefined();
+
     for (const locale of ["af", "es", "ja"]) {
-      expect(measureTranslatedRatio(readAsset(locale), reference)).toBe(
+      const dictionary = dictionaries.get(locale);
+      expect(dictionary).toBeDefined();
+      expect(measureTranslatedRatio(dictionary ?? {}, reference ?? {})).toBe(
         APP_I18N_LOCALE_TRANSLATED_RATIO[locale],
       );
     }
