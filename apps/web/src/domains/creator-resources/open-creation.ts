@@ -16,7 +16,7 @@ export interface OpenReference {
 export const OPEN_PROVIDERS: { id: OpenProvider; name: string; detail: string; url: string }[] = [
   { id: "artic", name: "시카고 미술관", detail: "공개 이용 표시가 있는 미술·복식·소품", url: "https://api.artic.edu/docs/" },
   { id: "cleveland", name: "클리블랜드 미술관", detail: "CC0 유물·동양화·공예·장식", url: "https://openaccess-api.clevelandart.org/" },
-  { id: "commons", name: "Wikimedia Commons CC0", detail: "CC0로 표시된 이미지와 파일별 저작자·출처", url: "https://commons.wikimedia.org/" },
+  { id: "commons", name: "Wikimedia Commons 무료 CC0", detail: "CC0로 표시된 이미지와 파일별 저작자·출처", url: "https://commons.wikimedia.org/" },
   { id: "wikipedia", name: "한국어 배경지식", detail: "한국어 문서 제목·원문 링크 (이미지/본문 재배포 아님)", url: "https://ko.wikipedia.org/" },
 ];
 export const KIT_FORMATS: { id: KitFormat; title: string; detail: string }[] = [

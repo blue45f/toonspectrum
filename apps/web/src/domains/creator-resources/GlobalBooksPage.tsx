@@ -193,7 +193,7 @@ export function GlobalBooksPage() {
   return (
     <ResourceLayout
       title="글로벌 만화·도서 판본 탐색"
-      intro="공급자를 고르지 않아도 Open Library와 Google Books의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다."
+      intro="공급자를 고르지 않아도 Open Library와 무료 Google Books API의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다."
     >
       <div className="grid gap-3 md:grid-cols-3">
         <ProviderStatus provider="openlibrary" />
