@@ -513,66 +513,126 @@ export function menuItemRowHasExactLabel(rowText: string, name: string): boolean
     .includes(name);
 }
 
-async function visibleMenuItemRowTexts(menu: Locator): Promise<string[]> {
-  const rows = menu.locator(
-    '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
-  );
-  // Capture the complete open-menu frame in one browser evaluation. Desktop hover ownership may
-  // close a short dropdown as soon as Playwright performs a later scroll/focus query; a synchronous
-  // snapshot proves the shipped rows without racing that ordinary lifecycle.
-  return rows.evaluateAll((elements) =>
-    elements.flatMap((element) => {
-      if (!(element instanceof HTMLElement)) return [];
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      if (
-        style.display === "none"
-        || style.visibility === "hidden"
-        || rect.width <= 0
-        || rect.height <= 0
-      ) {
-        return [];
-      }
-      const label = element.querySelector<HTMLElement>(
-        '[data-studio-main-menu-item-label="true"]',
-      )?.textContent?.trim();
-      return label ? [label] : [];
-    }),
-  );
+interface VisibleMenuFrame {
+  readonly itemRows: readonly string[];
+  readonly sectionCaptions: readonly string[];
 }
 
+const EMPTY_VISIBLE_MENU_FRAME: VisibleMenuFrame = {
+  itemRows: [],
+  sectionCaptions: [],
+};
+
 /**
- * Section caption inside a composite dropdown. The caption is no longer hidden from
- * assistive tech: `StudioMainMenu` wraps each source catalogue group in a
- * `role="group"` whose `aria-labelledby` points at the caption node (which still carries
- * `data-studio-main-menu-section`), so the caption *is* the section's accessible name and
- * the rows keep their own `menuitem` roles.
- *
- * Given both handles, the accessible query is the one worth making: it passes only when
- * the wrapper still has the group role AND `aria-labelledby` still resolves to a node
- * holding exactly this caption — delete the caption and the name resolves to nothing, so
- * the check fails, which is the property this helper owes its caller. A bare
- * `[data-studio-main-menu-section="…"]` lookup is weaker in the direction that matters
- * now: it would stay green if the labelling broke and the composite dropdown collapsed
- * back into one unannounced flat list of ~15 rows.
- *
- * The visibility pass is still required — an accessible name says nothing about the
- * caption being drawn — and it is scoped inside the matched group, using the data
- * attribute purely as the pointer to the labelling node.
+ * Capture rows and accessible composite captions in one browser evaluation. Pointer-opened
+ * desktop menus can hand hover ownership to a neighbouring title when the compressed header
+ * settles, so splitting these reads across several Playwright calls creates a false missing-row
+ * failure even though the complete frame was rendered.
  */
-async function hasVisibleSectionCaption(menu: Locator, caption: string): Promise<boolean> {
-  const groups = menu.getByRole("group", { name: caption, exact: true });
-  const count = await groups.count();
-  for (let index = 0; index < count; index += 1) {
-    const node = groups
-      .nth(index)
-      .locator(`[data-studio-main-menu-section="${caption}"]`)
-      .first();
-    if ((await node.count()) === 0) continue;
-    await node.scrollIntoViewIfNeeded().catch(() => undefined);
-    if (await node.isVisible().catch(() => false)) return true;
+async function snapshotVisibleMenuFrame(menu: Locator): Promise<VisibleMenuFrame> {
+  return menu.evaluateAll((elements) => {
+    for (const element of elements) {
+      if (!(element instanceof HTMLElement)) continue;
+      const menuStyle = getComputedStyle(element);
+      const menuRect = element.getBoundingClientRect();
+      if (
+        menuStyle.display === "none"
+        || menuStyle.visibility === "hidden"
+        || menuRect.width <= 0
+        || menuRect.height <= 0
+      ) {
+        continue;
+      }
+
+      const itemRows = Array.from(element.querySelectorAll<HTMLElement>(
+        '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
+      )).flatMap((row) => {
+        const style = getComputedStyle(row);
+        const rect = row.getBoundingClientRect();
+        if (
+          style.display === "none"
+          || style.visibility === "hidden"
+          || rect.width <= 0
+          || rect.height <= 0
+        ) {
+          return [];
+        }
+        const label = row.querySelector<HTMLElement>(
+          '[data-studio-main-menu-item-label="true"]',
+        )?.textContent?.trim();
+        return label ? [label] : [];
+      });
+
+      const sectionCaptions = Array.from(element.querySelectorAll<HTMLElement>(
+        '[role="group"][aria-labelledby]',
+      )).flatMap((group) => {
+        const labelledBy = group.getAttribute("aria-labelledby")?.trim();
+        if (!labelledBy || labelledBy.includes(" ")) return [];
+        const caption = document.getElementById(labelledBy);
+        if (!(caption instanceof HTMLElement) || !group.contains(caption)) return [];
+        if (!caption.hasAttribute("data-studio-main-menu-section")) return [];
+        const style = getComputedStyle(caption);
+        const rect = caption.getBoundingClientRect();
+        const label = caption.textContent?.trim();
+        if (
+          !label
+          || style.display === "none"
+          || style.visibility === "hidden"
+          || rect.width <= 0
+          || rect.height <= 0
+        ) {
+          return [];
+        }
+        return [label];
+      });
+
+      return { itemRows, sectionCaptions };
+    }
+    return { itemRows: [], sectionCaptions: [] };
+  });
+}
+
+async function openMainMenuGroupWithKeyboard(
+  page: Page,
+  label: string,
+  surface: "primary" | "action",
+): Promise<void> {
+  const nav = page.locator(
+    surface === "action"
+      ? '[data-studio-main-menu-action="true"]'
+      : '[data-studio-main-menu="true"]',
+  );
+  await nav.waitFor({ state: "visible", timeout: 15_000 });
+  await page.keyboard.press("Escape").catch(() => undefined);
+  const trigger = nav.getByRole("menuitem", { name: label, exact: true });
+  await trigger.focus();
+  await trigger.press("ArrowDown");
+  await page.locator(`[role="menu"][aria-label="${label}"]`).waitFor({
+    state: "visible",
+    timeout: 5_000,
+  });
+}
+
+async function captureMainMenuFrame(
+  page: Page,
+  label: string,
+  surface: "primary" | "action",
+): Promise<VisibleMenuFrame> {
+  let frame = EMPTY_VISIBLE_MENU_FRAME;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt === 0) await openMainMenuGroup(page, label, surface);
+    else await openMainMenuGroupWithKeyboard(page, label, surface);
+
+    frame = await snapshotVisibleMenuFrame(
+      page.locator(`[role="menu"][aria-label="${label}"]`),
+    ).catch(() => EMPTY_VISIBLE_MENU_FRAME);
+    if (frame.itemRows.length > 0) return frame;
+
+    if (attempt === 0) {
+      log(`  retry: 메인 메뉴 [${label}]가 포인터 수명주기 중 닫힘 — 키보드 경로로 다시 열기`);
+    }
   }
-  return false;
+  return frame;
 }
 
 async function hasVisibleText(page: Page | Locator, text: string): Promise<boolean> {
@@ -689,15 +749,13 @@ async function assertMainMenus(page: Page): Promise<string[]> {
 
     for (const presented of spec.menus) {
       try {
-        await openMainMenuGroup(page, presented.title, spec.surface);
-        const menu = page.locator(`[role="menu"][aria-label="${presented.title}"]`);
-        const visibleItemRows = await visibleMenuItemRowTexts(menu);
+        const frame = await captureMainMenuFrame(page, presented.title, spec.surface);
         for (const section of presented.sections) {
-          if (presented.composite && !(await hasVisibleSectionCaption(menu, section.caption))) {
+          if (presented.composite && !frame.sectionCaptions.includes(section.caption)) {
             failures.push(`${spec.label} [${presented.title}] 섹션 캡션 없음: ${section.caption}`);
           }
           for (const item of section.items) {
-            const visible = visibleItemRows.some((rowText) =>
+            const visible = frame.itemRows.some((rowText) =>
               menuItemRowHasExactLabel(rowText, item),
             );
             if (!visible) {
