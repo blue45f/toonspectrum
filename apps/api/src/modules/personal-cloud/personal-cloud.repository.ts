@@ -53,45 +53,7 @@ const SELECT_COLUMNS = `
 
 @Injectable()
 export class PersonalCloudRepository {
-  private schemaReady: Promise<void> | null = null;
-
-  private ensureSchema(): Promise<void> {
-    if (this.schemaReady) return this.schemaReady;
-    this.schemaReady = (async () => {
-      await dbClient.execute({
-        sql: `CREATE TABLE IF NOT EXISTS "personal_cloud_connection" (
-          "userId" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-          "provider" text NOT NULL CHECK ("provider" IN ('google-drive', 'dropbox', 'onedrive')),
-          "providerAccountId" text NOT NULL,
-          "accountLabel" text NOT NULL,
-          "encryptedAccessToken" text NOT NULL,
-          "encryptedRefreshToken" text NOT NULL,
-          "tokenType" text NOT NULL DEFAULT 'Bearer',
-          "scope" text NOT NULL,
-          "accessTokenExpiresAt" timestamptz NOT NULL,
-          "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "lastUsedAt" timestamptz,
-          PRIMARY KEY ("userId", "provider")
-        )`,
-        args: [],
-      });
-      await dbClient.execute({
-        sql: `CREATE INDEX IF NOT EXISTS "idx_personal_cloud_connection_updated"
-          ON "personal_cloud_connection" ("userId", "updatedAt" DESC)`,
-        args: [],
-      });
-      // PostgreSQL grants no table privileges to PUBLIC by default. A dedicated
-      // migration may harden ownership later, but runtime feature bootstrap must
-      // not fail merely because the application role cannot issue REVOKE.
-    })().catch((error) => {
-      this.schemaReady = null;
-      throw error;
-    });
-    return this.schemaReady;
-  }
   async list(userId: string): Promise<readonly PersonalCloudConnectionRecord[]> {
-    await this.ensureSchema();
     const result = await dbClient.execute({
       sql: `SELECT ${SELECT_COLUMNS}
         FROM "personal_cloud_connection"
@@ -106,7 +68,6 @@ export class PersonalCloudRepository {
     userId: string,
     provider: PersonalCloudProviderId,
   ): Promise<PersonalCloudConnectionRecord | null> {
-    await this.ensureSchema();
     const result = await dbClient.execute({
       sql: `SELECT ${SELECT_COLUMNS}
         FROM "personal_cloud_connection"
@@ -118,7 +79,6 @@ export class PersonalCloudRepository {
   }
 
   async upsert(input: Omit<PersonalCloudConnectionRecord, "createdAt" | "updatedAt" | "lastUsedAt">): Promise<PersonalCloudConnectionRecord> {
-    await this.ensureSchema();
     const now = new Date();
     const result = await dbClient.execute({
       sql: `INSERT INTO "personal_cloud_connection" (
@@ -163,7 +123,6 @@ export class PersonalCloudRepository {
     readonly scope: string;
     readonly accessTokenExpiresAt: Date;
   }): Promise<PersonalCloudConnectionRecord> {
-    await this.ensureSchema();
     const now = new Date();
     const result = await dbClient.execute({
       sql: `UPDATE "personal_cloud_connection"
@@ -193,7 +152,6 @@ export class PersonalCloudRepository {
   }
 
   async touch(userId: string, provider: PersonalCloudProviderId): Promise<void> {
-    await this.ensureSchema();
     await dbClient.execute({
       sql: `UPDATE "personal_cloud_connection"
         SET "lastUsedAt" = ?, "updatedAt" = ?
@@ -203,7 +161,6 @@ export class PersonalCloudRepository {
   }
 
   async remove(userId: string, provider: PersonalCloudProviderId): Promise<boolean> {
-    await this.ensureSchema();
     const result = await dbClient.execute({
       sql: `DELETE FROM "personal_cloud_connection"
         WHERE "userId" = ? AND "provider" = ?`,

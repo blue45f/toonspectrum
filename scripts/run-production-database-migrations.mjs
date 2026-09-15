@@ -141,6 +141,7 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_work_report",
   "creator_work_review_feedback",
   "creator_work_review_link",
+  "personal_cloud_connection",
   "studio_ai_comic_director_approval",
   "studio_ai_comic_director_artifact",
   "studio_ai_comic_director_job",
@@ -221,6 +222,60 @@ GRANT SELECT, INSERT, UPDATE, DELETE
  * Keep this condition beside the GRANT builder so migration normalization and
  * the production verifier cannot drift apart.
  */
+export function buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE public.personal_cloud_connection FROM PUBLIC;
+REVOKE ALL ON TABLE public.personal_cloud_connection FROM ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.personal_cloud_connection
+  TO ${quotedRole};
+`;
+}
+
+export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.personal_cloud_connection',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.personal_cloud_connection',
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        'PUBLIC',
+        'public.personal_cloud_connection',
+        public_privilege
+      )
+    )
+  )`;
+}
+
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   return `(
@@ -2649,6 +2704,7 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));

@@ -109,6 +109,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "feedback_reply",
   "feedback_vote",
   "monetization_plan",
+  "personal_cloud_connection",
   "rating",
   "read",
   "revenue_ledger",
@@ -151,6 +152,7 @@ export const REQUIRED_DATABASE_MIGRATIONS = [
   "0032_creator_marketplace_release_lifecycle",
   "0033_creator_marketplace_cloud_library",
   "0034_creator_marketplace_package_moderation",
+  "0051_personal_cloud_connections",
 ] as const;
 
 interface DatabasePingRow {
@@ -167,6 +169,7 @@ interface SchemaCatalogRow {
   authAccountConstraintsReady: boolean;
   authAccountUserIndexReady: boolean;
   authRuntimeDmlReady: boolean;
+  personalCloudConnectionAclReady: boolean;
   marketplaceResourceAclReady: boolean;
   marketplaceResourceLifecycleTriggerReady: boolean;
   marketplaceResourceTimestampPrecisionReady: boolean;
@@ -468,6 +471,11 @@ export class PostgresHealthReadinessRepository
                 'public.account',
                 'SELECT, INSERT, UPDATE, DELETE'
               ) AS "authRuntimeDmlReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.personal_cloud_connection',
+              'SELECT, INSERT, UPDATE, DELETE'
+            ) AS "personalCloudConnectionAclReady",
             NOT EXISTS (
               SELECT 1
               FROM (VALUES
@@ -1547,6 +1555,7 @@ export class PostgresHealthReadinessRepository
       state.authAccountConstraintsReady !== true ||
       state.authAccountUserIndexReady !== true ||
       state.authRuntimeDmlReady !== true ||
+      state.personalCloudConnectionAclReady !== true ||
       state.marketplaceResourceAclReady !== true ||
       state.marketplaceResourceLifecycleTriggerReady !== true ||
       state.marketplaceResourceTimestampPrecisionReady !== true ||

@@ -13,6 +13,7 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
@@ -59,6 +60,7 @@ const EXPECTED_SPECIAL_CAPABILITIES = Object.freeze([
   "marketplaceSearchGenerated",
   "marketplaceSearchIndexReady",
   "marketplaceTagIndexReady",
+  "personalCloudConnectionAclReady",
   "relationNames",
   "trigramExtensionReady",
 ]);
@@ -417,6 +419,11 @@ BEGIN
   IF ${buildAuthRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact authentication lifecycle privileges';
+  END IF;
+
+  IF ${buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact personal cloud connection privileges';
   END IF;
 
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
