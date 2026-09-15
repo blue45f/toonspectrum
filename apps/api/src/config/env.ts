@@ -431,6 +431,9 @@ const envSchema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, "STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT must be a positive integer")
     .optional(),
+  // 소셜 데모 로그인은 로컬 개발자가 명시적으로 opt-in한 경우에만 허용한다.
+  // providerMode()가 production에서는 이 값을 무시해 운영 데모 계정 발급을 막는다.
+  AUTH_SOCIAL_DEMO_ENABLED: z.enum(["true", "false"]).optional(),
   // Google GIS(ID 토큰)는 client ID만 필요하다. client secret은 레거시
   // authorization-code 폴백에서만 사용하며, 그 경우 AUTH_STATE_SECRET도 필수다.
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
@@ -439,10 +442,15 @@ const envSchema = z.object({
   KAKAO_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   KAKAO_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
   KAKAO_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
+  KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED: z.enum(["true", "false"]).optional(),
+  KAKAO_APP_ID: z.string().regex(/^\d{1,20}$/u).optional(),
+  KAKAO_ADMIN_KEY: z.string().min(1).max(4_096).optional(),
   NAVER_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
   NAVER_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   NAVER_CLIENT_ID: z.string().min(1).max(4_096).optional(),
   NAVER_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
+  GITHUB_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
+  GITHUB_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   // 만화규장각 서버 보강. 인증키는 URL query에 들어가므로 반드시 서버 secret으로만 보관한다.
   KMAS_PRV_KEY: z.string().min(1).max(4_096).optional(),
   KMAS_BASE_URL: z.url({ protocol: /^https$/u }).optional(),
@@ -518,10 +526,13 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "KAKAO_CLIENT_SECRET",
   "KAKAO_OAUTH_CLIENT_ID",
   "KAKAO_OAUTH_CLIENT_SECRET",
+  "KAKAO_ADMIN_KEY",
   "NAVER_OAUTH_CLIENT_ID",
   "NAVER_OAUTH_CLIENT_SECRET",
   "NAVER_CLIENT_ID",
   "NAVER_CLIENT_SECRET",
+  "GITHUB_OAUTH_CLIENT_ID",
+  "GITHUB_OAUTH_CLIENT_SECRET",
   "KMAS_PRV_KEY",
 ];
 
@@ -582,6 +593,8 @@ function assertProductionAuthSecrets(source: NodeJS.ProcessEnv): void {
     source.NAVER_OAUTH_CLIENT_SECRET,
     source.NAVER_CLIENT_ID,
     source.NAVER_CLIENT_SECRET,
+    source.GITHUB_OAUTH_CLIENT_ID,
+    source.GITHUB_OAUTH_CLIENT_SECRET,
   ].some((value) => Boolean(value?.trim()));
   if (stateSecret !== null || authorizationCodeFlowConfigured) {
     assertStrongProductionHmacSecret(

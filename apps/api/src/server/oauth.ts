@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 import { OAuth2Client } from "google-auth-library";
@@ -9,16 +9,16 @@ import { isWhitelistedAdminEmail, resolveEffectiveAdminRole } from "./admin-emai
 import { invalidateSessionUser } from "./session";
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
-// ── 소셜 로그인(Google·Kakao·Naver) ──
+// ── 소셜 로그인(Google·Kakao·Naver·GitHub) ──
 // Google: GIS(Google Identity Services) ID 토큰 흐름. 프론트가 받은 ID 토큰을 google-auth-library
 //   verifyIdToken 으로 서버 검증(서명·aud·iss·exp)해 신원을 확정한다(인가-코드 교환 불필요).
 //   하위 호환: 기존 인가-코드 콜백 경로(handleOAuthCallback)도 키 설정 시 그대로 동작한다.
-// Kakao·Naver: 실 앱키(REST API key / client secret) 가 없어 의도적으로 데모 고정(DEMO_ONLY_PROVIDERS).
-//   실연동 재개 시 외부 앱키 발급 후 이 집합에서 제거하면 인가-코드 흐름으로 동작한다.
+// Kakao·Naver·GitHub: 서버가 인가 코드를 교환하고 제공자 프로필을 검증하는 OAuth 2.0 흐름.
+//   Kakao·Naver는 관리자 데모 토글을 유지하고, GitHub는 설정 누락 시 비활성 진단만 노출한다.
 // 세션은 서명 JWT(./session.ts)로 발급되어 HttpOnly 쿠키에 저장된다.
 // 마이그레이션 중인 탭 전용 클라이언트는 같은 JWT를 x-user-id 헤더로도 보낼 수 있다.
 
-export type OAuthProviderId = "google" | "kakao" | "naver";
+export type OAuthProviderId = "google" | "kakao" | "naver" | "github";
 export type OAuthProviderMode = "oauth" | "demo" | "disabled";
 
 // OAuth 제공자 프로필 JSON: 키 형태를 고정할 수 없어 unknown 값 레코드로 표현.
@@ -34,7 +34,7 @@ function str(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-// 소셜 로그인(Google·Kakao·Naver) 실연동 활성화
+// 소셜 로그인(Google·Kakao·Naver·GitHub) 실연동 활성화
 const DEMO_ONLY_PROVIDERS = new Set<OAuthProviderId>();
 
 export interface OAuthUser {
@@ -75,6 +75,7 @@ interface ProviderConfig {
   authorizeUrl: string;
   tokenUrl: string;
   userInfoUrl: string;
+  emailInfoUrl?: string;
   scope: string;
   demoName: string;
   demoEmail: string;
@@ -83,6 +84,16 @@ interface ProviderConfig {
 function env(key: string): string | undefined {
   const v = process.env[key];
   return v && v.trim() ? v.trim() : undefined;
+}
+
+function kakaoOAuthScope(): string {
+  const scopes = ["profile_nickname", "profile_image"];
+  // account_email은 카카오 비즈니스/추가 기능 승인을 받은 앱에서만 요청한다.
+  // 권한 없는 앱이 scope를 보내면 전체 로그인 흐름이 거절될 수 있으므로 명시적으로 opt-in한다.
+  if (env("KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED") === "true") {
+    scopes.push("account_email");
+  }
+  return scopes.join(",");
 }
 
 function providerConfig(id: OAuthProviderId): ProviderConfig {
@@ -98,6 +109,22 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
       scope: "openid email profile",
       demoName: "구글 데모 사용자",
       demoEmail: "demo.google@webdex.local",
+    };
+  }
+  if (id === "github") {
+    return {
+      id,
+      label: "GitHub",
+      clientId: env("GITHUB_OAUTH_CLIENT_ID"),
+      clientSecret: env("GITHUB_OAUTH_CLIENT_SECRET"),
+      authorizeUrl: "https://github.com/login/oauth/authorize",
+      tokenUrl: "https://github.com/login/oauth/access_token",
+      userInfoUrl: "https://api.github.com/user",
+      emailInfoUrl: "https://api.github.com/user/emails",
+      // Private email lookup only. Public profile fields are available without an extra scope.
+      scope: "user:email",
+      demoName: "GitHub 데모 사용자",
+      demoEmail: "demo.github@webdex.local",
     };
   }
   if (id === "naver") {
@@ -117,30 +144,43 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
   return {
     id,
     label: "카카오",
-    // 카카오는 REST API 키를 client_id 로 사용. client secret 은 선택(보안 설정 시 필수).
+    // 카카오는 REST API 키를 client_id로, 활성화된 클라이언트 시크릿을 client_secret으로 사용.
     clientId: env("KAKAO_REST_API_KEY") ?? env("KAKAO_OAUTH_CLIENT_ID"),
     clientSecret: env("KAKAO_CLIENT_SECRET") ?? env("KAKAO_OAUTH_CLIENT_SECRET"),
     authorizeUrl: "https://kauth.kakao.com/oauth/authorize",
     tokenUrl: "https://kauth.kakao.com/oauth/token",
-    userInfoUrl: "https://kapi.kakao.com/v2/user/me",
-    scope: "profile_nickname profile_image account_email",
+    userInfoUrl: "https://kapi.kakao.com/v2/user/me?secure_resource=true",
+    scope: kakaoOAuthScope(),
     demoName: "카카오 데모 사용자",
     demoEmail: "demo.kakao@webdex.local",
   };
 }
 
 export function isOAuthProvider(value: string): value is OAuthProviderId {
-  return value === "google" || value === "kakao" || value === "naver";
+  return (
+    value === "google"
+    || value === "kakao"
+    || value === "naver"
+    || value === "github"
+  );
+}
+
+function socialLoginDemoEnabled(): boolean {
+  return process.env.NODE_ENV !== "production"
+    && env("AUTH_SOCIAL_DEMO_ENABLED") === "true";
 }
 
 export function providerMode(id: OAuthProviderId): OAuthProviderMode {
   if (DEMO_ONLY_PROVIDERS.has(id)) return "demo";
   const c = providerConfig(id);
-  // Google 은 GIS(ID 토큰) 흐름이라 client id 만 있으면 실연동(클라이언트 시크릿 불필요).
-  // Google 로그인은 실제 Google 계정임을 전제로 하므로, 설정이 없을 때 데모 계정으로 가장하지 않는다.
+  // Google은 GIS(ID 토큰) 흐름이라 client id만 있으면 실연동(클라이언트 시크릿 불필요).
+  // 실 공급자 자격 증명이 없을 때 운영에서 데모 사용자로 가장하지 않고 안전하게 숨긴다.
   if (id === "google") return c.clientId ? "oauth" : "disabled";
-  if (id === "kakao") return c.clientId ? "oauth" : "demo";
-  return c.clientId && c.clientSecret ? "oauth" : "demo";
+  if (c.clientId && c.clientSecret) return "oauth";
+  if ((id === "kakao" || id === "naver") && socialLoginDemoEnabled()) {
+    return "demo";
+  }
+  return "disabled";
 }
 
 /**
@@ -156,7 +196,6 @@ export function isAuthorizationCodeFlowConfigured(
 ): boolean {
   if (DEMO_ONLY_PROVIDERS.has(id)) return false;
   const c = providerConfig(id);
-  if (id === "kakao") return Boolean(c.clientId);
   return Boolean(c.clientId && c.clientSecret);
 }
 
@@ -167,12 +206,13 @@ export interface AuthProviderInfo {
   redirectAvailable: boolean;
   // GIS 버튼 렌더용 — google 실연동(oauth) 시에만 client id 를 노출(공개해도 안전한 값).
   clientId?: string;
-  reason?: "missing-client-id";
+  reason?: "missing-client-id" | "missing-credentials";
 }
 
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
 export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
   const googleMode = providerMode("google");
+  const githubMode = providerMode("github");
   const kakaoMode = providerMode("kakao");
   const naverMode = providerMode("naver");
   const out: Record<string, AuthProviderInfo> = {
@@ -183,6 +223,14 @@ export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
       // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출한다. client secret 은 절대 노출하지 않는다.
       ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
       ...(googleMode === "disabled" ? { reason: "missing-client-id" as const } : {}),
+    },
+    github: {
+      label: "GitHub",
+      mode: githubMode,
+      redirectAvailable: isAuthorizationCodeFlowConfigured("github"),
+      ...(githubMode === "disabled"
+        ? { reason: "missing-credentials" as const }
+        : {}),
     },
   };
   if (opts?.kakao || kakaoMode === "oauth") {
@@ -239,12 +287,23 @@ function stateSecret(): string {
 function sign(payload: string): string {
   return createHmac("sha256", stateSecret()).update(payload).digest("base64url");
 }
+export const OAUTH_STATE_MAX_LENGTH = 512;
+
 export function issueState(id: OAuthProviderId): string {
-  const payload = `${id}.${randomBytes(8).toString("hex")}.${Date.now()}`;
+  const payload = `${id}.${randomBytes(16).toString("hex")}.${Date.now()}`;
   return `${Buffer.from(payload).toString("base64url")}.${sign(payload)}`;
 }
-export function verifyState(id: OAuthProviderId, state: string | undefined, maxAgeMs = 10 * 60_000): boolean {
-  if (!state || typeof state !== "string") return false;
+
+export function verifyState(
+  id: OAuthProviderId,
+  state: string | undefined,
+  maxAgeMs = 10 * 60_000,
+): boolean {
+  if (
+    !state
+    || typeof state !== "string"
+    || state.length > OAUTH_STATE_MAX_LENGTH
+  ) return false;
   const dot = state.lastIndexOf(".");
   if (dot < 0) return false;
   const payloadB64 = state.slice(0, dot);
@@ -259,14 +318,59 @@ export function verifyState(id: OAuthProviderId, state: string | undefined, maxA
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
-  const [pid, , ts] = payload.split(".");
-  if (pid !== id) return false;
+  const [pid, nonce, ts] = payload.split(".");
+  if (pid !== id || !/^[a-f0-9]{32}$/u.test(nonce ?? "")) return false;
   const issued = Number(ts);
-  return Number.isFinite(issued) && Date.now() - issued < maxAgeMs;
+  const ageMs = Date.now() - issued;
+  return Number.isFinite(issued) && ageMs >= -60_000 && ageMs < maxAgeMs;
+}
+
+export function verifyBrowserBoundState(
+  id: OAuthProviderId,
+  state: string | undefined,
+  cookieState: string | null,
+  maxAgeMs = 10 * 60_000,
+): boolean {
+  if (!state || !cookieState || !verifyState(id, state, maxAgeMs)) return false;
+  const stateBytes = Buffer.from(state, "utf8");
+  const cookieBytes = Buffer.from(cookieState, "utf8");
+  return (
+    stateBytes.length === cookieBytes.length
+    && timingSafeEqual(stateBytes, cookieBytes)
+  );
+}
+
+const PKCE_VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/u;
+const PKCE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
+
+export function issuePkceVerifier(): string {
+  // 48 random bytes encode to 64 unpadded base64url characters (RFC 7636: 43-128).
+  return randomBytes(48).toString("base64url");
+}
+
+export function isValidPkceVerifier(
+  value: string | null | undefined,
+): value is string {
+  return typeof value === "string" && PKCE_VERIFIER_PATTERN.test(value);
+}
+
+export function createPkceCodeChallenge(verifier: string): string {
+  if (!isValidPkceVerifier(verifier)) {
+    throw new Error("invalid PKCE verifier");
+  }
+  return createHash("sha256").update(verifier, "ascii").digest("base64url");
+}
+
+export interface OAuthAuthorizeOptions {
+  pkceCodeChallenge?: string;
 }
 
 // ── authorize URL ──
-export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | null {
+export function buildAuthorizeUrl(
+  id: OAuthProviderId,
+  state: string,
+  options: OAuthAuthorizeOptions = {},
+): string | null {
   if (!isAuthorizationCodeFlowConfigured(id)) return null;
   const c = providerConfig(id);
   const clientId = c.clientId;
@@ -281,6 +385,12 @@ export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | 
     u.searchParams.set("access_type", "offline");
     u.searchParams.set("prompt", "select_account");
   }
+  if (id === "github") {
+    const challenge = options.pkceCodeChallenge;
+    if (!challenge || !PKCE_CHALLENGE_PATTERN.test(challenge)) return null;
+    u.searchParams.set("code_challenge", challenge);
+    u.searchParams.set("code_challenge_method", "S256");
+  }
   return u.toString();
 }
 
@@ -292,7 +402,56 @@ interface NormalizedProfile {
   image: string | null;
 }
 
-async function exchangeCode(id: OAuthProviderId, code: string): Promise<Record<string, unknown>> {
+export function canAutoLinkOAuthEmail(
+  provider: OAuthProviderId,
+  emailVerified: boolean | undefined,
+): boolean {
+  // Naver returns a consented profile email but no provider assertion that the
+  // address is verified. Never merge it into an existing account implicitly;
+  // linking requires a separate authenticated, explicit account-link flow.
+  return provider !== "naver" && emailVerified === true;
+}
+
+function normalizedEmail(value: unknown): string | null {
+  const email = str(value)?.trim().toLowerCase() ?? "";
+  if (!email || email.length > 254 || !email.includes("@") || /\s/u.test(email)) {
+    return null;
+  }
+  return email;
+}
+
+function normalizedProviderAccountId(value: unknown): string {
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw new Error("provider profile account id is missing");
+  }
+  const id = String(value).trim();
+  if (!id || id.length > 512) {
+    throw new Error("provider profile account id is invalid");
+  }
+  return id;
+}
+
+export function selectGitHubVerifiedEmail(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const verified = value
+    .map((entry) => asRecord(entry))
+    .map((entry) => ({
+      email: normalizedEmail(entry.email),
+      primary: entry.primary === true,
+      verified: entry.verified === true,
+    }))
+    .filter((entry): entry is { email: string; primary: boolean; verified: true } =>
+      entry.verified && entry.email !== null,
+    );
+  return verified.find((entry) => entry.primary)?.email ?? verified[0]?.email ?? null;
+}
+
+async function exchangeCode(
+  id: OAuthProviderId,
+  code: string,
+  state: string,
+  pkceVerifier?: string,
+): Promise<Record<string, unknown>> {
   const c = providerConfig(id);
   const params: Record<string, string> = {
     grant_type: "authorization_code",
@@ -300,48 +459,103 @@ async function exchangeCode(id: OAuthProviderId, code: string): Promise<Record<s
     redirect_uri: redirectUri(id),
     code,
   };
-  if (c.clientSecret) {
-    params.client_secret = c.clientSecret;
+  if (c.clientSecret) params.client_secret = c.clientSecret;
+  // Naver requires the callback state again during the authorization-code exchange.
+  if (id === "naver") params.state = state;
+  if (id === "github") {
+    if (!isValidPkceVerifier(pkceVerifier)) {
+      throw new Error("missing or invalid GitHub PKCE verifier");
+    }
+    params.code_verifier = pkceVerifier;
   }
   const body = new URLSearchParams(params);
   const res = await fetch(c.tokenUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
     body,
     signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`token exchange failed (${res.status})`);
-  return (await res.json()) as Record<string, unknown>;
+  const payload = (await res.json()) as Record<string, unknown>;
+  if (typeof payload.error === "string") {
+    throw new Error("provider rejected token exchange");
+  }
+  return payload;
 }
 
-async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<NormalizedProfile> {
+function providerProfileHeaders(
+  id: OAuthProviderId,
+  accessToken: string,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+  };
+  if (id === "github") {
+    headers.Accept = "application/vnd.github+json";
+    headers["User-Agent"] = "ToonSpectrum-OAuth";
+    headers["X-GitHub-Api-Version"] = "2026-03-10";
+  }
+  return headers;
+}
+
+async function fetchProfile(
+  id: OAuthProviderId,
+  accessToken: string,
+): Promise<NormalizedProfile> {
   const c = providerConfig(id);
+  const headers = providerProfileHeaders(id, accessToken);
   const res = await fetch(c.userInfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    headers,
     signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`profile fetch failed (${res.status})`);
   const raw = (await res.json()) as JsonRecord;
   if (id === "google") {
-    const email = str(raw.email)?.toLowerCase() ?? null;
+    const email = normalizedEmail(raw.email);
     const emailVerified = raw.email_verified === true;
     if (!email || !emailVerified) {
       throw new GoogleAuthCredentialError("google email is missing or unverified");
     }
     return {
-      providerAccountId: String(raw.sub),
+      providerAccountId: normalizedProviderAccountId(raw.sub),
       email,
       emailVerified,
       name: str(raw.name) ?? str(raw.given_name),
       image: str(raw.picture),
     };
   }
+  if (id === "github") {
+    let verifiedEmail: string | null = null;
+    if (c.emailInfoUrl) {
+      const emailResponse = await fetch(c.emailInfoUrl, {
+        headers,
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (emailResponse.ok) {
+        verifiedEmail = selectGitHubVerifiedEmail(await emailResponse.json());
+      }
+    }
+    return {
+      providerAccountId: normalizedProviderAccountId(raw.id),
+      email: verifiedEmail,
+      emailVerified: verifiedEmail !== null,
+      name: str(raw.name) ?? str(raw.login),
+      image: str(raw.avatar_url),
+    };
+  }
   if (id === "naver") {
-    // 네이버: { resultcode, message, response: { id, email, name, nickname, profile_image } }
+    // Naver exposes a consented profile email but no verification assertion.
+    // Preserve it only as transient profile data; account creation/linking uses
+    // the provider id unless an authenticated explicit-link flow is added.
     const r = asRecord(raw.response);
     return {
-      providerAccountId: String(r.id),
-      email: str(r.email)?.toLowerCase() ?? null,
+      providerAccountId: normalizedProviderAccountId(r.id),
+      email: normalizedEmail(r.email),
+      emailVerified: false,
       name: str(r.name) ?? str(r.nickname),
       image: str(r.profile_image),
     };
@@ -349,9 +563,15 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
   // kakao
   const acc = asRecord(raw.kakao_account);
   const profile = asRecord(acc.profile ?? raw.properties);
+  const email = normalizedEmail(acc.email);
+  const emailVerified =
+    email !== null
+    && acc.is_email_valid === true
+    && acc.is_email_verified === true;
   return {
-    providerAccountId: String(raw.id),
-    email: str(acc.email)?.toLowerCase() ?? null,
+    providerAccountId: normalizedProviderAccountId(raw.id),
+    email: emailVerified ? email : null,
+    emailVerified,
     name: str(profile.nickname),
     image: str(profile.profile_image_url) ?? str(profile.profile_image),
   };
@@ -399,14 +619,16 @@ function avatarFor(seed: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-// 프로필 → user/account upsert. Google은 검증된 이메일만 기존 계정에 연결하고, 없으면 신규 생성.
+// 프로필 → user/account upsert. 검증된 이메일만 기존 계정에 연결하고, 없으면 공급자 ID 기반 계정을 생성.
 async function upsertOAuthUser(
   id: OAuthProviderId,
   profile: NormalizedProfile,
-  tokens?: Record<string, unknown>
 ): Promise<OAuthUser> {
   await ensureOAuthTables();
-  const email = profile.email ?? `${id}_${profile.providerAccountId}@${id}.local`;
+  const mayLinkByEmail = canAutoLinkOAuthEmail(id, profile.emailVerified);
+  const email = mayLinkByEmail && profile.email
+    ? profile.email
+    : `${id}_${profile.providerAccountId}@${id}.local`;
   const name = profile.name ?? providerConfig(id).label;
 
   const [linked] = await db
@@ -417,7 +639,6 @@ async function upsertOAuthUser(
 
   let userId = linked?.userId;
   if (!userId) {
-    const mayLinkByEmail = id !== "google" || profile.emailVerified === true;
     const [byEmail] = mayLinkByEmail
       ? await db
           .select({ id: users.id })
@@ -466,11 +687,6 @@ async function upsertOAuthUser(
         type: "oauth",
         provider: id,
         providerAccountId: profile.providerAccountId,
-        access_token: (tokens?.access_token as string) ?? null,
-        refresh_token: (tokens?.refresh_token as string) ?? null,
-        token_type: (tokens?.token_type as string) ?? null,
-        scope: (tokens?.scope as string) ?? null,
-        id_token: (tokens?.id_token as string) ?? null,
       })
       .onConflictDoNothing({
         target: [accounts.provider, accounts.providerAccountId],
@@ -493,6 +709,26 @@ async function upsertOAuthUser(
     }
     userId = authoritativeAccount.userId;
   }
+
+  // 레거시 구현이 저장했던 공급자 토큰도 해당 계정의 다음 로그인에서 제거한다.
+  // 사용자 로그인에는 ToonSpectrum 자체 세션만 필요하며 외부 장기 자격 증명을 보존하지 않는다.
+  await db
+    .update(accounts)
+    .set({
+      refresh_token: null,
+      access_token: null,
+      expires_at: null,
+      token_type: null,
+      scope: null,
+      id_token: null,
+      session_state: null,
+    })
+    .where(
+      and(
+        eq(accounts.provider, id),
+        eq(accounts.providerAccountId, profile.providerAccountId),
+      ),
+    );
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const block = getUserAuthBlock(user);
@@ -524,12 +760,18 @@ function normalizeRole(value: string | null | undefined): string {
 }
 
 // 실제 OAuth 콜백 처리: code → token → profile → upsert.
-export async function handleOAuthCallback(id: OAuthProviderId, code: string): Promise<OAuthUser> {
-  const tokens = await exchangeCode(id, code);
+export async function handleOAuthCallback(
+  id: OAuthProviderId,
+  code: string,
+  state: string,
+  pkceVerifier?: string,
+): Promise<OAuthUser> {
+  const tokens = await exchangeCode(id, code, state, pkceVerifier);
   const accessToken = tokens.access_token as string | undefined;
   if (!accessToken) throw new Error("no access_token");
   const profile = await fetchProfile(id, accessToken);
-  return upsertOAuthUser(id, profile, tokens);
+  // 로그인 전용 OAuth 토큰은 저장하지 않는다. 제공자 신원을 확인한 뒤 자체 HttpOnly 세션을 발급한다.
+  return upsertOAuthUser(id, profile);
 }
 
 // ── Google Identity Services(GIS): ID 토큰 검증 ──
@@ -585,7 +827,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<NormalizedPr
   };
 }
 
-// GIS 로그인 처리: ID 토큰 검증 → user/account upsert. (kakao/naver 는 데모이므로 google 전용)
+// GIS 로그인 처리: ID 토큰 검증 → user/account upsert. Google 전용 흐름.
 export async function handleGoogleIdToken(idToken: string): Promise<OAuthUser> {
   const profile = await verifyGoogleIdToken(idToken);
   // ID 토큰은 로그인 순간의 검증 증명일 뿐 장기 자격 증명이 아니다. 검증 후 원문을 저장하지 않는다.

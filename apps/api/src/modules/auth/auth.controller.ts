@@ -33,23 +33,37 @@ import {
   type UpstashCoordinationPort,
 } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { resolveEffectiveAdminRole } from "../../server/admin-emails";
+import {
+  oauthPkceVerifierCookieName,
+  oauthStateCookieName,
+  resolveOAuthPkceVerifierCookieClearOptions,
+  resolveOAuthPkceVerifierCookieOptions,
+  resolveOAuthPkceVerifierCookieValue,
+  resolveOAuthStateCookieClearOptions,
+  resolveOAuthStateCookieOptions,
+  resolveOAuthStateCookieValue,
+} from "../../oauth-state-cookie";
 import { getAppConfig } from "../../server/app-config";
 import {
   buildAuthorizeUrl,
   consumeHandoff,
   createDemoUser,
+  createPkceCodeChallenge,
   GoogleAuthConfigurationError,
   GoogleAuthCredentialError,
   handleGoogleIdToken,
   handleOAuthCallback,
   isAuthorizationCodeFlowConfigured,
   isOAuthProvider,
+  isValidPkceVerifier,
+  issuePkceVerifier,
   issueState,
   listAuthProviders,
   OAuthAccountBlockedError,
   providerMode,
-  verifyState,
+  verifyBrowserBoundState,
   webAppBaseUrl,
+  type OAuthProviderId,
 } from "../../server/oauth";
 import {
   signSession,
@@ -191,11 +205,21 @@ export class AuthController {
         error: "이 로그인 제공자의 리다이렉트 로그인이 설정되지 않았어요.",
       });
     }
-    const url = buildAuthorizeUrl(provider, issueState(provider));
+    const state = issueState(provider);
+    const pkceVerifier = provider === "github" ? issuePkceVerifier() : undefined;
+    const url = buildAuthorizeUrl(provider, state, {
+      ...(pkceVerifier
+        ? { pkceCodeChallenge: createPkceCodeChallenge(pkceVerifier) }
+        : {}),
+    });
     if (!url) {
       throw new ServiceUnavailableException({
         error: "이 로그인 제공자의 리다이렉트 로그인이 설정되지 않았어요.",
       });
+    }
+    applyOAuthStateCookie(res, provider, state);
+    if (pkceVerifier) {
+      applyOAuthPkceVerifierCookie(res, provider, pkceVerifier);
     }
     return res.redirect(url);
   }
@@ -209,23 +233,47 @@ export class AuthController {
     @Query("code") code: string | undefined,
     @Query("state") state: string | undefined,
     @Query("error") error: string | undefined,
+    @Req() request: Request,
     @Res() res: Response,
   ) {
     const web = webAppBaseUrl();
     if (!isOAuthProvider(provider))
       return res.redirect(`${web}/auth/callback#error=unsupported`);
-    if (error)
-      return res.redirect(
-        `${web}/auth/callback#error=${encodeURIComponent(error)}`,
-      );
+
+    const browserState = resolveOAuthStateCookieValue(
+      request.headers.cookie,
+      provider,
+    );
+    const browserPkceVerifier = provider === "github"
+      ? resolveOAuthPkceVerifierCookieValue(request.headers.cookie, provider)
+      : null;
+    clearOAuthStateCookie(res, provider);
+    if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
+
     if (!isAuthorizationCodeFlowConfigured(provider)) {
       return res.redirect(`${web}/auth/callback#error=oauth_unavailable`);
     }
-    if (!verifyState(provider, state))
+    if (!state || !verifyBrowserBoundState(provider, state, browserState))
       return res.redirect(`${web}/auth/callback#error=bad_state`);
+    if (provider === "github" && !isValidPkceVerifier(browserPkceVerifier)) {
+      return res.redirect(`${web}/auth/callback#error=bad_state`);
+    }
+    if (error) {
+      const errorCode = /^[A-Za-z0-9._-]{1,80}$/u.test(error)
+        ? error
+        : "provider_error";
+      return res.redirect(
+        `${web}/auth/callback#error=${encodeURIComponent(errorCode)}`,
+      );
+    }
     if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
     try {
-      const user = await handleOAuthCallback(provider, code);
+      const user = await handleOAuthCallback(
+        provider,
+        code,
+        state,
+        browserPkceVerifier ?? undefined,
+      );
       const token = signSession(
         user.id,
         normalizeSessionVersion(user.sessionVersion),
@@ -540,6 +588,50 @@ function normalizeEmail(value: unknown) {
   return String(value ?? "")
     .toLowerCase()
     .trim();
+}
+
+function applyOAuthStateCookie(
+  response: Response,
+  provider: OAuthProviderId,
+  state: string,
+): void {
+  response.cookie(
+    oauthStateCookieName(provider),
+    state,
+    resolveOAuthStateCookieOptions(provider),
+  );
+}
+
+function applyOAuthPkceVerifierCookie(
+  response: Response,
+  provider: OAuthProviderId,
+  verifier: string,
+): void {
+  response.cookie(
+    oauthPkceVerifierCookieName(provider),
+    verifier,
+    resolveOAuthPkceVerifierCookieOptions(provider),
+  );
+}
+
+function clearOAuthStateCookie(
+  response: Response,
+  provider: OAuthProviderId,
+): void {
+  response.clearCookie(
+    oauthStateCookieName(provider),
+    resolveOAuthStateCookieClearOptions(provider),
+  );
+}
+
+function clearOAuthPkceVerifierCookie(
+  response: Response,
+  provider: OAuthProviderId,
+): void {
+  response.clearCookie(
+    oauthPkceVerifierCookieName(provider),
+    resolveOAuthPkceVerifierCookieClearOptions(provider),
+  );
 }
 
 function applyAuthSessionCookie(response: Response, token: string): void {

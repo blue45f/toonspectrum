@@ -5,17 +5,21 @@ export type AuthProviderInfo = {
   mode: AuthProviderMode;
   redirectAvailable: boolean;
   clientId?: string;
-  reason?: "missing-client-id" | "invalid-provider-response";
+  reason?:
+    | "missing-client-id"
+    | "missing-credentials"
+    | "invalid-provider-response";
 };
 
 export type AuthProviderDiscovery = Partial<
-  Record<"google" | "kakao" | "naver", AuthProviderInfo>
+  Record<"google" | "kakao" | "naver" | "github", AuthProviderInfo>
 >;
 
 const PROVIDER_LABELS = {
   google: "Google",
   kakao: "카카오",
   naver: "네이버",
+  github: "GitHub",
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -48,7 +52,7 @@ export function parseAuthProviderDiscovery(
   if (!isRecord(value)) return {};
   const result: AuthProviderDiscovery = {};
 
-  for (const id of ["google", "kakao", "naver"] as const) {
+  for (const id of ["google", "kakao", "naver", "github"] as const) {
     const raw = value[id];
     if (!isRecord(raw) || !isProviderMode(raw.mode)) continue;
     const label =
@@ -80,7 +84,18 @@ export function parseAuthProviderDiscovery(
       continue;
     }
 
-    // Disabled non-Google providers are omitted rather than rendered as an
+    if (id === "github") {
+      if (raw.mode === "oauth" && raw.redirectAvailable === true) {
+        result.github = {
+          label,
+          mode: "oauth",
+          redirectAvailable: true,
+        };
+      }
+      continue;
+    }
+
+    // Disabled Kakao/Naver providers are omitted rather than rendered as an
     // actionable redirect button.
     if (raw.mode !== "disabled") {
       result[id] = {

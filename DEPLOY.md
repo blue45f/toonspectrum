@@ -44,7 +44,7 @@ Render 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안
 - Cloudflare 계정과 수동 배포 권한
 - Core API를 실행할 검토된 호스트(전환기 Vercel 비상 fallback은 선택)
 - Neon 또는 호환 PostgreSQL `DATABASE_URL`
-- 소셜 로그인 실연동 시 Google Cloud / Kakao Developers 앱
+- 소셜 로그인 실연동 시 Google Cloud / Kakao Developers / Naver Developers / GitHub OAuth App
 
 ## 1. 로컬 검증
 
@@ -96,12 +96,17 @@ WEB_APP_BASE_URL=https://www.toonstudio.cloud
 - Google: `https://www.toonstudio.cloud/api/auth/oauth/google/callback`
 - Kakao: `https://www.toonstudio.cloud/api/auth/oauth/kakao/callback`
 - Naver: `https://www.toonstudio.cloud/api/auth/oauth/naver/callback`
+- GitHub: `https://www.toonstudio.cloud/api/auth/oauth/github/callback`
 
 Google Identity Services의 승인된 JavaScript origin에는
 `https://www.toonstudio.cloud`를 등록합니다. apex는 앱 실행 전에 정본으로 308
 리다이렉트하므로 OAuth 기준 URL은 www 하나로 유지합니다.
 
-키가 없으면 로그인 모달은 데모 폴백을 명확히 표시합니다.
+카카오는 REST API 키와 client secret, 네이버는 로그인 애플리케이션의 Client ID/Secret,
+GitHub는 OAuth App의 Client ID/Secret을 Core API에 주입합니다. 자세한 콘솔 신청·동의항목·
+검증 절차는 [`docs/social-login-provider-setup.md`](docs/social-login-provider-setup.md)를 따릅니다.
+운영에서 자격 증명이 없는 카카오·네이버·GitHub 공급자는 로그인 화면에서 숨기며,
+데모 로그인은 비운영 환경에서 명시적으로 활성화한 경우에만 노출합니다.
 
 ## 4. 데이터 갱신
 

@@ -1,5 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
+import {
+  Code2,
+  ImagePlus,
+  LogIn,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
@@ -436,7 +444,11 @@ export function AuthModal({
             </button>
           </form>
 
-          {(providerStatus !== "ready" || providers.kakao || providers.google || providers.naver) && (
+          {(providerStatus !== "ready"
+            || providers.kakao
+            || providers.google
+            || providers.naver
+            || providers.github) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
@@ -511,6 +523,16 @@ export function AuthModal({
                   >
                     네이버로 계속하기
                     {providers.naver.mode === "demo" && <DemoTag dark />}
+                  </button>
+                )}
+                {providers.github && (
+                  <button
+                    type="button"
+                    onClick={() => signIn("github")}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-[oklch(0.22_0.015_70)] text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  >
+                    <Code2 size={17} aria-hidden="true" />
+                    GitHub로 계속하기
                   </button>
                 )}
               </div>

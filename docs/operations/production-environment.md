@@ -39,7 +39,7 @@ Vercel 비상 fallback을 실제로 실행할 때만 필요한 권한:
 
 선택적 공급자 값:
 
-- 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`
+- 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`, `GITHUB_OAUTH_*`
 - `OPENAI_API_KEY`
 - `OPENROUTER_API_KEY`
 - `BLOB_READ_WRITE_TOKEN`
