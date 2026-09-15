@@ -18,6 +18,8 @@ const PUBLIC_ROUTE_SOURCE_FILES = [
 
 const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
   "/auth/callback",
+  "/auth/reset-password",
+  "/auth/verify-email",
   "/collaborate/moderation",
   "/community/promote/moderation",
   "/challenges",
@@ -125,6 +127,8 @@ describe("site directory experience contracts", () => {
     for (const href of [
       "/admin",
       "/auth/callback",
+      "/auth/reset-password",
+      "/auth/verify-email",
       "/collaborate/moderation",
       "/creator-hub",
       "/showcase",
