@@ -39,7 +39,7 @@ import type {
   CollaborationParty,
 } from "@toonspectrum/core/production";
 
-import { api } from "@/infrastructure/api";
+import { api, apiPath } from "@/infrastructure/api";
 
 export type ProductionPlanningRecord =
   | { readonly kind: "project-brief"; readonly value: ProjectBrief }
@@ -177,5 +177,277 @@ export function executeProductionCommand(
     expectedRevision,
     mutationId: mutationId(),
     command,
+  });
+}
+
+export type ProductionGoogleDriveArtifact =
+  | "project-backup"
+  | "calendar-ics"
+  | "provenance-json"
+  | "tax-invoice-csv"
+  | "tax-invoice-sheet";
+
+export interface ProductionIntegrationBudget {
+  readonly resetsAt: string;
+  readonly limits: Readonly<Record<string, number>>;
+  readonly used: Readonly<Record<string, number>>;
+  readonly remaining: Readonly<Record<string, number>>;
+}
+
+export interface ProductionIntegrationCapabilities {
+  readonly version: 1;
+  readonly zeroCostFirst: true;
+  readonly costPolicy: "zero-cost-only" | "explicit-cost-enabled";
+  readonly budget: ProductionIntegrationBudget;
+  readonly calendar: {
+    readonly icsExport: boolean;
+    readonly googleTemplateLinks: boolean;
+    readonly googleApiConfigured: boolean;
+    readonly googleConnected: boolean;
+  };
+  readonly email: {
+    readonly mailtoDraft: boolean;
+    readonly gmailApiConfigured: boolean;
+    readonly googleConnected: boolean;
+  };
+  readonly drive: {
+    readonly googleApiConfigured: boolean;
+    readonly googleConnected: boolean;
+    readonly scope: "drive.file";
+    readonly artifacts: readonly ProductionGoogleDriveArtifact[];
+  };
+  readonly notifications: {
+    readonly webPush: boolean;
+    readonly vapidPublicKey: string | null;
+    readonly genericWebhook: boolean;
+    readonly discord: boolean;
+    readonly ntfy: boolean;
+  };
+  readonly signatures: {
+    readonly documensoConfigured: boolean;
+    readonly selfHosted: boolean;
+    readonly hostedAllowed: boolean;
+    readonly manualSigningPackage: boolean;
+    readonly fallback: string;
+  };
+  readonly payments: {
+    readonly tossConfigured: boolean;
+    readonly mode: "disabled" | "test" | "live-explicitly-enabled" | "live-blocked";
+  };
+  readonly taxInvoice: {
+    readonly csvExport: boolean;
+    readonly googleSheetExport: boolean;
+    readonly automaticIssuance: false;
+  };
+  readonly provenance: {
+    readonly hashManifest: boolean;
+    readonly c2paDraft: boolean;
+    readonly trustedCertificateSigning: false;
+  };
+}
+
+export interface ProductionCalendarIntegrationEvent {
+  readonly key: string;
+  readonly title: string;
+  readonly description: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly url: string;
+  readonly googleCalendarUrl: string;
+}
+
+export function newProductionMutationId(): string {
+  return mutationId();
+}
+
+function integrationPath(projectId: string, suffix: string): string {
+  return `/production/projects/${encodeURIComponent(projectId)}/integrations/${suffix}`;
+}
+export function getProductionIntegrationCapabilities(
+  projectId: string,
+): Promise<ProductionIntegrationCapabilities> {
+  return api.get(integrationPath(projectId, "capabilities"));
+}
+
+export function getProductionCalendarEvents(
+  projectId: string,
+): Promise<{ readonly events: readonly ProductionCalendarIntegrationEvent[] }> {
+  return api.get(integrationPath(projectId, "calendar"));
+}
+
+export function productionCalendarIcsUrl(projectId: string): string {
+  return apiPath(integrationPath(projectId, "calendar.ics"));
+}
+
+export function productionTaxInvoiceCsvUrl(projectId: string): string {
+  return apiPath(integrationPath(projectId, "tax-invoices.csv"));
+}
+
+export function getProductionProvenance(
+  projectId: string,
+): Promise<Record<string, unknown>> {
+  return api.get(integrationPath(projectId, "provenance"));
+}
+
+export function getProductionProjectBackup(
+  projectId: string,
+): Promise<Record<string, unknown>> {
+  return api.get(integrationPath(projectId, "project-backup"));
+}
+
+export function getProductionSigningPackage(
+  projectId: string,
+): Promise<Record<string, unknown>> {
+  return api.get(integrationPath(projectId, "signing-package"));
+}
+
+export function createProductionMailtoDraft(
+  projectId: string,
+  input: {
+    readonly to: readonly string[];
+    readonly cc?: readonly string[];
+    readonly subject: string;
+    readonly body: string;
+  },
+): Promise<{ readonly url: string; readonly mode: string }> {
+  return api.post(integrationPath(projectId, "email/mailto"), {
+    mutationId: mutationId(),
+    ...input,
+  });
+}
+
+export function getGoogleProductionConnectUrl(
+  projectId: string,
+  redirectPath: string,
+): Promise<{ readonly authorizationUrl: string; readonly expiresAt: string }> {
+  return api.get(integrationPath(projectId, "google/connect"), {
+    params: { redirectPath },
+  });
+}
+
+export function disconnectGoogleProduction(
+  projectId: string,
+): Promise<{ readonly disconnected: true }> {
+  return api.delete(integrationPath(projectId, "google"));
+}
+
+export function syncProductionGoogleCalendar(
+  projectId: string,
+): Promise<{ readonly synced: number }> {
+  return api.post(integrationPath(projectId, "google/calendar/sync"), {
+    mutationId: mutationId(),
+  });
+}
+export function createProductionGmailDraft(
+  projectId: string,
+  input: {
+    readonly to: readonly string[];
+    readonly cc?: readonly string[];
+    readonly subject: string;
+    readonly body: string;
+  },
+): Promise<{ readonly id: string }> {
+  return api.post(integrationPath(projectId, "google/gmail/drafts"), {
+    mutationId: mutationId(),
+    ...input,
+  });
+}
+
+export function uploadProductionGoogleDriveArtifact(
+  projectId: string,
+  input: {
+    readonly artifact: ProductionGoogleDriveArtifact;
+    readonly folderId?: string;
+  },
+): Promise<{
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly webViewLink: string | null;
+  readonly created: boolean;
+  readonly digest: string;
+}> {
+  return api.post(integrationPath(projectId, "google/drive/files"), {
+    mutationId: mutationId(),
+    ...input,
+  });
+}
+
+export function registerProductionPushSubscription(
+  projectId: string,
+  subscription: PushSubscriptionJSON,
+): Promise<{ readonly subscribed: true; readonly endpointHash: string }> {
+  return api.post(integrationPath(projectId, "push/subscriptions"), {
+    endpoint: subscription.endpoint,
+    expirationTime: subscription.expirationTime ?? null,
+    keys: subscription.keys,
+  });
+}
+
+export function unregisterProductionPushSubscription(
+  projectId: string,
+  endpoint: string,
+): Promise<{ readonly unsubscribed: true }> {
+  return api.raw
+    .delete(apiPath(integrationPath(projectId, "push/subscriptions")), {
+      json: { endpoint },
+    })
+    .json<{ readonly unsubscribed: true }>();
+}
+
+export function sendProductionIntegrationNotification(
+  projectId: string,
+  input: {
+    readonly channel: "web-push" | "generic-webhook" | "discord" | "ntfy";
+    readonly title: string;
+    readonly body: string;
+    readonly url?: string;
+  },
+): Promise<{ readonly sent: number }> {
+  return api.post(integrationPath(projectId, "notifications"), {
+    mutationId: mutationId(),
+    ...input,
+  });
+}
+
+export async function createProductionDocumensoEnvelope(
+  projectId: string,
+  input: {
+    readonly file: File;
+    readonly title: string;
+    readonly distribute: boolean;
+    readonly recipients: readonly {
+      readonly email: string;
+      readonly name: string;
+      readonly role: "SIGNER" | "APPROVER" | "CC" | "VIEWER";
+    }[];
+  },
+): Promise<Record<string, unknown>> {
+  const form = new FormData();
+  form.append("file", input.file);
+  form.append("metadata", JSON.stringify({
+    mutationId: mutationId(),
+    title: input.title,
+    distribute: input.distribute,
+    recipients: input.recipients,
+  }));
+  return api.raw
+    .post(apiPath(integrationPath(projectId, "documenso/envelopes")), {
+      body: form,
+    })
+    .json<Record<string, unknown>>();
+}
+export function confirmProductionTossPayment(
+  projectId: string,
+  input: {
+    readonly paymentKey: string;
+    readonly orderId: string;
+    readonly amount: number;
+    readonly invoiceId: string;
+  },
+): Promise<Record<string, unknown>> {
+  return api.post(integrationPath(projectId, "toss/confirm"), {
+    mutationId: mutationId(),
+    ...input,
   });
 }

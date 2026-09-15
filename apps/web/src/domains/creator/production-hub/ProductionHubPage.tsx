@@ -50,6 +50,7 @@ import {
 } from "@toonspectrum/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
+import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import {
   executeProductionCommand,
   getProductionProject,
@@ -1039,7 +1040,8 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
 
 function SettingsSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
       <SectionCard title="참여자와 역할" description="역할 배정은 실제 기여·저작권·보상과 별도의 객체입니다.">
         <div className="space-y-2">
           {aggregate.parties.map((party) => (
@@ -1064,6 +1066,8 @@ function SettingsSurface({ aggregate }: { readonly aggregate: ProductionProjectA
           ].map((entry) => <li key={entry} className="rounded-xl border border-line bg-panel px-3 py-2">• {entry}</li>)}
         </ul>
       </SectionCard>
+      </div>
+      <ProductionIntegrationsPanel aggregate={aggregate} />
     </div>
   );
 }

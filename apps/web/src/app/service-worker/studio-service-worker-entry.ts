@@ -220,6 +220,69 @@ scope.addEventListener("activate", (event) => {
   })());
 });
 
+interface ProductionPushPayload {
+  readonly title?: string;
+  readonly body?: string;
+  readonly url?: string;
+  readonly tag?: string;
+}
+
+function productionPushPayload(event: PushEvent): ProductionPushPayload {
+  try {
+    const value = event.data?.json() as unknown;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? value as ProductionPushPayload
+      : {};
+  } catch {
+    return { body: event.data?.text() ?? "" };
+  }
+}
+
+function productionPushUrl(value: string | undefined): string {
+  if (!value) return "/production";
+  try {
+    const url = new URL(value, scope.location.origin);
+    return url.origin === scope.location.origin && url.pathname.startsWith("/production")
+      ? `${url.pathname}${url.search}${url.hash}`
+      : "/production";
+  } catch {
+    return "/production";
+  }
+}
+
+scope.addEventListener("push", (event) => {
+  const payload = productionPushPayload(event);
+  event.waitUntil(scope.registration.showNotification(
+    payload.title?.trim() || "ToonSpectrum 제작 알림",
+    {
+      body: payload.body?.trim() || "제작 프로젝트에 새 소식이 있습니다.",
+      icon: "/icon-192.png",
+      badge: "/favicon-96.png",
+      tag: payload.tag?.trim() || "toonspectrum-production",
+      data: { url: productionPushUrl(payload.url) },
+    },
+  ));
+});
+
+scope.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = productionPushUrl(
+    typeof event.notification.data?.url === "string"
+      ? event.notification.data.url
+      : undefined,
+  );
+  event.waitUntil((async () => {
+    const windows = await scope.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = windows.find((client) => new URL(client.url).origin === scope.location.origin);
+    if (existing && "focus" in existing) {
+      await existing.navigate(target);
+      await existing.focus();
+      return;
+    }
+    await scope.clients.openWindow(target);
+  })());
+});
+
 scope.addEventListener("fetch", (event) => {
   const { request } = event;
   const emergencyPath = emergencyDrawingPath(request, scope.location.origin);

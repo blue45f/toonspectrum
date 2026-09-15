@@ -51,3 +51,4 @@ apps/api/src/db/migrations/0050_studio_production_workspace_review_links_persona
 apps/api/src/db/migrations/0051_personal_cloud_connections.sql
 apps/api/src/db/migrations/0052_studio_ai_comic_director.sql
 apps/api/src/db/migrations/0053_production_collaboration_core.sql
+apps/api/src/db/migrations/0054_production_external_integrations.sql

@@ -6,6 +6,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs ../../scripts/verify-api-calendar-runtime.test.mjs && tsc -p tsconfig.json && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "integration:generate-secrets": "node scripts/generate-production-integration-secrets.mjs",
     "start": "node dist/apps/api/src/main.js"
   },
   "dependencies": {
@@ -34,12 +35,14 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
+    "web-push": "3.6.7",
     "yjs": "^13.6.31",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^24.13.2",
+    "@types/web-push": "3.6.4",
     "tsx": "^4.22.3",
     "typescript": "~6.0.3"
   }

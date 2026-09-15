@@ -29,12 +29,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(52);
+  expect(manifest).toHaveLength(54);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0052_studio_ai_comic_director",
+    "0054_production_external_integrations",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(52);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(54);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {

@@ -7,7 +7,7 @@ import {
   PRODUCTION_ROLE_TYPES,
   PRODUCTION_SCOPE_KINDS,
   REVIEW_LANES,
-} from "@toonspectrum/core/production";
+} from "../../../../../packages/core/src/production";
 
 const IdentitySchema = z.string().trim().min(1).max(160).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u);
 const HumanTextSchema = z.string().trim().min(1).max(4_000);

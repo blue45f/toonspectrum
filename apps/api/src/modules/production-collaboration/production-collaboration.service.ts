@@ -58,7 +58,7 @@ import {
   type RightsInterest,
   type ScopePackage,
   type StoryToArtHandoffPackage,
-} from "@toonspectrum/core/production";
+} from "../../../../../packages/core/src/production";
 
 import {
   CreateProductionProjectSchema,

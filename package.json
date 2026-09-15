@@ -22,6 +22,7 @@
     "vercel:status": "curl -I -s https://toonspectrum.vercel.app",
     "vercel:inspect": "vercel inspect",
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
+    "integration:generate-secrets": "pnpm --filter @webtoon-nest/api run integration:generate-secrets",
     "dev:all": "pnpm -r --parallel --include-workspace-root dev",
     "crawl": "node scripts/crawl.mjs --json --no-file",
     "ingest": "node scripts/ingest.mjs",
