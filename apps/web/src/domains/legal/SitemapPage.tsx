@@ -105,7 +105,7 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/studio/jobs", "처리 중 작업", "Production jobs", "무거운 제작 작업과 결과 영수증 관리", "Manage production jobs and result receipts"),
       destination("/studio/ai-lab", "AI 실험실", "AI lab", "사용자 키로 창작 추론 작업 실행", "Run creator-funded inference workflows"),
       destination("/studio/ai-runtime", "개인 AI 런타임", "Personal AI runtime", "직접 운영하는 추론 서버 연결", "Connect a creator-operated inference server"),
-      destination("/settings/ai", "Studio AI 설정", "Studio AI settings", "Studio 생성 도구의 연결과 모델 설정", "Configure Studio generation connections and models"),
+      destination("/studio/ai-settings", "Studio AI 설정", "Studio AI settings", "Studio 생성 도구의 연결과 모델 설정", "Configure Studio generation connections and models"),
       destination("/studio/character-convert", "캐릭터 변환", "Character conversion", "2D 캐릭터를 제작용 형식으로 변환", "Convert 2D characters into production-ready formats"),
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
