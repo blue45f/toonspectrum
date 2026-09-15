@@ -34,7 +34,11 @@ import {
 
 import type { StudioServiceWorkerManifest } from "./studio-service-worker-precache-plan";
 
-import { isStudioOfflinePreparationMessage } from "../../shared/lib/studio-offline-protocol";
+import {
+  isStudioOfflinePreparationMessage,
+  isStudioOfflineStatusMessage,
+  type StudioOfflineReadinessReport,
+} from "../../shared/lib/studio-offline-protocol";
 
 declare const __STUDIO_SERVICE_WORKER_MANIFEST__: StudioServiceWorkerManifest;
 
@@ -316,13 +320,36 @@ scope.addEventListener("message", (event) => {
     ));
     return;
   }
-  if (isStudioOfflinePreparationMessage(data)) {
-    // Only a same-origin Studio client may request explicit preparation. Never
-    // accept URLs from arbitrary frames, the public catalogue, or worker peers.
+  if (isStudioOfflinePreparationMessage(data) || isStudioOfflineStatusMessage(data)) {
+    // Only a same-origin Studio client may inspect or prepare the offline pack.
+    // Never accept requests from arbitrary frames, the public catalogue, or worker peers.
     const source = event.source;
     if (!source || !("url" in source)) return;
     const url = new URL(source.url);
     if (url.origin !== scope.location.origin || !(url.pathname === "/studio" || url.pathname.startsWith("/studio/"))) return;
+    if (isStudioOfflineStatusMessage(data)) {
+      event.waitUntil(hasPreparedStudioDrawingResources({
+        ...manifest,
+        drawingUrls: manifest.offlineUrls,
+        read: async (resourceUrl) => {
+          const request = manifest.shellUrls.includes(resourceUrl) ? shellRequest(resourceUrl) : new Request(resourceUrl);
+          const kind = classifyStudioServiceWorkerRequest({
+            url: request.url,
+            origin: scope.location.origin,
+            method: "GET",
+            mode: manifest.shellUrls.includes(resourceUrl) ? "navigate" : undefined,
+          });
+          const pinned = await readCached("precache", request, kind);
+          if (pinned) return pinned;
+          const bucket = studioServiceWorkerCacheBucket(kind);
+          return bucket ? readCached(bucket, request, kind) : undefined;
+        },
+      }).then(
+        (ready) => reply({ schema: 1, buildId: manifest.buildId, ready } satisfies StudioOfflineReadinessReport),
+        () => reply({ schema: 1, buildId: manifest.buildId, ready: false } satisfies StudioOfflineReadinessReport),
+      ));
+      return;
+    }
     event.waitUntil(prepareOffline(data.urls).then(reply, () => reply({ ok: false, error: "offline-preparation-failed" })));
     return;
   }

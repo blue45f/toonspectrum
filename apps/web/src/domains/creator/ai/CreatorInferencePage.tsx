@@ -41,7 +41,7 @@ export function CreatorInferencePage() {
     mounted.current = true; const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     void inferenceCapabilities(controller.signal).then((status) => {
       if (!mounted.current) return;
-      setCaps(status); setMessage(status.enabled ? "개인 추론 서버 연결됨 · 사용자 서버의 준비된 모델이 필요합니다." : status.reason ?? "추론 서버 또는 모델이 활성화되지 않았습니다. 로컬 드로잉과 공간형 감상은 별도로 사용할 수 있습니다.");
+      setCaps(status); setMessage(status.enabled ? "개인 추론 서버 연결됨 · 사용자 서버의 준비된 모델이 필요합니다." : status.reason ?? "추론 서버 또는 모델이 활성화되지 않았습니다. 스튜디오는 연결 장애 시 로컬 저장 가능한 기능으로 자동 전환됩니다.");
     }).catch((reason: unknown) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "추론 상태 확인 실패"); });
     const poll = async () => {
       try { if (!document.hidden) await refresh(controller.signal); }
@@ -91,7 +91,7 @@ export function CreatorInferencePage() {
   };
   const cancel = async (job: InferenceJob) => { try { await cancelInferenceJob(job.id); await refresh(); } catch (reason) { await notifyError(reason); } };
   return <main className="creator-inference-page">
-    <nav aria-label="제작실 이동"><Link href="/studio">← 스튜디오</Link><Link href="/showcase/promo">컷 기반 홍보 영상</Link><a href="/spatial-reader/">공간형 감상</a><a href="/offline-draw/">서버 없는 로컬 드로잉</a></nav>
+    <nav aria-label="제작실 이동"><Link href="/studio">← 스튜디오</Link><Link href="/showcase/promo">컷 기반 홍보 영상</Link><a href="/spatial-reader/">공간형 감상</a></nav>
     <header><p className="inference-kicker">SELF-HOSTED CREATIVE ENGINES</p><h1>그림에서 움직임으로.<br />입체에서 새로운 그림으로.</h1><p>실제 모델 추론으로 만드는 제작실입니다. 모델과 GPU가 준비되지 않으면 생성 성공으로 표시하지 않습니다.</p></header>
     <details className="my-6 rounded-xl border border-line p-4"><summary className="min-h-11 cursor-pointer font-semibold">통합 AI 설정 · 개인 서버 연결</summary><UnifiedAiSettings /></details>
     <section className="inference-modes" aria-label="추론 방식">{MODES.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} disabled={busy || uncertain} onClick={() => { setMode(option.value); setFiles([]); setPrompt(option.value === "image-to-video" ? "The character blinks naturally. Hair and clothes move gently in the breeze. Preserve the original character design and colors." : "Clean Korean webtoon character illustration, faithful silhouette, expressive eyes, refined cel shading."); }}><strong>{option.title}</strong><span>{option.description}</span><small>{caps?.enabled && caps.engines[option.value]?.configured ? "모델 설정 확인됨 · 실제 품질은 결과 검토 필요" : "모델 준비 필요"}</small></button>)}</section>

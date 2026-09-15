@@ -308,7 +308,7 @@ async function initialize() {
     if (!('serviceWorker' in navigator)) throw new Error('서비스 워커 미지원');
     await navigator.serviceWorker.register('/offline-draw/sw.js', { scope: '/offline-draw/' });
     const check = async () => {
-      const ready = await caches.match('/offline-draw/ready-v1', { cacheName: 'toonstudio-emergency-drawing-shell-v1' });
+      const ready = await caches.match('/offline-draw/ready-v2', { cacheName: 'toonstudio-emergency-drawing-shell-v2' });
       $('offline-state').textContent = ready ? '로컬 드로잉 실행 파일 보관됨' : '오프라인 실행 파일 준비 중 · 완료 전 창을 닫지 마세요';
       return Boolean(ready);
     };
