@@ -60,7 +60,7 @@ export function StudioGenerativePage(){
     try{const blob=await exportGeneratedClips(clips,controller.signal,setExportProgress);download(blob,`toonstudio-generated-promo.${blob.type==="video/mp4"?"mp4":"webm"}`);}catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"영상 연결에 실패했어요.");}finally{setExportProgress(null);exportAbort.current=null;}
   }
   return <main className="advanced-studio">
-    <header><div><p className="eyebrow">TOONSTUDIO / GENERATIVE LAB</p><h1>캐릭터에서, 움직이는 이야기로</h1><p>원본을 보존하면서 영상·3D·2D 결과를 별도 에셋으로 생성합니다.</p></div><nav><Link to="/read/spatial">공간 웹툰 감상</Link><Link to="/showcase/promo">컷 기반 홍보 영상</Link><a href="/offline-drawing.html">로컬 드로잉</a></nav></header>
+    <header><div><p className="eyebrow">TOONSTUDIO / GENERATIVE LAB</p><h1>캐릭터에서, 움직이는 이야기로</h1><p>원본을 보존하면서 영상·3D·2D 결과를 별도 에셋으로 생성합니다.</p></div><nav><Link to="/read/spatial">공간 웹툰 감상</Link><Link to="/showcase/promo">컷 기반 홍보 영상</Link><Link to="/studio">오프라인 대응 스튜디오</Link></nav></header>
     <section className="advanced-notice"><strong>{status?.configured?"자체 추론 서버 연결됨":"자체 GPU 추론 서버 준비 필요"}</strong><p>실제 모델이 설치되고 작업 저장소가 준비된 기능만 실행할 수 있습니다. 외부 유료 생성 서비스로 자동 전환하지 않습니다. 결과의 캐릭터 동일성·형태·저작권은 최종 사용 전에 확인해 주세요.</p>{status?.capabilities.map(capability=><p key={capability.kind}>{LABELS[capability.kind]} · {capability.ready?"준비됨":`준비 안 됨: ${capability.missing.join(", ")}`}</p>)}</section>
     {error&&<p role="alert" className="advanced-error">{error}</p>}
     <div className="advanced-columns"><section className="advanced-card"><h2>1. 변환 입력</h2>

@@ -1,14 +1,16 @@
 # ToonSpectrum 배포 가이드
 
-> **2026-09-14 사용자 정책:** 자동 빌드·배포 금지. PR 병합은 배포 승인이 아닙니다.
-> 승인한 main SHA를 외부에서 한 번 빌드하고 prebuilt로 한 번 업로드합니다.
+> **2026-09-15 사용자 정책:** 자동 빌드·배포 금지. PR 병합은 배포 승인이 아닙니다.
+> 승인한 main SHA의 변경 배포 단위만 Cloudflare와 Render에 수동 반영합니다.
+> Vercel은 정상 운영 권위가 아니라 승인형 emergency prebuilt rollback입니다.
 > [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)이 이전 자동 배포 지침을 대체합니다.
 
 기본 운영 권위는 무료 우선으로 분리합니다. Cloudflare Static Assets가 SPA와 정적 카탈로그를
 직접 제공하고, 최소 Worker gateway는 API·Socket.IO·OG crawler 경로만 검토된 Core API origin으로
 전달합니다. Neon/호환 PostgreSQL은 동적 원장, Cloudflare Durable Objects는 Studio의 임시 실시간
 상태, Upstash는 선택형 분산 제한·조정, 목적별 R2/B2/Supabase private storage는 파일 data plane을
-담당합니다. Vercel은 전환 기간의 수동 비상 fallback이며 Git 자동 배포 권위가 아닙니다.
+담당합니다. Core API의 기본 origin은 Render `toonspectrum-core-api`이며 Vercel은 수동 비상
+rollback일 뿐 Git 자동 배포나 정상 트래픽 권위가 아닙니다.
 
 한 제공자가 다른 제공자의 전체 폴백이 되지는 않습니다. 각 workload는 하나의 authority를 가지며,
 동등 계약·quota snapshot·복구 절차가 검증되지 않은 공급자에는 자동으로 쓰지 않습니다.
@@ -18,17 +20,17 @@
 | 프론트 | Vite + React SPA | Cloudflare Static Assets | `dist/` |
 | 카탈로그 | 정적 스냅샷 | Cloudflare Static Assets | `public/data/*.json` |
 | Edge gateway | Cloudflare Worker | Cloudflare | 동적 경로만 Core API로 전달 |
-| Core API | NestJS | 검토된 HTTPS origin | 인증·ACL·거래·원장 transaction |
+| Core API | NestJS | Render `toonspectrum-core-api` | 인증·ACL·거래·원장 transaction |
 | DB | PostgreSQL | Neon/호환 Postgres | 동적 데이터 + checksum migration 원장 |
 | Studio realtime | Durable Objects | Cloudflare | presence·comment invalidation·screen-share signaling |
 | 분산 제한/조정 | Redis | Upstash(선택) | auth rate-limit·lease·coordination |
 | private object storage | 목적별 private buckets | Supabase/R2/B2 | source·derived·export 고정 라우팅 |
 | 개인 프로젝트 | OPFS/로컬/BYOS | 사용자 기기·저장소 | 운영자 중앙 저장 최소화 |
 
-`render.yaml`은 Studio Socket.IO 연결을 검증하기 위한 **선택형 폴백** Blueprint입니다.
-`API_RUNTIME_ROLE=studio-live`는 health probe와 Socket.IO만 허용하므로 일반 HTTP API의 대체
-호스트가 아닙니다. 정적 gateway의 `CORE_API_ORIGIN`은 현재 검증된 Core API를 명시해야 하며,
-Render 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
+`render.yaml`은 두 런타임을 정의합니다. `toonspectrum-core-api`는
+`API_RUNTIME_ROLE=full`인 동적 HTTP 권위이고, `toonspectrum-studio-live`는 선택형 Socket.IO
+폴백입니다. 정적 gateway의 `CORE_API_ORIGIN`은 readiness를 통과한 Core 서비스만 가리켜야 하며,
+실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
 
 ### 운영 검증 스냅샷 (2026-08-02)
 
@@ -42,7 +44,7 @@ Render 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안
 
 - Node 24.16+와 pnpm 11 (`corepack enable` 권장)
 - Cloudflare 계정과 수동 배포 권한
-- Core API를 실행할 검토된 호스트(전환기 Vercel 비상 fallback은 선택)
+- Render Core API 서비스와 수동 배포 권한(Vercel 비상 rollback은 선택)
 - Neon 또는 호환 PostgreSQL `DATABASE_URL`
 - 소셜 로그인 실연동 시 Google Cloud / Kakao Developers / Naver Developers / GitHub OAuth App
 
@@ -66,20 +68,22 @@ pnpm run verify:free-infrastructure
 pnpm run verify:cloudflare-static
 pnpm run cloudflare:static:dry-run
 
-export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com pnpm run verify:render-core-origin
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```
 
 Core API에는 `.env.production.example`의 PostgreSQL·인증·CORS·목적별 object storage 설정을
-주입합니다. `CORE_API_ORIGIN`은 credential, path, query가 없는 별도 HTTPS origin이어야 합니다.
+Render encrypted environment 또는 root `.env.local` Secret File로 주입합니다. `CORE_API_ORIGIN`은
+credential, path, query가 없는 별도 HTTPS origin이어야 하며 readiness와 비-Vercel 검사를 통과해야 합니다.
 프런트의 상대경로 `/api/...`는 Cloudflare gateway를 통해 동일 origin 경험을 유지합니다.
 `/market/library`, `/market/publish` 같은 SPA 화면은 Worker를 실행하지 않고 Static Assets가
 처리하며, `/market`, `/market/browse`, `/market/resource/:id`의 crawler HTML만 OG endpoint로 갑니다.
 
-Vercel을 Core API 또는 긴급 정적 fallback으로 유지하는 동안에도 `vercel.json`의 Git 배포는 모든
-branch에서 비활성입니다. `.github/workflows/deploy-vercel.yml`은 production reviewer가 승인한
-current-main ancestor만 prebuilt로 올리는 수동 비상 절차이며 일반 릴리스 경로가 아닙니다.
+`vercel.json`의 Git 배포는 모든 branch에서 비활성입니다. `.github/workflows/deploy-vercel.yml`은
+Cloudflare 또는 Render를 즉시 복구할 수 없는 경우 production reviewer가 승인한 current-main
+ancestor만 prebuilt로 올리는 비상 절차이며 일반 릴리스 경로가 아닙니다.
 
 ## 3. OAuth 콜백
 
@@ -140,10 +144,11 @@ origin입니다. `realtime.toonstudio.cloud`는 DNS zone·custom hostname·TLS�
 
 로그인한 사용자가 저장된 작품을 다시 편집하고 서버에 저장하려면 CRDT 변경을 영속 저장하는
 Socket.IO 권위 서버가 필요합니다. Cloudflare presence나 local/P2P 전달은 이 저장 확인을
-대신하지 않습니다. 아래 native Vercel 경로 또는 별도 Nest 호스트를 명시적으로 구성하며,
-자동으로 확인을 생략하거나 Cloudflare 권위를 변경하지 않습니다.
+대신하지 않습니다. 기본 장기 실행 Nest 경로는 Render의 별도 runtime이며, 아래 Vercel native
+함수는 emergency rollback 호환성만 제공합니다. 자동으로 확인을 생략하거나 Cloudflare 권위를
+변경하지 않습니다.
 
-### 같은 Vercel 프로젝트의 native WebSocket 함수
+### 비상 롤백용 Vercel native WebSocket 함수
 
 [현재 Vercel WebSocket 문서](https://vercel.com/docs/functions/websockets)는 Fluid Compute에서
 Node `http.Server` export와 WebSocket 전용 Socket.IO 클라이언트를 지원합니다.
@@ -179,15 +184,16 @@ DB의 전체 연결 예산도 확인합니다. 초기화 실패는 해당 인스
 - `/socket.io`: Studio 실시간 협업 연결
 - 그 밖의 `/api/*`: 일반 API로 처리하지 않음
 
-따라서 `vercel.json`의 `/api/:path*` rewrite나 `VITE_API_BASE`를 Render origin으로 바꾸면
-안 됩니다. 검색·인증·ACL·리뷰·커뮤니티 등 일반 HTTP 요청은 계속 Vercel `/api/*`를 사용하고,
-프런트에는 Socket.IO 전용 `VITE_STUDIO_LIVE_ORIGIN`만 별도로 지정합니다.
+`toonspectrum-core-api`는 일반 HTTP 권위이고 `toonspectrum-studio-live`는 Socket.IO 전용입니다.
+Cloudflare의 `CORE_API_ORIGIN`은 전자를, 선택적인 `REALTIME_API_ORIGIN` 또는 프런트의
+`VITE_STUDIO_LIVE_ORIGIN`은 후자를 가리킵니다. 두 runtime role을 서로 바꾸거나 하나의 무료
+인스턴스에 이중 권위로 합치지 않습니다.
 
 ### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
 
 일반 `api/index.js` 진입점은 PostgreSQL Socket.IO adapter를 장착하지 않습니다.
-별도 호스트를 선택하면 SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 Render/Fly 등 승인된 장기 실행 Nest
-서버로 보낼 수 있도록 프런트 빌드에 별도 origin을 지정합니다.
+실시간 협업만 별도 Render/Fly 등 승인된 장기 실행 Nest 서버로 보낼 수 있도록 프런트 빌드에
+별도 origin을 지정합니다. SPA의 일반 HTTP API는 Cloudflare gateway가 Render Core API로 전달합니다.
 
 ```env
 # Vite 빌드 시 공개되는 값 — 경로가 아닌 https origin
@@ -339,8 +345,9 @@ PubSub listener를 닫은 다음 pool을 닫습니다. 장기 실행 서버에�
 
 ### Render 무료 Blueprint와 운영 승격 게이트
 
-현재 `render.yaml`의 `plan: free`는 미리보기·저비용 검증 전용입니다. Render 무료 web service는
-production 용도가 아니며 다음 제약이 Studio realtime authority와 맞지 않습니다
+현재 `render.yaml`의 `plan: free`는 무료 우선 best-effort 운영 등급입니다. Core API의 기능 권위로
+사용할 수 있지만 SLA를 제공하지 않으며, 다음 제약 때문에 always-on 응답 시간이나 수평 확장이 필요한
+서비스 등급과는 맞지 않습니다
 ([Render Free 공식 문서](https://render.com/docs/free)).
 
 - inbound HTTP 요청이나 기존 WebSocket의 메시지가 15분 동안 없으면 spin down하고, 다음 요청의
@@ -350,11 +357,11 @@ production 용도가 아니며 다음 제약이 Studio realtime authority와 맞
 - 단일 인스턴스만 허용되어 수평 확장과 다중 인스턴스 장애 검증을 할 수 없습니다.
 - 무료 web service에는 `preDeployCommand`를 설정할 수 없습니다.
 
-그러므로 무료 Render origin을 production realtime 권위 서버나 SLA 경로로 승격하지 않습니다.
-production 출시 전에는 유료 always-on Render web service 또는 동등한 상시 구동·WebSocket 지원
-호스트를 확보하고, direct PostgreSQL 연결·health probe·재시작 정책·교차 노드 integration을 다시
-검증해야 합니다. 이 인프라 승격이 끝나지 않으면 realtime 기능의 production release gate는
-통과하지 않은 것입니다.
+무료 Render Core API는 Cloudflare 정적·edge liveness와 결합한 best-effort 운영 권위로 사용합니다.
+다만 SLA, 짧은 첫 응답, 다중 인스턴스 또는 상시 WebSocket이 요구되면 유료 always-on Render나
+동등한 호스트로 별도 승인 승격하고 direct PostgreSQL, health probe, 재시작 정책과 교차 노드
+integration을 다시 검증해야 합니다. Cloudflare가 정적·R2·liveness를 계속 담당하므로 승격 시에도
+프런트와 파일 트래픽을 Core 호스트로 되돌리지 않습니다.
 
 Render의 [pre-deploy command](https://render.com/docs/deploys#pre-deploy-command)는 유료 web
 service에서 build 이후, 새 버전 시작 이전에 별도

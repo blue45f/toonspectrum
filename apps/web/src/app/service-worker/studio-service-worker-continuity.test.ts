@@ -58,7 +58,8 @@ function navigation(status = 503) {
     fetcher: vi.fn(async () => new Response("server", { status })),
     readPreparedShell: vi.fn(async (): Promise<Response | undefined> => shell()),
     readRescue: vi.fn(async () => new Response("rescue", { headers: { "content-type": "text/html" } })),
-    readShell: vi.fn(async () => shell()), refreshShell: vi.fn(async () => {}), waitUntil: vi.fn(),
+    readShell: vi.fn(async (): Promise<Response | undefined> => shell()),
+    refreshShell: vi.fn(async () => {}), waitUntil: vi.fn(),
   };
 }
 
@@ -70,14 +71,22 @@ describe("outage fallback precedence", () => {
     expect(result.headers.get("cross-origin-opener-policy")).toBe("same-origin");
     expect(input.readRescue).not.toHaveBeenCalled();
   });
-  it("uses rescue when the pack is missing or the prepared shell is invalid", async () => {
+  it("keeps the cached Studio shell when the optional full-pack audit is incomplete", async () => {
     for (const response of [undefined, shell(false)]) {
       const input = navigation(); input.readPreparedShell.mockResolvedValue(response);
-      expect(await (await resolveStudioNavigation(input)).text()).toBe("rescue");
+      expect(await (await resolveStudioNavigation(input)).text()).toBe("studio");
+      expect(input.readRescue).not.toHaveBeenCalled();
     }
   });
-  it("continues to rescue when cache inspection throws", async () => {
+  it("keeps the cached Studio shell when full-pack cache inspection throws", async () => {
     const input = navigation(); input.readPreparedShell.mockRejectedValue(new Error("quota"));
+    expect(await (await resolveStudioNavigation(input)).text()).toBe("studio");
+    expect(input.readRescue).not.toHaveBeenCalled();
+  });
+  it("uses the emergency editor only when no usable Studio shell survives", async () => {
+    const input = navigation();
+    input.readPreparedShell.mockResolvedValue(undefined);
+    input.readShell.mockResolvedValue(undefined);
     expect(await (await resolveStudioNavigation(input)).text()).toBe("rescue");
   });
   it.each([401, 403, 404, 429])("does not hide status %s behind either editor", async (status) => {

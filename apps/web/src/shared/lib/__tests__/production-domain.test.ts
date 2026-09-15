@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 import { SITE_URL, siteUrl } from "../../../../../../packages/core/src/business";
 
@@ -26,12 +27,12 @@ describe("toonstudio.cloud production domain", () => {
     expect(html).toContain(`"@id": "${CANONICAL_ORIGIN}/#website"`);
     expect(html).toContain(`"urlTemplate": "${CANONICAL_ORIGIN}/search?q={search_term_string}"`);
     expect(read("apps/web/public/robots.txt")).toContain(
-      `Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`
+      `Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`,
     );
     expect(read("apps/web/public/llms.txt")).toContain(`${CANONICAL_ORIGIN}/studio`);
   });
 
-  it("keeps host-scoped permanent redirects for apex and the legacy Vercel hostname", () => {
+  it("keeps host-scoped permanent redirects for apex and the legacy fallback hostname", () => {
     const config = JSON.parse(read("vercel.json")) as {
       redirects?: Array<{
         destination?: string;
@@ -47,12 +48,12 @@ describe("toonstudio.cloud production domain", () => {
           destination: `${CANONICAL_ORIGIN}/:path*`,
           permanent: true,
           has: [{ type: "host", value: host }],
-        })
+        }),
       );
     }
   });
 
-  it("routes creator-market resource detail crawlers through the metadata handler", () => {
+  it("keeps emergency fallback crawler rewrites compatible", () => {
     const config = JSON.parse(read("vercel.json")) as {
       rewrites?: Array<{ source?: string; destination?: string }>;
     };
@@ -73,32 +74,46 @@ describe("toonstudio.cloud production domain", () => {
     ]));
   });
 
-  it("keeps full API origins canonical while Render stays a least-privilege realtime host", () => {
+  it("keeps the Render Core API canonical and the realtime fallback isolated", () => {
     const production = read(".env.production.example");
-    const render = read("render.yaml");
+    const render = parse(read("render.yaml")) as {
+      services?: Array<{
+        name?: string;
+        autoDeployTrigger?: string;
+        healthCheckPath?: string;
+        envVars?: Array<{ key?: string; value?: string; sync?: boolean }>;
+      }>;
+    };
     const cloudflareGateway = read("deploy/cloudflare-static/wrangler.jsonc");
     expect(production).toContain(
-      "API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud"
+      "API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud",
     );
     expect(production).toContain("OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud");
     expect(production).toContain("WEB_APP_BASE_URL=https://www.toonstudio.cloud");
     expect(production).toContain("CANONICAL_HOST=www.toonstudio.cloud");
 
-    expect(render).toMatch(
-      /key: API_CORS_ALLOWED_ORIGINS\s+value: https:\/\/www\.toonstudio\.cloud,https:\/\/toonstudio\.cloud/u
-    );
-    expect(render).toMatch(
-      /key: API_RUNTIME_ROLE\s+value: studio-live/u
-    );
-    expect(render).toMatch(
-      /key: AUTH_SESSION_SECRET\s+sync: false/u
-    );
-    expect(render).toMatch(
-      /key: STUDIO_REALTIME_TICKET_ENABLED\s+value: "false"/u
-    );
-    expect(render).not.toMatch(
-      /key: (?:AUTH_STATE_SECRET|OAUTH_REDIRECT_BASE_URL|WEB_APP_BASE_URL|CANONICAL_HOST|GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_SECRET)/u
-    );
+    const core = render.services?.find(({ name }) => name === "toonspectrum-core-api");
+    expect(core).toMatchObject({
+      autoDeployTrigger: "off",
+      healthCheckPath: "/api/health/ready",
+    });
+    expect(core?.envVars).toEqual(expect.arrayContaining([
+      { key: "API_RUNTIME_ROLE", value: "full" },
+      {
+        key: "API_CORS_ALLOWED_ORIGINS",
+        value: "https://www.toonstudio.cloud,https://toonstudio.cloud",
+      },
+      { key: "OAUTH_REDIRECT_BASE_URL", value: "https://www.toonstudio.cloud" },
+      { key: "WEB_APP_BASE_URL", value: "https://www.toonstudio.cloud" },
+      { key: "CANONICAL_HOST", value: "www.toonstudio.cloud" },
+      { key: "DATABASE_URL", sync: false },
+    ]));
+
+    const realtime = render.services?.find(({ name }) => name === "toonspectrum-studio-live");
+    expect(realtime?.envVars).toEqual(expect.arrayContaining([
+      { key: "API_RUNTIME_ROLE", value: "studio-live" },
+      { key: "STUDIO_REALTIME_TICKET_ENABLED", value: "false" },
+    ]));
     expect(cloudflareGateway).toContain('"/api/*"');
     expect(cloudflareGateway).toContain('"/socket.io/*"');
     expect(cloudflareGateway).toContain('"not_found_handling": "single-page-application"');
