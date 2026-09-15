@@ -31,8 +31,8 @@ describe("federated Cloudflare gateway", () => {
       "https://www.toonstudio.cloud/api/fortune/today",
     ))).toBe("playground");
     expect(classifyFederatedRoute(new Request(
-      "https://www.toonstudio.cloud/api/catalog/ingest/status",
-    ))).toBe("core");
+      "https://www.toonstudio.cloud/api/admin/members",
+    ))).toBe("admin");
     expect(classifyFederatedRoute(new Request(
       "https://www.toonstudio.cloud/api/health/ready",
     ))).toBe("core");

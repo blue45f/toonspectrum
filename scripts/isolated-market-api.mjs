@@ -233,7 +233,6 @@ export function createIsolatedMarketApiEnvironment(
     AUTH_RATE_LIMIT_MODE: "single-instance-local",
     BACKEND_CAPABILITY_WORKER_ENABLED: "false",
     BACKEND_DISTRIBUTION_ENABLED: "false",
-    CATALOG_INGEST_MODE: "off",
     CREATOR_IMAGE_AI_ENABLED: "false",
     DATABASE_URL: target.databaseUrl,
     KMAS_LIVE_SEARCH: "0",
