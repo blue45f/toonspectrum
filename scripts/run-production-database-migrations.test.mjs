@@ -29,12 +29,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(51);
+  expect(manifest).toHaveLength(52);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0051_personal_cloud_connections",
+    "0052_studio_ai_comic_director",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(51);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(52);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {
@@ -60,6 +60,30 @@ test("creator community publishing migration separates immutable releases from d
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("AI Comic Director migration provisions the complete durable workflow schema", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0052_studio_ai_comic_director",
+  );
+  expect(migration?.id).toBe("0052_studio_ai_comic_director");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CREATE TABLE IF NOT EXISTS "studio_ai_comic_director_session"',
+    'CREATE TABLE IF NOT EXISTS "studio_ai_visual_bible_revision"',
+    'CREATE TABLE IF NOT EXISTS "studio_ai_comic_director_job"',
+    'CREATE TABLE IF NOT EXISTS "studio_ai_comic_director_job_event"',
+    'CREATE TABLE IF NOT EXISTS "studio_ai_comic_director_artifact"',
+    'CREATE TABLE IF NOT EXISTS "studio_ai_comic_director_approval"',
+    'uq_studio_ai_comic_job_event_sequence',
+    'uq_studio_ai_comic_approval_revision_digest',
+    'REVOKE ALL ON TABLE',
+    'studio AI Comic Director relations are incomplete',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("personal cloud runtime ACL grants only bounded credential DML", () => {
