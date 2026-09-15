@@ -30,6 +30,22 @@ async function waitForStableDocumentBounds(
   return latest;
 }
 
+async function restorePageScroll(
+  page: Page,
+  original: Readonly<{ x: number; y: number }>,
+): Promise<void> {
+  if (page.isClosed()) return;
+  try {
+    await page.evaluate(
+      ({ x, y }) => scrollTo({ left: x, top: y, behavior: "instant" }),
+      original,
+    );
+  } catch (error) {
+    if (page.isClosed()) return;
+    throw error;
+  }
+}
+
 /** Capture the complete page at its real viewport size, with overlapping scroll tiles.
  * Never enlarge the compositor surface, hide decorations, or silently omit failed tiles.
  */
@@ -98,6 +114,6 @@ export async function capturePageEvidence(page: Page, testInfo: TestInfo, name: 
       contentType: "application/json",
     });
   } finally {
-    await page.evaluate(({ x, y }) => scrollTo({ left: x, top: y, behavior: "instant" }), original);
+    await restorePageScroll(page, original);
   }
 }

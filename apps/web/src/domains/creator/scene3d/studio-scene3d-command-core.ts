@@ -193,8 +193,42 @@ export function hashStudioScene3dCommandState<State>(
   return `sha256:${sha256HexPortable(new TextEncoder().encode(serialize(state)))}`;
 }
 
+function isLowercaseAsciiAlphaNumeric(value: string): boolean {
+  if (value.length !== 1) return false;
+  const code = value.charCodeAt(0);
+  return (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
+}
+
+function isCommandIdSeparator(value: string): boolean {
+  return value === "." || value === ":" || value === "/" || value === "-";
+}
+
+function isStableNamespacedCommandId(value: string): boolean {
+  let cursor = 0;
+  while (cursor < value.length && isLowercaseAsciiAlphaNumeric(value[cursor]!)) {
+    cursor += 1;
+  }
+  if (cursor === 0 || cursor === value.length) return false;
+
+  let namespaceSegments = 0;
+  while (cursor < value.length) {
+    if (!isCommandIdSeparator(value[cursor]!)) return false;
+    cursor += 1;
+    const segmentStart = cursor;
+    while (
+      cursor < value.length
+      && (isLowercaseAsciiAlphaNumeric(value[cursor]!) || value[cursor] === "-")
+    ) {
+      cursor += 1;
+    }
+    if (cursor === segmentStart) return false;
+    namespaceSegments += 1;
+  }
+  return namespaceSegments > 0;
+}
+
 function assertCommandId(value: string, label: string): void {
-  if (!/^[a-z0-9]+(?:[.:/-][a-z0-9-]+)+$/u.test(value)) {
+  if (!isStableNamespacedCommandId(value)) {
     throw new TypeError(`${label} must be a namespaced stable id.`);
   }
 }

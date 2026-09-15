@@ -1147,7 +1147,6 @@ import {
   rememberStudioToolOperationSnapshot,
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
-import type { StudioToolOperationMemoryController } from "./studio-tool-operation-memory-sqlite";
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import {
   hasStudioUnloadPromptWork,
@@ -1437,6 +1436,12 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
+
+type StudioToolOperationMemoryController = ReturnType<
+  (typeof import("./studio-tool-operation-memory-sqlite"))[
+    "getProductStudioToolOperationMemoryController"
+  ]
+>;
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({

@@ -35,7 +35,10 @@ test.beforeEach(async ({ page }) => {
 // must not consume every subsequent route's budget or prevent their evidence upload.
 for (const width of [390, 1440]) {
   test.describe(`${width}px public route inventory`, () => {
-    test.describe.configure({ mode: "parallel" });
+    test.describe.configure({
+      mode: "parallel",
+      retries: process.env.CI ? 1 : 0,
+    });
     for (const path of routes) {
       test(`${path} remains navigable during API outage`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height: 900 });
