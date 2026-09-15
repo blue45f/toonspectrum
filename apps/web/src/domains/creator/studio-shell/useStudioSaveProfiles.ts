@@ -97,7 +97,7 @@ export function useStudioSaveProfiles(): StudioSaveProfilesController {
     ?? createDefaultStudioSaveProfile(projectId, { now: new Date(0).toISOString() })
   ), [state]);
 
-  return Object.freeze({
+  const controller: StudioSaveProfilesController = {
     state,
     error,
     profileFor,
@@ -156,5 +156,6 @@ export function useStudioSaveProfiles(): StudioSaveProfilesController {
       run(() => removeStudioSaveProfile(window.localStorage, projectId, { target: window }));
     },
     reload,
-  });
+  };
+  return Object.freeze(controller);
 }

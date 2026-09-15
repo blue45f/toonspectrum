@@ -5,7 +5,6 @@ import {
   ExternalLink,
   FileArchive,
   FolderOpen,
-  HardDrive,
   Plus,
   RotateCcw,
   Search,

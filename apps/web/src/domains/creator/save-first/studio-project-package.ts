@@ -171,6 +171,7 @@ function jsonEntry(name: string, value: unknown): ZipEntry {
 function safeFileStem(value: string): string {
   const stem = value
     .normalize("NFKC")
+    // eslint-disable-next-line no-control-regex -- ASCII control bytes are invalid in file names.
     .replace(/[\\/:*?"<>|\u0000-\u001f]+/gu, "-")
     .replace(/\s+/gu, " ")
     .trim()
@@ -219,8 +220,10 @@ export function buildStudioProjectPackage(input: {
   });
   const allEntries = [jsonEntry("manifest.json", manifest), ...entries];
   const zip = buildZip(allEntries, exportedAt);
+  const zipBuffer = new ArrayBuffer(zip.byteLength);
+  new Uint8Array(zipBuffer).set(zip);
   return Object.freeze({
-    blob: new Blob([zip], { type: STUDIO_PROJECT_PACKAGE_MIME }),
+    blob: new Blob([zipBuffer], { type: STUDIO_PROJECT_PACKAGE_MIME }),
     fileName: `${safeFileStem(input.project.title)}.toonstudio`,
     manifest,
   });

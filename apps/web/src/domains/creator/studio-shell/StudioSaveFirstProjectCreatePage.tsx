@@ -340,12 +340,12 @@ export function StudioSaveFirstProjectCreatePage() {
               {locale === "ko" ? "4. 저장 방식" : "4. Save behavior"}
             </h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel/45 p-3">
-                <input type="checkbox" checked={autoSave} onChange={(event) => setAutoSave(event.target.checked)} className="mt-1 size-4" />
+              <label htmlFor="studio-save-first-autosave" aria-label={locale === "ko" ? "작업 중 자동 저장" : "Autosave while working"} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel/45 p-3">
+                <input id="studio-save-first-autosave" type="checkbox" checked={autoSave} onChange={(event) => setAutoSave(event.target.checked)} className="mt-1 size-4" />
                 <span><b className="block text-sm text-fg">{locale === "ko" ? "작업 중 자동 저장" : "Autosave while working"}</b><small className="mt-1 block leading-5 text-fg-3">{locale === "ko" ? "편집 내용을 브라우저 작업 사본에 계속 보존합니다." : "Continuously preserve edits in the browser working copy."}</small></span>
               </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel/45 p-3">
-                <input type="checkbox" checked={createVersions} onChange={(event) => setCreateVersions(event.target.checked)} className="mt-1 size-4" />
+              <label htmlFor="studio-save-first-versioning" aria-label={locale === "ko" ? "중요한 변경 시 버전 생성" : "Create versions for important changes"} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel/45 p-3">
+                <input id="studio-save-first-versioning" type="checkbox" checked={createVersions} onChange={(event) => setCreateVersions(event.target.checked)} className="mt-1 size-4" />
                 <span><b className="block text-sm text-fg">{locale === "ko" ? "중요한 변경 시 버전 생성" : "Create versions for important changes"}</b><small className="mt-1 block leading-5 text-fg-3">{locale === "ko" ? "내보내기·제출·게시 전 복구 지점을 남깁니다." : "Keep recovery points before export, submission and publishing."}</small></span>
               </label>
             </div>
