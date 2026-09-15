@@ -8,6 +8,18 @@ const AboutPage = lazyRetry(
   })),
   "AboutPage",
 );
+const WebtoonWorkflowPage = lazyRetry(
+  () => import("@/domains/legal/WebtoonWorkflowPage").then((module) => ({
+    default: module.WebtoonWorkflowPage,
+  })),
+  "WebtoonWorkflowPage",
+);
+const TechnologyPage = lazyRetry(
+  () => import("@/domains/legal/TechnologyPage").then((module) => ({
+    default: module.TechnologyPage,
+  })),
+  "TechnologyPage",
+);
 const HelpCenterPage = lazyRetry(
   () => import("@/domains/legal/HelpCenterPage").then((module) => ({
     default: module.HelpCenterPage,
@@ -83,6 +95,16 @@ const FeedbackPage = lazyRetry(
 
 export const legalRoutes = defineAppRoutes([
   { id: "legal-about", path: "/about", element: <AboutPage /> },
+  {
+    id: "legal-about-workflow",
+    path: "/about/workflow",
+    element: <WebtoonWorkflowPage />,
+  },
+  {
+    id: "legal-about-technology",
+    path: "/about/technology",
+    element: <TechnologyPage />,
+  },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-accessibility", path: "/accessibility", element: <AccessibilityPage /> },
   { id: "legal-data-sources", path: "/about/data", element: <DataSourcesPage /> },
