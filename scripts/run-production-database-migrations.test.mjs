@@ -29,12 +29,33 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(52);
+  expect(manifest).toHaveLength(56);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0052_studio_ai_comic_director",
+    "0056_studio_ai_free_pool_contract",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(52);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(56);
+});
+
+test("Studio AI free pool migration supports three reviewed provider attempts", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0056_studio_ai_free_pool_contract",
+  );
+  expect(migration?.id).toBe("0056_studio_ai_free_pool_contract");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CHECK ("attemptCount" BETWEEN 0 AND 3)',
+    "'assistant', 'composition', 'scenario', 'translation', 'dialogue', 'palette'",
+    "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 3)',
+    'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {
@@ -1044,4 +1065,29 @@ test("personal cloud migration persists only encrypted account credentials", () 
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/\b(?:access|refresh)_token\b/iu);
+});
+
+test("personal cloud cutover marker is a forward-only verified repair", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0055_personal_cloud_cutover_marker",
+  );
+  expect(migration?.id).toBe("0055_personal_cloud_cutover_marker");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "personal_cloud_cutover_marker_contract",
+    "IN SHARE ROW EXCLUSIVE MODE",
+    "personal cloud connection columns are incomplete",
+    "personal cloud connection constraints are incomplete",
+    "personal cloud connection indexes are incomplete",
+    'INSERT INTO public."toonspectrum_schema_migration"',
+    "0051_personal_cloud_connections",
+    "ON CONFLICT",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+  expect(sql).not.toContain(
+    "CREATE TABLE IF NOT EXISTS public.personal_cloud_connection",
+  );
 });

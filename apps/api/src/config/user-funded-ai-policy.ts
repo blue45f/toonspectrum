@@ -1,12 +1,32 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 
 /**
- * Product policy, not an operator feature flag. Production and development never spend service
- * credentials. Unit/integration tests retain the legacy provider path only to regression-test its
- * security, idempotency and quota boundaries without shipping an executable operator-funded route.
+ * Enables only the reviewed text-only shared free pool. This must never be used
+ * as a generic switch for operator-funded image, media, video, or 3D services.
+ */
+export function sharedFreeAiPoolEnabled(): boolean {
+  return process.env.NODE_ENV === "test"
+    || process.env.STUDIO_AI_FREE_POOL_ENABLED?.trim().toLowerCase() === "true";
+}
+
+/**
+ * Legacy product policy for operator-funded AI. Tests retain the provider path
+ * to verify its security boundaries, while production and development keep it
+ * disabled even when the separate shared free text pool is enabled.
  */
 export function operatorAiFundingEnabled(): boolean {
   return process.env.NODE_ENV === "test";
+}
+
+export function rejectUnavailableFreeAiPool(): void {
+  if (sharedFreeAiPoolEnabled()) return;
+  throw new ServiceUnavailableException({
+    code: "FREE_AI_POOL_UNAVAILABLE",
+    message: "자동 무료 AI가 아직 연결되지 않았습니다. 통합 AI 설정에서 개인 무료 API 키를 입력하면 계속 사용할 수 있습니다.",
+    settingsHref: "/settings/ai",
+    operatorFunded: false,
+    freePool: true,
+  });
 }
 
 export function rejectOperatorFundedAi(): void {

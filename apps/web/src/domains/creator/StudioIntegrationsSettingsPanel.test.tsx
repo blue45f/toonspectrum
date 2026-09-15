@@ -53,7 +53,8 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
     // not the legacy OpenAI StudioAiSettings baseURL.
     expect(html).toContain("통합 AI 설정");
     expect(html).toContain("http://localhost:8082/v1");
-    expect(html).toContain("무료 연결 프리셋");
+    expect(html).toContain("자동 무료 AI · 키 입력 불필요");
+    expect(html).toContain("선택 사항: 개인 무료 키·로컬 AI");
     expect(html).toContain("모델 목록 연결 확인");
 
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.

@@ -48,8 +48,8 @@ describe("StudioDialogueSuggestPanel mount-time render contract", () => {
     const html = renderPanel({ configured: false });
 
     expect(html).toContain("AI 어시스트 설정");
-    expect(html).toContain("로그인해 서버 AI를 사용하거나");
-    expect(html).toContain("내 API 키를 등록하면 쓸 수 있어요");
+    expect(html).toContain("로그인하면 자동 무료 AI를 먼저 사용합니다");
+    expect(html).toContain("개인 무료 API 키 또는 로컬 AI를 연결하세요");
     expect(html).toMatch(/<textarea[^>]*disabled=""/);
     expect(html).toMatch(/<button type="button"[^>]*disabled=""/);
   });
@@ -57,7 +57,7 @@ describe("StudioDialogueSuggestPanel mount-time render contract", () => {
   it("hides the settings guidance and enables the textarea when configured", () => {
     const html = renderPanel({ configured: true });
 
-    expect(html).not.toContain("API 키를 등록하면 이");
+    expect(html).not.toContain("자동 무료 AI를 먼저 사용합니다");
     expect(html).not.toMatch(/<textarea[^>]*disabled=""/);
   });
 

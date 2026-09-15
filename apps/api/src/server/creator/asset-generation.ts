@@ -46,7 +46,7 @@ export async function generateImageAsset(
   throw new ServiceUnavailableException({
     code: "USER_AI_CONNECTION_REQUIRED",
     message: "운영측 이미지 생성은 비활성화되어 있습니다. 통합 AI 설정에서 본인 이미지 API 키를 연결하세요.",
-    settingsHref: "/studio/ai-settings",
+    settingsHref: "/settings/ai",
     operatorFunded: false,
   });
 }

@@ -24,14 +24,14 @@
 | 책임 | 기본 경계 | 원칙 |
 |---|---|---|
 | 정적 웹·카탈로그 | Cloudflare Static Assets | 정적 요청은 Worker를 실행하지 않는다. |
-| 동적 경로 게이트웨이 | Cloudflare Worker | `/api`, Socket.IO, OG 경로만 처리한다. |
+| 동적 경로 게이트웨이 | Cloudflare Worker | `/api`, Socket.IO, OG 경로만 처리하고 liveness는 edge에서 응답한다. |
 | 핵심 원장 | Neon/호환 PostgreSQL | 회원·ACL·소유권·거래의 단일 쓰기 권위다. |
 | 실시간 room 조정 | Cloudflare Durable Objects | presence·cursor·comment·signaling만 담당한다. |
 | 공개 에셋 | Cloudflare R2 Standard | 해시 기반 불변 객체와 장기 캐시를 사용한다. |
 | 원본·DB 백업 | Backblaze B2 + 암호화 로컬 사본 | 주 공급자와 실패 도메인을 분리한다. |
 | 개인 프로젝트 | OPFS/로컬 파일/BYOS | 운영자 중앙 저장소를 무제한 개인 드라이브로 사용하지 않는다. |
 | 이메일 | Resend | 인증·보안·거래 메일을 우선하고 알림은 digest한다. |
-| 기존 NestJS API | 기존 운영 경계 → scale-to-zero 호환 경계 | Worker로 옮기지 못한 핵심 API만 남긴다. |
+| Core NestJS API | Render `toonspectrum-core-api` | scale-to-zero full authority이며 Vercel은 비상 rollback만 남긴다. |
 | AI | 사용자 키 또는 로컬 모델 | 운영자 AI key를 기본 경로로 사용하지 않는다. |
 
 ## 현재 구현된 전환 경계
@@ -45,15 +45,17 @@
 
 ### 보안·캐시 헤더 보존
 
-`apps/web/public/_headers`는 `vercel.json`의 검증된 헤더에서 생성한다. 정적 호스트를 바꾼다는
-이유로 CSP, COOP/COEP, HSTS, immutable cache 계약을 제거하지 않는다.
+`apps/web/public/_headers`와 Worker 동적 응답은 같은 보안·캐시 계약을 사용한다. 정적 호스트를
+바꾼다는 이유로 CSP, COOP/COEP, HSTS, immutable cache 계약을 제거하지 않는다. `vercel.json`은
+이 계약의 권위가 아니라 비상 rollback 호환 구성이다.
 
 ### 자동 배포 차단
 
-- `vercel.json`은 모든 Git branch 배포를 비활성화한다.
+- `vercel.json`은 모든 Git branch 배포를 비활성화하고 Vercel은 비상 prebuilt rollback으로만 유지한다.
 - 기존 `vercel:deploy`, `vercel:preview` 명령은 실패한다.
-- Cloudflare 운영 배포는 검토된 `main`, clean worktree, 명시적 approval 문자열이 모두 있어야 한다.
-- PR과 `main` 병합 자체는 배포를 만들지 않는다.
+- Render Core API와 Cloudflare 운영 배포는 모두 수동이며 검토된 `main` SHA를 사용한다.
+- Cloudflare 운영 배포는 clean worktree와 명시적 approval 문자열이 모두 있어야 한다.
+- PR과 `main` 병합 자체는 어느 공급자에도 배포를 만들지 않는다.
 
 ### 공급자 제외
 
@@ -180,13 +182,15 @@ pnpm run cloudflare:static:dry-run
 git switch main
 git pull --ff-only
 git status --short
-export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com pnpm run verify:render-core-origin
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```
 
-운영 배포 전에는 커스텀 도메인, CSP, 로그인 cookie, OAuth callback, `/api/health/ready`, Socket.IO
-upgrade, OG crawler HTML, Studio WASM/WebGPU 로딩을 canary에서 확인한다.
+운영 배포 전에는 커스텀 도메인, CSP, 로그인 cookie, OAuth callback, Render 직접
+`/api/health/ready`, edge `/api/health/live`, Socket.IO upgrade, OG crawler HTML, Studio WASM/WebGPU
+로딩을 canary에서 확인한다. Core 응답에 `x-vercel-id`가 있으면 전환을 중단한다.
 
 ## 단계별 후속 전환
 

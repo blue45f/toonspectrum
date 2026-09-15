@@ -23,7 +23,7 @@ function sphere(
 
 describe("mannequin anatomical silhouette controls", () => {
   it("normalizes every anatomy parameter and clamps hostile values", () => {
-    const defaults = clampStudioMannequinBodyParams({});
+    const defaults = clampStudioMannequinBodyParams(null);
     expect(defaults).toMatchObject({
       torsoDepth: 1,
       waistWidth: 1,

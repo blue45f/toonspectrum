@@ -2,6 +2,7 @@ import {
   ChevronDown,
   Plus,
   RotateCcw,
+  ScanSearch,
   Search,
   Sparkles,
   Trash2,
@@ -58,6 +59,8 @@ export interface StudioVrmPropPanelProps {
   readonly onUpdate: (uid: string, patch: Partial<PropInstance>) => void;
   readonly onRemove: (uid: string) => void;
   readonly onClear: () => void;
+  /** Moves the viewport to a socket-aware close-up without changing the prop itself. */
+  readonly onInspect?: (item: PropInstance) => void;
 }
 
 type CatalogCategory = PropCategory | "all";
@@ -486,6 +489,7 @@ interface SelectedEditorProps {
   readonly rigMetrics: VrmPropRigMetrics;
   readonly onUpdate: (uid: string, patch: Partial<PropInstance>) => void;
   readonly onStatus: (message: string) => void;
+  readonly onInspect?: () => void;
 }
 
 function SelectedEditor({
@@ -498,6 +502,7 @@ function SelectedEditor({
   rigMetrics,
   onUpdate,
   onStatus,
+  onInspect,
 }: SelectedEditorProps) {
   const qualityNotice = studioVrmPropQualityNotice(item.propId);
   const editorTitleId = useId();
@@ -655,6 +660,22 @@ function SelectedEditor({
           {rig ? "스마트 소켓" : "기존 부착"}
         </span>
       </div>
+
+      {onInspect ? (
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`${definition?.label ?? item.propId} 부착부 확대 확인`}
+          className={cn(
+            "mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/45 px-3 text-xs font-bold text-accent transition-colors hover:border-accent/60 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45",
+            FOCUS_RING
+          )}
+          onClick={onInspect}
+        >
+          <ScanSearch size={15} aria-hidden />
+          부착부 확대 확인
+        </button>
+      ) : null}
 
       <div
         role="note"
@@ -1000,6 +1021,7 @@ export function StudioVrmPropPanel({
   onUpdate,
   onRemove,
   onClear,
+  onInspect,
 }: StudioVrmPropPanelProps) {
   const headingId = useId();
   const catalogContentId = useId();
@@ -1294,6 +1316,7 @@ export function StudioVrmPropPanel({
                       editorId={selectedEditorId}
                       onUpdate={onUpdate}
                       onStatus={setStatusMessage}
+                      onInspect={onInspect ? () => onInspect(item) : undefined}
                     />
                   ) : null}
                 </li>

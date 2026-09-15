@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MANAGED_FREE_MAX_OUTPUT_TOKENS } from "@/shared/ai/free-ai-runtime-budget";
+import {
+  MANAGED_FREE_MAX_OUTPUT_TOKENS,
+  resetFreeAiRuntimeBudget,
+} from "@/shared/ai/free-ai-runtime-budget";
 import { setUserAiConfiguration } from "@/shared/ai/user-ai-store";
 import { EMPTY_AI_CONFIGURATION } from "@/shared/ai/user-ai-types";
 
 import {
   canonicalStudioServerAiOperationId,
+  completeAutomaticFreeText,
   completeStudioServerText,
   getStudioServerAiStatus,
   parseStudioServerAiCompletion,
@@ -13,6 +17,17 @@ import {
 } from "./studio-server-ai-client";
 
 const OPERATION_ID = "composition-00000000-0000-4000-8000-000000000001";
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function urlOf(input: RequestInfo | URL): URL {
+  return new URL(input instanceof Request ? input.url : String(input));
+}
 
 function configureFreeTextConnection(): void {
   setUserAiConfiguration({
@@ -38,19 +53,54 @@ function configureFreeTextConnection(): void {
   });
 }
 
-describe("studio free-only user AI client", () => {
+function input() {
+  return {
+    task: "composition" as const,
+    promptVersion: 1 as const,
+    system: "구도를 제안하세요.",
+    user: "옥상 장면",
+    operationId: OPERATION_ID,
+  };
+}
+
+describe("studio automatic free AI client", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    resetFreeAiRuntimeBudget();
     setUserAiConfiguration(EMPTY_AI_CONFIGURATION);
   });
 
-  it("reports that operator-funded server AI is unavailable", async () => {
-    await expect(getStudioServerAiStatus()).resolves.toMatchObject({
-      configured: false,
-      provider: "none",
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetFreeAiRuntimeBudget();
+    setUserAiConfiguration(EMPTY_AI_CONFIGURATION);
+  });
+
+  it("loads the shared free-pool status", async () => {
+    const fetchMock = vi.fn(async (_request: RequestInfo | URL) => json({
+      configured: true,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+      providers: [],
+      selection: {
+        default: "auto",
+        order: ["gemini", "groq", "openrouter"],
+        fallback: true,
+        fallbackPolicy: "free_quota_exhausted",
+      },
+      capabilities: ["composition"],
+      requiresAuth: true,
       operatorFunded: false,
-      settingsHref: "/studio/ai-settings",
+      freePool: true,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getStudioServerAiStatus()).resolves.toMatchObject({
+      configured: true,
+      provider: "gemini",
+      freePool: true,
     });
+    expect(urlOf(fetchMock.mock.calls[0]![0]).pathname).toBe("/api/studio-ai/status");
   });
 
   it("accepts only canonical bounded operation identifiers", () => {
@@ -63,104 +113,167 @@ describe("studio free-only user AI client", () => {
     expect(canonicalStudioServerAiOperationId("작업-0000000000000000")).toBeNull();
   });
 
-  it("fails before fetch when no free text connection is assigned", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    await expect(completeStudioServerText({
-      task: "composition",
-      promptVersion: 1,
-      system: "구도를 제안하세요.",
-      user: "옥상 장면",
-      operationId: OPERATION_ID,
-    })).resolves.toEqual({
-      ok: false,
-      code: "http_error",
-      error: "통합 AI 설정에서 무료 연결과 기능 연결을 선택하세요. 운영측 AI나 유료 모델로 대체하지 않습니다.",
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("calls the configured free-tier provider directly with the user's key", async () => {
-    configureFreeTextConnection();
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe("https://api.groq.com/openai/v1/chat/completions");
-      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-secret-key");
-      expect(init?.credentials).toBe("omit");
-      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      expect(body).toMatchObject({
-        model: "text-model",
-        max_tokens: MANAGED_FREE_MAX_OUTPUT_TOKENS,
-      });
-      return new Response(JSON.stringify({
-        model: "text-model-v2",
-        choices: [{ message: { content: "  사용자 키 결과  " } }],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
+  it("uses the keyless shared free pool before personal connections", async () => {
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      expect(urlOf(request).pathname).toBe("/api/studio-ai/chat");
+      const req = request as Request;
+      expect(req.headers.get("Idempotency-Key")).toBe(OPERATION_ID);
+      const body = await req.clone().json() as Record<string, unknown>;
+      expect(body).toMatchObject({ task: "composition", promptVersion: 1 });
+      return json({
+        content: "공용 무료 결과",
+        provider: "gemini",
+        model: "gemini-3.8-flash",
+        requestId: "server-request-1",
       });
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(completeStudioServerText({
-      task: "composition",
-      promptVersion: 1,
-      system: "구도를 제안하세요.",
-      user: "옥상 장면",
-      operationId: OPERATION_ID,
-    })).resolves.toEqual({
+    await expect(completeStudioServerText(input())).resolves.toEqual({
       ok: true,
       data: {
-        content: "사용자 키 결과",
-        provider: "user",
-        model: "text-model",
-        requestId: `byok:${OPERATION_ID}`,
+        content: "공용 무료 결과",
+        provider: "gemini",
+        model: "gemini-3.8-flash",
+        requestId: "server-request-1",
       },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("never reflects the API key from a free-provider response", async () => {
-    configureFreeTextConnection();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "user-secret-key를 숨긴 결과" } }],
-    }), { status: 200 })));
-
-    const result = await completeStudioServerText({
-      task: "dialogue",
-      promptVersion: 1,
-      system: "대사를 제안하세요.",
-      user: "인사",
-      operationId: "dialogue-00000000-0000-4000-8000-000000000002",
+  it("routes generic site text tools through the same automatic free chain", async () => {
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const req = request as Request;
+      expect(urlOf(req).pathname).toBe("/api/studio-ai/chat");
+      expect(req.headers.get("Idempotency-Key")).toMatch(/^assistant-/u);
+      await expect(req.clone().json()).resolves.toMatchObject({
+        task: "assistant",
+        promptVersion: 1,
+        system: "system",
+        user: "user",
+      });
+      return json({
+        content: "범용 무료 결과",
+        provider: "groq",
+        model: "openai/gpt-oss-120b",
+      });
     });
-    expect(JSON.stringify(result)).not.toContain("user-secret-key");
-    expect(JSON.stringify(result)).toContain("[비밀정보 제거]");
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeAutomaticFreeText("system", "user")).resolves.toMatchObject({
+      ok: true,
+      data: {
+        content: "범용 무료 결과",
+        provider: "groq",
+      },
+    });
   });
 
-  it("keeps legacy parser metadata allowlisted", () => {
+  it("uses a personal free key only after shared quota exhaustion", async () => {
+    configureFreeTextConnection();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = urlOf(request);
+      if (url.pathname === "/api/studio-ai/chat") {
+        return json({
+          code: "FREE_AI_POOL_EXHAUSTED",
+          message: "오늘의 자동 무료 AI 사용량이 모두 소진되었습니다.",
+        }, 429);
+      }
+      expect(url.toString()).toBe("https://api.groq.com/openai/v1/chat/completions");
+      const req = request instanceof Request ? request : new Request(request, init);
+      expect(req.headers.get("Authorization")).toBe("Bearer user-secret-key");
+      const body = await req.clone().json() as Record<string, unknown>;
+      expect(body).toMatchObject({
+        model: "text-model",
+        max_tokens: MANAGED_FREE_MAX_OUTPUT_TOKENS,
+      });
+      return json({ choices: [{ message: { content: "개인 무료 결과" } }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeStudioServerText(input())).resolves.toEqual({
+      ok: true,
+      data: {
+        content: "개인 무료 결과",
+        provider: "user",
+        model: "text-model",
+        requestId: `byok:${OPERATION_ID}`,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not mislabel a personal-key authentication failure as free exhaustion", async () => {
+    configureFreeTextConnection();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = urlOf(request);
+      if (url.pathname === "/api/studio-ai/chat") {
+        return json({ code: "FREE_AI_POOL_EXHAUSTED", message: "공용 무료 제한" }, 429);
+      }
+      return json({ error: "invalid key" }, 401);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeStudioServerText(input())).resolves.toMatchObject({
+      ok: false,
+      code: "http_error",
+      error: expect.stringMatching(/인증/u),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a feature-unavailable message after every free route is exhausted", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({
+      code: "FREE_AI_POOL_EXHAUSTED",
+      message: "소진",
+    }, 429)));
+
+    await expect(completeStudioServerText(input())).resolves.toMatchObject({
+      ok: false,
+      code: "free_exhausted",
+      error: expect.stringMatching(/개인 무료 API 키|사용할 수 없습니다/u),
+    });
+  });
+
+  it("does not retry or use another provider after an ambiguous network error", async () => {
+    configureFreeTextConnection();
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("offline");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeStudioServerText(input())).resolves.toMatchObject({
+      ok: false,
+      code: "http_error",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps free-pool failover metadata allowlisted", () => {
     expect(parseStudioServerAiFailoverMetadata({
-      attemptedProvider: "zai",
-      attemptedModel: "glm",
-      actualProvider: "deepseek",
-      actualModel: "deepseek-v4",
-      reason: "billing_quota_exhausted",
+      attemptedProvider: "gemini",
+      attemptedModel: "gemini-3.8-flash",
+      actualProvider: "groq",
+      actualModel: "openai/gpt-oss-120b",
+      reason: "free_quota_exhausted",
       rawError: "secret",
-    }, { provider: "deepseek", model: "deepseek-v4" })).toEqual({
-      attemptedProvider: "zai",
-      attemptedModel: "glm",
-      actualProvider: "deepseek",
-      actualModel: "deepseek-v4",
-      reason: "billing_quota_exhausted",
+    }, { provider: "groq", model: "openai/gpt-oss-120b" })).toEqual({
+      attemptedProvider: "gemini",
+      attemptedModel: "gemini-3.8-flash",
+      actualProvider: "groq",
+      actualModel: "openai/gpt-oss-120b",
+      reason: "free_quota_exhausted",
     });
     expect(parseStudioServerAiCompletion({
       content: "완료",
-      provider: "user",
-      model: "text-model",
+      provider: "groq",
+      model: "openai/gpt-oss-120b",
       usage: { promptTokens: 10, totalTokens: 12 },
       rawError: "private",
     })).toEqual({
       content: "완료",
-      provider: "user",
-      model: "text-model",
+      provider: "groq",
+      model: "openai/gpt-oss-120b",
       usage: { promptTokens: 10, totalTokens: 12 },
     });
   });

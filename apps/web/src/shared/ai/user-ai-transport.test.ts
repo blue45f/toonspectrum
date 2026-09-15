@@ -5,7 +5,7 @@ import {
   resetFreeAiRuntimeBudget,
 } from "./free-ai-runtime-budget";
 import { lockUserAi, setUserAiConfiguration } from "./user-ai-store";
-import { userAiFetch } from "./user-ai-transport";
+import { completeUserAiTextDetailed, userAiFetch } from "./user-ai-transport";
 import type { UserAiConnection } from "./user-ai-types";
 
 const managedConnection: UserAiConnection = {
@@ -88,5 +88,63 @@ describe("managed free AI transport response limits", () => {
     });
     expect(init.credentials).toBe("omit");
     expect(init.redirect).toBe("error");
+  });
+
+  it("reports a missing personal free connection without sending a request", async () => {
+    setUserAiConfiguration({
+      version: 1,
+      connections: [],
+      assignments: { text: null, image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).rejects.toMatchObject({
+      code: "not-configured",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("falls through personal free connections by quality only after quota exhaustion", async () => {
+    const gemini: UserAiConnection = {
+      ...managedConnection,
+      id: "gemini-user",
+      label: "Gemini free",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+      apiKey: "gemini-user-key",
+      textModel: "gemini-free-model",
+      costPolicy: "provider-free-tier",
+    };
+    const groq: UserAiConnection = {
+      ...managedConnection,
+      id: "groq-user",
+      label: "Groq free",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "groq-user-key",
+      textModel: "groq-free-model",
+      costPolicy: "provider-free-tier",
+    };
+    setUserAiConfiguration({
+      version: 1,
+      connections: [groq, gemini],
+      assignments: { text: null, image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("generativelanguage.googleapis.com")) {
+        return new Response(JSON.stringify({ error: "quota" }), { status: 429 });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "Groq fallback" } }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).resolves.toMatchObject({
+      content: "Groq fallback",
+      connection: { id: "groq-user" },
+      attemptedConnectionIds: ["gemini-user", "groq-user"],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

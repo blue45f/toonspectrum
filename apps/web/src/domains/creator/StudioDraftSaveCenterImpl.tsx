@@ -46,6 +46,11 @@ import { studioSaveIntentScopeKey, type StudioSaveIntentScope } from "./studio-d
 import { useStudioDurableSaveIntent } from "./use-studio-durable-save-intent";
 import { STUDIO_SERVER_AUTOSAVE_IDLE_MS } from "./studio-page-editor-runtime-contracts";
 import { useStudioReliabilityStatus } from "./use-studio-reliability-status";
+import {
+  reportStudioServerRequestFailure,
+  reportStudioServerRequestSuccess,
+} from "./offline/studio-connectivity";
+import { useStudioConnectivity } from "./offline/use-studio-connectivity";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -106,10 +111,6 @@ const TONE_CLASS: Readonly<Record<StudioDraftSaveTone, string>> = {
   danger: "border-danger/40 bg-danger-soft/25 text-danger",
   neutral: "border-line bg-card/95 text-fg-2",
 };
-
-function readOnlineStatus(): boolean {
-  return typeof navigator === "undefined" ? true : navigator.onLine;
-}
 
 function readOutboxStorage(): StudioDraftSaveOutboxStorage | null {
   if (typeof window === "undefined") return null;
@@ -227,11 +228,12 @@ export function StudioDraftSaveCenter({
   onExportBackup,
 }: StudioDraftSaveCenterProps) {
   const reliability = useStudioReliabilityStatus();
+  const connectivity = useStudioConnectivity();
+  const isOnline = connectivity.serverAvailable;
   const durableSaveIntent = useStudioDurableSaveIntent(saveIntentScope);
   const rememberDurableIntent = durableSaveIntent.remember;
   const cancelDurableIntent = durableSaveIntent.cancel;
   const [open, setOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(readOnlineStatus);
   const [deferredSave, setDeferredSave] = useState(false);
   const [deferredSaveQueuedAt, setDeferredSaveQueuedAt] = useState<number | null>(null);
   const [deferredSaveDurable, setDeferredSaveDurable] = useState(false);
@@ -359,10 +361,14 @@ export function StudioDraftSaveCenter({
     setManualSaveError(null);
     try {
       await Promise.resolve(onSaveDraft());
+      reportStudioServerRequestSuccess();
       return true;
     } catch (cause) {
-      if (restoreDeferredOnFailure) queueDeferredSave();
-      setManualSaveError(errorMessage(cause));
+      const serverUnavailable = reportStudioServerRequestFailure(cause);
+      if (restoreDeferredOnFailure || serverUnavailable) queueDeferredSave();
+      setManualSaveError(serverUnavailable
+        ? "서버에 연결할 수 없어 이 기기에 저장 예약을 보관했습니다. 연결이 복구되면 자동으로 다시 저장합니다."
+        : errorMessage(cause));
       setOpen(true);
       return false;
     }
@@ -458,18 +464,6 @@ export function StudioDraftSaveCenter({
     setDeferredSaveDurable(true);
     setDeferredSave(true);
   }, [outboxWorkId, serverRevision]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, []);
 
   useEffect(() => {
     if (

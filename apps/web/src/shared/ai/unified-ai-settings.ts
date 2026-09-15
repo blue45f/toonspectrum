@@ -1,7 +1,10 @@
 import { useSyncExternalStore } from "react";
 
-import { requireUserAiConnection } from "./user-ai-store";
-import { completeUserAiText } from "./user-ai-transport";
+import {
+  completeUserAiTextDetailed,
+  UserAiTransportError,
+  type UserAiTransportErrorCode,
+} from "./user-ai-transport";
 
 export const STUDIO_AI_SETTINGS_STORAGE_KEY = "toonspectrum-studio-ai-settings";
 const UNIFIED_AI_AUX_STORAGE_KEY = "toonspectrum-unified-ai-aux-v1";
@@ -239,7 +242,11 @@ export function clearUnifiedAiSecrets(): void {
 
 export type UserTextResult =
   | { ok: true; content: string; model: string; provider: string }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      code: UserAiTransportErrorCode | "request-failed";
+    };
 
 /** All legacy callers now use the same free-only runtime guard as the unified settings page. */
 export async function completeWithUserTextKey(
@@ -248,13 +255,12 @@ export async function completeWithUserTextKey(
   signal?: AbortSignal,
 ): Promise<UserTextResult> {
   try {
-    const connection = requireUserAiConnection("text");
-    const content = await completeUserAiText(system, user, signal);
+    const result = await completeUserAiTextDetailed(system, user, signal);
     return {
       ok: true,
-      content: content.trim().slice(0, 100_000),
-      model: connection.textModel.slice(0, 200),
-      provider: new URL(connection.baseUrl).hostname.slice(0, 120),
+      content: result.content.trim().slice(0, 100_000),
+      model: result.connection.textModel.slice(0, 200),
+      provider: new URL(result.connection.baseUrl).hostname.slice(0, 120),
     };
   } catch (error) {
     return {
@@ -262,6 +268,7 @@ export async function completeWithUserTextKey(
       error: error instanceof Error
         ? error.message
         : "무료 AI 제공자에 연결하지 못했습니다.",
+      code: error instanceof UserAiTransportError ? error.code : "request-failed",
     };
   }
 }

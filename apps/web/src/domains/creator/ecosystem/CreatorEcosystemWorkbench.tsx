@@ -2,9 +2,7 @@ import { ArrowRight, CheckCircle2, Download, Languages, LockKeyhole, WandSparkle
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { completeUserAiText } from "@/shared/ai/user-ai-transport";
-import { useUserAi } from "@/shared/ai/user-ai-store";
-
+import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { createOriginalSample, ORIGINAL_CONTENT_CREDIT, SAMPLE_WORKS, type ProcessStage } from "./ecosystem-content";
 import { BETA_PACKAGE_SCHEMA, PROCESS_PACKAGE_SCHEMA, type TranslationDraft } from "./ecosystem-record";
 import { downloadEcosystemJson, renderEcosystemPreview } from "./ecosystem-preview";
@@ -28,8 +26,6 @@ function parseAiArray(value: string): unknown {
 }
 
 export function CreatorEcosystemWorkbench() {
-  const ai = useUserAi();
-  const textAiReady = Boolean(ai.configuration.assignments.text);
   const [sampleId, setSampleId] = useState(SAMPLE_WORKS[0]!.id);
   const [pages, setPages] = useState(() => [samplePage(SAMPLE_WORKS[0]!.id)]);
   const [locale, setLocale] = useState("en");
@@ -85,12 +81,13 @@ export function CreatorEcosystemWorkbench() {
     try {
       const selected = rows.slice(0, 20);
       const request = selected.map(row => ({ id: row.elementId, text: row.source }));
-      const content = await completeUserAiText(
+      const result = await completeAutomaticFreeText(
         "Translate webtoon dialogue. Return only a JSON array of {id,text}. Preserve names and tone. Never add IDs.",
         `Target locale: ${locale}\nDialogue:\n${JSON.stringify(request)}`,
         controller.signal,
       );
-      const translations = validateAiTranslations(parseAiArray(content), selected);
+      if (!result.ok) throw new Error(result.error);
+      const translations = validateAiTranslations(parseAiArray(result.data.content), selected);
       const now = new Date().toISOString();
       setDrafts(current => [
         ...current.filter(item => item.locale !== locale || !translations.some(value => value.elementId === item.elementId)),
@@ -179,10 +176,10 @@ export function CreatorEcosystemWorkbench() {
             <div><h3 className="flex items-center gap-2 text-lg font-black text-fg"><Languages size={18} className="text-accent" /> 언어별 원고</h3>
               <p className="mt-1 text-xs text-fg-3">원문이 바뀌면 초안을 오래된 상태로 표시하고 승인된 항목만 적용합니다.</p></div>
             <div className="flex flex-wrap gap-2"><input className={`${CONTROL} w-24`} value={locale} maxLength={20} aria-label="번역 대상 로케일" onChange={event => setLocale(event.target.value.trim())} />
-              <button type="button" className={BUTTON} disabled={busy || !textAiReady} onClick={() => void runAiTranslation()}><WandSparkles size={15} /> 사용자 키로 초안</button>
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => void runAiTranslation()}><WandSparkles size={15} /> 자동 무료 AI 초안</button>
               <button type="button" className={BUTTON} onClick={applyTranslations}><CheckCircle2 size={15} /> 승인본 적용</button></div>
           </div>
-          {!textAiReady ? <p className="mt-3 text-xs text-fg-3">AI 초안은 <Link className="text-accent" to="/settings/ai">통합 AI 설정</Link>에서 사용자 텍스트 키를 연결한 경우에만 활성화됩니다.</p> : null}
+          <p className="mt-3 text-xs text-fg-3">자동 무료 풀을 먼저 사용합니다. 무료 한도 또는 요청 제한으로 사용할 수 없으면 <Link className="text-accent" to="/settings/ai">통합 AI 설정</Link>의 개인 무료 키 또는 로컬 AI로 이어집니다.</p>
           <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
             {rows.map(row => {
               const draft = drafts.find(item => item.elementId === row.elementId && item.locale === locale);

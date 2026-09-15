@@ -10,7 +10,7 @@ import { STUDIO_AI_ASSIST_TOOLS, type StudioAiAssistToolId } from "./studio-ai-a
 export const STUDIO_AI_EXECUTION_COST_CATEGORIES = [
   "로컬 0원",
   "제공자 과금 가능",
-  "서버 쿼터",
+  "공용 무료 쿼터",
 ] as const;
 
 export type StudioAiExecutionCostCategory =
@@ -110,14 +110,17 @@ const TOOL_SPECS: Readonly<Record<StudioAiAssistToolId, StudioAiExecutionToolSpe
   },
 };
 
-const FALLBACK_RETRY_POLICY =
+const TEXT_FALLBACK_RETRY_POLICY =
+  "무료 한도·요청 제한으로 추론 전에 거절된 경우에만 다음 무료 경로로 자동 전환 · 네트워크 오류·타임아웃·5xx 자동 재시도 없음";
+
+const IMAGE_FALLBACK_RETRY_POLICY =
   "자동 fallback·자동 재시도 없음 · 실패 내용을 확인한 뒤 수동 재시도";
 
 const IMAGE_UNAVAILABLE_REASON =
   "이미지 API가 연결되지 않아 실행할 수 없습니다. AI 어시스트 설정에서 키를 등록해 주세요.";
 
 const TEXT_UNAVAILABLE_REASON =
-  "텍스트 AI가 연결되지 않아 실행할 수 없습니다. 로그인으로 서버 AI를 사용하거나 API 키를 등록해 주세요.";
+  "텍스트 AI가 연결되지 않아 실행할 수 없습니다. 로그인하면 자동 무료 AI를 먼저 사용하며, 무료 경로를 사용할 수 없으면 통합 AI 설정에서 개인 무료 키 또는 로컬 AI를 연결하세요.";
 
 function normalizeConnectionLabel(connectionLabel: string): string {
   const normalized = connectionLabel.replace(/\s+/g, " ").trim().slice(0, 120);
@@ -137,7 +140,7 @@ function costCategoryFor(
   }
   return isPersonalProviderConnection(connectionLabel)
     ? "제공자 과금 가능"
-    : "서버 쿼터";
+    : "공용 무료 쿼터";
 }
 
 export function planStudioAiExecutionPreflight(
@@ -174,7 +177,9 @@ export function planStudioAiExecutionPreflight(
     estimatedTimeLabel: spec.estimatedTimeLabel,
     outputCount: spec.outputCount,
     outputCountLabel: spec.outputCountLabel,
-    fallbackRetryPolicy: FALLBACK_RETRY_POLICY,
+    fallbackRetryPolicy: spec.requiredConnection === "text"
+      ? TEXT_FALLBACK_RETRY_POLICY
+      : IMAGE_FALLBACK_RETRY_POLICY,
     sourceNonDestructivePolicy: spec.sourceNonDestructivePolicy,
     connectionLabel,
   };

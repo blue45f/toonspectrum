@@ -40,9 +40,12 @@ function r2Object(
 }
 
 describe("Cloudflare static gateway", () => {
-  it("keeps dynamic security headers synchronized with the canonical Vercel contract", () => {
-    const vercel = JSON.parse(
-      readFileSync(new URL("../../../vercel.json", import.meta.url), "utf8"),
+  it("keeps dynamic security headers synchronized with the provider-neutral contract", () => {
+    const responsePolicy = JSON.parse(
+      readFileSync(
+        new URL("../../../config/http-response-headers.json", import.meta.url),
+        "utf8",
+      ),
     ) as {
       headers?: Array<{
         source?: string;
@@ -50,7 +53,7 @@ describe("Cloudflare static gateway", () => {
       }>;
     };
     const rootHeaders = Object.fromEntries(
-      (vercel.headers?.find(({ source }) => source === "/(.*)")?.headers ?? [])
+      (responsePolicy.headers?.find(({ source }) => source === "/(.*)")?.headers ?? [])
         .map(({ key, value }) => [key, value]),
     );
 
@@ -91,6 +94,34 @@ describe("Cloudflare static gateway", () => {
       bucket_name: "toonspectrum-public-assets",
       preview_bucket_name: "toonspectrum-public-assets",
     }]);
+  });
+
+  it("serves liveness at the edge without waking the Core API", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const env = environment();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    for (const pathname of ["/api/health", "/api/health/live"]) {
+      const response = await gateway(
+        new Request(`https://www.toonstudio.cloud${pathname}`),
+        env,
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ status: "ok" });
+      expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+      expect(response.headers.get("x-toonspectrum-health-source")).toBe(
+        "cloudflare-edge",
+      );
+    }
+
+    const head = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/health/live",
+      { method: "HEAD" },
+    ), env);
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("leaves static traffic on the free Static Assets path", async () => {
@@ -138,12 +169,16 @@ describe("Cloudflare static gateway", () => {
       }),
       { headers: { "content-type": "application/json" } },
     ));
-    const env = environment();
+    const coreOriginSecret = "cloudflare-to-render-origin-secret-0123456789";
+    const env = environment({ CORE_ORIGIN_SECRET: coreOriginSecret });
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
 
     const response = await gateway(
       new Request("https://www.toonstudio.cloud/api/auth/session", {
-        headers: { cookie: "session=opaque" },
+        headers: {
+          cookie: "session=opaque",
+          "x-toonspectrum-origin-secret": "client-spoofed-value",
+        },
       }),
       env,
     );
@@ -158,9 +193,27 @@ describe("Cloudflare static gateway", () => {
     expect((proxied as Request).headers.get("cookie")).toBe("session=opaque");
     expect((proxied as Request).headers.get("x-forwarded-host")).toBe("www.toonstudio.cloud");
     expect((proxied as Request).headers.get("x-toonspectrum-edge-route")).toBe("core");
+    expect((proxied as Request).headers.get("x-toonspectrum-origin-secret")).toBe(
+      coreOriginSecret,
+    );
     expect(response.headers.get("content-security-policy")).toBe(
       COMMON_SECURITY_HEADERS["Content-Security-Policy"],
     );
+  });
+
+  it("fails closed when the Core origin secret binding is weak", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/api/projects"),
+      environment({ CORE_ORIGIN_SECRET: "too-short" }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "CORE_API_UNAVAILABLE",
+    });
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("routes social, playground, admin, and realtime traffic to isolated authorities", async () => {
@@ -386,6 +439,29 @@ describe("Cloudflare static gateway", () => {
     });
     expect(get).toHaveBeenCalledOnce();
     expect(upstream).toHaveBeenCalledOnce();
+  });
+
+  it("does not wake the Core API when every large-asset authority misses", async () => {
+    const assetFetch = vi.fn(async () => new Response("missing", { status: 404 }));
+    const get = vi.fn(async () => null);
+    const head = vi.fn(async () => null);
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/assets/opencascade.wasm-build123.wasm",
+      { headers: { range: "bytes=0-7" } },
+    ), environment({
+      ASSETS: { fetch: assetFetch },
+      LARGE_ASSETS: { get, head },
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "LARGE_ASSET_UNAVAILABLE",
+    });
+    expect(get).toHaveBeenCalledOnce();
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("falls back to the core authority while a domain-specific service is not configured", async () => {

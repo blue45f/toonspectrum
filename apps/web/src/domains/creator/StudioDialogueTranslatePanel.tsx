@@ -462,7 +462,7 @@ export function StudioDialogueTranslatePanel({
 
           {!configured && (
             <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
-              로그인해 서버 AI를 사용하거나 설정에서 내 API 키를 등록하세요.
+              로그인하면 자동 무료 AI를 먼저 사용합니다. 사용할 수 있는 무료 경로가 없으면 통합 AI 설정에서 개인 무료 키 또는 로컬 AI를 연결하세요.
             </p>
           )}
           {error && (
