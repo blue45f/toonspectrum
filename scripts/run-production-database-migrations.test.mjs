@@ -29,12 +29,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(53);
+  expect(manifest).toHaveLength(55);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0053_personal_cloud_cutover_marker",
+    "0055_personal_cloud_cutover_marker",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(53);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(55);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {
@@ -1048,9 +1048,9 @@ test("personal cloud migration persists only encrypted account credentials", () 
 
 test("personal cloud cutover marker is a forward-only verified repair", () => {
   const migration = loadMigrationManifest().find(
-    ({ id }) => id === "0053_personal_cloud_cutover_marker",
+    ({ id }) => id === "0055_personal_cloud_cutover_marker",
   );
-  expect(migration?.id).toBe("0053_personal_cloud_cutover_marker");
+  expect(migration?.id).toBe("0055_personal_cloud_cutover_marker");
   const sql = migration?.contents ?? "";
 
   for (const requiredFragment of [
