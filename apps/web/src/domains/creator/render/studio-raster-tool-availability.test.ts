@@ -136,7 +136,9 @@ describe("Studio raster tool availability matrix", () => {
     }).entry;
     expect(gate.enabled).toBe(false);
     expect(gate.action).toBeNull();
-    expect(gate.reason).toContain("똑같이");
+    expect(gate.reason).toContain("현재 모습");
+    expect(gate.reason).toContain("잠시 끄거나");
+    expect(gate.reason).not.toContain("지우개");
   });
 
   it("honors document, hidden, selected lock, animation and playback gates in that order", () => {

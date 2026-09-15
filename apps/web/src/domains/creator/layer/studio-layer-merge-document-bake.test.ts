@@ -98,11 +98,29 @@ describe("mixed document layer merge bake", () => {
     ]);
   });
 
-  it("fails closed instead of silently dropping eraser fidelity", () => {
-    expect(planStudioDocumentMergeBake(mergeInput([
+  it("bakes eraser history with the same causal mask instead of blocking the merge", async () => {
+    const planned = planStudioDocumentMergeBake(mergeInput([
       line("ink"),
       line("erase", "eraser"),
-    ]))).toMatchObject({ ok: false, code: "unsupported-fidelity" });
+    ]));
+    expect(planned).toMatchObject({ ok: true });
+    if (!planned.ok) return;
+
+    let capturedSvg = "";
+    await renderStudioDocumentMergeBake(
+      planned.plan,
+      renderStudioVectorReference,
+      {
+        workerFactory: null,
+        rasterExecutionBackend: "custom",
+        rasterize: async (request) => {
+          capturedSvg = request.svg;
+          return { dataUrl: PNG, width: request.width, height: request.height };
+        },
+      },
+    );
+    expect(capturedSvg).toContain('style="mask-type:luminance"');
+    expect(capturedSvg).toContain('<g mask="url(#sem');
   });
 
   it("rejects missing, duplicated and hidden source ownership", () => {

@@ -65,7 +65,7 @@ export function CrawlerPolicyPage() {
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <FileSearch size={19} aria-hidden="true" />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-fg">수집 봇 식별 정보</h2>
             <p className="mt-2 text-sm leading-7 text-fg-2">자동 요청은 일반 브라우저로 가장하지 않고 아래 User-Agent로 식별합니다.</p>
             <code className="mt-3 block overflow-x-auto rounded-xl border border-line bg-canvas p-3 text-xs leading-6 text-fg">
@@ -135,7 +135,7 @@ export function CrawlerPolicyPage() {
       <section className="mt-10 rounded-2xl border border-line bg-card/40 p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <MailQuestion size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-fg">정정·삭제·수집 중지 요청</h2>
             <p className="mt-2 text-sm leading-7 text-fg-2">
               권리자나 데이터 제공자는 대상 URL과 요청 근거를 보내 정정, 노출 중지, 캐시 삭제 또는 재수집 방지를 요청할 수 있습니다.

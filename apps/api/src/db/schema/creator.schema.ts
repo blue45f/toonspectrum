@@ -1322,6 +1322,288 @@ export const creatorWorkLikes = pgTable(
 );
 
 
+export const creatorWorkBookmarks = pgTable(
+  "creator_work_bookmark",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.workId] }),
+    index("idx_creator_work_bookmark_work").on(t.workId),
+    index("idx_creator_work_bookmark_user_created").on(t.userId, t.createdAt.desc()),
+  ]
+);
+
+
+export const creatorWorkReleases = pgTable(
+  "creator_work_release",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    ownerUserId: text("ownerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    releaseNo: integer("releaseNo").notNull(),
+    workRevision: integer("workRevision").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    manifest: jsonb("manifest").$type<Record<string, unknown>>().notNull(),
+    state: text("state").notNull().default("review"),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_work_release_work_no_unique").on(t.workId, t.releaseNo),
+    unique("creator_work_release_work_id_unique").on(t.workId, t.id),
+    unique("creator_work_release_work_revision_unique").on(t.workId, t.workRevision),
+    unique("creator_work_release_fingerprint_unique").on(t.workId, t.fingerprint),
+    index("idx_creator_work_release_published").on(t.workId, t.publishedAt.desc()),
+    index("idx_creator_work_release_owner_created").on(t.ownerUserId, t.createdAt.desc()),
+    index("idx_creator_work_release_state_created").on(t.state, t.createdAt.desc()),
+    check("creator_work_release_no_positive_check", sql`${t.releaseNo} >= 1`),
+    check("creator_work_release_revision_positive_check", sql`${t.workRevision} >= 1`),
+    check("creator_work_release_manifest_object_check", sql`jsonb_typeof(${t.manifest}) = 'object'`),
+    check("creator_work_release_fingerprint_check", sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("creator_work_release_state_check", sql`${t.state} in ('review', 'approved', 'published', 'superseded', 'withdrawn')`),
+  ]
+);
+
+
+export const creatorWorkReleaseApprovals = pgTable(
+  "creator_work_release_approval",
+  {
+    releaseId: text("releaseId")
+      .notNull()
+      .references(() => creatorWorkReleases.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    state: text("state").notNull().default("pending"),
+    note: text("note").notNull().default(""),
+    decidedAt: timestamp("decidedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_work_release_approval_pkey",
+      columns: [t.releaseId, t.userId],
+    }),
+    index("idx_creator_work_release_approval_user_state").on(
+      t.userId,
+      t.state,
+      t.updatedAt.desc()
+    ),
+    check(
+      "creator_work_release_approval_state_check",
+      sql`${t.state} in ('pending', 'approved', 'rejected')`
+    ),
+    check(
+      "creator_work_release_approval_decision_check",
+      sql`(${t.state} = 'pending' and ${t.decidedAt} is null) or (${t.state} in ('approved', 'rejected') and ${t.decidedAt} is not null)`
+    ),
+  ]
+);
+
+
+export const creatorWorkPublications = pgTable(
+  "creator_work_publication",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    state: text("state").notNull().default("unpublished"),
+    visibility: text("visibility").notNull().default("private"),
+    canonicalSlug: text("canonicalSlug").notNull().default(""),
+    scheduledAt: timestamp("scheduledAt", { mode: "date", withTimezone: true }),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    unpublishedAt: timestamp("unpublishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_work_publication_work_unique").on(t.workId),
+    foreignKey({
+      name: "creator_work_publication_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_work_publication_release").on(t.releaseId),
+    index("idx_creator_work_publication_discovery").on(
+      t.state,
+      t.visibility,
+      t.publishedAt.desc()
+    ),
+    uniqueIndex("creator_work_publication_slug_unique")
+      .on(t.canonicalSlug)
+      .where(
+        sql`${t.canonicalSlug} <> '' and ${t.state} = 'published' and ${t.visibility} = 'public'`
+      ),
+    check(
+      "creator_work_publication_state_check",
+      sql`${t.state} in ('scheduled', 'published', 'unpublished')`
+    ),
+    check(
+      "creator_work_publication_visibility_check",
+      sql`${t.visibility} in ('public', 'unlisted', 'private')`
+    ),
+    check(
+      "creator_work_publication_lifecycle_check",
+      sql`(${t.state} = 'scheduled' and ${t.scheduledAt} is not null and ${t.publishedAt} is null) or (${t.state} = 'published' and ${t.publishedAt} is not null) or (${t.state} = 'unpublished')`
+    ),
+  ]
+);
+
+
+export const creatorPortfolioEntries = pgTable(
+  "creator_portfolio_entry",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    position: integer("position").notNull().default(0),
+    featured: boolean("featured").notNull().default(false),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_portfolio_entry_pkey",
+      columns: [t.userId, t.workId],
+    }),
+    foreignKey({
+      name: "creator_portfolio_entry_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_portfolio_user_order").on(
+      t.userId,
+      t.featured.desc(),
+      t.position,
+      t.updatedAt.desc()
+    ),
+    check(
+      "creator_portfolio_position_check",
+      sql`${t.position} between 0 and 10000`
+    ),
+  ]
+);
+
+
+export const creatorExternalPublications = pgTable(
+  "creator_external_publication",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    platform: text("platform").notNull(),
+    externalUrl: text("externalUrl").notNull(),
+    status: text("status").notNull().default("draft"),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_external_publication_work_platform_url_unique").on(
+      t.workId,
+      t.platform,
+      t.externalUrl
+    ),
+    foreignKey({
+      name: "creator_external_publication_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_external_publication_release").on(t.releaseId),
+    index("idx_creator_external_publication_work_updated").on(t.workId, t.updatedAt.desc()),
+    check(
+      "creator_external_publication_platform_check",
+      sql`${t.platform} in ('naver', 'webtoon_canvas', 'tapas', 'postype', 'pixiv', 'globalcomix', 'other')`
+    ),
+    check(
+      "creator_external_publication_status_check",
+      sql`${t.status} in ('draft', 'published', 'updated', 'removed')`
+    ),
+  ]
+);
+
+
+export const creatorWorkReports = pgTable(
+  "creator_work_report",
+  {
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    reporterId: text("reporterId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    details: text("details").notNull().default(""),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolvedAt", { mode: "date", withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workId, t.reporterId] }),
+    index("idx_creator_work_report_status_created").on(t.status, t.createdAt),
+    check(
+      "creator_work_report_reason_check",
+      sql`${t.reason} in ('copyright', 'unsafe', 'spam', 'misleading', 'ai_disclosure', 'other')`
+    ),
+    check(
+      "creator_work_report_status_check",
+      sql`${t.status} in ('open', 'resolved', 'dismissed')`
+    ),
+  ]
+);
+
+
 export const creatorWorkComments = pgTable(
   "creator_work_comment",
   {

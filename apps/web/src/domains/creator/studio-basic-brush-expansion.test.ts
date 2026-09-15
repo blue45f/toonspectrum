@@ -327,14 +327,27 @@ describe("commercial basic brush expansion", () => {
       width: 64,
       height: 48,
       transparentBg: true,
-      elements: [element],
+      elements: [
+        {
+          id: "ink-under-kneaded-eraser",
+          type: "draw",
+          kind: "freehand",
+          mode: "pen",
+          brush: "pen",
+          points: [0, 8, 64, 8],
+          pressures: [1, 1],
+          stroke: "#2457d6",
+          strokeWidth: 32,
+          opacity: 1,
+          sampleSpacing: 1,
+        },
+        element,
+      ],
     });
-    expect(svg.elementCount).toBe(1);
-    expect(svg.skipped).toEqual([expect.objectContaining({
-      id: element.id,
-      mode: "skipped",
-      label: expect.stringContaining("지우개"),
-    })]);
-    expect(svg.svg).not.toContain(element.stroke);
+    expect(svg.elementCount).toBe(2);
+    expect(svg.skipped).toEqual([]);
+    expect(svg.svg).toContain("#2457d6");
+    expect(svg.svg).toContain('style="mask-type:luminance"');
+    expect(svg.svg).toContain('<g mask="url(#sem');
   });
 });

@@ -135,13 +135,9 @@ export function svgSegmentedDynamicDabVariations(
   }));
 }
 
-export function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
-  if (el.mode === "eraser") {
-    addSkip(ctx, el, "skipped", "지우개 자국은 벡터로 재현할 수 없어 제외했어요.");
-    return "";
-  }
+function serializeDrawMarkup(ctx: ExportCtx, el: SvgDrawElLike): string {
   const kind = el.kind ?? "freehand";
-  if (kind === "freehand" && el.brushEnginePrograms?.material) {
+  if (kind === "freehand" && el.mode !== "eraser" && el.brushEnginePrograms?.material) {
     return `<g data-brush-engine="material-contact-v1">${studioMaterialBrushToSvg(el)}</g>`;
   }
   const opacity = el.opacity ?? 1;
@@ -160,7 +156,7 @@ export function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const variations = getSymmetricPoints(el.points, el.symmetry);
   // Same captured resolver as StudioDrawNode — one shared engine decision keeps the durable SVG
   // output and the Canvas replay on the same branch (no SVG-only fallback may widen this set).
-  const dynamicBrushId = kind === "freehand"
+  const dynamicBrushId = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioCapturedBrushDynamicsPresetId(el)
     : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
@@ -614,4 +610,32 @@ export function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
     }
   }
   return parts.join("");
+}
+
+
+/**
+ * Serializes an ordinary paint element. Erasers are composed causally by the page serializer,
+ * because a destination-out mark must subtract from everything that came before it rather than
+ * appear as an independent visible shape.
+ */
+export function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
+  if (el.mode === "eraser") {
+    addSkip(ctx, el, "skipped", "지우개 합성은 페이지 순서 마스크에서 처리해야 합니다.");
+    return "";
+  }
+  return serializeDrawMarkup(ctx, el);
+}
+
+/**
+ * Produces only the eraser's authored coverage. The caller converts every resulting colour to
+ * black while retaining alpha, then places it over a white luminance mask. That yields the exact
+ * Porter-Duff destination-out factor (1 - sourceAlpha) without exposing implementation details to
+ * the artist or asking them to flatten the layer first.
+ */
+export function serializeEraserMaskDraw(
+  ctx: ExportCtx,
+  el: SvgDrawElLike,
+): string {
+  if (el.mode !== "eraser") return "";
+  return serializeDrawMarkup(ctx, el);
 }

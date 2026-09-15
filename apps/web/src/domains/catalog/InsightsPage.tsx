@@ -21,6 +21,20 @@ import { useApiResource } from "@/infrastructure/use-api-resource";
 
 type InsightsData = Awaited<ReturnType<typeof getInsightsData>>;
 
+function InsightsPageHeading() {
+  return (
+    <header className="mb-8 max-w-xl">
+      <p className="eyebrow text-accent">DATA · INSIGHTS</p>
+      <h1 className="mt-3 text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-[3rem]">
+        이야기의 지형을 읽다
+      </h1>
+      <p className="mt-4 text-pretty text-base leading-relaxed text-fg-2">
+        수록작 전체를 가로질러 장르·플랫폼·평점·가격·어댑테이션을 집계했습니다.
+      </p>
+    </header>
+  );
+}
+
 export function InsightsPage() {
   const { data, loading, error, reload } = useApiResource<InsightsData>(
     "/api/insights",
@@ -30,6 +44,7 @@ export function InsightsPage() {
   if (loading) {
     return (
       <Container size="wide" className="py-16">
+        <InsightsPageHeading />
         <div className="skeleton h-40 rounded-2xl" />
       </Container>
     );
@@ -38,6 +53,7 @@ export function InsightsPage() {
   if (error || !data) {
     return (
       <Container size="wide" className="py-10">
+        <InsightsPageHeading />
         <ErrorState title="인사이트 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
       </Container>
     );

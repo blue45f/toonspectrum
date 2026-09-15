@@ -9,6 +9,15 @@ import type {
   CreatorAssetModerationStatus,
   CreatorAssetReportReason,
 } from "@/shared/lib/creator-asset-contract";
+import type {
+  CreatorCommunityContentGroup,
+  CreatorCommunityExternalPlatform,
+  CreatorCommunityExternalPublication,
+  CreatorCommunityExternalStatus,
+  CreatorCommunityMetadata,
+  CreatorCommunityProvenance,
+  CreatorCommunityReleaseSummary,
+} from "@/shared/lib/creator-community-publication-contract";
 
 import {
   CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
@@ -47,6 +56,9 @@ export interface WorkSummary {
   comments: number;
   views: number;
   liked: boolean;
+  community?: CreatorCommunityMetadata;
+  bookmarks?: number;
+  bookmarked?: boolean;
   createdAt: string;
   // 연재 시리즈/챌린지 연결 — 구버전 서버 응답엔 없을 수 있어 optional(하위호환).
   seriesId?: string | null;
@@ -90,6 +102,22 @@ export interface WorkComment {
   createdAt: string;
 }
 
+export type WorkReportReason =
+  | "copyright"
+  | "unsafe"
+  | "spam"
+  | "misleading"
+  | "ai_disclosure"
+  | "other";
+
+export interface SaveExternalPublicationInput {
+  releaseId?: string;
+  platform: CreatorCommunityExternalPlatform;
+  externalUrl: string;
+  status?: CreatorCommunityExternalStatus;
+  publishedAt?: string | null;
+}
+
 export type WorkSort = "recent" | "likes" | "views";
 
 export interface WorkListParams {
@@ -99,6 +127,10 @@ export interface WorkListParams {
   tag?: string;
   seriesId?: string;
   challengeId?: string;
+  contentType?: CreatorCommunityContentGroup;
+  portfolio?: "1" | "true";
+  provenance?: CreatorCommunityProvenance;
+  bookmarked?: "1" | "true";
 }
 
 export interface CreateWorkInput {
@@ -533,6 +565,35 @@ export async function toggleWorkLike(id: string): Promise<{ liked: boolean; like
   );
 }
 
+export async function toggleWorkBookmark(
+  id: string
+): Promise<{ bookmarked: boolean; bookmarks: number }> {
+  return callOrThrow(
+    () => api.post<{ bookmarked: boolean; bookmarks: number }>(
+      `${BASE}/works/${encodeURIComponent(id)}/bookmark`
+    ),
+    "북마크를 처리하지 못했습니다."
+  );
+}
+
+export async function listWorkReleases(
+  id: string,
+  signal?: AbortSignal
+): Promise<CreatorCommunityReleaseSummary[]> {
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/works/${encodeURIComponent(id)}/releases`, { signal }),
+    "작품 릴리스 목록을 불러오지 못했습니다."
+  );
+  return ensureArray<CreatorCommunityReleaseSummary>(data);
+}
+
+export async function createWorkRelease(id: string): Promise<CreatorCommunityReleaseSummary> {
+  return callOrThrow(
+    () => api.post<CreatorCommunityReleaseSummary>(`${BASE}/works/${encodeURIComponent(id)}/releases`),
+    "현재 저장본의 릴리스를 만들지 못했습니다."
+  );
+}
+
 export async function listComments(id: string, signal?: AbortSignal): Promise<WorkComment[]> {
   const data = await callOrThrow(
     () => api.get<unknown>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { signal }),
@@ -545,6 +606,59 @@ export async function postComment(id: string, text: string): Promise<WorkComment
   return callOrThrow(
     () => api.post<WorkComment>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { text }),
     "댓글을 등록하지 못했습니다."
+  );
+}
+
+export async function listExternalPublications(
+  id: string,
+  signal?: AbortSignal
+): Promise<CreatorCommunityExternalPublication[]> {
+  const data = await callOrThrow(
+    () => api.get<unknown>(
+      `${BASE}/works/${encodeURIComponent(id)}/external-publications`,
+      { signal }
+    ),
+    "외부 게시 이력을 불러오지 못했습니다."
+  );
+  return ensureArray<CreatorCommunityExternalPublication>(data);
+}
+
+export async function saveExternalPublication(
+  id: string,
+  input: SaveExternalPublicationInput
+): Promise<CreatorCommunityExternalPublication> {
+  return callOrThrow(
+    () => api.post<CreatorCommunityExternalPublication>(
+      `${BASE}/works/${encodeURIComponent(id)}/external-publications`,
+      { ...input, status: input.status ?? "published" }
+    ),
+    "외부 게시 이력을 저장하지 못했습니다."
+  );
+}
+
+export async function removeExternalPublication(
+  id: string,
+  publicationId: string
+): Promise<CreatorCommunityExternalPublication> {
+  return callOrThrow(
+    () => api.delete<CreatorCommunityExternalPublication>(
+      `${BASE}/works/${encodeURIComponent(id)}/external-publications/${encodeURIComponent(publicationId)}`
+    ),
+    "외부 게시 이력을 정리하지 못했습니다."
+  );
+}
+
+export async function reportWork(
+  id: string,
+  reason: WorkReportReason,
+  details = ""
+): Promise<{ ok: true }> {
+  return callOrThrow(
+    () => api.post<{ ok: true }>(`${BASE}/works/${encodeURIComponent(id)}/report`, {
+      reason,
+      details,
+    }),
+    "작품 신고를 접수하지 못했습니다."
   );
 }
 

@@ -395,7 +395,8 @@ describe("bootstrap SQL and repository contract", () => {
       "0046_creator_promotion_community",
       "0047_creator_collaboration_board",
       "0048_creator_asset_storage_locations",
-      "0049_studio_production_workspace_review_links_personal_kit",
+      "0049_creator_community_publishing",
+      "0050_studio_production_workspace_review_links_personal_kit",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

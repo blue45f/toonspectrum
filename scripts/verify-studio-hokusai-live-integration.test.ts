@@ -349,7 +349,13 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).toContain('[data-studio-rail-tool-id="select"]');
     expect(source).toContain('page.keyboard.press("Meta+z")');
     expect(source).toContain('page.keyboard.press("Meta+Shift+z")');
-    expect(source).toContain('page.reload({ waitUntil: "domcontentloaded"');
+    expect(source).toContain('"/studio/tools-companion?studio-hokusai-verifier-release=1"');
+    expect(source).toContain('state: "detached"');
+    expect(source).toContain('name === "writer-lease.bin"');
+    expect(source).toContain('name?.startsWith("toonspectrum-opfs-recovery:")');
+    expect(source).toContain('Date.now() - leaseFreeSince >= 1_500');
+    expect(source).toContain('page.goto(studioUrl, { waitUntil: "domcontentloaded"');
+    expect(source).not.toContain('page.reload({ waitUntil: "domcontentloaded"');
     expect(source).toContain('name: "이어서 그리기"');
     expect(source).not.toContain("waitForWorkerReady");
     expect(source).not.toContain("readStoredDocument");

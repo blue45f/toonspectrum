@@ -54,10 +54,10 @@ test("Korean query reaches the real reference screen without losing its original
   await expect(page.locator('aside').filter({ hasText: "medieval armor" })).toBeVisible();
 });
 
-test("professional webtoon entry leads with simple mode and projects available", async ({ page }) => {
+test("professional webtoon entry leads with quick draw and projects available", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator('.cf-hero a.cf-primary[href="/studio"]')).toBeVisible();
-  await expect(page.locator('.cf-hero a[href="/studio?uiMode=simple"]')).toBeVisible();
+  await expect(page.locator('.cf-hero a[href="/studio/new#quick-draw"]')).toBeVisible();
   await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
   await expect(page.locator('.creator-flagship form')).toHaveCount(1);
 });

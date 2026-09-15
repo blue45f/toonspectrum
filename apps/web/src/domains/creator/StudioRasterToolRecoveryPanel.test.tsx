@@ -396,7 +396,7 @@ describe("StudioInspectorPixelSelectionLauncher", () => {
         exactRenderableVisibleCount: 1,
         unsupportedVisibleCount: 1,
       }),
-      "화면과 똑같이",
+      "현재 모습",
       null,
     ],
   ] as const)(

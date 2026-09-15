@@ -27,12 +27,37 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(49);
+  expect(manifest).toHaveLength(50);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0049_studio_production_workspace_review_links_personal_kit",
+    "0050_studio_production_workspace_review_links_personal_kit",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(49);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(50);
+});
+
+test("creator community publishing migration separates immutable releases from discovery state", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0049_creator_community_publishing",
+  );
+  expect(migration?.id).toBe("0049_creator_community_publishing");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CREATE TABLE IF NOT EXISTS public."creator_work_bookmark"',
+    'CREATE TABLE IF NOT EXISTS public."creator_work_release"',
+    'CREATE TABLE IF NOT EXISTS public."creator_work_publication"',
+    'CREATE TABLE IF NOT EXISTS public."creator_portfolio_entry"',
+    'CREATE TABLE IF NOT EXISTS public."creator_external_publication"',
+    'CREATE TABLE IF NOT EXISTS public."creator_work_report"',
+    'FOREIGN KEY ("workId", "releaseId")',
+    'ON DELETE CASCADE',
+    'creator_work_release_immutable_trigger',
+    'creator_work_publication_lifecycle_check',
+    'REVOKE ALL ON TABLE public."creator_work_bookmark" FROM PUBLIC',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
 });
 
 test("creator storage location migration pins primaries and inventories verified replicas", () => {
@@ -61,10 +86,10 @@ test("creator storage location migration pins primaries and inventories verified
 
 test("studio production migration persists private workflows and token-hashed review links", () => {
   const migration = loadMigrationManifest().find(
-    ({ id }) => id === "0049_studio_production_workspace_review_links_personal_kit",
+    ({ id }) => id === "0050_studio_production_workspace_review_links_personal_kit",
   );
   expect(migration?.id).toBe(
-    "0049_studio_production_workspace_review_links_personal_kit",
+    "0050_studio_production_workspace_review_links_personal_kit",
   );
   const sql = migration?.contents ?? "";
 
