@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
+  STUDIO_RAIL_VISIBLE_LIMIT,
   DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES,
   DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID,
   defaultStudioAppSettings,
@@ -36,6 +37,8 @@ describe("studio-app-settings", () => {
     const defaults = defaultStudioAppSettings();
     expect(defaults.general.densityMode).toBe("simple");
     expect(defaults.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_VISIBLE_IDS);
+    expect(STUDIO_RAIL_VISIBLE_LIMIT).toBe(9);
+    expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toHaveLength(STUDIO_RAIL_VISIBLE_LIMIT);
     expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toEqual([
       "select",
       "pen",
@@ -226,6 +229,14 @@ describe("studio-app-settings", () => {
     expect(studioRailHiddenIds(list)).toContain("eraser");
     list = showStudioRailTool(list, "eraser");
     expect(list.at(-1)).toBe("eraser");
+
+    const full = [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS];
+    expect(showStudioRailTool(full, "hand")).toEqual([
+      ...full.slice(0, STUDIO_RAIL_VISIBLE_LIMIT - 1),
+      "hand",
+    ]);
+    expect(normalizeStudioRailVisibleIds(DEFAULT_STUDIO_RAIL_TOOL_ORDER))
+      .toHaveLength(STUDIO_RAIL_VISIBLE_LIMIT);
   });
 
   it("shortcut chords parse and match events", () => {

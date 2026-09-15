@@ -1,12 +1,11 @@
 /**
  * StudioMainMenu — ToonStudio's desktop application menubar.
  *
- * The workflow presentation supplies ten titles in one row:
- * 파일 · 편집 · 보기 · 삽입 · 레이어 · 그리기 · 만화 · 효과 · AI · 도움말.
- * File, Edit, View, Insert, Comic and Effects are workflow composites whose source
- * catalogue groups remain visible as named role="group" sections. AI remains a
- * first-class title because its assist, stock and integration commands are broader
- * than visual effects. Rows keep one flat menuitem order for predictable arrows.
+ * The workflow presentation supplies eight primary titles in one row:
+ * 파일 · 편집 · 보기 · 삽입 · 레이어 · 창작 · 효과 · 도움말.
+ * Related catalogue groups remain visible as named role="group" sections. AI is
+ * rendered through the same component as a detached action menu beside document CTAs.
+ * Rows keep one flat menuitem order for predictable arrows.
  *
  * Menus portal to document.body with fixed coordinates, switch on neighbouring-title
  * hover/click like a desktop editor, and implement a WAI-ARIA menubar with one roving
@@ -785,6 +784,8 @@ function MenuDropdown({
 export function StudioMainMenu({
   groups,
   specialistBoundaryGroupId = null,
+  ariaLabel,
+  surface = "primary",
   className,
 }: StudioMainMenuProps): ReactElement {
   const t = useT();
@@ -826,8 +827,9 @@ export function StudioMainMenu({
     <div
       ref={menuBarRef}
       role="menubar"
-      aria-label={localizeText(t, "Main menu", "studio.mainMenu.aria")}
-      data-studio-main-menu="true"
+      aria-label={ariaLabel ?? localizeText(t, "Main menu", "studio.mainMenu.aria")}
+      data-studio-main-menu={surface === "primary" ? "true" : undefined}
+      data-studio-main-menu-action={surface === "action" ? "true" : undefined}
       data-studio-shortcut-boundary="true"
       className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
     >

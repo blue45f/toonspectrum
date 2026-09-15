@@ -1119,15 +1119,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   // Composite titles take a shipped translation when the pack has one and fall back to
   // the catalogue's own language otherwise (same escape hatch the Help group uses).
   const menuT = useT();
-  const compositeMenuLabel = (id: "insert"): string | undefined => {
+  const compositeMenuLabel = (id: "insert" | "create"): string | undefined => {
     const key = `studio.mainMenu.group.${id}.label`;
     const translated = menuT(key);
     return translated === key ? undefined : translated;
   };
   const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups, {
-    labels: { insert: compositeMenuLabel("insert") },
+    labels: {
+      insert: compositeMenuLabel("insert"),
+      create: compositeMenuLabel("create"),
+    },
   });
   const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
+  const actionStudioMainMenuGroups = mainMenuPresentation.actionGroups;
 
   // Unified search executes only explicitly reviewed rows, using the menu's own closure.
   // This is the first safe slice of the CommandRegistry strangler: no second implementation.
@@ -1523,6 +1527,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             mobileImmersive && "min-w-0 gap-1"
           )}
         >
+          {!isMobile && actionStudioMainMenuGroups.length > 0 ? (
+            <Suspense fallback={null}>
+              <StudioMainMenu
+                groups={actionStudioMainMenuGroups}
+                ariaLabel={actionStudioMainMenuGroups[0]?.label ?? "AI 도우미"}
+                surface="action"
+                className={cn("shrink-0", mobileImmersive && "hidden")}
+              />
+            </Suspense>
+          ) : null}
           {isMobile ? (
             <StudioToolHintTarget
               hint={mobileImmersive ? MENUBAR_HINTS.immersiveExit : MENUBAR_HINTS.immersive}

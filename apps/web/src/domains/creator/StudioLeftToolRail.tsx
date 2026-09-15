@@ -51,12 +51,13 @@ import {
 } from "./editor-client/studio-left-tool-rail-client";
 import { preloadStudioRasterRetouchRuntime } from "./render/studio-raster-retouch-preload";
 import {
-  DEFAULT_STUDIO_RAIL_TOOL_ORDER,
+  STUDIO_RAIL_VISIBLE_LIMIT,
   formatStudioShortcutChord,
+  showStudioRailTool,
   studioRailToolLabel,
 } from "./studio-app-settings";
 import {
-  STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER,
+  STUDIO_CHROME_RAIL_TOOL_GROUPS,
   studioChromeRailGroupLabel,
 } from "./studio-chrome-ia-map";
 import {
@@ -570,6 +571,13 @@ function StudioLeftToolRailConnected() {
     });
   }
 
+  const hasVisibleRailGroup = (
+    groupId: (typeof STUDIO_CHROME_RAIL_TOOL_GROUPS)[number]["id"],
+  ): boolean =>
+    STUDIO_CHROME_RAIL_TOOL_GROUPS
+      .find((group) => group.id === groupId)
+      ?.toolIds.some((id) => isRailToolVisible(id)) ?? false;
+
   const railMoreFooter = (
     <div className="relative" data-studio-tool-rail-settings="true">
       <StudioRailToolButton
@@ -607,33 +615,48 @@ function StudioLeftToolRailConnected() {
           }}
         >
           <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
-            숨긴 도구
+            추가 도구
           </p>
-          {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
-            <p className="px-2 py-1.5 text-[0.6875rem] text-fg-3">모두 표시 중</p>
-          ) : (
-            STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER
-              .filter((id) => !isRailToolVisible(id))
-              .map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  data-studio-hidden-tool-id={id}
-                  className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
-                  onClick={() => {
-                    commitAppSettings({
-                      ...appSettings,
-                      toolbar: {
-                        visibleIds: [...appSettings.toolbar.visibleIds, id],
-                      },
-                    });
-                    closeRailMoreAndRestoreFocus();
-                  }}
+          <p className="px-2 pb-2 text-[0.6875rem] leading-relaxed text-fg-3">
+            도구막대 {Math.min(appSettings.toolbar.visibleIds.length, STUDIO_RAIL_VISIBLE_LIMIT)}/{STUDIO_RAIL_VISIBLE_LIMIT}
+            {" · 가득 차면 마지막 도구를 바꿉니다."}
+          </p>
+          {STUDIO_CHROME_RAIL_TOOL_GROUPS.map((group) => {
+            const hiddenIds = group.toolIds.filter((id) => !isRailToolVisible(id));
+            if (hiddenIds.length === 0) return null;
+            const groupLabelId = `${railMoreDialogId}-${group.id}`;
+            return (
+              <section key={group.id} aria-labelledby={groupLabelId} className="mb-1">
+                <p
+                  id={groupLabelId}
+                  className="px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wider text-fg-3"
                 >
-                  {isKoreanUiLocale(railLang) ? studioRailToolLabel(id) : studioRailToolLabel(id, railT)}
-                </button>
-              ))
-          )}
+                  {group.labelKo}
+                </p>
+                {hiddenIds.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    data-studio-hidden-tool-id={id}
+                    className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
+                    onClick={() => {
+                      commitAppSettings({
+                        ...appSettings,
+                        toolbar: {
+                          visibleIds: showStudioRailTool(appSettings.toolbar.visibleIds, id),
+                        },
+                      });
+                      closeRailMoreAndRestoreFocus();
+                    }}
+                  >
+                    {isKoreanUiLocale(railLang)
+                      ? studioRailToolLabel(id)
+                      : studioRailToolLabel(id, railT)}
+                  </button>
+                ))}
+              </section>
+            );
+          })}
           <button
             type="button"
             className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
@@ -664,10 +687,12 @@ function StudioLeftToolRailConnected() {
             className={cn(mobileImmersive && "hidden")}
             footer={railMoreFooter}
           >
-            <StudioRailDivider
-              data-studio-rail-group-divider="navigate-select"
-              label={studioChromeRailGroupLabel("navigate-select")}
-            />
+            {hasVisibleRailGroup("navigate-select") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="navigate-select"
+                label={studioChromeRailGroupLabel("navigate-select")}
+              />
+            ) : null}
 {isRailToolVisible("select") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="select"
@@ -696,10 +721,12 @@ function StudioLeftToolRailConnected() {
               }}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="draw"
-              label={studioChromeRailGroupLabel("draw")}
-            />
+            {hasVisibleRailGroup("draw") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="draw"
+                label={studioChromeRailGroupLabel("draw")}
+              />
+            ) : null}
 {isRailToolVisible("pen") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="pen"
@@ -738,10 +765,12 @@ function StudioLeftToolRailConnected() {
               onClick={() => activateDrawTool("eraser")}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="paint-retouch"
-              label={studioChromeRailGroupLabel("paint-retouch")}
-            />
+            {hasVisibleRailGroup("paint-retouch") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="paint-retouch"
+                label={studioChromeRailGroupLabel("paint-retouch")}
+              />
+            ) : null}
 {isRailToolVisible("blend") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="blend"
@@ -845,10 +874,12 @@ function StudioLeftToolRailConnected() {
               }}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="selection"
-              label={studioChromeRailGroupLabel("selection")}
-            />
+            {hasVisibleRailGroup("selection") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="selection"
+                label={studioChromeRailGroupLabel("selection")}
+              />
+            ) : null}
 {isRailToolVisible("marquee-rect") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="marquee-rect"
@@ -935,10 +966,12 @@ function StudioLeftToolRailConnected() {
               }}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="transform"
-              label={studioChromeRailGroupLabel("transform")}
-            />
+            {hasVisibleRailGroup("transform") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="transform"
+                label={studioChromeRailGroupLabel("transform")}
+              />
+            ) : null}
 {isRailToolVisible("transform") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="transform"
@@ -1009,10 +1042,12 @@ function StudioLeftToolRailConnected() {
               onClick={openSelectedLayerCrop}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="objects"
-              label={studioChromeRailGroupLabel("objects")}
-            />
+            {hasVisibleRailGroup("objects") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="objects"
+                label={studioChromeRailGroupLabel("objects")}
+              />
+            ) : null}
 {isRailToolVisible("smart-shape") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="smart-shape"
@@ -1180,10 +1215,12 @@ function StudioLeftToolRailConnected() {
               }}
             />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="media-3d"
-              label={studioChromeRailGroupLabel("media-3d")}
-            />
+            {hasVisibleRailGroup("media-3d") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="media-3d"
+                label={studioChromeRailGroupLabel("media-3d")}
+              />
+            ) : null}
 {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="frame-anim"
@@ -1289,10 +1326,12 @@ function StudioLeftToolRailConnected() {
                 onFocus={preloadStudioReferencePanel}
               />
             ) : null}
-            <StudioRailDivider
-              data-studio-rail-group-divider="view"
-              label={studioChromeRailGroupLabel("view")}
-            />
+            {hasVisibleRailGroup("view") ? (
+              <StudioRailDivider
+                data-studio-rail-group-divider="view"
+                label={studioChromeRailGroupLabel("view")}
+              />
+            ) : null}
             <StudioLeftToolRailViewToolsCluster
               isRailToolVisible={isRailToolVisible}
               zoomViewToolOpen={zoomViewToolOpen}

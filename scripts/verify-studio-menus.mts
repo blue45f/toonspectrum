@@ -2,13 +2,13 @@
  * scripts/verify-studio-menus.mts
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
- * Desktop IA (workflow optimization 2026-09-05):
+ * Desktop IA (canvas-first simplification 2026-09-15):
  * - Catalogue: 17 specification groups + AI remains the complete command inventory.
- * - Presentation: ten workflow titles. Fourteen catalogue groups are owned by six
+ * - Presentation: eight primary workflow titles. Fifteen catalogue groups are owned by six
  *   composites: 파일←파일·협업, 편집←편집·선택·변형, 보기←보기·캔버스·창,
- *   삽입←텍스트·벡터·3D, 만화←만화·애니메이션, 효과←필터.
- * - AI remains a standalone title; every source group keeps its caption and row ids.
- * - Toolbelt workflow is insert → reference/3D → scene/style → AI.
+ *   삽입←텍스트·벡터·3D, 창작←그리기·만화·애니메이션, 효과←필터.
+ * - AI remains first-class in a detached action menu beside completion controls.
+ * - Every source group keeps its caption, row ids and execution handler.
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
  * Expects production build in dist/ (vite preview).
@@ -19,6 +19,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Locator, type Page } from "playwright";
 
 import {
+  STUDIO_MAIN_MENU_ACTION_ORDER,
   STUDIO_MAIN_MENU_COMPOSITE_GROUPS,
   STUDIO_MAIN_MENU_PRESENTATION_ORDER,
   studioMainMenuPresentedTitleFor,
@@ -210,7 +211,7 @@ const COMPOSITE_TITLES: Readonly<Record<StudioMainMenuCompositeGroupId, string>>
   edit: "편집",
   view: "보기",
   insert: "삽입",
-  comic: "만화",
+  create: "창작",
   filter: "효과",
 };
 
@@ -226,23 +227,20 @@ interface PresentedMenu {
 }
 
 const PRESENTED_ORDER: readonly string[] = STUDIO_MAIN_MENU_PRESENTATION_ORDER;
+const ACTION_ORDER: readonly string[] = STUDIO_MAIN_MENU_ACTION_ORDER;
 
-/**
- * 메뉴 IA 감사가 확정한 표시 제목 10종. 개수·순서·표기를 독립적으로 고정한다.
- * 행과 구획은 정본 카탈로그에서 유도해 중복 대장을 만들지 않는다.
- */
+/** Canvas-first IA: eight primary titles, plus AI beside completion actions. */
 const PINNED_PRESENTED_TITLES: readonly string[] = [
   "파일",
   "편집",
   "보기",
   "삽입",
   "레이어",
-  "그리기",
-  "만화",
+  "창작",
   "효과",
-  "AI",
   "도움말",
 ];
+const PINNED_ACTION_TITLES: readonly string[] = ["AI 도우미"];
 
 function compositeSourceOrder(presentedId: string): readonly string[] | null {
   return (
@@ -258,12 +256,16 @@ function compositeSourceOrder(presentedId: string): readonly string[] | null {
  * order inside a composite dropdown. `orphans` catches any catalogue group the presentation
  * would not place, so a future re-fold cannot silently retire rows from this verifier.
  */
-function buildPresentedMenus(): { menus: PresentedMenu[]; orphans: string[] } {
+function buildPresentedMenus(): {
+  menus: PresentedMenu[];
+  actionMenus: PresentedMenu[];
+  orphans: string[];
+} {
   const orphans: string[] = [];
   const owned = new Map<string, CatalogueGroup[]>();
   for (const group of CATALOGUE_GROUPS) {
     const presentedId = studioMainMenuPresentedTitleFor(group.id);
-    if (!PRESENTED_ORDER.includes(presentedId)) {
+    if (!PRESENTED_ORDER.includes(presentedId) && !ACTION_ORDER.includes(presentedId)) {
       orphans.push(`${group.caption} (${group.id}) → ${presentedId}`);
       continue;
     }
@@ -272,49 +274,69 @@ function buildPresentedMenus(): { menus: PresentedMenu[]; orphans: string[] } {
     else owned.set(presentedId, [group]);
   }
 
-  const menus: PresentedMenu[] = [];
-  for (const presentedId of PRESENTED_ORDER) {
-    const sections = owned.get(presentedId);
-    if (!sections || sections.length === 0) {
-      orphans.push(`제시 제목에 대응하는 카탈로그 그룹 없음: ${presentedId}`);
-      continue;
+  const buildOrder = (order: readonly string[]): PresentedMenu[] => {
+    const menus: PresentedMenu[] = [];
+    for (const presentedId of order) {
+      const sections = owned.get(presentedId);
+      if (!sections || sections.length === 0) {
+        orphans.push(`제시 제목에 대응하는 카탈로그 그룹 없음: ${presentedId}`);
+        continue;
+      }
+      const sourceOrder = compositeSourceOrder(presentedId);
+      const ordered = sourceOrder
+        ? [...sections].sort(
+          (a, b) => sourceOrder.indexOf(a.id) - sourceOrder.indexOf(b.id),
+        )
+        : sections;
+      menus.push({
+        id: presentedId,
+        title: ACTION_ORDER.includes(presentedId)
+          ? "AI 도우미"
+          : sourceOrder
+            ? COMPOSITE_TITLES[presentedId as StudioMainMenuCompositeGroupId]
+            : ordered[0].caption,
+        composite: sourceOrder !== null,
+        sections: ordered,
+      });
     }
-    const sourceOrder = compositeSourceOrder(presentedId);
-    const ordered = sourceOrder
-      ? [...sections].sort(
-        (a, b) => sourceOrder.indexOf(a.id) - sourceOrder.indexOf(b.id),
-      )
-      : sections;
-    menus.push({
-      id: presentedId,
-      // A stand-alone title renders its own catalogue caption; a composite renders the
-      // presentation's own word instead.
-      title: sourceOrder
-        ? COMPOSITE_TITLES[presentedId as StudioMainMenuCompositeGroupId]
-        : ordered[0].caption,
-      composite: sourceOrder !== null,
-      sections: ordered,
-    });
-  }
-  return { menus, orphans };
+    return menus;
+  };
+
+  return {
+    menus: buildOrder(PRESENTED_ORDER),
+    actionMenus: buildOrder(ACTION_ORDER),
+    orphans,
+  };
 }
 
-const { menus: PRESENTED_MENUS, orphans: PRESENTATION_ORPHANS } = buildPresentedMenus();
+const {
+  menus: PRESENTED_MENUS,
+  actionMenus: ACTION_MENUS,
+  orphans: PRESENTATION_ORPHANS,
+} = buildPresentedMenus();
 
-/**
- * 유도된 표시 제목이 고정 10종과 정확히(개수·순서·표기) 일치하는지 대조한다.
- * 불일치는 `assertMainMenus` 가 실패로 올린다 — 여기서 throw 하면 리포트가 인쇄되기 전에
- * 런이 죽어 어떤 제목이 어긋났는지 보이지 않는다.
- */
+/** Compare primary and action menu titles independently so AI never re-enters the scroll lane. */
 function pinnedTitleDrift(): string[] {
-  const presented = PRESENTED_MENUS.map((menu) => menu.title);
-  const matches =
-    presented.length === PINNED_PRESENTED_TITLES.length &&
-    presented.every((title, index) => title === PINNED_PRESENTED_TITLES[index]);
-  if (matches) return [];
-  return [
-    `표시 제목 10종 계약 위반 — 기대: [${PINNED_PRESENTED_TITLES.join(" ")}] / 실제: [${presented.join(" ")}]`,
-  ];
+  const primary = PRESENTED_MENUS.map((menu) => menu.title);
+  const actions = ACTION_MENUS.map((menu) => menu.title);
+  const primaryMatches =
+    primary.length === PINNED_PRESENTED_TITLES.length
+    && primary.every((title, index) => title === PINNED_PRESENTED_TITLES[index]);
+  const actionMatches =
+    actions.length === PINNED_ACTION_TITLES.length
+    && actions.every((title, index) => title === PINNED_ACTION_TITLES[index]);
+  const failures: string[] = [];
+  if (!primaryMatches) {
+    failures.push(
+      `기본 메뉴 8종 계약 위반 — 기대: [${PINNED_PRESENTED_TITLES.join(" ")}] / 실제: [${primary.join(" ")}]`,
+    );
+  }
+  if (!actionMatches) {
+    failures.push(
+      `액션 메뉴 계약 위반 — 기대: [${PINNED_ACTION_TITLES.join(" ")}] / 실제: [${actions.join(" ")}]`,
+    );
+  }
+  return failures;
 }
 
 const PRESENTATION_TITLE_DRIFT = pinnedTitleDrift();
@@ -326,7 +348,8 @@ const PRESENTATION_TITLE_DRIFT = pinnedTitleDrift();
  */
 function presentedTitleFor(catalogueGroupId: string): string {
   const presentedId = studioMainMenuPresentedTitleFor(catalogueGroupId);
-  const menu = PRESENTED_MENUS.find((entry) => entry.id === presentedId);
+  const menu = [...PRESENTED_MENUS, ...ACTION_MENUS]
+    .find((entry) => entry.id === presentedId);
   if (menu) return menu.title;
   const group = CATALOGUE_GROUPS.find((entry) => entry.id === catalogueGroupId);
   return group?.caption ?? catalogueGroupId;
@@ -352,9 +375,8 @@ const RAIL_TOOLS = [
 /**
  * Open via main menu → assert popover chrome appears.
  *
- * Entries name the CATALOGUE group that owns the row; the runner resolves the menubar
- * title through the presentation, so a row that moves under a composite title (AI now
- * opens from 도구) keeps working without editing this table.
+ * Entries name the CATALOGUE group that owns the row; the runner resolves the visible
+ * title and surface, so composite moves and the detached AI action remain stable.
  */
 export const MENU_DRIVEN_POPOVERS: {
   groupId: string;
@@ -437,8 +459,16 @@ async function waitForStableBox(target: Locator, quietMs: number, timeoutMs: num
   }
 }
 
-async function openMainMenuGroup(page: Page, label: string): Promise<void> {
-  const nav = page.locator('[data-studio-main-menu="true"]');
+async function openMainMenuGroup(
+  page: Page,
+  label: string,
+  surface: "primary" | "action" = "primary",
+): Promise<void> {
+  const nav = page.locator(
+    surface === "action"
+      ? '[data-studio-main-menu-action="true"]'
+      : '[data-studio-main-menu="true"]',
+  );
   await nav.waitFor({ state: "visible", timeout: 15000 });
   // Close any open group first
   await page.keyboard.press("Escape").catch(() => undefined);
@@ -603,67 +633,84 @@ async function assertChrome(page: Page): Promise<string[]> {
 
 async function assertMainMenus(page: Page): Promise<string[]> {
   const failures: string[] = [];
-  // The pinned ten come first: if the presentation re-folded, every derived assertion
-  // below is measuring the wrong menubar and this line is the only one that says so.
-  for (const drift of PRESENTATION_TITLE_DRIFT) {
-    failures.push(drift);
-  }
-  // A catalogue group the presentation refuses to place would silently stop being
-  // asserted, so surface it as a failure rather than skipping it.
+  for (const drift of PRESENTATION_TITLE_DRIFT) failures.push(drift);
   for (const orphan of PRESENTATION_ORPHANS) {
     failures.push(`메뉴 표현 매핑 누락: ${orphan}`);
   }
 
-  const nav = page.locator('[data-studio-main-menu="true"]');
-  if (!(await nav.isVisible().catch(() => false))) {
-    failures.push("메인 메뉴 nav 미노출 (lg 이상 뷰포트 필요)");
-    return failures;
-  }
+  const surfaces: readonly {
+    surface: "primary" | "action";
+    selector: string;
+    menus: readonly PresentedMenu[];
+    titles: readonly string[];
+    label: string;
+  }[] = [
+    {
+      surface: "primary",
+      selector: '[data-studio-main-menu="true"]',
+      menus: PRESENTED_MENUS,
+      titles: PINNED_PRESENTED_TITLES,
+      label: "기본 메뉴",
+    },
+    {
+      surface: "action",
+      selector: '[data-studio-main-menu-action="true"]',
+      menus: ACTION_MENUS,
+      titles: PINNED_ACTION_TITLES,
+      label: "액션 메뉴",
+    },
+  ];
 
-  // Presented titles are always visible. Folded catalogue groups remain section captions,
-  // while AI stays a first-class title.
-  const triggerCount = await nav.locator("[data-studio-main-menu-trigger]").count();
-  if (triggerCount !== PINNED_PRESENTED_TITLES.length) {
-    failures.push(
-      `메인 메뉴 제목 수 불일치: 기대 ${PINNED_PRESENTED_TITLES.length} / 실제 ${triggerCount}`,
-    );
-  }
-
-  for (const menu of PRESENTED_MENUS) {
-    if (!(await nav.getByRole("menuitem", { name: menu.title, exact: true }).isVisible().catch(() => false))) {
-      failures.push(`메인 메뉴 그룹 버튼 미노출: ${menu.title}`);
+  for (const spec of surfaces) {
+    const nav = page.locator(spec.selector);
+    if (!(await nav.isVisible().catch(() => false))) {
+      failures.push(`${spec.label} nav 미노출`);
+      continue;
     }
-  }
 
-  for (const presented of PRESENTED_MENUS) {
-    try {
-      await openMainMenuGroup(page, presented.title);
-      const menu = page.locator(`[role="menu"][aria-label="${presented.title}"]`);
-      const visibleItemRows = await visibleMenuItemRowTexts(menu);
-      for (const section of presented.sections) {
-        // Only a composite dropdown captions its sections; a stand-alone title's caption
-        // is the menubar label itself and is not repeated inside the panel.
-        if (presented.composite && !(await hasVisibleSectionCaption(menu, section.caption))) {
-          failures.push(`메인 메뉴 [${presented.title}] 섹션 캡션 없음: ${section.caption}`);
-        }
-        for (const item of section.items) {
-          const visible = visibleItemRows.some((rowText) =>
-            menuItemRowHasExactLabel(rowText, item),
-          );
-          if (!visible) {
-            const where = presented.composite
-              ? `${presented.title} ▸ ${section.caption}`
-              : presented.title;
-            failures.push(`메인 메뉴 [${where}] 항목 없음: ${item}`);
+    const triggerCount = await nav.locator("[data-studio-main-menu-trigger]").count();
+    if (triggerCount !== spec.titles.length) {
+      failures.push(
+        `${spec.label} 제목 수 불일치: 기대 ${spec.titles.length} / 실제 ${triggerCount}`,
+      );
+    }
+
+    for (const menu of spec.menus) {
+      const visible = await nav
+        .getByRole("menuitem", { name: menu.title, exact: true })
+        .isVisible()
+        .catch(() => false);
+      if (!visible) failures.push(`${spec.label} 그룹 버튼 미노출: ${menu.title}`);
+    }
+
+    for (const presented of spec.menus) {
+      try {
+        await openMainMenuGroup(page, presented.title, spec.surface);
+        const menu = page.locator(`[role="menu"][aria-label="${presented.title}"]`);
+        const visibleItemRows = await visibleMenuItemRowTexts(menu);
+        for (const section of presented.sections) {
+          if (presented.composite && !(await hasVisibleSectionCaption(menu, section.caption))) {
+            failures.push(`${spec.label} [${presented.title}] 섹션 캡션 없음: ${section.caption}`);
+          }
+          for (const item of section.items) {
+            const visible = visibleItemRows.some((rowText) =>
+              menuItemRowHasExactLabel(rowText, item),
+            );
+            if (!visible) {
+              const where = presented.composite
+                ? `${presented.title} ▸ ${section.caption}`
+                : presented.title;
+              failures.push(`${spec.label} [${where}] 항목 없음: ${item}`);
+            }
           }
         }
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(100);
+      } catch (err) {
+        failures.push(
+          `${spec.label} [${presented.title}] 열기 실패: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(100);
-    } catch (err) {
-      failures.push(
-        `메인 메뉴 [${presented.title}] 열기 실패: ${err instanceof Error ? err.message : String(err)}`
-      );
     }
   }
   return failures;
@@ -743,7 +790,7 @@ async function assertRailTools(page: Page): Promise<string[]> {
     const tool = page.locator(`[data-studio-rail-tool-id="${id}"]`);
     if (await tool.isVisible()) continue;
     await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
-    const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구", exact: true });
+    const hiddenTools = page.getByRole("dialog", { name: "추가 도구", exact: true });
     await hiddenTools.getByRole("button", { name: label, exact: true }).click();
     await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
     await tool.waitFor({ state: "visible", timeout: 5_000 });
@@ -792,9 +839,12 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   const failures: string[] = [];
   for (const entry of MENU_DRIVEN_POPOVERS) {
     const title = presentedTitleFor(entry.groupId);
+    const surface = ACTION_ORDER.includes(studioMainMenuPresentedTitleFor(entry.groupId))
+      ? "action" as const
+      : "primary" as const;
     try {
       await closeFloatingUi(page);
-      await openMainMenuGroup(page, title);
+      await openMainMenuGroup(page, title, surface);
       const menu = page.locator(`[role="menu"][aria-label="${title}"]`);
       await menu.getByRole("menuitem", { name: entry.item }).click({ timeout: 4000 });
       // Lazy panels + fixed popovers need a beat after main-menu close
@@ -990,7 +1040,7 @@ async function main() {
     ];
 
     if (failures.length === 0) {
-      log("PASS: optimized menus exposed (10 titles + sections + rail + popovers + draw options + export)");
+      log("PASS: canvas-first menus exposed (8 primary + AI action + sections + rail + popovers)");
       exitCode = 0;
     } else {
       log(`FAIL (${failures.length}):`);
