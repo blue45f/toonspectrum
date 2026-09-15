@@ -449,7 +449,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
 
     const migration = readFileSync(
       new URL(
-        "../../db/migrations/0053_studio_ai_free_pool_contract.sql",
+        "../../db/migrations/0056_studio_ai_free_pool_contract.sql",
         import.meta.url
       ),
       "utf8"

@@ -128,7 +128,7 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
 Apply the production migration manifest through
-`apps/api/src/db/migrations/0053_studio_ai_free_pool_contract.sql` before deploying
+`apps/api/src/db/migrations/0056_studio_ai_free_pool_contract.sql` before deploying
 this API build. Migration `0053` expands idempotency receipts to three provider
 attempts and admits the `assistant`, `gemini`, and `groq` usage-ledger values used
 by the shared free pool. The schema preflight rejects an incomplete contract,
