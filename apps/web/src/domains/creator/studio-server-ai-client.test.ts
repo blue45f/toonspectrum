@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MANAGED_FREE_MAX_OUTPUT_TOKENS } from "@/shared/ai/free-ai-runtime-budget";
 import { setUserAiConfiguration } from "@/shared/ai/user-ai-store";
 import { EMPTY_AI_CONFIGURATION } from "@/shared/ai/user-ai-types";
 
@@ -86,7 +87,10 @@ describe("studio free-only user AI client", () => {
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-secret-key");
       expect(init?.credentials).toBe("omit");
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      expect(body).toMatchObject({ model: "text-model", max_tokens: 4096 });
+      expect(body).toMatchObject({
+        model: "text-model",
+        max_tokens: MANAGED_FREE_MAX_OUTPUT_TOKENS,
+      });
       return new Response(JSON.stringify({
         model: "text-model-v2",
         choices: [{ message: { content: "  사용자 키 결과  " } }],

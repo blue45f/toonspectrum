@@ -10,6 +10,7 @@ ToonSpectrum must not create AI costs for the service operator. The production A
 4. A connection must declare and satisfy one of the accepted zero-cost policies before any request is sent.
 5. Legacy or ambiguous connections are imported as `unverified` and remain blocked until the user reviews them.
 6. API keys stay in memory by default. Optional persistence uses the existing encrypted local vault.
+7. Managed free providers pass through a local request/token budget and circuit breaker before network I/O.
 
 ## Accepted connection policies
 
@@ -61,6 +62,33 @@ The UI includes presets for:
 
 Provider model catalogs and free limits can change. Presets intentionally avoid pinning most remote model IDs. The user checks `/models`, chooses a currently available free model, and keeps billing disabled in the provider console.
 
+## Managed-free safety budget
+
+The browser applies its own conservative safety cap to `provider-free-tier` and `openrouter-free` connections. These values are application limits, not claims about a provider's current quota:
+
+- 25 network attempts per connection and UTC day;
+- 64,000 conservatively reserved input/output tokens per connection and UTC day;
+- 1,024 output tokens per managed request;
+- 256 KiB maximum JSON request body and 2 MiB maximum response body;
+- one completion only (`n = 1`, `best_of = 1`) with log-probability expansion disabled;
+- no managed-provider streaming;
+- only `GET /models` and `POST /chat/completions`.
+
+Before a managed request is sent, the runtime overwrites the request model with the reviewed connection model. This prevents a feature from bypassing the free-only configuration by supplying a different model in its request body. The budget ledger stores only counters, timestamps, connection ID, and provider host; prompts, responses, API keys, and model output are never stored in it.
+
+The ledger is serialized in `localStorage` so separate tabs share the daily cap. Browsers supporting Web Locks serialize reservations across tabs. If persistent storage is unavailable, the runtime keeps a fail-safe in-memory ledger for the current document.
+
+Provider responses also operate a circuit breaker:
+
+- `429`: at least 15 minutes of cooldown; a second quota failure on the same UTC day blocks until the next UTC day;
+- `401` or `403`: 10-minute authentication cooldown;
+- `402`: connection remains locked until it is explicitly removed/reviewed and its local budget is reset;
+- successful responses clear transient rate/authentication breaker state.
+
+Requests are reserved before network I/O and are not refunded after timeout or network failure because the provider may already have accepted them. This intentionally over-counts rather than risking unexpected use.
+
+Provider billing must remain disabled and no payment method should be attached when the provider permits that setup. This browser-local guard can be cleared by the browser owner and provider quotas, model routing, and billing terms can change without notice, so it is an additional safety boundary—not a guarantee against provider-side charges.
+
 ## Failure behavior
 
 Quota exhaustion, rate limiting, CORS errors, timeouts, and unavailable models are surfaced to the user. The runtime does not retry, switch providers, use an operator proxy, or select a paid model. This is deliberate: degraded availability is preferable to an unexpected charge.
@@ -72,7 +100,10 @@ Quota exhaustion, rate limiting, CORS errors, timeouts, and unavailable models a
 - [ ] Keyless remote endpoints remain rejected.
 - [ ] Known public AI APIs cannot be labelled self-hosted.
 - [ ] Managed free-tier connections remain text-only and exact-path allowlisted.
+- [ ] Managed free requests pass through the daily request/token budget before `fetch`.
+- [ ] Managed request bodies cannot select a model different from the reviewed connection.
+- [ ] `402` and repeated `429` responses open a fail-closed circuit breaker.
 - [ ] OpenRouter non-free model IDs remain rejected.
 - [ ] Legacy connections remain `unverified` until explicitly reviewed.
 - [ ] Browser requests omit cookies, redirects, and retries.
-- [ ] No secret is logged or included in generated project files.
+- [ ] No secret, prompt, or model response is stored in the budget ledger or logs.

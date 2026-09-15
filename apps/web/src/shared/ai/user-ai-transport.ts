@@ -1,5 +1,10 @@
 import { assertFreeAiConnection } from "./free-ai-policy";
 import {
+  guardFreeAiRuntimeRequest,
+  MANAGED_FREE_MAX_RESPONSE_BYTES,
+  recordFreeAiRuntimeResponse,
+} from "./free-ai-runtime-budget";
+import {
   getUserAiSnapshot,
   registerUserAiRequest,
   requireUserAiConnection,
@@ -73,8 +78,25 @@ export async function userAiFetch(
   ) {
     throw new Error("AI 연결이 변경되어 이전 작업을 전송하지 않았습니다.");
   }
+  if (options.signal?.aborted) {
+    throw new Error("AI 요청이 전송되기 전에 취소되었습니다.");
+  }
+
   const revision = currentRevision;
-  const url = `${validateUserAiBaseUrl(connection.baseUrl)}${validateUserAiPath(path)}`;
+  const validatedPath = validateUserAiPath(path);
+  const method = options.method ?? (body === undefined ? "GET" : "POST");
+  const guardedRequest = await guardFreeAiRuntimeRequest(
+    connection,
+    capability,
+    validatedPath,
+    method,
+    body,
+  );
+  if (revision !== getUserAiSnapshot().revision) {
+    throw new Error("AI 연결이 변경되어 이전 작업을 전송하지 않았습니다.");
+  }
+
+  const url = `${validateUserAiBaseUrl(connection.baseUrl)}${validatedPath}`;
   const controller = new AbortController();
   const unregister = registerUserAiRequest(controller);
   const signal = AbortSignal.any([
@@ -90,32 +112,45 @@ export async function userAiFetch(
   } else {
     headers.delete("Authorization");
   }
-  const form = typeof FormData !== "undefined" && body instanceof FormData;
-  if (body !== undefined && !form) headers.set("Content-Type", "application/json");
+  const requestBody = guardedRequest.body;
+  const form = typeof FormData !== "undefined" && requestBody instanceof FormData;
+  if (requestBody !== undefined && !form) headers.set("Content-Type", "application/json");
   if (form) headers.delete("Content-Type");
   try {
     signal.throwIfAborted();
     const response = await fetch(url, {
-      method: options.method ?? (body === undefined ? "GET" : "POST"),
+      method,
       headers,
-      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      body: requestBody === undefined
+        ? undefined
+        : form
+          ? requestBody
+          : JSON.stringify(requestBody),
       signal,
       credentials: "omit",
       redirect: "error",
       referrerPolicy: "no-referrer",
       cache: "no-store",
     });
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error(`무료 AI 요청 실패 (HTTP ${response.status}). 자동 재시도하거나 유료 모델로 전환하지 않았습니.`);
-    }
+    await recordFreeAiRuntimeResponse(
+      connection,
+      response.status,
+      response.headers,
+    );
+    const requestedMaximum = Math.min(
+      options.maxBytes ?? MAX_JSON_BYTES,
+      MAX_JSON_BYTES,
+    );
+    const responseMaximum = guardedRequest.guarded
+      ? Math.min(requestedMaximum, MANAGED_FREE_MAX_RESPONSE_BYTES)
+      : requestedMaximum;
     const bytes = response.status === 204
       ? null
-      : await readBounded(
-        response,
-        Math.min(options.maxBytes ?? MAX_JSON_BYTES, MAX_JSON_BYTES),
-      );
+      : await readBounded(response, responseMaximum);
     signal.throwIfAborted();
+    if (!response.ok) {
+      throw new Error(`무료 AI 요청 실패 (HTTP ${response.status}). 자동 재시도하거나 유료 모델로 전환하지 않았습니다.`);
+    }
     if (revision !== getUserAiSnapshot().revision) {
       throw new Error("AI 연결이 변경되어 결과를 적용하지 않았습니다.");
     }
