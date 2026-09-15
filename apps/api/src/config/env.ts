@@ -154,46 +154,9 @@ const envSchema = z.object({
   // 진단 메시지와 production unsafe-default 감사에서는 비밀값으로 취급한다.
   STUDIO_LIVE_POSTGRES_INTEGRATION_URL: z.string().min(1).optional(),
   STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL: z.string().min(1).optional(),
-  // 카탈로그 파일·수집 경계. 활성 ingest는 별도 정규화 함수에서 동일 범위를 다시 적용한다.
+  // 배포 시 번들된 정적 카탈로그 파일 경로. 런타임 수집·쓰기 기능은 없다.
   WEBDEX_CATALOG_FILE: boundedPath("WEBDEX_CATALOG_FILE").optional(),
   WEBDEX_CATALOG_GZ: boundedPath("WEBDEX_CATALOG_GZ").optional(),
-  WEBDEX_CATALOG_FORCE_DB: z.enum(["0", "1"]).optional(),
-  WEBDEX_SOURCE_IDS: z.string().min(1).max(4_096).optional(),
-  CATALOG_INGEST_MODE: z.enum(["off", "fixed"]).optional(),
-  CATALOG_INGEST_INTERVAL_SECONDS: boundedPositiveInteger(
-    "CATALOG_INGEST_INTERVAL_SECONDS",
-    60,
-    86_400
-  ).optional(),
-  CATALOG_INGEST_TIMEOUT_MS: boundedPositiveInteger(
-    "CATALOG_INGEST_TIMEOUT_MS",
-    30_000,
-    1_800_000
-  ).optional(),
-  CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB: boundedPositiveInteger(
-    "CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB",
-    1,
-    200
-  ).optional(),
-  CATALOG_CRAWL_SCRIPT: boundedPath("CATALOG_CRAWL_SCRIPT").optional(),
-  CATALOG_INGEST_MIN_RETAIN_RATIO: z
-    .string()
-    .regex(/^(?:0?\.\d+|1(?:\.0+)?)$/u)
-    .refine((value) => {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) && parsed > 0 && parsed <= 1;
-    })
-    .optional(),
-  CATALOG_REFRESH_POLL_SECONDS: boundedNonNegativeInteger(
-    "CATALOG_REFRESH_POLL_SECONDS",
-    0,
-    3_600
-  ).optional(),
-  CATALOG_SNAPSHOT_RETENTION: boundedPositiveInteger(
-    "CATALOG_SNAPSHOT_RETENTION",
-    1,
-    100
-  ).optional(),
   COVER_IMAGE_POLICY: z.enum(["proxy", "off"]).optional(),
   // 장기 실행 Nest API의 Socket.IO 다중 인스턴스 adapter. postgres 모드는 LISTEN 가능한
   // direct PostgreSQL URL과 listener + publisher를 위한 최소 2개 연결을 사용한다.
@@ -392,8 +355,6 @@ const envSchema = z.object({
   STUDIO_WORK_ASSET_ADMISSION: z
     .literal("enable-immutable-readonly-work-assets-v1")
     .optional(),
-  // 카탈로그 ingest 트리거 토큰(설정 시 reload/ingest 인증).
-  CATALOG_INGEST_TRIGGER_TOKEN: z.string().min(1).optional(),
   // 관리자 화이트리스트(콤마 구분 이메일).
   ADMIN_EMAILS: z.string().optional(),
   // 창작 스튜디오 LLM 키(선택 — 미설정 시 해당 기능만 비활성).
@@ -497,7 +458,6 @@ const UNSAFE_DEFAULTS: ReadonlyArray<string> = [
 const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "AUTH_SESSION_SECRET",
   "AUTH_STATE_SECRET",
-  "CATALOG_INGEST_TRIGGER_TOKEN",
   "DATABASE_URL",
   "STUDIO_LIVE_POSTGRES_URL",
   "STUDIO_LIVE_POSTGRES_INTEGRATION_URL",

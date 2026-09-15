@@ -7,7 +7,7 @@ import { index, integer, pgTable, primaryKey, text, timestamp } from "drizzle-or
 //  - 금액(*Cents)                 → bigint({mode:"number"})  (KRW 큰 금액 int32 오버플로 방지)
 //
 // 인덱스 정책: lib/server/*.ts 의 실제 조회 패턴(외래키 lookup + createdAt 정렬/커서)에 맞춘
-// 보조 인덱스를 스키마에 선언한다. 일부는 런타임 ensure(community.ts·creator.ts·catalog-ingest.ts)가
+// 보조 인덱스를 스키마에 선언한다. 일부는 런타임 ensure(community.ts·creator.ts)가
 // 이미 raw SQL 로 만드는 인덱스의 미러 — drizzle-kit 이 스키마 사실을 알도록 "이름까지 동일"하게
 // 선언했다(push 시 중복 생성 없음). (userId, titleId) 류 복합 PK/unique 는 첫 컬럼 prefix 조회를
 // 이미 커버하므로 별도 인덱스를 만들지 않는다.

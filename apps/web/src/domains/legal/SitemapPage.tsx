@@ -222,6 +222,20 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
     },
     items: [
       destination("/about", "서비스 소개", "About ToonStudio", "기능과 운영 원칙", "Features and operating principles"),
+      destination(
+        "/about/workflow",
+        "웹툰 제작 과정",
+        "Webtoon workflow",
+        "기획부터 저장·연재까지 단계별 제작 흐름",
+        "Follow the production flow from planning to saving and release",
+      ),
+      destination(
+        "/about/technology",
+        "기술과 신뢰",
+        "Technology & trust",
+        "웹·2D·3D·저장·협업 기술과 신뢰 원칙",
+        "See the web, 2D, 3D, storage, collaboration and trust foundations",
+      ),
       destination("/about/data", "데이터 출처", "Data sources", "공급자별 연결·이용 준비 상태", "Provider connections and readiness"),
       destination("/about/crawler", "공개 데이터 수집 정책", "Public data policy", "자동수집 원칙·제외·중지 요청", "Collection rules, exclusions and opt-out"),
       destination("/guide", "랭킹 산정 방식", "Ranking guide", "데이터와 산식 설명", "Understand ranking data and formulas"),

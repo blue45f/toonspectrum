@@ -57,6 +57,7 @@ export function CrawlerPolicyPage() {
         <p className="mt-4 text-base leading-8 text-fg-2">
           ToonSpectrum은 작품 본문을 복제하는 서비스가 아닙니다. 공식 API·오픈데이터·소유자가 직접 제공한 피드를 우선하고,
           공개 웹을 확인할 때에도 접근 가능성, 저장 가능성, 표시·상업 이용 가능성을 서로 다른 기준으로 검토합니다.
+          배포된 서비스는 외부 사이트를 실시간 또는 주기적으로 수집하지 않으며, 갱신이 필요할 때 운영자가 별도 환경에서 수동으로 실행·검토합니다.
         </p>
       </header>
 
