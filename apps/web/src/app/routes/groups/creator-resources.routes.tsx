@@ -29,6 +29,10 @@ const WorksPage = lazyRetry(
   () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WorksPage })),
   "WorksPage",
 );
+const PolyHavenPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.PolyHavenPage })),
+  "PolyHavenPage",
+);
 const GlobalBooksPage = lazyRetry(
   () => import("@/domains/creator-resources/GlobalBooksPage").then((module) => ({ default: module.GlobalBooksPage })),
   "GlobalBooksPage",
@@ -71,6 +75,7 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "research-open-creation", path: "/research/open-creation", element: <OpenCreationPage /> },
   { id: "research-content-packs", path: "/research/packs", element: <ContentPacksPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
+  { id: "research-polyhaven", path: "/research/3d-assets", element: <PolyHavenPage /> },
   { id: "resources-references", path: "/creator-hub/references", element: <Navigate to="/research/assets" replace /> },
   { id: "resources-opportunities", path: "/opportunities", element: <OpportunitiesPage /> },
   { id: "resources-recipes", path: "/learn/recipes", element: <RecipesPage /> },
