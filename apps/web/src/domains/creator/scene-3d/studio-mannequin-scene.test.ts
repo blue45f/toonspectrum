@@ -9,8 +9,10 @@ import { describe, expect, it } from "vitest";
 import {
   resolveStudioMannequinCameraFrame,
   resolveStudioMannequinCaptureResult,
+  resolveStudioMannequinPointerRotation,
   type StudioMannequinCameraPreset,
 } from "./studio-mannequin-scene";
+import { getStudioMannequinJointLimit } from "./studio-mannequin-model";
 
 const PNG = "data:image/png;base64,AAAA";
 
@@ -124,5 +126,78 @@ describe("resolveStudioMannequinCameraFrame", () => {
       giant.position[2] - giant.target[2],
     );
     expect(giantDistance / shortDistance).toBeCloseTo(2 / 1.2, 8);
+  });
+});
+
+describe("resolveStudioMannequinPointerRotation", () => {
+  it("maps one pointer drag to two visible swing axes without mutating the start pose", () => {
+    const start = [0.05, -0.02, 0.03] as const;
+    const before = [...start];
+    const result = resolveStudioMannequinPointerRotation({
+      jointId: "head",
+      startRotation: start,
+      deltaX: 30,
+      deltaY: -20,
+      viewportWidth: 800,
+      viewportHeight: 600,
+    });
+
+    expect(start).toEqual(before);
+    expect(result[0]).toBeGreaterThan(start[0]);
+    expect(result[1]).toBe(start[1]);
+    expect(result[2]).toBeGreaterThan(start[2]);
+  });
+
+  it("uses Alt/twist mode for the local Y axis and Shift precision for smaller changes", () => {
+    const regular = resolveStudioMannequinPointerRotation({
+      jointId: "head",
+      startRotation: [0, 0, 0],
+      deltaX: 40,
+      deltaY: 0,
+      viewportWidth: 600,
+      viewportHeight: 600,
+      twistMode: true,
+    });
+    const fine = resolveStudioMannequinPointerRotation({
+      jointId: "head",
+      startRotation: [0, 0, 0],
+      deltaX: 40,
+      deltaY: 0,
+      viewportWidth: 600,
+      viewportHeight: 600,
+      twistMode: true,
+      fine: true,
+    });
+
+    expect(regular[0]).toBe(0);
+    expect(regular[1]).toBeGreaterThan(0);
+    expect(regular[2]).toBe(0);
+    expect(Math.abs(fine[1])).toBeLessThan(Math.abs(regular[1]));
+  });
+
+  it("clamps extreme or non-finite pointer input to the authored joint limits", () => {
+    const limit = getStudioMannequinJointLimit("leftLowerArm");
+    const extreme = resolveStudioMannequinPointerRotation({
+      jointId: "leftLowerArm",
+      startRotation: [0, 0, 0],
+      deltaX: 1_000_000,
+      deltaY: -1_000_000,
+      viewportWidth: 0,
+      viewportHeight: Number.NaN,
+    });
+    expect(extreme[0]).toBeGreaterThanOrEqual(limit.x[0]);
+    expect(extreme[0]).toBeLessThanOrEqual(limit.x[1]);
+    expect(extreme[2]).toBeGreaterThanOrEqual(limit.z[0]);
+    expect(extreme[2]).toBeLessThanOrEqual(limit.z[1]);
+
+    const broken = resolveStudioMannequinPointerRotation({
+      jointId: "head",
+      startRotation: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+      deltaX: Number.NaN,
+      deltaY: Number.POSITIVE_INFINITY,
+      viewportWidth: Number.NaN,
+      viewportHeight: Number.NEGATIVE_INFINITY,
+    });
+    expect(broken.every(Number.isFinite)).toBe(true);
   });
 });
