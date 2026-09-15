@@ -1,8 +1,14 @@
 import type { StudioAiProviderPreference } from "./studio-ai.dto";
 
-export const STUDIO_AI_PROVIDER_IDS = ["zai", "deepseek", "openrouter"] as const;
+export const STUDIO_AI_FREE_PROVIDER_IDS = ["gemini", "groq", "openrouter"] as const;
+const STUDIO_AI_LEGACY_TEST_PROVIDER_IDS = ["zai", "deepseek"] as const;
+export const STUDIO_AI_PROVIDER_IDS = [
+  ...STUDIO_AI_FREE_PROVIDER_IDS,
+  ...STUDIO_AI_LEGACY_TEST_PROVIDER_IDS,
+] as const;
 
 export type StudioAiProviderId = (typeof STUDIO_AI_PROVIDER_IDS)[number];
+export type StudioAiFreeProviderId = (typeof STUDIO_AI_FREE_PROVIDER_IDS)[number];
 
 export interface StudioAiProviderConfig {
   id: StudioAiProviderId;
@@ -11,12 +17,18 @@ export interface StudioAiProviderConfig {
   endpoint: string;
   apiKey: string;
   model: string;
+  freePool: boolean;
 }
 
+export const STUDIO_AI_FREE_QUOTA_FAILOVER_REASON = "free_quota_exhausted" as const;
+/** Kept for historical receipts produced by the retired paid-provider test path. */
 export const STUDIO_AI_BILLING_FAILOVER_REASON = "billing_quota_exhausted" as const;
+export type StudioAiFailoverReason =
+  | typeof STUDIO_AI_FREE_QUOTA_FAILOVER_REASON
+  | typeof STUDIO_AI_BILLING_FAILOVER_REASON;
 
 export type StudioAiProviderFailureKind =
-  | typeof STUDIO_AI_BILLING_FAILOVER_REASON
+  | StudioAiFailoverReason
   | "rate_limited"
   | "authentication"
   | "provider_unavailable"
@@ -24,19 +36,38 @@ export type StudioAiProviderFailureKind =
 
 export interface StudioAiProviderFailureClassification {
   kind: StudioAiProviderFailureKind;
-  /**
-   * `true` means the provider explicitly rejected the request before inference
-   * because the server account has no payable balance/package quota. It is the
-   * only condition under which the same prompt may safely be sent elsewhere.
-   */
+  /** The provider rejected before inference, so the same prompt may safely use the next free route. */
   billingFailoverEligible: boolean;
+  failoverReason?: StudioAiFailoverReason;
   businessCode?: string;
 }
 
 type EnvLike = Partial<Record<string, string | undefined>>;
 
-const DEFAULT_PROVIDER_ORDER: readonly StudioAiProviderId[] = ["zai", "deepseek", "openrouter"];
+const DEFAULT_FREE_PROVIDER_ORDER: readonly StudioAiFreeProviderId[] = [
+  "gemini",
+  "groq",
+  "openrouter",
+];
+const DEFAULT_LEGACY_PROVIDER_ORDER: readonly StudioAiProviderId[] = [
+  "zai",
+  "deepseek",
+  "openrouter",
+];
 const DEFAULT_TIMEOUT_MS = 45_000;
+
+function enabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
+export function studioAiFreePoolEnabled(env: EnvLike = process.env): boolean {
+  return enabled(env.STUDIO_AI_FREE_POOL_ENABLED);
+}
+
+function legacyTestMode(env: EnvLike): boolean {
+  return !studioAiFreePoolEnabled(env)
+    && (env.NODE_ENV ?? process.env.NODE_ENV) === "test";
+}
 
 function boundedText(value: unknown, fallback: string, maxLength: number): string {
   return typeof value === "string" && value.trim()
@@ -44,78 +75,145 @@ function boundedText(value: unknown, fallback: string, maxLength: number): strin
     : fallback;
 }
 
-function providerConfig(id: StudioAiProviderId, env: EnvLike): StudioAiProviderConfig {
+function isOpenRouterFreeModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized === "openrouter/free" || normalized.endsWith(":free");
+}
+
+function freeProviderConfig(
+  id: StudioAiFreeProviderId,
+  env: EnvLike,
+): StudioAiProviderConfig {
+  const poolEnabled = studioAiFreePoolEnabled(env);
+  if (id === "gemini") {
+    const apiKey = env.STUDIO_AI_FREE_GEMINI_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "Gemini 무료",
+      configured: poolEnabled && enabled(env.STUDIO_AI_FREE_GEMINI_CONFIRMED) && apiKey.length > 0,
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_GEMINI_MODEL, "gemini-3.8-flash", 200),
+      freePool: true,
+    };
+  }
+  if (id === "groq") {
+    const apiKey = env.STUDIO_AI_FREE_GROQ_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "Groq 무료",
+      configured: poolEnabled && enabled(env.STUDIO_AI_FREE_GROQ_CONFIRMED) && apiKey.length > 0,
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_GROQ_MODEL, "openai/gpt-oss-120b", 200),
+      freePool: true,
+    };
+  }
+  const apiKey = env.STUDIO_AI_FREE_OPENROUTER_API_KEY?.trim() ?? "";
+  const model = boundedText(env.STUDIO_AI_FREE_OPENROUTER_MODEL, "openrouter/free", 200);
+  return {
+    id,
+    label: "OpenRouter 무료",
+    configured: poolEnabled
+      && enabled(env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED)
+      && apiKey.length > 0
+      && isOpenRouterFreeModel(model),
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    apiKey,
+    model,
+    freePool: true,
+  };
+}
+
+function legacyTestProviderConfig(
+  id: "zai" | "deepseek" | "openrouter",
+  env: EnvLike,
+): StudioAiProviderConfig {
   if (id === "zai") {
     const apiKey = env.ZAI_API_KEY?.trim() ?? "";
     return {
       id,
       label: "Z.ai",
-      configured: apiKey.length > 0,
+      configured: legacyTestMode(env) && apiKey.length > 0,
       endpoint: "https://api.z.ai/api/paas/v4/chat/completions",
       apiKey,
       model: boundedText(env.ZAI_MODEL, "glm-5.1", 200),
+      freePool: false,
     };
   }
-  if (id === "openrouter") {
-    const apiKey = env.OPENROUTER_API_KEY?.trim() ?? "";
+  if (id === "deepseek") {
+    const apiKey = env.DEEPSEEK_API_KEY?.trim() ?? "";
     return {
       id,
-      label: "OpenRouter",
-      configured: apiKey.length > 0,
-      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      label: "DeepSeek",
+      configured: legacyTestMode(env) && apiKey.length > 0,
+      endpoint: "https://api.deepseek.com/chat/completions",
       apiKey,
-      model: boundedText(env.OPENROUTER_MODEL, "stealth/ox-alpha", 200),
+      model: boundedText(env.DEEPSEEK_MODEL, "deepseek-v4-flash", 200),
+      freePool: false,
     };
   }
-  const apiKey = env.DEEPSEEK_API_KEY?.trim() ?? "";
+  const apiKey = env.OPENROUTER_API_KEY?.trim() ?? "";
   return {
     id,
-    label: "DeepSeek",
-    configured: apiKey.length > 0,
-    endpoint: "https://api.deepseek.com/chat/completions",
+    label: "OpenRouter",
+    configured: legacyTestMode(env) && apiKey.length > 0,
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
     apiKey,
-    model: boundedText(env.DEEPSEEK_MODEL, "deepseek-v4-flash", 200),
+    model: boundedText(env.OPENROUTER_MODEL, "stealth/ox-alpha", 200),
+    freePool: false,
   };
 }
 
+function providerConfig(id: StudioAiProviderId, env: EnvLike): StudioAiProviderConfig {
+  if (id === "gemini" || id === "groq") return freeProviderConfig(id, env);
+  if (id === "openrouter") {
+    return studioAiFreePoolEnabled(env)
+      ? freeProviderConfig(id, env)
+      : legacyTestProviderConfig(id, env);
+  }
+  return legacyTestProviderConfig(id, env);
+}
+
+function providerUniverse(env: EnvLike): readonly StudioAiProviderId[] {
+  return studioAiFreePoolEnabled(env)
+    ? STUDIO_AI_FREE_PROVIDER_IDS
+    : legacyTestMode(env)
+      ? DEFAULT_LEGACY_PROVIDER_ORDER
+      : STUDIO_AI_FREE_PROVIDER_IDS;
+}
+
 export function resolveStudioAiProviderOrder(env: EnvLike = process.env): StudioAiProviderId[] {
-  const requested = env.STUDIO_AI_PROVIDER_ORDER?.split(",")
+  const freeMode = studioAiFreePoolEnabled(env);
+  const universe = providerUniverse(env);
+  const requested = (freeMode
+    ? env.STUDIO_AI_FREE_PROVIDER_ORDER
+    : env.STUDIO_AI_PROVIDER_ORDER)?.split(",")
     .map((value) => value.trim().toLowerCase())
     .filter((value): value is StudioAiProviderId =>
-      STUDIO_AI_PROVIDER_IDS.includes(value as StudioAiProviderId)
+      universe.includes(value as StudioAiProviderId)
     );
-  // The variable controls priority, not enablement. A configured key enables a
-  // provider, so append omitted provider IDs to preserve a complete failover
-  // chain even when an operator specifies only the preferred first provider.
-  const source = requested?.length
-    ? [...requested, ...DEFAULT_PROVIDER_ORDER]
-    : DEFAULT_PROVIDER_ORDER;
-  return [...new Set(source)];
+  const defaults = freeMode ? DEFAULT_FREE_PROVIDER_ORDER : DEFAULT_LEGACY_PROVIDER_ORDER;
+  const source = requested?.length ? [...requested, ...defaults] : defaults;
+  return [...new Set(source)].filter((id) => universe.includes(id));
 }
 
 export function resolveStudioAiProviders(
   preference: StudioAiProviderPreference = "auto",
-  env: EnvLike = process.env
+  env: EnvLike = process.env,
 ): StudioAiProviderConfig[] {
   const ids = preference === "auto" ? resolveStudioAiProviderOrder(env) : [preference];
   return ids.map((id) => providerConfig(id, env)).filter((provider) => provider.configured);
 }
 
-/**
- * Builds the request candidate chain without silently replacing an
- * unconfigured explicit choice. Explicit choices remain first, while a second
- * configured provider is available solely for a verified billing/quota
- * rejection handled by the service.
- */
+/** Explicit preference remains first; only a definitive pre-inference quota rejection advances. */
 export function resolveStudioAiProviderCandidates(
   preference: StudioAiProviderPreference = "auto",
-  env: EnvLike = process.env
+  env: EnvLike = process.env,
 ): StudioAiProviderConfig[] {
   if (preference === "auto") return resolveStudioAiProviders("auto", env);
-
   const preferred = providerConfig(preference, env);
   if (!preferred.configured) return [];
-
   const remaining = resolveStudioAiProviderOrder(env)
     .filter((id) => id !== preference)
     .map((id) => providerConfig(id, env))
@@ -124,7 +222,7 @@ export function resolveStudioAiProviderCandidates(
 }
 
 export function studioAiProviderStatuses(env: EnvLike = process.env) {
-  return STUDIO_AI_PROVIDER_IDS.map((id) => {
+  return providerUniverse(env).map((id) => {
     const provider = providerConfig(id, env);
     return {
       id: provider.id,
@@ -137,15 +235,20 @@ export function studioAiProviderStatuses(env: EnvLike = process.env) {
 
 export function resolveStudioAiTimeoutMs(
   firstProvider: StudioAiProviderId | undefined,
-  env: EnvLike = process.env
+  env: EnvLike = process.env,
 ): number {
-  const raw = env.STUDIO_AI_TIMEOUT_MS ??
-    (firstProvider === "zai"
-      ? env.ZAI_TIMEOUT_MS
-      : firstProvider === "openrouter"
-        ? env.OPENROUTER_TIMEOUT_MS
-        : env.DEEPSEEK_TIMEOUT_MS);
-  const parsed = Number(raw);
+  const providerTimeout = firstProvider === "gemini"
+    ? env.STUDIO_AI_FREE_GEMINI_TIMEOUT_MS
+    : firstProvider === "groq"
+      ? env.STUDIO_AI_FREE_GROQ_TIMEOUT_MS
+      : firstProvider === "openrouter" && studioAiFreePoolEnabled(env)
+        ? env.STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS
+        : firstProvider === "zai"
+          ? env.ZAI_TIMEOUT_MS
+          : firstProvider === "openrouter"
+            ? env.OPENROUTER_TIMEOUT_MS
+            : env.DEEPSEEK_TIMEOUT_MS;
+  const parsed = Number(env.STUDIO_AI_TIMEOUT_MS ?? providerTimeout);
   return Number.isFinite(parsed) && parsed >= 5_000 && parsed <= 120_000
     ? Math.round(parsed)
     : DEFAULT_TIMEOUT_MS;
@@ -161,20 +264,15 @@ export function studioAiProviderRequestId(payload: unknown): string | undefined 
 }
 
 const ZAI_BILLING_OR_PACKAGE_EXHAUSTED_CODES = new Set([
-  "1113", // Account in arrears / insufficient balance.
-  "1304", // Daily purchased API call limit reached.
-  "1308", // Subscription usage limit reached until reset.
-  "1309", // Resource package expired.
-  "1310", // Weekly/monthly package limit exhausted.
+  "1113", "1304", "1308", "1309", "1310",
 ]);
 
 function boundedBusinessCode(value: unknown): string | undefined {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
   const code = String(value).trim();
-  return /^\d{3,8}$/.test(code) ? code : undefined;
+  return /^\d{3,8}$/u.test(code) ? code : undefined;
 }
 
-/** Extracts only the allowlistable business code; messages are never retained. */
 export function studioAiProviderBusinessCode(payload: unknown): string | undefined {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
   const record = payload as Record<string, unknown>;
@@ -187,30 +285,34 @@ export function studioAiProviderBusinessCode(payload: unknown): string | undefin
   return boundedBusinessCode(error.code ?? error.error_code);
 }
 
-/**
- * Classifies only documented, machine-verifiable provider signals. DeepSeek & OpenRouter
- * HTTP 402 is insufficient balance; its HTTP 429 is a concurrency/rate limit.
- * Z.ai overloads HTTP 429, so only documented account/package business codes
- * are eligible for billing failover. Authentication, generic 429, 5xx and
- * ambiguous failures intentionally remain ineligible.
- */
 export function classifyStudioAiProviderFailure(
   provider: StudioAiProviderId,
   responseStatus: number,
-  payload?: unknown
+  payload?: unknown,
+  freePool = provider === "gemini" || provider === "groq",
 ): StudioAiProviderFailureClassification {
   const businessCode = studioAiProviderBusinessCode(payload);
-  const billingFailoverEligible =
-    ((provider === "deepseek" || provider === "openrouter") && responseStatus === 402) ||
-    (provider === "zai" &&
-      responseStatus === 429 &&
-      businessCode !== undefined &&
-      ZAI_BILLING_OR_PACKAGE_EXHAUSTED_CODES.has(businessCode));
+  const freeProvider = freePool;
+  if (freeProvider && (responseStatus === 402 || responseStatus === 429)) {
+    return {
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+      failoverReason: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      ...(businessCode ? { businessCode } : {}),
+    };
+  }
 
-  if (billingFailoverEligible) {
+  const legacyBillingRejection =
+    ((provider === "deepseek" || provider === "openrouter") && responseStatus === 402)
+    || (provider === "zai"
+      && responseStatus === 429
+      && businessCode !== undefined
+      && ZAI_BILLING_OR_PACKAGE_EXHAUSTED_CODES.has(businessCode));
+  if (legacyBillingRejection) {
     return {
       kind: STUDIO_AI_BILLING_FAILOVER_REASON,
       billingFailoverEligible: true,
+      failoverReason: STUDIO_AI_BILLING_FAILOVER_REASON,
       ...(businessCode ? { businessCode } : {}),
     };
   }

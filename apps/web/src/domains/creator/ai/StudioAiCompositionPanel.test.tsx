@@ -40,6 +40,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("StudioAiCompositionPanel server operation identity", () => {
+  it("explains the automatic free-first path before a connection is available", () => {
+    render(
+      <StudioAiCompositionPanel
+        settings={STUDIO_AI_DEFAULT_SETTINGS}
+        configured={false}
+      />
+    );
+
+    expect(screen.getByText(/로그인하면 자동 무료 AI를 먼저 사용합니다/u)).toBeTruthy();
+    expect(screen.getByText(/개인 무료 키 또는 로컬 AI를 연결하세요/u)).toBeTruthy();
+  });
+
   it("binds the tracked operation ID to the server request and settlement", async () => {
     const onOperationStart = vi.fn(() => OPERATION_ID);
     const onOperationSettled = vi.fn();

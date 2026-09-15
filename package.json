@@ -22,6 +22,7 @@
     "vercel:status": "curl -I -s https://toonspectrum.vercel.app",
     "vercel:inspect": "vercel inspect",
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
+    "integration:generate-secrets": "pnpm --filter @webtoon-nest/api run integration:generate-secrets",
     "dev:all": "pnpm -r --parallel --include-workspace-root dev",
     "catalog:crawl:manual": "node scripts/crawl.mjs --json --no-file",
     "catalog:update:manual": "rm -f /tmp/toonspectrum-catalog.json /tmp/toonspectrum-catalog.merged.json.gz && node scripts/crawl.mjs --json --no-file > /tmp/toonspectrum-catalog.json && node scripts/merge-catalog.mjs /tmp/toonspectrum-catalog.json --out /tmp/toonspectrum-catalog.merged.json.gz && node scripts/validate-catalog.mjs /tmp/toonspectrum-catalog.merged.json.gz apps/api/data/catalog.json.gz && mv /tmp/toonspectrum-catalog.merged.json.gz apps/api/data/catalog.json.gz && rm -f /tmp/toonspectrum-catalog.json && pnpm catalog:gen",

@@ -34,6 +34,20 @@ function complete(
   return service.complete(userId, input, IDEMPOTENCY_KEY, signal);
 }
 
+function configureSharedFreePool(): void {
+  process.env.STUDIO_AI_FREE_POOL_ENABLED = "true";
+  process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,openrouter";
+  process.env.STUDIO_AI_FREE_GEMINI_API_KEY = "gemini-free-test-key";
+  process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED = "true";
+  process.env.STUDIO_AI_FREE_GEMINI_MODEL = "gemini-3.8-flash";
+  process.env.STUDIO_AI_FREE_GROQ_API_KEY = "groq-free-test-key";
+  process.env.STUDIO_AI_FREE_GROQ_CONFIRMED = "true";
+  process.env.STUDIO_AI_FREE_GROQ_MODEL = "openai/gpt-oss-120b";
+  process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY = "openrouter-free-test-key";
+  process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED = "true";
+  process.env.STUDIO_AI_FREE_OPENROUTER_MODEL = "openrouter/free";
+}
+
 async function captureHttpException(promise: Promise<unknown>): Promise<HttpException> {
   try {
     await promise;
@@ -163,6 +177,17 @@ describe("StudioAiService", () => {
     delete process.env.ZAI_MODEL;
     delete process.env.ZAI_TIMEOUT_MS;
     delete process.env.STUDIO_AI_PROVIDER_ORDER;
+    delete process.env.STUDIO_AI_FREE_POOL_ENABLED;
+    delete process.env.STUDIO_AI_FREE_PROVIDER_ORDER;
+    delete process.env.STUDIO_AI_FREE_GEMINI_API_KEY;
+    delete process.env.STUDIO_AI_FREE_GEMINI_MODEL;
+    delete process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_GROQ_API_KEY;
+    delete process.env.STUDIO_AI_FREE_GROQ_MODEL;
+    delete process.env.STUDIO_AI_FREE_GROQ_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY;
+    delete process.env.STUDIO_AI_FREE_OPENROUTER_MODEL;
+    delete process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED;
     delete process.env.STUDIO_AI_TIMEOUT_MS;
     delete process.env.DEEPSEEK_MODEL;
     delete process.env.DEEPSEEK_TIMEOUT_MS;
@@ -192,7 +217,7 @@ describe("StudioAiService", () => {
       globalDailyTokenLimit: 2_000_000,
     });
     expect(status.selection).toMatchObject({
-      fallback: true,
+      fallback: false,
       fallbackPolicy: "billing_quota_exhausted",
       explicitPreferenceFallback: true,
     });
@@ -931,6 +956,203 @@ describe("StudioAiService", () => {
 
     expect(error.getStatus()).toBe(502);
     expect(JSON.stringify(error.getResponse())).not.toContain("postgres release connection detail");
+  });
+
+  it("공유 무료 풀은 Gemini와 Groq 한도 소진 뒤 세 번째 OpenRouter까지 전환한다", async () => {
+    process.env.STUDIO_AI_FREE_POOL_ENABLED = "true";
+    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,openrouter";
+    process.env.STUDIO_AI_FREE_GEMINI_API_KEY = "gemini-free-test-key";
+    process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_GROQ_API_KEY = "groq-free-test-key";
+    process.env.STUDIO_AI_FREE_GROQ_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY = "openrouter-free-test-key";
+    process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED = "true";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"gemini-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"groq-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "openrouter-free-request-3",
+            model: "openrouter/free-selected-model",
+            choices: [{ finish_reason: "stop", message: { content: "무료 풀 전환 완료" } }],
+            usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, finalize, markSent, markSucceeded } = createService();
+
+    const result = await complete(service, "studio-user-three-free-providers", {
+      ...compositionInput,
+      task: "assistant",
+    });
+
+    expect(result).toMatchObject({
+      content: "무료 풀 전환 완료",
+      provider: "openrouter",
+      model: "openrouter/free-selected-model",
+      requestId: "openrouter-free-request-3",
+      failover: {
+        attemptedProvider: "groq",
+        attemptedModel: "openai/gpt-oss-120b",
+        actualProvider: "openrouter",
+        actualModel: "openrouter/free-selected-model",
+        reason: "free_quota_exhausted",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("private-quota-detail");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "https://api.groq.com/openai/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
+    ]);
+    expect(markSent).toHaveBeenCalledTimes(3);
+    expect(markSucceeded).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
+      task: "assistant",
+      provider: "openrouter",
+      model: "openrouter/free",
+      attemptCount: 3,
+      status: "success",
+    }));
+  });
+
+  it("공용 무료 풀은 Gemini와 Groq 한도 거절 뒤 OpenRouter까지 성능 순서대로 전환한다", async () => {
+    configureSharedFreePool();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"error":{"message":"gemini free limit"}}', { status: 429 }))
+      .mockResolvedValueOnce(new Response('{"error":{"message":"groq free limit"}}', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "openrouter-free-request-3",
+            model: "openrouter/free",
+            choices: [{ finish_reason: "stop", message: { content: "세 번째 무료 경로 완료" } }],
+            usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, finalize, markSent, markSucceeded } = createService();
+
+    await expect(complete(service, "studio-user-three-free-providers")).resolves.toMatchObject({
+      content: "세 번째 무료 경로 완료",
+      provider: "openrouter",
+      model: "openrouter/free",
+      requestId: "openrouter-free-request-3",
+      failover: {
+        attemptedProvider: "groq",
+        attemptedModel: "openai/gpt-oss-120b",
+        actualProvider: "openrouter",
+        actualModel: "openrouter/free",
+        reason: "free_quota_exhausted",
+      },
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "https://api.groq.com/openai/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
+    ]);
+    expect(markSent).toHaveBeenCalledTimes(3);
+    expect(markSucceeded).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "openrouter",
+      model: "openrouter/free",
+      attemptCount: 3,
+      status: "success",
+    }));
+    for (const [, init] of fetchMock.mock.calls) {
+      const body = JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>;
+      expect(body).not.toHaveProperty("thinking");
+    }
+  });
+
+  it("공용 무료 제공자 세 곳이 모두 한도 거절하면 개인 키 안내용 오류로 끝낸다", async () => {
+    configureSharedFreePool();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"error":{"message":"gemini limit"}}', { status: 429 }))
+      .mockResolvedValueOnce(new Response('{"error":{"message":"groq limit"}}', { status: 429 }))
+      .mockResolvedValueOnce(new Response('{"error":{"message":"openrouter limit"}}', { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, finalize, markSent, abandonSafeRejection } = createService();
+
+    const error = await captureHttpException(
+      complete(service, "studio-user-all-shared-free-exhausted"),
+    );
+
+    expect(error.getStatus()).toBe(429);
+    expect(error.getResponse()).toMatchObject({
+      code: "FREE_AI_POOL_EXHAUSTED",
+      settingsHref: "/settings/ai",
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain("gemini limit");
+    expect(JSON.stringify(error.getResponse())).not.toContain("groq limit");
+    expect(JSON.stringify(error.getResponse())).not.toContain("openrouter limit");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(markSent).toHaveBeenCalledTimes(3);
+    expect(abandonSafeRejection).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "openrouter",
+      model: "openrouter/free",
+      attemptCount: 3,
+      status: "provider_rate_limited",
+    }));
+  });
+
+  it("세 공유 무료 제공자가 모두 소진되면 개인 키 안내와 구조화된 소진 코드를 반환한다", async () => {
+    process.env.STUDIO_AI_FREE_POOL_ENABLED = "true";
+    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,openrouter";
+    process.env.STUDIO_AI_FREE_GEMINI_API_KEY = "gemini-free-test-key";
+    process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_GROQ_API_KEY = "groq-free-test-key";
+    process.env.STUDIO_AI_FREE_GROQ_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY = "openrouter-free-test-key";
+    process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED = "true";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"gemini-private-exhausted"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"groq-private-exhausted"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"openrouter-private-exhausted"}}', { status: 429 })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, finalize, markSent, abandonSafeRejection } = createService();
+
+    const error = await captureHttpException(
+      complete(service, "studio-user-all-free-exhausted")
+    );
+
+    expect(error.getStatus()).toBe(429);
+    expect(error.getResponse()).toMatchObject({
+      code: "FREE_AI_POOL_EXHAUSTED",
+      settingsHref: "/settings/ai",
+    });
+    expect(JSON.stringify(error.getResponse())).toContain("개인 무료 API 키");
+    expect(JSON.stringify(error.getResponse())).not.toContain("private-exhausted");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(markSent).toHaveBeenCalledTimes(3);
+    expect(abandonSafeRejection).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "openrouter",
+      model: "openrouter/free",
+      attemptCount: 3,
+      status: "provider_rate_limited",
+    }));
   });
 
   it("auto 선택은 Z.ai 한도 응답 뒤 DeepSeek로 안전하게 전환하고 실제 제공자를 기록한다", async () => {

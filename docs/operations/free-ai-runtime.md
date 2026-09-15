@@ -1,70 +1,62 @@
 # Free-only AI runtime
 
-ToonSpectrum must not create AI costs for the service operator. The production API already rejects operator-funded AI execution; the browser runtime adds a second, independent guard for every user AI request.
+ToonSpectrum may provide text AI without requiring every user to paste a key, but the service must never create a silent paid-AI path. The runtime therefore combines a billing-disabled shared free pool with policy-validated personal free connections and fails closed when all free capacity is unavailable.
 
-## Runtime invariants
+## End-to-end routing
 
-1. No operator API key is used in production or development.
-2. Browser AI requests go directly to the selected connection with cookies omitted.
-3. Requests are never automatically retried and never fall back to a paid model.
-4. A connection must declare and satisfy one of the accepted zero-cost policies before any request is sent.
-5. Legacy or ambiguous connections are imported as `unverified` and remain blocked until the user reviews them.
-6. API keys stay in memory by default. Optional persistence uses the existing encrypted local vault.
-7. Managed free providers pass through a local request/token budget and circuit breaker before network I/O.
+For text requests the default order is:
 
-## Accepted connection policies
+1. shared Gemini free tier;
+2. shared Groq free tier;
+3. shared OpenRouter free router;
+4. the user's explicitly selected personal free connection;
+5. remaining valid personal free connections in quality order: Gemini, Groq, OpenRouter, Mistral, then local/self-hosted connections.
+
+A route advances only after a definitive pre-inference free-capacity or request-limit rejection (`402` or `429`) or the application's own local free-budget exhaustion. Network errors, timeouts, `5xx` responses, malformed responses, and authentication errors are surfaced immediately and are not sent to another provider. This avoids duplicate inference after an ambiguous failure.
+
+When every free route is exhausted or currently rate-limited, the UI explains that the user may add a personal free API key or local AI, retry after the provider limit clears, or leave the feature unavailable. The runtime never substitutes a paid model or silently enables billing.
+
+## Shared free pool invariants
+
+1. `STUDIO_AI_FREE_POOL_ENABLED=true` is required.
+2. Every provider needs a server-side key and a matching `STUDIO_AI_FREE_*_CONFIRMED=true` operational approval.
+3. Approval means the account was checked to have billing disabled or an enforced free-only boundary.
+4. OpenRouter is limited to `openrouter/free` or a model ending in `:free`.
+5. Shared credentials are never exposed through `VITE_` variables or API responses.
+6. Existing user-level and service-wide UTC daily request/token admissions remain authoritative and fail closed when their storage is unavailable.
+7. Shared providers are text-only. Image, video, and 3D generation remain local/self-hosted or use an explicitly configured personal integration.
+
+The application cannot independently inspect every provider's billing configuration. The `CONFIRMED` flags are therefore deliberate deployment approvals, not automatic billing guarantees. Use accounts with no payment method or provider-side hard spending limits wherever possible.
+
+## Personal connection policies
 
 | Policy | Enforcement |
 | --- | --- |
 | `local-zero-cost` | Only `localhost`, `127.0.0.1`, or `::1`; API key optional. |
 | `self-hosted-zero-cost` | Authenticated HTTPS endpoint explicitly operated by the user. Known public AI provider hosts are rejected. |
 | `openrouter-free` | Exact OpenRouter API base URL and `openrouter/free` or a model ending in `:free`; text only. |
-| `provider-free-tier` | Exact official Groq, Gemini, or Mistral OpenAI-compatible endpoint with the user's key; text only. The user must confirm billing is disabled on that provider account. |
-| `unverified` | Always blocked. Used for legacy or changed settings until reviewed. |
+| `provider-free-tier` | Exact official Groq, Gemini, or Mistral OpenAI-compatible endpoint with the user's key; text only. The user confirms billing is disabled. |
+| `unverified` | Always blocked until the user reviews the migrated or changed connection. |
 
-The application cannot inspect a third-party account's billing configuration. For Groq, Gemini, and Mistral, the user confirmation is therefore mandatory and the safest setup is an account with no payment method. Local inference and OpenRouter's free model route provide stronger application-side guarantees. Managed provider endpoints are exact-match allowlisted, while known public paid API hosts cannot be re-labelled as self-hosted.
+Personal API keys stay in memory by default. Optional persistence uses the existing encrypted local vault. Browser requests omit cookies, reject redirects, and do not automatically retry.
 
-## Local M2 / Apple Silicon setup
+## Unified settings surface
 
-The default local preset points to `http://localhost:8082/v1`, matching a local OpenAI-compatible proxy such as LiteLLM. A typical local chain is:
+`/settings/ai`, the Studio settings page, Studio popovers, and account settings all render the same `UnifiedAiSettings` owner. It contains:
 
-```text
-ToonSpectrum browser
-  -> http://localhost:8082/v1
-  -> LiteLLM (local only)
-  -> MLX-LM or Rapid-MLX on the same Mac
-```
+- shared free-pool status and provider order;
+- personal free API keys and local/self-hosted AI connections;
+- per-connection local request/token budget and blocker state;
+- capability assignments used after the shared pool is exhausted or currently limited;
+- Hyper3D/Rodin personal key;
+- personal Creator Runtime URL, token, and owner ID;
+- optional encrypted local persistence.
 
-Example commands already compatible with the project owner's workstation setup:
+No other Studio component owns an independent token-entry form.
 
-```bash
-python3 -m mlx_lm server \
-  --model mlx-community/Qwen3.6-35B-A3B-4bit \
-  --port 8080
+## Managed personal free safety budget
 
-litellm --config ~/litellm_config.yaml --port 8082
-```
-
-The local gateway must allow the ToonSpectrum web origin through CORS. It should listen on loopback only unless the user deliberately secures a remote endpoint.
-
-Ollama users can select the `http://localhost:11434/v1` preset and enter the exact installed model name.
-
-## Provider presets
-
-The UI includes presets for:
-
-- local OpenAI-compatible server;
-- Ollama;
-- OpenRouter free model router;
-- Groq free plan;
-- Gemini free tier;
-- Mistral free mode.
-
-Provider model catalogs and free limits can change. Presets intentionally avoid pinning most remote model IDs. The user checks `/models`, chooses a currently available free model, and keeps billing disabled in the provider console.
-
-## Managed-free safety budget
-
-The browser applies its own conservative safety cap to `provider-free-tier` and `openrouter-free` connections. These values are application limits, not claims about a provider's current quota:
+The browser applies a conservative application cap to `provider-free-tier` and `openrouter-free` connections. These are local safety limits, not claims about current provider quotas:
 
 - 25 network attempts per connection and UTC day;
 - 64,000 conservatively reserved input/output tokens per connection and UTC day;
@@ -74,36 +66,54 @@ The browser applies its own conservative safety cap to `provider-free-tier` and 
 - no managed-provider streaming;
 - only `GET /models` and `POST /chat/completions`.
 
-Before a managed request is sent, the runtime overwrites the request model with the reviewed connection model. This prevents a feature from bypassing the free-only configuration by supplying a different model in its request body. The budget ledger stores only counters, timestamps, connection ID, and provider host; prompts, responses, API keys, and model output are never stored in it.
+The runtime overwrites a managed request's model with the reviewed connection model before network I/O. Its budget ledger stores only counters, timestamps, connection ID, and provider host; prompts, responses, keys, and model output are never stored.
 
 The ledger is serialized in `localStorage` so separate tabs share the daily cap. Browsers supporting Web Locks serialize reservations across tabs. If persistent storage is unavailable, the runtime keeps a fail-safe in-memory ledger for the current document.
 
-Provider responses also operate a circuit breaker:
+Provider responses operate a local circuit breaker:
 
 - `429`: at least 15 minutes of cooldown; a second quota failure on the same UTC day blocks until the next UTC day;
-- `401` or `403`: 10-minute authentication cooldown;
-- `402`: connection remains locked until it is explicitly removed/reviewed and its local budget is reset;
+- `401` or `403`: 10-minute authentication cooldown and no fallback;
+- `402`: locked until the connection is explicitly removed/reviewed and its local budget is reset;
 - successful responses clear transient rate/authentication breaker state.
 
-Requests are reserved before network I/O and are not refunded after timeout or network failure because the provider may already have accepted them. This intentionally over-counts rather than risking unexpected use.
+Requests are reserved before network I/O and are not refunded after a timeout or network failure because the provider may already have accepted them.
 
-Provider billing must remain disabled and no payment method should be attached when the provider permits that setup. This browser-local guard can be cleared by the browser owner and provider quotas, model routing, and billing terms can change without notice, so it is an additional safety boundary—not a guarantee against provider-side charges.
+Provider billing must remain disabled and no payment method should be attached when the provider permits that setup. Browser-local limits can be cleared by the browser owner and provider terms can change, so these guards are an additional safety boundary—not a provider-side billing guarantee.
 
-## Failure behavior
+## Local Apple Silicon setup
 
-Quota exhaustion, rate limiting, CORS errors, timeouts, and unavailable models are surfaced to the user. The runtime does not retry, switch providers, use an operator proxy, or select a paid model. This is deliberate: degraded availability is preferable to an unexpected charge.
+The local preset points to `http://localhost:8082/v1`, matching an OpenAI-compatible proxy such as LiteLLM:
+
+```text
+ToonSpectrum browser
+  -> http://localhost:8082/v1
+  -> LiteLLM (loopback only)
+  -> MLX-LM or Rapid-MLX
+```
+
+Example:
+
+```bash
+python3 -m mlx_lm server \
+  --model mlx-community/Qwen3.6-35B-A3B-4bit \
+  --port 8080
+
+litellm --config ~/litellm_config.yaml --port 8082
+```
+
+The local gateway must permit the ToonSpectrum origin through CORS and should listen on loopback unless the user deliberately secures a remote endpoint. Ollama users can select the `http://localhost:11434/v1` preset and enter an installed model name.
 
 ## Review checklist
 
-- [ ] Production and development still reject operator-funded AI.
-- [ ] New connections default to localhost rather than a paid API.
-- [ ] Keyless remote endpoints remain rejected.
-- [ ] Known public AI APIs cannot be labelled self-hosted.
-- [ ] Managed free-tier connections remain text-only and exact-path allowlisted.
-- [ ] Managed free requests pass through the daily request/token budget before `fetch`.
-- [ ] Managed request bodies cannot select a model different from the reviewed connection.
-- [ ] `402` and repeated `429` responses open a fail-closed circuit breaker.
+- [ ] Shared accounts have billing disabled or an equivalent hard free-only boundary.
+- [ ] Every enabled provider has a matching explicit `CONFIRMED=true` flag.
+- [ ] Shared and personal managed providers remain text-only.
 - [ ] OpenRouter non-free model IDs remain rejected.
+- [ ] `402`/`429` are the only remote conditions that advance the free chain.
+- [ ] Network, timeout, `5xx`, authentication, and parse failures do not resend a prompt.
+- [ ] All-free exhaustion or request limiting returns the personal-key/local-AI/feature-unavailable message.
 - [ ] Legacy connections remain `unverified` until explicitly reviewed.
 - [ ] Browser requests omit cookies, redirects, and retries.
-- [ ] No secret, prompt, or model response is stored in the budget ledger or logs.
+- [ ] No secret, prompt, or response is stored in quota ledgers or logs.
+- [ ] All token-entry surfaces render the shared unified settings owner.
