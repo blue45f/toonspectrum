@@ -17,8 +17,8 @@ import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 
+import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { CreatorEcosystemWorkbench } from "./CreatorEcosystemWorkbench";
-import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 
 import {
   applySafePreflightFixes,
@@ -88,7 +88,7 @@ export function CreatorEcosystemPage() {
     try { return loadCreatorEcosystemState(globalThis.localStorage); }
     catch { return structuredClone(EMPTY_CREATOR_ECOSYSTEM_STATE); }
   });
-  const [notice, setNotice] = useState("모든 기록은 이 브라우저에 저장됩니다. AI 호출은 통합 설정의 사용자 키만 사용합니다.");
+  const [notice, setNotice] = useState("모든 기록은 이 브라우저에 저장됩니다. AI는 자동 무료 풀을 먼저 사용하고, 무료 한도 또는 요청 제한으로 사용할 수 없을 때만 통합 설정의 개인 무료 연결을 사용합니다.");
   const [preflightSource, setPreflightSource] = useState(PREFLIGHT_EXAMPLE);
   const [preflightDocument, setPreflightDocument] = useState<PreflightDocument | null>(null);
   const [continuityDraft, setContinuityDraft] = useState({ episode: "1", entity: "주인공", field: "의상", value: "교복", transitionReason: "" });
@@ -161,14 +161,14 @@ export function CreatorEcosystemPage() {
   const suggestTranslation = async () => {
     if (!dialogueDraft.source.trim() || aiBusy) return;
     setAiBusy(true);
-    const result = await completeWithUserTextKey(
+    const result = await completeAutomaticFreeText(
       "You are a professional webtoon localizer. Return only the translated dialogue, without quotes or explanation.",
       `Target locale: ${dialogueDraft.locale}\nDialogue: ${dialogueDraft.source}`,
     );
     setAiBusy(false);
     if (!result.ok) { setNotice(result.error); return; }
-    setDialogueDraft((current) => ({ ...current, translated: result.content }));
-    setNotice(`${result.provider} / ${result.model} 제안을 검토용 초안으로만 불러왔습니다. 승인 전에는 배포 데이터가 되지 않습니다.`);
+    setDialogueDraft((current) => ({ ...current, translated: result.data.content }));
+    setNotice(`${result.data.provider} / ${result.data.model} 제안을 검토용 초안으로만 불러왔습니다. 승인 전에는 배포 데이터가 되지 않습니다.`);
   };
 
   const exportBetaPackage = () => {
@@ -207,7 +207,7 @@ export function CreatorEcosystemPage() {
         <p className="eyebrow text-accent">CREATE · REVIEW · SHARE</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">작품을 끝까지 완성하는 창작 생태계 작업대</h1>
         <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">샘플을 고르는 순간부터 장면 구성, 안내형 실습, 원고 검수, 설정 변경 영향, 번역, 베타 독자, 제작 과정 공개까지 한 흐름으로 관리합니다.</p>
-        <div className="mt-5 flex flex-wrap gap-2"><Link to="/studio/templates" className={`${BUTTON} bg-accent text-on-accent`}>템플릿에서 시작</Link><Link to="/studio/ai-settings" className={BUTTON}>통합 AI 설정</Link><Link to="/learn" className={BUTTON}>학습실</Link></div>
+        <div className="mt-5 flex flex-wrap gap-2"><Link to="/studio/templates" className={`${BUTTON} bg-accent text-on-accent`}>템플릿에서 시작</Link><Link to="/settings/ai" className={BUTTON}>통합 AI 설정</Link><Link to="/learn" className={BUTTON}>학습실</Link></div>
       </header>
       <p className="my-5 rounded-xl border border-line bg-card px-4 py-3 text-sm text-fg-2" role="status">{notice}</p>
 

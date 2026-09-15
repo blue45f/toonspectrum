@@ -217,7 +217,7 @@ export interface StudioTextAiProvenance {
   createdAt: string;
   requestId?: string;
   usage?: StudioAiTokenUsage;
-  /** 서버 자동 선택이 잔액 소진을 감지해 다른 공급자로 전환한 경우의 안전한 구조화 이력. */
+  /** 서버 자동 선택이 무료 한도·요청 제한을 감지해 다른 공급자로 전환한 경우의 안전한 구조화 이력. */
   failover?: StudioServerAiFailoverMetadata;
 }
 
@@ -240,6 +240,7 @@ export type StudioAiErrorCode =
   | "invalid_input" // 빈 프롬프트, data URL이 아닌 채색 소스 등 호출 전 검증 실패.
   | "network_error" // fetch 자체가 reject(오프라인, CORS, DNS 등).
   | "http_error" // 2xx 아닌 응답(401/429/500 등).
+  | "free_exhausted" // 공용·개인 무료 경로가 모두 소진되었거나 제한되어 기능을 사용할 수 없음.
   | "parse_error"; // 2xx이지만 JSON이 아니거나 기대한 필드가 없음.
 
 export type StudioAiResult<T> = { ok: true; data: T } | { ok: false; code: StudioAiErrorCode; error: string };
@@ -554,18 +555,26 @@ function extractTextAiProvenance(
     : "";
   const provider = rawProvider || (
     transport.mode === "server"
-      ? transport.provider === "zai"
-        ? "zai"
-        : transport.provider === "deepseek"
-          ? "deepseek"
+      ? transport.provider === "gemini"
+        ? "gemini"
+        : transport.provider === "groq"
+          ? "groq"
           : transport.provider === "openrouter"
             ? "openrouter"
-            : "server-auto"
+            : transport.provider === "zai"
+              ? "zai"
+              : transport.provider === "deepseek"
+                ? "deepseek"
+                : "server-auto"
       : textProviderFromSettings(settings)
   );
   const model = rawModel || settings.textModel.trim().slice(0, 200) || "unknown";
   const failover = transport.mode === "server"
-    && (provider === "zai" || provider === "deepseek" || provider === "openrouter")
+    && (provider === "gemini"
+      || provider === "groq"
+      || provider === "openrouter"
+      || provider === "zai"
+      || provider === "deepseek")
     ? parseStudioServerAiFailoverMetadata(record.failover, { provider, model })
     : undefined;
   return {

@@ -54,7 +54,6 @@ export function StudioAi3dGenerationPanel({
   const [prompt, setPrompt] = useState("");
   const [files, setFiles] = useState<readonly File[]>([]);
   const [modelFile, setModelFile] = useState<File | null>(null);
-  const [transport, setTransport] = useState<"server" | "byok">("server");
   const [preset, setPreset] = useState<"blockout" | "webtoon" | "line-tone" | "character" | "quality">("webtoon");
   const [advanced, setAdvanced] = useState(false);
   const [seed, setSeed] = useState(73);
@@ -145,7 +144,7 @@ export function StudioAi3dGenerationPanel({
           ...(prompt.trim() ? { prompt: prompt.trim() } : {}),
           ...(encodedImages.length > 0 ? { images: encodedImages } : {}),
           ...(encodedModel ? { model: encodedModel } : {}),
-          transport,
+          transport: "byok",
           options,
           estimatedCredits: preset === "quality" ? 4 : preset === "character" ? 3 : preset === "blockout" ? 1 : 2,
         },
@@ -203,7 +202,7 @@ export function StudioAi3dGenerationPanel({
       <header>
         <h3 className="text-sm font-bold">AI 3D 생성</h3>
         <p className="mt-1 text-[0.63rem] leading-relaxed text-fg-3">
-          입력은 실행 전 확인 후 Hyper3D/Rodin으로 전송됩니다. API 키는 브라우저 번들·작업 기록·오류 로그에 저장하지 않습니다.
+          입력은 실행 전 확인 후 Hyper3D/Rodin으로 전송됩니다. 통합 AI 설정의 개인 키만 요청 단위로 사용하며 브라우저 번들·작업 기록·오류 로그에 저장하지 않습니다.
         </p>
       </header>
 
@@ -276,13 +275,12 @@ export function StudioAi3dGenerationPanel({
             <option value="quality">고품질 소재</option>
           </select>
         </label>
-        <label className="grid gap-1 text-xs font-semibold">
+        <div className="grid gap-1 text-xs font-semibold">
           처리 경로
-          <select value={transport} onChange={(event) => setTransport(event.currentTarget.value as typeof transport)} className="min-h-11 rounded-lg border border-line bg-panel px-2">
-            <option value="server">서버 관리 키</option>
-            <option value="byok">내 API 키 · 세션 한정</option>
-          </select>
-        </label>
+          <div className="flex min-h-11 items-center rounded-lg border border-line bg-panel px-2 font-normal text-fg-2">
+            통합 AI 설정의 내 Hyper3D/Rodin 키
+          </div>
+        </div>
       </div>
 
       <details onToggle={(event) => setAdvanced(event.currentTarget.open)} className="rounded-lg border border-line bg-panel/50">

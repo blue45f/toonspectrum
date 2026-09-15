@@ -12,6 +12,7 @@ import { StudioLocalizationPanel } from "./StudioLocalizationPanel";
 import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";
 import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";
 import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";
+import { StudioProductionCocreatorBridgePanel } from "./StudioProductionCocreatorBridgePanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
@@ -56,6 +57,9 @@ function SectionWorkflow({
         view={view}
         locale={locale}
       />
+      {section === "production" ? (
+        <StudioProductionCocreatorBridgePanel projectId={projectId} locale={locale} />
+      ) : null}
       {section === "production" && view === "documents" ? (
         <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />
       ) : null}

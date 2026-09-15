@@ -31,11 +31,14 @@ import type { StudioCharacterBibleEntry } from "./studio-character-bible";
 
 // 이 리뷰 표면은 AI 클라이언트 모듈을 import하지 않는다는 경계 계약(studio-writer-room-review-boundary)이
 // 있어 라벨만 로컬로 둔다. studio-server-ai-client의 StudioServerAiProvider와 동일한 집합을 유지한다.
-const FAILOVER_PROVIDER_LABELS: Record<string, string> = {
+const FAILOVER_PROVIDER_LABELS = {
+  gemini: "Gemini 무료",
+  groq: "Groq 무료",
+  openrouter: "OpenRouter 무료",
+  user: "내 무료 AI",
   zai: "Z.ai",
   deepseek: "DeepSeek",
-  openrouter: "OpenRouter",
-};
+} as const;
 
 export interface StudioWriterRoomAiReview {
   stage: StudioWriterRoomStage;
@@ -560,8 +563,8 @@ export function StudioWriterRoomAiReviewPanel({
               className="mt-1 rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-[0.65rem] leading-relaxed text-warn"
               role="status"
             >
-              {FAILOVER_PROVIDER_LABELS[review.failover.attemptedProvider]} 잔액·패키지
-              한도 소진으로 {FAILOVER_PROVIDER_LABELS[review.failover.actualProvider]}에
+              {FAILOVER_PROVIDER_LABELS[review.failover.attemptedProvider]} 무료 한도·요청
+              제한으로 {FAILOVER_PROVIDER_LABELS[review.failover.actualProvider]}에
               자동 전환했어요.
             </p>
           ) : null}

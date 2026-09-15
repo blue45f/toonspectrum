@@ -173,7 +173,7 @@ WHERE "userId" = $1
   AND "requestHash" = $3::bytea
   AND "leaseFence" = $4::bigint
   AND "status" IN ('admitted', 'sent')
-  AND "attemptCount" < 2
+  AND "attemptCount" < 3
 RETURNING "userKeyHash"
 `;
 
