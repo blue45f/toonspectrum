@@ -66,6 +66,7 @@ describe("StudioProjectCreatePage", () => {
       </MemoryRouter>,
     );
 
+    fireEvent.click(screen.getByText(/3\. 저장 위치|3\. Save location/u));
     fireEvent.click(screen.getByRole("button", { name: /다른 원격 저장소 보기|Show more remote storage/u }));
     fireEvent.click(screen.getByRole("radio", { name: /Google Drive/u }));
     fireEvent.click(screen.getByRole("button", { name: /웹툰 시작|Start Webtoon/u }));
@@ -87,6 +88,20 @@ describe("StudioProjectCreatePage", () => {
     }));
   });
 
+  it("honors a homepage deep link for project kind and starting template", () => {
+    render(
+      <MemoryRouter initialEntries={["/studio/new?kind=illustration&template=illustration-portrait"]}>
+        <StudioProjectCreatePage />
+      </MemoryRouter>,
+    );
+
+    const illustrationOption = screen.getAllByRole("button", { name: /일러스트|Illustration/u })
+      .find((element) => element.hasAttribute("aria-pressed"));
+    expect(illustrationOption?.getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }) as HTMLSelectElement).value)
+      .toBe("illustration-portrait");
+  });
+
   it("switches project type and prepares the matching template choices", () => {
     render(
       <MemoryRouter>
@@ -94,6 +109,7 @@ describe("StudioProjectCreatePage", () => {
       </MemoryRouter>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /다른 작업 종류 보기|Show more project types/u }));
     fireEvent.click(screen.getByRole("button", { name: /발표 자료|Presentation/u }));
     expect(screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }).textContent)
       .toMatch(/작품 피칭|Series pitch/u);

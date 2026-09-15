@@ -42,7 +42,6 @@ import {
   productionWorkspaceHasContent,
   resolveStudioProductionWorkspaceMode,
   studioProductionWorkspaceCapabilities,
-  studioProductionWorkspaceModeLabel,
   type ProductionVersionSnapshot,
   type ProductionWorkspace,
   type StudioProductionWorkspaceMode,
@@ -108,15 +107,15 @@ function persistenceLabel(
 ): string {
   switch (state) {
     case "loading":
-      return "불러오는 중";
+      return "저장 상태 확인 중";
     case "saving":
-      return mode === "server-work" ? "서버 저장 중" : "저장 중";
+      return "저장 중";
     case "saved":
-      return mode === "server-work" ? "서버 저장됨" : "SQLite/OPFS 저장됨";
+      return mode === "server-work" ? "팀에 저장됨" : "이 기기에 저장됨";
     case "demo":
-      return "데모 · 저장 안 함";
+      return "샘플 · 저장 안 함";
     case "error":
-      return mode === "server-work" ? "서버 저장 오류" : "저장소 오류";
+      return "저장을 확인해 주세요";
   }
 }
 
@@ -220,10 +219,10 @@ function EmptyState({
 const SURFACE_META: Readonly<
   Record<StudioProductionSurface, { readonly label: string; readonly icon: typeof FolderKanban }>
 > = {
-  projects: { label: "프로젝트", icon: FolderKanban },
-  review: { label: "리뷰", icon: MessageSquareCheck },
-  versions: { label: "버전", icon: FileClock },
-  present: { label: "피치", icon: Presentation },
+  projects: { label: "홈", icon: FolderKanban },
+  review: { label: "검토", icon: MessageSquareCheck },
+  versions: { label: "변경 기록", icon: FileClock },
+  present: { label: "발표", icon: Presentation },
   share: { label: "공유", icon: Share2 },
   join: { label: "참여", icon: Users },
 };
@@ -242,7 +241,7 @@ function ModeNotice({ mode }: { readonly mode: StudioProductionWorkspaceMode }) 
     return (
       <div className={cn(sharedClass, "border-emerald-500/30 bg-emerald-500/10 text-fg")} role="status">
         <Server className="mr-2 inline size-4 text-emerald-600" aria-hidden="true" />
-        서버 제작 운영 데이터입니다. 권한과 리비전 검사가 적용됩니다.
+        팀과 공유되는 프로젝트입니다. 권한에 따라 편집과 승인이 제한될 수 있습니다.
       </div>
     );
   }
@@ -250,14 +249,14 @@ function ModeNotice({ mode }: { readonly mode: StudioProductionWorkspaceMode }) 
     return (
       <div className={cn(sharedClass, "border-amber-500/30 bg-amber-500/10 text-fg")} role="status">
         <WifiOff className="mr-2 inline size-4 text-amber-600" aria-hidden="true" />
-        마지막으로 확인한 캐시를 읽기 전용으로 표시합니다. 연결 전에는 변경·승인·공유할 수 없습니다.
+        연결이 없어 마지막으로 확인한 내용을 보여드립니다. 다시 연결되기 전에는 변경하거나 공유할 수 없습니다.
       </div>
     );
   }
   return (
     <div className={cn(sharedClass, "border-amber-500/30 bg-amber-500/10 text-fg")} role="status">
       <HardDrive className="mr-2 inline size-4 text-amber-600" aria-hidden="true" />
-      이 작업·검수 목록은 현재 기기의 SQLite/OPFS에만 저장됩니다. 서버 원고 리비전, 팀 승인 또는 출판 권한이 아닙니다.
+      이 작업 목록과 검토 의견은 현재 이 기기에 저장됩니다. 다른 기기에서도 사용하려면 백업 파일을 만들어 주세요.
     </div>
   );
 }
@@ -629,12 +628,12 @@ function StudioProductionHubWorkspace({
             <div className="flex flex-wrap items-center gap-2">
               <Radio className="size-4 text-accent" aria-hidden="true" />
               <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
-                {studioProductionWorkspaceModeLabel(mode)} · {SURFACE_META[surface].label}
+                {SURFACE_META[surface].label}
               </p>
               <Pill tone={releaseReady ? "success" : configured ? "warning" : "neutral"}>
-                {releaseReady ? "운영 점검 완료" : configured ? "점검 필요" : "설정 필요"}
+                {releaseReady ? "내보낼 준비 완료" : configured ? "확인할 내용 있음" : "시작 전"}
               </Pill>
-              <Pill>{mode === "server-work" ? "server" : "local"} r{workspace.revision}</Pill>
+              <Pill>변경 {workspace.revision}</Pill>
             </div>
             <input
               key={`${workspace.scopeKey}:${workspace.title}`}
@@ -662,7 +661,7 @@ function StudioProductionHubWorkspace({
         </div>
         <nav
           className="mx-auto max-w-[1920px] overflow-x-auto px-3 pb-2 sm:px-5"
-          aria-label="제작 운영 기능"
+          aria-label="프로젝트 메뉴"
         >
           <div className="flex min-w-max gap-1">
             {STUDIO_PRODUCTION_SURFACES.map((item, index) => {
@@ -723,7 +722,7 @@ function StudioProductionHubWorkspace({
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric
-            label="제작 진척"
+            label="진행률"
             value={`${progress}%`}
             detail={workspace.tasks.length === 0
               ? "제작 작업을 추가해 진행률을 관리하세요."
@@ -731,21 +730,21 @@ function StudioProductionHubWorkspace({
             tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
           />
           <Metric
-            label="차단 작업"
+            label="먼저 해결할 항목"
             value={`${blocked}건`}
-            detail={mode === "server-work" ? "서버 제작 운영 기준" : "현재 로컬 플래너 기준"}
+            detail={blocked > 0 ? "다음 단계 전에 확인해 주세요" : "진행을 막는 항목이 없습니다"}
             tone={blocked > 0 ? "danger" : "success"}
           />
           <Metric
-            label="미해결 검수"
+            label="확인할 의견"
             value={`${openBlockers + openMajor}건`}
-            detail={`Blocker ${openBlockers} · Major ${openMajor}`}
+            detail={`중요 ${openBlockers} · 일반 ${openMajor}`}
             tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
           />
           <Metric
-            label="표시 멤버"
+            label="참여자"
             value={`${workspace.members.length}명`}
-            detail={capabilities.serverAuthoritative ? "서버 권한 적용" : "권한 없는 로컬 메모"}
+            detail={capabilities.serverAuthoritative ? "팀 권한에 따라 표시" : "이 기기의 프로젝트 정보"}
           />
         </div>
 
@@ -753,10 +752,10 @@ function StudioProductionHubWorkspace({
           <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <Card
-              title="제작 보드"
+              title="다음 할 일"
               description={mode === "server-work"
-                ? "서버 리비전으로 저장되는 제작 작업입니다. 원고 컷·레이어 리비전과는 분리됩니다."
-                : "현재 기기에 저장되는 작업 목록입니다. 서버 원고 상태와 자동으로 동일시하지 않습니다."}
+                ? "팀과 공유하는 할 일을 추가하고 진행 상태를 확인하세요."
+                : "이 프로젝트에서 이어서 할 일을 간단히 정리하세요."}
               action={(
                 <button
                   type="button"
@@ -778,10 +777,10 @@ function StudioProductionHubWorkspace({
               />
             </Card>
             <Card
-              title="출시 게이트"
+              title="내보내기 전 확인"
               description={mode === "server-work"
-                ? "서버 권한을 적용한 제작 작업·검수 기준입니다. 실제 공개 전 원고 검수도 함께 확인하세요."
-                : "현재 화면은 로컬 점검 도구이며 서버 승인 기록이 아닙니다."}
+                ? "남은 할 일과 검토 의견을 확인한 뒤 내보내기를 준비하세요."
+                : "현재 기기의 할 일과 검토 의견을 기준으로 준비 상태를 보여드립니다."}
             >
               <div className={cn(
                 "rounded-2xl border p-4 text-center",
@@ -796,11 +795,11 @@ function StudioProductionHubWorkspace({
                 )}
                 <p className="mt-2 text-sm font-black">
                   {releaseReady
-                    ? mode === "server-work" ? "운영 점검 완료" : "로컬 점검 완료"
-                    : configured ? "조치 필요" : "작업을 먼저 구성하세요"}
+                    ? "내보낼 준비가 됐어요"
+                    : configured ? "확인할 내용이 있어요" : "할 일을 먼저 추가하세요"}
                 </p>
                 <p className="mt-1 text-xs text-fg-2">
-                  차단 작업 {blocked} · 중요 검수 {openBlockers + openMajor}
+                  먼저 해결할 항목 {blocked} · 확인할 의견 {openBlockers + openMajor}
                 </p>
               </div>
             </Card>
@@ -816,10 +815,10 @@ function StudioProductionHubWorkspace({
 
         {surface === "review" ? (
           <Card
-            title={mode === "server-work" ? "제작 검수 항목" : "로컬 리뷰 메모"}
+            title={mode === "server-work" ? "검토 의견" : "내 검토 메모"}
             description={mode === "server-work"
-              ? "서버 제작 운영 리비전에 저장됩니다. 외부 검토 링크의 댓글·승인 기록과는 별도입니다."
-              : "서버 리비전에 고정된 공식 Review Snapshot이 아니라 현재 기기의 작업 메모입니다."}
+              ? "팀이 확인할 의견을 장면과 작업에 연결해 관리합니다."
+              : "이 기기에 저장되는 개인 검토 메모입니다."}
             action={(
               <button
                 type="button"
@@ -828,7 +827,7 @@ function StudioProductionHubWorkspace({
                 disabled={!capabilities.canEdit || Boolean(loadError)}
               >
                 <Plus className="size-4" aria-hidden="true" />
-                검수 항목 추가
+                의견 추가
               </button>
             )}
           >
@@ -940,7 +939,7 @@ function StudioProductionHubWorkspace({
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">
                 브라우저에 저장된 문자열이나 작품 ID에서 계산한 값은 인증 토큰으로 인정하지 않습니다.
-                현재 작업 목록은 {studioProductionWorkspaceModeLabel(mode)}에 있으며 팀 권한을 부여하지 않습니다.
+                현재 작업 목록은 {mode === "server-work" ? "서버 프로젝트" : mode === "read-only-cache" ? "읽기 전용 사본" : "이 기기"}에 있으며 팀 권한을 부여하지 않습니다.
               </p>
               <div className="mt-4 grid gap-2 text-xs text-fg-2 sm:grid-cols-3">
                 <div className="rounded-xl border border-line bg-panel p-3">초대 권한: {capabilities.canInvite ? "서버 검증" : "사용 불가"}</div>
