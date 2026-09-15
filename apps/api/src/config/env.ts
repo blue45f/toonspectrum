@@ -367,7 +367,7 @@ const envSchema = z.object({
   STUDIO_AI_FREE_POOL_ENABLED: z.enum(["true", "false"]).optional(),
   STUDIO_AI_FREE_PROVIDER_ORDER: z
     .string()
-    .regex(/^(gemini|groq|openrouter)(,(gemini|groq|openrouter))*$/u, "STUDIO_AI_FREE_PROVIDER_ORDER must be a free provider CSV")
+    .regex(/^(gemini|groq|sambanova|mistral|openrouter)(,(gemini|groq|sambanova|mistral|openrouter))*$/u, "STUDIO_AI_FREE_PROVIDER_ORDER must be a free provider CSV")
     .optional(),
   STUDIO_AI_FREE_GEMINI_API_KEY: z.string().min(1).optional(),
   STUDIO_AI_FREE_GEMINI_MODEL: z.string().min(1).max(200).optional(),
@@ -377,6 +377,14 @@ const envSchema = z.object({
   STUDIO_AI_FREE_GROQ_MODEL: z.string().min(1).max(200).optional(),
   STUDIO_AI_FREE_GROQ_CONFIRMED: z.enum(["true", "false"]).optional(),
   STUDIO_AI_FREE_GROQ_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_GROQ_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_SAMBANOVA_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_SAMBANOVA_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_MISTRAL_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_MISTRAL_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_MISTRAL_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS must be numeric").optional(),
   STUDIO_AI_FREE_OPENROUTER_API_KEY: z.string().min(1).optional(),
   STUDIO_AI_FREE_OPENROUTER_MODEL: z.string().min(1).max(200).optional(),
   STUDIO_AI_FREE_OPENROUTER_CONFIRMED: z.enum(["true", "false"]).optional(),
@@ -493,6 +501,8 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "GEMINI_API_KEY",
   "STUDIO_AI_FREE_GEMINI_API_KEY",
   "STUDIO_AI_FREE_GROQ_API_KEY",
+  "STUDIO_AI_FREE_SAMBANOVA_API_KEY",
+  "STUDIO_AI_FREE_MISTRAL_API_KEY",
   "STUDIO_AI_FREE_OPENROUTER_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",

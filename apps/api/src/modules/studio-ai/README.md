@@ -9,12 +9,17 @@ Production text AI is free-first and fail-closed. The default shared pool order 
 
 1. Gemini free tier;
 2. Groq free tier;
-3. OpenRouter free router.
+3. SambaNova Free Tier;
+4. Mistral Free mode;
+5. OpenRouter free router.
 
 `STUDIO_AI_FREE_PROVIDER_ORDER` may reorder only those reviewed providers. A
 provider is eligible only when the shared pool is enabled, its server-side key
 is present, its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is present,
-and—on OpenRouter—the model is `openrouter/free` or ends in `:free`.
+and—on OpenRouter—the model is `openrouter/free` or ends in `:free`. SambaNova
+approval additionally asserts that no payment method is linked to the account;
+Mistral approval asserts that the organization remains in cardless Free mode
+with Pay-as-you-go disabled.
 
 The confirmation flag is a deployment assertion that billing is disabled or a
 provider-side hard free-only boundary exists. It is not an automatic billing
@@ -128,9 +133,9 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
 Apply the production migration manifest through
-`apps/api/src/db/migrations/0056_studio_ai_free_pool_contract.sql` before deploying
-this API build. Migration `0053` expands idempotency receipts to three provider
-attempts and admits the `assistant`, `gemini`, and `groq` usage-ledger values used
-by the shared free pool. The schema preflight rejects an incomplete contract,
-and quota/admission storage failures return a sanitized error before provider
-use.
+`apps/api/src/db/migrations/0057_studio_ai_free_provider_expansion.sql` before
+deploying this API build. Migration `0056` establishes the original three-provider
+free-pool contract; migration `0057` expands idempotency receipts to five attempts
+and admits the `sambanova` and `mistral` usage-ledger values. The schema preflight
+rejects an incomplete contract, and quota/admission storage failures return a
+sanitized error before provider use.

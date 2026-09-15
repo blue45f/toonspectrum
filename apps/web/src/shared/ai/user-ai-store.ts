@@ -90,10 +90,11 @@ function connectionQualityRank(connection: UserAiConnection): number {
   }
   if (host === "generativelanguage.googleapis.com") return 10;
   if (host === "api.groq.com") return 20;
-  if (host === "openrouter.ai") return 30;
+  if (host === "api.sambanova.ai") return 30;
   if (host === "api.mistral.ai") return 40;
-  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return 50;
-  return connection.costPolicy === "self-hosted-zero-cost" ? 60 : 100;
+  if (host === "openrouter.ai") return 50;
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return 60;
+  return connection.costPolicy === "self-hosted-zero-cost" ? 70 : 100;
 }
 
 /**

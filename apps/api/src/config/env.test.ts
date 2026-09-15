@@ -183,6 +183,39 @@ describe("authentication boundary environment validation", () => {
 });
 
 describe("Studio AI quota environment validation", () => {
+  it("accepts the reviewed five-provider free-only order", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    const result = validateEnv(
+      {
+        NODE_ENV: "test",
+        STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,mistral,openrouter",
+        STUDIO_AI_FREE_SAMBANOVA_API_KEY: "free-only-sambanova-key",
+        STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+        STUDIO_AI_FREE_MISTRAL_API_KEY: "free-only-mistral-key",
+        STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+      },
+      logger
+    );
+
+    expect(result).toMatchObject({
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,mistral,openrouter",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unreviewed provider in the shared free pool", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "test",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,unknown-provider",
+    }, logger)).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+  });
+
   it("accepts positive distributed quota overrides", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
 
