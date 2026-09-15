@@ -77,6 +77,7 @@ describe("studio production workspace", () => {
     for (const mode of ["local-draft", "linked-local", "demo", "read-only-cache"] as const) {
       expect(studioProductionWorkspaceCapabilities(mode)).toMatchObject({
         canInvite: false,
+        canManageRoles: false,
         canApprove: false,
         canPublish: false,
         serverAuthoritative: false,
@@ -84,6 +85,7 @@ describe("studio production workspace", () => {
     }
     expect(studioProductionWorkspaceCapabilities("server-work")).toMatchObject({
       canInvite: true,
+      canManageRoles: true,
       canApprove: true,
       canPublish: true,
       serverAuthoritative: true,
@@ -105,13 +107,16 @@ describe("studio production workspace", () => {
     });
 
     expect(parseProductionWorkspace(legacy, "work:chapter-1")).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 0,
       scopeKey: "work:chapter-1",
       title: "기존 제작 운영",
       updatedAt: NOW,
       tasks: [],
       reviews: [],
+      hierarchy: [],
+      roleAssignments: [],
+      handoffs: [],
       versions: [],
       slides: [],
       members: [],

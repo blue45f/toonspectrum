@@ -641,6 +641,184 @@ export const creatorWorkCollaborators = pgTable(
 );
 
 
+// 웹툰 제작 운영 데이터. 원고 문서 revision과 독립된 낙관적 revision을 사용해
+// 역할·작업·에피소드/시퀀스/장면 계층·인계 브리프를 안전하게 저장한다.
+export const creatorWorkProductionWorkspaces = pgTable(
+  "creator_work_production_workspace",
+  {
+    workId: text("workId")
+      .primaryKey()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
+    updatedBy: text("updatedBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_production_updated_by").on(t.updatedBy, t.updatedAt.desc()),
+    check("creator_work_production_revision_check", sql`${t.revision} between 0 and 2147483647`),
+    check(
+      "creator_work_production_document_check",
+      sql`jsonb_typeof(${t.document}) = 'object'
+        and ${t.document}->>'schemaVersion' = '3'
+        and jsonb_typeof(${t.document}->'tasks') = 'array'
+        and jsonb_typeof(${t.document}->'reviews') = 'array'
+        and jsonb_typeof(${t.document}->'hierarchy') = 'array'
+        and jsonb_typeof(${t.document}->'roleAssignments') = 'array'
+        and jsonb_typeof(${t.document}->'handoffs') = 'array'`
+    ),
+    check("creator_work_production_timestamp_check", sql`${t.updatedAt} >= ${t.createdAt}`),
+  ]
+);
+
+
+// 장치 간 Studio 개인 설정 동기화. API 키·원고·클립보드는 계약에서 허용하지 않으며
+// 작업공간/빠른 액세스/제스처/즐겨찾기처럼 작은 개인화 메타데이터만 저장한다.
+export const creatorStudioPersonalKits = pgTable(
+  "creator_studio_personal_kit",
+  {
+    userId: text("userId")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("creator_studio_personal_kit_revision_check", sql`${t.revision} between 0 and 2147483647`),
+    check(
+      "creator_studio_personal_kit_document_check",
+      sql`jsonb_typeof(${t.document}) = 'object'
+        and ${t.document}->>'schemaVersion' = '1'
+        and jsonb_typeof(${t.document}->'quickAccess') = 'object'
+        and jsonb_typeof(${t.document}->'gestureMap') = 'object'
+        and jsonb_typeof(${t.document}->'favoriteRefs') = 'array'`
+    ),
+    check("creator_studio_personal_kit_timestamp_check", sql`${t.updatedAt} >= ${t.createdAt}`),
+  ]
+);
+
+
+// 외부 검토 링크는 원문 토큰 대신 SHA-256만 저장한다. 페이지 범위·만료·워터마크·
+// 다운로드 허용을 서버가 검증하며 폐기 후에는 동일 토큰을 다시 활성화하지 않는다.
+export const creatorWorkReviewLinks = pgTable(
+  "creator_work_review_link",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    tokenHash: text("tokenHash").notNull().unique(),
+    role: text("role").notNull().default("viewer"),
+    pageIds: jsonb("pageIds").$type<string[]>().notNull().default([]),
+    watermark: boolean("watermark").notNull().default(true),
+    allowDownload: boolean("allowDownload").notNull().default(false),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    revokedAt: timestamp("revokedAt", { mode: "date", withTimezone: true }),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_review_link_work_created").on(t.workId, t.createdAt.desc()),
+    index("idx_creator_work_review_link_active_expiry")
+      .on(t.expiresAt, t.id)
+      .where(sql`${t.revokedAt} is null`),
+    index("idx_creator_work_review_link_created_by").on(t.createdBy, t.createdAt.desc()),
+    check("creator_work_review_link_id_check", sql`length(${t.id}) between 1 and 160`),
+    check("creator_work_review_link_hash_check", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("creator_work_review_link_role_check", sql`${t.role} in ('viewer', 'commenter')`),
+    check(
+      "creator_work_review_link_page_ids_check",
+      sql`jsonb_typeof(${t.pageIds}) = 'array' and jsonb_array_length(${t.pageIds}) <= 500`
+    ),
+    check(
+      "creator_work_review_link_time_check",
+      sql`${t.expiresAt} > ${t.createdAt}
+        and ${t.updatedAt} >= ${t.createdAt}
+        and (${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt})`
+    ),
+  ]
+);
+
+
+export const creatorWorkReviewFeedback = pgTable(
+  "creator_work_review_feedback",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    reviewLinkId: text("reviewLinkId")
+      .notNull()
+      .references(() => creatorWorkReviewLinks.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    reviewerName: text("reviewerName").notNull(),
+    reviewerUserId: text("reviewerUserId").references(() => users.id, { onDelete: "set null" }),
+    anchor: jsonb("anchor").$type<{ pageId: string; x?: number; y?: number } | null>(),
+    body: text("body").notNull().default(""),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_review_feedback_link_created").on(
+      t.reviewLinkId,
+      t.createdAt,
+      t.id
+    ),
+    index("idx_creator_work_review_feedback_user_created").on(
+      t.reviewerUserId,
+      t.createdAt.desc()
+    ),
+    check("creator_work_review_feedback_id_check", sql`length(${t.id}) between 1 and 160`),
+    check(
+      "creator_work_review_feedback_kind_check",
+      sql`${t.kind} in ('comment', 'approve', 'reject')`
+    ),
+    check(
+      "creator_work_review_feedback_name_check",
+      sql`length(${t.reviewerName}) between 1 and 120 and ${t.reviewerName} = btrim(${t.reviewerName})`
+    ),
+    check(
+      "creator_work_review_feedback_body_check",
+      sql`length(${t.body}) <= 4000 and (${t.kind} = 'approve' or length(btrim(${t.body})) >= 1)`
+    ),
+    check(
+      "creator_work_review_feedback_anchor_check",
+      sql`(${t.anchor} is null or (
+        jsonb_typeof(${t.anchor}) = 'object'
+        and ${t.anchor} ? 'pageId'
+        and jsonb_typeof(${t.anchor}->'pageId') = 'string'
+        and length(${t.anchor}->>'pageId') between 1 and 160
+        and not (${t.anchor} ? 'x') = not (${t.anchor} ? 'y')
+        and (not (${t.anchor} ? 'x') or (
+          jsonb_typeof(${t.anchor}->'x') = 'number'
+          and jsonb_typeof(${t.anchor}->'y') = 'number'
+          and (${t.anchor}->>'x')::numeric between 0 and 1
+          and (${t.anchor}->>'y')::numeric between 0 and 1
+        ))
+      )) is true`
+    ),
+  ]
+);
+
+
 // 팀 변경 이력은 멤버십 행과 달리 append-only로 보존한다. 개인정보 이름·초대 동의 토큰은
 // 저장하지 않고, 조회 시 현재 사용자 행을 조인한다. 사용자 hard delete 뒤 FK는 SET NULL이 된다.
 // UUID는 공개 식별자, sequence는 동일 시각/clock skew에도 안정적인 DB 삽입 순서다.

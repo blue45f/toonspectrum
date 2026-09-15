@@ -17,6 +17,8 @@ import {
   buildRuntimeCutoverLedgerAclSql,
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
+  buildStudioProductionRuntimeAclSql,
+  buildStudioProductionRuntimeAclViolationSql,
   decideMigrationAction,
   loadMigrationManifest,
   validateMigrationSequenceContinuity,
@@ -25,12 +27,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(49);
+  expect(manifest).toHaveLength(50);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0049_creator_community_publishing",
+    "0050_studio_production_workspace_review_links_personal_kit",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(49);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(50);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {
@@ -80,6 +82,34 @@ test("creator storage location migration pins primaries and inventories verified
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).toContain("REVOKE ALL ON TABLE public.creator_asset_storage_replica FROM PUBLIC");
+});
+
+test("studio production migration persists private workflows and token-hashed review links", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0050_studio_production_workspace_review_links_personal_kit",
+  );
+  expect(migration?.id).toBe(
+    "0050_studio_production_workspace_review_links_personal_kit",
+  );
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CREATE TABLE IF NOT EXISTS "creator_work_production_workspace"',
+    'CREATE TABLE IF NOT EXISTS "creator_studio_personal_kit"',
+    'CREATE TABLE IF NOT EXISTS "creator_work_review_link"',
+    'CREATE TABLE IF NOT EXISTS "creator_work_review_feedback"',
+    '"tokenHash" text NOT NULL UNIQUE',
+    "creator_work_review_link_hash_check",
+    "creator_work_review_feedback_anchor_check",
+    'REFERENCES "creator_work"("id") ON DELETE CASCADE',
+    'REVOKE ALL ON TABLE "creator_work_production_workspace" FROM PUBLIC',
+    'REVOKE ALL ON TABLE "creator_studio_personal_kit" FROM PUBLIC',
+    'REVOKE ALL ON TABLE "creator_work_review_link" FROM PUBLIC',
+    'REVOKE ALL ON TABLE "creator_work_review_feedback" FROM PUBLIC',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toContain('"token" text');
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -396,6 +426,74 @@ test("creator object-storage grants and verification share one exact SQL contrac
   expect(violation).toContain("'toonspectrum_runtime'");
 });
 
+test("Studio production runtime ACL is exact and append-only where required", () => {
+  const sql = buildStudioProductionRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildStudioProductionRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain("DO $studio_production_acl$");
+  expect(sql).toContain(
+    "REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM %I",
+  );
+  expect(sql).toContain(
+    "REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE\n    public.creator_work_production_workspace,",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("revision", "document", "updatedBy", "updatedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("revision", "document", "updatedAt")',
+  );
+  expect(sql).toContain('GRANT UPDATE ("revokedAt", "updatedAt")');
+  expect(sql).not.toMatch(
+    /GRANT[^;]*UPDATE[^;]*creator_work_review_feedback/u,
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*DELETE/u);
+
+  for (const relation of [
+    "creator_work_production_workspace",
+    "creator_studio_personal_kit",
+    "creator_work_review_link",
+    "creator_work_review_feedback",
+  ]) {
+    expect(violation).toContain(`'${relation}'`);
+  }  for (const mutableColumn of [
+    "updatedBy",
+    "revision",
+    "document",
+    "revokedAt",
+    "updatedAt",
+  ]) {
+    expect(violation).toContain(`'${mutableColumn}'`);
+  }
+  for (const privilege of [
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
+  expect(violation).toContain("WITH GRANT OPTION");
+  expect(violation).toContain("has_any_column_privilege");
+  expect(violation).toContain("0::oid");
+
+  const runner = readFileSync(
+    new URL("./run-production-database-migrations.mjs", import.meta.url),
+    "utf8",
+  );
+  expect(runner).toContain(
+    "buildStudioProductionRuntimeAclSql(runtimeDatabaseRole)",
+  );
+});
+
 test("creator marketplace runtime ACL is normalized to the repository contract", () => {
   const sql = buildCreatorMarketplaceRuntimeAclSql("toonspectrum_runtime");
   const violation = buildCreatorMarketplaceRuntimeAclViolationSql(
@@ -653,10 +751,14 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_work_asset_storage_reference",
     "creator_work_bookmark",
     "creator_work_catalog_asset_binding",
+    "creator_studio_personal_kit",
+    "creator_work_production_workspace",
     "creator_work_publication",
     "creator_work_release",
     "creator_work_release_approval",
     "creator_work_report",
+    "creator_work_review_feedback",
+    "creator_work_review_link",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",

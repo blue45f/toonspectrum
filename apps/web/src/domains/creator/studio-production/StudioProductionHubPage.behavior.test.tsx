@@ -14,7 +14,7 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock("../studio-local-database-runtime", () => ({ acquireStudioLocalDatabase: async () => storage }));
 const NOW = "2026-09-07T00:00:00.000Z";
-const SCOPE = "work:behavior-299";
+const SCOPE = "remix:behavior-299";
 const task = { id: "task-1", title: "원고 확인", owner: "작가", due: "2026-09-08", progress: 45, status: "doing" as const };
 const review = { id: "review-1", title: "대사 검수", assignee: "편집자", severity: "major" as const, status: "open" as const };
 class Channel {
@@ -41,7 +41,7 @@ function Mount({ onOpen }: { onOpen: () => void }) {
   const navigate = useNavigate();
   const surfaces: Record<string, StudioProductionSurface> = { projects: "projects", review: "review", versions: "versions", present: "present", share: "share", join: "join" };
   return <>
-    <button onClick={() => void navigate("/studio/projects?scope=work%3Aother-299")}>다른 작품으로</button>
+    <button onClick={() => void navigate("/studio/projects?scope=remix%3Aother-299")}>다른 작품으로</button>
     <output data-testid="location">{location.pathname + location.search}</output>
     <StudioProductionHubPage surface={surfaces[location.pathname.split("/").at(-1)!] ?? "projects"} onOpenStudio={onOpen} />
   </>;
@@ -68,7 +68,7 @@ describe("production hub durable user operations", () => {
   it("adds, completes and resumes a task, saves a title, and broadcasts only a revision receipt", async () => {
     const { onOpen } = mount();
     await saved();
-    fireEvent.click(screen.getByRole("button", { name: "첫 작업 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 추가" }));
     await screen.findByRole("heading", { name: "새 제작 작업" });
     expect(row()).toMatchObject({ revision: 1, tasks: [{ title: "새 제작 작업", progress: 0, status: "todo" }] });
     const title = screen.getByRole("textbox", { name: "프로젝트 제목" });
@@ -143,28 +143,27 @@ describe("production hub durable user operations", () => {
     expect(row().slides[1]).toMatchObject({ title: "새 슬라이드", body: "핵심 메시지를 입력하세요." });
   });
 
-  it("preserves a rejected save, refuses more edits until reload, then accepts a corrected retry", async () => {
-    const original = seed({ tasks: [task] });
+  it("preserves a rejected save and accepts a corrected retry without mutating the acknowledged row", async () => {
+    seed({ tasks: [task] });
+    const original = row();
     storage.kvSet.mockRejectedValueOnce(new Error("저장 공간 부족"));
     mount(); await saved();
     fireEvent.click(screen.getByRole("button", { name: "완료" }));
-    await screen.findByRole("alert");
+    await screen.findByText("저장 공간 부족");
     expect(row()).toEqual(original);
-    expect((screen.getByRole("textbox", { name: "프로젝트 제목" }) as HTMLInputElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect((screen.getByRole("textbox", { name: "프로젝트 제목" }) as HTMLInputElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "완료" }));
     await waitFor(() => expect(row().tasks[0]!.status).toBe("done"));
     expect(storage.kvSet).toHaveBeenCalledTimes(2);
   });
 
   it("reports a non-Error write failure without claiming success or replacing the acknowledged row", async () => {
-    const original = seed({ tasks: [task] });
+    seed({ tasks: [task] });
+    const original = row();
     storage.kvSet.mockRejectedValueOnce("storage disconnected");
     mount(); await saved();
     fireEvent.click(screen.getByRole("button", { name: "완료" }));
-    await screen.findByRole("alert");
-    expect(screen.getByRole("alert").textContent).toContain("제작 운영 데이터를 저장하지 못했습니다.");
+    await screen.findByText("제작 운영 데이터를 저장하지 못했습니다.");
     expect(row()).toEqual(original);
     expect(screen.queryByText("작업 상태를 갱신했습니다.")).toBeNull();
   });
@@ -174,7 +173,7 @@ describe("production hub durable user operations", () => {
       constructor() { throw new DOMException("blocked", "SecurityError"); }
     });
     mount(); await saved();
-    fireEvent.click(screen.getByRole("button", { name: "첫 작업 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 추가" }));
     await screen.findByRole("heading", { name: "새 제작 작업" });
     expect(row().revision).toBe(1);
     expect(screen.queryByRole("alert")).toBeNull();
@@ -185,7 +184,7 @@ describe("production hub durable user operations", () => {
     storage.kvGet.mockRejectedValueOnce("offline");
     mount();
     await screen.findByRole("alert");
-    fireEvent.click(screen.getByRole("button", { name: "첫 작업 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 추가" }));
     expect(storage.kvSet).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
     await screen.findByRole("heading", { name: "원고 확인" });
@@ -195,7 +194,7 @@ describe("production hub durable user operations", () => {
   it("keeps delayed reads scoped to their original document after navigation", async () => {
     const old = deferred<string | null>();
     storage.kvGet.mockImplementationOnce(() => old.promise);
-    seed({ title: "다른 작품 제목" }, "work:other-299");
+    seed({ title: "다른 작품 제목" }, "remix:other-299");
     mount();
     await waitFor(() => expect(storage.kvGet).toHaveBeenCalledWith(STUDIO_PRODUCTION_NAMESPACE, SCOPE));
     fireEvent.click(screen.getByRole("button", { name: "다른 작품으로" }));
@@ -209,7 +208,7 @@ describe("production hub durable user operations", () => {
     seed({ revision: 3 });
     const view = mount(); await saved();
     const channel = Channel.instances[0]!;
-    const invalid = [{}, { type: "studio-production-workspace-invalidated", scopeKey: "work:else", revision: 4, sourceClientId: "peer" },
+    const invalid = [{}, { type: "studio-production-workspace-invalidated", scopeKey: "remix:else", revision: 4, sourceClientId: "peer" },
       { type: "studio-production-workspace-invalidated", scopeKey: SCOPE, revision: 3, sourceClientId: "peer" }];
     for (const receipt of invalid) channel.receive(receipt);
     expect(storage.kvGet).toHaveBeenCalledTimes(1);

@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { StudioExternalReviewPanel } from "./StudioExternalReviewPanel";
+import { resolveStudioExternalReviewEntry } from "./studio-external-review-entry";
 import { resolveStudioProductionScope } from "./studio-production-scope";
 import {
   StudioProductionHubPage as StudioProductionHubPageV2,
@@ -36,7 +38,14 @@ export function StudioProductionHubPage(props: {
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const externalReviewEntry = useMemo(
+    () => props.surface === "review"
+      ? resolveStudioExternalReviewEntry(location.search)
+      : { kind: "none" } as const,
+    [location.search, props.surface],
+  );
   const preserveDemo = useMemo(() => {
+    if (externalReviewEntry.kind !== "none") return false;
     const resolution = resolveStudioProductionScope(location);
     const params = new URLSearchParams(location.search);
     const demoValues = params.getAll("demo");
@@ -46,10 +55,10 @@ export function StudioProductionHubPage(props: {
       && demoValues.length === 1
       && demoValues[0] === "1"
     );
-  }, [location]);
+  }, [externalReviewEntry.kind, location]);
 
   useEffect(() => {
-    if (!preserveDemo) return undefined;
+    if (externalReviewEntry.kind !== "none" || !preserveDemo) return undefined;
     const handler = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented
@@ -78,7 +87,30 @@ export function StudioProductionHubPage(props: {
     };
     globalThis.addEventListener("keydown", handler, { capture: true });
     return () => globalThis.removeEventListener("keydown", handler, { capture: true });
-  }, [navigate, preserveDemo]);
+  }, [externalReviewEntry.kind, navigate, preserveDemo]);
+
+  if (externalReviewEntry.kind === "invalid") {
+    return (
+      <main className="mx-auto min-h-dvh max-w-5xl px-4 py-8 sm:px-6">
+        <section className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6" role="alert">
+          <h1 className="text-lg font-black">검토 링크를 확인할 수 없습니다</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">
+            토큰이 없거나 중복됐거나 작품 범위 파라미터와 충돌합니다. 원고와 권한은 변경하지 않았습니다.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (externalReviewEntry.kind === "valid") {
+    return (
+      <main className="min-h-dvh bg-bg px-3 py-4 text-fg sm:px-5 sm:py-6">
+        <div className="mx-auto max-w-[1920px]">
+          <StudioExternalReviewPanel token={externalReviewEntry.token} />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <PreserveLinkQueryParams params={preserveDemo ? { demo: "1" } : {}}>

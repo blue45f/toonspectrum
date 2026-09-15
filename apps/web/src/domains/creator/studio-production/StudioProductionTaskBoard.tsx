@@ -1,0 +1,532 @@
+import {
+  CheckCircle2,
+  RotateCcw,
+  Save,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import {
+  STUDIO_PRODUCTION_PRIORITIES,
+  STUDIO_PRODUCTION_ROLES,
+  STUDIO_PRODUCTION_STAGES,
+  type ProductionPriority,
+  type ProductionRole,
+  type ProductionStage,
+  type ProductionTask,
+  type ProductionTaskStatus,
+  type ProductionWorkspace,
+} from "./studio-production-workspace-runtime";
+
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
+
+interface StudioProductionTaskBoardProps {
+  readonly workspace: ProductionWorkspace;
+  readonly canEdit: boolean;
+  readonly canApprove: boolean;
+  readonly canPublish: boolean;
+  readonly onCommit: (
+    update: (current: ProductionWorkspace) => ProductionWorkspace,
+    message: string,
+  ) => void;
+}
+
+interface TaskDraft {
+  readonly title: string;
+  readonly owner: string;
+  readonly due: string;
+  readonly progress: number;
+  readonly status: ProductionTaskStatus;
+  readonly stage: ProductionStage;
+  readonly priority: ProductionPriority;
+  readonly role: ProductionRole | null;
+  readonly hierarchyNodeId: string | null;
+  readonly dependencyIds: readonly string[];
+  readonly assigneeIds: readonly string[];
+  readonly reviewerIds: readonly string[];
+  readonly blockedReason: string;
+}
+
+const STATUS_LABELS: Readonly<Record<ProductionTaskStatus, string>> = {
+  todo: "할 일",
+  doing: "진행 중",
+  blocked: "차단됨",
+  done: "완료",
+};
+const STAGE_LABELS: Readonly<Record<ProductionStage, string>> = {
+  planning: "기획",
+  script: "대본 작성",
+  "script-approved": "대본 승인",
+  storyboard: "콘티",
+  "storyboard-approved": "콘티 승인",
+  rough: "밑그림",
+  lineart: "선화",
+  "color-background": "채색·배경",
+  lettering: "레터링",
+  review: "최종 검수",
+  approved: "승인 완료",
+  publishing: "게시 준비",
+};
+const PRIORITY_LABELS: Readonly<Record<ProductionPriority, string>> = {
+  low: "낮음",
+  normal: "보통",
+  high: "높음",
+  urgent: "긴급",
+};
+const ROLE_LABELS: Readonly<Record<ProductionRole, string>> = {
+  story: "스토리",
+  storyboard: "콘티",
+  lineart: "선화",
+  color: "채색",
+  background: "배경",
+  lettering: "레터링",
+  reviewer: "검수",
+  director: "디렉터",
+  publisher: "게시",
+};
+
+function taskDraft(task: ProductionTask): TaskDraft {
+  return {
+    title: task.title,
+    owner: task.owner,
+    due: task.due,
+    progress: Math.round(task.progress),
+    status: task.status,
+    stage: task.stage ?? "planning",
+    priority: task.priority ?? "normal",
+    role: task.role ?? null,
+    hierarchyNodeId: task.hierarchyNodeId ?? null,
+    dependencyIds: task.dependencyIds ?? [],
+    assigneeIds: task.assigneeIds ?? [],
+    reviewerIds: task.reviewerIds ?? [],
+    blockedReason: task.blockedReason ?? "",
+  };
+}
+
+function selectedValues(target: HTMLSelectElement): readonly string[] {
+  return Array.from(target.selectedOptions, (option) => option.value);
+}
+
+function taskTone(status: ProductionTaskStatus): string {
+  if (status === "done") return "border-emerald-500/30 bg-emerald-500/10";
+  if (status === "blocked") return "border-red-500/30 bg-red-500/10";
+  if (status === "doing") return "border-accent/30 bg-accent-soft";
+  return "border-line bg-raised";
+}
+
+function TaskEditor({
+  task,
+  workspace,
+  canEdit,
+  canApprove,
+  canPublish,
+  onCommit,
+}: {
+  readonly task: ProductionTask;
+  readonly workspace: ProductionWorkspace;
+  readonly canEdit: boolean;
+  readonly canApprove: boolean;
+  readonly canPublish: boolean;
+  readonly onCommit: StudioProductionTaskBoardProps["onCommit"];
+}) {
+  const [draft, setDraft] = useState<TaskDraft>(() => taskDraft(task));
+  const [error, setError] = useState<string | null>(null);
+  const updateDraft = (patch: Partial<TaskDraft>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+  };
+  useEffect(() => {
+    setDraft(taskDraft(task));
+    setError(null);
+  }, [task]);
+
+  const taskById = useMemo(
+    () => new Map(workspace.tasks.map((candidate) => [candidate.id, candidate] as const)),
+    [workspace.tasks],
+  );
+  const protectedStage = draft.stage === "approved" || draft.stage === "publishing";
+  const canChangeProtectedStage = draft.stage === "publishing" ? canPublish : canApprove;
+
+  const save = () => {
+    const title = draft.title.trim();
+    if (!title) {
+      setError("작업 제목을 입력해 주세요.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.due)) {
+      setError("마감일을 올바르게 입력해 주세요.");
+      return;
+    }
+    const nextStage = draft.stage === "publishing" && !canPublish
+      ? task.stage ?? "planning"
+      : draft.stage === "approved" && !canApprove
+        ? task.stage ?? "planning"
+        : draft.stage;
+    const status = draft.status;
+    const progress = status === "done" ? 100 : Math.max(0, Math.min(99, Math.round(draft.progress)));
+    onCommit((current) => ({
+      ...current,
+      tasks: current.tasks.map((candidate) => candidate.id === task.id
+        ? {
+            ...candidate,
+            title,
+            owner: draft.owner.trim(),
+            due: draft.due,
+            progress,
+            status,
+            stage: nextStage,
+            priority: draft.priority,
+            role: draft.role,
+            hierarchyNodeId: draft.hierarchyNodeId,
+            dependencyIds: [...draft.dependencyIds],
+            assigneeIds: [...draft.assigneeIds],
+            reviewerIds: [...draft.reviewerIds],
+            blockedReason: status === "blocked" ? draft.blockedReason.trim() : "",
+          }
+        : candidate),
+    }), `“${title}” 작업 정보를 저장했습니다.`);
+    setError(null);
+  };
+
+  const toggleDone = () => {
+    const done = task.status === "done";
+    onCommit((current) => ({
+      ...current,
+      tasks: current.tasks.map((candidate) => candidate.id === task.id
+        ? {
+            ...candidate,
+            status: done ? "doing" : "done",
+            progress: done ? Math.min(candidate.progress, 90) : 100,
+          }
+        : candidate),
+    }), done ? "작업을 다시 시작했습니다." : "작업을 완료했습니다.");
+  };
+
+  const remove = () => {
+    onCommit((current) => ({
+      ...current,
+      tasks: current.tasks
+        .filter((candidate) => candidate.id !== task.id)
+        .map((candidate) => ({
+          ...candidate,
+          dependencyIds: (candidate.dependencyIds ?? []).filter((id) => id !== task.id),
+        })),
+      versions: current.versions,
+    }), `“${task.title}” 작업을 삭제했습니다.`);
+  };
+
+  return (
+    <article className="rounded-xl border border-line bg-panel p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate text-sm font-bold">{task.title}</h3>
+            <span className={cn(
+              "rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
+              taskTone(task.status),
+            )}>
+              {STATUS_LABELS[task.status]}
+            </span>
+            <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.6875rem] text-fg-2">
+              {STAGE_LABELS[task.stage ?? "planning"]}
+            </span>
+            <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.6875rem] text-fg-2">
+              {PRIORITY_LABELS[task.priority ?? "normal"]}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-fg-2">
+            {task.owner || "미배정"} · 마감 {task.due}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={buttonClass({ variant: "outline", size: "sm" })}
+          onClick={toggleDone}
+          disabled={!canEdit}
+        >
+          {task.status === "done" ? (
+            <RotateCcw className="size-4" aria-hidden="true" />
+          ) : (
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+          )}
+          {task.status === "done" ? "재개" : "완료"}
+        </button>
+      </div>
+      <div
+        className="mt-3 h-2 overflow-hidden rounded-full bg-raised"
+        role="progressbar"
+        aria-label={`${task.title} 진행률`}
+        aria-valuenow={task.progress}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="h-full rounded-full bg-accent" style={{ width: `${task.progress}%` }} />
+      </div>
+
+      <details className="mt-3 rounded-xl border border-line bg-card">
+        <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold">
+          단계·담당·의존성 편집
+        </summary>
+        <div className="border-t border-line p-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
+              작업 제목
+              <input
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.title}
+                onChange={(event) => updateDraft({ title: event.currentTarget.value })}
+                maxLength={240}
+                disabled={!canEdit}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              상태
+              <select
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.status}
+                onChange={(event) => updateDraft({
+                  status: event.currentTarget.value as ProductionTaskStatus,
+                })}
+                disabled={!canEdit}
+              >
+                {(Object.keys(STATUS_LABELS) as ProductionTaskStatus[]).map((status) => (
+                  <option key={status} value={status}>{STATUS_LABELS[status]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              우선순위
+              <select
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.priority}
+                onChange={(event) => updateDraft({
+                  priority: event.currentTarget.value as ProductionPriority,
+                })}
+                disabled={!canEdit}
+              >
+                {STUDIO_PRODUCTION_PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              제작 단계
+              <select
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.stage}
+                onChange={(event) => updateDraft({
+                  stage: event.currentTarget.value as ProductionStage,
+                })}
+                disabled={!canEdit || (protectedStage && !canChangeProtectedStage)}
+              >
+                {STUDIO_PRODUCTION_STAGES.map((stage) => (
+                  <option
+                    key={stage}
+                    value={stage}
+                    disabled={(stage === "approved" && !canApprove) || (stage === "publishing" && !canPublish)}
+                  >
+                    {STAGE_LABELS[stage]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              주 담당 역할
+              <select
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.role ?? ""}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  updateDraft({ role: value ? value as ProductionRole : null });
+                }}
+                disabled={!canEdit}
+              >
+                <option value="">역할 미정</option>
+                {STUDIO_PRODUCTION_ROLES.map((role) => (
+                  <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              제작 범위
+              <select
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.hierarchyNodeId ?? ""}
+                onChange={(event) => updateDraft({
+                  hierarchyNodeId: event.currentTarget.value || null,
+                })}
+                disabled={!canEdit}
+              >
+                <option value="">프로젝트 전체</option>
+                {workspace.hierarchy.map((node) => (
+                  <option key={node.id} value={node.id}>{node.title}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              담당자 표시
+              <input
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.owner}
+                onChange={(event) => updateDraft({ owner: event.currentTarget.value })}
+                maxLength={240}
+                disabled={!canEdit}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              마감일
+              <input
+                type="date"
+                className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+                value={draft.due}
+                onChange={(event) => updateDraft({ due: event.currentTarget.value })}
+                disabled={!canEdit}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
+              진행률 {draft.progress}%
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={draft.progress}
+                onChange={(event) => updateDraft({ progress: Number(event.currentTarget.value) })}
+                disabled={!canEdit || draft.status === "done"}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
+              선행 작업
+              <select
+                multiple
+                className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
+                value={[...draft.dependencyIds]}
+                onChange={(event) => updateDraft({
+                  dependencyIds: selectedValues(event.currentTarget),
+                })}
+                disabled={!canEdit}
+              >
+                {workspace.tasks.filter((candidate) => candidate.id !== task.id).map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.title} · {STATUS_LABELS[candidate.status]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              실행 담당 배정
+              <select
+                multiple
+                className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
+                value={[...draft.assigneeIds]}
+                onChange={(event) => updateDraft({
+                  assigneeIds: selectedValues(event.currentTarget),
+                })}
+                disabled={!canEdit}
+              >
+                {workspace.roleAssignments.map((assignment) => (
+                  <option key={assignment.id} value={assignment.id}>
+                    {assignment.displayName} · {assignment.roles.map((role) => ROLE_LABELS[role]).join("/")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-fg-2">
+              검수 담당 배정
+              <select
+                multiple
+                className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
+                value={[...draft.reviewerIds]}
+                onChange={(event) => updateDraft({
+                  reviewerIds: selectedValues(event.currentTarget),
+                })}
+                disabled={!canEdit}
+              >
+                {workspace.roleAssignments.map((assignment) => (
+                  <option key={assignment.id} value={assignment.id}>
+                    {assignment.displayName} · {assignment.roles.map((role) => ROLE_LABELS[role]).join("/")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {draft.status === "blocked" ? (
+            <label className="mt-3 grid gap-1 text-xs font-semibold text-fg-2">
+              차단 사유
+              <textarea
+                className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
+                value={draft.blockedReason}
+                onChange={(event) => updateDraft({ blockedReason: event.currentTarget.value })}
+                maxLength={4_000}
+                disabled={!canEdit}
+              />
+            </label>
+          ) : null}
+          {error ? <p className="mt-3 text-xs font-semibold text-red-600" role="alert">{error}</p> : null}
+          <div className="mt-3 flex flex-wrap justify-between gap-2">
+            <button
+              type="button"
+              className={buttonClass({
+                variant: "outline",
+                size: "sm",
+                className: "border-red-500/40 text-red-600 hover:border-red-500 hover:bg-red-500/10",
+              })}
+              onClick={remove}
+              disabled={!canEdit}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              작업 삭제
+            </button>
+            <button
+              type="button"
+              className={buttonClass({ size: "sm" })}
+              onClick={save}
+              disabled={!canEdit || !draft.title.trim() || (protectedStage && !canChangeProtectedStage)}
+            >
+              <Save className="size-4" aria-hidden="true" />
+              작업 정보 저장
+            </button>
+          </div>
+          {draft.dependencyIds.some((id) => !taskById.has(id)) ? (
+            <p className="mt-3 text-xs text-red-600" role="alert">
+              존재하지 않는 선행 작업이 포함되어 있습니다. 선택을 다시 저장해 주세요.
+            </p>
+          ) : null}
+        </div>
+      </details>
+    </article>
+  );
+}
+
+export function StudioProductionTaskBoard({
+  workspace,
+  canEdit,
+  canApprove,
+  canPublish,
+  onCommit,
+}: StudioProductionTaskBoardProps) {
+  if (workspace.tasks.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-line p-6 text-center">
+        <p className="text-sm font-bold">등록된 제작 작업이 없습니다</p>
+        <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">
+          필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {workspace.tasks.map((task) => (
+        <TaskEditor
+          key={task.id}
+          task={task}
+          workspace={workspace}
+          canEdit={canEdit}
+          canApprove={canApprove}
+          canPublish={canPublish}
+          onCommit={onCommit}
+        />
+      ))}
+    </div>
+  );
+}
