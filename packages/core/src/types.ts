@@ -204,20 +204,113 @@ export interface FanCafePost {
   replies?: FanCafeReply[];
 }
 
-// ── 장르 카페(소모임) ──
+// ── 회원 개설형 커뮤니티(기존 장르 카페 URL·게시글과 호환) ──
+export type CommunityCafeKind =
+  | "creator"
+  | "work"
+  | "genre"
+  | "project"
+  | "study"
+  | "social";
+export type CommunityCafeVisibility = "public" | "private";
+export type CommunityCafeJoinPolicy = "open" | "approval" | "invite";
+export type CommunityCafePostingPolicy = "members" | "staff";
+export type CommunityCafeRole = "owner" | "admin" | "moderator" | "member";
+export type CommunityCafeStatus = "active" | "archived";
+export type CommunityCafeMembershipState = "none" | "pending" | "member" | "banned";
+
+export interface CommunityCafeRule {
+  id: string;
+  title: string;
+  description: string;
+}
+
 export interface CommunityCafe {
   id: string;
   slug: string;
   name: string;
   description: string;
-  genre: string; // GENRES 중 하나 또는 ""(자유)
+  genre: string;
+  kind: CommunityCafeKind;
+  tags: string[];
+  visibility: CommunityCafeVisibility;
+  joinPolicy: CommunityCafeJoinPolicy;
+  postingPolicy: CommunityCafePostingPolicy;
+  rules: CommunityCafeRule[];
+  status: CommunityCafeStatus;
   createdBy: string;
   ownerName: string;
   memberCount: number;
   postCount: number;
   createdAt: string;
+  updatedAt: string;
   viewerIsMember?: boolean;
-  viewerRole?: "owner" | "member" | null;
+  viewerRole?: CommunityCafeRole | null;
+  viewerMembershipState?: CommunityCafeMembershipState;
+  viewerJoinRequestId?: string | null;
+  viewerCanViewContent?: boolean;
+  viewerCanManage?: boolean;
+  viewerCanModerate?: boolean;
+  viewerCanPost?: boolean;
+}
+
+export interface CommunityCafeMember {
+  userId: string;
+  name: string;
+  avatar: string | null;
+  role: CommunityCafeRole;
+  joinedAt: string;
+}
+
+export interface CommunityCafeJoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  message: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommunityCafeBan {
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  reason: string;
+  bannedBy: string | null;
+  bannedByName: string;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CommunityCafeInvite {
+  id: string;
+  createdBy: string | null;
+  creatorName: string;
+  maxUses: number;
+  useCount: number;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface CreatedCommunityCafeInvite extends CommunityCafeInvite {
+  code: string;
+  sharePath: string;
+}
+
+export interface CommunityCafeModerationLog {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  action: string;
+  targetUserId: string | null;
+  targetPostId: string | null;
+  metadata: Record<string, string | number | boolean | null>;
+  createdAt: string;
 }
 
 export interface FanCafeBoard {

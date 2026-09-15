@@ -133,7 +133,7 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
 Apply the production migration manifest through
-`apps/api/src/db/migrations/0058_studio_ai_free_provider_expansion.sql` before
+`apps/api/src/db/migrations/0060_studio_ai_free_provider_expansion.sql` before
 deploying this API build. Migration `0056` establishes the original three-provider
 free-pool contract; migration `0057` expands idempotency receipts to five attempts
 and admits the `sambanova` and `mistral` usage-ledger values. The schema preflight

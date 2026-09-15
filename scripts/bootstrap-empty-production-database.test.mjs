@@ -404,7 +404,8 @@ describe("bootstrap SQL and repository contract", () => {
       "0055_personal_cloud_cutover_marker",
       "0056_studio_ai_free_pool_contract",
       "0057_community_threaded_comments",
-      "0058_studio_ai_free_provider_expansion",
+      "0058_community_cafe_governance",
+      "0060_studio_ai_free_provider_expansion",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

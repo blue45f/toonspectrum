@@ -1,8 +1,9 @@
-import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { users } from "./index";
 
 import type { FeedbackDetails } from "../../../../../packages/core/src/feedback";
+import type { CommunityCafeRule } from "../../../../../packages/core/src/types";
 
 export const fanPosts = pgTable(
   "fan_post",
@@ -59,46 +60,123 @@ export const fanPostReplies = pgTable(
 );
 
 
-// ── 장르 카페(소모임) — 회원이 직접 만들고 가입하는 커뮤니티 단위 ──────────────
-// 게시글은 fan_post(scope='cafe', targetId=cafe.slug)를 재사용한다.
+// ── 회원 개설형 커뮤니티 ─────────────────────────────────────────────
+// 기존 community_cafe URL/행을 그대로 확장하고 게시글은 fan_post(scope='cafe')를 재사용한다.
 export const communityCafes = pgTable(
   "community_cafe",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
-    genre: text("genre").notNull().default(""), // lib/taxonomy GENRES 중 하나(또는 빈 값=자유)
-    createdBy: text("createdBy")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
-    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+    genre: text("genre").notNull().default(""),
+    kind: text("kind").notNull().default("genre"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    visibility: text("visibility").notNull().default("public"),
+    joinPolicy: text("joinPolicy").notNull().default("open"),
+    postingPolicy: text("postingPolicy").notNull().default("members"),
+    rules: jsonb("rules").$type<CommunityCafeRule[]>().notNull().default([]),
+    status: text("status").notNull().default("active"),
+    createdBy: text("createdBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+    hidden: boolean("hidden").notNull().default(false),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("idx_community_cafe_genre").on(t.genre, t.createdAt)] // 런타임 ensure 미러
+  (t) => [
+    index("idx_community_cafe_genre").on(t.genre, t.createdAt),
+    index("idx_community_cafe_discovery").on(t.visibility, t.status, t.createdAt),
+    index("idx_community_cafe_kind_created").on(t.kind, t.createdAt),
+  ],
 );
-
 
 export const communityCafeMembers = pgTable(
   "community_cafe_member",
   {
-    cafeId: text("cafeId")
-      .notNull()
-      .references(() => communityCafes.id, { onDelete: "cascade" }),
-    userId: text("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("member"), // owner | member
-    joinedAt: timestamp("joinedAt", { mode: "date" }).$defaultFn(() => new Date()),
+    cafeId: text("cafeId").notNull().references(() => communityCafes.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"),
+    joinedAt: timestamp("joinedAt", { mode: "date" }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.cafeId, t.userId] }),
-    index("idx_community_cafe_member_user").on(t.userId), // 런타임 ensure 미러 — 내 카페 목록
-  ]
+    index("idx_community_cafe_member_user").on(t.userId),
+    index("idx_community_cafe_member_role").on(t.cafeId, t.role, t.joinedAt),
+  ],
 );
 
+export const communityCafeJoinRequests = pgTable(
+  "community_cafe_join_request",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    cafeId: text("cafeId").notNull().references(() => communityCafes.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    message: text("message").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    reviewedBy: text("reviewedBy").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_community_cafe_join_request_user").on(t.cafeId, t.userId),
+    index("idx_community_cafe_join_request_queue").on(t.cafeId, t.status, t.createdAt),
+    index("idx_community_cafe_join_request_user").on(t.userId, t.status),
+  ],
+);
+
+export const communityCafeInvites = pgTable(
+  "community_cafe_invite",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    cafeId: text("cafeId").notNull().references(() => communityCafes.id, { onDelete: "cascade" }),
+    codeHash: text("codeHash").notNull().unique(),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    maxUses: integer("maxUses").notNull().default(1),
+    useCount: integer("useCount").notNull().default(0),
+    expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
+    revokedAt: timestamp("revokedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_community_cafe_invite_cafe").on(t.cafeId, t.createdAt),
+    index("idx_community_cafe_invite_expiry").on(t.expiresAt, t.revokedAt),
+  ],
+);
+
+export const communityCafeBans = pgTable(
+  "community_cafe_ban",
+  {
+    cafeId: text("cafeId").notNull().references(() => communityCafes.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull().default(""),
+    bannedBy: text("bannedBy").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expiresAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cafeId, t.userId] }),
+    index("idx_community_cafe_ban_cafe").on(t.cafeId, t.createdAt),
+    index("idx_community_cafe_ban_user").on(t.userId, t.expiresAt),
+  ],
+);
+
+export const communityCafeModerationLogs = pgTable(
+  "community_cafe_moderation_log",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    cafeId: text("cafeId").notNull().references(() => communityCafes.id, { onDelete: "cascade" }),
+    actorId: text("actorId").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    targetUserId: text("targetUserId").references(() => users.id, { onDelete: "set null" }),
+    targetPostId: text("targetPostId"),
+    metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_community_cafe_moderation_log_cafe").on(t.cafeId, t.createdAt),
+    index("idx_community_cafe_moderation_log_actor").on(t.actorId, t.createdAt),
+  ],
+);
 
 // ── 사이트 Q&A·의견 게시판 ─────────────────────────────────
 export const feedbackPosts = pgTable(

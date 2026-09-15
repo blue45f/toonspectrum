@@ -1086,6 +1086,7 @@ import {
 } from "./studio-magnetic-lasso-authority";
 import {
   getStudioServerAiStatus,
+  resolveActiveServerAiProviderLabel,
   type StudioServerAiProviderPreference,
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
@@ -15007,7 +15008,7 @@ const puppetWarpArmed =
     () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
     [serverAiStatus]
   );
-  const activeServerAiProviderLabel = serverAiProvider === "auto" ? (serverAiStatus?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키") : (configuredServerAiProviders.find((provider) => provider.id === serverAiProvider)?.label ?? "선택한 무료 AI");
+  const activeServerAiProviderLabel = resolveActiveServerAiProviderLabel(serverAiProvider, serverAiStatus);
   function updateServerAiProvider(next: StudioServerAiProviderPreference) {
     serverAiProviderUserRevisionRef.current += 1;
     serverAiProviderRef.current = next;

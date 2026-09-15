@@ -396,3 +396,176 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
   .creator-flagship .cf-primary { background: ButtonFace; color: ButtonText; }
   .creator-flagship .cf-stage-switcher button[aria-pressed="true"] { border-bottom: 3px solid Highlight; color: Highlight; }
 }
+
+/* Clarity-first public home: one preview, four common starts, and three next steps. */
+.creator-flagship .cf-home-preview {
+  overflow: hidden;
+  border: 1px solid var(--cf-line);
+  border-radius: 10px;
+  background: var(--cf-card);
+}
+.creator-flagship .cf-home-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.45;
+  object-fit: cover;
+  object-position: center;
+}
+.creator-flagship .cf-home-preview figcaption {
+  padding: 13px 16px;
+  color: var(--cf-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.creator-flagship .cf-start-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.creator-flagship .cf-start-card {
+  display: flex;
+  min-width: 0;
+  min-height: 260px;
+  flex-direction: column;
+  padding: 22px;
+  border: 1px solid var(--cf-line);
+  border-radius: 9px;
+  background: var(--cf-card);
+  transition: border-color .2s, transform .2s cubic-bezier(.16,1,.3,1), background .2s;
+}
+.creator-flagship .cf-start-card:hover {
+  border-color: var(--cf-accent);
+  background: var(--cf-raised);
+  transform: translateY(-3px);
+}
+.creator-flagship .cf-start-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  color: var(--cf-accent);
+  background: oklch(0.72 0.185 42 / .12);
+}
+.creator-flagship .cf-start-tag {
+  margin-top: 24px;
+  color: var(--cf-accent);
+  font-family: var(--font-display), sans-serif;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .12em;
+}
+.creator-flagship .cf-start-card strong {
+  margin-top: 9px;
+  color: var(--cf-ink);
+  font-size: 21px;
+  letter-spacing: -.04em;
+}
+.creator-flagship .cf-start-card p {
+  margin-top: 10px;
+  color: var(--cf-muted);
+  font-size: 12px;
+  line-height: 1.8;
+  word-break: keep-all;
+}
+.creator-flagship .cf-start-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 22px;
+  color: var(--cf-ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+.creator-flagship .cf-start-card:hover .cf-start-action { color: var(--cf-accent); }
+.creator-flagship .cf-more-formats { margin-top: 14px; }
+.creator-flagship .cf-support-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.creator-flagship .cf-support-grid > a {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  gap: 16px;
+  padding: 25px;
+  border: 1px solid var(--cf-line);
+  margin-right: -1px;
+  transition: background .2s;
+}
+.creator-flagship .cf-support-grid > a:hover { background: var(--cf-card); }
+.creator-flagship .cf-support-grid a > span {
+  color: var(--cf-accent);
+  font-family: var(--font-display), sans-serif;
+  font-size: 9px;
+  letter-spacing: .13em;
+}
+.creator-flagship .cf-support-grid a > svg:first-of-type { color: var(--cf-muted); }
+.creator-flagship .cf-support-grid a > strong {
+  color: var(--cf-ink);
+  font-size: 20px;
+  letter-spacing: -.03em;
+}
+.creator-flagship .cf-support-grid a > p {
+  color: var(--cf-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.creator-flagship .cf-support-grid a > svg:last-child {
+  margin-top: auto;
+  transition: transform .2s;
+}
+.creator-flagship .cf-support-grid a:hover > svg:last-child {
+  color: var(--cf-accent);
+  transform: translateX(5px);
+}
+.creator-flagship .cf-simple-closing {
+  margin-bottom: 70px;
+  padding: 58px;
+  border: 1px solid var(--cf-line);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 85% 20%, oklch(0.72 0.185 42 / .12), transparent 35%),
+    var(--cf-card);
+}
+.creator-flagship .cf-simple-closing h2 {
+  max-width: 760px;
+  margin-top: 20px;
+  white-space: pre-line;
+  color: var(--cf-ink);
+  font-size: clamp(36px, 4.2vw, 60px);
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -.055em;
+}
+.creator-flagship .cf-simple-closing > p:not(.cf-kicker) {
+  max-width: 560px;
+  margin-top: 18px;
+  color: var(--cf-muted);
+  font-size: 14px;
+  line-height: 1.9;
+}
+@media (max-width: 1000px) {
+  .creator-flagship .cf-start-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .creator-flagship .cf-home-preview img { aspect-ratio: 1.2; }
+  .creator-flagship .cf-start-grid,
+  .creator-flagship .cf-support-grid { grid-template-columns: minmax(0, 1fr); }
+  .creator-flagship .cf-start-card { min-height: 225px; }
+  .creator-flagship .cf-support-grid > a {
+    min-height: 190px;
+    margin-top: -1px;
+    margin-right: 0;
+  }
+  .creator-flagship .cf-simple-closing {
+    margin-bottom: 36px;
+    padding: 36px 24px;
+  }
+  .creator-flagship .cf-simple-closing h2 { font-size: clamp(31px, 8vw, 44px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .creator-flagship .cf-start-card:hover { transform: none; }
+  .creator-flagship .cf-support-grid a:hover > svg:last-child { transform: none; }
+}

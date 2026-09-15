@@ -22,6 +22,7 @@ export function studioServerAiProviderLabel(provider: StudioServerAiProvider): s
   return LABELS[provider];
 }
 
+
 export interface StudioServerAiFailoverMetadata {
   attemptedProvider: StudioServerAiProvider;
   attemptedModel: string;
@@ -61,6 +62,16 @@ export type StudioServerAiStatus = {
     globalDailyTokenLimit?: number;
   };
 };
+
+export function resolveActiveServerAiProviderLabel(
+  preference: StudioServerAiProviderPreference,
+  status: Pick<StudioServerAiStatus, "configured" | "providers"> | null,
+): string {
+  if (preference === "auto") {
+    return status?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키";
+  }
+  return status?.providers.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
+}
 
 export type StudioServerAiCompletion = {
   content: string;

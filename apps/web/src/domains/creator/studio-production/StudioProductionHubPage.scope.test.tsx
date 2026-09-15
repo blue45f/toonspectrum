@@ -85,7 +85,7 @@ function LocationProbe() {
 describe("production scope at the actual React page", () => {
   it.each(["work", "remix"])("loads %s query identity and retains every destination", async (kind) => {
     mount(`/studio/share?scope=${kind}%3Achapter-1`);
-    await screen.findByText(kind === "work" ? "서버 저장됨" : "SQLite/OPFS 저장됨");
+    await screen.findByText(kind === "work" ? "팀에 저장됨" : "이 기기에 저장됨");
     if (kind === "work") {
       expect(server.loadWorkspace).toHaveBeenCalledWith("chapter-1");
       expect(database.kvGet).not.toHaveBeenCalled();
@@ -99,7 +99,7 @@ describe("production scope at the actual React page", () => {
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(
       `/studio/${kind}/chapter-1/canvas`,
     );
-    expect(screen.getByRole("link", { name: "프로젝트" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "홈" }).getAttribute("href")).toBe(
       `/studio/projects?scope=${kind}%3Achapter-1`,
     );
     expect(screen.getByRole("link", { name: "참여" }).getAttribute("href")).toBe(
@@ -133,7 +133,7 @@ describe("production scope at the actual React page", () => {
         <Harness />
       </MemoryRouter>,
     );
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("이 기기에 저장됨");
     fireEvent.click(screen.getByRole("button", { name: "다른 작품" }));
     await waitFor(() => expect(database.kvGet).toHaveBeenLastCalledWith(
       "studio-production-command-center-v1",
@@ -147,7 +147,7 @@ describe("production scope at the actual React page", () => {
 
   it("does not steal typing or IME keyboard events for workspace shortcuts", async () => {
     mount("/studio/share?scope=remix%3Aa");
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("이 기기에 저장됨");
     const input = screen.getByRole("textbox", { name: "프로젝트 제목" });
     fireEvent.keyDown(input, { key: "1", altKey: true });
     expect(document.querySelector("[data-scope-key]")?.getAttribute("data-scope-key")).toBe("remix:a");
@@ -164,7 +164,7 @@ describe("production scope at the actual React page", () => {
 
   it("does not seed fake work or review data into a real work scope", async () => {
     mount("/studio/projects?scope=work%3Achapter-1", "projects");
-    await screen.findByText("서버 저장됨");
+    await screen.findByText("팀에 저장됨");
 
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
       "server-work",
@@ -178,12 +178,12 @@ describe("production scope at the actual React page", () => {
   it("shows seeded content only for an explicit draft demo", async () => {
     mount("/studio/projects?demo=1", "projects");
 
-    await screen.findByText("데모 · 저장 안 함");
+    await screen.findByText("샘플 · 저장 안 함");
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
       "demo",
     );
     expect(screen.getByText("대사와 장면 의도 확정")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "검토" }).getAttribute("href")).toBe(
       "/studio/review?demo=1",
     );
     expect(screen.getByRole("link", { name: "공유" }).getAttribute("href")).toBe(
@@ -203,7 +203,7 @@ describe("production scope at the actual React page", () => {
         <StudioProductionHubPage surface="projects" onOpenStudio={vi.fn()} />
       </MemoryRouter>,
     );
-    await screen.findByText("데모 · 저장 안 함");
+    await screen.findByText("샘플 · 저장 안 함");
 
     fireEvent.keyDown(window, { key: "2", altKey: true });
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe(
@@ -213,12 +213,12 @@ describe("production scope at the actual React page", () => {
 
   it("ignores a demo query for saved work scopes", async () => {
     mount("/studio/projects?scope=work%3Achapter-1&demo=1", "projects");
-    await screen.findByText("서버 저장됨");
+    await screen.findByText("팀에 저장됨");
 
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
       "server-work",
     );
-    expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "검토" }).getAttribute("href")).toBe(
       "/studio/work/chapter-1/review",
     );
     expect(screen.queryByText("대사와 장면 의도 확정")).toBeNull();
@@ -226,7 +226,7 @@ describe("production scope at the actual React page", () => {
 
   it("fails closed instead of treating local tokens as share authority", async () => {
     mount("/studio/share?scope=remix%3Achapter-1");
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("이 기기에 저장됨");
 
     expect(screen.getByText("이 모드에서는 초대 링크를 만들 수 없습니다")).toBeTruthy();
     expect(screen.getByText(/인증 토큰으로 인정하지 않습니다/u)).toBeTruthy();
@@ -235,7 +235,7 @@ describe("production scope at the actual React page", () => {
 
   it("does not grant membership from an unverified invite parameter", async () => {
     mount("/studio/join?scope=work%3Achapter-1&invite=ts-local-token", "join");
-    await screen.findByText("서버 저장됨");
+    await screen.findByText("팀에 저장됨");
 
     expect(screen.getByText("이 링크는 서버에서 검증되지 않았습니다")).toBeTruthy();
     expect(screen.getByText(/권한 부여 안 됨/u)).toBeTruthy();
