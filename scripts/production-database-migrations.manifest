@@ -54,4 +54,5 @@ apps/api/src/db/migrations/0053_production_collaboration_core.sql
 apps/api/src/db/migrations/0054_production_external_integrations.sql
 apps/api/src/db/migrations/0055_personal_cloud_cutover_marker.sql
 apps/api/src/db/migrations/0056_studio_ai_free_pool_contract.sql
-apps/api/src/db/migrations/0057_studio_ai_free_provider_expansion.sql
+apps/api/src/db/migrations/0057_community_threaded_comments.sql
+apps/api/src/db/migrations/0058_studio_ai_free_provider_expansion.sql

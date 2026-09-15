@@ -144,10 +144,10 @@ describe("database integration runner CI policy", () => {
     // The bundle-only build the browser gates use must be exactly the `vite build` half of
     // `build`: tsc is `noEmit`, so the dist is byte-identical and `typecheck` proves the types.
     expect(packageManifest.scripts?.build).toBe(
-      "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
+      "NODE_OPTIONS='--max-old-space-size=12288' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=12288' vite build",
     );
     expect(packageManifest.scripts?.["build:bundle"]).toBe(
-      "NODE_OPTIONS='--max-old-space-size=8192' vite build",
+      "NODE_OPTIONS='--max-old-space-size=12288' vite build",
     );
     // pnpm runs `pre<script>`/`post<script>` around any script name. `build` gets the catalog
     // generation (apps/web/public/data/ is gitignored, so without it the bundle ships no catalog) and the
