@@ -46,7 +46,7 @@ vi.mock("./studio-unified-asset-catalog", async (importOriginal) => {
   };
 });
 
-function useContract(source: StudioUnifiedAssetSource): {
+function contractForSource(source: StudioUnifiedAssetSource): {
   useMode: StudioUnifiedAssetItem["useMode"];
   useLabel: string;
 } {
@@ -63,7 +63,7 @@ function useContract(source: StudioUnifiedAssetSource): {
 }
 
 function createItem(source: StudioUnifiedAssetSource): StudioUnifiedAssetItem {
-  const contract = useContract(source);
+  const contract = contractForSource(source);
   return {
     id: "test:item",
     category:
@@ -117,7 +117,7 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
   return { toolBelt, stableHandlers, setMenu };
 }
 
-async function useAsset(item: StudioUnifiedAssetItem): Promise<void> {
+async function clickAssetUseButton(item: StudioUnifiedAssetItem): Promise<void> {
   fireEvent.click(
     await screen.findByRole("button", {
       name: `${item.title} ${item.useLabel}`,
@@ -130,7 +130,7 @@ async function renderRoute(source: StudioUnifiedAssetSource) {
   mocks.catalog = [item];
   const context = createToolBelt();
   render(<StudioAssetToolPopoverWorkspace toolBelt={context.toolBelt} />);
-  await useAsset(item);
+  await clickAssetUseButton(item);
   return { ...context, item };
 }
 
@@ -176,7 +176,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
       : stableHandlers.addCatalogElement;
     insert.mockReturnValue(accepted);
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
-    await useAsset(item);
+    await clickAssetUseButton(item);
     if (accepted) {
       expect(await screen.findByText("테스트 에셋을(를) 캔버스에 삽입했습니다.")).toBeTruthy();
     } else {
