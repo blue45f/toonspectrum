@@ -1,6 +1,5 @@
 import {
   CheckCircle2,
-  Copy,
   CloudOff,
   Copy,
   Download,
@@ -534,14 +533,6 @@ export function StudioSaveFirstProjectLibraryPage({
                         <button type="button" onClick={() => duplicateProject(project)} aria-label={locale === "ko" ? "프로젝트 복제" : "Duplicate project"} className={buttonClass({ variant: "quiet", size: "icon" })}><Copy size={15} aria-hidden="true" /></button>
                       </div>
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { library.duplicate(project.id); }}
-                          className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-fg-3 hover:text-fg"
-                        >
-                          <Copy size={12} aria-hidden="true" />
-                          {locale === "ko" ? "프로젝트 복제" : "Duplicate project"}
-                        </button>
                         <button type="button" onClick={() => { library.archive(project.id); }} className="text-[0.68rem] font-semibold text-fg-3 hover:text-fg">{locale === "ko" ? "보관" : "Archive"}</button>
                         <button type="button" onClick={() => { library.trash(project.id); }} className="text-[0.68rem] font-semibold text-danger">{locale === "ko" ? "휴지통" : "Trash"}</button>
                       </div>

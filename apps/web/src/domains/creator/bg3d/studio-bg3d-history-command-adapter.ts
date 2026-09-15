@@ -95,9 +95,17 @@ export function ensureStudioBg3dHistoryCommandTimeline(
 }
 
 export function clearStudioBg3dCommandHistory(refs: StudioBg3dHistoryCommandRefs): void {
-  refs.historyCommandTimelineRef.current = null;
-  refs.historyRef.current = [];
-  refs.historyIndexRef.current = -1;
+  // Defensive: restore/readiness harnesses and remount paths may pass a partial refs bag.
+  // Never crash production restore effects when a ref object is missing.
+  if (refs.historyCommandTimelineRef) {
+    refs.historyCommandTimelineRef.current = null;
+  }
+  if (refs.historyRef) {
+    refs.historyRef.current = [];
+  }
+  if (refs.historyIndexRef) {
+    refs.historyIndexRef.current = -1;
+  }
 }
 
 export function resetStudioBg3dCommandHistory(

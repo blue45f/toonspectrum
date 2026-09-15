@@ -103,4 +103,12 @@ describe("Studio BG3D legacy history command adapter", () => {
     expect(state.historyRef.current).toEqual([]);
     expect(state.historyIndexRef.current).toBe(-1);
   });
+
+  it("tolerates a partial refs bag without throwing", () => {
+    expect(() => clearStudioBg3dCommandHistory({} as StudioBg3dHistoryCommandRefs)).not.toThrow();
+    expect(() => clearStudioBg3dCommandHistory({
+      historyRef: { current: [snapshot(0)] },
+      historyIndexRef: { current: 0 },
+    } as StudioBg3dHistoryCommandRefs)).not.toThrow();
+  });
 });
