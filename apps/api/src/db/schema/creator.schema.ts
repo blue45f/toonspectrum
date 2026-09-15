@@ -1616,11 +1616,50 @@ export const creatorWorkComments = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    parentId: text("parentId"),
     text: text("text").notNull(),
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
-    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+    deletedAt: timestamp("deletedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date" })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index("idx_creator_work_comment_work").on(t.workId, t.createdAt)]
+  (t) => [
+    unique("creator_work_comment_work_id_unique").on(t.workId, t.id),
+    foreignKey({
+      columns: [t.workId, t.parentId],
+      foreignColumns: [t.workId, t.id],
+      name: "creator_work_comment_parent_fkey",
+    }).onDelete("cascade"),
+    index("idx_creator_work_comment_work").on(t.workId, t.createdAt),
+    index("idx_creator_work_comment_parent").on(t.parentId, t.createdAt),
+    check(
+      "creator_work_comment_parent_not_self_check",
+      sql`${t.parentId} is null or ${t.parentId} <> ${t.id}`
+    ),
+  ]
+);
+
+export const creatorWorkCommentLikes = pgTable(
+  "creator_work_comment_like",
+  {
+    commentId: text("commentId")
+      .notNull()
+      .references(() => creatorWorkComments.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.commentId, t.userId] }),
+    index("idx_creator_work_comment_like_user").on(t.userId, t.createdAt),
+  ]
 );
 
 

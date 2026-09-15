@@ -1,10 +1,17 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { PROMOTION_KINDS, PROMOTION_STAGES, PROMOTION_GENRES, promotionCursor, promotionKey, promotionRecord, promotionText, validatePromotion } from "../../../../../packages/core/src/promotion";
-import { db, promotionBookmarks, promotionComments, promotionPosts, promotionReports, users } from "../../db";
+import { db, promotionBookmarks, promotionPosts, promotionReports, users } from "../../db";
 import { isOfficialUser } from "../../server/feedback";
 import { escapeLikePattern } from "../../server/sql-like";
 import type { PromotionPost } from "../../../../../packages/core/src/promotion";
+import {
+  addPromotionComment,
+  deletePromotionComment,
+  listPromotionComments,
+  togglePromotionCommentLike,
+  updatePromotionComment,
+} from "./promotion-comments";
 
 const visible = () => and(eq(promotionPosts.hidden, false), eq(promotionPosts.archived, false));
 function fields(viewerId?: string) {
@@ -59,8 +66,8 @@ export class PromotionService {
   }
   async detail(id: string, viewerId?: string) {
     const detail = await this.accessible(id, viewerId);
-    const comments = await db.select({ id: promotionComments.id, text: promotionComments.text, userId: promotionComments.userId, name: users.name, createdAt: promotionComments.createdAt }).from(promotionComments).innerJoin(users, eq(users.id, promotionComments.userId)).where(eq(promotionComments.postId, id)).orderBy(desc(promotionComments.createdAt), desc(promotionComments.id)).limit(50);
-    return { ...detail, comments: comments.reverse().map((row) => ({ id: row.id, text: row.text, author: { id: row.userId, name: row.name ?? "독자" }, createdAt: row.createdAt.toISOString() })) };
+    const comments = await listPromotionComments(id, viewerId);
+    return { ...detail, comments };
   }
   async create(userId: string, input: unknown) {
     const parsed = validatePromotion(input);
@@ -100,19 +107,58 @@ export class PromotionService {
     return { saved: body.saved };
   }
   async comment(id: string, userId: string, input: unknown) {
-    const text = promotionText(promotionRecord(input).text);
-    if (text.length < 1 || text.length > 1000) throw new BadRequestException("댓글은 1~1000자로 입력해 주세요.");
     const { post } = await this.accessible(id, userId);
-    if (post.hidden || post.archived) throw new ConflictException("비공개 게시물에는 댓글을 작성할 수 없어요.");
-    await db.insert(promotionComments).values({ id: crypto.randomUUID(), postId: id, userId, text, createdAt: new Date() });
-    return { created: true };
+    if (post.hidden || post.archived) {
+      throw new ConflictException("비공개 게시물에는 댓글을 작성할 수 없어요.");
+    }
+    try {
+      return await addPromotionComment(id, userId, input);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글을 작성할 수 없어요.",
+      );
+    }
   }
+
+  async updateComment(id: string, commentId: string, userId: string, input: unknown) {
+    const { post } = await this.accessible(id, userId);
+    if (post.hidden || post.archived) {
+      throw new ConflictException("비공개 게시물의 댓글은 수정할 수 없어요.");
+    }
+    try {
+      return await updatePromotionComment(id, commentId, userId, input);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글을 수정할 수 없어요.",
+      );
+    }
+  }
+
   async deleteComment(id: string, commentId: string, userId: string) {
     const { canModerate } = await this.accessible(id, userId);
-    const rows = await db.delete(promotionComments).where(and(eq(promotionComments.id, commentId), eq(promotionComments.postId, id), canModerate ? undefined : eq(promotionComments.userId, userId))).returning({ id: promotionComments.id });
-    if (!rows.length) throw new ForbiddenException("본인 댓글만 삭제할 수 있어요.");
-    return { deleted: true };
+    try {
+      return await deletePromotionComment(id, commentId, userId, canModerate);
+    } catch (error) {
+      throw new ForbiddenException(
+        error instanceof Error ? error.message : "댓글을 삭제할 수 없어요.",
+      );
+    }
   }
+
+  async toggleCommentLike(id: string, commentId: string, userId: string) {
+    const { post } = await this.accessible(id, userId);
+    if (post.hidden || post.archived) {
+      throw new ConflictException("비공개 게시물의 댓글에는 반응할 수 없어요.");
+    }
+    try {
+      return await togglePromotionCommentLike(id, commentId, userId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글 반응을 처리할 수 없어요.",
+      );
+    }
+  }
+
   async report(id: string, userId: string, input: unknown) {
     const reason = promotionText(promotionRecord(input).reason);
     if (reason.length < 10 || reason.length > 1000) throw new BadRequestException("신고 사유는 10~1000자로 입력해 주세요.");

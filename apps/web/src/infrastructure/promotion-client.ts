@@ -1,7 +1,7 @@
 import { api } from "./api";
-import { assertPromotionPage, isPromotionPost, promotionRecord } from "../../../../packages/core/src/promotion";
+import { assertPromotionPage, isPromotionComment, isPromotionPost, promotionRecord } from "../../../../packages/core/src/promotion";
 
-import type { PromotionDetail, PromotionInput, PromotionReport } from "../../../../packages/core/src/promotion";
+import type { PromotionComment, PromotionDetail, PromotionInput, PromotionReport } from "../../../../packages/core/src/promotion";
 
 const root = "/promotions";
 const path = (id: string) => `${root}/posts/${encodeURIComponent(id)}`;
@@ -15,7 +15,7 @@ export const promotionClient = {
     const data = await api.get<PromotionDetail>(path(id), { ...options, signal });
     if (!data || !isPromotionPost(data.post) || data.post.id !== id || !Array.isArray(data.comments)
       || typeof data.canManage !== "boolean" || typeof data.canModerate !== "boolean"
-      || data.comments.some((comment) => typeof comment?.id !== "string" || typeof comment.text !== "string" || typeof comment.author?.id !== "string" || typeof comment.author.name !== "string")) throw new Error("게시물 응답을 확인하지 못했어요.");
+      || data.comments.some((comment) => !isPromotionComment(comment))) throw new Error("게시물 응답을 확인하지 못했어요.");
     return data;
   },
   async create(input: PromotionInput): Promise<{ id: string }> {
@@ -27,8 +27,14 @@ export const promotionClient = {
   update: (id: string, input: PromotionInput, version: number) => api.patch(path(id), { ...input, version }, options),
   archive: (id: string, archived: boolean, version: number) => api.patch(`${path(id)}/archive`, { archived, version }, options),
   save: (id: string, saved: boolean) => api.post(`${path(id)}/bookmark`, { saved }, options),
-  comment: (id: string, text: string) => api.post(`${path(id)}/comments`, { text }, options),
-  deleteComment: (id: string, commentId: string) => api.delete(`${path(id)}/comments/${encodeURIComponent(commentId)}`, options),
+  comment: (id: string, text: string, parentId: string | null = null) =>
+    api.post<PromotionComment>(`${path(id)}/comments`, { text, parentId }, options),
+  updateComment: (id: string, commentId: string, text: string) =>
+    api.patch<PromotionComment>(`${path(id)}/comments/${encodeURIComponent(commentId)}`, { text }, options),
+  toggleCommentLike: (id: string, commentId: string) =>
+    api.post<{ liked: boolean; likes: number }>(`${path(id)}/comments/${encodeURIComponent(commentId)}/like`, {}, options),
+  deleteComment: (id: string, commentId: string) =>
+    api.delete<{ deleted: true; soft: boolean; removedIds: string[] }>(`${path(id)}/comments/${encodeURIComponent(commentId)}`, options),
   report: (id: string, reason: string) => api.post(`${path(id)}/reports`, { reason }, options),
   async reports(signal?: AbortSignal): Promise<PromotionReport[]> {
     const data = await api.get<PromotionReport[]>(`${root}/reports`, { ...options, signal });

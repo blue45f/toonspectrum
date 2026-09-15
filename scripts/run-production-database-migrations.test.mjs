@@ -5,6 +5,8 @@ import { expect, test } from "vitest";
 import {
   POST_BASELINE_RELATIONS,
   buildAuthRuntimeAclSql,
+  buildCommunityCommentRuntimeAclSql,
+  buildCommunityCommentRuntimeAclViolationSql,
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
@@ -29,12 +31,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(56);
+  expect(manifest).toHaveLength(57);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0056_studio_ai_free_pool_contract",
+    "0057_community_threaded_comments",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(56);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(57);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
@@ -105,6 +107,42 @@ test("AI Comic Director migration provisions the complete durable workflow schem
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("community comments migration provisions threads, edit state, reactions, and bounded ACL", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0057_community_threaded_comments",
+  );
+  expect(migration?.id).toBe("0057_community_threaded_comments");
+  const sql = migration?.contents ?? "";
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "parentId" text',
+    'ADD COLUMN IF NOT EXISTS "deletedAt"',
+    'ADD COLUMN IF NOT EXISTS "updatedAt"',
+    'creator_work_comment_work_id_unique',
+    'UNIQUE ("workId", "id")',
+    'creator_work_comment_parent_fkey',
+    'creator_promotion_comment_post_id_unique',
+    'UNIQUE ("postId", "id")',
+    'creator_promotion_comment_parent_fkey',
+    'REFERENCES public."creator_work_comment" ("workId", "id")\n      ON DELETE CASCADE',
+    'REFERENCES public."creator_promotion_comment" ("postId", "id")\n      ON DELETE CASCADE',
+    'CREATE TABLE IF NOT EXISTS public."creator_work_comment_like"',
+    'CREATE TABLE IF NOT EXISTS public."creator_promotion_comment_like"',
+    'ON DELETE CASCADE',
+    'REVOKE ALL ON TABLE',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+
+  const grant = buildCommunityCommentRuntimeAclSql("toonspectrum_runtime");
+  expect(grant).toContain('public.creator_work_comment_like');
+  expect(grant).toContain('public.creator_promotion_comment_like');
+  expect(grant).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE');
+  expect(grant).toContain('TO "toonspectrum_runtime"');
+  expect(buildCommunityCommentRuntimeAclViolationSql("toonspectrum_runtime"))
+    .toContain("has_table_privilege");
 });
 
 test("personal cloud runtime ACL grants only bounded credential DML", () => {
@@ -807,10 +845,12 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_portfolio_entry",
     "creator_promotion_bookmark",
     "creator_promotion_comment",
+    "creator_promotion_comment_like",
     "creator_promotion_post",
     "creator_promotion_report",
     "creator_work_asset_storage_reference",
     "creator_work_bookmark",
+    "creator_work_comment_like",
     "creator_work_catalog_asset_binding",
     "creator_studio_personal_kit",
     "creator_work_production_workspace",
