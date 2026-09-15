@@ -34,6 +34,11 @@ describe("StudioShortcutsHelp search and familiar operations", () => {
 
     fireEvent.change(search, { target: { value: "⌘Z" } });
     expect(screen.getByText("실행취소")).toBeTruthy();
+
+    fireEvent.change(search, { target: { value: "가로 스크롤" } });
+    expect(screen.getByText("검색 결과 1개")).toBeTruthy();
+    expect(screen.getByText("⇧ + Wheel")).toBeTruthy();
+    expect(screen.getByText("화면 이동(팬)")).toBeTruthy();
   });
 
   it("검색 결과가 없을 때 전체 목록으로 돌아가는 복구 동작을 제공한다", () => {

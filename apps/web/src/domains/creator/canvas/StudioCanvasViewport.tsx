@@ -312,6 +312,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         ref={wrapRef}
         data-studio-canvas-viewport
         data-studio-hand-navigation="pointer-capture-v2"
+        data-studio-horizontal-wheel-navigation="shift-wheel-v1"
         data-studio-hand-shortcut={
           appSettings.shortcuts["tool-hand"] || undefined
         }
@@ -330,7 +331,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         aria-keyshortcuts={handAriaShortcuts}
         aria-label={localizeText(
           t,
-          "작업 캔버스 — H로 핸드 전환, 스페이스·드래그, 설정된 보조 버튼·드래그 또는 방향키로 이동",
+          "작업 캔버스 — 휠로 세로 이동, Shift+휠로 가로 이동, H·스페이스·휠 버튼 드래그 또는 방향키로 자유 이동",
           "studio.canvas.canvasAriaLabel"
         )}
         onDragLeave={onWrapDragLeave}
