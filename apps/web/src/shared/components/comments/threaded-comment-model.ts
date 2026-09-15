@@ -25,6 +25,12 @@ export interface ThreadedCommentNode<T extends ThreadedCommentRecord> {
   depth: number;
 }
 
+export interface ThreadedCommentDeleteResult {
+  deleted: true;
+  soft: boolean;
+  removedIds: string[];
+}
+
 function timestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -99,5 +105,44 @@ export function buildThreadedCommentForest<T extends ThreadedCommentRecord>(
 }
 
 export function countActiveComments(comments: readonly ThreadedCommentRecord[]): number {
-  return comments.reduce((count, comment) => count + (comment.deleted ? 0 : 1), 0);
+  return comments.reduce((count, comment) => count + (comment.deleted || comment.hidden ? 0 : 1), 0);
+}
+
+export function replaceThreadedComment<T extends ThreadedCommentRecord>(
+  comments: readonly T[],
+  replacement: T,
+): T[] {
+  return comments.map((comment) => comment.id === replacement.id ? replacement : comment);
+}
+
+export function applyThreadedCommentLike<T extends ThreadedCommentRecord>(
+  comments: readonly T[],
+  commentId: string,
+  result: { liked: boolean; likes: number },
+): T[] {
+  return comments.map((comment) => comment.id === commentId
+    ? { ...comment, viewerLiked: result.liked, likes: result.likes }
+    : comment);
+}
+
+export function applyThreadedCommentDelete<T extends ThreadedCommentRecord>(
+  comments: readonly T[],
+  commentId: string,
+  result: ThreadedCommentDeleteResult,
+): T[] {
+  if (result.soft) {
+    const updatedAt = new Date().toISOString();
+    return comments.map((comment) => comment.id === commentId
+      ? {
+          ...comment,
+          text: "",
+          deleted: true,
+          likes: 0,
+          viewerLiked: false,
+          updatedAt,
+        }
+      : comment);
+  }
+  const removedIds = new Set(result.removedIds.length > 0 ? result.removedIds : [commentId]);
+  return comments.filter((comment) => !removedIds.has(comment.id));
 }

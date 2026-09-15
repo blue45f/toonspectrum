@@ -569,7 +569,7 @@ export const creatorWorkAssetTombstones = pgTable(
     assetId: text("assetId").notNull(),
     elementType: text("elementType").notNull(),
     deletedBy: text("deletedBy"),
-    deletedAt: timestamp("deletedAt", { mode: "date" }).notNull().defaultNow(),
+    deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     foreignKey({
@@ -652,10 +652,10 @@ export const creatorWorkProductionWorkspaces = pgTable(
     revision: integer("revision").notNull().default(0),
     document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
     updatedBy: text("updatedBy").references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -687,10 +687,10 @@ export const creatorStudioPersonalKits = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     revision: integer("revision").notNull().default(0),
     document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -728,10 +728,10 @@ export const creatorWorkReviewLinks = pgTable(
     expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
     revokedAt: timestamp("revokedAt", { mode: "date", withTimezone: true }),
     createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -923,10 +923,10 @@ export const creatorWorkTeamCommentThreads = pgTable(
     lastActivitySequence: bigint("lastActivitySequence", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -1361,10 +1361,10 @@ export const creatorWorkReleases = pgTable(
     manifest: jsonb("manifest").$type<Record<string, unknown>>().notNull(),
     state: text("state").notNull().default("review"),
     publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -1397,10 +1397,10 @@ export const creatorWorkReleaseApprovals = pgTable(
     state: text("state").notNull().default("pending"),
     note: text("note").notNull().default(""),
     decidedAt: timestamp("decidedAt", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -1442,10 +1442,10 @@ export const creatorWorkPublications = pgTable(
     scheduledAt: timestamp("scheduledAt", { mode: "date", withTimezone: true }),
     publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
     unpublishedAt: timestamp("unpublishedAt", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -1495,10 +1495,10 @@ export const creatorPortfolioEntries = pgTable(
     releaseId: text("releaseId").notNull(),
     position: integer("position").notNull().default(0),
     featured: boolean("featured").notNull().default(false),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -1540,10 +1540,10 @@ export const creatorExternalPublications = pgTable(
     externalUrl: text("externalUrl").notNull(),
     status: text("status").notNull().default("draft"),
     publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("createdAt", { mode: "date" })
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" })
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
   },

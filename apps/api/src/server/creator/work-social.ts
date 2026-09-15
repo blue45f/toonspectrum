@@ -11,6 +11,7 @@ import {
 
 import {
   authorOf,
+  excludeTestUserId,
   MAX_COMMENT,
   normalizeMultiline,
   safeDate,
@@ -18,7 +19,6 @@ import {
 import { assertPublicCreatorWork } from "./works";
 
 import type { CreatorWorkComment } from "./works-contract";
-import type { SQL } from "drizzle-orm";
 
 const MAX_COMMENT_DEPTH = 4;
 
@@ -101,7 +101,7 @@ async function assertReplyParent(
   while (cursor) {
     if (visited.has(cursor)) throw new Error("댓글 연결 구조를 확인해 주세요.");
     visited.add(cursor);
-    if (visited.size > MAX_COMMENT_DEPTH) {
+    if (visited.size >= MAX_COMMENT_DEPTH) {
       throw new Error(`대댓글은 ${MAX_COMMENT_DEPTH}단계까지 작성할 수 있습니다.`);
     }
     const [parent] = await db
@@ -171,7 +171,10 @@ export async function toggleLike(
   const [count] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(creatorWorkLikes)
-    .where(eq(creatorWorkLikes.workId, workId));
+    .where(and(
+      eq(creatorWorkLikes.workId, workId),
+      excludeTestUserId(creatorWorkLikes.userId),
+    ));
   return { liked, likes: Number(count?.count ?? 0) };
 }
 
