@@ -114,7 +114,13 @@ function parseJson(raw: string | null): unknown {
 }
 
 function normalizeServerAiProvider(value: unknown): StudioServerAiProviderPreference {
-  return value === "zai" || value === "deepseek" || value === "openrouter" ? value : "auto";
+  return value === "gemini"
+    || value === "groq"
+    || value === "openrouter"
+    || value === "zai"
+    || value === "deepseek"
+    ? value
+    : "auto";
 }
 
 function assetFavoritesKey(userId: string | null): string {

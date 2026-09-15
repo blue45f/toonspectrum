@@ -2,6 +2,7 @@ import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
 export const StudioAiTaskSchema = z.enum([
+  "assistant",
   "composition",
   "scenario",
   "translation",
@@ -9,7 +10,7 @@ export const StudioAiTaskSchema = z.enum([
   "palette",
 ]);
 
-export const StudioAiProviderPreferenceSchema = z.enum(["auto", "zai", "deepseek", "openrouter"]);
+export const StudioAiProviderPreferenceSchema = z.enum(["auto", "gemini", "groq", "openrouter", "zai", "deepseek"]);
 
 export const StudioAiChatSchema = z
   .object({

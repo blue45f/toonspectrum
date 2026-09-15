@@ -3,6 +3,40 @@
 The server-backed Studio AI path is fail-closed and uses PostgreSQL as the
 cross-instance quota authority.
 
+## Automatic free provider routing
+
+Production text AI is free-first and fail-closed. The default shared pool order is:
+
+1. Gemini free tier;
+2. Groq free tier;
+3. OpenRouter free router.
+
+`STUDIO_AI_FREE_PROVIDER_ORDER` may reorder only those reviewed providers. A
+provider is eligible only when the shared pool is enabled, its server-side key
+is present, its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is present,
+and—on OpenRouter—the model is `openrouter/free` or ends in `:free`.
+
+The confirmation flag is a deployment assertion that billing is disabled or a
+provider-side hard free-only boundary exists. It is not an automatic billing
+inspection. Credentials remain server-side and must never use a `VITE_`
+variable.
+
+The server advances to the next shared provider only when `402` or `429`
+definitively rejects the request before inference because the current free
+route cannot accept more work. Network errors, timeouts, `5xx`, malformed
+success responses, authentication errors, and post-acceptance failures are not
+replayed elsewhere. This avoids duplicate inference after an ambiguous outcome.
+
+When every shared route is unavailable because of a free-capacity or request
+limit, the browser tries the user's policy-validated personal free connection,
+then the remaining personal connections in deterministic quality order. If no
+free route can run, the client directs the user to `/settings/ai` to add a
+personal free key or local AI and otherwise leaves the feature unavailable. It
+never selects a paid model or silently enables billing.
+
+Shared providers are text-only. Image, video, and 3D generation remain local,
+self-hosted, or explicitly configured personal integrations.
+
 ## Privacy contract
 
 `studio_ai_usage_ledger` stores only:
@@ -24,7 +58,7 @@ provider error bodies, client IPs, or the provider-facing pseudonymous user ID.
    request and a conservative token upper bound in both the global UTC-day row
    and the `(user, UTC day)` row. The global row is always locked first, making
    service-wide and per-user admission atomic across all API instances.
-2. No database transaction remains open during a Z.ai or DeepSeek HTTP request.
+2. No database transaction remains open during an external provider HTTP request.
 3. A short transaction releases both reservations, charges returned token
    usage to both quota rows, and inserts the terminal ledger event together.
 4. The UTC day comes from the PostgreSQL clock, not an API instance clock. A
@@ -46,7 +80,11 @@ columns remain `NULL`; estimated values are never presented as provider facts.
   that UTC day. This intentionally favors budget safety over availability and
   automatically stops affecting admission after the next UTC boundary.
 
-### Billing-only provider failover
+### Legacy billing-only provider failover
+
+The following compatibility behavior applies only to the retired paid-provider
+regression path used by tests and older deployments. Production free-pool mode
+ignores those legacy credentials.
 
 The service may send the prompt to the next configured provider only when the
 first provider gives a documented, machine-verifiable rejection that happens
@@ -89,7 +127,10 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_DAILY_TOKEN_LIMIT`, `STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT`, and
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
-Apply `apps/api/src/db/migrations/0001_studio_ai_usage_ledger.sql` and
-`apps/api/src/db/migrations/0014_studio_ai_global_daily_quota.sql` (or the equivalent
-`drizzle-kit push`) before deploying the quota-enforcing API build. If any
-quota table is missing, Studio AI safely returns `503` before provider use.
+Apply the production migration manifest through
+`apps/api/src/db/migrations/0053_studio_ai_free_pool_contract.sql` before deploying
+this API build. Migration `0053` expands idempotency receipts to three provider
+attempts and admits the `assistant`, `gemini`, and `groq` usage-ledger values used
+by the shared free pool. The schema preflight rejects an incomplete contract,
+and quota/admission storage failures return a sanitized error before provider
+use.

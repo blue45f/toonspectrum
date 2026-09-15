@@ -32,7 +32,7 @@ export const STUDIO_AI_IDEMPOTENCY_CANONICAL_CHECK_DEFINITIONS: Readonly<
   studio_ai_request_receipt_status_check:
     `CHECK ("status" = ANY (ARRAY['admitted'::text, 'sent'::text, 'succeeded'::text, 'ambiguous'::text]::text[]))`,
   studio_ai_request_receipt_attempt_count_check:
-    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= 2)`,
+    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= 3)`,
   studio_ai_request_receipt_expiry_check:
     `CHECK ("expiresAt" > "createdAt")`,
 };
@@ -54,7 +54,7 @@ interface ReceiptSchemaRow {
 type QueryablePool = Pick<Pool, "query">;
 
 const INCOMPLETE_SCHEMA_MESSAGE =
-  "Studio AI idempotency schema is incomplete; apply migration 0019_studio_ai_request_receipt.sql before starting the API";
+  "Studio AI idempotency schema is incomplete; apply production migrations through 0053_studio_ai_free_pool_contract.sql before starting the API";
 
 function compactDefault(value: unknown): string | null {
   if (typeof value !== "string") return null;

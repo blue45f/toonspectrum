@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { completeUserAiText } from "@/shared/ai/user-ai-transport";
-import { useUserAi } from "@/shared/ai/user-ai-store";
-
+import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
@@ -20,9 +18,7 @@ import type { PromoPanel, PromoProject } from "./promo-model";
 import "./promo-studio.css";
 
 export function StudioPromoPage() {
-  const userAi = useUserAi();
-  const configured = Boolean(userAi.configuration.assignments.text);
-  const aiStatus = configured ? "무료 전용 AI 연결됨" : "무료 AI 미설정 · 로컬 템플릿 사용 가능";
+  const aiStatus = "자동 무료 AI 우선 · 한도·요청 제한 시 개인 무료 연결";
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
   const [undo, setUndo] = useState<PromoProject[]>([]);
   const [redo, setRedo] = useState<PromoProject[]>([]);
@@ -136,9 +132,10 @@ export function StudioPromoPage() {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     try {
       const prompt = promoAiPrompt(project);
-      const content = await completeUserAiText(prompt.system, prompt.user, controller.signal);
+      const result = await completeAutomaticFreeText(prompt.system, prompt.user, controller.signal);
+      if (!result.ok) throw new Error(result.error);
       if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
-      const panels = parsePromoAiPlan(content, project);
+      const panels = parsePromoAiPlan(result.data.content, project);
       patch({ panels });
       setMessage("무료 텍스트 AI 구성 적용 · 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.");
     } catch (reason) { failed(reason, controller.signal); } finally { clearTimeout(timeout); finish(controller); }
@@ -193,7 +190,7 @@ export function StudioPromoPage() {
             <input id="promo-panels" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onChange={(event) => { void uploadPanels(event.target.files); event.target.value = ""; }} />
             <p className="promo-muted">자동 감지는 가로로 이어진 흰색·투명 여백을 기준으로 분할합니다. 경계가 불확실하면 원고를 한 컷으로 유지합니다. 균등 분할도 선택할 수 있으며 말풍선 경계는 직접 확인하세요. 원본 파일은 수정하지 않습니다.</p>
             <div className="promo-button-row">
-              <button type="button" className="promo-primary" disabled={busy || !configured || !project.panels.length} onClick={() => void generate()}>AI로 홍보 콘티 구성</button>
+              <button type="button" className="promo-primary" disabled={busy || !project.panels.length} onClick={() => void generate()}>자동 무료 AI로 홍보 콘티 구성</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => { patch({ panels: localPromoPlan(project) }); setMessage("로컬 연출 템플릿을 적용했어요. AI 생성 결과가 아니며 네트워크 요청 없이 동작해요."); }}>로컬 연출 템플릿</button>
               <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
               <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>

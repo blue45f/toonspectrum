@@ -28,6 +28,15 @@ type FreeAiBlockReason =
   | "payment-required"
   | "authentication";
 
+export class FreeAiRuntimeBudgetError extends Error {
+  readonly code = "free-quota-exhausted" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "FreeAiRuntimeBudgetError";
+  }
+}
+
 interface FreeAiBudgetEntry {
   day: string;
   requests: number;
@@ -364,7 +373,10 @@ export async function guardFreeAiRuntimeRequest(
     const key = scopeKey(connection);
     const entry = currentEntry(ledger, key, now);
     const blocked = blockMessage(entry, now);
-    if (blocked) throw new Error(blocked);
+    if (blocked) {
+      if (entry.blockedReason === "authentication") throw new Error(blocked);
+      throw new FreeAiRuntimeBudgetError(blocked);
+    }
     if (entry.blockedUntil !== null && entry.blockedUntil <= now) {
       entry.blockedReason = null;
       entry.blockedUntil = null;
@@ -376,7 +388,7 @@ export async function guardFreeAiRuntimeRequest(
       entry.updatedAt = now;
       ledger.entries[key] = entry;
       writeLedger(ledger);
-      throw new Error("오늘의 앱 무료 요청 안전 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
+      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 요청 안전 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
     }
     if (
       entry.reservedTokens + prepared.reservedTokens
@@ -387,7 +399,7 @@ export async function guardFreeAiRuntimeRequest(
       entry.updatedAt = now;
       ledger.entries[key] = entry;
       writeLedger(ledger);
-      throw new Error("오늘의 앱 무료 토큰 예약 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
+      throw new FreeAiRuntimeBudgetError("오늘의 앱 무료 토큰 예약 한도에 도달했습니다. UTC 자정까지 차단하며 유료 모델로 전환하지 않습니다.");
     }
 
     entry.requests += 1;

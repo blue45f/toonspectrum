@@ -400,6 +400,25 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   CREATOR_IMAGE_AI_ENABLED: z.enum(["true", "false"]).optional(),
+  // Text-only shared free pool. Each provider must be explicitly confirmed as
+  // billing-disabled/free-tier before it can become configured.
+  STUDIO_AI_FREE_POOL_ENABLED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_PROVIDER_ORDER: z
+    .string()
+    .regex(/^(gemini|groq|openrouter)(,(gemini|groq|openrouter))*$/u, "STUDIO_AI_FREE_PROVIDER_ORDER must be a free provider CSV")
+    .optional(),
+  STUDIO_AI_FREE_GEMINI_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_GEMINI_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_GEMINI_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_GEMINI_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_GEMINI_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_GROQ_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_GROQ_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_GROQ_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_GROQ_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_GROQ_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_OPENROUTER_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_OPENROUTER_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_OPENROUTER_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS must be numeric").optional(),
   DEEPSEEK_API_KEY: z.string().min(1).optional(),
   DEEPSEEK_MODEL: z.string().min(1).max(200).optional(),
   DEEPSEEK_TIMEOUT_MS: z.string().regex(/^\d+$/, "DEEPSEEK_TIMEOUT_MS must be numeric").optional(),
@@ -510,6 +529,9 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "OPENAI_API_KEY",
   "OPENROUTER_API_KEY",
   "GEMINI_API_KEY",
+  "STUDIO_AI_FREE_GEMINI_API_KEY",
+  "STUDIO_AI_FREE_GROQ_API_KEY",
+  "STUDIO_AI_FREE_OPENROUTER_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",
   "ZAI_API_KEY",

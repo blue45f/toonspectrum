@@ -14,7 +14,7 @@ import {
 const PERSONAL_RUNTIME_REQUIRED = Object.freeze({
   code: "PERSONAL_CREATOR_RUNTIME_REQUIRED",
   message: "운영측 GPU 추론 경로는 비활성화되어 있습니다. 통합 AI 설정에서 개인 Creator Runtime을 연결하세요.",
-  settingsHref: "/studio/ai-settings",
+  settingsHref: "/settings/ai",
   directBrowserConnection: true,
   operatorFunded: false,
 });
