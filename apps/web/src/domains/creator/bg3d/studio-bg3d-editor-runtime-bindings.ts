@@ -519,9 +519,10 @@ export {
 export {
   deleteBg3dTemplateV12 as deleteBg3dTemplate,
   instantiateBg3dTemplateDocument,
-  listBg3dTemplatesV12 as listBg3dTemplates,
+  loadBg3dTemplatesV12WithLegacyMigration as loadBg3dTemplates,
   saveBg3dTemplateV12 as saveBg3dTemplate,
   type Bg3dTemplateLibraryEntry,
+  type Bg3dTemplateLibraryLoadResult,
 } from "./studio-bg3d-template-library-loader";
 export {
   calculateStudioBg3dThreeReparentTransform,
@@ -603,6 +604,11 @@ export const StudioBg3dSceneTemplatePanel = createLazyComponent(() =>
   import("./StudioBg3dSceneTemplatePanel").then(({ StudioBg3dSceneTemplatePanel: Panel }) => ({
     default: Panel,
   }))
+);
+export const StudioBg3dUserTemplateLibraryPanel = createLazyComponent(() =>
+  import("./StudioBg3dUserTemplateLibraryPanel").then(({
+    StudioBg3dUserTemplateLibraryPanel: Panel,
+  }) => ({ default: Panel }))
 );
 export { StudioBg3dShapesPanel } from "./StudioBg3dShapesPanel";
 export { StudioBg3dSharedCharacterSceneContent } from "./StudioBg3dSharedCharacterSceneContent";

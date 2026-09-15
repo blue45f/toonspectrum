@@ -2,6 +2,8 @@ type StudioBg3dTemplateLibraryModule = typeof import( "./bg3d-template-library")
 
 export type Bg3dTemplateLibraryEntry =
   import( "./bg3d-template-library").Bg3dTemplateLibraryEntry;
+export type Bg3dTemplateLibraryLoadResult =
+  import( "./bg3d-template-library").Bg3dTemplateLibraryLoadResult;
 
 let studioBg3dTemplateLibraryModulePromise:
   Promise<StudioBg3dTemplateLibraryModule> | null = null;
@@ -46,6 +48,19 @@ export async function listBg3dTemplatesV12(
 ): Promise<Awaited<ReturnType<StudioBg3dTemplateLibraryModule["listBg3dTemplatesV12"]>>> {
   const library = await loadStudioBg3dTemplateLibraryModule();
   return library.listBg3dTemplatesV12(...args);
+}
+
+export async function loadBg3dTemplatesV12WithLegacyMigration(
+  ...args: Parameters<
+    StudioBg3dTemplateLibraryModule["loadBg3dTemplatesV12WithLegacyMigration"]
+  >
+): Promise<
+  Awaited<
+    ReturnType<StudioBg3dTemplateLibraryModule["loadBg3dTemplatesV12WithLegacyMigration"]>
+  >
+> {
+  const library = await loadStudioBg3dTemplateLibraryModule();
+  return library.loadBg3dTemplatesV12WithLegacyMigration(...args);
 }
 
 export async function saveBg3dTemplateV12(

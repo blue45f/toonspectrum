@@ -88,7 +88,7 @@ export function useStudioBg3dEditorEffects(h) {
     hasStudioBg3dBabylonDiagnosticStableIds, studioBg3dBabylonDiagnosticErrorMessage, DEFAULT_STUDIO_BG3D_SUN_RIG_CONFIG, STUDIO_BG3D_SUN_TIME_PRESETS,
     applyStudioBg3dSunRig, resolveStudioBg3dSunLightState, buildStudioBg3dSurfacePresetOverride, STUDIO_BG3D_SURFACE_PRESETS,
     collectStudioBg3dSurfaceSelectionSubtreeIds, collectStudioBg3dSurfaceTargetPathIds, planStudioBg3dMultiSurfaceSnap, STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS,
-    deleteBg3dTemplate, instantiateBg3dTemplateDocument, listBg3dTemplates, saveBg3dTemplate,
+    deleteBg3dTemplate, instantiateBg3dTemplateDocument, loadBg3dTemplates, saveBg3dTemplate,
     calculateStudioBg3dThreeReparentTransform, calculateStudioBg3dThreeWorldMatrix, calculateStudioBg3dThreeWorldDeltaTransform, resolveStudioBg3dThreeCenterGroundLocalPosition,
     applyStudioBg3dThreeWebglRenderSettings, ADD_BUTTONS, BG_PANEL_TABS, BG3D_VIEWPORT_HINTS,
     DEFAULT_LT_USER_PRESET_DESCRIPTION, EMPTY_THREE_ANIMATION_CLIPS, EMPTY_THREE_JOINTS, EMPTY_THREE_MORPH_TARGETS,
@@ -154,8 +154,10 @@ export function useStudioBg3dEditorEffects(h) {
     modelAnimationTimeReadersRef, modelRigBakeReadersRef, ikEndJointSelection, setIkEndJointSelection,
     morphTargetSelection, setMorphTargetSelection, deletingModelId, setDeletingModelId,
     isRestoringScene, setIsRestoringScene, sceneRestoreAbortRef, templateLibrary,
-    setTemplateLibrary, templateLibraryStatus, setTemplateLibraryStatus, isSavingTemplate,
-    setIsSavingTemplate, applyingTemplateId, setApplyingTemplateId, generateId,
+    setTemplateLibrary, templateLibraryStatus, setTemplateLibraryStatus,
+    setTemplateLibraryNotice, templateLibraryLoadRevision, isSavingTemplate,
+    setIsSavingTemplate,
+    applyingTemplateId, setApplyingTemplateId, generateId,
     handleSaveSceneAsTemplate, handleDeleteTemplate, failedCloneIds, setFailedCloneIds,
     readyCloneIds, setReadyCloneIds, unbatchableModelIds, setUnbatchableModelIds,
     sceneBaseDocument, setSceneBaseDocument, savedShots, shotBatchSelectedIds,
@@ -617,23 +619,60 @@ export function useStudioBg3dEditorEffects(h) {
   }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   useEffect(() => {
-    if (!open || (!modelsPanelActivated && activePanelTab !== "templates")) return;
+    if (!open || activePanelTab !== "templates") return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
+    let active = true;
     setTemplateLibraryStatus("loading");
-    listBg3dTemplates()
-      .then((entries) => {
+    setTemplateLibraryNotice(null);
+    loadBg3dTemplates()
+      .then((result) => {
+        if (!active) return;
         studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
-          setTemplateLibrary(entries);
+          setTemplateLibrary([...result.entries]);
           setTemplateLibraryStatus("ready");
+          setTemplateLibraryNotice(
+            result.legacyMigration.status === "completed" &&
+              result.legacyMigration.importedCount > 0
+              ? {
+                  tone: "success",
+                  message: `기존 템플릿 ${result.legacyMigration.importedCount}개를 SQLite/OPFS로 안전하게 이전했습니다.`,
+                }
+              : null,
+          );
         });
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
+        if (!active) return;
         studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
+          const migrationFailed = Boolean(
+            cause && typeof cause === "object" &&
+              "code" in cause && cause.code === "migration-failed",
+          );
+          const migrationFailureMessage = migrationFailed && cause instanceof Error
+            ? cause.message
+            : null;
           setTemplateLibraryStatus("error");
+          setTemplateLibraryNotice({
+            tone: "error",
+            message: migrationFailureMessage
+              ? `${migrationFailureMessage} 기존 IndexedDB 데이터는 삭제하지 않았습니다.`
+              : "SQLite/OPFS 템플릿 저장소를 열지 못했습니다. 브라우저 저장공간과 사이트 권한을 확인한 뒤 다시 시도해 주세요.",
+          });
         });
       });
-  }, [activePanelTab, modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
+    return () => {
+      active = false;
+    };
+  }, [
+    activePanelTab,
+    loadBg3dTemplates,
+    open,
+    setTemplateLibrary,
+    setTemplateLibraryNotice,
+    setTemplateLibraryStatus,
+    templateLibraryLoadRevision,
+  ]);
 
   useEffect(() => {
     if (!open) {

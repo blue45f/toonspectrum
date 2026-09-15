@@ -150,7 +150,8 @@ export function StudioBg3dEditorSidebar({ h }) {
     BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper, BgPlacementPreview,
     BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController, BgViewportController,
     SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
-    StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent,
+    StudioBg3dSceneTemplatePanel, StudioBg3dUserTemplateLibraryPanel, StudioBg3dShapesPanel,
+    StudioBg3dSharedCharacterSceneContent,
     StudioBg3dSharedCharacterStatusOverlay, StudioBg3dSharedStagePanel, StudioBg3dViewPanel,
     StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge, StudioBg3dCaptureAdapter,
     StudioBg3dCaptureRequest, StudioBg3dImmersiveStagePlan, StudioBg3dImportProgress,
@@ -208,8 +209,10 @@ export function StudioBg3dEditorSidebar({ h }) {
     ikEndJointSelection, setIkEndJointSelection, morphTargetSelection, setMorphTargetSelection,
     deletingModelId, setDeletingModelId, isRestoringScene, setIsRestoringScene,
     sceneRestoreAbortRef, templateLibrary, setTemplateLibrary, templateLibraryStatus,
-    setTemplateLibraryStatus, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
-    setApplyingTemplateId, generateId, handleSaveSceneAsTemplate, handleDeleteTemplate,
+    setTemplateLibraryStatus, templateLibraryNotice, setTemplateLibraryNotice,
+    templateLibraryLoadRevision, setTemplateLibraryLoadRevision, isSavingTemplate,
+    setIsSavingTemplate, applyingTemplateId, setApplyingTemplateId, generateId,
+    handleSaveSceneAsTemplate, handleDeleteTemplate,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds, unbatchableModelIds,
     setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, savedShots,
     shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals, setDeviceSignals, skyPresetId,
@@ -536,6 +539,24 @@ export function StudioBg3dEditorSidebar({ h }) {
                       onResetAllTemplateInstances={h.resetAllTemplateInstances}
                       onDeleteTemplateInstance={h.deleteTemplateInstance}
                       onDeleteAllTemplateInstances={h.deleteAllTemplateInstances}
+                    />
+                    <StudioBg3dUserTemplateLibraryPanel
+                      entries={templateLibrary}
+                      status={templateLibraryStatus}
+                      notice={templateLibraryNotice}
+                      isSaving={isSavingTemplate}
+                      applyingTemplateId={applyingTemplateId}
+                      saveDisabled={
+                        isRestoringScene || isUploadingModel ||
+                        (primitives.length === 0 && customModels.length === 0)
+                      }
+                      applyDisabled={isRestoringScene || isUploadingModel}
+                      onSave={() => void handleSaveSceneAsTemplate()}
+                      onApply={(entry) => void applyUserTemplate(entry)}
+                      onDelete={(id) => void handleDeleteTemplate(id)}
+                      onRetry={() => {
+                        setTemplateLibraryLoadRevision((revision) => revision + 1);
+                      }}
                     />
                   </Suspense>
                 ) : null}
