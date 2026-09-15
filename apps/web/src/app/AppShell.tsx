@@ -6,7 +6,6 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
-import { AccessibleTooltipLayer } from "@/shared/components/AccessibleTooltipLayer";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
@@ -18,6 +17,9 @@ import { pingVisit } from "@/shared/lib/visits-api";
 
 import "@toonspectrum/core/fx/fx.css";
 
+const AccessibleTooltipLayer = lazy(() =>
+  import("@/shared/components/AccessibleTooltipLayer").then((mod) => ({ default: mod.AccessibleTooltipLayer })),
+);
 const SiteCreationCompass = lazy(() =>
   import("@/shared/components/site-experience/SiteCreationCompass").then((mod) => ({ default: mod.SiteCreationCompass })),
 );
@@ -110,7 +112,7 @@ export function AppShell({
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname);
   return (
     <AuthSessionProvider>
-      <AccessibleTooltipLayer />
+      <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
