@@ -118,7 +118,8 @@ test("personal cloud runtime ACL grants only bounded credential DML", () => {
   expect(violation).toContain("TRUNCATE");
   expect(violation).toContain("REFERENCES");
   expect(violation).toContain("TRIGGER");
-  expect(violation).toContain("'PUBLIC'");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });
 
 test("creator storage location migration pins primaries and inventories verified replicas", () => {
