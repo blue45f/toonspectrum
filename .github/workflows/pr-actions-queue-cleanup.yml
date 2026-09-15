@@ -1,4 +1,4 @@
-name: One-shot repository Actions triage
+name: Retired PR Actions triage
 
 on:
   push:
@@ -8,7 +8,6 @@ on:
       - ".github/workflows/pr-actions-queue-cleanup.yml"
 
 permissions:
-  actions: write
   contents: read
 
 concurrency:
@@ -16,61 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  cleanup:
-    name: Reserve runners for the CI repair PR
+  retired:
+    name: Confirm queue triage is retired
     runs-on: ubuntu-slim
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - name: Cancel active runs outside main and PR 1482 in parallel
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const currentRunId = Number(context.runId);
-            const keepBranch = "fix/ci-reruns-clean-20260916";
-            const activeStatuses = new Set([
-              "queued",
-              "in_progress",
-              "pending",
-              "requested",
-              "waiting",
-            ]);
-
-            const runs = await github.paginate(
-              github.rest.actions.listWorkflowRunsForRepo,
-              { owner, repo, per_page: 100 },
-            );
-            const cancellable = runs.filter((run) =>
-              run.id !== currentRunId &&
-              activeStatuses.has(run.status) &&
-              run.head_branch !== keepBranch &&
-              run.head_branch !== "main" &&
-              run.event !== "schedule"
-            );
-            const cancelled = [];
-            const failed = [];
-            const chunkSize = 20;
-            for (let index = 0; index < cancellable.length; index += chunkSize) {
-              const chunk = cancellable.slice(index, index + chunkSize);
-              const results = await Promise.allSettled(
-                chunk.map((run) => github.rest.actions.cancelWorkflowRun({
-                  owner,
-                  repo,
-                  run_id: run.id,
-                })),
-              );
-              results.forEach((result, resultIndex) => {
-                const runId = chunk[resultIndex].id;
-                if (result.status === "fulfilled") cancelled.push(runId);
-                else failed.push(`${runId}: ${result.reason?.message ?? result.reason}`);
-              });
-            }
-
-            await core.summary
-              .addHeading("Repository Actions triage")
-              .addRaw(`Cancellation candidates: ${cancellable.length}\n`)
-              .addRaw(`Cancelled: ${cancelled.length}\n`)
-              .addRaw(`Failed: ${failed.length}\n`)
-              .addCodeBlock(failed.join("\n") || "none")
-              .write();
-            if (failed.length > 0) core.setFailed(`Failed to cancel ${failed.length} runs`);
+      - run: echo "Queue triage retired; no workflow runs are modified."
