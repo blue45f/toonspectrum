@@ -1,5 +1,5 @@
 /** Free-only, browser-side discovery. No credentials, paid fallback, or private manuscript upload. */
-export type OpenProvider = "artic" | "cleveland" | "wikipedia";
+export type OpenProvider = "artic" | "cleveland" | "commons" | "wikipedia";
 export type KitFormat = "comic" | "character" | "world" | "promo" | "study" | "article";
 export interface OpenReference {
   id: string;
@@ -16,6 +16,7 @@ export interface OpenReference {
 export const OPEN_PROVIDERS: { id: OpenProvider; name: string; detail: string; url: string }[] = [
   { id: "artic", name: "시카고 미술관", detail: "공개 이용 표시가 있는 미술·복식·소품", url: "https://api.artic.edu/docs/" },
   { id: "cleveland", name: "클리블랜드 미술관", detail: "CC0 유물·동양화·공예·장식", url: "https://openaccess-api.clevelandart.org/" },
+  { id: "commons", name: "Wikimedia Commons 무료 CC0", detail: "CC0로 표시된 이미지와 파일별 저작자·출처", url: "https://commons.wikimedia.org/" },
   { id: "wikipedia", name: "한국어 배경지식", detail: "한국어 문서 제목·원문 링크 (이미지/본문 재배포 아님)", url: "https://ko.wikipedia.org/" },
 ];
 export const KIT_FORMATS: { id: KitFormat; title: string; detail: string }[] = [
@@ -104,6 +105,16 @@ export function openSearchUrl(provider: OpenProvider, query: string, page = 1): 
       fields: "id,title,creators,creation_date,images,share_license_status,creditline,url,copyright" });
     return `https://openaccess-api.clevelandart.org/api/artworks/?${params}`;
   }
+  if (provider === "commons") {
+    const params = new URLSearchParams({
+      action: "query", generator: "search", gsrsearch: `${q} incategory:"CC-Zero"`, gsrnamespace: "6",
+      gsrlimit: String(PAGE_SIZE), gsroffset: String((page - 1) * PAGE_SIZE), prop: "imageinfo",
+      iiprop: "url|extmetadata", iiurlwidth: "400",
+      iiextmetadatafilter: "LicenseShortName|License|AttributionRequired|Restrictions|Artist|Credit|DateTimeOriginal",
+      iiextmetadatalanguage: "en", format: "json", formatversion: "2", origin: "*", maxlag: "5",
+    });
+    return `https://commons.wikimedia.org/w/api.php?${params}`;
+  }
   if (provider !== "wikipedia") throw new Error("지원하지 않는 제공처입니다.");
   const params = new URLSearchParams({ action: "query", list: "search", srsearch: q, srlimit: String(PAGE_SIZE),
     sroffset: String((page - 1) * PAGE_SIZE), srprop: "timestamp", format: "json", origin: "*" });
@@ -112,12 +123,18 @@ export function openSearchUrl(provider: OpenProvider, query: string, page = 1): 
 export function parseOpenReferences(provider: OpenProvider, payload: unknown, now = new Date().toISOString()): OpenReference[] {
   const root = row(payload);
   if (root.error || root.errors) throw new Error("제공처에서 검색 오류를 반환했습니다. 공식 사이트에서 확인하세요.");
-  const raw = provider === "wikipedia" ? row(root.query).search : root.data;
+  const raw = provider === "wikipedia" ? row(root.query).search
+    : provider === "commons" ? row(root.query).pages : root.data;
   if (!Array.isArray(raw)) throw new Error("검색 응답 형식을 확인하지 못했습니다.");
+  const metadataRawValue = (metadata: Row, key: string) => {
+    const value = row(metadata[key]).value;
+    return typeof value === "string" ? value.slice(0, 4_000) : "";
+  };
+  const metadataValue = (metadata: Row, key: string) => text(metadataRawValue(metadata, key), 800);
   const found = new Map<string, OpenReference>();
   for (const value of raw.slice(0, PAGE_SIZE)) {
     const item = row(value);
-    const rawId = provider === "wikipedia" ? item.pageid : item.id;
+    const rawId = provider === "wikipedia" || provider === "commons" ? item.pageid : item.id;
     if (!Number.isSafeInteger(rawId) || Number(rawId) <= 0 || !text(item.title)) continue;
     const ref: OpenReference = { id: `${provider}:${rawId}`, provider, title: text(item.title), creator: "", date: "", sourceUrl: "", imageUrl: "", rights: "원문 확인", credit: "", fetchedAt: now };
     if (provider === "artic") {
@@ -133,6 +150,25 @@ export function parseOpenReferences(provider: OpenProvider, payload: unknown, no
       ref.imageUrl = safeOpenUrl(row(row(item.images).web).url, ["openaccess-cdn.clevelandart.org"]);
       ref.creator = Array.isArray(item.creators) ? item.creators.slice(0, 3).map((creator) => text(row(creator).description)).filter(Boolean).join(" · ") : "";
       ref.date = text(item.creation_date); ref.credit = text(item.creditline); ref.rights = "CC0";
+    } else if (provider === "commons") {
+      const info = Array.isArray(item.imageinfo) ? row(item.imageinfo[0]) : {};
+      const metadata = row(info.extmetadata);
+      const license = metadataValue(metadata, "LicenseShortName").toUpperCase();
+      const licenseCode = metadataValue(metadata, "License").toLowerCase();
+      const attributionRequired = metadataValue(metadata, "AttributionRequired").toLowerCase();
+      const restrictions = metadataValue(metadata, "Restrictions");
+      const rawRestrictions = row(metadata.Restrictions).value;
+      if (license !== "CC0" || licenseCode !== "cc0" || attributionRequired !== "false"
+        || rawRestrictions !== "" || restrictions) continue;
+      ref.sourceUrl = safeOpenUrl(info.descriptionurl, ["commons.wikimedia.org"]);
+      ref.imageUrl = safeOpenUrl(info.thumburl, ["thumb.wikimedia.org", "upload.wikimedia.org"]);
+      if (!ref.sourceUrl || !ref.imageUrl) continue;
+      ref.title = text(item.title).replace(/^File:/u, "").trim();
+      if (!ref.title) continue;
+      ref.creator = metadataValue(metadata, "Artist");
+      ref.date = text(metadataRawValue(metadata, "DateTimeOriginal").split(/<div\b/iu)[0], 120);
+      ref.credit = metadataValue(metadata, "Credit") || "Wikimedia Commons 파일 페이지";
+      ref.rights = "CC0";
     } else {
       ref.sourceUrl = `https://ko.wikipedia.org/?curid=${rawId}`;
       ref.creator = "위키백과 기여자"; ref.date = text(item.timestamp);
@@ -144,19 +180,23 @@ export function parseOpenReferences(provider: OpenProvider, payload: unknown, no
 }
 export function parseSavedOpenReference(value: unknown): OpenReference | null {
   const item = row(value);
-  if (typeof item.id !== "string" || !/^(artic|cleveland|wikipedia|saved):[a-zA-Z0-9:_-]{1,180}$/u.test(item.id)) return null;
-  if (!["artic", "cleveland", "wikipedia", "saved"].includes(String(item.provider)) || !item.id.startsWith(`${item.provider}:`)) return null;
+  if (typeof item.id !== "string" || !/^(artic|cleveland|commons|wikipedia|saved):[a-zA-Z0-9:_-]{1,180}$/u.test(item.id)) return null;
+  if (!["artic", "cleveland", "commons", "wikipedia", "saved"].includes(String(item.provider)) || !item.id.startsWith(`${item.provider}:`)) return null;
   const sourceUrl = safeOpenUrl(item.sourceUrl);
   if (!sourceUrl || !text(item.title) || typeof item.fetchedAt !== "string" || !Number.isFinite(Date.parse(item.fetchedAt))) return null;
   // Stored/imported metadata cannot promote a knowledge link into an image licence.
   const host = new URL(sourceUrl).hostname;
-  const museum = ["www.artic.edu", "artic.edu"].includes(host) ? "artic"
+  const verifiedSource = ["www.artic.edu", "artic.edu"].includes(host) ? "artic"
     : ["www.clevelandart.org", "clevelandart.org"].includes(host) ? "cleveland"
+    : host === "commons.wikimedia.org" ? "commons"
     : ["www.metmuseum.org", "metmuseum.org"].includes(host) ? "met" : null;
-  const allowed = item.provider === "saved" ? museum !== null : item.provider === museum;
+  const allowed = item.provider === "saved"
+    ? verifiedSource === "artic" || verifiedSource === "cleveland" || verifiedSource === "met"
+    : item.provider === verifiedSource;
   const rights = item.rights === "CC0" && allowed ? "CC0" : "원문 확인";
-  const imageHosts = museum === "artic" ? ["www.artic.edu", "artic.edu"]
-    : museum === "cleveland" ? ["openaccess-cdn.clevelandart.org"] : ["images.metmuseum.org"];
+  const imageHosts = verifiedSource === "artic" ? ["www.artic.edu", "artic.edu"]
+    : verifiedSource === "cleveland" ? ["openaccess-cdn.clevelandart.org"]
+    : verifiedSource === "commons" ? ["thumb.wikimedia.org", "upload.wikimedia.org"] : ["images.metmuseum.org"];
   return { id: item.id, provider: item.provider as OpenReference["provider"], title: text(item.title), creator: text(item.creator), date: text(item.date),
     sourceUrl, imageUrl: rights === "CC0" ? safeOpenUrl(item.imageUrl, imageHosts) : "",
     rights, credit: text(item.credit), fetchedAt: item.fetchedAt };

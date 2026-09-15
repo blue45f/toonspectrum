@@ -13,13 +13,15 @@ import type {
 } from "@/shared/lib/creator-resources";
 
 const DAY_MS = 86_400_000;
-const RESOURCE_PROVIDERS: readonly ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo", "aic", "cleveland"];
+const RESOURCE_PROVIDERS: readonly ResourceProvider[] = ["met", "openlibrary", "googlebooks", "openbd", "kakao", "bizinfo", "aic", "cleveland", "polyhaven"];
 
 const SOURCE_REVIEW_DAYS: Record<ResourceProvider, number> = {
   aic: 30,
   cleveland: 30,
+  polyhaven: 30,
   met: 180,
   openlibrary: 180,
+  googlebooks: 180,
   openbd: 180,
   kakao: 90,
   bizinfo: 7,

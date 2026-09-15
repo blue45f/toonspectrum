@@ -380,14 +380,57 @@ export class CreatorController {
 
   @Get("/creator/works/:id/comments")
   @Header("Cache-Control", "no-store, max-age=0")
-  async listComments(@Param("id") id: string) {
-    return this.creatorService.listComments(id);
+  async listComments(
+    @Param("id") id: string,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.creatorService.listComments(id, userId || undefined);
   }
 
   @Post("/creator/works/:id/comments")
-  async addComment(@Param("id") id: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) {
+  async addComment(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Headers("x-user-id") userId?: string,
+  ) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.addComment(uid, id, body);
+  }
+
+  @Patch("/creator/works/:id/comments/:commentId")
+  async updateComment(
+    @Param("id") id: string,
+    @Param("commentId") commentId: string,
+    @Body() body: unknown,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.updateComment(uid, id, commentId, body);
+  }
+
+  @Delete("/creator/works/:id/comments/:commentId")
+  async deleteComment(
+    @Param("id") id: string,
+    @Param("commentId") commentId: string,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.deleteComment(
+      uid,
+      id,
+      commentId,
+      await isAdminUser(uid),
+    );
+  }
+
+  @Post("/creator/works/:id/comments/:commentId/like")
+  async toggleCommentLike(
+    @Param("id") id: string,
+    @Param("commentId") commentId: string,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.toggleCommentLike(uid, id, commentId);
   }
 
   // ── 공유 에셋(회원이 올려 모두가 재사용) ──────────────────────────────
