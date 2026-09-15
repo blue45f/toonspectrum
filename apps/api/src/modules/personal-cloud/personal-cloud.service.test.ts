@@ -111,7 +111,7 @@ describe("PersonalCloudService", () => {
     expect(authorizeUrl.origin).toBe("https://accounts.google.com");
     expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe("S256");
     expect(authorizeUrl.searchParams.get("scope")).toContain("drive.file");
-    expect(authorizeUrl.searchParams.get("state")).toMatch(/^s1\./u);
+    expect(authorizeUrl.searchParams.get("state")).toMatch(/^s2\./u);
     expect(started.cookieValue).toMatch(/^v1\./u);
     expect(started.cookieValue).not.toContain(USER_ID);
   });
