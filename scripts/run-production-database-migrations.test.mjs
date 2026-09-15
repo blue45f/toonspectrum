@@ -29,12 +29,33 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(55);
+  expect(manifest).toHaveLength(56);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0055_personal_cloud_cutover_marker",
+    "0056_studio_ai_free_pool_contract",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(55);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(56);
+});
+
+test("Studio AI free pool migration supports three reviewed provider attempts", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0056_studio_ai_free_pool_contract",
+  );
+  expect(migration?.id).toBe("0056_studio_ai_free_pool_contract");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CHECK ("attemptCount" BETWEEN 0 AND 3)',
+    "'assistant', 'composition', 'scenario', 'translation', 'dialogue', 'palette'",
+    "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 3)',
+    'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("creator community publishing migration separates immutable releases from discovery state", () => {

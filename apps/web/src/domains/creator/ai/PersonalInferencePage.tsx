@@ -154,7 +154,7 @@ export function PersonalInferencePage() {
         <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">내 GPU·내 모델로 만드는 변환실</h1>
         <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 통합 설정에 등록한 개인 Creator Runtime으로 브라우저가 직접 요청합니다. 운영측 AI 비용·자동 유료 폴백·숨은 재시도는 없습니다.</p>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link to="/studio/ai-settings" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 개인 서버 설정</Link>
+          <Link to="/settings/ai" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 개인 서버 설정</Link>
           <Link to="/studio/ecosystem" className={BUTTON}>창작 생태계 작업대</Link>
           <Link to="/studio" className={BUTTON}>Studio</Link>
         </div>

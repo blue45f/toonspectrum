@@ -192,7 +192,7 @@ describe("StudioAiAssistHub execution preflight", () => {
     );
 
     expect(preflight?.dataset.executionReady).toBe("true");
-    expect(preflight?.textContent).toContain("서버 쿼터");
+    expect(preflight?.textContent).toContain("공용 무료 쿼터");
     expect(preflight?.textContent).toContain("구도 제안 1세트");
   });
 

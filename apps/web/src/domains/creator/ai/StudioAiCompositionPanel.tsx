@@ -107,8 +107,8 @@ export function StudioAiCompositionPanel({
 
       {!configured && (
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          장면 초안은 먼저 작성할 수 있어요. 실행하려면 로그인해 서버 AI를 사용하거나{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 내 API 키를 등록하세요.
+          장면 초안은 먼저 작성할 수 있어요. 로그인하면 자동 무료 AI를 먼저 사용합니다. 무료 경로를 사용할 수 없으면{" "}
+          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 개인 무료 키 또는 로컬 AI를 연결하세요.
         </p>
       )}
 
