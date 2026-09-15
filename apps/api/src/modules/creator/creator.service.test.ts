@@ -179,6 +179,22 @@ describe("CreatorService safety gates", () => {
     delete process.env.CREATOR_IMAGE_AI_ENABLED;
   });
 
+  it("댓글 parentId의 타입·길이·문자 형식을 저장소 호출 전에 검증한다", async () => {
+    const service = createService();
+    for (const parentId of [
+      { forged: true },
+      "a".repeat(81),
+      "../other-comment",
+    ]) {
+      await expect(
+        service.addComment("comment-parent-validation-user", "work-1", {
+          text: "댓글",
+          parentId,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
+
   it("소유자의 작품 조회는 공개 조회수를 올리지 않는다", async () => {
     getWork.mockResolvedValue({ id: "work-owner", isOwner: true });
     await expect(createService().getWork("work-owner", "owner")).resolves.toMatchObject({ id: "work-owner" });

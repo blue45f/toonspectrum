@@ -11,7 +11,7 @@ import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/infrastructure/api";
 
-type ResourceSearchProvider = Extract<ResourceProvider, "met" | "kakao" | "bizinfo">;
+type ResourceSearchProvider = Extract<ResourceProvider, "met" | "kakao" | "bizinfo" | "polyhaven">;
 interface ResourceSearchConfig {
   title: string;
   intro: string;
@@ -23,6 +23,7 @@ const CONFIG: Record<ResourceSearchProvider, ResourceSearchConfig> = {
   met: { title: "창작 레퍼런스", intro: "복식·장식·가구·미술 자료를 찾아 출처와 함께 저장하세요. 공개 이용이 확인된 Met 자료만 미리보기를 제공합니다.", hint: "예: armor, costume, furniture, Korea", url: "https://www.metmuseum.org/art/collection", examples: ["armor", "costume", "furniture", "Korea"] },
   kakao: { title: "만화·작법서 탐색", intro: "만화 단행본, 작법서와 참고 도서를 검색하세요. 작품과 판본의 관계는 원출처에서 확인하며 자동으로 동일 작품으로 합치지 않습니다.", hint: "예: 만화 작법, 웹툰, 스토리", url: "https://search.daum.net/search?w=book&q=%EB%A7%8C%ED%99%94", examples: ["만화 작법", "웹툰", "스토리"] },
   bizinfo: { title: "작가 기회센터", intro: "기업마당 최근 최대 100건에서 지원사업을 찾습니다. 모든 공모전을 포함하지 않으며, 개인 작가와 사업자의 신청 자격은 공고 원문을 확인해야 합니다.", hint: "예: 웹툰, 만화, 콘텐츠", url: "https://www.bizinfo.go.kr/", examples: ["웹툰", "만화", "콘텐츠"] },
+  polyhaven: { title: "무료 3D·HDRI·텍스처 재료실", intro: "Poly Haven의 CC0 3D 모델·HDRI·텍스처를 검색해 배경과 소품 제작 자료로 저장하세요. 미리보기와 메타데이터만 불러오며 실제 파일 포맷·크기·의존성은 원문에서 확인합니다.", hint: "예: chair, architecture, forest, concrete", url: "https://polyhaven.com/", examples: ["chair", "architecture", "forest", "concrete"] },
 };
 function resourceUsageLabel(item: CreatorResource): string {
   if (item.license === "CC0") return "공개 이용 확인";
@@ -139,3 +140,4 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
 export function ReferencesPage() { return <ResourceSearchPage provider="met" />; }
 export function OpportunitiesPage() { return <ResourceSearchPage provider="bizinfo" />; }
 export function WorksPage() { return <ResourceSearchPage provider="kakao" />; }
+export function PolyHavenPage() { return <ResourceSearchPage provider="polyhaven" />; }
