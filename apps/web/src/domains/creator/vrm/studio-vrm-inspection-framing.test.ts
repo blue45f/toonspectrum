@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioVrmInspectionBounds, STUDIO_VRM_INSPECTION_VIEWS, type StudioVrmInspectionLandmarks } from "./studio-vrm-inspection-framing";
+import { resolveStudioVrmInspectionBounds, resolveStudioVrmPropInspectionPreset, STUDIO_VRM_INSPECTION_VIEWS, type StudioVrmInspectionLandmarks } from "./studio-vrm-inspection-framing";
 import { CAMERA_PRESETS } from "./studio-vrm-poser-catalogs";
 import { fitStudioVrmPreviewCamera } from "./studio-vrm-preview-framing";
 
@@ -20,6 +20,18 @@ describe("close-up inspection framing", () => {
     expect(CAMERA_PRESETS[0]?.id).toBe("front");
     expect(new Set(CAMERA_PRESETS.map((preset) => preset.id)).size).toBe(CAMERA_PRESETS.length);
     for (const view of STUDIO_VRM_INSPECTION_VIEWS) expect(CAMERA_PRESETS.find((preset) => preset.id === view.id)?.label).toBe(view.label);
+  });
+
+  it("maps prop sockets to the nearest inspection crop", () => {
+    expect(resolveStudioVrmPropInspectionPreset("leftHand")).toBe("inspectLeftHand");
+    expect(resolveStudioVrmPropInspectionPreset("rightHand")).toBe("inspectRightHand");
+    expect(resolveStudioVrmPropInspectionPreset("head")).toBe("closeup");
+    expect(resolveStudioVrmPropInspectionPreset("neck")).toBe("closeup");
+    expect(resolveStudioVrmPropInspectionPreset("chest")).toBe("inspectTorso");
+    expect(resolveStudioVrmPropInspectionPreset("spine")).toBe("inspectTorso");
+    expect(resolveStudioVrmPropInspectionPreset("hips")).toBe("inspectTorso");
+    expect(resolveStudioVrmPropInspectionPreset(null)).toBe("fullBody");
+    expect(resolveStudioVrmPropInspectionPreset("unknown")).toBe("fullBody");
   });
   it.each(crops)("frames $id at narrow and wide viewport sizes", ({ id }) => {
     const crop = resolveStudioVrmInspectionBounds(id, body, points)!;

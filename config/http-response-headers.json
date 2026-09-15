@@ -1,106 +1,5 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "git": {
-    "deploymentEnabled": {
-      "**": false
-    }
-  },
-  "buildCommand": "pnpm --filter @webtoon-nest/api build && pnpm run build",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 60,
-      "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
-    },
-    "api/studio-live.js": {
-      "maxDuration": 60,
-      "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
-    },
-    "api/og.js": {
-      "maxDuration": 30,
-      "includeFiles": "{dist/index.html,dist/og/titles/**}"
-    }
-  },
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "toonstudio.cloud"
-        }
-      ],
-      "destination": "https://www.toonstudio.cloud/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "toonspectrum.vercel.app"
-        }
-      ],
-      "destination": "https://www.toonstudio.cloud/:path*",
-      "permanent": true
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/offline-draw",
-      "destination": "/offline-draw/index.html"
-    },
-    {
-      "source": "/offline-draw/",
-      "destination": "/offline-draw/index.html"
-    },
-    {
-      "source": "/spatial-reader",
-      "destination": "/spatial-reader/index.html"
-    },
-    {
-      "source": "/spatial-reader/",
-      "destination": "/spatial-reader/index.html"
-    },
-    {
-      "source": "/socket.io",
-      "destination": "/api/studio-live"
-    },
-    {
-      "source": "/socket.io/:path*",
-      "destination": "/api/studio-live"
-    },
-    {
-      "source": "/api/cover",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/title/:slug",
-      "destination": "/api/og?slug=:slug"
-    },
-    {
-      "source": "/market",
-      "destination": "/api/og?marketPage=home"
-    },
-    {
-      "source": "/market/browse",
-      "destination": "/api/og?marketPage=browse"
-    },
-    {
-      "source": "/market/resource/:resourceId",
-      "destination": "/api/og?marketResourceId=:resourceId"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
+  "version": 1,
   "headers": [
     {
       "source": "/offline-draw/sw.js",
@@ -137,7 +36,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com; script-src 'self' 'sha256-OmHwrCLVdhu+S3kh6CjljJPz6ndGTuXZGMTrN96KuAg=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://desk-platform.vercel.app https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-OmHwrCLVdhu+S3kh6CjljJPz6ndGTuXZGMTrN96KuAg=' 'wasm-unsafe-eval' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://desk-platform.vercel.app https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content"
         },
         {
           "key": "Permissions-Policy",

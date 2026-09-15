@@ -465,7 +465,7 @@ export function StudioMannequinJointSection({
     <div className="space-y-3">
       <StudioSectionHeader
         title="관절"
-        description="뷰포트에서 몸을 클릭하거나 아래에서 관절을 고르세요. 손·발 핸들 드래그 = IK."
+        description="몸을 직접 드래그하면 관절이 회전하고, 손·발 원형 핸들을 드래그하면 IK로 팔다리가 따라옵니다. Alt+드래그는 비틀기, Shift는 정밀 조절, 더블클릭은 부위 확대입니다."
         action={
           selectedJointId ? (
             <button
@@ -1676,7 +1676,7 @@ export function StudioMannequinPoserPanel({
                 ref={viewportRef}
                 className="h-full w-full"
                 data-studio-mannequin-viewport="true"
-                aria-label="3D 데생 인형 뷰포트 — 몸 클릭으로 관절 선택, 손·발 핸들 드래그로 IK 포즈"
+                aria-label="3D 데생 인형 뷰포트 — 몸 드래그로 관절 회전, 손·발 핸들 드래그로 IK, 더블클릭으로 부위 확대"
               />
             )}
             {error ? (

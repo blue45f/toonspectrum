@@ -6,22 +6,22 @@ import { runInNewContext } from "node:vm";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
-import { verifyVercelCspContract } from "./verify-vercel-csp.mjs";
+import { verifyStaticCspContract } from "./verify-static-csp.mjs";
 
 const ROOT = new URL("../", import.meta.url);
 
-function rootCspHeader(vercelConfig) {
-  const root = vercelConfig.headers?.find(({ source }) => source === "/(.*)");
+function rootCspHeader(responsePolicy) {
+  const root = responsePolicy.headers?.find(({ source }) => source === "/(.*)");
   const header = root?.headers?.find(({ key }) => key === "Content-Security-Policy");
-  if (!header) throw new Error("Vercel root Content-Security-Policy is missing.");
+  if (!header) throw new Error("Provider-neutral root Content-Security-Policy is missing.");
   return header;
 }
 
 function fixture() {
   return {
     html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
-    vercelConfig: JSON.parse(
-      readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
+    responsePolicy: JSON.parse(
+      readFileSync(fileURLToPath(new URL("config/http-response-headers.json", ROOT)), "utf8"),
     ),
     bootstrapCompatSource: readFileSync(
       fileURLToPath(new URL("apps/web/public/bootstrap-compat.js", ROOT)),
@@ -126,9 +126,9 @@ function renderedText(root) {
     .join(" ");
 }
 
-describe("Vercel CSP build contract", () => {
+describe("provider-neutral CSP build contract", () => {
   it("accepts the repository HTML and exact production network allowlist", () => {
-    expect(verifyVercelCspContract(fixture())).toMatchObject({
+    expect(verifyStaticCspContract(fixture())).toMatchObject({
       inlineScriptCount: 1,
     });
   });
@@ -248,7 +248,7 @@ describe("Vercel CSP build contract", () => {
 
   it("rejects executable inline script and unrestricted connection schemes", () => {
     const current = fixture();
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       html: current.html.replace(
         "</body>",
@@ -256,15 +256,15 @@ describe("Vercel CSP build contract", () => {
       ),
     })).toThrow("Executable inline script");
 
-    const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
+    const broadened = JSON.parse(JSON.stringify(current.responsePolicy));
     const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "connect-src 'self'",
       "connect-src 'self' https:",
     );
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       html: current.html,
-      vercelConfig: broadened,
+      responsePolicy: broadened,
       bootstrapCompatSource: current.bootstrapCompatSource,
     })).toThrow("unrestricted network scheme");
   });
@@ -281,7 +281,7 @@ describe("Vercel CSP build contract", () => {
     expect(parsed.hasAttribute("src")).toBe(false);
     expect(parsed.textContent).toBe("globalThis.compromised = true");
     const current = fixture();
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       html: current.html.replace("</body>", `${script}</body>`),
     })).toThrow("Executable inline script");
@@ -294,10 +294,10 @@ describe("Vercel CSP build contract", () => {
       .replaceAll("</script>", "</SCRIPT >")
       .replaceAll(" src=", " SRC = ")
       .replaceAll(" type=", " TYPE = ");
-    expect(verifyVercelCspContract({ ...current, html })).toMatchObject({
+    expect(verifyStaticCspContract({ ...current, html })).toMatchObject({
       inlineScriptCount: 1,
     });
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       html: html.replace('"@context": "https://schema.org"', '"@context": "https://example.invalid"'),
     })).toThrow("Inline JSON-LD hash is absent");
@@ -310,7 +310,7 @@ describe("Vercel CSP build contract", () => {
       '<!-- <script>not executable</script> -->',
       "</body>",
     ].join("\n"));
-    expect(verifyVercelCspContract({ ...current, html })).toMatchObject({
+    expect(verifyStaticCspContract({ ...current, html })).toMatchObject({
       inlineScriptCount: 1,
     });
   });
@@ -320,10 +320,10 @@ describe("Vercel CSP build contract", () => {
     const content = '{"name":"<!-- literal data -->"}';
     const script = `<script type="application/ld+json">${content}</script>`;
     expect(JSDOM.fragment(script).querySelector("script").textContent).toBe(content);
-    const cspHeader = rootCspHeader(current.vercelConfig);
+    const cspHeader = rootCspHeader(current.responsePolicy);
     const hash = createHash("sha256").update(content).digest("base64");
     cspHeader.value = cspHeader.value.replace("script-src ", `script-src 'sha256-${hash}' `);
-    expect(verifyVercelCspContract({
+    expect(verifyStaticCspContract({
       ...current,
       html: current.html.replace("</head>", `${script}</head>`),
     })).toMatchObject({ inlineScriptCount: 2 });
@@ -340,12 +340,12 @@ describe("Vercel CSP build contract", () => {
   ]))("requires each complete realtime origin token and rejects %s", (replacement) => {
     const current = fixture();
     const scheme = new URL(replacement).protocol;
-    const cspHeader = rootCspHeader(current.vercelConfig);
+    const cspHeader = rootCspHeader(current.responsePolicy);
     cspHeader.value = cspHeader.value.replace(
       `${scheme}//realtime.toonstudio.cloud`,
       replacement,
     );
-    expect(() => verifyVercelCspContract(current)).toThrow("exact production realtime origins are missing");
+    expect(() => verifyStaticCspContract(current)).toThrow("exact production realtime origins are missing");
   });
 
   it("requires the Blob fetch boundary used by verified Studio 3D asset textures", () => {
@@ -354,15 +354,15 @@ describe("Vercel CSP build contract", () => {
       "connect-src 'self'",
       "connect-src 'self' blob: blob:",
     ]) {
-      const changed = JSON.parse(JSON.stringify(current.vercelConfig));
+      const changed = JSON.parse(JSON.stringify(current.responsePolicy));
       const cspHeader = rootCspHeader(changed);
       cspHeader.value = cspHeader.value.replace(
         "connect-src 'self' blob:",
         replacement,
       );
-      expect(() => verifyVercelCspContract({
+      expect(() => verifyStaticCspContract({
         html: current.html,
-        vercelConfig: changed,
+        responsePolicy: changed,
         bootstrapCompatSource: current.bootstrapCompatSource,
       }), replacement).toThrow("exactly one blob: source");
     }
@@ -370,24 +370,24 @@ describe("Vercel CSP build contract", () => {
 
   it("rejects JavaScript eval permission without confusing wasm-unsafe-eval", () => {
     const current = fixture();
-    expect(() => verifyVercelCspContract(current)).not.toThrow();
+    expect(() => verifyStaticCspContract(current)).not.toThrow();
 
-    const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
+    const broadened = JSON.parse(JSON.stringify(current.responsePolicy));
     const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "'wasm-unsafe-eval'",
       "'wasm-unsafe-eval' 'unsafe-eval'",
     );
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       html: current.html,
-      vercelConfig: broadened,
+      responsePolicy: broadened,
       bootstrapCompatSource: current.bootstrapCompatSource,
     })).toThrow("script-src must not contain unsafe-eval");
   });
 
   it("rejects a missing, late, asynchronous, commented, or disabled Zod CSP bootstrap", () => {
     const current = fixture();
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       bootstrapCompatSource: current.bootstrapCompatSource.replace(
         "zodConfig.jitless = true;",
@@ -395,7 +395,7 @@ describe("Vercel CSP build contract", () => {
       ),
     })).toThrow("preserve the Zod config object and enable jitless");
 
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       html: current.html.replace(
         '<script src="/bootstrap-compat.js"></script>',
@@ -403,7 +403,7 @@ describe("Vercel CSP build contract", () => {
       ),
     })).toThrow("one parser-blocking classic head script");
 
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       html: current.html
         .replace('<script src="/bootstrap-compat.js"></script>', "")
@@ -419,7 +419,7 @@ describe("Vercel CSP build contract", () => {
       '<script type="module" src="/bootstrap-compat.js"></script>',
       '<!-- <script src="/bootstrap-compat.js"></script> -->',
     ]) {
-      expect(() => verifyVercelCspContract({
+      expect(() => verifyStaticCspContract({
         ...current,
         html: current.html.replace(
           '<script src="/bootstrap-compat.js"></script>',
@@ -428,7 +428,7 @@ describe("Vercel CSP build contract", () => {
       }), replacement).toThrow("one parser-blocking classic head script");
     }
 
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       bootstrapCompatSource:
         "/* window.__zod_globalConfig; fake.jitless = true; */",
@@ -442,7 +442,7 @@ describe("Vercel CSP build contract", () => {
       'state.readyListener,\n        false,\n      );',
     );
     expect(withTrailingCallComma).not.toBe(current.bootstrapCompatSource);
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       ...current,
       bootstrapCompatSource: withTrailingCallComma,
     })).toThrow("ES5-compatible (trailing function-call comma)");
@@ -456,12 +456,12 @@ describe("Vercel CSP build contract", () => {
       (value) => value.replace("worker-src 'self' blob:;", "worker-src 'self' blob: *;"),
       (value) => value.replace("worker-src 'self' blob:;", "worker-src 'self' blob: data:;"),
     ]) {
-      const changed = JSON.parse(JSON.stringify(current.vercelConfig));
+      const changed = JSON.parse(JSON.stringify(current.responsePolicy));
       const cspHeader = rootCspHeader(changed);
       cspHeader.value = mutate(cspHeader.value);
-      expect(() => verifyVercelCspContract({
+      expect(() => verifyStaticCspContract({
         html: current.html,
-        vercelConfig: changed,
+        responsePolicy: changed,
         bootstrapCompatSource: current.bootstrapCompatSource,
       })).toThrow("worker-src must be exactly 'self' blob:");
     }
@@ -469,27 +469,27 @@ describe("Vercel CSP build contract", () => {
 
   it("rejects a wildcard or a second Supabase tenant origin", () => {
     const current = fixture();
-    const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
+    const broadened = JSON.parse(JSON.stringify(current.responsePolicy));
     const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
       "https://*.supabase.co",
     );
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       html: current.html,
-      vercelConfig: broadened,
+      responsePolicy: broadened,
       bootstrapCompatSource: current.bootstrapCompatSource,
     })).toThrow("exact production Supabase origin");
 
-    const secondTenant = JSON.parse(JSON.stringify(current.vercelConfig));
+    const secondTenant = JSON.parse(JSON.stringify(current.responsePolicy));
     const secondCsp = rootCspHeader(secondTenant);
     secondCsp.value = secondCsp.value.replace(
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
       "https://ybsgfhofuvkhywbpytnl.supabase.co https://attacker.supabase.co",
     );
-    expect(() => verifyVercelCspContract({
+    expect(() => verifyStaticCspContract({
       html: current.html,
-      vercelConfig: secondTenant,
+      responsePolicy: secondTenant,
       bootstrapCompatSource: current.bootstrapCompatSource,
     })).toThrow("exact production Supabase origin");
   });

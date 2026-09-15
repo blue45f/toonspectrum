@@ -26,6 +26,14 @@ import {
   STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH,
 } from "./studio-vrm-creative-sqlite-repository";
 import {
+  STUDIO_VRM_FINGER_LABELS,
+  STUDIO_VRM_FINGER_NAMES,
+  readStudioVrmFingerCurlDegrees,
+} from "./studio-vrm-finger-curl";
+import {
+  resolveStudioVrmPropInspectionPreset,
+} from "./studio-vrm-inspection-framing";
+import {
   CAMERA_PRESETS,
   ENV_VARIANTS,
   HAND_SHAPE_PRESETS,
@@ -307,28 +315,104 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                     )}
                   </div>
 
-                  {/* 손가락 굽힘 + 손모양 프리셋 */}
-                  <div className="space-y-2 border-t border-line/45 pt-3">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">손가락 굽힘 (검지)</p>
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">왼손</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="h-2 flex-1 accent-accent" />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))}°</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">오른손</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="h-2 flex-1 accent-accent" />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
-                    </label>
+                  {/* 손가락별 굽힘 + 손모양 프리셋 + 확대 검수 */}
+                  <div className="space-y-3 border-t border-line/45 pt-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">손 모양 정밀 편집</p>
+                        <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
+                          손가락을 각각 굽히고 실제 손·소품 접촉을 확대해서 확인합니다.
+                        </p>
+                      </div>
+                      <div className="grid shrink-0 grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          disabled={!vrm}
+                          aria-pressed={activeCameraId === "inspectLeftHand"}
+                          onClick={() => setActiveCameraId("inspectLeftHand")}
+                          className={cx(
+                            CONTROL_BUTTON,
+                            "px-2 text-[0.64rem] font-bold",
+                            activeCameraId === "inspectLeftHand"
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-2 hover:bg-accent-soft hover:text-accent",
+                          )}
+                        >
+                          왼손 확대
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!vrm}
+                          aria-pressed={activeCameraId === "inspectRightHand"}
+                          onClick={() => setActiveCameraId("inspectRightHand")}
+                          className={cx(
+                            CONTROL_BUTTON,
+                            "px-2 text-[0.64rem] font-bold",
+                            activeCameraId === "inspectRightHand"
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-2 hover:bg-accent-soft hover:text-accent",
+                          )}
+                        >
+                          오른손 확대
+                        </button>
+                      </div>
+                    </div>
                     {(["left", "right"] as const).map((side) => (
-                      <div key={side} className="flex flex-wrap items-center gap-1.5">
-                        <span className="w-16 shrink-0 whitespace-nowrap text-[0.66rem] font-semibold text-fg-2">{side === "left" ? "왼손 모양" : "오른손 모양"}</span>
-                        {HAND_SHAPE_PRESETS.map((p) => (
-                          <button key={p.id} type="button" onClick={() => applyHandPosePreset(side, p.id)} className="rounded-lg border border-line bg-card px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{p.label}</button>
-                        ))}
+                      <div key={side} className="rounded-xl border border-line/70 bg-panel/35 p-2.5">
+                        <p className="text-[0.68rem] font-bold text-fg-2">
+                          {side === "left" ? "왼손" : "오른손"}
+                        </p>
+                        <div className="mt-2 space-y-1.5">
+                          {STUDIO_VRM_FINGER_NAMES.map((finger) => {
+                            const degrees = readStudioVrmFingerCurlDegrees(fingerEdits, side, finger);
+                            return (
+                              <label key={finger} className="flex min-h-10 items-center gap-2 text-xs text-fg-2">
+                                <span className="w-10 shrink-0 font-medium">{STUDIO_VRM_FINGER_LABELS[finger]}</span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="90"
+                                  step="1"
+                                  value={degrees}
+                                  disabled={!vrm || webcamActive}
+                                  aria-label={`${side === "left" ? "왼손" : "오른손"} ${STUDIO_VRM_FINGER_LABELS[finger]} 굽힘`}
+                                  onChange={(event) => updateFingerCurl(side, Number(event.target.value), finger)}
+                                  className="h-2 flex-1 accent-accent disabled:opacity-45"
+                                />
+                                <span className="w-9 shrink-0 text-right tabular-nums text-fg-3">{degrees}°</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {HAND_SHAPE_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              disabled={!vrm || webcamActive}
+                              onClick={() => applyHandPosePreset(side, preset.id)}
+                              className={cx(
+                                CONTROL_BUTTON,
+                                "border-line bg-card px-2 py-1 text-[0.66rem] font-medium text-fg-2 hover:bg-raised hover:text-fg",
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ))}
-                    <button type="button" onClick={() => setFingerEdits({})} className="rounded-lg border border-line bg-card px-2 py-1 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-accent">손가락 초기화</button>
+                    <button
+                      type="button"
+                      disabled={!vrm || webcamActive}
+                      onClick={() => setFingerEdits({})}
+                      className={cx(
+                        CONTROL_BUTTON,
+                        "border-line bg-card px-2 text-[0.66rem] font-medium text-fg-2 hover:bg-raised hover:text-accent",
+                      )}
+                    >
+                      양손 손가락 초기화
+                    </button>
                   </div>
 
                   {/* 전체 상태 저장 · 불러오기 */}
@@ -430,6 +514,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                   onAdd={addVrmProp}
                   onUpdate={updateVrmProp}
                   onRemove={removeVrmProp}
+                  onInspect={(item) => setActiveCameraId(resolveStudioVrmPropInspectionPreset(item.bone))}
                   onClear={() => {
                     setVrmPropItems([]);
                     setSelectedVrmPropUid(null);

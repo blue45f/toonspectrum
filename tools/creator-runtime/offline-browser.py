@@ -52,7 +52,7 @@ try:
         path=d.value.path();backup=json.loads(pathlib.Path(path).read_text());assert len(backup['layers'])==2;record('editable recovery file exports layers and strokes')
         with page.expect_download() as d:page.locator('#export-png').click()
         assert pathlib.Path(d.value.path()).read_bytes().startswith(b'\x89PNG\r\n\x1a\n');record('PNG export is a real PNG')
-        assert page.evaluate("async()=>{await navigator.serviceWorker.ready;return !!(await caches.match('/offline-draw/ready-v1',{cacheName:'toonstudio-emergency-drawing-shell-v1'}))}")
+        assert page.evaluate("async()=>{await navigator.serviceWorker.ready;return !!(await caches.match('/offline-draw/ready-v2',{cacheName:'toonstudio-emergency-drawing-shell-v2'}))}")
         ctx.set_offline(True);page.reload();wait_ready(page);draw(page);offline_ink=pixel_hash(page)
         page.reload();wait_ready(page);assert pixel_hash(page)==offline_ink;record('offline navigation, drawing, save and second reload work')
         ctx.set_offline(False)

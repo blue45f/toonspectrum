@@ -6,6 +6,7 @@ import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import { planStudioGroupUniformResizeSelection } from "./studio-group-uniform-resize";
 import { createStudioLiveTransformDraftStore } from "./studio-live-transform-draft-store";
 import { beginStudioKonvaGroupDrawTransformGesture } from "./studio-live-transform-group-gesture-konva";
+import { STUDIO_LIVE_TRANSFORM_WIREFRAME_FALLBACK_NAME } from "./studio-live-transform-wireframe-fallback-konva";
 import { STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR } from "./studio-selection-chrome-mirror";
 
 import type { DrawEl, El } from "./studio-element-model";
@@ -154,6 +155,10 @@ function begin(options: {
 
 const frame = { targetBounds: { x: 20, y: 30, width: 400, height: 200 }, rotationDeg: 0 };
 
+function fallbackRoot(): Konva.Node | null {
+  return scene.stage.findOne(`.${STUDIO_LIVE_TRANSFORM_WIREFRAME_FALLBACK_NAME}`) ?? null;
+}
+
 describe("beginStudioKonvaGroupDrawTransformGesture", () => {
   it("draws the commit planner's own output for every selected stroke", () => {
     const { gesture, store, clock } = begin();
@@ -193,40 +198,65 @@ describe("beginStudioKonvaGroupDrawTransformGesture", () => {
     gesture!.close({ kind: "cancel", reason: "escape" });
   });
 
-  it("stands the whole gesture down when any member is ineligible", () => {
-    // Fail closed as a set. A mixed selection that previewed only its audited half would show a
-    // selection coming apart under the handles.
+  it("degrades unsupported members to one continuous bounded guide", () => {
     const unaudited = { ...stroke("stroke-c", [0, 0, 10, 10]), brush: "dry-media" } as DrawEl;
     scene.stage.destroy();
     scene.container.remove();
     scene = createScene([first, unaudited]);
-    expect(begin({ selection: [first, unaudited], elements: [first, unaudited] }).gesture)
-      .toBeNull();
+    const dry = begin({ selection: [first, unaudited], elements: [first, unaudited] });
+    expect(dry.gesture).not.toBeNull();
+    dry.gesture!.offer(frame);
+    dry.clock.flush();
+    expect(dry.store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    expect(scene.wrappers.get(first.id)!.visible()).toBe(true);
+    expect(scene.wrappers.get(first.id)!.opacity()).toBeLessThan(1);
+    dry.gesture!.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrappers.get(first.id)!.opacity()).toBe(1);
 
-    // Same for an eraser, whose destination-out mark an isolated Layer cannot show at all.
+    // Subtractive ink cannot be isolated faithfully, but it still receives a source-over guide
+    // instead of leaving the handles to move over motionless artwork.
     const eraser = { ...stroke("stroke-d", [0, 0, 10, 10]), mode: "eraser" } as DrawEl;
     scene.stage.destroy();
     scene.container.remove();
     scene = createScene([first, eraser]);
-    expect(begin({ selection: [first, eraser], elements: [first, eraser] }).gesture).toBeNull();
+    const erase = begin({ selection: [first, eraser], elements: [first, eraser] });
+    expect(erase.gesture).not.toBeNull();
+    erase.gesture!.offer(frame);
+    erase.clock.flush();
+    expect(erase.store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    erase.gesture!.close({ kind: "cancel", reason: "escape" });
 
-    // And for a locked member, which the commit planner refuses outright.
+    // A locked member is a durable-commit restriction, not merely a renderer restriction.
     scene.stage.destroy();
     scene.container.remove();
     scene = createScene([first, second]);
     expect(begin({ isLocked: (element) => element.id === second.id }).gesture).toBeNull();
   });
 
-  it("refuses a selection with authored paint above it, which the isolated Layer would reorder", () => {
-    // The draft Layer paints after the whole document Layer, so a selection under an image would
-    // jump in front of it for the drag and drop back behind at release.
+  it("keeps authored stacking and uses the guide when exact isolation would reorder paint", () => {
     const cover = new studioKonvaRuntime.Rect({ x: 0, y: 0, width: 50, height: 50, fill: "#fff" });
     scene.mainLayer.add(cover);
     cover.moveToTop();
-    expect(begin().gesture).toBeNull();
+    const blocked = begin();
+    expect(blocked.gesture).not.toBeNull();
+    blocked.gesture!.offer(frame);
+    blocked.clock.flush();
+    expect(blocked.store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    expect(cover.getLayer()).toBe(scene.mainLayer);
+    expect(scene.wrappers.get(first.id)!.getLayer()).toBe(scene.mainLayer);
+    blocked.gesture!.close({ kind: "cancel", reason: "escape" });
+
     cover.destroy();
-    // With nothing painting above it the same selection is admitted again.
-    expect(begin().gesture).not.toBeNull();
+    // With nothing painting above it the same selection keeps the commit-equivalent exact lane.
+    const exact = begin();
+    exact.gesture!.offer(frame);
+    exact.clock.flush();
+    expect(exact.store.getSnapshot()?.entries).toHaveLength(2);
+    expect(fallbackRoot()?.visible()).toBe(false);
+    exact.gesture!.close({ kind: "cancel", reason: "escape" });
   });
 
   it("previews a rotated frame with what the rotating commit will produce", () => {
@@ -282,11 +312,7 @@ describe("beginStudioKonvaGroupDrawTransformGesture", () => {
     expect(gesture!.settle?.({ kind: "commit", committed: true })).toBe(true);
   });
 
-  it("charges the selection's summed work against one shared frame budget", () => {
-    // Per-member admission bounds ONE stroke, but the frame draws them all in a single main-thread
-    // pass. Three strokes that each stay comfortably inside their own causal-dab ceiling can still
-    // exceed what one frame may spend, and then the WHOLE selection returns to the document rather
-    // than half of it staying live.
+  it("degrades once at the shared frame budget and never flickers back", () => {
     const line = (id: string, y: number): DrawEl => {
       const points: number[] = [];
       for (let index = 0; index < 100; index += 1) points.push(index * 2, y);
@@ -299,19 +325,31 @@ describe("beginStudioKonvaGroupDrawTransformGesture", () => {
     const { gesture, store, clock } = begin({ selection: trio, elements: trio });
     expect(gesture).not.toBeNull();
 
-    // Near identity: ~500 dabs each, 1,500 for the frame -- well inside the budget.
-    gesture!.offer({ targetBounds: { x: 0, y: 0, width: 210, height: 105 }, rotationDeg: 0 });
+    // Near identity stays on the exact commit-equivalent lane.
+    const small = { targetBounds: { x: 0, y: 0, width: 210, height: 105 }, rotationDeg: 0 };
+    gesture!.offer(small);
     clock.flush();
     expect(store.getSnapshot()?.entries).toHaveLength(3);
     expect(trio.every((element) => scene.wrappers.get(element.id)!.visible() === false)).toBe(true);
 
-    // 3.5x: ~1,500 dabs each, so every member still passes its own 2,048-dab lane ceiling, and only
-    // the summed 4,500 refuses the frame.
-    gesture!.offer({ targetBounds: { x: 0, y: 0, width: 700, height: 350 }, rotationDeg: 0 });
+    // 3.5x exceeds only the aggregate budget. The old code restored stationary sources and
+    // removed every moving pixel; the new code atomically switches to the bounded guide.
+    const large = { targetBounds: { x: 0, y: 0, width: 700, height: 350 }, rotationDeg: 0 };
+    gesture!.offer(large);
     clock.flush();
     expect(store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
     expect(trio.every((element) => scene.wrappers.get(element.id)!.visible())).toBe(true);
+    expect(trio.every((element) => scene.wrappers.get(element.id)!.opacity() < 1)).toBe(true);
+
+    // Crossing back under the threshold cannot switch renderer authority again inside the same
+    // gesture. That latch removes the previous off/on threshold flicker.
+    gesture!.offer(small);
+    clock.flush();
+    expect(store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
     gesture!.close({ kind: "cancel", reason: "escape" });
+    expect(trio.every((element) => scene.wrappers.get(element.id)!.opacity() === 1)).toBe(true);
   });
 
   it("paints the draft in document order however the selection was made", () => {
@@ -350,16 +388,38 @@ describe("beginStudioKonvaGroupDrawTransformGesture", () => {
     gesture!.close({ kind: "cancel", reason: "escape" });
   });
 
-  it("refuses an oversized selection before it traverses the scene for it", () => {
-    // Ctrl+A over a big page must cost the pointerdown nothing: the ceiling is charged before any
-    // wrapper lookup or sample clone, which is the work the per-element gate cannot see.
+  it("keeps large selections live without entering the unbounded exact compiler", () => {
     const many = Array.from({ length: 65 }, (_, index) =>
       stroke(`bulk-${index}`, [index, 0, index + 5, 5]));
-    expect(begin({ selection: many, elements: many }).gesture).toBeNull();
-    // The scene budget is charged the same way, from the document snapshot alone.
-    const scene = Array.from({ length: 2_049 }, (_, index) =>
-      stroke(`scene-${index}`, [index, 0, index + 5, 5]));
-    expect(begin({ selection: [first, second], elements: scene }).gesture).toBeNull();
+    scene.stage.destroy();
+    scene.container.remove();
+    scene = createScene(many);
+    const selectionBudget = begin({ selection: many, elements: many });
+    expect(selectionBudget.gesture).not.toBeNull();
+    selectionBudget.gesture!.offer(frame);
+    selectionBudget.clock.flush();
+    expect(selectionBudget.store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    selectionBudget.gesture!.close({ kind: "cancel", reason: "escape" });
+
+    // A large page similarly avoids compiling every draw snapshot, while selected sources still
+    // receive bounded visual feedback.
+    const largeScene = [
+      first,
+      second,
+      ...Array.from({ length: 2_047 }, (_, index) =>
+        stroke(`scene-${index}`, [index, 0, index + 5, 5])),
+    ];
+    scene.stage.destroy();
+    scene.container.remove();
+    scene = createScene([first, second]);
+    const sceneBudget = begin({ selection: [first, second], elements: largeScene });
+    expect(sceneBudget.gesture).not.toBeNull();
+    sceneBudget.gesture!.offer(frame);
+    sceneBudget.clock.flush();
+    expect(sceneBudget.store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    sceneBudget.gesture!.close({ kind: "cancel", reason: "escape" });
   });
 
   it("stands down when a selected id is not in the document snapshot", () => {
