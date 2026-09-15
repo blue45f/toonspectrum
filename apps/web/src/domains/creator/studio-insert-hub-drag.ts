@@ -48,6 +48,14 @@ function isPositiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
+function isSafeSvgMarkup(value: string | undefined): value is string {
+  return Boolean(
+    value
+    && /^\s*<svg(?:\s|>)/iu.test(value)
+    && !OBVIOUSLY_UNSAFE_SVG_PATTERN.test(value),
+  );
+}
+
 function validatedAssetDescriptor(
   src: string,
   width: number,
@@ -77,17 +85,24 @@ export function canDragStudioInsertHubEntry(
   const source = entry.item.source;
   if (source.kind === "local") {
     return (
-      source.value.dataUrl.startsWith("data:image/") &&
-      isPositiveFinite(source.value.width) &&
-      isPositiveFinite(source.value.height)
+      source.value.dataUrl.startsWith("data:image/")
+      && isPositiveFinite(source.value.width)
+      && isPositiveFinite(source.value.height)
     );
+  }
+  if (source.kind === "background") {
+    return isSafeSvgMarkup(source.value.svg)
+      || Boolean(
+        source.value.imgSrc?.startsWith("data:image/")
+        && isPositiveFinite(source.value.width ?? 0)
+        && isPositiveFinite(source.value.height ?? 0),
+      );
   }
   if (source.kind === "element") {
     return (
-      /^\s*<svg(?:\s|>)/iu.test(source.value.svg) &&
-      !OBVIOUSLY_UNSAFE_SVG_PATTERN.test(source.value.svg) &&
-      isPositiveFinite(source.value.width) &&
-      isPositiveFinite(source.value.height)
+      isSafeSvgMarkup(source.value.svg)
+      && isPositiveFinite(source.value.width)
+      && isPositiveFinite(source.value.height)
     );
   }
   return source.kind === "object-3d" && source.value.id.trim().length > 0;
@@ -116,6 +131,17 @@ export function resolveStudioInsertHubDragDescriptor({
         source.value.dataUrl,
         source.value.width,
         source.value.height,
+      );
+    }
+    if (source.kind === "background") {
+      const src = isSafeSvgMarkup(source.value.svg)
+        ? svgToDataUrl(source.value.svg)
+        : source.value.imgSrc;
+      if (!src) return null;
+      return validatedAssetDescriptor(
+        src,
+        source.value.width ?? canvasWidth,
+        source.value.height ?? canvasHeight,
       );
     }
     if (source.kind === "element") {

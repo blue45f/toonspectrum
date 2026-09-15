@@ -1,24 +1,11 @@
-import {
-  Bookmark,
-  Clapperboard,
-  Folder,
-  Grid2x2,
-  LayoutTemplate,
-  Library,
-  PenTool,
-  Shapes,
-  Sticker as StickerIcon,
-} from "lucide-react";
-import { useRef } from "react";
+import { Folder } from "lucide-react";
 
-import { StudioAssetLibraryCollections } from "./StudioAssetLibraryCollections";
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
-import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";
-import { StudioInsertBatchPreflight } from "./StudioInsertBatchPreflight";
+import { StudioUnifiedAssetWorkspace } from "./StudioUnifiedAssetWorkspace";
 import { CANVAS_W } from "./studio-assets";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
-import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
+import { StudioMenuPopoverHeader } from "./studio-chrome-ui";
 import { elBounds } from "./studio-element-geometry";
 import { listStudioElementLibrary } from "./studio-elements-catalog";
 import {
@@ -32,70 +19,16 @@ import {
   type StudioInsertActionId,
   type StudioInsertPlacementMode,
 } from "./studio-insert-hub-model";
-import { preloadStudioAssetMenuPanel } from "./studio-page-lazy-ui";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 import {
   buildStudioUnifiedAssetCatalog,
   type StudioUnifiedAssetItem,
 } from "./studio-unified-asset-catalog";
-import { StudioUnifiedAssetSmartLibrary } from "./StudioUnifiedAssetSmartLibrary";
 
-import type { StudioMenu } from "./studio-editor-tool-model";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
 const INSERT_REVIEW_LOCKED_MESSAGE =
   "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.";
-
-const ASSET_MENU_ITEMS = [
-  {
-    id: "asset",
-    label: "삽입",
-    icon: Library,
-    title: "검색·최근·즐겨찾기·배치가 통합된 삽입 허브",
-  },
-  {
-    id: "template",
-    label: "템플릿",
-    icon: LayoutTemplate,
-    title: "캔버스·컷 레이아웃 템플릿",
-  },
-  {
-    id: "collage",
-    label: "콜라주",
-    icon: Grid2x2,
-    title: "이미지 콜라주 배치",
-  },
-  {
-    id: "elements",
-    label: "요소",
-    icon: Shapes,
-    title: "도형·장식 요소",
-  },
-  {
-    id: "emeres",
-    label: "이메레스",
-    icon: PenTool,
-    title: "스케치 밑그림 틀",
-  },
-  {
-    id: "scene",
-    label: "장면",
-    icon: Clapperboard,
-    title: "장면 템플릿",
-  },
-  {
-    id: "clip",
-    label: "클립",
-    icon: Bookmark,
-    title: "저장된 클립",
-  },
-  {
-    id: "sticker",
-    label: "효과",
-    icon: StickerIcon,
-    title: "만화 효과·스티커",
-  },
-] as const;
 
 export interface StudioUnifiedAssetToolPopoverContentProps {
   readonly toolBelt: StudioToolBeltContentProps;
@@ -122,15 +55,13 @@ function resolveSelectionBounds(
   if (!toolBelt.selected) return null;
   const bounds = elBounds(toolBelt.selected);
   if (
-    !Number.isFinite(bounds.x) ||
-    !Number.isFinite(bounds.y) ||
-    !Number.isFinite(bounds.w) ||
-    !Number.isFinite(bounds.h) ||
-    bounds.w <= 0 ||
-    bounds.h <= 0
-  ) {
-    return null;
-  }
+    !Number.isFinite(bounds.x)
+    || !Number.isFinite(bounds.y)
+    || !Number.isFinite(bounds.w)
+    || !Number.isFinite(bounds.h)
+    || bounds.w <= 0
+    || bounds.h <= 0
+  ) return null;
   return {
     x: bounds.x,
     y: bounds.y,
@@ -148,15 +79,16 @@ function routeUnifiedAsset(
   const handlers = toolBelt.stableHandlers;
   switch (item.source.kind) {
     case "background":
+      assertInsertMutationAllowed(toolBelt);
       return handlers.addBgScene(item.source.value);
     case "scene-template":
-      // The legacy controller resolves void even when it rejects internally.
-      // Open its owned preview surface instead of announcing an insertion here.
-      toolBelt.setMenu("scene");
-      return true;
+      assertInsertMutationAllowed(toolBelt);
+      return handlers.addSceneTemplate(item.source.value).then(() => true);
     case "element":
+      assertInsertMutationAllowed(toolBelt);
       return handlers.addCatalogElement(item.source.value);
     case "object-3d":
+      assertInsertMutationAllowed(toolBelt);
       toolBelt.setMenu(null);
       handlers.openStudioObjectInsert({
         openTarget: item.source.value.openTarget,
@@ -164,6 +96,7 @@ function routeUnifiedAsset(
       });
       return true;
     case "local": {
+      assertInsertMutationAllowed(toolBelt);
       const placement = resolveStudioInsertPlacement(placementMode, {
         canvasWidth: CANVAS_W,
         canvasHeight: toolBelt.canvasH,
@@ -222,7 +155,6 @@ function routeInsertAction(
       toolBelt.setMenu("bubble");
       return true;
     case "upload":
-      // The workspace owns the hidden file input so cancellation is a no-op.
       return true;
     case "stock":
       toolBelt.setMenu("stockImage");
@@ -265,12 +197,8 @@ function routeInsertAction(
 export function StudioUnifiedAssetToolPopoverContent({
   toolBelt,
 }: StudioUnifiedAssetToolPopoverContentProps) {
-  const requestedPlacementModeRef =
-    useRef<StudioInsertPlacementMode>("auto");
   const selectionBounds = resolveSelectionBounds(toolBelt);
   const items = buildStudioUnifiedAssetCatalog({
-    // Cold entry must not require visiting legacy background or scene tabs first.
-    // Stable ids are deduplicated by the unified catalog.
     backgrounds: [
       ...STUDIO_GENERATED_BG_SCENES,
       ...BG_SCENES,
@@ -288,85 +216,36 @@ export function StudioUnifiedAssetToolPopoverContent({
       ...toolBelt.sceneTemplates.templates,
     ],
     localAssets: toolBelt.assets,
-  })
-    .map(decorateStudioGenerated2dAsset)
-    .map((item) =>
-      item.source.kind === "scene-template"
-        ? {
-            ...item,
-            description: `${item.description} · 장면 도구에서 미리보기 후 배치합니다.`,
-            useMode: "open" as const,
-            useLabel: "장면 도구 열기",
-          }
-        : item,
-    );
-  const initialView =
-    toolBelt.assetTab === "community" ? "library" : "insert";
+  }).map(decorateStudioGenerated2dAsset);
+  const initialView = toolBelt.assetTab === "community" ? "library" : "discover";
 
   return (
     <>
       <StudioMenuPopoverHeader
         icon={Folder}
-        title="삽입 허브"
-        description="텍스트·말풍선·이미지·레이아웃·효과·3D·내 에셋을 검색하고 최근 사용, 즐겨찾기와 배치 방식까지 한곳에서 관리합니다."
+        title="에셋 워크스페이스"
+        description="2D 배경·장면 레시피·스토리 연출·3D·내 에셋을 실제 미리보기로 비교하고 바로 캔버스에 배치합니다."
       />
-      <StudioMenuSubtabs
-        aria-label="삽입·에셋 메뉴 구역"
-        activeId={toolBelt.menu}
-        onSelect={(id: string) => {
-          if (id === "asset") preloadStudioAssetMenuPanel();
-          toolBelt.setMenu(id as StudioMenu);
-        }}
-        items={ASSET_MENU_ITEMS}
-      />
-      <StudioInsertBatchPreflight toolBelt={toolBelt} />
-      <StudioAssetLibraryCollections
+      <StudioUnifiedAssetWorkspace
+        initialView={initialView}
         items={items}
-        assets={toolBelt.assets}
-        loading={toolBelt.assetsLoading}
-        onDeleteAsset={toolBelt.stableHandlers.onDeleteAsset}
-        onUseAsset={(asset) => {
+        legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+        selectionPlacementAvailable={selectionBounds !== null}
+        reviewLocked={toolBelt.activeSurfaceReviewLocked}
+        onUseItem={(item, placementMode = "auto") =>
+          routeUnifiedAsset(item, toolBelt, placementMode, selectionBounds)}
+        onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
+        onUploadImage={async (event) => {
           assertInsertMutationAllowed(toolBelt);
-          return toolBelt.stableHandlers.addRenderedImage(asset.dataUrl, asset.width, asset.height);
+          await toolBelt.stableHandlers.onPickImage(event);
         }}
-        onUseItem={(item) => routeUnifiedAsset(item, toolBelt, "auto", selectionBounds)}
-        onOpen3d={() => { routeInsertAction("background3d", toolBelt); }}
-      >
-        <StudioUnifiedAssetSmartLibrary
-          items={items}
-          defaultCollapsed={initialView === "library"}
-          onUseItem={(item) => {
-            // Placement is request-scoped and reset before an awaited mutation can interleave.
-            const placementMode = requestedPlacementModeRef.current;
-            requestedPlacementModeRef.current = "auto";
-            return routeUnifiedAsset(item, toolBelt, placementMode, selectionBounds);
-          }}
-        >
-          {({ items: visibleItems, onUseItem }) => (
-            <StudioInsertHubWorkspace
-              initialView={initialView}
-              items={visibleItems}
-              legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-              selectionPlacementAvailable={selectionBounds !== null}
-              onUseItem={(item, placementMode) => {
-                requestedPlacementModeRef.current = placementMode;
-                return onUseItem(item);
-              }}
-              onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
-              onUploadImage={async (event) => {
-                assertInsertMutationAllowed(toolBelt);
-                await toolBelt.stableHandlers.onPickImage(event);
-              }}
-              onOpenAi={(prompt) => {
-                if (prompt) {
-                  toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
-                }
-                toolBelt.setMenu("aiAssist");
-              }}
-            />
-          )}
-        </StudioUnifiedAssetSmartLibrary>
-      </StudioAssetLibraryCollections>
+        onOpenAi={(prompt) => {
+          if (prompt) {
+            toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
+          }
+          toolBelt.setMenu("aiAssist");
+        }}
+      />
     </>
   );
 }
