@@ -149,6 +149,18 @@ const GROUPS: ShortcutGroup[] = [
         keysKey: "studio.shortcuts.keys.spaceDrag",
         labelKey: "studio.shortcuts.row.view.pan",
       },
+      {
+        keys: "⇧ + Wheel",
+        labelKey: "studio.shortcuts.row.view.pan",
+        searchAliases: [
+          "가로 스크롤",
+          "가로 이동",
+          "좌우 이동",
+          "horizontal scroll",
+          "horizontal pan",
+          "shift wheel",
+        ],
+      },
       { keys: "`", labelKey: "studio.shortcuts.row.view.toggleCanvas", actionId: "toggle-chrome" },
       { keys: "H", labelKey: "studio.shortcuts.row.view.flipCanvas", actionId: "flip-canvas" },
       { keys: "?", labelKey: "studio.shortcuts.row.view.help", actionId: "shortcuts-help" },
@@ -179,8 +191,8 @@ const SHORTCUT_HELP_COPY = {
       {
         id: "view",
         title: "화면만 이동·확대하기",
-        body: "Space를 누른 채 드래그하면 화면이 이동하고, ⌘+휠은 포인터 위치를 중심으로 확대해요.",
-        keys: "Space · ⌘+휠",
+        body: "Space를 누른 채 드래그해 자유롭게 이동하고, Shift+휠로 좌우 이동, ⌘+휠로 포인터 중심 확대를 할 수 있어요.",
+        keys: "Space · ⇧+Wheel · ⌘+Wheel",
       },
       {
         id: "recover",
@@ -212,8 +224,8 @@ const SHORTCUT_HELP_COPY = {
       {
         id: "view",
         title: "Pan and zoom the view",
-        body: "Hold Space and drag to pan. ⌘+wheel zooms around the pointer position.",
-        keys: "Space · ⌘+wheel",
+        body: "Hold Space and drag to pan freely, use Shift+wheel for horizontal movement, and ⌘+wheel to zoom around the pointer.",
+        keys: "Space · ⇧+Wheel · ⌘+Wheel",
       },
       {
         id: "recover",
@@ -476,7 +488,7 @@ export function StudioShortcutsHelp({
               </p>
               <ul className="space-y-1">
                 {g.rows.map((r) => (
-                  <li key={r.labelKey} className="flex items-center justify-between gap-3 text-xs text-fg-2">
+                  <li key={`${r.labelKey}:${r.keysKey ?? r.keys}`} className="flex items-center justify-between gap-3 text-xs text-fg-2">
                     <span>{t(r.labelKey)}</span>
                     <kbd className="shrink-0 rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[0.66rem] text-fg-3">
                       {r.keysKey && !r.actionId && !r.actionIds

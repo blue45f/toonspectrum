@@ -288,6 +288,7 @@ import {
   resolveBubbleLineHeight,
 } from "./lettering/studio-bubble-text-fit";
 import { resolveStudioCanvasGestureDisposition } from "./canvas/studio-canvas-gesture-arbitration";
+import { applyStudioCanvasWheelNavigation } from "./canvas/studio-canvas-wheel-navigation";
 import { recordStudioHotPathRender } from "./canvas/studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./canvas/studio-canvas-size";
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
@@ -12292,7 +12293,7 @@ export function StudioCuttoonEditor({
     panelSplitDragRef,
     quickMaskDragRef,
   ]);
-  // 휠 동작 — 마우스 휠 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
+  // 휠 동작 — 설정된 줌/팬/브러시 크기 + Shift+휠 가로 이동 + 기존 ⌘휠 줌.
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
@@ -12313,6 +12314,7 @@ export function StudioCuttoonEditor({
       const prefs = appSettingsRef.current.mouse;
       const modZoom = e.ctrlKey || e.metaKey;
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
+      if (applyStudioCanvasWheelNavigation(node, e, wheelMode, prefs.reverseWheel)) return;
       if (wheelMode === "zoom") {
         e.preventDefault();
         if (zoomLockedRef.current) return;
@@ -12336,10 +12338,9 @@ export function StudioCuttoonEditor({
         return;
       }
       if (wheelMode === "pan") {
+        // Zero/non-finite wheel packets have no movement plan, but pan mode still
+        // owns the canvas scrollport and must not bubble into the surrounding page.
         e.preventDefault();
-        const mul = prefs.reverseWheel ? -1 : 1;
-        node.scrollLeft += e.deltaX * mul;
-        node.scrollTop += e.deltaY * mul;
       }
     };
     node.addEventListener("wheel", onWheel, { passive: false });
