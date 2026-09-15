@@ -9,6 +9,10 @@ import { spawnSync } from "node:child_process";
 import { buildAdminCapabilitySql, buildAdminRuntimeAclSql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
+  buildCommunityCafeCapabilitySql,
+  buildCommunityCafeRuntimeAclSql,
+} from "./community-cafe-database-contract.mjs";
+import {
   createPsqlEnvironment,
   validateProductionDatabaseUrl,
 } from "./validate-production-database-url.mjs";
@@ -95,6 +99,10 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "admin_content_reports",
   "admin_promos",
   "admin_security_policies",
+  "community_cafe_ban",
+  "community_cafe_invite",
+  "community_cafe_join_request",
+  "community_cafe_moderation_log",
   "creator_asset_artifact",
   "creator_asset_artifact_set",
   "creator_asset_license_snapshot",
@@ -142,6 +150,13 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_work_review_feedback",
   "creator_work_review_link",
   "personal_cloud_connection",
+  "production_integration_connection",
+  "production_integration_oauth_state",
+  "production_integration_receipt",
+  "production_project",
+  "production_project_event",
+  "production_project_mutation_receipt",
+  "production_push_subscription",
   "studio_ai_comic_director_approval",
   "studio_ai_comic_director_artifact",
   "studio_ai_comic_director_job",
@@ -2768,6 +2783,8 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCommunityCafeRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCommunityCafeCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
     psql(
