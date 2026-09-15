@@ -807,6 +807,7 @@ import {
   type StudioLivingInkOverlaySurfaceState,
   type StudioLivingInkPinnedStroke,
   type StudioQuickAccessIntegrationModule,
+  type StudioToolOperationMemoryController,
 } from "./studio-page-editor-types";
 import {
   EMPTY_EFFECT_EMOJIS,
@@ -1389,7 +1390,7 @@ import type {
 } from "./studio-publish-preflight";
 import type { StudioQuickAccessCommandMeta, StudioQuickAccessState } from "./studio-quick-access";
 import type { StudioQuickAccessCommandAvailability } from "./studio-quick-access-integration";
-import { useStudioQuickAccessPersonalKit } from "./use-studio-quick-access-personal-kit";
+import { useStudioQuickAccessPersonalKitBridge } from "./use-studio-quick-access-personal-kit";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
@@ -1436,12 +1437,6 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
-
-type StudioToolOperationMemoryController = ReturnType<
-  (typeof import("./studio-tool-operation-memory-sqlite"))[
-    "getProductStudioToolOperationMemoryController"
-  ]
->;
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({
@@ -3317,7 +3312,6 @@ export function StudioCuttoonEditor({
   const [quickAccessPaletteLoading, setQuickAccessPaletteLoading] = useState(false);
   const [quickAccessState, setQuickAccessState] =
     useState<StudioQuickAccessState | null>(null);
-  const [quickAccessLocalRevision, setQuickAccessLocalRevision] = useState(0);
   const [quickAccessIntegration, setQuickAccessIntegration] =
     useState<StudioQuickAccessIntegrationModule | null>(null);
   const quickAccessIntegrationRef =
@@ -3330,6 +3324,22 @@ export function StudioCuttoonEditor({
   const quickAccessPersistenceWarningRef = useRef(false);
   quickAccessOwnerScopeRef.current = currentWorkspaceOwnerScope;
   quickAccessIntegrationRef.current = quickAccessIntegration;
+
+  const {
+    changeStudioQuickAccessState,
+    resetStudioQuickAccessPersonalKit,
+  } = useStudioQuickAccessPersonalKitBridge({
+    userId: studioAuthReady ? studioAuthUserId : null,
+    ownerScope: currentWorkspaceOwnerScope,
+    state: quickAccessState,
+    runtimeRef: quickAccessIntegrationRef,
+    loadedOwnerScopeRef: quickAccessLoadedOwnerScopeRef,
+    ownerScopeRef: quickAccessOwnerScopeRef,
+    persistenceWarningRef: quickAccessPersistenceWarningRef,
+    setPersistenceWarning: (next) => { quickAccessPersistenceWarningRef.current = next; },
+    setState: setQuickAccessState,
+    onStatus: announceDrawingShortcut,
+  });
 
   function loadStudioQuickAccessIntegration(): Promise<StudioQuickAccessIntegrationModule> {
     if (!quickAccessRuntimeLoadRef.current) {
@@ -3406,53 +3416,6 @@ export function StudioCuttoonEditor({
     void openStudioQuickAccessPalette();
   }
 
-  function changeStudioQuickAccessState(next: StudioQuickAccessState): void {
-    const runtime = quickAccessIntegrationRef.current;
-    if (!runtime) return;
-    const ownerScope = currentWorkspaceOwnerScope;
-    setQuickAccessState(next);
-    setQuickAccessLocalRevision((current) => current + 1);
-    void runtime.saveStudioQuickAccessState(ownerScope, next).then((status) => {
-      if (quickAccessOwnerScopeRef.current !== ownerScope) return;
-      if (status === "persisted") {
-        quickAccessPersistenceWarningRef.current = false;
-        return;
-      }
-      if (!quickAccessPersistenceWarningRef.current) {
-        quickAccessPersistenceWarningRef.current = true;
-        announceDrawingShortcut(
-          "SQLite/OPFS 저장에 실패해 빠른 액세스 변경은 현재 세션에만 유지돼요",
-        );
-      }
-    });
-  }
-
-  async function adoptStudioQuickAccessPersonalKitState(
-    next: StudioQuickAccessState,
-  ): Promise<void> {
-    const runtime = quickAccessIntegrationRef.current;
-    const ownerScope = quickAccessOwnerScopeRef.current;
-    if (!runtime || quickAccessLoadedOwnerScopeRef.current !== ownerScope) return;
-    setQuickAccessState(next);
-    const status = await runtime.saveStudioQuickAccessState(ownerScope, next);
-    if (quickAccessOwnerScopeRef.current !== ownerScope) return;
-    if (status !== "persisted" && !quickAccessPersistenceWarningRef.current) {
-      quickAccessPersistenceWarningRef.current = true;
-      announceDrawingShortcut(
-        "Personal Kit 설정은 적용했지만 SQLite/OPFS에 저장하지 못했어요",
-      );
-    }
-  }
-
-  useStudioQuickAccessPersonalKit({
-    userId: studioAuthReady ? studioAuthUserId : null,
-    ownerScope: currentWorkspaceOwnerScope,
-    state: quickAccessState,
-    localRevision: quickAccessLocalRevision,
-    onAdoptRemote: adoptStudioQuickAccessPersonalKitState,
-    onStatus: announceDrawingShortcut,
-  });
-
   useEffect(() => {
     if (
       quickAccessLoadedOwnerScopeRef.current === null
@@ -3466,8 +3429,8 @@ export function StudioCuttoonEditor({
     setQuickAccessPaletteOpen(false);
     setQuickAccessPaletteLoading(false);
     setQuickAccessState(null);
-    setQuickAccessLocalRevision(0);
-  }, [currentWorkspaceOwnerScope]);
+    resetStudioQuickAccessPersonalKit();
+  }, [currentWorkspaceOwnerScope, resetStudioQuickAccessPersonalKit]);
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);

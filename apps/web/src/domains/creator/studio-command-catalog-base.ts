@@ -302,9 +302,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
  * this snapshot plus a source-file drift guard stands in for a live import.
  */
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
-  // file (10) — studio-main-menu-items-document.ts
+  // file save/import/export (9) — studio-main-menu-items-document.ts
   "file/save-draft",
-  "file/publish",
   "file/import-json",
   "file/import-psd",
   "file/import-ora-cbz",
@@ -320,6 +319,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "file/publish-preflight",
   "file/publish-package",
   "file/rights-manifest",
+  // Optional publication stays last in the save-first File lifecycle.
+  "file/publish",
   // edit (12) — spread from STUDIO_EDIT_MENU_COMMANDS
   "edit/undo",
   "edit/redo",

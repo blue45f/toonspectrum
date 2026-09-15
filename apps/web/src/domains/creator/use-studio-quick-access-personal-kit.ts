@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { StudioQuickAccessState } from "./studio-quick-access";
+import type { StudioQuickAccessIntegrationModule } from "./studio-page-editor-types";
 import type { StudioServerPersonalKitSnapshot } from "./studio-production/studio-production-server-client";
 
 type PersonalKitModule = typeof import(
@@ -134,4 +135,101 @@ export function useStudioQuickAccessPersonalKit({
       }
     };
   }, [localRevision, ownerScope, ready, userId]);
+}
+interface StudioMutableRef<T> {
+  current: T;
+}
+
+interface UseStudioQuickAccessPersonalKitBridgeOptions {
+  readonly userId: string | null;
+  readonly ownerScope: string;
+  readonly state: StudioQuickAccessState | null;
+  readonly runtimeRef: StudioMutableRef<StudioQuickAccessIntegrationModule | null>;
+  readonly loadedOwnerScopeRef: StudioMutableRef<string | null>;
+  readonly ownerScopeRef: StudioMutableRef<string>;
+  readonly persistenceWarningRef: StudioMutableRef<boolean>;
+  readonly setPersistenceWarning: (next: boolean) => void;
+  readonly setState: (
+    next:
+      | StudioQuickAccessState
+      | null
+      | ((current: StudioQuickAccessState | null) => StudioQuickAccessState | null),
+  ) => void;
+  readonly onStatus: (message: string) => void;
+}
+
+export function useStudioQuickAccessPersonalKitBridge({
+  userId,
+  ownerScope,
+  state,
+  runtimeRef,
+  loadedOwnerScopeRef,
+  ownerScopeRef,
+  persistenceWarningRef,
+  setPersistenceWarning,
+  setState,
+  onStatus,
+}: UseStudioQuickAccessPersonalKitBridgeOptions): {
+  readonly changeStudioQuickAccessState: (next: StudioQuickAccessState) => void;
+  readonly resetStudioQuickAccessPersonalKit: () => void;
+} {
+  const [localRevision, setLocalRevision] = useState(0);
+  const changeStudioQuickAccessState = useCallback((next: StudioQuickAccessState) => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    setState(next);
+    setLocalRevision((current) => current + 1);
+    void runtime.saveStudioQuickAccessState(ownerScope, next).then((status) => {
+      if (ownerScopeRef.current !== ownerScope) return;
+      if (status === "persisted") {
+        setPersistenceWarning(false);
+        return;
+      }
+      if (!persistenceWarningRef.current) {
+        setPersistenceWarning(true);
+        onStatus("SQLite/OPFS 저장에 실패해 빠른 액세스 변경은 현재 세션에만 유지돼요");
+      }
+    });
+  }, [
+    onStatus,
+    ownerScope,
+    ownerScopeRef,
+    persistenceWarningRef,
+    runtimeRef,
+    setPersistenceWarning,
+    setState,
+  ]);
+
+  const adoptRemote = useCallback(async (next: StudioQuickAccessState): Promise<void> => {
+    const runtime = runtimeRef.current;
+    const currentOwnerScope = ownerScopeRef.current;
+    if (!runtime || loadedOwnerScopeRef.current !== currentOwnerScope) return;
+    setState(next);
+    const status = await runtime.saveStudioQuickAccessState(currentOwnerScope, next);
+    if (ownerScopeRef.current !== currentOwnerScope) return;
+    if (status !== "persisted" && !persistenceWarningRef.current) {
+      setPersistenceWarning(true);
+      onStatus("Personal Kit 설정은 적용했지만 SQLite/OPFS에 저장하지 못했어요");
+    }
+  }, [
+    loadedOwnerScopeRef,
+    onStatus,
+    ownerScopeRef,
+    persistenceWarningRef,
+    runtimeRef,
+    setPersistenceWarning,
+    setState,
+  ]);
+
+  useStudioQuickAccessPersonalKit({
+    userId,
+    ownerScope,
+    state,
+    localRevision,
+    onAdoptRemote: adoptRemote,
+    onStatus,
+  });
+
+  const resetStudioQuickAccessPersonalKit = useCallback(() => setLocalRevision(0), []);
+  return { changeStudioQuickAccessState, resetStudioQuickAccessPersonalKit };
 }
