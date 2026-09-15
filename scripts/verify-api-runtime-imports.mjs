@@ -43,11 +43,11 @@ function hasApiPackageBoundaryEntry(packageRoot, specifier) {
 
 /**
  * TypeScript paths do not rewrite emitted imports. Resolve local/workspace
- * dependencies with plain Node and require them to stay inside Vercel's dist
- * includeFiles boundary. A source file present in CI must not mask an omitted
+ * dependencies with plain Node and require them to stay inside the emitted API
+ * distribution boundary. A source file present in CI must not mask an omitted
  * production dependency. Third-party packages must also have a direct entry at
  * the API package boundary. This prevents a parent workspace node_modules from
- * masking an undeclared serverless dependency when build tools relocate temp files.
+ * masking an undeclared runtime dependency when deployment tools relocate files.
  */
 export function verifyCompiledApiImports(directory) {
   const root = realpathSync(resolve(directory));

@@ -37,7 +37,7 @@ jobs:
           - gate: typecheck-all
             command: pnpm run typecheck && pnpm run typecheck:cloudflare-realtime
           - gate: production-workspace-build
-            command: pnpm run build && pnpm run check:studio-bundle && pnpm run build:all && pnpm run verify:api-serverless-build
+            command: pnpm --filter @webtoon-nest/api build && test -s apps/api/dist/apps/api/src/main.js && node --check apps/api/dist/apps/api/src/main.js && pnpm run build && pnpm run check:studio-bundle && pnpm run build:all
     steps:
       - uses: actions/checkout@v6
         with:

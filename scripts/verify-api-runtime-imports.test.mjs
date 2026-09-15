@@ -73,7 +73,7 @@ test("rejects the production alias when its exported source was not packaged", (
   assert.throws(() => verifyCompiledApiImports(dist), /cannot resolve \(MODULE_NOT_FOUND\)/);
 });
 
-test("rejects a relative source escape outside Vercel includeFiles", (t) => {
+test("rejects a relative source escape outside emitted API output", (t) => {
   const { dist, write } = fixture(t);
   write("dist/module.js", 'require("../source/query.js");');
   write("source/query.js", "module.exports = {};");

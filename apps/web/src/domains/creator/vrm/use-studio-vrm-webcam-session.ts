@@ -114,7 +114,7 @@ function parseCameraError(error: unknown): string {
         "[해결 방법]\n" +
         `1. 현재 비보안 주소로 접속 중입니다. 브라우저 보안 규정상 웹캠은 HTTPS 또는 localhost에서만 허용됩니다.\n` +
         `2. 로컬 개발 시: 주소창에 'http://localhost:5173' (또는 현재 Vite 포트)을 직접 입력해 접속하세요.\n` +
-        `3. 운영/배포 환경에서는 반드시 HTTPS 주소(${recommended})로 접속하세요. (Vercel 등은 자동으로 HTTPS를 강제합니다.)\n` +
+        `3. 운영/배포 환경에서는 반드시 HTTPS 주소(${recommended})로 접속하세요. 운영 도메인은 HTTPS로 제공되어야 합니다.\n` +
         `4. 외부 IP(예: http://192.168.x.x:xxxx)로 직접 접속 중이라면, 도메인 또는 localhost를 사용하거나 ngrok/cloudflare tunnel 같은 HTTPS 터널을 이용하세요.`;
     }
 

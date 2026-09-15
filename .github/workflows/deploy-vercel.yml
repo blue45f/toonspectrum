@@ -88,6 +88,9 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Verify cold fallback configuration
+        run: node scripts/cloudflare-static-rules.mjs --check-vercel-fallback
+
       - name: Install and verify pinned Vercel CLI
         shell: bash
         run: |

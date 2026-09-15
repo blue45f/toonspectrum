@@ -124,6 +124,32 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it("serves legal policies from first-party static content without an upstream", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const env = environment();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/legal/policies/privacy-policy",
+    ), env);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      policySlug: "privacy-policy",
+      source: "first-party",
+    }));
+    expect(response.headers.get("x-toonspectrum-policy-source")).toBe(
+      "first-party-release",
+    );
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+
+    const missing = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/legal/policies/not-a-policy",
+    ), env);
+    expect(missing.status).toBe(404);
+  });
+
   it("leaves static traffic on the free Static Assets path", async () => {
     const upstream = vi.fn<typeof fetch>();
     const env = environment();

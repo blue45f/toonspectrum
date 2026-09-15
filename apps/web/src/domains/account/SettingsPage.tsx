@@ -1,4 +1,4 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3, Sparkles } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,7 +15,6 @@ import {
   clearAllRememberedFilters,
 } from "@/shared/lib/use-remembered-filters";
 import { formatCount } from "@/shared/lib/utils";
-import { fetchVisitStats, type VisitStats } from "@/shared/lib/visits-api";
 
 function Choice<T extends string>({
   options,
@@ -97,7 +96,6 @@ export function SettingsPage() {
   const [searchesCleared, setSearchesCleared] = useState(false);
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
   const t = useT();
   const langOptions = getLanguageOptions(lang).map((entry) => ({
     id: entry.code,
@@ -109,17 +107,6 @@ export function SettingsPage() {
     { id: "ten", label: t("settings.rating.ten") },
     { id: "hundred", label: t("settings.rating.hundred") },
   ];
-
-  // 방문 통계는 best-effort 표시 — 실패하면 조용히 숨긴다(아래 Row가 null 가드).
-  useEffect(() => {
-    let alive = true;
-    fetchVisitStats().then((stats) => {
-      if (alive) setVisitStats(stats);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // 내 서재(별점·읽음·구독·컬렉션)는 이 브라우저에만 저장되므로 JSON 백업으로 내보내기/가져오기 지원.
   const doExport = () => {
@@ -398,27 +385,6 @@ export function SettingsPage() {
             </button>
           )}
         </Row>
-        {visitStats && (
-          <Row
-            icon={BarChart3}
-            title={t("settings.data.stats")}
-            desc={t("settings.data.statsDesc")}
-          >
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-fg-2">
-              <span className="tabular-nums">
-                {t("settings.data.statsToday")}{" "}
-                <span className="font-semibold text-fg">{formatCount(visitStats.todayVisits)}</span>
-              </span>
-              <span className="text-line-strong" aria-hidden>
-                ·
-              </span>
-              <span className="tabular-nums">
-                {t("settings.data.statsTotal")}{" "}
-                <span className="font-semibold text-fg">{formatCount(visitStats.totalVisits)}</span>
-              </span>
-            </span>
-          </Row>
-        )}
       </section>
 
       {/* 계정 */}

@@ -88,20 +88,15 @@ describe("manual-only minimum-cost release policy", () => {
     expect(publishers).toEqual(["deploy-vercel.yml"]);
   });
 
-  it.each(["vercel:deploy", "vercel:preview"])(
-    "blocks the legacy %s alias without network access",
-    (key) => {
-      const scripts = JSON.parse(
-        readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-      ).scripts;
-      expect(scripts[key]).toContain("node scripts/blocked-deployment-command.mjs");
-      const result = spawnSync(
-        process.execPath,
-        [new URL("./blocked-deployment-command.mjs", import.meta.url).pathname, key],
-        { encoding: "utf8" },
-      );
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain("disabled by the free-strict infrastructure policy");
-    },
-  );
+  it("removes legacy Vercel aliases from the normal package scripts", () => {
+    const scripts = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    ).scripts;
+    for (const key of ["vercel:deploy", "vercel:preview", "vercel:status", "vercel:inspect"]) {
+      expect(scripts[key]).toBeUndefined();
+    }
+    expect(scripts["verify:vercel-fallback"]).toBe(
+      "node scripts/cloudflare-static-rules.mjs --check-vercel-fallback",
+    );
+  });
 });

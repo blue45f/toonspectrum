@@ -20,7 +20,7 @@ export const BUSINESS_INFO = {
   /** 대표 전화번호. */
   phone: "010-3873-4197",
   /** 호스팅 사업자. */
-  hosting: "Vercel (Frontend)",
+  hosting: "Cloudflare (Frontend) · Render (API)",
   /** 서비스 형태 한 줄 설명. */
   serviceType: "웹툰·웹소설 통합 검색 및 분석 인덱스",
 } as const;

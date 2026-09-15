@@ -40,7 +40,7 @@ jobs:
             scripts/production-database-migrations.manifest
             apps/web/src/app/routes/groups/community.routes.tsx
             apps/api/src/db/migrations/0046_creator_promotion_community.sql
-            vercel.json
+            config/http-response-headers.json
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v6
         with:

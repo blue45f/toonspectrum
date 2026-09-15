@@ -39,29 +39,18 @@ jobs:
           mapfile -t tests < <(node -e 'JSON.parse(require("fs").readFileSync("scripts/api-followup-test-files.json","utf8")).forEach(x=>console.log(x))')
           test "${#tests[@]}" -gt 0
           pnpm exec vitest run "${tests[@]}" --reporter=default --reporter=json --outputFile=artifacts/api-runtime/vitest.json
-      - name: Build and verify real packaged Lambda
+      - name: Build and verify the long-running Render API artifact
         run: |
           set -euo pipefail
-          pnpm --filter @webtoon-nest/api build
-          pnpm run build
-          pnpm run check:studio-bundle
-          set +e
-          pnpm run verify:api-serverless-build 2>&1 | tee artifacts/api-runtime/packaging.log
-          result=${PIPESTATUS[0]}
-          set -e
-          python3 - <<'PY'
-          import pathlib, shutil
-          target = pathlib.Path('artifacts/api-runtime')
-          for directory in pathlib.Path('/tmp').glob('toonspectrum-api-lambda-*'):
-              out = target / directory.name
-              out.mkdir(exist_ok=True)
-              for path in directory.iterdir():
-                  if path.is_file() and path.suffix in {'.log', '.json'}:
-                      shutil.copy2(path, out / path.name)
-                      if path.suffix == '.log':
-                          print(path.name + '\n' + path.read_text(errors='replace')[-24000:])
-          PY
-          exit "$result"
+          pnpm --filter @webtoon-nest/api build 2>&1 | tee artifacts/api-runtime/build.log
+          test -s apps/api/dist/apps/api/src/main.js
+          node --check apps/api/dist/apps/api/src/main.js
+          node --check apps/api/dist/apps/api/src/runtime/general-api.module.js
+          {
+            echo "runtime=render-web-service"
+            echo "entrypoint=apps/api/dist/apps/api/src/main.js"
+            echo "sha=$(git rev-parse HEAD)"
+          } > artifacts/api-runtime/runtime.txt
       - uses: actions/upload-artifact@v6
         if: always()
         with:

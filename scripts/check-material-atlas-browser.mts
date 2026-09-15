@@ -15,8 +15,14 @@ const root = process.cwd();
 const dist = path.join(root, "dist");
 const artifacts = path.join(root, "artifacts/material-atlas");
 await mkdir(artifacts, { recursive: true });
-const config = JSON.parse(await readFile(path.join(root, "vercel.json"), "utf8")) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
-const headers = Object.fromEntries(config.headers.filter((entry) => entry.source === "/(.*)").flatMap((entry) => entry.headers.map((header) => [header.key, header.value])));
+const responsePolicy = JSON.parse(
+  await readFile(path.join(root, "config/http-response-headers.json"), "utf8"),
+) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
+const headers = Object.fromEntries(
+  responsePolicy.headers
+    .filter((entry) => entry.source === "/(.*)")
+    .flatMap((entry) => entry.headers.map((header) => [header.key, header.value])),
+);
 const mime: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff", ".wasm": "application/wasm", ".ico": "image/x-icon" };
 assert(existsSync(path.join(dist, "index.html")), "Run pnpm build first");
 const server = createServer((request, response) => {
@@ -113,7 +119,7 @@ try {
     console.log(JSON.stringify(results.at(-1)));
     await context.close();
   }
-  await writeFile(path.join(artifacts, "browser-report.json"), JSON.stringify({ testedAt: new Date().toISOString(), bundle: "production dist", backend: "explicit 503 fixture", securityHeaders: "vercel global headers", results }, null, 2));
+  await writeFile(path.join(artifacts, "browser-report.json"), JSON.stringify({ testedAt: new Date().toISOString(), bundle: "production dist", backend: "explicit 503 fixture", securityHeaders: "provider-neutral global headers", results }, null, 2));
 } catch (cause) {
   const page = browser.contexts()[0]?.pages()[0];
   if (page) { await page.screenshot({ path: path.join(artifacts, "failure.png"), fullPage: true }); await writeFile(path.join(artifacts, "failure.html"), await page.content()); console.error("Note state", await page.locator("#material-note").inputValue().catch(() => "missing")); }

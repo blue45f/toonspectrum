@@ -8,7 +8,7 @@ function safeDecodePath(path: string): string {
   }
 }
 
-/** Canonicalizes the Vercel-compatible `?path=` adapter shape before security boundaries run. */
+/** Canonicalizes the provider-neutral `?path=` compatibility adapter shape before security boundaries run. */
 export function rewriteQueryPathToUrl(request: Request): void {
   const pathValue =
     request.query && typeof request.query === "object"
