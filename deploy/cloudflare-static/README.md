@@ -30,7 +30,7 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
 
-`/api/catalog/ingest/status`, catalog refresh/run, readiness, runtime config처럼 운영 상태나 기준 권위를 나타내는 경로는 메서드가 읽기여도 공개 replica 풀에 포함하지 않는다. 공개 읽기 allowlist는 실제 API controller와 함께 검토하며, 새로운 prefix를 포괄적으로 자동 분산하지 않는다.
+readiness, runtime config, 관리자 경로처럼 운영 상태나 기준 권위를 나타내는 경로는 메서드가 읽기여도 공개 replica 풀에 포함하지 않는다. 공개 읽기 allowlist는 실제 API controller와 함께 검토하며, 새로운 prefix를 포괄적으로 자동 분산하지 않는다.
 
 ### 공개 replica 보안 경계
 

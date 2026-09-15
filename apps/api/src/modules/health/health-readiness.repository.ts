@@ -25,8 +25,6 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "admin_promos",
   "admin_security_policies",
   "app_setting",
-  "catalog_ingest_run",
-  "catalog_snapshot",
   "collection",
   "collection_item",
   "community_cafe",

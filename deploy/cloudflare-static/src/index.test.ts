@@ -529,7 +529,7 @@ describe("Cloudflare static gateway", () => {
       new Response("core-write", { status: 503 }));
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
     const response = await gateway(
-      new Request("https://www.toonstudio.cloud/api/catalog/refresh", {
+      new Request("https://www.toonstudio.cloud/api/creator-marketplace/orders", {
         method: "POST",
         body: "{}",
         headers: { "content-type": "application/json" },
@@ -547,7 +547,7 @@ describe("Cloudflare static gateway", () => {
     expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("core");
   });
 
-  it("keeps catalog ingest operations and readiness checks on core", async () => {
+  it("keeps readiness and runtime configuration on core", async () => {
     const upstream = vi.fn<typeof fetch>(async (request) => new Response(
       JSON.stringify({
         host: new URL((request as Request).url).host,
@@ -561,7 +561,6 @@ describe("Cloudflare static gateway", () => {
     });
 
     for (const pathname of [
-      "/api/catalog/ingest/status",
       "/api/health/ready",
       "/api/config",
     ]) {
