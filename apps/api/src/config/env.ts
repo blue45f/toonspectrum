@@ -110,6 +110,7 @@ const envSchema = z.object({
   API_LOCAL_ENV_FILE_ENABLED: z.enum(["true", "false"]).optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
+  CLOUDFLARE_EDGE_ORIGIN_SECRET: z.string().min(32).optional(),
   // 인증/요청 경계: production은 topology를 명시하고, development/test만 Upstash 유무에
   // 따라 자동 선택합니다. 신뢰 프록시는 항상 별도로 명시해야 합니다.
   AUTH_RATE_LIMIT_MODE: z
@@ -495,6 +496,7 @@ const UNSAFE_DEFAULTS: ReadonlyArray<string> = [
 const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "AUTH_SESSION_SECRET",
   "AUTH_STATE_SECRET",
+  "CLOUDFLARE_EDGE_ORIGIN_SECRET",
   "CATALOG_INGEST_TRIGGER_TOKEN",
   "DATABASE_URL",
   "STUDIO_LIVE_POSTGRES_URL",

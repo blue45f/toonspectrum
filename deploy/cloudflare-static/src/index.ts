@@ -34,6 +34,7 @@ export interface CloudflareStaticEnv {
   readonly ASSETS: AssetsBinding;
   readonly LARGE_ASSETS?: R2BucketBinding;
   readonly CORE_API_ORIGIN?: string;
+  readonly CORE_ORIGIN_SECRET?: string;
   /** Comma-separated stateless read replicas for public/catalog/search traffic. */
   readonly PUBLIC_READ_API_ORIGINS?: string;
   readonly SOCIAL_API_ORIGIN?: string;
@@ -68,6 +69,8 @@ const DEFAULT_RUNTIME: GatewayRuntime = {
 const RETRYABLE_READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 const MAX_PUBLIC_READ_ORIGINS = 8;
+const CORE_ORIGIN_AUTH_HEADER = "x-toonspectrum-origin-secret";
+const MINIMUM_CORE_ORIGIN_SECRET_BYTES = 32;
 
 export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
@@ -87,6 +90,40 @@ function jsonError(status: number, code: string): Response {
       ...COMMON_SECURITY_HEADERS,
     },
   });
+}
+
+function isEdgeLivenessRequest(request: Request, url: URL): boolean {
+  const method = request.method.toUpperCase();
+  return (method === "GET" || method === "HEAD")
+    && (url.pathname === "/api/health" || url.pathname === "/api/health/live");
+}
+
+function edgeLivenessResponse(request: Request): Response {
+  const body = request.method.toUpperCase() === "HEAD"
+    ? null
+    : JSON.stringify({ status: "ok" });
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store, max-age=0",
+      pragma: "no-cache",
+      "x-toonspectrum-health-source": "cloudflare-edge",
+      ...COMMON_SECURITY_HEADERS,
+    },
+  });
+}
+
+function validatedCoreOriginSecret(raw: string | undefined): string | null {
+  if (raw === undefined) return null;
+  const normalized = raw.trim();
+  if (
+    raw !== normalized
+    || new TextEncoder().encode(normalized).byteLength < MINIMUM_CORE_ORIGIN_SECRET_BYTES
+  ) {
+    return null;
+  }
+  return normalized;
 }
 
 function validatedOrigin(raw: string | undefined): URL | null {
@@ -289,7 +326,9 @@ function resolveOrigins(
     case "realtime":
       return optionalOrigin(env.REALTIME_API_ORIGIN, core);
     case "large-asset":
-      return optionalOrigin(env.LARGE_ASSET_ORIGIN, core);
+      // Static sidecars and R2 are the normal authorities. A final HTTP origin
+      // is used only when explicitly configured; never wake the Core API for files.
+      return optionalOrigin(env.LARGE_ASSET_ORIGIN, null);
     case "core":
       return {
         origins: core ? [core] : [],
@@ -379,6 +418,7 @@ export function createUpstreamApiRequest(
   origin: URL,
   route: DynamicRoute,
   attempt: number,
+  coreOriginSecret?: string,
 ): Request {
   const incoming = new URL(request.url);
   const upstream = new URL(incoming.pathname + incoming.search, origin);
@@ -398,6 +438,7 @@ export function createUpstreamApiRequest(
   headers.delete("true-client-ip");
   headers.delete("x-forwarded-for");
   headers.delete("x-real-ip");
+  headers.delete(CORE_ORIGIN_AUTH_HEADER);
   if (route === "public-read" || route === "large-asset") {
     removePublicReadCredentials(headers);
   } else if (connectingIp) {
@@ -408,6 +449,9 @@ export function createUpstreamApiRequest(
   headers.set("x-toonspectrum-edge", "cloudflare-static-gateway-v2");
   headers.set("x-toonspectrum-edge-route", route);
   headers.set("x-toonspectrum-edge-attempt", String(attempt));
+  if (coreOriginSecret) {
+    headers.set(CORE_ORIGIN_AUTH_HEADER, coreOriginSecret);
+  }
 
   const upstreamRequest = new Request(upstream, request);
   return new Request(upstreamRequest, {
@@ -650,6 +694,9 @@ export function createCloudflareStaticGateway(
     env: CloudflareStaticEnv,
   ): Promise<Response> {
     const requestUrl = new URL(request.url);
+    if (isEdgeLivenessRequest(request, requestUrl)) {
+      return edgeLivenessResponse(request);
+    }
     if (!isDynamicPath(requestUrl.pathname)) {
       return env.ASSETS.fetch(request);
     }
@@ -666,6 +713,12 @@ export function createCloudflareStaticGateway(
       if (r2Response) return r2Response;
     }
 
+    const configuredCoreSecret = env.CORE_ORIGIN_SECRET;
+    const coreOriginSecret = validatedCoreOriginSecret(configuredCoreSecret);
+    if (configuredCoreSecret !== undefined && coreOriginSecret === null) {
+      return jsonError(503, "CORE_API_UNAVAILABLE");
+    }
+    const coreOrigin = validatedOrigin(env.CORE_API_ORIGIN);
     const resolution = resolveOrigins(route, env);
     const selfReferential = resolution.origins.some(
       (origin) => origin.origin === requestUrl.origin,
@@ -678,7 +731,12 @@ export function createCloudflareStaticGateway(
       || selfReferential
       || origins.length === 0
     ) {
-      return jsonError(503, "CORE_API_UNAVAILABLE");
+      return jsonError(
+        503,
+        route === "large-asset"
+          ? "LARGE_ASSET_UNAVAILABLE"
+          : "CORE_API_UNAVAILABLE",
+      );
     }
 
     const orderedOrigins = retryableRead(request, route)
@@ -689,7 +747,15 @@ export function createCloudflareStaticGateway(
       attempted += 1;
       try {
         const response = await runtime.fetch(
-          createUpstreamApiRequest(request, origin, route, index),
+          createUpstreamApiRequest(
+            request,
+            origin,
+            route,
+            index,
+            coreOrigin?.origin === origin.origin
+              ? coreOriginSecret ?? undefined
+              : undefined,
+          ),
         );
         // Reconstructing a WebSocket upgrade response drops the runtime-specific
         // WebSocket handle. Security headers apply to HTTP responses; the upgrade

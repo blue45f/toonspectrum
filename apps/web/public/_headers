@@ -1,4 +1,4 @@
-# Generated from vercel.json by scripts/cloudflare-static-rules.mjs.
+# Generated from config/http-response-headers.json by scripts/cloudflare-static-rules.mjs.
 # Run `pnpm run generate:cloudflare-static-rules` after changing response headers.
 
 /offline-draw/sw.js
@@ -42,7 +42,6 @@
 /assets/studio/cc0-20260906/manifest.json
   Cache-Control: public, max-age=0, must-revalidate
   CDN-Cache-Control: no-cache
-  Vercel-CDN-Cache-Control: no-cache
 
 /vrm/*
   Access-Control-Allow-Origin: *

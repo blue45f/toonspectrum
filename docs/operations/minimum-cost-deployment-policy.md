@@ -1,80 +1,100 @@
 # 최소 비용·수동 전용 배포 정책
 
-결정일: 2026-09-14 · 결정자: 저장소 소유자 · 범위: ToonSpectrum 및 Vercel `blue45fs-projects` 팀.
-이 문서는 과거의 main 자동 배포, `[deploy]` 예외, Vercel 원격 빌드 권장 지침을 대체한다.
+결정일: 2026-09-15 · 결정자: 저장소 소유자 · 범위: ToonSpectrum 운영 인프라 전체.
+이 문서는 과거의 main 자동 배포, `[deploy]` 예외, Vercel 중심 릴리스 지침을 대체한다.
+
+## 운영 권위
+
+| 배포 단위 | 기본 운영 권위 | 비고 |
+|---|---|---|
+| SPA·정적 카탈로그·일반 에셋 | Cloudflare Static Assets | 정적 요청은 Worker 실행량을 사용하지 않는다. |
+| 동적 경로 게이트웨이·edge liveness | Cloudflare Worker | `/api/health/live`는 Core API를 깨우지 않는다. |
+| 대형 불변 파일 | 압축 Static Assets + R2 | Range 요청만 R2 원본을 사용한다. |
+| Core API | Render `toonspectrum-core-api` | `API_RUNTIME_ROLE=full`, 수동 release, scale-to-zero. |
+| 임시 실시간 조정 | Cloudflare Durable Objects | presence·cursor·comment·signaling. |
+| PostgreSQL 원장 | Neon/호환 PostgreSQL | migration은 별도 승인형 single writer. |
+| Vercel | 비상 prebuilt rollback | 정상 배포·정적 제공·Core API 권위가 아니다. |
 
 ## 변하지 않는 기본 원칙
 
-PR 생성·병합·브랜치 정리는 배포 승인이 아니다. 사용자가 별도로 배포를 명시적으로 승인해야 한다.
-자동 Git 빌드·운영 배포·Preview·Deploy Hooks·push/cron/workflow_run 배포를 활성화하지 않는다.
-작업 중 여러 변경을 검증·병합하고, 필요한 시점에 정확한 40자리 main SHA 하나를 한 번 배포한다.
-PR의 테스트·lint·typecheck·보안·필수 core/verify·브랜치 보호는 유지한다. CI 검증은 호스팅 배포와 구분한다.
+PR 생성·병합·브랜치 정리는 배포 승인이 아니다. 사용자가 배포를 명시적으로 승인해야 한다.
+자동 Git 빌드, 운영 배포, Preview, Deploy Hook, push/cron/workflow_run 배포를 활성화하지 않는다.
+각 workload는 하나의 쓰기 권위만 가지며 공급자 장애를 이유로 다른 DB나 API에 자동 이중 쓰기하지 않는다.
+유료 플랜, 유료 failover, 상위 빌드 머신으로 자동 승격하지 않는다.
 
-## 허용되는 기본 패턴
+## 기본 수동 릴리스 순서
 
-1. 사용자 승인과 배포 범위, 정확한 SHA를 기록한다. origin/main 포함 여부와 필수 CI 성공을 확인한다.
-2. 이미 운영 중인 SHA와 비교한다. 같은 SHA·환경·산출물을 중복 배포하지 않는다.
-3. Linux 호환 로컬 환경 또는 무료 사용 자격/남은 할당을 확인한 표준 GitHub 러너를 선택한다.
-4. 고정한 Node·pnpm·Vercel CLI와 lockfile, 의존성 캐시로 생산용 산출물을 한 번 만든다.
-5. `.vercel/output/config.json`, static, functions 및 Lambda의 Linux/native 의존성 호환성을 검증한다.
-6. `vercel deploy --prebuilt --prod`로 같은 산출물을 한 번 업로드한다. Vercel source build는 금지한다.
-7. 배포 ID/URL과 상태, 주요 화면·API, 기존 도메인 연결을 확인하고 릴리스 기록을 남긴다.
-
-일반 개발에서는 Vite 로컬 서버와 PR CI를 사용하며 Vercel Preview를 만들지 않는다.
-Mac/ARM에서 만든 서버 native 모듈을 검증 없이 Linux 함수에 업로드하지 않는다.
-무료 러너가 불가능하면 유료·대형 러너나 Vercel 원격 빌드로 자동 전환하지 않고 중단·보고한다.
-
-## 기본 수동 실행 경로
-
-`.github/workflows/deploy-vercel.yml`을 main에서 수동 실행한다. 호환성을 위해 기존 워크플로 파일명과
-fallback 이름은 유지하지만, 이제 예외 경로가 아니라 승인된 기본 Vercel 배포 경로다.
-`ref`에는 승인된 40자리 SHA, `confirm`에는 `DEPLOY-TOONSPECTRUM-PREBUILT`를 넣는다.
-확인 문구 자체는 사용자 승인을 대신하지 않는다. 실행자는 승인과 필수 CI 결과를 먼저 확인한다.
+1. 승인한 정확한 40자리 `main` SHA와 변경 배포 단위를 기록한다.
+2. 필수 CI, migration manifest, 보안·라이선스 검증을 확인한다.
+3. DB 변경이 있으면 승인형 migration workflow를 먼저 실행하고 runtime role readiness를 검증한다.
+4. Render Core API를 수동 배포하되 아직 Cloudflare의 `CORE_API_ORIGIN`은 변경하지 않는다.
+5. 다음 검증을 통과해야 Core API 권위를 전환할 수 있다.
 
 ```bash
-# 별도의 사용자 배포 승인 이후에만 실행하는 예시. 이 정책 적용 작업에서는 실행하지 않는다.
-gh workflow run deploy-vercel.yml --repo blue45f/toonspectrum --ref main \
-  -f ref="$APPROVED_MAIN_SHA" -f confirm=DEPLOY-TOONSPECTRUM-PREBUILT
+RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com \
+  pnpm run verify:render-core-origin
 ```
 
-워크플로는 production Environment, main ancestry, 고정 CLI, 직렬 배포, prebuilt 검증을 유지한다.
-배포용 GitHub-hosted Linux 러너에서도 사용 자격·과금 조건을 먼저 확인하며 무료라고 무조건 가정하지 않는다.
-검증된 로컬 Linux 경로를 쓸 때도 동일한 승인·SHA·환경·검증·단일 업로드 규칙을 적용한다.
+검증은 `/api/health/live`, `/api/health/ready`, JSON 계약, redirect 부재와 `x-vercel-id` 부재를 확인한다.
+무료 Render는 inactivity 후 cold start가 있을 수 있으므로 timeout은 이를 허용하지만 readiness 실패를
+성공으로 취급하지 않는다.
+
+6. Cloudflare 정적 배포를 dry-run한 다음 검토된 Core origin으로 한 번 배포한다.
 
 ```bash
-# 승인·검증된 격리된 Linux 작업 디렉터리에서만 실행하는 명령 순서
-pnpm exec vercel pull --yes --environment=production
-pnpm exec vercel build --prod --yes
-# 위 출력의 static/functions 및 필요한 runtime·보안 검증을 완료한 뒤
-pnpm exec vercel deploy --prebuilt --prod --yes --archive=tgz
+pnpm run verify:free-infrastructure
+pnpm run verify:cloudflare-static
+pnpm run cloudflare:static:dry-run
+
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
+export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
+pnpm run cloudflare:static:deploy
 ```
 
-로컬 `.vercel/project.json`의 프로젝트 연결은 Vercel의 Git 저장소 자동 배포 연결과 다르다.
-`vercel link`가 Git 연결을 제안하면 거절하고, 로컬 프로젝트 식별자만 사용한다. 자격증명은 출력·커밋하지 않는다.
+7. 루트, Studio SPA, 정적 카탈로그, edge liveness, Core readiness, 로그인·OAuth callback,
+   권한이 필요한 API, R2 Range, realtime reconnect를 검사한다.
+8. 릴리스 ID, Worker version, Render deploy ID, SHA와 롤백 대상을 기록한다.
 
-## 차단 상태와 예외
+## Render Core API 경계
 
-- Vercel 팀 5개 프로젝트 모두 Git 연결 해제, Preview 비활성화, Ignored Build Step `exit 0`을 유지한다.
-- Basic 고정·유료 동시 빌드 해제·팀 동시 빌드 1개를 유지한다. Git 재연결이나 `[deploy]` 예외를 만들지 않는다.
-- `production-readiness.yml`의 과거 원격 배포 경로는 폐기하며, 워크플로는 읽기 전용 audit 용도로만 둔다.
-- `pnpm vercel:deploy`와 `pnpm vercel:preview`의 과거 별칭은 종료 코드 1로 중단하며 정책 문서를 안내한다.
-- Deploy Hooks, source upload 기반 `vercel --prod`, dashboard Redeploy 재빌드, 자동 재시도와 중복 배포를 금지한다.
-- 유료 옵션·상위 빌드 머신·플랜 변경·자동 배포 재활성화는 비용과 영향을 설명한 별도 승인이 필요하다.
+- `render.yaml`의 `toonspectrum-core-api`는 `autoDeployTrigger: off`를 유지한다.
+- build/start에서 migration이나 `drizzle-kit push`를 실행하지 않는다.
+- 운영 비밀은 Render encrypted environment 또는 root `.env.local` Secret File에 저장한다.
+- 비밀값은 터미널, PR, 로그, GitHub summary에 출력하지 않는다.
+- `DATABASE_URL`, 인증 서명키와 OAuth state key가 준비되지 않으면 트래픽을 전환하지 않는다.
+- 무료 인스턴스의 cold start와 월 사용 제한은 기능 저하가 아니라 운영 등급 제약이다. SLA가 필요할 때만
+  별도 승인으로 always-on 호스트로 승격한다.
 
-실패하면 배포를 반복하지 말고 원인을 먼저 조사한다. 재업로드가 필요하면 추가 승인을 기록하고 동일한
-검증된 산출물을 재사용한다. 운영 장애는 기존 정상 배포로의 롤백/승격을 먼저 검토하고 새 빌드를 만들지 않는다.
-DB migration, 환경변수 변경, 데이터 삭제, 도메인 이전, 프로젝트 정지는 이 배포 승인에 포함되지 않는다.
+## Cloudflare 경계
+
+- Static Assets가 가능한 요청을 Worker로 보내지 않는다.
+- `/api/health`와 `/api/health/live`는 edge에서 `no-store`로 응답한다.
+- `/api/health/ready`는 반드시 Core API의 DB/schema readiness를 확인한다.
+- 대형 파일은 압축 sidecar와 R2가 모두 실패한 경우에만 명시적으로 설정한 HTTP fallback을 사용한다.
+  `LARGE_ASSET_ORIGIN`이 비어 있으면 Core API를 파일 서버처럼 깨우지 않는다.
+- 운영 배포는 검토된 `main`, clean worktree, 명시적 approval 문자열이 모두 필요하다.
+
+## Vercel 비상 롤백
+
+`.github/workflows/deploy-vercel.yml`은 정상 릴리스 경로가 아니다. Cloudflare 또는 Render 전환에서
+복구할 수 없는 운영 장애가 있고 사용자가 별도로 승인한 경우에만 current-main ancestor의 검증된
+prebuilt 산출물을 올린다.
+
+- Vercel Git 연결과 모든 branch 자동 배포는 계속 비활성이다.
+- `pnpm vercel:deploy`, `pnpm vercel:preview`는 실패한다.
+- Preview, Deploy Hook, dashboard source rebuild, 자동 재시도는 금지한다.
+- `origin.toonstudio.cloud`는 필요 시 롤백 확인에 사용할 수 있지만 정상 Worker origin으로 사용하지 않는다.
+- 안정화 후 Vercel project·DNS fallback 삭제는 별도 운영 변경으로 수행한다.
+
+## 실패·롤백
+
+배포 실패를 반복 실행하지 말고 원인을 먼저 조사한다. Core API 전환 실패 시 Cloudflare의
+`CORE_API_ORIGIN`만 직전 검증 origin으로 되돌리고 정적/R2 계층은 유지한다. Worker 장애는 zone route의
+fail-open 또는 직전 Worker version rollback을 사용한다. DB migration, secret rotation, 데이터 삭제,
+DNSSEC·nameserver 변경은 일반 애플리케이션 배포 승인에 포함되지 않는다.
 
 ## 릴리스 기록
 
-승인 시각/내용, 실행자, 정확한 SHA, main ancestry, 필수 CI, 빌드 환경/CLI 버전, 산출물 검증,
-배포 ID/URL, 배포 후 검사, 롤백 대상, 재시도 여부를 남긴다. 비밀 값은 기록하지 않는다.
-원격 빌드를 없애도 Pro 기본료·Functions·트래픽·저장소·외부 서비스 사용료는 남을 수 있다.
-이 정책은 자동 빌드 비용 억제이며 총 청구액 0원을 보장하는 지출 상한 설정은 아니다.
-
-## 근거 문서 (2026-09-14 확인)
-
-- Vercel Git 연결 해제: https://vercel.com/docs/cli/git
-- 자동 Git 배포 차단: https://vercel.com/docs/project-configuration/git-configuration
-- 로컬/CI 빌드와 prebuilt: https://vercel.com/docs/cli/build
-- GitHub Actions와 중복 배포 방지: https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel
+승인 시각·범위, 실행자, 정확한 SHA, CI, migration 상태, Render deploy ID, Worker version, R2 검증,
+배포 후 smoke test, 롤백 대상과 재시도 여부를 남긴다. 비밀 값은 기록하지 않는다.
+무료 플랜의 한도와 cold start를 수용하는 정책이며 무제한 트래픽·SLA·영구 0원을 보장한다는 뜻은 아니다.
