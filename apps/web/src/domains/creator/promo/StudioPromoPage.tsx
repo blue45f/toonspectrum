@@ -22,7 +22,7 @@ import "./promo-studio.css";
 export function StudioPromoPage() {
   const userAi = useUserAi();
   const configured = Boolean(userAi.configuration.assignments.text);
-  const aiStatus = configured ? "내 API 키 연결됨" : "내 API 키 미설정 · 로컬 템플릿 사용 가능";
+  const aiStatus = configured ? "무료 전용 AI 연결됨" : "무료 AI 미설정 · 로컬 템플릿 사용 가능";
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
   const [undo, setUndo] = useState<PromoProject[]>([]);
   const [redo, setRedo] = useState<PromoProject[]>([]);
@@ -140,7 +140,7 @@ export function StudioPromoPage() {
       if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
       const panels = parsePromoAiPlan(content, project);
       patch({ panels });
-      setMessage("내 API 키의 텍스트 AI 구성 적용 · 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.");
+      setMessage("무료 텍스트 AI 구성 적용 · 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.");
     } catch (reason) { failed(reason, controller.signal); } finally { clearTimeout(timeout); finish(controller); }
   };
   const exportVideo = async () => {
@@ -198,7 +198,7 @@ export function StudioPromoPage() {
               <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
               <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
-            <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 요청 비용은 연결한 API 키 소유자에게 청구되며 운영측 유료 AI로 자동 전환하지 않습니다.</p>
+            <p className="promo-muted">{aiStatus}. 무료 전용 AI 연결에는 제목·줄거리·컷 설명·자막만 전송합니다. 운영측 유료 AI로 자동 전환하지 않습니다.</p>
             {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
             <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeekFrame={(frame) => setSeekRequest({ frame, token: Date.now() })} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
               if (project.panels.length >= PROMO_MAX_PANELS) return;

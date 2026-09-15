@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
-import { extname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
@@ -29,15 +29,29 @@ function compiledFiles(directory) {
   }).sort();
 }
 
+function packageNameFromSpecifier(specifier) {
+  const segments = specifier.split("/");
+  return specifier.startsWith("@")
+    ? segments.slice(0, 2).join("/")
+    : segments[0];
+}
+
+function hasApiPackageBoundaryEntry(packageRoot, specifier) {
+  const packageName = packageNameFromSpecifier(specifier);
+  return existsSync(join(packageRoot, "node_modules", ...packageName.split("/")));
+}
+
 /**
  * TypeScript paths do not rewrite emitted imports. Resolve local/workspace
  * dependencies with plain Node and require them to stay inside Vercel's dist
  * includeFiles boundary. A source file present in CI must not mask an omitted
- * production dependency. Resolve third-party imports from the emitted caller too:
- * workspace-only dependencies can disappear when shared sources move under API dist.
+ * production dependency. Third-party packages must also have a direct entry at
+ * the API package boundary. This prevents a parent workspace node_modules from
+ * masking an undeclared serverless dependency when build tools relocate temp files.
  */
 export function verifyCompiledApiImports(directory) {
   const root = realpathSync(resolve(directory));
+  const packageRoot = dirname(root);
   const files = compiledFiles(root);
   assert.ok(files.length > 0, "API build contains no compiled JavaScript");
   const failures = [];
@@ -48,6 +62,12 @@ export function verifyCompiledApiImports(directory) {
       if (isBuiltin(specifier)) continue;
       const localOrWorkspace = specifier.startsWith(".") || specifier.startsWith("@toonspectrum/");
       importsChecked += 1;
+      if (!localOrWorkspace && !hasApiPackageBoundaryEntry(packageRoot, specifier)) {
+        failures.push(
+          `${relative(root, filename)}: ${specifier} cannot resolve (MODULE_NOT_FOUND); not installed at API package boundary`,
+        );
+        continue;
+      }
       try {
         const target = realpathSync(requireFromFile.resolve(specifier));
         const targetRelative = relative(root, target);
