@@ -5,7 +5,7 @@ import {
   createPersonalCloudPkcePair,
   decryptPersonalCloudSecret,
   encryptPersonalCloudSecret,
-  issuePersonalCloudOAuthState,
+  encodePersonalCloudOAuthState,
   verifyPersonalCloudOAuthState,
 } from "./personal-cloud.crypto";
 
@@ -28,7 +28,7 @@ describe("personal cloud cryptography", () => {
 
   it("rejects tampered and expired OAuth state", () => {
     const now = Date.now();
-    const state = issuePersonalCloudOAuthState({
+    const state = encodePersonalCloudOAuthState({
       version: 1,
       provider: "google-drive",
       userId: "user-1",

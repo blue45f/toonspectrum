@@ -5,7 +5,8 @@ import { isDiscoverPurposeRoute, isPublicCreativeRoute } from "./site-public-rou
 describe("public creative chrome route boundaries", () => {
   it.each([
     "/", "/about", "/about/", "/help", "/support", "/contact", "/research/assets",
-    "/learn", "/learn/lessons/panel-pacing", "/learn/paths/webtoon", "/market/browse",
+    "/learn", "/learn/process", "/learn/careers", "/learn/education",
+    "/learn/lessons/panel-pacing", "/learn/paths/webtoon", "/market/browse",
     "/market/resource/brush-1", "/showcase/work/work-1", "/community/cafes/comics",
   ])("keeps the creative journey on public destination %s", (pathname) => {
     expect(isPublicCreativeRoute(pathname)).toBe(true);
