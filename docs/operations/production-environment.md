@@ -40,6 +40,8 @@ Vercel 비상 fallback을 실제로 실행할 때만 필요한 권한:
 선택적 공급자 값:
 
 - 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`, `GITHUB_OAUTH_*`
+- 개인 저장소 OAuth의 `GOOGLE_DRIVE_OAUTH_*`, `DROPBOX_OAUTH_*`, `ONEDRIVE_OAUTH_*`,
+  `PERSONAL_CLOUD_OAUTH_STATE_SECRET`, `PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY`
 - `OPENAI_API_KEY`
 - `OPENROUTER_API_KEY`
 - `BLOB_READ_WRITE_TOKEN`
@@ -51,6 +53,8 @@ Vercel 비상 fallback을 실제로 실행할 때만 필요한 권한:
 - 기존 `R2_*`, `S3_*`, `CREATOR_ASSET_OBJECT_STORAGE_*` — 해당 레거시 코드가 실제 참조할 때만 유지
 
 선택적 공급자 값이 없으면 해당 기능은 명시적으로 비활성 또는 구성되지 않음 상태를 표시해야 하며, 공개 페이지와 기본 Studio 기능을 중단해서는 안 된다.
+
+개인 저장소 공급자의 콘솔 등록값, 최소 scope, 운영·로컬 콜백은 [`personal-cloud-provider-registration.md`](./personal-cloud-provider-registration.md)를 따른다.
 
 ## 실행
 

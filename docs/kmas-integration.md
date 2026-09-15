@@ -55,22 +55,25 @@ KMAS item(정확한 JSON 키는 실응답 확인) → `Title`(packages/core/src/
 
 `stats`(조회수·평점 등)는 KMAS 미제공 → 기존 크롤/추정값 유지, `statsEstimated` 규약 준수.
 
-## 4. 소스 레지스트리 등록
+## 4. 수동 보강 경계
 
-`apps/api/src/server/catalog-sources.ts` `CATALOG_SOURCE_REGISTRY`에 KMAS 추가:
-- `implementation: "manual"`(오프라인 수동 fetch), `risk: "low"`(공식 공공데이터),
-  `requiredReview: []`(허용된 오픈 API), `capabilities: ["catalog", "search"]`,
-  `notes: "한국만화영상진흥원 공식 오픈API — 메타·시놉시스·썸네일 URL 공신력 출처"`.
-- `id`는 `PlatformId`라 KMAS용 식별자를 타입에 추가하거나, availability 아닌 enrichment이므로
-  레지스트리만 별도 관리하는 방식 중 실구현 시 결정.
+KMAS는 작품의 유통 플랫폼(`availability`)이 아니라 공식 메타데이터 보강 소스입니다. 별도 런타임
+소스 레지스트리나 스케줄러에 등록하지 않고, 운영자가 필요할 때 로컬 명령으로만 실행합니다.
+`scripts/kmas-update-catalog.mjs`가 기존 작품 제목을 공식 API로 조회해 시놉시스·연령등급·썸네일 URL을
+병합하며, 이미지 바이너리는 저장하지 않습니다.
 
 ## 5. 활성화
 
 ```bash
-KMAS_PRV_KEY=<발급키> pnpm run kmas:fetch      # KMAS → data/kmas-catalog.json
-pnpm run kmas:merge                             # 병합 + catalog:gen
+# 공식 응답을 별도 JSON으로 확인
+KMAS_PRV_KEY=<발급키> pnpm kmas:fetch
+
+# 기존 catalog.json.gz에 선택적으로 병합하고 정적 파일 재생성
+KMAS_PRV_KEY=<발급키> pnpm kmas:update-catalog
 ```
-env `KMAS_PRV_KEY` 미설정 시 스킵(크롤 데이터 유지). 주기 갱신은 수동(일 1000회 한도 내).
+
+`KMAS_PRV_KEY`는 로컬 실행 환경 또는 서버의 공식 API 보강 기능에만 둡니다. 카탈로그 파일 변경은
+결과를 검토한 뒤 커밋·재배포하며, KMAS 갱신을 실행하는 GitHub Actions나 주기 작업은 없습니다.
 
 ## 6. 컴플라이언스 효과
 

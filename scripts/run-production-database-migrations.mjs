@@ -32,8 +32,6 @@ const REPAIR_LOCK_STALE_AFTER = "60 minutes";
 const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "account",
   "app_setting",
-  "catalog_ingest_run",
-  "catalog_snapshot",
   "collection",
   "collection_item",
   "community_cafe",

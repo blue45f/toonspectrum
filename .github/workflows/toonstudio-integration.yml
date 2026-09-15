@@ -190,6 +190,7 @@ jobs:
             .github/workflows
             apps/web/src
             apps/web/public
+            config
             packages
             patches
             scripts

@@ -12,8 +12,7 @@ export class LazyServerlessCatalogService extends CatalogService {
   // Only the serverless adapter opts in, before app.init(). A native HTTP server
   // running on Vercel still keeps the ordinary eager lifecycle.
   deferInitializationUntilRequest(): void {
-    this.deferInitialLoad = process.env.WEBDEX_CATALOG_FORCE_DB !== "1"
-      && process.env.CATALOG_EAGER_INIT !== "1";
+    this.deferInitialLoad = process.env.CATALOG_EAGER_INIT !== "1";
   }
 
   override async onModuleInit(): Promise<void> {
@@ -32,9 +31,7 @@ export class LazyServerlessCatalogService extends CatalogService {
     return this.initialization;
   }
 
-  override onModuleDestroy(): void {
+  onModuleDestroy(): void {
     this.initializationClosed = true;
-    // The base lifecycle also prevents a late initializer from restarting its timer.
-    super.onModuleDestroy();
   }
 }

@@ -87,7 +87,12 @@ function providerEndpoints(provider: PersonalCloudProviderId, env: EnvLike) {
       authorizeUrl: "https://www.dropbox.com/oauth2/authorize",
       tokenUrl: "https://api.dropboxapi.com/oauth2/token",
       accountUrl: "https://api.dropboxapi.com/2/users/get_current_account",
-      scopes: ["account_info.read", "files.content.read", "files.content.write"],
+      scopes: [
+        "account_info.read",
+        "files.metadata.read",
+        "files.content.read",
+        "files.content.write",
+      ],
     } as const;
   }
   const tenant = clean(env.ONEDRIVE_OAUTH_TENANT) || "common";

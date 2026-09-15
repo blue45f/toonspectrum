@@ -1,18 +1,12 @@
 import { parseSearchPageQuery, searchPageItems, searchPagination, type SearchPageQuery } from "../../../../../packages/core/src/search-pagination";
 import "reflect-metadata";
 import {
-  BadGatewayException,
   BadRequestException,
-  ConflictException,
-  HttpException,
-  HttpStatus,
   Injectable,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 
 import { fromDb } from "../../../../web/src/shared/lib/api-helpers";
-import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../web/src/shared/lib/recommend";
 import { MAX_SEARCH_QUERY_LENGTH, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
 import {
@@ -30,8 +24,7 @@ import {
   TITLES,
 } from "../../../../../packages/core/src/server";
 import { db, reviewLikes, reviews, users } from "../../db";
-import { isAdminUser } from "../../server/app-config";
-import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../server/catalog-ingest";
+import { loadBundledCatalog } from "../../server/catalog-loader";
 import {
   enrichTitleWithKmas,
   enrichTitlesWithKmas,
@@ -51,7 +44,7 @@ import { getTitleDetail as getTitleDetailFromLib } from "../../server/title";
 import { CatalogSearchCache } from "./catalog-search-cache";
 
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../web/src/shared/lib/types";
-import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import type { OnModuleInit } from "@nestjs/common";
 
 type QueryRecord = Record<string, string>;
 
@@ -83,12 +76,6 @@ interface RecommendPayload {
   seedId?: unknown;
   ratings?: unknown;
   reads?: unknown;
-}
-
-interface IngestRunPayload {
-  token?: unknown;
-  requestedBy?: unknown;
-  force?: unknown;
 }
 
 interface KmasBookAndWebtoonQuery {
@@ -129,43 +116,23 @@ type ReadStateMap = Record<string, ReadState>;
 type RatingMap = Record<string, number>;
 
 @Injectable()
-export class CatalogService implements OnModuleInit, OnModuleDestroy {
+export class CatalogService implements OnModuleInit {
   private readonly searchCache = new CatalogSearchCache();
-  private readonly ingestConfig = normalizeCatalogIngestConfig();
-  private ingestInProgress: Promise<CatalogIngestRunResult> | null = null;
-  private consecutiveIngestFailures = 0;
-  private refreshTimer: ReturnType<typeof setInterval> | null = null;
-  private destroyed = false;
   private kmasSiteAccessLogged = false;
 
   async onModuleInit() {
     try {
-      // 카탈로그는 파일 전용: 번들/지정 gz(apps/api/data/catalog.json.gz 또는 WEBDEX_CATALOG_FILE) →
-      // 없으면 빈 카탈로그. DB catalog_snapshot 읽기는 WEBDEX_CATALOG_FORCE_DB=1 레거시 모드에서만.
-      if (isCatalogForceDb()) {
-        await loadLatestCatalogSnapshotFromDb();
+      const result = loadBundledCatalog();
+      if (result.loaded) {
+        console.log(`catalog loaded from bundled file (${result.titleCount} titles)`);
       } else {
-        const result = loadLatestCatalogSnapshotFromFile();
-        if (result.loaded) {
-          console.log(`catalog loaded from file (${result.titleCount} titles) — DB 전송 0`);
-        } else {
-          console.warn("catalog file missing; starting empty (pnpm ingest 또는 WEBDEX_CATALOG_FILE 확인)");
-        }
+        console.warn(
+          "catalog file missing; starting empty (run pnpm catalog:update:manual, review, commit, and redeploy)"
+        );
       }
     } catch (error) {
-      console.error("catalog load failed; runtime catalog is empty until a successful load", error);
+      console.error("catalog load failed; runtime catalog is empty", error);
     }
-    // 자동 크롤 스케줄러 폐기 — 수집은 운영자가 필요할 때 수동으로만 수행한다(pnpm catalog:update
-    // 또는 인증된 /catalog/ingest API). 런타임에 외부 플랫폼을 주기 페치하지 않는다.
-    // 갱신 감지 폴링: 파일 모드는 mtime/size 스탯 비교(무비용)라 항상 켠다.
-    // 레거시 FORCE_DB 모드에서만 기존 DB 해시 폴링이 동작한다(refreshCatalogIfChanged 내부 분기).
-    this.startCatalogRefreshPoll();
-  }
-
-  onModuleDestroy() {
-    this.destroyed = true;
-    if (this.refreshTimer) clearInterval(this.refreshTimer);
-    this.refreshTimer = null;
   }
 
   async mergeKmasOnSiteAccess(options: KmasMergeOptions = {}): Promise<KmasSiteAccessMergeResult & { generatedAt: string }> {
@@ -217,36 +184,6 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
       console.error("KMAS response image URL overlay failed; returning existing title data", error);
       return resolved;
     });
-  }
-
-  // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 카탈로그를 적재하면
-  // 재시작 없이 메모리 카탈로그를 갱신한다. 파일 모드는 스탯 폴링, 레거시 DB 모드는 id 폴링.
-  private startCatalogRefreshPoll() {
-    const seconds = this.ingestConfig.refreshPollSeconds;
-    if (this.destroyed || !seconds) return; // 0 = 비활성; 늦게 끝난 초기화도 종료를 되돌리지 않음
-    if (this.refreshTimer) clearInterval(this.refreshTimer);
-    this.refreshTimer = setInterval(() => {
-      if (this.destroyed || this.ingestInProgress) return; // ingest 중엔 건너뜀(곧 in-process 갱신됨)
-      void refreshCatalogIfChanged()
-        .then((r) => {
-          if (r.reloaded) {
-            console.log(`catalog hot-reloaded: snapshot=${r.snapshotId} titles=${r.titleCount}`);
-          }
-        })
-        .catch((error) => console.error("catalog refresh poll failed", error));
-    }, seconds * 1000);
-    if (typeof this.refreshTimer.unref === "function") this.refreshTimer.unref();
-  }
-
-  // 강제 리로드(엔드포인트용) — 변경 없으면 reloaded:false. 토큰 설정 시 일치 필요(reload는 read-only).
-  async refreshCatalog(headerToken?: string, clientKey = "unknown") {
-    this.assertIngestRateLimit("refresh", clientKey, 10);
-    if (this.ingestConfig.triggerToken) {
-      if (verifyCatalogIngestToken(this.ingestConfig.triggerToken, headerToken) !== "ok") {
-        throw new UnauthorizedException("invalid catalog ingest token");
-      }
-    }
-    return refreshCatalogIfChanged();
   }
 
   getRandomData(query: QueryRecord) {
@@ -512,78 +449,6 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async getCatalogIngestStatus() {
-    const status = await getCatalogIngestStatus(this.ingestConfig);
-    return {
-      ...status,
-      // 자동 스케줄러 폐기 — 수동 수집만. 예약된 다음 실행이 없다.
-      scheduler: {
-        running: false,
-        inProgress: Boolean(this.ingestInProgress),
-        nextRunAt: null,
-        nextRunInSeconds: null,
-        consecutiveFailures: this.consecutiveIngestFailures,
-      },
-    };
-  }
-
-  async runCatalogIngest(payload: IngestRunPayload, headerToken?: string, userId?: string, clientKey = "unknown") {
-    // 연타·토큰 무차별 대입 방지 — 인증 검사보다 먼저 적용해 실패 시도도 카운트한다.
-    this.assertIngestRateLimit("run", clientKey, 5);
-    await this.assertIngestAuthorized(payload, headerToken, userId);
-    return this.runCatalogIngestOnce({
-      requestedBy: typeof payload.requestedBy === "string" ? payload.requestedBy : "manual",
-      triggeredBy: "manual",
-      force: boolValue(payload.force),
-    });
-  }
-
-  // 인메모리 슬라이딩 윈도(1분) — lib/rate-limit 재사용. 한도 초과 시 429.
-  private assertIngestRateLimit(scope: string, clientKey: string, limit: number) {
-    if (!rateLimit(`catalog-ingest:${scope}:${clientKey}`, limit, 60_000)) {
-      throw new HttpException("too many catalog ingest requests; retry later", HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
-
-  private async assertIngestAuthorized(payload: IngestRunPayload, headerToken?: string, userId?: string) {
-    // 관리자(서명 세션이 검증된 x-user-id)는 ingest 토큰 없이도 수동 크롤을 트리거할 수 있다.
-    if (userId && (await isAdminUser(userId))) return;
-
-    // 토큰 인증 경로(cron·비관리자 호출). 비교는 타이밍 세이프, 토큰 미설정 시 토큰 인증은 사용할 수 없다.
-    const verdict = verifyCatalogIngestToken(
-      this.ingestConfig.triggerToken,
-      typeof payload.token === "string" ? payload.token : "",
-      headerToken
-    );
-    if (verdict === "not-configured") {
-      throw new UnauthorizedException("catalog ingest token is not configured");
-    }
-    if (verdict !== "ok") {
-      throw new UnauthorizedException("invalid catalog ingest token");
-    }
-  }
-
-  private async runCatalogIngestOnce(options: { requestedBy: string; triggeredBy: string; force?: boolean }) {
-    if (this.ingestInProgress) throw new ConflictException("catalog ingest is already running");
-
-    const job = runCatalogIngest({ ...options, config: this.ingestConfig })
-      .then((result) => {
-        this.consecutiveIngestFailures = 0;
-        return result;
-      })
-      .catch((error: unknown) => {
-        this.consecutiveIngestFailures += 1;
-        const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
-        // 크롤/적재 실패는 클라이언트 요청 문제(4xx)가 아니라 업스트림 수집 실패 → 502.
-        throw new BadGatewayException(`catalog ingest failed${detail}`);
-      })
-      .finally(() => {
-        this.ingestInProgress = null;
-      });
-
-    this.ingestInProgress = job;
-    return job;
-  }
 
 }
 
@@ -634,12 +499,6 @@ function boolParam(raw: string | null | undefined): boolean {
   return raw === "true";
 }
 
-function boolValue(raw: unknown): boolean {
-  if (typeof raw === "boolean") return raw;
-  if (typeof raw === "number") return raw === 1;
-  if (typeof raw === "string") return ["1", "true", "yes", "on"].includes(raw.trim().toLowerCase());
-  return false;
-}
 
 function clampLimit(raw: number | string | undefined) {
   const parsed = Number(raw);
