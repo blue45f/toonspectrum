@@ -16,6 +16,17 @@ import {
 const MAX_COMMENT_LENGTH = 1000;
 const MAX_COMMENT_DEPTH = 4;
 
+function parseCommentParentId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") throw new Error("상위 댓글을 확인해 주세요.");
+  const parentId = value.trim();
+  if (!parentId) return null;
+  if (!/^[A-Za-z0-9_-]{1,80}$/u.test(parentId)) {
+    throw new Error("상위 댓글을 확인해 주세요.");
+  }
+  return parentId;
+}
+
 function fields(viewerId?: string) {
   return {
     id: promotionComments.id,
@@ -142,9 +153,7 @@ export async function addPromotionComment(
 ): Promise<PromotionComment> {
   const body = promotionRecord(input);
   const text = promotionText(body.text);
-  const parentId = typeof body.parentId === "string" && body.parentId.trim()
-    ? body.parentId.trim()
-    : null;
+  const parentId = parseCommentParentId(body.parentId);
   if (text.length < 1 || text.length > MAX_COMMENT_LENGTH) {
     throw new Error("댓글은 1~1000자로 입력해 주세요.");
   }

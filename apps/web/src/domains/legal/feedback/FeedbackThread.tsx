@@ -152,7 +152,9 @@ function ReplyComposer({
           </button>
         </span>
       </div>
-      <p className="fb-caption">⌘/Ctrl + Enter로 등록 · Esc로 답글 닫기</p>
+      <p className="fb-caption">
+        {onCancel ? "⌘/Ctrl + Enter로 등록 · Esc로 답글 닫기" : "⌘/Ctrl + Enter로 등록"}
+      </p>
     </form>
   );
 }

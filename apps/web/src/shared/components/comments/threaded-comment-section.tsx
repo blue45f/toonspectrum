@@ -10,7 +10,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyThreadedCommentDelete,
@@ -215,6 +215,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedRoots, setCollapsedRoots] = useState<Set<string>>(() => new Set());
   const [busyKeys, setBusyKeys] = useState<Set<string>>(() => new Set());
+  const busyKeysRef = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -276,16 +277,16 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     });
   }
 
-  function startBusy(key: string) {
-    setBusyKeys((current) => new Set(current).add(key));
+  function startBusy(key: string): boolean {
+    if (busyKeysRef.current.has(key)) return false;
+    busyKeysRef.current.add(key);
+    setBusyKeys(new Set(busyKeysRef.current));
+    return true;
   }
 
   function stopBusy(key: string) {
-    setBusyKeys((current) => {
-      const next = new Set(current);
-      next.delete(key);
-      return next;
-    });
+    busyKeysRef.current.delete(key);
+    setBusyKeys(new Set(busyKeysRef.current));
   }
 
   async function createComment(parentId: string | null) {
@@ -294,8 +295,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     const text = (drafts[draftKey] ?? "").trim();
     if (!text) return;
     const busyKey = `create:${parentId ?? "root"}`;
-    if (busyKeys.has(busyKey)) return;
-    startBusy(busyKey);
+    if (!startBusy(busyKey)) return;
     setError(null);
     try {
       const created = await onCreate(text, parentId);
@@ -320,8 +320,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     const text = (drafts[draftKey] ?? "").trim();
     if (!text || disabled) return;
     const busyKey = `edit:${commentId}`;
-    if (busyKeys.has(busyKey)) return;
-    startBusy(busyKey);
+    if (!startBusy(busyKey)) return;
     setError(null);
     try {
       const updated = await onUpdate(commentId, text);
@@ -338,8 +337,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
   async function removeComment(commentId: string) {
     if (disabled || !window.confirm("이 댓글을 삭제할까요? 대댓글이 있으면 삭제 표시로 남습니다.")) return;
     const busyKey = `delete:${commentId}`;
-    if (busyKeys.has(busyKey)) return;
-    startBusy(busyKey);
+    if (!startBusy(busyKey)) return;
     setError(null);
     try {
       const result = await onDelete(commentId);
@@ -356,8 +354,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
   async function toggleLike(commentId: string) {
     if (!viewerId || disabled) return;
     const busyKey = `like:${commentId}`;
-    if (busyKeys.has(busyKey)) return;
-    startBusy(busyKey);
+    if (!startBusy(busyKey)) return;
     setError(null);
     try {
       const result = await onToggleLike(commentId);

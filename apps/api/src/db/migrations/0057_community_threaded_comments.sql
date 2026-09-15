@@ -15,12 +15,17 @@ ALTER TABLE public."creator_work_comment"
   ALTER COLUMN "createdAt" SET NOT NULL,
   ALTER COLUMN "updatedAt" SET DEFAULT clock_timestamp(),
   ALTER COLUMN "updatedAt" SET NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS "creator_work_comment_work_id_unique"
-  ON public."creator_work_comment" ("workId", "id");
 CREATE INDEX IF NOT EXISTS "idx_creator_work_comment_parent"
   ON public."creator_work_comment" ("parentId", "createdAt");
 DO $creator_work_comment_constraints$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+    WHERE conname = 'creator_work_comment_work_id_unique'
+      AND conrelid = 'public.creator_work_comment'::regclass) THEN
+    ALTER TABLE public."creator_work_comment"
+      ADD CONSTRAINT "creator_work_comment_work_id_unique"
+      UNIQUE ("workId", "id");
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
     WHERE conname = 'creator_work_comment_parent_fkey'
       AND conrelid = 'public.creator_work_comment'::regclass) THEN
@@ -28,7 +33,7 @@ BEGIN
       ADD CONSTRAINT "creator_work_comment_parent_fkey"
       FOREIGN KEY ("workId", "parentId")
       REFERENCES public."creator_work_comment" ("workId", "id")
-      ON DELETE RESTRICT;
+      ON DELETE CASCADE;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
     WHERE conname = 'creator_work_comment_parent_not_self_check'
@@ -59,13 +64,18 @@ WHERE "updatedAt" IS NULL;
 ALTER TABLE public."creator_promotion_comment"
   ALTER COLUMN "updatedAt" SET DEFAULT clock_timestamp(),
   ALTER COLUMN "updatedAt" SET NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS "creator_promotion_comment_post_id_unique"
-  ON public."creator_promotion_comment" ("postId", "id");
 CREATE INDEX IF NOT EXISTS "idx_promotion_comment_parent"
   ON public."creator_promotion_comment" ("parentId", "createdAt");
 
 DO $creator_promotion_comment_constraints$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+    WHERE conname = 'creator_promotion_comment_post_id_unique'
+      AND conrelid = 'public.creator_promotion_comment'::regclass) THEN
+    ALTER TABLE public."creator_promotion_comment"
+      ADD CONSTRAINT "creator_promotion_comment_post_id_unique"
+      UNIQUE ("postId", "id");
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
     WHERE conname = 'creator_promotion_comment_parent_fkey'
       AND conrelid = 'public.creator_promotion_comment'::regclass) THEN
@@ -73,7 +83,7 @@ BEGIN
       ADD CONSTRAINT "creator_promotion_comment_parent_fkey"
       FOREIGN KEY ("postId", "parentId")
       REFERENCES public."creator_promotion_comment" ("postId", "id")
-      ON DELETE RESTRICT;
+      ON DELETE CASCADE;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint
     WHERE conname = 'creator_promotion_comment_parent_not_self_check'

@@ -121,7 +121,10 @@ export class PromotionService {
   }
 
   async updateComment(id: string, commentId: string, userId: string, input: unknown) {
-    await this.accessible(id, userId);
+    const { post } = await this.accessible(id, userId);
+    if (post.hidden || post.archived) {
+      throw new ConflictException("비공개 게시물의 댓글은 수정할 수 없어요.");
+    }
     try {
       return await updatePromotionComment(id, commentId, userId, input);
     } catch (error) {

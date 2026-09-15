@@ -149,6 +149,19 @@ function creatorDraftCollaborationStatusLockedConflict(): ConflictException {
   });
 }
 
+function parseCreatorCommentParentId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new BadRequestException("상위 댓글을 확인해 주세요.");
+  }
+  const parentId = value.trim();
+  if (!parentId) return null;
+  if (!/^[A-Za-z0-9_-]{1,80}$/u.test(parentId)) {
+    throw new BadRequestException("상위 댓글을 확인해 주세요.");
+  }
+  return parentId;
+}
+
 @Injectable()
 export class CreatorService {
   private readonly logger = new Logger(CreatorService.name);
@@ -616,9 +629,7 @@ export class CreatorService {
 
   async addComment(userId: string, workId: string, body: unknown) {
     const input = body as { text?: unknown; parentId?: unknown } | null | undefined;
-    const parentId = typeof input?.parentId === "string" && input.parentId.trim()
-      ? input.parentId.trim()
-      : null;
+    const parentId = parseCreatorCommentParentId(input?.parentId);
     if (!rateLimit(`creator-work-comment:${userId}`, 40, 10 * 60_000)) {
       throw new HttpException(
         "댓글 작성이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
@@ -635,6 +646,12 @@ export class CreatorService {
   }
 
   async updateComment(userId: string, workId: string, commentId: string, body: unknown) {
+    if (!rateLimit(`creator-work-comment-edit:${userId}`, 80, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 수정이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     const text = (body as { text?: unknown } | null | undefined)?.text;
     try {
       return await updateComment(userId, workId, commentId, text);
@@ -651,6 +668,12 @@ export class CreatorService {
     commentId: string,
     canModerate = false,
   ) {
+    if (!rateLimit(`creator-work-comment-delete:${userId}`, 80, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 삭제 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     try {
       return await deleteComment(userId, workId, commentId, canModerate);
     } catch (error) {

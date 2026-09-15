@@ -26,7 +26,7 @@ export const promotionComments = pgTable("creator_promotion_comment", {
     columns: [t.postId, t.parentId],
     foreignColumns: [t.postId, t.id],
     name: "creator_promotion_comment_parent_fkey",
-  }).onDelete("restrict"),
+  }).onDelete("cascade"),
   index("idx_promotion_comment_post").on(t.postId, t.createdAt),
   index("idx_promotion_comment_parent").on(t.parentId, t.createdAt),
   check("creator_promotion_comment_parent_not_self_check", sql`${t.parentId} is null or ${t.parentId} <> ${t.id}`),

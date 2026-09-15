@@ -1633,7 +1633,7 @@ export const creatorWorkComments = pgTable(
       columns: [t.workId, t.parentId],
       foreignColumns: [t.workId, t.id],
       name: "creator_work_comment_parent_fkey",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     index("idx_creator_work_comment_work").on(t.workId, t.createdAt),
     index("idx_creator_work_comment_parent").on(t.parentId, t.createdAt),
     check(
