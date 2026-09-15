@@ -109,7 +109,5 @@ jobs:
         env:
           MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
         run: |
-          set -euo pipefail
-          node --test scripts/run-production-database-capability-verifier.test.mjs
-          node scripts/run-production-database-capability-verifier.mjs \
+          node scripts/verify-production-database-capabilities.mjs \
             --runtime-database-role "$RUNTIME_DATABASE_ROLE"

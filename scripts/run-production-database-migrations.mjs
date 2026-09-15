@@ -266,7 +266,7 @@ export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
         'TRIGGER'
       ]::text[]) AS public_privilege
       WHERE pg_catalog.has_table_privilege(
-        'PUBLIC',
+        0::oid,
         'public.personal_cloud_connection',
         public_privilege
       )
