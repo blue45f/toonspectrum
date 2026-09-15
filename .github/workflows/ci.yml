@@ -332,6 +332,10 @@ jobs:
     name: Core production build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    env:
+      # The integrated production workspace crosses the 8 GiB V8 heap ceiling
+      # during Vite chunk generation. Keep the larger heap scoped to this job.
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
       - uses: actions/checkout@v6
         with:
