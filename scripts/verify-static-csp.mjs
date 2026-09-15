@@ -16,8 +16,8 @@ function directive(csp, name) {
     .find((part) => part === name || part.startsWith(`${name} `)) ?? "";
 }
 
-function rootCsp(vercelConfig) {
-  const root = vercelConfig.headers?.find((entry) => entry.source === "/(.*)");
+function rootCsp(responsePolicy) {
+  const root = responsePolicy.headers?.find((entry) => entry.source === "/(.*)");
   return root?.headers?.find((header) => header.key === "Content-Security-Policy")?.value;
 }
 
@@ -254,10 +254,10 @@ function verifyBootstrapBehavior(source) {
   }
 }
 
-export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSource }) { // NOSONAR javascript:S3776
-  const csp = rootCsp(vercelConfig);
+export function verifyStaticCspContract({ html, responsePolicy, bootstrapCompatSource }) { // NOSONAR javascript:S3776
+  const csp = rootCsp(responsePolicy);
   if (typeof csp !== "string" || csp.length === 0) {
-    throw new Error("Vercel root Content-Security-Policy is missing.");
+    throw new Error("Provider-neutral root Content-Security-Policy is missing.");
   }
 
   const scripts = directive(csp, "script-src");
@@ -352,19 +352,19 @@ function main() {
   // Default to the source entry; the 2026-09 apps/web move relocated it from the
   // repository root. `postbuild` still passes `dist/index.html` explicitly.
   const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "apps/web/index.html");
-  const vercelPath = resolve(repositoryRoot, "vercel.json");
+  const responsePolicyPath = resolve(repositoryRoot, "config/http-response-headers.json");
   const builtBootstrapPath = resolve(dirname(htmlPath), "bootstrap-compat.js");
   const sourceBootstrapPath = resolve(repositoryRoot, "apps/web/public/bootstrap-compat.js");
   const bootstrapCompatPath = existsSync(builtBootstrapPath)
     ? builtBootstrapPath
     : sourceBootstrapPath;
-  const result = verifyVercelCspContract({
+  const result = verifyStaticCspContract({
     html: readFileSync(htmlPath, "utf8"),
-    vercelConfig: JSON.parse(readFileSync(vercelPath, "utf8")),
+    responsePolicy: JSON.parse(readFileSync(responsePolicyPath, "utf8")),
     bootstrapCompatSource: readFileSync(bootstrapCompatPath, "utf8"),
   });
   console.log(
-    `Verified Vercel CSP for ${htmlPath}: ${result.inlineScriptCount} hashed inline data block(s).`,
+    `Verified provider-neutral CSP for ${htmlPath}: ${result.inlineScriptCount} hashed inline data block(s).`,
   );
 }
 

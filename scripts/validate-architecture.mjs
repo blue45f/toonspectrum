@@ -229,7 +229,7 @@ for (const script of requiredScripts) {
   if (!scripts[script]) issues.push(`missing script: ${script}`);
 }
 
-const expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";
+const expectedCspCommand = "node scripts/verify-static-csp.mjs apps/web/index.html";
 if (scripts["verify:csp"] !== expectedCspCommand) {
   issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);
 }

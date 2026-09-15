@@ -19,13 +19,14 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 
 | workload | 경로 | Worker 변수 | 실패·폴백 정책 |
 |---|---|---|---|
-| core | 나머지 `/api/*`, OG crawler 경로, `/api/catalog/*`, `/api/health/*`, `/api/config` | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
+| edge liveness | `/api/health`, `/api/health/live`의 `GET`/`HEAD` | Worker 자체 | Core API를 깨우지 않고 `no-store`로 `status=ok` 응답 |
+| core | 나머지 `/api/*`, OG crawler 경로, `/api/catalog/*`, `/api/health/ready`, `/api/config` | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
 | public read | 안전한 `GET`/`HEAD`/`OPTIONS`의 `/api/random`, `/api/home`, `/api/calendar`, `/api/insights`, `/api/ranking`, `/api/explore`, `/api/tags`, `/api/search`, `/api/titles/*`, `/api/authors/*`, `/api/kmas/book-webtoons`, `/api/cover`, `/api/public/*` | `PUBLIC_READ_API_ORIGINS` | 최대 8개 동일 계약 origin에 결정적 분산, `502`/`503`/`504`와 네트워크 오류만 다음 origin 재시도 |
 | social | `/api/community`, `/api/reviews` | `SOCIAL_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
 | realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
-| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | 압축 Static Assets + R2 `LARGE_ASSETS` binding | 일반 읽기는 Brotli/gzip sidecar, Range·압축 미지원은 R2, 두 계층 누락/장애 시 `LARGE_ASSET_ORIGIN`으로 폴백 |
+| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | 압축 Static Assets + R2 `LARGE_ASSETS` binding | 일반 읽기는 Brotli/gzip sidecar, Range·압축 미지원은 R2, 두 계층 누락/장애 시 명시한 `LARGE_ASSET_ORIGIN`만 사용 |
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
 
@@ -63,7 +64,7 @@ core·social·playground·admin·realtime 요청의 전달 IP는 클라이언트
 
 공개 읽기 풀의 **일부라도** 현재 gateway를 가리키면 해당 origin만 제거하고 진행하지 않고 전체 구성을 fail closed 한다. 잘못된 풀 일부를 숨긴 채 재귀 프록시가 발생하는 상황을 방지하기 위한 규칙이다.
 
-`CORE_API_ORIGIN`은 필수 호환 권위다. 나머지 도메인 origin이 비어 있으면 해당 요청은 core로 유지되므로 기능을 한 번에 모두 이전하지 않고 단계적으로 분리할 수 있다. 반대로 변수가 존재하지만 유효하지 않으면 조용히 core로 우회하지 않고 `503 CORE_API_UNAVAILABLE`로 닫힌다.
+`CORE_API_ORIGIN`은 동적 원장의 필수 권위다. 나머지 기능별 origin이 비어 있으면 해당 요청은 core로 유지되므로 기능을 단계적으로 분리할 수 있다. 반대로 변수가 존재하지만 유효하지 않으면 조용히 core로 우회하지 않고 `503 CORE_API_UNAVAILABLE`로 닫힌다. 대형 파일만 예외로, sidecar와 R2가 실패해도 `LARGE_ASSET_ORIGIN`을 명시하지 않았다면 Core API를 파일 서버로 깨우지 않고 `503 LARGE_ASSET_UNAVAILABLE`을 반환한다.
 
 예시는 [`.env.example`](./.env.example)을 참고한다.
 
@@ -86,7 +87,7 @@ pnpm run cloudflare:static:dry-run
 - 잘못된·중복된·일부 자기참조 origin fail-closed
 - POST body stream을 손상하지 않는 URL rewrite
 - OG route mapping과 WebSocket passthrough
-- Vercel과 Cloudflare 보안 헤더 계약 동기화
+- provider-neutral 보안 헤더 계약과 Cloudflare 동적 응답 동기화
 - R2 대형 파일의 전체·HEAD·Range·ETag 응답과 원본 fallback
 
 `dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성과 모든 origin 변수를 검사하지만 원격에 배포하지 않는다.
@@ -95,7 +96,7 @@ pnpm run cloudflare:static:dry-run
 
 Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB의 Brotli(`.br`)·gzip(`.gz`) sidecar를 생성한다. 원본 대형 파일만 `.assetsignore`에서 제외하고, sidecar가 25 MiB를 넘거나 새로운 미검토 파일이 한도를 넘으면 배포를 중단한다.
 
-일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다.
+일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 명시적으로 설정한 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다. 변수를 생략하면 Core API fallback을 추론하지 않는다.
 
 `sync:cloudflare-r2-assets:dry-run`은 빌드 산출물과 허용 목록을 검증하고 원격 쓰기를 하지 않는다. 운영 배포에서는 `prepare:cloudflare-static-assets`가 sidecar를 만든 뒤 `sync:cloudflare-r2-assets`가 승인된 원본 초과 파일을 R2에 먼저 업로드하고 Worker를 배포한다.
 
@@ -104,7 +105,7 @@ Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `pr
 자동 Git 배포는 허용하지 않는다. 검토된 `main`의 깨끗한 worktree에서만 다음 명령을 실행한다.
 
 ```bash
-export CLOUDFLARE_CORE_API_ORIGIN=https://<reviewed-core-api-origin>
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
 export CLOUDFLARE_PUBLIC_READ_API_ORIGINS=https://<read-a>,https://<read-b>
 export CLOUDFLARE_SOCIAL_API_ORIGIN=https://<social-origin>
 export CLOUDFLARE_PLAYGROUND_API_ORIGIN=https://<playground-origin>
@@ -142,6 +143,6 @@ pnpm run generate:cloudflare-static-rules -- --check
 - 공개 읽기 replica 장애는 안전한 읽기 요청 안에서만 다른 replica를 시도한다.
 - core·social·playground·admin·realtime 권위는 임의의 다른 공급자로 자동 write failover하지 않는다.
 - 특정 기능 권위가 중단되어도 정적 앱과 로컬 OPFS 프로젝트는 계속 사용할 수 있어야 한다.
-- Vercel 수동 fallback은 Cloudflare 전환 기간의 비상 경로일 뿐 자동 배포 권위가 아니다.
+- Vercel 수동 fallback은 Cloudflare 또는 Render를 복구할 수 없는 비상 rollback일 뿐 정상 트래픽·자동 배포 권위가 아니다.
 - 사용자 프로젝트 원본은 이 정적 배포 단위에 저장하지 않는다.
 - 사용 금지된 퇴역 공급자는 운영·fallback·복구 경로에 포함하지 않는다.
