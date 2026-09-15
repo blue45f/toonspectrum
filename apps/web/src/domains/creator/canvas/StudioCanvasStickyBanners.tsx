@@ -306,19 +306,6 @@ export function renderStudioCanvasStickyBanners({
                 {workHydrationError}
               </span>
             ) : null}
-            {(workHydrationFailed || collaborationDocumentUnavailable) && (
-              <span className="mt-3 block">
-                <a
-                  href="/offline-drawing.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center rounded-lg border border-accent/40 bg-accent-soft px-4 text-xs font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                >
-                  서버 없이 로컬에서 계속 그리기
-                </a>
-                <span className="mt-1 block text-xs text-fg-2">새 탭에서 별도 로컬 원고를 엽니다. 이 서버 원고의 잠금과 내용은 그대로 보존됩니다.</span>
-              </span>
-            )}
             {sourceHydrationPending && workHydrationFailed ? (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <button

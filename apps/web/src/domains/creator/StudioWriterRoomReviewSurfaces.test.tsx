@@ -403,7 +403,7 @@ describe("StudioWriterRoomAiReviewPanel", () => {
     expect(within(region).getByText("한 줄 기획 AI 검토 초안")).toBeTruthy();
     expect(within(region).getByText("DeepSeek / deepseek-chat · 1,234 tokens")).toBeTruthy();
     const status = within(region).getByRole("status");
-    expect(status.textContent).toContain("Z.ai 잔액·패키지");
+    expect(status.textContent).toContain("Z.ai 무료 한도·요청");
     expect(status.textContent).toContain("DeepSeek에");
     expect(within(region).getByText(/원본 기획/)).toBeTruthy();
     expect(within(region).getByText(/AI가 제안한 기획/)).toBeTruthy();

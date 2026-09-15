@@ -356,7 +356,7 @@ export function StudioBubbleToolPopoverBody({
             }}
             className="min-h-11 rounded-xl border border-line/60 bg-card/70 px-2 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
           >
-            {localizeText(t, "번역 (내 API 키)", "studio.bubble.translate")}
+            {localizeText(t, "번역 (자동 무료 AI)", "studio.bubble.translate")}
           </button>
         </div>
       </div>

@@ -8,7 +8,7 @@ import {
 } from "./cloudflare-static-rules.mjs";
 
 describe("Cloudflare static response rules", () => {
-  it("maps Vercel wildcard sources without changing header values", () => {
+  it("maps provider-neutral wildcard sources without changing header values", () => {
     const output = renderCloudflareHeaders({
       headers: [
         {

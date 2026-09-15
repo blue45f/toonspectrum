@@ -1,4 +1,4 @@
-import { operatorAiFundingEnabled, rejectOperatorFundedAi } from "../../config/user-funded-ai-policy";
+import { rejectUnavailableFreeAiPool, sharedFreeAiPoolEnabled } from "../../config/user-funded-ai-policy";
 import { createHmac } from "node:crypto";
 
 import {
@@ -36,6 +36,7 @@ import {
   resolveStudioAiProviderOrder,
   resolveStudioAiTimeoutMs,
   STUDIO_AI_BILLING_FAILOVER_REASON,
+  STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
   studioAiProviderRequestId,
   studioAiProviderStatuses,
 } from "./studio-ai-provider";
@@ -52,7 +53,11 @@ import type {
   StudioAiIdempotencyConflictReason,
   StudioAiReceiptMutationInput,
 } from "./studio-ai-admission";
-import type { StudioAiProviderConfig, StudioAiProviderId } from "./studio-ai-provider";
+import type {
+  StudioAiFailoverReason,
+  StudioAiProviderConfig,
+  StudioAiProviderId,
+} from "./studio-ai-provider";
 import type {
   StudioAiTokenUsage,
   StudioAiUsageStatus,
@@ -93,7 +98,7 @@ interface StudioAiCompletionResult {
     attemptedModel: string;
     actualProvider: StudioAiProviderId;
     actualModel: string;
-    reason: typeof STUDIO_AI_BILLING_FAILOVER_REASON;
+    reason: StudioAiFailoverReason;
   };
 }
 
@@ -183,7 +188,7 @@ function normalizeGatewayResult(
         attemptedModel: rawFailover.attemptedModel,
         actualProvider: rawFailover.actualProvider,
         actualModel: rawFailover.actualModel,
-        reason: STUDIO_AI_BILLING_FAILOVER_REASON,
+        reason: rawFailover.reason as StudioAiFailoverReason,
       }
     : undefined;
   const normalizedProvider: StudioAiProviderId = isStudioAiProviderId(providerValue)
@@ -218,15 +223,22 @@ function isStudioAiDistributedFailover(
     typeof raw.actualProvider === "string" &&
     isStudioAiProviderId(raw.actualProvider) &&
     typeof raw.actualModel === "string" &&
-    typeof raw.reason === "string"
+    (raw.reason === STUDIO_AI_FREE_QUOTA_FAILOVER_REASON
+      || raw.reason === STUDIO_AI_BILLING_FAILOVER_REASON)
   );
 }
 
 function isStudioAiProviderId(value: string | undefined): value is StudioAiProviderId {
-  return value === "zai" || value === "deepseek";
+  return value === "gemini"
+    || value === "groq"
+    || value === "openrouter"
+    || value === "zai"
+    || value === "deepseek";
 }
 
 const TASK_SPECS = {
+  // 범용 창작 보조는 홍보·생태계·설정 화면 등 특정 Studio 도구에 종속되지 않는 텍스트 작업용이다.
+  assistant: { temperature: 0.6, maxTokens: 1_600, responseFormat: "text" },
   // composition/dialogue도 완료 토큰이 상한에 정확히 맞아 finish_reason=length로 잘리는 실패가
   // 실측됐다(예: composition 992 = prompt 392 + 600). 잘림 없이 완성되도록 상한을 넉넉히 둔다 —
   // quota 예약량이 maxTokens를 따라가므로 과다 회수 위험은 없다.
@@ -247,24 +259,43 @@ function providerUserId(userId: string): string | undefined {
 }
 
 function providerFailure(
-  provider: StudioAiProviderId,
+  provider: StudioAiProviderConfig,
   responseStatus: number,
   payload?: unknown
 ): {
   status: StudioAiUsageStatus;
   exception: HttpException;
   billingFailoverEligible: boolean;
+  failoverReason?: StudioAiFailoverReason;
+  freeQuotaExhausted: boolean;
   definitivelyRejectedBeforeInference: boolean;
 } {
-  const classification = classifyStudioAiProviderFailure(provider, responseStatus, payload);
-  if (classification.kind === STUDIO_AI_BILLING_FAILOVER_REASON) {
+  const classification = classifyStudioAiProviderFailure(
+    provider.id,
+    responseStatus,
+    payload,
+    provider.freePool,
+  );
+  if (
+    classification.kind === STUDIO_AI_FREE_QUOTA_FAILOVER_REASON
+    || classification.kind === STUDIO_AI_BILLING_FAILOVER_REASON
+  ) {
     return {
       status: "provider_rate_limited",
       exception: new HttpException(
-        "AI 제공자의 잔액 또는 패키지 사용 한도가 소진됐어요. 다른 서버 AI나 내 API 키 연동을 이용해 주세요.",
-        HttpStatus.TOO_MANY_REQUESTS
+        {
+          code: classification.kind === STUDIO_AI_FREE_QUOTA_FAILOVER_REASON
+            ? "FREE_AI_PROVIDER_QUOTA_EXHAUSTED"
+            : "AI_BILLING_QUOTA_EXHAUSTED",
+          message: classification.kind === STUDIO_AI_FREE_QUOTA_FAILOVER_REASON
+            ? "이 무료 AI 제공자의 사용량이 소진됐습니다. 다음 무료 제공자를 확인합니다."
+            : "AI 제공자의 잔액 또는 패키지 사용 한도가 소진됐어요.",
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
       ),
       billingFailoverEligible: true,
+      failoverReason: classification.failoverReason,
+      freeQuotaExhausted: classification.kind === STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
       definitivelyRejectedBeforeInference: true,
     };
   }
@@ -276,6 +307,7 @@ function providerFailure(
         HttpStatus.TOO_MANY_REQUESTS
       ),
       billingFailoverEligible: false,
+      freeQuotaExhausted: false,
       definitivelyRejectedBeforeInference: true,
     };
   }
@@ -286,6 +318,7 @@ function providerFailure(
         "서버 AI 인증 또는 결제 설정을 확인하고 있어요. 내 API 키 연동을 이용해 주세요."
       ),
       billingFailoverEligible: false,
+      freeQuotaExhausted: false,
       definitivelyRejectedBeforeInference: true,
     };
   }
@@ -296,6 +329,7 @@ function providerFailure(
         "AI 제공자가 일시적으로 응답하지 않아요. 잠시 후 다시 시도해 주세요."
       ),
       billingFailoverEligible: false,
+      freeQuotaExhausted: false,
       definitivelyRejectedBeforeInference: false,
     };
   }
@@ -305,6 +339,7 @@ function providerFailure(
       "AI 제공자가 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
     ),
     billingFailoverEligible: false,
+    freeQuotaExhausted: false,
     definitivelyRejectedBeforeInference: responseStatus < 500,
   };
 }
@@ -337,8 +372,12 @@ function usageLedgerUnavailableException(): ServiceUnavailableException {
 
 function dailyQuotaExceededException(): HttpException {
   return new HttpException(
-    "오늘의 서버 AI 사용 한도에 도달했어요. UTC 자정 이후 다시 시도하거나 내 API 키 연동을 이용해 주세요.",
-    HttpStatus.TOO_MANY_REQUESTS
+    {
+      code: "FREE_AI_POOL_EXHAUSTED",
+      message: "오늘의 자동 무료 AI 사용량이 모두 소진되었습니다. 개인 무료 API 키를 입력하거나 UTC 자정 이후 다시 시도하세요.",
+      settingsHref: "/settings/ai",
+    },
+    HttpStatus.TOO_MANY_REQUESTS,
   );
 }
 
@@ -408,10 +447,10 @@ export class StudioAiService {
   ) {}
 
   status() {
-    if (!operatorAiFundingEnabled()) return {
+    if (!sharedFreeAiPoolEnabled()) return {
       configured: false, provider: "none" as const, model: "", providers: [],
       selection: { default: "auto" as const, order: [], fallback: false },
-      capabilities: [], requiresAuth: false, operatorFunded: false, settingsHref: "/settings/ai",
+      capabilities: [], requiresAuth: true, operatorFunded: false, freePool: true, settingsHref: "/settings/ai",
     };
     const limits = resolveStudioAiQuotaLimits();
     const providers = studioAiProviderStatuses();
@@ -425,12 +464,16 @@ export class StudioAiService {
       selection: {
         default: "auto" as const,
         order: resolveStudioAiProviderOrder(),
-        fallback: true,
-        fallbackPolicy: STUDIO_AI_BILLING_FAILOVER_REASON,
+        fallback: configuredProviders.length > 1,
+        fallbackPolicy: preferred && !preferred.freePool
+          ? STUDIO_AI_BILLING_FAILOVER_REASON
+          : STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
         explicitPreferenceFallback: true,
       },
       capabilities: Object.keys(TASK_SPECS),
       requiresAuth: true,
+      operatorFunded: false,
+      freePool: preferred ? preferred.freePool : true,
       quota: {
         enforced: true,
         timezone: "UTC" as const,
@@ -449,7 +492,7 @@ export class StudioAiService {
     idempotencyKeyInput: string | undefined,
     clientSignal?: AbortSignal
   ) {
-    rejectOperatorFundedAi();
+    rejectUnavailableFreeAiPool();
     let idempotencyKey: string;
     try {
       idempotencyKey = parseStudioAiIdempotencyKey(idempotencyKeyInput);
@@ -463,11 +506,13 @@ export class StudioAiService {
     const providerPreference = input.provider ?? "auto";
     const providers = resolveStudioAiProviderCandidates(providerPreference);
     if (providers.length === 0) {
-      throw new ServiceUnavailableException(
-        providerPreference === "auto"
-          ? "서버 AI가 아직 설정되지 않았어요. 내 API 키 연동을 이용해 주세요."
-          : "선택한 서버 AI 제공자가 설정되지 않았어요. 자동 선택이나 내 API 키 연동을 이용해 주세요."
-      );
+      throw new ServiceUnavailableException({
+        code: "FREE_AI_POOL_UNAVAILABLE",
+        message: providerPreference === "auto"
+          ? "자동 무료 AI가 아직 연결되지 않았습니다. 개인 무료 API 키를 입력하면 계속 사용할 수 있습니다."
+          : "선택한 무료 AI 제공자가 준비되지 않았습니다. 자동 선택이나 개인 무료 API 키를 이용하세요.",
+        settingsHref: "/settings/ai",
+      });
     }
     const providerTimeoutMs = resolveStudioAiTimeoutMs(providers[0]?.id);
     const leaseMs = providerTimeoutMs + STUDIO_AI_LEASE_GRACE_MS;
@@ -703,6 +748,7 @@ export class StudioAiService {
     let ledgerProvider: StudioAiProviderConfig = providers[0];
     let attemptCount = 0;
     let failoverSource: StudioAiProviderConfig | undefined;
+    let failoverReason: StudioAiFailoverReason | undefined;
     let receiptOutcome: StudioAiReceiptOutcome = "not_sent";
 
     const abortFromClient = () => {
@@ -808,7 +854,7 @@ export class StudioAiService {
                 { role: "system", content: `${CREATOR_SCOPE}\n\n작업별 지시:\n${input.system}` },
                 { role: "user", content: input.user },
               ],
-              thinking: { type: "disabled" },
+              ...(!provider.freePool ? { thinking: { type: "disabled" } } : {}),
               temperature: spec.temperature,
               max_tokens: spec.maxTokens,
               stream: false,
@@ -834,7 +880,7 @@ export class StudioAiService {
         if (!response.ok) {
           const errorPayload = await safeProviderErrorPayload(response);
           throwIfCancelled();
-          const providerError = providerFailure(provider.id, response.status, errorPayload);
+          const providerError = providerFailure(provider, response.status, errorPayload);
           outcomeStatus = providerError.status;
           lastProviderFailure = providerError.exception;
           if (providerError.definitivelyRejectedBeforeInference) {
@@ -842,7 +888,18 @@ export class StudioAiService {
           }
           if (hasFallback && providerError.billingFailoverEligible) {
             failoverSource = provider;
+            failoverReason = providerError.failoverReason;
             continue;
+          }
+          if (providerError.freeQuotaExhausted) {
+            throw new HttpException(
+              {
+                code: "FREE_AI_POOL_EXHAUSTED",
+                message: "연결된 자동 무료 AI 제공자가 모두 무료 한도 또는 요청 제한 상태입니다. 개인 무료 API 키를 입력하거나 제한 해제 후 다시 시도하세요.",
+                settingsHref: "/settings/ai",
+              },
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
           }
           throw providerError.exception;
         }
@@ -910,7 +967,7 @@ export class StudioAiService {
                   attemptedModel: failoverSource.model,
                   actualProvider: provider.id,
                   actualModel: responseModel,
-                  reason: STUDIO_AI_BILLING_FAILOVER_REASON,
+                  reason: failoverReason ?? STUDIO_AI_BILLING_FAILOVER_REASON,
                 },
               }
             : {}),

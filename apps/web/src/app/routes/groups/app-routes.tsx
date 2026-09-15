@@ -8,6 +8,7 @@ import { experienceRoutes } from "./experience.routes";
 import { legalRoutes } from "./legal.routes";
 import { marketRoutes } from "./market.routes";
 import { notFoundRoutes } from "./not-found.route";
+import { productionRoutes } from "./production.routes";
 import { referenceRoutes } from "./reference.routes";
 
 /**
@@ -19,6 +20,7 @@ export const appRoutes = [
   ...referenceRoutes,
   ...communityRoutes,
   ...creatorRoutes,
+  ...productionRoutes,
   ...creatorResourcesRoutes,
   ...marketRoutes,
   ...accountRoutes,

@@ -34,7 +34,7 @@ function requireProviderApiKey(value: string | undefined): string {
     throw new BadRequestException({
       code: "USER_PROVIDER_KEY_REQUIRED",
       message: "통합 AI 설정에서 Hyper3D/Rodin 사용자 키를 등록하세요.",
-      settingsHref: "/studio/ai-settings",
+      settingsHref: "/settings/ai",
       operatorFunded: false,
     });
   }
@@ -86,7 +86,7 @@ export class Studio3dGenerationController {
       configured: Boolean(providerApiKey?.trim()),
       operatorFunded: false,
       requiresUserProviderKey: true,
-      settingsHref: "/studio/ai-settings",
+      settingsHref: "/settings/ai",
     };
   }
 

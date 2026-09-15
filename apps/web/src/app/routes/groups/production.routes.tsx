@@ -1,0 +1,24 @@
+import { Navigate } from "react-router-dom";
+
+import { defineAppRoutes } from "../app-route-definition";
+import {
+  ProductionEpisodeRoomPage,
+  ProductionLandingPage,
+  ProductionProjectPage,
+} from "./production-route-pages";
+
+export const productionRoutes = defineAppRoutes([
+  { id: "production-home", path: "/production", element: <ProductionLandingPage /> },
+  { id: "production-projects", path: "/production/projects", element: <ProductionLandingPage /> },
+  { id: "production-project-root", path: "/production/projects/:projectId", element: <Navigate to="overview" replace /> },
+  { id: "production-project-overview", path: "/production/projects/:projectId/overview", element: <ProductionProjectPage surface="overview" /> },
+  { id: "production-project-planning", path: "/production/projects/:projectId/planning", element: <ProductionProjectPage surface="planning" /> },
+  { id: "production-project-episodes", path: "/production/projects/:projectId/episodes", element: <ProductionProjectPage surface="episodes" /> },
+  { id: "production-project-production", path: "/production/projects/:projectId/production", element: <ProductionProjectPage surface="production" /> },
+  { id: "production-project-handoff", path: "/production/projects/:projectId/handoff", element: <ProductionProjectPage surface="handoff" /> },
+  { id: "production-project-review", path: "/production/projects/:projectId/review", element: <ProductionProjectPage surface="review" /> },
+  { id: "production-project-procurement", path: "/production/projects/:projectId/procurement", element: <ProductionProjectPage surface="procurement" /> },
+  { id: "production-project-rights", path: "/production/projects/:projectId/rights", element: <ProductionProjectPage surface="rights" /> },
+  { id: "production-project-settings", path: "/production/projects/:projectId/settings", element: <ProductionProjectPage surface="settings" /> },
+  { id: "production-episode-room", path: "/production/projects/:projectId/episodes/:episodeId", element: <ProductionEpisodeRoomPage /> },
+]);

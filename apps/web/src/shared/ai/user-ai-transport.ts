@@ -1,5 +1,6 @@
 import { assertFreeAiConnection } from "./free-ai-policy";
 import {
+  FreeAiRuntimeBudgetError,
   guardFreeAiRuntimeRequest,
   MANAGED_FREE_MAX_RESPONSE_BYTES,
   recordFreeAiRuntimeResponse,
@@ -8,11 +9,13 @@ import {
   getUserAiSnapshot,
   registerUserAiRequest,
   requireUserAiConnection,
+  userAiConnectionsForCapability,
 } from "./user-ai-store";
 import {
   validateUserAiBaseUrl,
   validateUserAiPath,
   type UserAiCapability,
+  type UserAiConnection,
 } from "./user-ai-types";
 
 export interface UserAiRequestOptions {
@@ -22,6 +25,32 @@ export interface UserAiRequestOptions {
   method?: string;
   maxBytes?: number;
   headers?: HeadersInit;
+  /** Internal explicit candidate used by the automatic free connection chain. */
+  connection?: UserAiConnection;
+}
+
+export type UserAiTransportErrorCode =
+  | "not-configured"
+  | "quota-exhausted"
+  | "all-free-exhausted"
+  | "authentication"
+  | "http-error";
+
+export class UserAiTransportError extends Error {
+  constructor(
+    readonly code: UserAiTransportErrorCode,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "UserAiTransportError";
+  }
+}
+
+export function isUserAiQuotaExhaustion(error: unknown): boolean {
+  return error instanceof FreeAiRuntimeBudgetError
+    || (error instanceof UserAiTransportError
+      && (error.code === "quota-exhausted" || error.code === "all-free-exhausted"));
 }
 
 const MAX_JSON_BYTES = 80 * 1024 * 1024;
@@ -69,7 +98,7 @@ export async function userAiFetch(
   body?: unknown,
   options: UserAiRequestOptions = {},
 ): Promise<Response> {
-  const connection = requireUserAiConnection(capability);
+  const connection = options.connection ?? requireUserAiConnection(capability);
   assertFreeAiConnection(connection, capability);
   const currentRevision = getUserAiSnapshot().revision;
   if (
@@ -149,7 +178,25 @@ export async function userAiFetch(
       : await readBounded(response, responseMaximum);
     signal.throwIfAborted();
     if (!response.ok) {
-      throw new Error(`무료 AI 요청 실패 (HTTP ${response.status}). 자동 재시도하거나 유료 모델로 전환하지 않았습니다.`);
+      if (response.status === 402 || response.status === 429) {
+        throw new UserAiTransportError(
+          "quota-exhausted",
+          `이 무료 AI 연결의 사용량이 소진되었습니다 (HTTP ${response.status}).`,
+          response.status,
+        );
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw new UserAiTransportError(
+          "authentication",
+          `개인 무료 API 키 인증에 실패했습니다 (HTTP ${response.status}).`,
+          response.status,
+        );
+      }
+      throw new UserAiTransportError(
+        "http-error",
+        `무료 AI 요청 실패 (HTTP ${response.status}). 자동 재시도하거나 유료 모델로 전환하지 않았습니다.`,
+        response.status,
+      );
     }
     if (revision !== getUserAiSnapshot().revision) {
       throw new Error("AI 연결이 변경되어 결과를 적용하지 않았습니다.");
@@ -158,6 +205,9 @@ export async function userAiFetch(
   } catch (error) {
     if (signal.aborted) {
       throw new Error("AI 요청이 취소되거나 제한 시간을 초과했습니다. 앱은 같은 요청을 자동 재전송하지 않습니다.", { cause: error });
+    }
+    if (error instanceof UserAiTransportError || error instanceof FreeAiRuntimeBudgetError) {
+      throw error;
     }
     if (error instanceof TypeError) {
       throw new Error("제공자 연결 또는 CORS를 확인하세요. 로컬 게이트웨이를 사용할 수 있으며 운영측 프록시나 유료 경로로 전환하지 않습니다.", { cause: error });
@@ -182,41 +232,83 @@ export async function userAiJson<T = unknown>(
   }
 }
 
+export interface CompletedUserAiText {
+  content: string;
+  connection: UserAiConnection;
+  attemptedConnectionIds: string[];
+}
+
+export async function completeUserAiTextDetailed(
+  system: string,
+  user: string,
+  signal?: AbortSignal,
+): Promise<CompletedUserAiText> {
+  if (!user.trim() || user.length + system.length > 64_000) {
+    throw new Error("프롬프트는 비어 있지 않은 64,000자 이하여야 합니다.");
+  }
+  const candidates = userAiConnectionsForCapability("text");
+  if (candidates.length === 0) {
+    throw new UserAiTransportError(
+      "not-configured",
+      "통합 AI 설정에 사용할 수 있는 개인 무료 AI 연결이 없습니다.",
+    );
+  }
+
+  const attemptedConnectionIds: string[] = [];
+  let lastQuotaError: unknown;
+  for (const connection of candidates) {
+    attemptedConnectionIds.push(connection.id);
+    try {
+      const result = await userAiJson<{
+        choices?: Array<{ message?: { content?: unknown } }>;
+      }>(
+        "text",
+        connection.chatCompletionsPath,
+        {
+          model: connection.textModel,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          max_tokens: 4096,
+        },
+        {
+          signal,
+          maxBytes: 2 * 1024 * 1024,
+          connection,
+          connectionId: connection.id,
+        },
+      );
+      const content = result.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim() || content.length > 100_000) {
+        throw new Error("AI 텍스트 결과를 확인하지 못했습니다.");
+      }
+      return {
+        content: connection.apiKey
+          ? content.replaceAll(connection.apiKey, "[비밀정보 제거]")
+          : content,
+        connection,
+        attemptedConnectionIds,
+      };
+    } catch (error) {
+      if (!isUserAiQuotaExhaustion(error)) throw error;
+      lastQuotaError = error;
+    }
+  }
+
+  throw new UserAiTransportError(
+    "all-free-exhausted",
+    "등록된 개인 무료 AI 연결도 모두 무료 한도 또는 요청 제한 상태입니다.",
+    lastQuotaError instanceof UserAiTransportError ? lastQuotaError.status : undefined,
+  );
+}
+
 export async function completeUserAiText(
   system: string,
   user: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const connection = requireUserAiConnection("text");
-  assertFreeAiConnection(connection, "text");
-  if (!connection.textModel.trim()) {
-    throw new Error("통합 AI 설정에서 텍스트 모델 ID를 입력하세요.");
-  }
-  if (!user.trim() || user.length + system.length > 64_000) {
-    throw new Error("프롬프트는 비어 있지 않은 64,000자 이하여야 합니다.");
-  }
-  const result = await userAiJson<{
-    choices?: Array<{ message?: { content?: unknown } }>;
-  }>(
-    "text",
-    connection.chatCompletionsPath,
-    {
-      model: connection.textModel,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      max_tokens: 4096,
-    },
-    { signal, maxBytes: 2 * 1024 * 1024 },
-  );
-  const content = result.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim() || content.length > 100_000) {
-    throw new Error("AI 텍스트 결과를 확인하지 못했습니다.");
-  }
-  return connection.apiKey
-    ? content.replaceAll(connection.apiKey, "[비밀정보 제거]")
-    : content;
+  return (await completeUserAiTextDetailed(system, user, signal)).content;
 }
 
 export async function userAiLegacyJson(
