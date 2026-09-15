@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,6 +94,26 @@ describe("ThreadedCommentSection interactions", () => {
     expect(create).toHaveBeenCalledWith("첫 댓글", null);
     await act(async () => gate.resolve(comment("comment-1", "첫 댓글")));
     expect(await screen.findByText("첫 댓글")).toBeTruthy();
+  });
+
+  it("allows replies through depth four and hides the composer beyond the server limit", () => {
+    render(
+      <Harness
+        initial={[
+          comment("depth-0", "깊이 0"),
+          comment("depth-1", "깊이 1", { parentId: "depth-0" }),
+          comment("depth-2", "깊이 2", { parentId: "depth-1" }),
+          comment("depth-3", "깊이 3", { parentId: "depth-2" }),
+          comment("depth-4", "깊이 4", { parentId: "depth-3" }),
+        ]}
+        onCreate={async () => comment("unused", "unused")}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "답글" })).toHaveLength(4);
+    const deepest = screen.getByText("깊이 4").closest("article");
+    expect(deepest).toBeTruthy();
+    expect(within(deepest as HTMLElement).queryByRole("button", { name: "답글" })).toBeNull();
   });
 
   it("updates, reacts to, and deletes an owned comment without a full reload", async () => {

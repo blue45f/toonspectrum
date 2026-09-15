@@ -394,7 +394,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     const ownComment = Boolean(viewerId) && comment.author.id === viewerId;
     const canEdit = ownComment && !deleted && !disabled;
     const canDelete = (ownComment || canModerate) && !deleted && !disabled;
-    const canReply = Boolean(viewerId) && !deleted && !disabled && depth < maxDepth - 1;
+    const canReply = Boolean(viewerId) && !deleted && !disabled && depth < maxDepth;
     const replyDraftKey = draftKeyForReply(comment.id);
     const editDraftKey = draftKeyForEdit(comment.id);
     const isReplyOpen = openReplyId === comment.id;
