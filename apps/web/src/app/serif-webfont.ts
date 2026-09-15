@@ -37,6 +37,7 @@ export function ensureSerifWebFont(doc: Document): void {
  * 브리지가 부른다(`/studio` → `/` 이동도 덮인다). 멱등이라 두 번 불려도 안전하다.
  */
 export function ensureSerifWebFontForRoute(pathname: string, doc: Document = document): void {
+  if (pathname === "/studio" || pathname.startsWith("/studio/")) return;
   if (isImmersiveMobileRoute(pathname)) return;
   ensureSerifWebFont(doc);
 }

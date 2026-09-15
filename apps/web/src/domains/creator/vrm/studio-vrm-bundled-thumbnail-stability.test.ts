@@ -5,6 +5,7 @@ import { SAMPLE_VRM_ENTRIES } from "./vrm-library";
 
 const runtime = readFileSync(new URL("./useStudioVrmPoserRuntimeD.ts", import.meta.url), "utf8");
 const panel = readFileSync(new URL("./StudioVrmCharacterLibraryPanel.tsx", import.meta.url), "utf8");
+const preview = readFileSync(new URL("./StudioVrmCharacterPreviewImage.tsx", import.meta.url), "utf8");
 
 describe("bundled VRM thumbnail stability", () => {
   it("ships real same-origin thumbnails for every bundled picker entry", () => {
@@ -25,8 +26,9 @@ describe("bundled VRM thumbnail stability", () => {
   });
 
   it("keeps a stable preview box while decoding product card art", () => {
-    expect(panel).toContain('decoding="async"');
-    expect(panel).toContain('loading="eager"');
-    expect(panel).toContain('entry.thumbnail ?? buildFallbackVrmLibraryThumbnail');
+    expect(panel).toContain("<StudioVrmCharacterPreviewImage");
+    expect(preview).toContain('decoding="async"');
+    expect(preview).toContain('loading="eager"');
+    expect(preview).toContain("setDisplayedSrc(candidate.src)");
   });
 });
