@@ -207,7 +207,7 @@ export function StudioAiToolPopoverBody({
             id: "integrations",
             label: lt("설정", "studio.aiToolPopover.tabIntegrations"),
             icon: Settings2,
-            title: lt("API 키·연동 설정", "studio.aiToolPopover.tabIntegrationsTitle"),
+            title: lt("자동 무료 AI·개인 키 설정", "studio.aiToolPopover.tabIntegrationsTitle"),
           },
         ]}
       />
@@ -236,8 +236,8 @@ export function StudioAiToolPopoverBody({
                   : isStudioAiConfigured(aiSettings)
                     ? lt("이미지 API 연결됨", "studio.aiToolPopover.imageApiConnected")
                     : serverAiStatus?.configured
-                      ? lt("로그인 또는 API 키 필요", "studio.aiToolPopover.serverLoginHint")
-                      : lt("API 키 등록 필요", "studio.aiToolPopover.apiKeyNeed")
+                      ? lt("로그인하면 자동 무료 AI 사용", "studio.aiToolPopover.serverLoginHint")
+                      : lt("무료 AI 준비 중 · 개인 키 연결 가능", "studio.aiToolPopover.apiKeyNeed")
               }
               onOpenSettings={() => {
                 preloadStudioIntegrationsSettingsPanel();
@@ -276,9 +276,9 @@ export function StudioAiToolPopoverBody({
                         {(serverAiStatus?.providers.length
                           ? serverAiStatus.providers
                           : [
-                              { id: "zai" as const, label: "Z.ai", configured: false, model: "" },
-                              { id: "deepseek" as const, label: "DeepSeek", configured: false, model: "" },
-                              { id: "openrouter" as const, label: "OpenRouter", configured: false, model: "" },
+                              { id: "gemini" as const, label: "Gemini 무료", configured: false, model: "" },
+                              { id: "groq" as const, label: "Groq 무료", configured: false, model: "" },
+                              { id: "openrouter" as const, label: "OpenRouter 무료", configured: false, model: "" },
                             ]
                         ).map((provider) => (
                           <option key={provider.id} value={provider.id} disabled={!provider.configured}>
@@ -289,7 +289,7 @@ export function StudioAiToolPopoverBody({
                     </label>
                     <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">
                       {lt(
-                        "잔액·패키지 한도 소진 시 다른 제공자로 전환합니다. 일반 오류는 이중 과금을 막기 위해 자동 재전송하지 않아요.",
+                        "무료 한도·요청 제한으로 추론 전에 거절된 경우에만 다음 무료 제공자로 전환합니다. 네트워크 오류·타임아웃·5xx에는 중복 요청하지 않아요.",
                         "studio.aiToolPopover.serverFallbackMessage"
                       )}
                     </p>

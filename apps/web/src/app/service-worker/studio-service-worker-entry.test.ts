@@ -266,16 +266,26 @@ describe("prepared full editor and rescue coexistence", () => {
     expect(await response?.text()).toBe("prepared editor");
     expect(response?.headers.get("cross-origin-embedder-policy")).toBe("credentialless");
   });
-  it("uses rescue if a pinned drawing resource has been evicted", async () => {
+  it("reports full-pack readiness to the controlling Studio client", async () => {
+    await preparedWorker();
+    const replies: unknown[] = [];
+    await harness.dispatch("message", {
+      source: { url: `${ORIGIN}/studio/canvas` },
+      data: { type: "toonspectrum-sw:offline-status" },
+      ports: [{ postMessage: (value: unknown) => replies.push(value) }],
+    });
+    expect(replies).toEqual([{ schema: 1, buildId: BUILD_ID, ready: true }]);
+  });
+  it("keeps the same cached Studio if an optional drawing resource has been evicted", async () => {
     await preparedWorker();
     await (await harness.caches.api.open(PRECACHE)).delete("/assets/pen-def.js");
     const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas"));
-    expect(await response?.text()).toBe("local rescue");
+    expect(await response?.text()).toBe("prepared editor");
   });
-  it("uses rescue if the dictionary is HTML rather than JSON", async () => {
+  it("keeps the same cached Studio if a dictionary needs recovery", async () => {
     await preparedWorker();
     harness.caches.seed("toonspectrum-sw-data-v5", MANIFEST.warmUrls[0], shell("error page"));
     const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas"));
-    expect(await response?.text()).toBe("local rescue");
+    expect(await response?.text()).toBe("prepared editor");
   });
 });

@@ -5,6 +5,7 @@ import {
   createStudioVrmAuthoredHairClumpGeometry,
   createStudioVrmAuthoredHairGeometry,
   mergeStudioVrmAuthoredHairGeometry,
+  resolveStudioVrmAuthoredHairClumpCenter,
 } from "./studio-vrm-authored-hair-geometry";
 
 import type { AvatarForgeHairPart } from "./studio-vrm-avatar-forge";
@@ -41,7 +42,7 @@ describe("studio-vrm-authored-hair-geometry", () => {
     const color = geometry.getAttribute("color");
     const uv = geometry.getAttribute("uv");
 
-    expect(position.count).toBe((18 + 1) * (6 + 1) * 2);
+    expect(position.count).toBe((24 + 1) * (8 + 1) * 2);
     expect(normal.count).toBe(position.count);
     expect(color.count).toBe(position.count);
     expect(uv.count).toBe(position.count);
@@ -55,8 +56,8 @@ describe("studio-vrm-authored-hair-geometry", () => {
     const geometry = createStudioVrmAuthoredHairClumpGeometry(CLUMP);
     const position = geometry.getAttribute("position");
     const color = geometry.getAttribute("color");
-    const columns = 7;
-    const rows = 19;
+    const columns = 9;
+    const rows = 25;
 
     const rowWidth = (row: number) => {
       let minimum = Number.POSITIVE_INFINITY;
@@ -81,6 +82,34 @@ describe("studio-vrm-authored-hair-geometry", () => {
       edge.getHSL({ h: 0, s: 0, l: 0 }).l,
     );
     geometry.dispose();
+  });
+
+  it("pins the root and bounds extreme thin-part waves during style changes", () => {
+    const extreme: AvatarForgeHairPart = {
+      ...CLUMP,
+      scale: [0.015, 2.8, 0.01],
+      curl: 4,
+      wave: 8,
+      waveFrequency: 99,
+    };
+    expect(resolveStudioVrmAuthoredHairClumpCenter(extreme, 0)).toEqual([0, 0]);
+    for (let step = 0; step <= 100; step += 1) {
+      const centre = resolveStudioVrmAuthoredHairClumpCenter(extreme, step / 100);
+      expect(centre.every(Number.isFinite)).toBe(true);
+      expect(Math.hypot(centre[0], centre[1])).toBeLessThan(0.72);
+    }
+  });
+
+  it("clamps invalid progress and corrupt aspect values instead of emitting a broken buffer", () => {
+    expect(resolveStudioVrmAuthoredHairClumpCenter(CLUMP, Number.NaN)).toEqual([0, 0]);
+    expect(resolveStudioVrmAuthoredHairClumpCenter(CLUMP, -5)).toEqual([0, 0]);
+    expect(resolveStudioVrmAuthoredHairClumpCenter(CLUMP, 5))
+      .toEqual(resolveStudioVrmAuthoredHairClumpCenter(CLUMP, 1));
+    const corrupt = {
+      ...CLUMP,
+      scale: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+    } as AvatarForgeHairPart;
+    expect(resolveStudioVrmAuthoredHairClumpCenter(corrupt, 0.6).every(Number.isFinite)).toBe(true);
   });
 
   it("preserves shell and bun parts while applying authored palette colours", () => {

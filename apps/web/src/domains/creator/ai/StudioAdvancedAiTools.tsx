@@ -58,7 +58,7 @@ export function StudioAdvancedAiTools({
           ) : (
             <div className="grid gap-2 rounded-lg border border-warn/35 bg-warn/10 p-3 text-xs text-fg-2">
               <p>{userId ? "통합 AI 설정에 Hyper3D/Rodin 사용자 키를 등록해야 합니다." : "작업 기록을 보호하려면 로그인 후 사용자 키를 연결하세요."}</p>
-              <Link to="/studio/ai-settings" className="inline-flex min-h-11 items-center font-bold text-accent">통합 AI 설정 열기 →</Link>
+              <Link to="/settings/ai" className="inline-flex min-h-11 items-center font-bold text-accent">통합 AI 설정 열기 →</Link>
             </div>
           )
         ) : null}

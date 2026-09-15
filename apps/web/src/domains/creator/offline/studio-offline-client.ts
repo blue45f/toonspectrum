@@ -1,8 +1,10 @@
 import {
   STUDIO_OFFLINE_MAX_RESOURCES,
   STUDIO_OFFLINE_PREPARE_MESSAGE,
+  STUDIO_OFFLINE_STATUS_MESSAGE,
   normalizeStudioOfflineAssetUrl,
   type StudioOfflinePreparationReport,
+  type StudioOfflineReadinessReport,
 } from "@/shared/lib/studio-offline-protocol";
 
 export interface StudioOfflineDeviceState {
@@ -11,23 +13,58 @@ export interface StudioOfflineDeviceState {
   readonly navigationFallback: boolean;
   readonly supported: boolean;
   readonly controlled: boolean;
+  readonly offlineReady: boolean | null;
+  readonly buildId: string | null;
   readonly persisted: boolean | null;
   readonly usage: number | null;
   readonly quota: number | null;
 }
 
-async function bounded<T>(operation: () => Promise<T>, fallback: T): Promise<T> {
+async function bounded<T>(
+  operation: () => Promise<T>,
+  fallback: T,
+  timeoutMs = 2_000,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       Promise.resolve().then(operation).catch(() => fallback),
-      new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), 2_000); }),
+      new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), timeoutMs); }),
     ]);
   } finally { clearTimeout(timer); }
 }
 
 export function studioOfflineController(): ServiceWorker | null {
   try { return navigator.serviceWorker?.controller ?? null; } catch { return null; }
+}
+
+function messageStudioWorker(
+  worker: ServiceWorker,
+  data: unknown,
+  timeoutMs: number,
+): Promise<unknown> {
+  return new Promise<unknown>((resolve, reject) => {
+    const channel = new MessageChannel();
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      channel.port1.close();
+      channel.port2.close();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("오프라인 실행 모듈 응답 시간이 초과됐습니다."));
+    }, timeoutMs);
+    channel.port1.onmessage = (event: MessageEvent<unknown>) => {
+      cleanup();
+      resolve(event.data);
+    };
+    channel.port1.onmessageerror = () => {
+      cleanup();
+      reject(new Error("오프라인 실행 모듈 응답을 읽지 못했습니다."));
+    };
+    try { worker.postMessage(data, [channel.port2]); }
+    catch (cause) { cleanup(); reject(cause); }
+  });
 }
 
 export function collectLoadedStudioResources(entries: readonly PerformanceEntry[], origin: string): string[] {
@@ -42,10 +79,33 @@ export function studioNavigationUsedOfflineShell(entries: readonly PerformanceEn
     ) === true);
 }
 
+export function isStudioOfflineReadinessReport(
+  value: unknown,
+): value is StudioOfflineReadinessReport {
+  if (!value || typeof value !== "object") return false;
+  const report = value as Partial<StudioOfflineReadinessReport>;
+  return report.schema === 1
+    && typeof report.buildId === "string"
+    && typeof report.ready === "boolean";
+}
+
+export async function inspectStudioOfflineReadiness(): Promise<StudioOfflineReadinessReport | null> {
+  const worker = studioOfflineController();
+  if (!worker) return null;
+  const result = await bounded(
+    () => messageStudioWorker(worker, { type: STUDIO_OFFLINE_STATUS_MESSAGE }, 4_000),
+    null,
+    4_500,
+  );
+  if (studioOfflineController() !== worker || !isStudioOfflineReadinessReport(result)) return null;
+  return result;
+}
+
 export async function inspectStudioOfflineDevice(): Promise<StudioOfflineDeviceState> {
-  const [persisted, estimate] = await Promise.all([
+  const [persisted, estimate, readiness] = await Promise.all([
     bounded<boolean | null>(async () => navigator.storage?.persisted?.() ?? null, null),
     bounded<StorageEstimate | null>(async () => navigator.storage?.estimate?.() ?? null, null),
+    inspectStudioOfflineReadiness(),
   ]);
   let supported = false;
   try { supported = window.isSecureContext && "serviceWorker" in navigator && "caches" in window; } catch { /* Restricted frame. */ }
@@ -54,8 +114,17 @@ export async function inspectStudioOfflineDevice(): Promise<StudioOfflineDeviceS
   let navigationFallback = false;
   try { navigationFallback = studioNavigationUsedOfflineShell(performance.getEntriesByType("navigation")); }
   catch { /* Navigation timing may be unavailable in restricted browsers. */ }
-  return { online: navigator.onLine, navigationFallback, supported, controlled: studioOfflineController() !== null,
-    persisted, usage: bytes(estimate?.usage), quota: bytes(estimate?.quota) };
+  return {
+    online: navigator.onLine,
+    navigationFallback,
+    supported,
+    controlled: studioOfflineController() !== null,
+    offlineReady: readiness?.ready ?? null,
+    buildId: readiness?.buildId ?? null,
+    persisted,
+    usage: bytes(estimate?.usage),
+    quota: bytes(estimate?.quota),
+  };
 }
 
 export function requestStudioPersistentStorage(): Promise<boolean | null> {

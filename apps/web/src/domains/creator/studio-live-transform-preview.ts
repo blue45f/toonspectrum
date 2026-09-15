@@ -17,7 +17,8 @@
  * — the same point mapping as `planStudioDrawObjectTransform` for uniform frames. That geometric
  * identity alone does not prove renderer equivalence: absolute dab spacing, quantization and
  * topology can still differ, so the compiler may force even a uniform frame through the isolated
- * exact-draft renderer. Renderer-ineligible or over-budget strokes retain commit-at-release.
+ * exact-draft renderer. Renderer-ineligible or over-budget strokes use a bounded moving guide
+ * while pointer-up remains the sole authoritative document commit.
  *
  * This module is deliberately renderer-free: the attrs are plain numbers in the decomposition
  * every scene graph understands — Konva node attrs today, and the same gesture frame projects to

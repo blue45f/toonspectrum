@@ -52,7 +52,7 @@ function publicAssetPath(src: string): string {
 describe("PWA manifest", () => {
   it("pins the app identity with an explicit id matching the scope", () => {
     expect(manifest.id).toBe("/");
-    expect(manifest.start_url).toBe("/");
+    expect(manifest.start_url).toBe("/studio");
     expect(manifest.scope).toBe("/");
   });
 

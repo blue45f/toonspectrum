@@ -1,41 +1,72 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
+  Headers,
   HttpCode,
   HttpStatus,
+  Inject,
   Post,
-  ServiceUnavailableException,
+  Req,
+  Res,
+  UnauthorizedException,
 } from "@nestjs/common";
 
-const USER_AI_REQUIRED = Object.freeze({
-  code: "USER_AI_CONNECTION_REQUIRED",
-  message: "운영측 텍스트 AI는 비활성화되어 있습니다. 통합 AI 설정에서 본인 키를 연결하세요.",
-  settingsHref: "/studio/ai-settings",
-  operatorFunded: false,
-});
+import { StudioAiChatDto } from "./studio-ai.dto";
+import { StudioAiService } from "./studio-ai.service";
+
+import type { Request, Response } from "express";
 
 @Controller("studio-ai")
 export class StudioAiController {
+  constructor(@Inject(StudioAiService) private readonly studioAiService: StudioAiService) {}
+
   @Get("status")
   @Header("Cache-Control", "no-store, max-age=0")
   status() {
-    return {
-      configured: false,
-      provider: "none",
-      model: "",
-      providers: [],
-      selection: { default: "auto", order: [], fallback: false },
-      capabilities: [],
-      requiresAuth: false,
-      operatorFunded: false,
-      settingsHref: USER_AI_REQUIRED.settingsHref,
-    };
+    return this.studioAiService.status();
   }
 
   @Post("chat")
-  @HttpCode(HttpStatus.SERVICE_UNAVAILABLE)
-  chat(): never {
-    throw new ServiceUnavailableException(USER_AI_REQUIRED);
+  @HttpCode(HttpStatus.OK)
+  async chat(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: StudioAiChatDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({
+        code: "FREE_AI_LOGIN_REQUIRED",
+        message: "자동 무료 AI를 사용하려면 로그인하세요. 로그인하지 않으려면 개인 무료 API 키를 연결할 수 있습니다.",
+        settingsHref: "/settings/ai",
+      });
+    }
+
+    const clientController = new AbortController();
+    const abortForClientDisconnect = () => {
+      if (!clientController.signal.aborted) clientController.abort();
+    };
+    const abortForResponseClose = () => {
+      if (!response.writableEnded) abortForClientDisconnect();
+    };
+
+    request.once("aborted", abortForClientDisconnect);
+    response.once("close", abortForResponseClose);
+    if (request.aborted || response.destroyed) abortForClientDisconnect();
+
+    try {
+      return await this.studioAiService.complete(
+        userId,
+        body,
+        idempotencyKey,
+        clientController.signal,
+      );
+    } finally {
+      request.off("aborted", abortForClientDisconnect);
+      response.off("close", abortForResponseClose);
+    }
   }
 }

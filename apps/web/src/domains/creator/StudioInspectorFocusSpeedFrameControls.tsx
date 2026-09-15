@@ -358,7 +358,7 @@ export function StudioInspectorFocusSpeedFrameControls({
                     </span>
                     {selected.storyBeat.textAiProvenance.failover ? (
                       <span className="mt-1 block rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-warn">
-                        {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.attemptedProvider)} 잔액·패키지 한도 소진으로 {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.actualProvider)}에 자동 전환
+                        {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.attemptedProvider)} 무료 한도·요청 제한으로 {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.actualProvider)}에 자동 전환
                       </span>
                     ) : null}
                   </div>

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 import { decryptUserAiVault, encryptUserAiVault } from "./user-ai-crypto";
+import { freeAiConnectionPolicyIssue } from "./free-ai-policy";
 import {
   EMPTY_AI_CONFIGURATION,
   EMPTY_AI_CONNECTION,
@@ -78,6 +79,39 @@ export function userAiConnection(
 ): UserAiConnection | null {
   const id = snapshot.configuration.assignments[capability];
   return snapshot.configuration.connections.find((item) => item.id === id) ?? null;
+}
+
+function connectionQualityRank(connection: UserAiConnection): number {
+  let host: string;
+  try {
+    host = new URL(connection.baseUrl).hostname.toLowerCase();
+  } catch {
+    return 10_000;
+  }
+  if (host === "generativelanguage.googleapis.com") return 10;
+  if (host === "api.groq.com") return 20;
+  if (host === "openrouter.ai") return 30;
+  if (host === "api.mistral.ai") return 40;
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return 50;
+  return connection.costPolicy === "self-hosted-zero-cost" ? 60 : 100;
+}
+
+/**
+ * Returns every valid free connection in deterministic quality order. The explicit
+ * capability assignment remains first; the remaining connections provide quota-only fallback.
+ */
+export function userAiConnectionsForCapability(
+  capability: UserAiCapability,
+): UserAiConnection[] {
+  const assigned = snapshot.configuration.assignments[capability];
+  return snapshot.configuration.connections
+    .filter((connection) => freeAiConnectionPolicyIssue(connection, capability) === null)
+    .sort((left, right) => {
+      if (left.id === assigned && right.id !== assigned) return -1;
+      if (right.id === assigned && left.id !== assigned) return 1;
+      const rank = connectionQualityRank(left) - connectionQualityRank(right);
+      return rank || left.id.localeCompare(right.id);
+    });
 }
 
 export function requireUserAiConnection(

@@ -1,37 +1,25 @@
 /**
- * Konva's renderer adapter for a MULTI-SELECTION live transform gesture.
+ * Konva renderer adapter for a MULTI-SELECTION draw transform.
  *
- * The single-element adapter (`studio-live-transform-gesture-konva`) can present two ways: a
- * retained affine on the source subtree, or an isolated model draft. This one deliberately offers
- * only the second. A multi-selection resize commits through `planStudioGroupUniformResize`, which
- * PRESERVES stroke width by default -- the layout moves, the line weight does not -- so scaling the
- * source nodes would show ink that thickens with the box and then snaps back thin at release. The
- * only presentation that can be trusted is the one the commit itself produces, so this adapter
- * calls the commit planner's own selection half every frame and draws its output.
+ * The preferred lane is a commit-equivalent model draft. Group resize preserves authored stroke
+ * width, so scaling the existing wrappers would thicken the ink during the gesture and snap it
+ * thin again at pointer-up. The exact lane therefore runs the same selection planner the durable
+ * commit will use and publishes the resulting draw elements on the isolated transform Layer.
  *
- * Everything here is all-or-nothing across the selection, and that is the point rather than a
- * simplification:
+ * Exact presentation remains atomic across the selection: every member is admitted, published and
+ * hidden together. A partial exact draft would tear the selection apart. What changed is the
+ * failure mode. Work budgets, unsupported brush topology, cached composition or authored paint
+ * above the selection now degrade the whole gesture to one bounded centre-line guide instead of
+ * restoring a motionless source under moving handles. The guide samples once at gesture start,
+ * applies one matrix per frame and leaves the dimmed authored wrappers in their original stacking
+ * context. Once degraded, the gesture stays in that mode until release, eliminating threshold
+ * flicker when the user reverses an enlargement.
  *
- *  - One draft claim owns the whole set, so a superseded gesture can never leave one stroke's
- *    source hidden while its neighbour's is restored.
- *  - Admission is a single verdict. If any member is ineligible, over budget, missing its wrapper
- *    or subtractive, the WHOLE gesture keeps commit-at-release -- the same honest fallback the
- *    editor has today, never a selection where half the strokes follow the handles.
- *  - Stacking is checked once, for the set. The isolated Layer paints after the document Layer, so
- *    a selection with anything painting above it would jump to the front for the drag and drop
- *    back at release; `studioLiveTransformGroupStackingIsolatable` refuses that outright.
- *
- * The frame's angle is forwarded to the group planner untouched. That planner is the authority on
- * whether the selection can carry it -- it turns the set as a rigid body and refuses the WHOLE
- * plan when any member cannot (`studioGroupUniformResizeMemberCanRotate`: a panel frame, a
- * bounds-derived shape, a mirrored-symmetry stroke, or a calligraphy stroke with effective
- * per-sample orientation -- the one this adapter has already refused for itself below, for the
- * same tearing reason) -- and a refused plan falls back to commit-at-release here exactly like
- * any other refusal. Admission stays angle-agnostic in every lane, though not for one reason: the
- * ribbon and generic lanes bound the fill by the target box diagonal, which no rotation can
- * exceed, while the causal-ink lane charges dab count times dab area and reads the box only
- * through its scale factor.
+ * Pointer-up is still the only document/history/CRDT mutation. A successful exact terminal frame
+ * may hand its pixels across the authoritative receipt; a guide frame is always cleared before the
+ * durable commit and never claims to reproduce blend, eraser or renderer-specific brush texture.
  */
+
 import { flushSync } from "react-dom";
 
 import {
@@ -61,6 +49,10 @@ import {
 } from "./studio-live-transform-preview-konva";
 import { createStudioLiveTransformPreviewSession } from "./studio-live-transform-preview-session";
 import {
+  createStudioLiveTransformWireframeFallback,
+  STUDIO_LIVE_TRANSFORM_WIREFRAME_MAX_MEMBERS,
+} from "./studio-live-transform-wireframe-fallback-konva";
+import {
   STUDIO_DRAW_SELECTION_INDICATOR_NAME,
   STUDIO_GROUP_SELECTION_OVERLAY_NAME,
   drainStudioLateParkedChrome,
@@ -86,6 +78,7 @@ import type {
 } from "./studio-live-transform-draft-store";
 import type { StudioLiveTransformDrawSnapshot } from "./studio-live-transform-draw-compiler";
 import type { StudioLiveTransformPreviewScheduler } from "./studio-live-transform-preview-session";
+import type { StudioLiveTransformWireframeFallback } from "./studio-live-transform-wireframe-fallback-konva";
 import type { StudioSingleObjectDragLayerSession } from "./studio-single-object-drag-layer";
 import type Konva from "konva";
 
@@ -113,7 +106,7 @@ export interface BeginStudioKonvaGroupDrawTransformGestureOptions {
 interface StudioGroupTransformMember {
   readonly element: DrawEl;
   readonly node: Konva.Node;
-  readonly snapshot: StudioLiveTransformDrawSnapshot;
+  readonly snapshot: StudioLiveTransformDrawSnapshot | null;
   /**
    * This member's OWN box, padded by the radius its renderer can paint outside the centre line.
    *
@@ -123,7 +116,7 @@ interface StudioGroupTransformMember {
    * strokes over a 400x400 box outright. The padding also keeps the box non-degenerate: a
    * perfectly horizontal stroke spans zero height, and a zero-extent box has no derivable scale.
    */
-  readonly paintBounds: StudioGroupUniformResizeBounds;
+  readonly paintBounds: StudioGroupUniformResizeBounds | null;
 }
 
 function drawPointBounds(points: readonly number[]): {
@@ -188,28 +181,31 @@ function studioLiveTransformRasterMetrics(
 }
 
 /**
- * Claims a whole eligible multi-selection, or returns `null` for today's commit-at-release.
+ * Claims a whole valid multi-selection and chooses exact or bounded-guide presentation.
  */
 export function beginStudioKonvaGroupDrawTransformGesture(
   options: BeginStudioKonvaGroupDrawTransformGestureOptions,
 ): StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame> | null {
   const { selection, elements, dragLayer } = options.preview;
-  if (selection.length < 2) return null;
-  // Both ceilings are O(1) and both are charged BEFORE any scene traversal or sample clone, so a
-  // selection this lane will refuse costs a pointerdown nothing. The per-member gates below each
-  // bound one stroke; these bound the set, which is the dimension they cannot see.
-  if (selection.length > STUDIO_LIVE_TRANSFORM_EXACT_MAX_SELECTION_MEMBERS) return null;
-  if (elements.length > STUDIO_LIVE_TRANSFORM_EXACT_MAX_SCENE_ELEMENTS) return null;
+  if (
+    selection.length < 2
+    || selection.length > STUDIO_LIVE_TRANSFORM_WIREFRAME_MAX_MEMBERS
+  ) {
+    return null;
+  }
+  // These ceilings decide whether the exact React/Konva draft is affordable. They no longer decide
+  // whether the gesture gets visual feedback at all: an over-budget selection takes the bounded
+  // wireframe lane instead of making the ink appear to freeze under moving handles.
+  let exactPreviewEligible =
+    selection.length <= STUDIO_LIVE_TRANSFORM_EXACT_MAX_SELECTION_MEMBERS
+    && elements.length <= STUDIO_LIVE_TRANSFORM_EXACT_MAX_SCENE_ELEMENTS;
   const selectedIdSet = new Set(selection.map((element) => element.id));
   if (selectedIdSet.size !== selection.length) return null;
   // Members are taken in DOCUMENT order, never the caller's selection order.
   //
   // `StudioLiveTransformDraftNode` paints the entries as Konva children in the order it receives
-  // them, so member order IS the draft's stacking. A layer-navigator range selection arrives
-  // front-to-back, which would put the bottom stroke on top of its neighbour for the whole drag
-  // and drop it back at release. It is also what `studioLiveTransformGroupStackingIsolatable`
-  // relies on when it exempts the selection from its own z-order check: members may move above
-  // the rest of the page together only because they keep their relative order among themselves.
+  // them, so member order IS the exact draft's stacking. The fallback keeps this order too, while
+  // leaving authored wrappers in their original parents as dimmed composition context.
   const orderedSelection = elements.filter((element) => selectedIdSet.has(element.id));
   if (orderedSelection.length !== selection.length) return null;
 
@@ -218,52 +214,56 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     if (element.type !== "draw") return null;
     const draw = element as DrawEl & El;
     if (options.preview.isLocked(element)) return null;
-    if (
-      studioLiveTransformPreviewBlockedForElement(
-        element,
-        studioDrawShapeIsBoundsDerived(draw.kind),
-      )
-    ) {
-      return null;
-    }
     const node = findStudioDrawWrapperNode(options.stage, element.id);
     if (
       !node
-      || !studioLiveTransformPreviewEligible(node)
-      || studioLiveTransformPreviewHasCachedDuplicate(options.stage, element.id, node)
       // A member still being dragged by another pointer, or one whose previous gesture's Layer
-      // cleanup has not finished, already has a writer on its wrapper. Hiding it underneath a
-      // draft would give that writer nothing visible to move and leave the release reading bounds
-      // the user never saw. Refuse rather than arbitrate -- the same call the single lane makes.
+      // cleanup has not finished, already has a writer on its wrapper. Even a guide must not race
+      // that writer's source styling or terminal receipt.
       || studioKonvaDrawTransformIsBusy(options.stage, element.id, node)
     ) {
       return null;
     }
-    if (
-      !admitStudioLiveTransformDrawCompilation(draw, elements.length).admitted
-      || studioDrawHasEffectivePerSampleOrientation(draw)
-    ) {
-      return null;
+
+    let snapshot: StudioLiveTransformDrawSnapshot | null = null;
+    let paintBounds: StudioGroupUniformResizeBounds | null = null;
+    if (exactPreviewEligible) {
+      const compilation = admitStudioLiveTransformDrawCompilation(draw, elements.length);
+      if (
+        studioLiveTransformPreviewBlockedForElement(
+          element,
+          studioDrawShapeIsBoundsDerived(draw.kind),
+        )
+        || !studioLiveTransformPreviewEligible(node)
+        || studioLiveTransformPreviewHasCachedDuplicate(options.stage, element.id, node)
+        || !compilation.admitted
+        || studioDrawHasEffectivePerSampleOrientation(draw)
+      ) {
+        exactPreviewEligible = false;
+      } else {
+        snapshot = compileStudioLiveTransformDrawSnapshot(draw);
+        const bounds = drawPointBounds(draw.points);
+        if (!bounds) {
+          exactPreviewEligible = false;
+          snapshot = null;
+        } else {
+          const complexity = snapshot.exactDraftComplexity;
+          const paintRadius = Math.max(
+            0.5,
+            complexity.rendererMaxPaintRadius
+              ?? complexity.causalMaxDabRadius
+              ?? draw.strokeWidth / 2,
+          );
+          paintBounds = {
+            x: bounds.x - paintRadius,
+            y: bounds.y - paintRadius,
+            width: bounds.w + paintRadius * 2,
+            height: bounds.h + paintRadius * 2,
+          };
+        }
+      }
     }
-    const snapshot = compileStudioLiveTransformDrawSnapshot(draw);
-    const bounds = drawPointBounds(draw.points);
-    if (!bounds) return null;
-    const complexity = snapshot.exactDraftComplexity;
-    const paintRadius = Math.max(
-      0.5,
-      complexity.rendererMaxPaintRadius ?? complexity.causalMaxDabRadius ?? draw.strokeWidth / 2,
-    );
-    members.push({
-      element: draw,
-      node,
-      snapshot,
-      paintBounds: {
-        x: bounds.x - paintRadius,
-        y: bounds.y - paintRadius,
-        width: bounds.w + paintRadius * 2,
-        height: bounds.h + paintRadius * 2,
-      },
-    });
+    members.push({ element: draw, node, snapshot, paintBounds });
   }
   const selectedIds = members.map((member) => member.element.id);
   const mainLayer = members[0]!.node.getLayer();
@@ -275,8 +275,10 @@ export function beginStudioKonvaGroupDrawTransformGesture(
   let parkedIndicators: Konva.Node[] = [];
   let chromeLift: StudioSingleObjectDragLayerSession | null = null;
   let previewSession: ReturnType<typeof createStudioLiveTransformPreviewSession> | null = null;
+  let fallbackPreview: StudioLiveTransformWireframeFallback | null = null;
   let draftClaim: StudioLiveTransformDraftClaim | null = null;
   let terminalDraft: readonly DrawEl[] | null = null;
+  let presentationMode: "exact" | "fallback" = exactPreviewEligible ? "exact" : "fallback";
   let handoffRegistered = false;
   let handoffReleaseRequested = false;
   let handoffSourceRestored = false;
@@ -349,25 +351,29 @@ export function beginStudioKonvaGroupDrawTransformGesture(
   };
 
   const frameAdmitted = (frame: StudioLiveSelectionTransformFrame): boolean => {
+    if (!exactPreviewEligible) return false;
     const rasterMetrics = studioLiveTransformRasterMetrics(options.stage, dragLayer);
     const frameScale = studioDrawObjectTransformScale(options.sourceBounds, frame.targetBounds);
     if (!frameScale || !frameScale.uniform) return false;
     let totalWork = 0;
     let totalBackingPixels = 0;
     for (const member of members) {
+      const snapshot = member.snapshot;
+      const paintBounds = member.paintBounds;
+      if (!snapshot || !paintBounds) return false;
       // Each member is graded on its OWN box mapped through this frame, not on the selection box.
       // The scale is identical either way -- the group planner applies one uniform factor to every
       // member -- so the sample and path-length terms are unchanged, while the footprint term
       // becomes the member's own fill instead of a copy of the union.
       const memberTarget = mapBoundsThroughFrame(
-        member.paintBounds,
+        paintBounds,
         options.sourceBounds,
         frame.targetBounds,
         frameScale.uniformEquivalent,
       );
       const decision = admitStudioLiveTransformExactDraft({
-        complexity: member.snapshot.exactDraftComplexity,
-        sourceBounds: member.paintBounds,
+        complexity: snapshot.exactDraftComplexity,
+        sourceBounds: paintBounds,
         targetBounds: memberTarget,
         sceneElementCount: elements.length,
         rasterScale: rasterMetrics.rasterScale,
@@ -401,7 +407,7 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     }
     // The planner is asked for the angle too, and it is the authority on whether the selection can
     // take one: a member that cannot carry an angle makes it return null, and this frame then
-    // falls back to commit-at-release like any other refusal.
+    // hands the whole selection to the bounded guide like any other exact-lane refusal.
     const planned = planStudioGroupUniformResizeSelection({
       items: elements,
       selectedIds,
@@ -421,7 +427,8 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     const entries: StudioLiveTransformDraftEntry[] = [];
     for (const member of members) {
       const element = plannedById.get(member.element.id);
-      if (element?.type !== "draw") {
+      const snapshot = member.snapshot;
+      if (element?.type !== "draw" || !snapshot) {
         restoreSources();
         return null;
       }
@@ -433,7 +440,7 @@ export function beginStudioKonvaGroupDrawTransformGesture(
           rotationDeg: frame.rotationDeg,
           elements,
           ...(transformedBounds ? { transformedBounds } : {}),
-          ...(member.snapshot.noClip !== undefined ? { noClip: member.snapshot.noClip } : {}),
+          ...(snapshot.noClip !== undefined ? { noClip: snapshot.noClip } : {}),
         }),
       });
     }
@@ -466,6 +473,19 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     }
     draftLayer.drawScene();
     return drafted;
+  };
+
+  /**
+   * Prefer commit-equivalent pixels while they fit. The first exact refusal permanently degrades
+   * this gesture to the bounded wireframe so crossing a work threshold cannot make the ink blink
+   * off and back on as the user reverses direction.
+   */
+  const presentFrame = (frame: StudioLiveSelectionTransformFrame): boolean => {
+    if (presentationMode === "exact") {
+      if (exactPresentation(frame) !== null) return true;
+      presentationMode = "fallback";
+    }
+    return fallbackPreview?.present(frame) ?? false;
   };
 
   /** Give the document its pixels back and surrender any presented draft. */
@@ -527,13 +547,22 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     if (!terminalFramePrepared) {
       if (ownedOutcome.kind === "commit") {
         critical(() => {
-          terminalDraft = exactPresentation(ownedOutcome.terminalFrame);
+          terminalDraft = presentationMode === "exact"
+            ? exactPresentation(ownedOutcome.terminalFrame)
+            : null;
           terminalFramePrepared = true;
         });
       } else {
         terminalDraft = null;
         terminalFramePrepared = true;
       }
+    }
+    let fallbackRestored = fallbackPreview === null;
+    if (fallbackPreview) {
+      critical(() => {
+        fallbackPreview?.clear();
+        fallbackRestored = true;
+      });
     }
     let ownershipRestored = true;
     critical(() => {
@@ -550,6 +579,12 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     if ((ownedOutcome.kind !== "commit" || terminalDraft === null) && ownershipRestored) {
       critical(() => {
         restoreSources("release");
+      });
+    }
+    if (fallbackRestored) {
+      critical(() => {
+        fallbackPreview?.dispose();
+        fallbackPreview = null;
       });
     }
     for (const indicator of parkedIndicators) {
@@ -609,18 +644,32 @@ export function beginStudioKonvaGroupDrawTransformGesture(
       cleanup({ kind: "cancel", reason: "preview-error" });
       return null;
     }
+    fallbackPreview = createStudioLiveTransformWireframeFallback({
+      members,
+      sourceBounds: options.sourceBounds,
+      dragLayer: draftLayer,
+      strokeWidthPolicy: "preserve",
+    });
+    if (!fallbackPreview) {
+      cleanup({ kind: "cancel", reason: "preview-error" });
+      return null;
+    }
+
     // Deliberately after the chrome lift and the indicator parking, not before: the proxy and its
     // Transformer are ordinary later siblings of the strokes until they move to the isolated
-    // Layer, and grading the selection against its own gesture chrome would refuse every gesture.
-    if (!studioLiveTransformGroupStackingIsolatable(members.map((member) => member.node))) {
-      cleanup({ kind: "cancel", reason: "preview-error" });
-      return null;
+    // Layer. Stacking now disables only the exact top-Layer draft; the bounded guide leaves the
+    // authored wrappers in their original composition and remains available.
+    if (
+      exactPreviewEligible
+      && !studioLiveTransformGroupStackingIsolatable(members.map((member) => member.node))
+    ) {
+      exactPreviewEligible = false;
     }
-    draftClaim = options.preview.draftStore?.claim(options.preview.scope, selectedIds) ?? null;
-    if (!draftClaim) {
-      cleanup({ kind: "cancel", reason: "preview-error" });
-      return null;
+    if (exactPreviewEligible) {
+      draftClaim = options.preview.draftStore?.claim(options.preview.scope, selectedIds) ?? null;
+      if (!draftClaim) exactPreviewEligible = false;
     }
+    presentationMode = exactPreviewEligible ? "exact" : "fallback";
 
     previewSession = createStudioLiveTransformPreviewSession({
       sourceBounds: options.sourceBounds,
@@ -644,11 +693,12 @@ export function beginStudioKonvaGroupDrawTransformGesture(
         // Unreachable while the route above says model-draft-only, and a refusal is the correct
         // answer if that ever changes: a retained affine here would show scaled line weight.
         apply: () => false,
-        applyExact: (frame) => exactPresentation({
+        applyExact: (frame) => presentFrame({
           targetBounds: frame.targetBounds,
           rotationDeg: frame.rotationDeg,
-        }) !== null,
+        }),
         neutralize: () => {
+          fallbackPreview?.clear();
           restoreSources();
         },
       },

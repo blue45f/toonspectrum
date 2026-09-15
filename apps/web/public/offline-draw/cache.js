@@ -1,7 +1,8 @@
 /** Classic script usable in the page and dedicated worker. Cache files only, never artwork. */
 (() => {
-  const name = 'toonstudio-emergency-drawing-shell-v1';
-  const ready = '/offline-draw/ready-v1';
+  const name = 'toonstudio-emergency-drawing-shell-v2';
+  const ready = '/offline-draw/ready-v2';
+  const legacyNames = ['toonstudio-emergency-drawing-shell-v1'];
   const files = [
     ['/offline-draw/index.html', /text\/html/i],
     ['/offline-draw/portable.html', /text\/html/i],
@@ -13,12 +14,18 @@
     ['/offline-draw/bootstrap.js', /(javascript|ecmascript)/i],
   ];
   let preparing = null;
+  const cleanupLegacy = () => Promise.all(
+    legacyNames.map((legacyName) => caches.delete(legacyName).catch(() => false)),
+  );
   async function prepare() {
     if (preparing) return preparing;
     preparing = (async () => {
       const cache = await caches.open(name);
       const existing = await cache.match(ready);
-      if (existing && (await Promise.all(files.map(([url]) => cache.match(url)))).every(Boolean)) return true;
+      if (existing && (await Promise.all(files.map(([url]) => cache.match(url)))).every(Boolean)) {
+        await cleanupLegacy();
+        return true;
+      }
       // Fetch and validate the whole set before any put. Never cache a proxy's HTML error as JS.
       const responses = await Promise.all(files.map(async ([url, mime]) => {
         const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 12000);
@@ -32,7 +39,8 @@
       }));
       await cache.delete(ready);
       await Promise.all(files.map(([url], i) => cache.put(url, responses[i])));
-      await cache.put(ready, new Response('ready-v1', { headers: { 'content-type': 'text/plain' } }));
+      await cache.put(ready, new Response('ready-v2', { headers: { 'content-type': 'text/plain' } }));
+      await cleanupLegacy();
       return true;
     })().finally(() => { preparing = null; });
     return preparing;

@@ -61,6 +61,7 @@ function renderPanel(
   rigMetrics: VrmPropRigMetrics,
   onUpdate = vi.fn(),
   suppliedItems?: PropInstance[],
+  onInspect?: (item: PropInstance) => void,
 ) {
   const items = suppliedItems ?? [createPropInstance("mug", "panel-mug")!];
   const item = items[0]!;
@@ -75,10 +76,29 @@ function renderPanel(
       onUpdate={onUpdate}
       onRemove={vi.fn()}
       onClear={vi.fn()}
+      onInspect={onInspect}
     />,
   );
   return { item, onUpdate };
 }
+
+describe("StudioVrmPropPanel 정밀 검수", () => {
+  it("선택한 실제 소품을 확대 검수 콜백에 전달하고 편집값은 바꾸지 않는다", () => {
+    const onInspect = vi.fn();
+    const onUpdate = vi.fn();
+    const { item } = renderPanel(
+      completeRightGripMetrics(),
+      onUpdate,
+      undefined,
+      onInspect,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /부착부 확대 확인/ }));
+
+    expect(onInspect).toHaveBeenCalledExactlyOnceWith(item);
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
 
 describe("StudioVrmPropPanel 자동 그립", () => {
   it("실측 리그에서는 ON 권한을 설명하고 70–130% 맞춤값을 저장한다", () => {

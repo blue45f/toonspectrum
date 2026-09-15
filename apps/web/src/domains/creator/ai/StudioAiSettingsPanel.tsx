@@ -1,13 +1,15 @@
-import type { StudioAiSettings } from "./studio-ai-client";
-import { UnifiedAiSettingsEditor } from "./UnifiedAiSettingsEditor";
+import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
 
-/** Studio popover and the standalone page share the same credential editor and storage contract. */
-export function StudioAiSettingsPanel({
-  settings,
-  onChange,
-}: {
+import type { StudioAiSettings } from "./studio-ai-client";
+
+/**
+ * Legacy props remain while the Studio host migrates, but every credential
+ * surface now renders the single shared free-first settings owner.
+ */
+export function StudioAiSettingsPanel(props: {
   settings: StudioAiSettings;
   onChange: (next: StudioAiSettings) => void;
 }) {
-  return <UnifiedAiSettingsEditor compact studioSettings={settings} onStudioSettingsChange={onChange} />;
+  void props;
+  return <UnifiedAiSettings />;
 }
