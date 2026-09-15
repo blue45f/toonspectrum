@@ -6,11 +6,12 @@ export interface ProviderAvailability {
   provider: ResourceProvider;
   availability: "keyless" | "configured" | "not_configured";
 }
-const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd", "aic", "cleveland"]);
+const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd", "aic", "cleveland", "polyhaven"]);
 const LEGACY_PROVIDERS: ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo"];
-const EXPECTED_PROVIDERS: ResourceProvider[] = [...LEGACY_PROVIDERS, "aic", "cleveland"];
+const EXPANDED_PROVIDERS: ResourceProvider[] = [...LEGACY_PROVIDERS, "aic", "cleveland"];
+const EXPECTED_PROVIDERS: ResourceProvider[] = [...EXPANDED_PROVIDERS, "googlebooks", "polyhaven"];
 /** Public configuration summary only; it is not a health check or a credential endpoint. */
-export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean }): ProviderAvailability[] {
+export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean; googlebooks: boolean }): ProviderAvailability[] {
   return [
     { provider: "met", availability: "keyless" },
     { provider: "openlibrary", availability: "keyless" },
@@ -19,11 +20,14 @@ export function providerAvailability(configured: { kakao: boolean; bizinfo: bool
     { provider: "bizinfo", availability: configured.bizinfo ? "configured" : "not_configured" },
     { provider: "aic", availability: "keyless" },
     { provider: "cleveland", availability: "keyless" },
+    { provider: "googlebooks", availability: configured.googlebooks ? "configured" : "not_configured" },
+    { provider: "polyhaven", availability: "keyless" },
   ];
 }
 export function parseProviderAvailability(value: unknown): ProviderAvailability[] | null {
-  if (!Array.isArray(value) || ![LEGACY_PROVIDERS.length, EXPECTED_PROVIDERS.length].includes(value.length)) return null;
-  const expected = value.length === LEGACY_PROVIDERS.length ? LEGACY_PROVIDERS : EXPECTED_PROVIDERS;
+  if (!Array.isArray(value) || ![LEGACY_PROVIDERS.length, EXPANDED_PROVIDERS.length, EXPECTED_PROVIDERS.length].includes(value.length)) return null;
+  const expected = value.length === LEGACY_PROVIDERS.length ? LEGACY_PROVIDERS
+    : value.length === EXPANDED_PROVIDERS.length ? EXPANDED_PROVIDERS : EXPECTED_PROVIDERS;
   const entries: ProviderAvailability[] = [];
   for (const raw of value) {
     if (raw === null || typeof raw !== "object") return null;

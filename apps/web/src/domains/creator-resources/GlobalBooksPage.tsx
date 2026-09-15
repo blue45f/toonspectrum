@@ -17,7 +17,7 @@ import {
 import { apiPath } from "@/infrastructure/api";
 
 const EXAMPLES = ["webtoon drawing", "manga art", "graphic novel", "9784088820118"] as const;
-const SEARCH_PROVIDERS: ResourceProvider[] = ["openlibrary", "openbd"];
+const SEARCH_PROVIDERS: ResourceProvider[] = ["openlibrary", "googlebooks", "openbd"];
 
 interface ProviderResultState {
   provider: ResourceProvider;
@@ -72,7 +72,9 @@ function BookResultCard({
       <p className="mt-3 text-xs leading-5 text-fg-3">
         {item.provider === "openbd"
           ? "openBD 자료는 일본 도서의 소개·홍보 범위로 사용하며 원본 서지 데이터의 재판매나 임의 변경을 하지 않습니다."
-          : "Open Library 검색 결과는 판본 조사와 원문 연결을 위한 메타데이터입니다. 표지나 도서 원문의 이용 권한을 뜻하지 않습니다."}
+          : item.provider === "googlebooks"
+            ? "Google Books 결과는 판본 발견용 메타데이터입니다. 표지·미리보기·본문의 복제나 각색 권한을 뜻하지 않습니다."
+            : "Open Library 검색 결과는 판본 조사와 원문 연결을 위한 메타데이터입니다. 표지나 도서 원문의 이용 권한을 뜻하지 않습니다."}
       </p>
       <div className="mt-auto flex flex-wrap gap-2 pt-5">
         <a className={RESOURCE_BUTTON} href={item.sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -133,7 +135,9 @@ export function GlobalBooksPage() {
     let disposed = false;
     setLoading(true);
     const isbn = normalizeIsbnCandidate(trimmed);
-    const providers = isbn && page === 1 ? SEARCH_PROVIDERS : ["openlibrary"] satisfies ResourceProvider[];
+    const providers = isbn && page === 1
+      ? SEARCH_PROVIDERS
+      : ["openlibrary", "googlebooks"] satisfies ResourceProvider[];
     void Promise.allSettled(
       providers.map(async (provider) => ({
         provider,
@@ -169,9 +173,9 @@ export function GlobalBooksPage() {
     () => states.flatMap((state) => state.result?.items ?? []),
     [states],
   );
-  const openLibraryResult = states.find((state) => state.provider === "openlibrary")?.result;
+  const paginatedResults = states.filter((state) => state.provider === "openlibrary" || state.provider === "googlebooks").flatMap((state) => state.result ? [state.result] : []);
   const savedItems = workspace.saved.filter((item) => SEARCH_PROVIDERS.includes(item.provider));
-  const hasPartialFailure = states.some((state) => state.error || state.result?.status === "partial" || state.result?.status === "unavailable");
+  const hasPartialFailure = states.some((state) => state.error || state.result?.status === "partial" || state.result?.status === "unavailable" || state.result?.status === "not_configured");
 
   const toggle = (item: CreatorResource) => {
     const remove = workspace.saved.some((saved) => saved.id === item.id);
@@ -189,10 +193,11 @@ export function GlobalBooksPage() {
   return (
     <ResourceLayout
       title="글로벌 만화·도서 판본 탐색"
-      intro="공급자를 고르지 않아도 Open Library의 글로벌 서지와 openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다."
+      intro="공급자를 고르지 않아도 Open Library와 무료 Google Books API의 글로벌 서지, openBD의 일본 ISBN 정보를 함께 확인합니다. 결과는 판본 조사와 원문 연결을 위한 메타데이터이며, 표지·본문 이용 권한을 의미하지 않습니다."
     >
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
         <ProviderStatus provider="openlibrary" />
+        <ProviderStatus provider="googlebooks" />
         <ProviderStatus provider="openbd" />
       </div>
 
@@ -232,7 +237,7 @@ export function GlobalBooksPage() {
       <div aria-live="polite" aria-atomic="true" className="space-y-2 text-sm leading-6 text-fg-2">
         {loading ? <p role="status">글로벌 도서 메타데이터를 확인하고 있습니다…</p> : null}
         {requestError ? <p role="alert">{requestError}</p> : null}
-        {!query ? <p>작품명·작가를 입력하면 Open Library를 검색하고, 정확한 ISBN을 입력하면 openBD 일본 판본도 함께 조회합니다.</p> : null}
+        {!query ? <p>작품명·작가를 입력하면 Open Library와 Google Books를 검색하고, 정확한 ISBN을 입력하면 openBD 일본 판본도 함께 조회합니다.</p> : null}
         {!loading && query && !requestError && items.length === 0 ? <p>현재 검색 범위에서 표시할 판본을 찾지 못했습니다. 다른 표기나 ISBN으로 다시 확인하세요.</p> : null}
         {hasPartialFailure && items.length > 0 ? <p>일부 제공처는 응답하지 않았지만 확인된 결과는 계속 표시합니다.</p> : null}
         {states.map((state) => state.result?.message ? <p key={state.provider}>{RESOURCE_LABELS[state.provider]} · {state.result.message}</p> : null)}
@@ -252,11 +257,11 @@ export function GlobalBooksPage() {
         ))}
       </div>
 
-      {openLibraryResult && (openLibraryResult.status === "ready" || openLibraryResult.status === "partial") ? (
+      {paginatedResults.some((result) => result.status === "ready" || result.status === "partial") ? (
         <nav className="flex items-center justify-center gap-4" aria-label="글로벌 도서 검색 결과 페이지">
           <button className={RESOURCE_BUTTON} type="button" disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button>
           <span className="text-sm text-fg-2">{page} 페이지</span>
-          <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !openLibraryResult.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
+          <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !paginatedResults.some((result) => result.hasMore) || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
         </nav>
       ) : null}
 

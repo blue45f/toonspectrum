@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { ResourceLayout } from "./ResourceLayout";
-import { RESOURCE_SOURCES } from "./sources";
+import { isFreeResourceSource, resourceSourceCostLabel, RESOURCE_SOURCES } from "./sources";
 
 const COMMERCIAL_STYLE: Record<string, string> = {
   "상업 핵심 후보": "border-good/30 bg-good/10 text-good",
@@ -13,12 +13,22 @@ const COMMERCIAL_STYLE: Record<string, string> = {
   "운영 제외": "border-danger/30 bg-danger/10 text-danger",
 };
 
+function sourceCostStyle(label: string): string {
+  if (label.startsWith("무료")) return "border-good/30 bg-good/10 text-good";
+  if (label === "유료·계약 필요") return "border-warn/30 bg-warn/10 text-warn";
+  if (label === "운영 제외") return "border-danger/30 bg-danger/10 text-danger";
+  return "border-line bg-raised text-fg-2";
+}
+
 export function SourcesPage() {
   const [query, setQuery] = useState("");
+  const [freeOnly, setFreeOnly] = useState(false);
   const [keylessOnly, setKeylessOnly] = useState(false);
   const normalized = query.toLocaleLowerCase().trim();
-  const rows = RESOURCE_SOURCES.filter((source) => (!keylessOnly || source.freeKeyless === true) &&
-    `${source.name} ${source.category} ${source.status} ${source.commercial} ${source.note}`
+  const rows = RESOURCE_SOURCES.filter((source) =>
+    (!freeOnly || isFreeResourceSource(source))
+    && (!keylessOnly || source.freeKeyless === true)
+    && `${source.name} ${source.category} ${source.status} ${source.commercial} ${resourceSourceCostLabel(source)} ${source.note}`
       .toLocaleLowerCase()
       .includes(normalized),
   );
@@ -45,13 +55,17 @@ export function SourcesPage() {
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="상업 이용 상태 설명">
       {Object.keys(COMMERCIAL_STYLE).map((label) => <div key={label} className={`rounded-xl border p-3 text-center text-xs font-semibold ${COMMERCIAL_STYLE[label]}`}>{label}</div>)}
     </section>
-    <label htmlFor="resource-source-filter" className="block font-semibold">제공처·분야·상업 준비 상태 필터<input id="resource-source-filter" type="search" className={`${RESOURCE_INPUT} mt-2`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 글로벌 판본, 계약 후 이용, 3D" /></label>
-    <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={keylessOnly} onChange={(event) => setKeylessOnly(event.target.checked)} />무료·키 없는 제공처만 보기 (연동 상태는 각 카드 확인)</label>
-    <p className="text-sm leading-7 text-fg-2">이번 제작실에는 추가 신청이나 인증키가 필요하지 않습니다. 신청 예정·검토로 표시된 제공처는 승인되거나 연결된 상태가 아닙니다. 무료 API도 호출 한도와 자료별 이용조건이 있습니다.</p>
+    <label htmlFor="resource-source-filter" className="block font-semibold">제공처·분야·비용·상업 준비 상태 필터<input id="resource-source-filter" type="search" className={`${RESOURCE_INPUT} mt-2`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 무료, 글로벌 판본, 계약 후 이용, 3D" /></label>
+    <div className="flex flex-wrap gap-x-6 gap-y-2">
+      <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={freeOnly} onChange={(event) => setFreeOnly(event.target.checked)} />무료 제공처만 보기</label>
+      <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={keylessOnly} onChange={(event) => setKeylessOnly(event.target.checked)} />가입·키 없는 제공처만 보기</label>
+    </div>
+    <p className="text-sm leading-7 text-fg-2">무료 표시는 API 이용료 기준입니다. 계정·키·승인, 호스팅·전송량, 개별 자료의 저작권·상업 이용 조건은 별도이며, 신청 예정·검토 제공처는 아직 연결된 상태가 아닙니다.</p>
     <p role="status" className="text-sm text-fg-2">{rows.length}개 제공처</p>
     <div className="grid gap-4 md:grid-cols-2">{rows.map((source) => <article key={source.name} className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-accent">{source.category} · {source.status}</span>
+        <span className={`rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${sourceCostStyle(resourceSourceCostLabel(source))}`}>{resourceSourceCostLabel(source)}</span>
         <span className={`rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${COMMERCIAL_STYLE[source.commercial]}`}>{source.commercial}</span>
       </div>
       <h2 className="text-lg font-bold">{source.name}</h2><p className="flex-1 text-sm leading-7 text-fg-2">{source.note}</p>
