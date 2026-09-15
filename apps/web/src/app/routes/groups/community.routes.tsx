@@ -22,6 +22,10 @@ const CafeDetailPage = lazyRetry(
   () => import("@/domains/community/CafeDetailPage").then((module) => ({ default: module.CafeDetailPage })),
   "CafeDetailPage",
 );
+const CafeManagePage = lazyRetry(
+  () => import("@/domains/community/CafeManagePage").then((module) => ({ default: module.CafeManagePage })),
+  "CafeManagePage",
+);
 const CommunityPostPage = lazyRetry(
   () => import("@/domains/community/CommunityPostPage").then((module) => ({ default: module.CommunityPostPage })),
   "CommunityPostPage",
@@ -66,6 +70,7 @@ export const communityRoutes = defineAppRoutes([
   { id: "community-promote-edit", path: "/community/promote/:id/edit", element: <PromotionEditorPage /> },
   { id: "community-promote-post", path: "/community/promote/:id", element: <PromotionPostPage /> },
   { id: "community-cafes", path: "/community/cafes", element: <CafesPage /> },
+  { id: "community-cafe-manage", path: "/community/cafes/:slug/manage", element: <CafeManagePage /> },
   { id: "community-cafe", path: "/community/cafes/:slug", element: <CafeDetailPage /> },
   { id: "community-post", path: "/community/post/:id", element: <CommunityPostPage /> },
   { id: "community-scope", path: "/community/:scope", element: <CommunityScopePage /> },

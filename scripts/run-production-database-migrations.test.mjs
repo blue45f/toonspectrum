@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 
 import {
+  buildCommunityCafeCapabilitySql,
+  buildCommunityCafeRuntimeAclSql,
+} from "./community-cafe-database-contract.mjs";
+
+import {
   POST_BASELINE_RELATIONS,
   buildAuthRuntimeAclSql,
   buildAuthRuntimeAclViolationSql,
@@ -29,12 +34,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(56);
+  expect(manifest).toHaveLength(57);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0056_studio_ai_free_pool_contract",
+    "0057_community_cafe_governance",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(56);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(57);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
@@ -81,6 +86,70 @@ test("creator community publishing migration separates immutable releases from d
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("community governance migration is additive and stores only invite hashes", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0057_community_cafe_governance",
+  );
+  expect(migration?.id).toBe("0057_community_cafe_governance");
+  const sql = migration?.contents ?? "";
+  for (const fragment of [
+    "ADD COLUMN IF NOT EXISTS kind",
+    "community_cafe_join_request",
+    "community_cafe_invite",
+    "community_cafe_ban",
+    "community_cafe_moderation_log",
+    '"codeHash" text NOT NULL UNIQUE',
+    "uq_community_cafe_single_owner",
+    "REVOKE ALL ON TABLE",
+  ]) {
+    expect(sql).toContain(fragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+  expect(sql).not.toMatch(/\bcode\s+text\b/iu);
+});
+
+test("community governance runtime ACL is bounded and capability checked", () => {
+  const grant = buildCommunityCafeRuntimeAclSql("toonspectrum_runtime");
+  const capability = buildCommunityCafeCapabilitySql("toonspectrum_runtime");
+  for (const relation of [
+    "community_cafe",
+    "community_cafe_member",
+    "community_cafe_join_request",
+    "community_cafe_invite",
+    "community_cafe_ban",
+    "community_cafe_moderation_log",
+  ]) {
+    expect(grant).toContain(`public.${relation}`);
+    expect(capability).toContain(relation);
+  }
+  expect(grant).toContain(
+    "GRANT SELECT, INSERT, UPDATE ON TABLE public.community_cafe",
+  );
+  expect(grant).toContain(
+    "GRANT SELECT, INSERT ON TABLE public.community_cafe_moderation_log",
+  );
+  expect(grant).not.toContain(
+    "UPDATE, DELETE ON TABLE public.community_cafe_moderation_log",
+  );
+  expect(grant).not.toContain("TRUNCATE");
+  expect(capability).toContain("community cafe runtime DML privileges are incomplete");
+  expect(capability).toContain("community cafe runtime role has unexpected privileges");
+  expect(capability).toContain("pg_catalog.aclexplode");
+  expect(capability).toContain("privilege.grantee = 0");
+  expect(capability).toContain("community cafe relations are exposed to PUBLIC");
+});
+
+test("community governance ACL rejects unsafe runtime role names", () => {
+  for (const role of ["PUBLIC", "public", "runtime-role", 'runtime"role', ""]) {
+    expect(() => buildCommunityCafeRuntimeAclSql(role)).toThrow(
+      "explicit safe community runtime role",
+    );
+    expect(() => buildCommunityCafeCapabilitySql(role)).toThrow(
+      "explicit safe community runtime role",
+    );
+  }
 });
 
 test("AI Comic Director migration provisions the complete durable workflow schema", () => {
@@ -776,6 +845,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "admin_content_reports",
     "admin_promos",
     "admin_security_policies",
+    "community_cafe_ban",
+    "community_cafe_invite",
+    "community_cafe_join_request",
+    "community_cafe_moderation_log",
     "creator_asset_artifact",
     "creator_asset_artifact_set",
     "creator_asset_license_snapshot",

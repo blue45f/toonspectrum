@@ -60,9 +60,19 @@ export const ensureCommunityTables = createSchemaReadinessCheck([
    FROM "fan_post" WHERE FALSE`,
   `SELECT "id", "postId", "parentId", "userId", "text", "deletedAt", "createdAt"
    FROM "fan_post_reply" WHERE FALSE`,
-  `SELECT "id", "slug", "name", "description", "genre", "createdBy", "hidden", "createdAt"
+  `SELECT "id", "slug", "name", "description", "genre", "kind", "tags",
+          "visibility", "joinPolicy", "postingPolicy", "rules", "status",
+          "createdBy", "hidden", "createdAt", "updatedAt"
    FROM "community_cafe" WHERE FALSE`,
   `SELECT "cafeId", "userId", "role", "joinedAt" FROM "community_cafe_member" WHERE FALSE`,
+  `SELECT "id", "cafeId", "userId", "message", "status", "reviewedBy",
+          "reviewedAt", "createdAt", "updatedAt" FROM "community_cafe_join_request" WHERE FALSE`,
+  `SELECT "id", "cafeId", "codeHash", "createdBy", "maxUses", "useCount",
+          "expiresAt", "revokedAt", "createdAt" FROM "community_cafe_invite" WHERE FALSE`,
+  `SELECT "cafeId", "userId", "reason", "bannedBy", "expiresAt", "createdAt"
+   FROM "community_cafe_ban" WHERE FALSE`,
+  `SELECT "id", "cafeId", "actorId", "action", "targetUserId", "targetPostId",
+          "metadata", "createdAt" FROM "community_cafe_moderation_log" WHERE FALSE`,
 ]);
 
 function clampId(value: unknown, max: number) {
@@ -926,11 +936,19 @@ function mapCafeRow(row: CafeRowShape): CommunityCafe {
     name: row.name,
     description: row.description,
     genre: row.genre,
+    kind: "genre",
+    tags: [],
+    visibility: "public",
+    joinPolicy: "open",
+    postingPolicy: "members",
+    rules: [],
+    status: "active",
     createdBy: row.createdBy,
     ownerName: row.ownerName ?? "익명",
     memberCount: Number(row.memberCount ?? 0),
     postCount: Number(row.postCount ?? 0),
     createdAt: safeDate(row.createdAt ?? undefined),
+    updatedAt: safeDate(row.createdAt ?? undefined),
   };
 }
 

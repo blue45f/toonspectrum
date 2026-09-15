@@ -1,35 +1,69 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 
 import { parseCommunitySort } from "../../../../web/src/shared/lib/community-ui";
 import { GENRES } from "../../../../web/src/shared/lib/taxonomy";
 import {
-  createCafe,
   createFanPost,
-  deleteFanPost,
-  deleteFanPostReply,
-  deleteReviewReply,
   createFanPostReply,
-  getCafeBySlug,
+  createReviewReply,
+  deleteReviewReply,
   getFanPost,
-  isCafeMember,
-  joinCafe,
-  leaveCafe,
-  listCafes,
   listCommunityBoards,
   listFanPostReplies,
   listFanPosts,
+  listReviewReplies,
   parseCommunityScopeFilter,
   parsePostKindOrNull,
   parsePostSort,
-  validateCafeInput,
   validatePostInput,
   validateReplyPayload,
-  createReviewReply,
-  listReviewReplies,
 } from "../../server/community";
+import {
+  archiveGovernedCafe,
+  assertCafePostAccess,
+  assertCommunityPostingAccess,
+  banGovernedCafeMember,
+  CommunityGovernanceError,
+  createGovernedCafe,
+  createGovernedCafeInvite,
+  deleteGovernedCommunityPost,
+  deleteGovernedCommunityReply,
+  filterAccessibleCafeBoards,
+  filterAccessibleCafePosts,
+  getGovernedCafeBySlug,
+  joinGovernedCafe,
+  leaveOrCancelGovernedCafe,
+  listGovernedCafeBans,
+  listGovernedCafeInvites,
+  listGovernedCafeJoinRequests,
+  listGovernedCafeMembers,
+  listGovernedCafeModerationLogs,
+  listGovernedCafes,
+  reviewGovernedCafeJoinRequest,
+  revokeGovernedCafeInvite,
+  transferGovernedCafeOwnership,
+  unbanGovernedCafeMember,
+  updateGovernedCafe,
+  updateGovernedCafeMemberRole,
+  validateCommunityCafeCreateInput,
+  validateCommunityCafeUpdateInput,
+} from "../../server/community-governance";
 import { getReviewsData } from "../../server/reviews";
 
-import type { CommunityCafe, FanCafePost, FanCafeReply, ReviewReply } from "../../../../web/src/shared/lib/types";
+import type {
+  CommunityCafe,
+  CommunityCafeRole,
+  FanCafePost,
+  FanCafeReply,
+  ReviewReply,
+} from "../../../../web/src/shared/lib/types";
 
 interface PostQuery {
   scope?: string | null;
@@ -41,7 +75,7 @@ interface PostQuery {
   cursor?: string | null;
   limit?: number | string | null;
   mineOnly?: boolean;
-  requesterId?: string | null;
+  viewerId?: string | null;
 }
 
 interface PostPayload {
@@ -52,6 +86,7 @@ interface PostPayload {
   title?: unknown;
   text?: unknown;
   tags?: unknown;
+  images?: unknown;
 }
 
 interface ReviewPayload {
@@ -82,22 +117,52 @@ function parseLimit(value: number | string | null | undefined): number {
   return Math.max(1, Math.min(Math.floor(raw), 100));
 }
 
+function rethrowGovernance(error: unknown): never {
+  if (!(error instanceof CommunityGovernanceError)) throw error;
+  switch (error.code) {
+    case "unauthorized":
+      throw new UnauthorizedException(error.message);
+    case "forbidden":
+      throw new ForbiddenException(error.message);
+    case "not-found":
+      throw new NotFoundException(error.message);
+    case "conflict":
+      throw new ConflictException(error.message);
+    default:
+      throw new BadRequestException(error.message);
+  }
+}
+
+async function governed<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    rethrowGovernance(error);
+  }
+}
+
 @Injectable()
 export class CommunityService {
-  async boards(scopeValue: string | null, query: string | null, sortValue: string | null, limitValue: number | null) {
+  async boards(
+    scopeValue: string | null,
+    query: string | null,
+    sortValue: string | null,
+    limitValue: number | null,
+    viewerId: string | null,
+  ) {
     const scope = parseCommunityScopeFilter(scopeValue) ?? "all";
     const sort = parseCommunitySort(sortValue);
     const safeLimit = parseLimit(limitValue);
-    // DB(Neon) 불가 시 빈 목록으로 우아하게 폴백 — 팬카페가 500 대신 빈 디렉토리로 뜬다.
     let boards: Awaited<ReturnType<typeof listCommunityBoards>>;
     try {
       boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
     } catch {
       boards = [];
     }
+    const visibleBoards = await filterAccessibleCafeBoards(boards, viewerId);
     return {
-      items: boards,
-      meta: { scope, sort, limit: safeLimit, total: boards.length, generatedAt: new Date().toISOString() },
+      items: visibleBoards,
+      meta: { scope, sort, limit: safeLimit, total: visibleBoards.length, generatedAt: new Date().toISOString() },
     };
   }
 
@@ -110,18 +175,32 @@ export class CommunityService {
     const search = String(query.query ?? "").trim();
     const tag = String(query.tag ?? "").trim();
     const cursor = query.cursor ? String(query.cursor) : null;
-    const requesterId = parseBool(query.mineOnly) && query.requesterId ? query.requesterId : null;
-    if (query.mineOnly && !requesterId) {
-      throw new UnauthorizedException("로그인이 필요해요.");
-    }
+    const mineUserId = parseBool(query.mineOnly) ? query.viewerId ?? null : null;
+    if (query.mineOnly && !mineUserId) throw new UnauthorizedException("로그인이 필요해요.");
     if (scope !== "all" && !targetId) {
       throw new BadRequestException("scope가 all이 아니면 targetId가 필요합니다.");
     }
-
-    // DB(Neon) 불가 시 빈 피드로 폴백 — 검증 오류(위 throw)는 그대로 두고 DB 호출만 보호.
+    if (scope === "cafe" && targetId) {
+      await governed(() => assertCafePostAccessBySlug(targetId, query.viewerId ?? null));
+    }
     try {
-      return await listFanPosts(scope, targetId, kind, search, tag, sort, cursor, safeLimit, requesterId);
-    } catch {
+      const result = await listFanPosts(
+        scope,
+        targetId,
+        kind,
+        search,
+        tag,
+        sort,
+        cursor,
+        safeLimit,
+        mineUserId,
+      );
+      return {
+        ...result,
+        items: await filterAccessibleCafePosts(result.items, query.viewerId ?? null),
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException || error instanceof NotFoundException) throw error;
       return { items: [], hasMore: false, nextCursor: null };
     }
   }
@@ -131,21 +210,16 @@ export class CommunityService {
     if (parsed.error || !parsed.value) {
       throw new BadRequestException(parsed.error ?? "잘못된 요청");
     }
-    // 장르 카페 글은 가입 회원만 — 카페 존재·멤버십을 서버에서 강제하고 라벨 스푸핑을 차단.
     if (parsed.value.scope === "cafe") {
-      const cafe = await getCafeBySlug(parsed.value.targetId, userId);
-      if (!cafe) throw new NotFoundException("카페를 찾을 수 없어요.");
-      if (!(await isCafeMember(userId, cafe.slug))) {
-        throw new ForbiddenException("카페에 가입한 회원만 글을 쓸 수 있어요.");
-      }
+      const cafe = await governed(() => assertCommunityPostingAccess(parsed.value!.targetId, userId));
       parsed.value.targetLabel = cafe.name;
     }
     return createFanPost(userId, parsed.value);
   }
 
-  // 토론 스레드 상세(답글 트리 포함). 숨김 글은 404.
-  async getPost(postId: string): Promise<FanCafePost> {
+  async getPost(postId: string, viewerId: string | null): Promise<FanCafePost> {
     if (!postId) throw new BadRequestException("postId 필요");
+    await governed(() => assertCafePostAccess(postId, viewerId));
     let post: FanCafePost | null;
     try {
       post = await getFanPost(postId);
@@ -158,86 +232,17 @@ export class CommunityService {
 
   async deletePost(postId: string, userId: string) {
     if (!postId) throw new BadRequestException("postId 필요");
-    try {
-      return await deleteFanPost(userId, postId, false);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "글을 삭제하지 못했습니다.");
-    }
+    return governed(() => deleteGovernedCommunityPost(postId, userId));
   }
 
   async deletePostReply(postId: string, replyId: string, userId: string) {
     if (!postId || !replyId) throw new BadRequestException("postId/replyId 필요");
-    try {
-      return await deleteFanPostReply(userId, postId, replyId, false);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
-    }
+    return governed(() => deleteGovernedCommunityReply(postId, replyId, userId));
   }
 
-  async deleteReviewReply(reviewId: string, replyId: string, userId: string) {
-    if (!reviewId || !replyId) throw new BadRequestException("reviewId/replyId 필요");
-    try {
-      return await deleteReviewReply(userId, reviewId, replyId, false);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
-    }
-  }
-
-  // ── 장르 카페(소모임) ──────────────────────────────────────────────
-  async listCafes(genre: string | null, query: string | null, sortValue: string | null) {
-    const sort = parseCommunitySort(sortValue) === "recent" ? ("recent" as const) : ("popular" as const);
-    // DB 불가 시 빈 디렉토리로 폴백(500 방지) — 검증 오류는 그대로 던진다.
-    let items: CommunityCafe[];
-    try {
-      items = await listCafes({ genre, query, sort });
-    } catch {
-      items = [];
-    }
-    return { items, meta: { sort, total: items.length, generatedAt: new Date().toISOString() } };
-  }
-
-  async getCafe(slug: string, viewerId: string | null) {
-    if (!slug) throw new BadRequestException("slug 필요");
-    let cafe: CommunityCafe | null;
-    try {
-      cafe = await getCafeBySlug(slug, viewerId);
-    } catch {
-      throw new BadRequestException("카페 정보를 불러오지 못했습니다.");
-    }
-    if (!cafe) throw new NotFoundException("카페를 찾을 수 없어요.");
-    return cafe;
-  }
-
-  async createCafe(body: unknown, userId: string) {
-    const parsed = validateCafeInput(body, GENRES);
-    if (parsed.error || !parsed.value) throw new BadRequestException(parsed.error ?? "카페 정보를 확인해 주세요.");
-    try {
-      return await createCafe(userId, parsed.value);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "카페를 만들지 못했습니다.");
-    }
-  }
-
-  async joinCafe(slug: string, userId: string) {
-    if (!slug) throw new BadRequestException("slug 필요");
-    try {
-      return await joinCafe(userId, slug);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "카페에 가입하지 못했습니다.");
-    }
-  }
-
-  async leaveCafe(slug: string, userId: string) {
-    if (!slug) throw new BadRequestException("slug 필요");
-    try {
-      return await leaveCafe(userId, slug);
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "카페에서 탈퇴하지 못했습니다.");
-    }
-  }
-
-  async listPostReplies(postId: string): Promise<FanCafeReply[]> {
+  async listPostReplies(postId: string, viewerId: string | null): Promise<FanCafeReply[]> {
     if (!postId) throw new BadRequestException("postId 필요");
+    await governed(() => assertCafePostAccess(postId, viewerId));
     try {
       return await listFanPostReplies(postId);
     } catch {
@@ -247,7 +252,13 @@ export class CommunityService {
 
   async createPostReply(postId: string, userId: string, body: ReplyPayload) {
     const parsed = validateReplyPayload(body);
-    if (parsed.error || !parsed.text) throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    if (parsed.error || !parsed.text) {
+      throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    }
+    const post = await governed(() => assertCafePostAccess(postId, userId));
+    if (post.scope === "cafe") {
+      await governed(() => assertCommunityPostingAccess(post.targetId, userId));
+    }
     try {
       return await createFanPostReply({
         postId,
@@ -256,10 +267,119 @@ export class CommunityService {
         text: parsed.text,
       });
     } catch (error) {
-      if (error instanceof Error) {
-        throw new BadRequestException(error.message);
-      }
-      throw new BadRequestException("답글을 저장하지 못했습니다.");
+      throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
+    }
+  }
+
+  async listCafes(
+    genre: string | null,
+    kind: string | null,
+    query: string | null,
+    sortValue: string | null,
+    mineOnly: boolean,
+    viewerId: string | null,
+  ) {
+    const sort = parseCommunitySort(sortValue) === "recent" ? "recent" : "popular";
+    const items = await governed(() =>
+      listGovernedCafes({ genre, kind, query, sort, mineOnly, viewerId }),
+    );
+    return { items, meta: { sort, total: items.length, generatedAt: new Date().toISOString() } };
+  }
+
+  async getCafe(slug: string, viewerId: string | null) {
+    if (!slug) throw new BadRequestException("slug 필요");
+    const cafe = await governed(() => getGovernedCafeBySlug(slug, viewerId));
+    if (!cafe) throw new NotFoundException("커뮤니티를 찾을 수 없어요.");
+    return cafe;
+  }
+
+  async createCafe(body: unknown, userId: string) {
+    return governed(() => createGovernedCafe(userId, validateCommunityCafeCreateInput(body, GENRES)));
+  }
+
+  async updateCafe(slug: string, body: unknown, userId: string) {
+    return governed(() => updateGovernedCafe(slug, userId, validateCommunityCafeUpdateInput(body, GENRES)));
+  }
+
+  async archiveCafe(slug: string, userId: string) {
+    return governed(() => archiveGovernedCafe(slug, userId));
+  }
+
+  async joinCafe(slug: string, userId: string, body: { message?: unknown; inviteCode?: unknown }) {
+    return governed(() => joinGovernedCafe(slug, userId, body));
+  }
+
+  async leaveCafe(slug: string, userId: string) {
+    return governed(() => leaveOrCancelGovernedCafe(slug, userId));
+  }
+
+  async listCafeMembers(slug: string, userId: string) {
+    return governed(() => listGovernedCafeMembers(slug, userId));
+  }
+
+  async updateCafeMemberRole(slug: string, targetUserId: string, role: unknown, userId: string) {
+    return governed(() => updateGovernedCafeMemberRole(slug, targetUserId, userId, String(role) as CommunityCafeRole));
+  }
+
+  async transferCafeOwnership(slug: string, targetUserId: string, userId: string) {
+    return governed(() => transferGovernedCafeOwnership(slug, targetUserId, userId));
+  }
+
+  async listCafeJoinRequests(slug: string, userId: string) {
+    return governed(() => listGovernedCafeJoinRequests(slug, userId));
+  }
+
+  async reviewCafeJoinRequest(
+    slug: string,
+    requestId: string,
+    decision: unknown,
+    userId: string,
+  ) {
+    if (decision !== "approve" && decision !== "reject") {
+      throw new BadRequestException("승인 또는 거절을 선택해 주세요.");
+    }
+    return governed(() => reviewGovernedCafeJoinRequest(slug, requestId, userId, decision));
+  }
+
+  async listCafeInvites(slug: string, userId: string) {
+    return governed(() => listGovernedCafeInvites(slug, userId));
+  }
+
+  async createCafeInvite(slug: string, body: { maxUses?: unknown; expiresInDays?: unknown }, userId: string) {
+    return governed(() => createGovernedCafeInvite(slug, userId, body));
+  }
+
+  async revokeCafeInvite(slug: string, inviteId: string, userId: string) {
+    return governed(() => revokeGovernedCafeInvite(slug, inviteId, userId));
+  }
+
+  async listCafeBans(slug: string, userId: string) {
+    return governed(() => listGovernedCafeBans(slug, userId));
+  }
+
+  async banCafeMember(
+    slug: string,
+    targetUserId: string,
+    body: { reason?: unknown; expiresAt?: unknown },
+    userId: string,
+  ) {
+    return governed(() => banGovernedCafeMember(slug, targetUserId, userId, body));
+  }
+
+  async unbanCafeMember(slug: string, targetUserId: string, userId: string) {
+    return governed(() => unbanGovernedCafeMember(slug, targetUserId, userId));
+  }
+
+  async listCafeModerationLogs(slug: string, limit: number | null, userId: string) {
+    return governed(() => listGovernedCafeModerationLogs(slug, userId, parseLimit(limit)));
+  }
+
+  async deleteReviewReply(reviewId: string, replyId: string, userId: string) {
+    if (!reviewId || !replyId) throw new BadRequestException("reviewId/replyId 필요");
+    try {
+      return await deleteReviewReply(userId, reviewId, replyId, false);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
     }
   }
 
@@ -274,7 +394,9 @@ export class CommunityService {
 
   async createReviewReply(reviewId: string, userId: string, body: ReplyPayload) {
     const parsed = validateReplyPayload(body);
-    if (parsed.error || !parsed.text) throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    if (parsed.error || !parsed.text) {
+      throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    }
     try {
       return await createReviewReply({
         reviewId,
@@ -284,10 +406,7 @@ export class CommunityService {
         spoiler: !!body.spoiler,
       });
     } catch (error) {
-      if (error instanceof Error) {
-        throw new BadRequestException(error.message);
-      }
-      throw new BadRequestException("답글을 저장하지 못했습니다.");
+      throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
     }
   }
 
@@ -299,4 +418,12 @@ export class CommunityService {
       userId: query.userId ?? undefined,
     });
   }
+}
+
+async function assertCafePostAccessBySlug(slug: string, viewerId: string | null): Promise<CommunityCafe> {
+  const cafe = await getGovernedCafeBySlug(slug, viewerId);
+  if (!cafe || !cafe.viewerCanViewContent) {
+    throw new CommunityGovernanceError("not-found", "커뮤니티를 찾을 수 없어요.");
+  }
+  return cafe;
 }
