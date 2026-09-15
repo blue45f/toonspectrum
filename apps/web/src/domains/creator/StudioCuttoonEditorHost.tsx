@@ -288,7 +288,7 @@ import {
   resolveBubbleLineHeight,
 } from "./lettering/studio-bubble-text-fit";
 import { resolveStudioCanvasGestureDisposition } from "./canvas/studio-canvas-gesture-arbitration";
-import { planStudioCanvasWheelNavigation } from "./canvas/studio-canvas-wheel-navigation";
+import { applyStudioCanvasWheelNavigation } from "./canvas/studio-canvas-wheel-navigation";
 import { recordStudioHotPathRender } from "./canvas/studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./canvas/studio-canvas-size";
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
@@ -12314,24 +12314,7 @@ export function StudioCuttoonEditor({
       const prefs = appSettingsRef.current.mouse;
       const modZoom = e.ctrlKey || e.metaKey;
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
-      const wheelNavigation = planStudioCanvasWheelNavigation({
-        deltaX: e.deltaX,
-        deltaY: e.deltaY,
-        deltaMode: e.deltaMode,
-        shiftKey: e.shiftKey,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        wheelMode,
-        reverseWheel: prefs.reverseWheel,
-        viewportWidth: node.clientWidth,
-        viewportHeight: node.clientHeight,
-      });
-      if (wheelNavigation) {
-        e.preventDefault();
-        node.scrollLeft += wheelNavigation.deltaX;
-        node.scrollTop += wheelNavigation.deltaY;
-        return;
-      }
+      if (applyStudioCanvasWheelNavigation(node, e, wheelMode, prefs.reverseWheel)) return;
       if (wheelMode === "zoom") {
         e.preventDefault();
         if (zoomLockedRef.current) return;

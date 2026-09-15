@@ -65,9 +65,9 @@ function dominantAxisDelta(deltaX: number, deltaY: number): number {
  * 1. Ctrl/Meta + wheel remains pointer-anchored zoom.
  * 2. Shift + a conventional vertical wheel becomes horizontal movement, except
  *    in brush-size mode where Shift is the established 5 px size step.
- * 3. Native horizontal input from a trackpad or Magic Mouse always remains
- *    horizontal movement instead of being misread as zoom/brush-size input.
- * 4. The configured pan mode consumes both axes with normalized DOM units.
+ * 3. The configured pan mode consumes both axes with normalized DOM units.
+ * 4. Native horizontal input in zoom/brush-size mode remains horizontal movement
+ *    instead of being misread as the configured vertical-wheel action.
  */
 export function planStudioCanvasWheelNavigation(
   input: StudioCanvasWheelNavigationInput
@@ -89,28 +89,72 @@ export function planStudioCanvasWheelNavigation(
     return { deltaX, deltaY: 0, source: "shift-horizontal" };
   }
 
-  if (Math.abs(rawDeltaX) > Math.abs(rawDeltaY)) {
+  if (input.wheelMode === "pan") {
     const deltaX = normalizeStudioCanvasWheelDelta(
       rawDeltaX,
       input.deltaMode,
       input.viewportWidth
     ) * direction;
-    if (deltaX === 0) return null;
-    return { deltaX, deltaY: 0, source: "native-horizontal" };
+    const deltaY = normalizeStudioCanvasWheelDelta(
+      rawDeltaY,
+      input.deltaMode,
+      input.viewportHeight
+    ) * direction;
+    if (deltaX === 0 && deltaY === 0) return null;
+    return { deltaX, deltaY, source: "configured-pan" };
   }
 
-  if (input.wheelMode !== "pan") return null;
-
+  if (Math.abs(rawDeltaX) <= Math.abs(rawDeltaY)) return null;
   const deltaX = normalizeStudioCanvasWheelDelta(
     rawDeltaX,
     input.deltaMode,
     input.viewportWidth
   ) * direction;
-  const deltaY = normalizeStudioCanvasWheelDelta(
-    rawDeltaY,
-    input.deltaMode,
-    input.viewportHeight
-  ) * direction;
-  if (deltaX === 0 && deltaY === 0) return null;
-  return { deltaX, deltaY, source: "configured-pan" };
+  if (deltaX === 0) return null;
+  return { deltaX, deltaY: 0, source: "native-horizontal" };
+}
+
+export interface StudioCanvasWheelNavigationViewport {
+  readonly clientWidth: number;
+  readonly clientHeight: number;
+  scrollLeft: number;
+  scrollTop: number;
+}
+
+export type StudioCanvasWheelNavigationEvent = Pick<
+  WheelEvent,
+  | "deltaX"
+  | "deltaY"
+  | "deltaMode"
+  | "shiftKey"
+  | "ctrlKey"
+  | "metaKey"
+  | "preventDefault"
+>;
+
+/** Apply an owned horizontal/configured-pan wheel packet to the canvas scrollport. */
+export function applyStudioCanvasWheelNavigation(
+  viewport: StudioCanvasWheelNavigationViewport,
+  event: StudioCanvasWheelNavigationEvent,
+  wheelMode: StudioMouseWheelAction,
+  reverseWheel: boolean
+): boolean {
+  const plan = planStudioCanvasWheelNavigation({
+    deltaX: event.deltaX,
+    deltaY: event.deltaY,
+    deltaMode: event.deltaMode,
+    shiftKey: event.shiftKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    wheelMode,
+    reverseWheel,
+    viewportWidth: viewport.clientWidth,
+    viewportHeight: viewport.clientHeight,
+  });
+  if (!plan) return false;
+
+  event.preventDefault();
+  viewport.scrollLeft += plan.deltaX;
+  viewport.scrollTop += plan.deltaY;
+  return true;
 }

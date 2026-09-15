@@ -64,17 +64,14 @@ describe("studio canvas gesture arbitration", () => {
       "const onWheel = (e: WheelEvent) => {",
       'node.addEventListener("wheel", onWheel'
     );
-    const planner = wheel.indexOf("planStudioCanvasWheelNavigation({");
-    const horizontalScroll = wheel.indexOf("node.scrollLeft += wheelNavigation.deltaX;");
+    const horizontalNavigation = wheel.indexOf("applyStudioCanvasWheelNavigation(");
     const zoom = wheel.indexOf('if (wheelMode === "zoom") {');
     const brushSize = wheel.indexOf('if (wheelMode === "brush-size") {');
 
-    expect(planner).toBeGreaterThanOrEqual(0);
-    expect(horizontalScroll).toBeGreaterThan(planner);
-    expect(zoom).toBeGreaterThan(horizontalScroll);
+    expect(horizontalNavigation).toBeGreaterThanOrEqual(0);
+    expect(zoom).toBeGreaterThan(horizontalNavigation);
     expect(brushSize).toBeGreaterThan(zoom);
-    expect(wheel).toContain("shiftKey: e.shiftKey,");
-    expect(wheel).toContain("deltaMode: e.deltaMode,");
+    expect(wheel).toContain("node, e, wheelMode, prefs.reverseWheel");
   });
 
   it("routes wheel and touchmove through the shared ownership-first policy", () => {

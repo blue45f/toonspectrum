@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyStudioCanvasWheelNavigation,
   normalizeStudioCanvasWheelDelta,
   planStudioCanvasWheelNavigation,
   type StudioCanvasWheelNavigationInput,
@@ -54,8 +55,8 @@ describe("studio canvas wheel navigation", () => {
     });
   });
 
-  it("preserves native horizontal trackpad and Magic Mouse input in every wheel mode", () => {
-    for (const wheelMode of ["zoom", "pan", "brush-size"] as const) {
+  it("preserves native horizontal trackpad and Magic Mouse input outside pan mode", () => {
+    for (const wheelMode of ["zoom", "brush-size"] as const) {
       expect(planStudioCanvasWheelNavigation({
         ...baseInput,
         deltaX: 24,
@@ -67,6 +68,19 @@ describe("studio canvas wheel navigation", () => {
         source: "native-horizontal",
       });
     }
+  });
+
+  it("keeps both trackpad axes in configured pan mode", () => {
+    expect(planStudioCanvasWheelNavigation({
+      ...baseInput,
+      deltaX: 24,
+      deltaY: 3,
+      wheelMode: "pan",
+    })).toEqual({
+      deltaX: 24,
+      deltaY: 3,
+      source: "configured-pan",
+    });
   });
 
   it("keeps Ctrl/Meta wheel reserved for pointer-anchored zoom", () => {
@@ -108,6 +122,60 @@ describe("studio canvas wheel navigation", () => {
       deltaY: 32,
       source: "configured-pan",
     });
+  });
+
+  it("applies an owned wheel plan and prevents native page scrolling", () => {
+    const viewport = {
+      clientWidth: 1_200,
+      clientHeight: 800,
+      scrollLeft: 400,
+      scrollTop: 500,
+    };
+    let prevented = false;
+
+    expect(applyStudioCanvasWheelNavigation(
+      viewport,
+      {
+        deltaX: 0,
+        deltaY: 3,
+        deltaMode: 1,
+        shiftKey: true,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: () => { prevented = true; },
+      },
+      "zoom",
+      false
+    )).toBe(true);
+    expect(viewport).toMatchObject({ scrollLeft: 448, scrollTop: 500 });
+    expect(prevented).toBe(true);
+  });
+
+  it("leaves unowned vertical zoom input untouched", () => {
+    const viewport = {
+      clientWidth: 1_200,
+      clientHeight: 800,
+      scrollLeft: 400,
+      scrollTop: 500,
+    };
+    let prevented = false;
+
+    expect(applyStudioCanvasWheelNavigation(
+      viewport,
+      {
+        deltaX: 0,
+        deltaY: -120,
+        deltaMode: 0,
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: () => { prevented = true; },
+      },
+      "zoom",
+      false
+    )).toBe(false);
+    expect(viewport).toMatchObject({ scrollLeft: 400, scrollTop: 500 });
+    expect(prevented).toBe(false);
   });
 
   it("returns no pan plan for zero or non-finite input", () => {
