@@ -14990,10 +14990,7 @@ const puppetWarpArmed =
       .catch(() => setServerAiStatus(null));
     return () => controller.abort();
   }, []);
-  const textAiTransport: StudioTextAiTransport = {
-    mode: "server",
-    provider: serverAiProvider,
-  };
+  const textAiTransport: StudioTextAiTransport = { mode: "server", provider: serverAiProvider };
   const textAiConfigured = isStudioTextAiConfigured(aiSettings, textAiTransport);
   const [writerRoomAiDirection, setWriterRoomAiDirection] = useState("");
   const [writerRoomAiBusy, setWriterRoomAiBusy] = useState(false);
@@ -15010,12 +15007,7 @@ const puppetWarpArmed =
     () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
     [serverAiStatus]
   );
-  const activeServerAiProviderLabel = serverAiProvider === "auto"
-    ? serverAiStatus?.configured
-      ? "자동 무료 AI"
-      : "자동 무료 AI → 내 무료 키"
-    : configuredServerAiProviders.find((provider) => provider.id === serverAiProvider)?.label
-      ?? "선택한 무료 AI";
+  const activeServerAiProviderLabel = serverAiProvider === "auto" ? (serverAiStatus?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키") : (configuredServerAiProviders.find((provider) => provider.id === serverAiProvider)?.label ?? "선택한 무료 AI");
   function updateServerAiProvider(next: StudioServerAiProviderPreference) {
     serverAiProviderUserRevisionRef.current += 1;
     serverAiProviderRef.current = next;
