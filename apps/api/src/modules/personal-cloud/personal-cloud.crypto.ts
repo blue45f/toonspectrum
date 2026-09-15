@@ -13,14 +13,22 @@ import type {
 } from "./personal-cloud.types";
 
 const ENVELOPE_VERSION = "v1";
-const STATE_VERSION = "s1";
+// s2 signs with the configured high-entropy secret directly as the HMAC key.
+// The retired s1 format pre-hashed that secret and is deliberately not accepted.
+const STATE_VERSION = "s2";
 const STATE_MAX_AGE_MS = 10 * 60_000;
 
-function requireSecret(secret: string, label: string): Buffer {
-  if (Buffer.byteLength(secret, "utf8") < 32) {
+function requireSecretBytes(secret: string, label: string): Buffer {
+  const bytes = Buffer.from(secret, "utf8");
+  if (bytes.length < 32) {
     throw new Error(`${label} must contain at least 32 UTF-8 bytes`);
   }
-  return createHash("sha256").update(secret, "utf8").digest();
+  return bytes;
+}
+
+// Preserve the deployed v1 AES envelope derivation so stored provider tokens remain readable.
+function deriveEncryptionKey(secret: string, label: string): Buffer {
+  return createHash("sha256").update(requireSecretBytes(secret, label)).digest();
 }
 
 function encodedJson(value: unknown): string {
@@ -49,7 +57,7 @@ export function encryptPersonalCloudSecret(
   context: string,
   secret: string,
 ): string {
-  const key = requireSecret(secret, "personal cloud token encryption key");
+  const key = deriveEncryptionKey(secret, "personal cloud token encryption key");
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from(context, "utf8"));
@@ -72,7 +80,7 @@ export function decryptPersonalCloudSecret(
   if (version !== ENVELOPE_VERSION || !ivValue || !ciphertextValue || !tagValue || rest.length > 0) {
     throw new Error("invalid personal cloud secret envelope");
   }
-  const key = requireSecret(secret, "personal cloud token encryption key");
+  const key = deriveEncryptionKey(secret, "personal cloud token encryption key");
   const iv = Buffer.from(ivValue, "base64url");
   const ciphertext = Buffer.from(ciphertextValue, "base64url");
   const tag = Buffer.from(tagValue, "base64url");
@@ -97,24 +105,25 @@ export function issuePersonalCloudOAuthState(
   payload: PersonalCloudOAuthStatePayload,
   secret: string,
 ): string {
-  const key = requireSecret(secret, "personal cloud OAuth state secret");
+  const key = requireSecretBytes(secret, "personal cloud OAuth state secret");
   const encoded = encodedJson(payload);
   const signature = createHmac("sha256", key).update(encoded, "ascii").digest("base64url");
   return `${STATE_VERSION}.${encoded}.${signature}`;
 }
 
 export function verifyPersonalCloudOAuthState(
-  value: string,
+  value: unknown,
   secret: string,
   now = Date.now(),
 ): PersonalCloudOAuthStatePayload | null {
+  if (typeof value !== "string") return null;
   const [version, encoded, signature, ...rest] = value.split(".");
   if (version !== STATE_VERSION || !encoded || !signature || rest.length > 0 || value.length > 4_096) {
     return null;
   }
   let key: Buffer;
   try {
-    key = requireSecret(secret, "personal cloud OAuth state secret");
+    key = requireSecretBytes(secret, "personal cloud OAuth state secret");
   } catch {
     return null;
   }

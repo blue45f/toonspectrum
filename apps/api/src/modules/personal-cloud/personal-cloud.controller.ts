@@ -122,9 +122,9 @@ export class PersonalCloudController {
   @Get("oauth/:provider/callback")
   async callback(
     @Param("provider") provider: string,
-    @Query("code") code: string | undefined,
-    @Query("state") state: string | undefined,
-    @Query("error") providerError: string | undefined,
+    @Query("code") rawCode: unknown,
+    @Query("state") rawState: unknown,
+    @Query("error") rawProviderError: unknown,
     @Headers("x-user-id") sessionUserId: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
@@ -140,6 +140,15 @@ export class PersonalCloudController {
       clear();
       return response.redirect(callbackUrl({ status: "error", error: "unsupported-provider" }));
     }
+    const malformedQuery = [rawCode, rawState, rawProviderError]
+      .some((value) => value !== undefined && typeof value !== "string");
+    if (malformedQuery) {
+      clear();
+      return response.redirect(callbackUrl({ status: "error", provider, error: "invalid-query" }));
+    }
+    const code = typeof rawCode === "string" ? rawCode : undefined;
+    const state = typeof rawState === "string" ? rawState : undefined;
+    const providerError = typeof rawProviderError === "string" ? rawProviderError : undefined;
     if (providerError || !code || !state) {
       clear();
       return response.redirect(callbackUrl({

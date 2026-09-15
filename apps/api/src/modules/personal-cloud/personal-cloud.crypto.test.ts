@@ -36,8 +36,11 @@ describe("personal cloud cryptography", () => {
       returnTo: "/studio?view=storage",
       issuedAt: now,
     }, secret);
+    expect(state).toMatch(/^s2\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u);
     expect(verifyPersonalCloudOAuthState(state, secret, now)?.userId).toBe("user-1");
     expect(verifyPersonalCloudOAuthState(`${state.slice(0, -1)}x`, secret, now)).toBeNull();
     expect(verifyPersonalCloudOAuthState(state, secret, now + 11 * 60_000)).toBeNull();
+    expect(verifyPersonalCloudOAuthState([state], secret, now)).toBeNull();
+    expect(verifyPersonalCloudOAuthState({ state }, secret, now)).toBeNull();
   });
 });
