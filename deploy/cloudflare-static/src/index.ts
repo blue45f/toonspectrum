@@ -2,7 +2,9 @@ import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
   cloudflareLargeAssetDescriptor,
   cloudflareLargeAssetKey,
+  cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
 
 export interface AssetsBinding {
@@ -437,6 +439,107 @@ function retryableRead(request: Request, route: DynamicRoute): boolean {
     && !isWebSocketUpgrade(request);
 }
 
+function encodingQuality(header: string, name: string): number {
+  let wildcardQuality: number | null = null;
+  for (const entry of header.split(",")) {
+    const [rawToken, ...parameters] = entry.trim().split(";");
+    const token = rawToken?.trim().toLowerCase();
+    if (!token) continue;
+    let quality = 1;
+    for (const parameter of parameters) {
+      const [rawKey, rawValue] = parameter.trim().split("=");
+      if (rawKey?.toLowerCase() !== "q") continue;
+      const parsed = Number(rawValue);
+      quality = Number.isFinite(parsed) && parsed >= 0 && parsed <= 1
+        ? parsed
+        : 0;
+    }
+    if (token === name) return quality;
+    if (token === "*") wildcardQuality = quality;
+  }
+  return wildcardQuality ?? 0;
+}
+
+function preferredLargeAssetEncoding(
+  request: Request,
+): CloudflareLargeAssetEncoding | null {
+  const method = request.method.toUpperCase();
+  if ((method !== "GET" && method !== "HEAD") || request.headers.has("range")) {
+    return null;
+  }
+  const accepted = request.headers.get("accept-encoding") ?? "";
+  const brotliQuality = encodingQuality(accepted, "br");
+  const gzipQuality = encodingQuality(accepted, "gzip");
+  if (brotliQuality > 0 && brotliQuality >= gzipQuality) return "br";
+  if (gzipQuality > 0) return "gzip";
+  return null;
+}
+
+function appendVary(headers: Headers, value: string): void {
+  const current = headers.get("vary")
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean) ?? [];
+  if (!current.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
+    current.push(value);
+  }
+  headers.set("vary", current.join(", "));
+}
+
+async function serveCompressedLargeAsset(
+  request: Request,
+  env: CloudflareStaticEnv,
+): Promise<Response | null> {
+  const incoming = new URL(request.url);
+  const descriptor = cloudflareLargeAssetDescriptor(incoming.pathname);
+  const encoding = preferredLargeAssetEncoding(request);
+  if (!descriptor || !encoding) return null;
+
+  const sidecarUrl = new URL(incoming);
+  sidecarUrl.pathname = cloudflareLargeAssetSidecarPath(
+    incoming.pathname,
+    encoding,
+  );
+  const headers = new Headers(request.headers);
+  removePublicReadCredentials(headers);
+  headers.delete("range");
+  headers.delete("if-range");
+  headers.set("accept-encoding", "identity");
+
+  const assetResponse = await env.ASSETS.fetch(new Request(sidecarUrl, {
+    method: request.method,
+    headers,
+    redirect: "manual",
+    signal: request.signal,
+  }));
+  if (assetResponse.status === 404 || assetResponse.status >= 500) {
+    await cancelRetryResponse(assetResponse);
+    return null;
+  }
+
+  const responseHeaders = new Headers(assetResponse.headers);
+  responseHeaders.set("content-encoding", encoding === "br" ? "br" : "gzip");
+  responseHeaders.set("content-type", descriptor.contentType);
+  responseHeaders.set("cache-control", CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL);
+  responseHeaders.set("accept-ranges", "none");
+  responseHeaders.set(
+    "x-toonspectrum-large-asset-source",
+    `static-${encoding}`,
+  );
+  responseHeaders.delete("content-range");
+  appendVary(responseHeaders, "Accept-Encoding");
+
+  const body = request.method.toUpperCase() === "HEAD"
+    || assetResponse.status === 304
+    ? null
+    : assetResponse.body;
+  return withSecurityHeaders(new Response(body, {
+    status: assetResponse.status,
+    statusText: assetResponse.statusText,
+    headers: responseHeaders,
+  }));
+}
+
 function matchesIfNoneMatch(request: Request, httpEtag: string): boolean {
   const raw = request.headers.get("if-none-match");
   if (!raw) return false;
@@ -473,6 +576,12 @@ function r2LargeAssetHeaders(
   return headers;
 }
 
+function r2RangeHeaders(request: Request): Headers | undefined {
+  const range = request.headers.get("range");
+  if (!range || request.headers.has("if-range")) return undefined;
+  return new Headers({ range });
+}
+
 async function serveR2LargeAsset(
   request: Request,
   env: CloudflareStaticEnv,
@@ -480,7 +589,12 @@ async function serveR2LargeAsset(
   const requestUrl = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(requestUrl.pathname);
   const key = cloudflareLargeAssetKey(requestUrl.pathname);
-  if (!descriptor || !key || !env.LARGE_ASSETS) return null;
+  if (
+    !descriptor
+    || !key
+    || !env.LARGE_ASSETS
+    || request.headers.has("if-range")
+  ) return null;
 
   const method = request.method.toUpperCase();
   if (method === "OPTIONS") {
@@ -502,11 +616,12 @@ async function serveR2LargeAsset(
   }
 
   try {
+    const rangeHeaders = r2RangeHeaders(request);
     const object = method === "HEAD"
       ? await env.LARGE_ASSETS.head(key)
       : await env.LARGE_ASSETS.get(
         key,
-        request.headers.has("range") ? { range: request.headers } : undefined,
+        rangeHeaders ? { range: rangeHeaders } : undefined,
       );
     if (!object) return null;
 
@@ -541,6 +656,12 @@ export function createCloudflareStaticGateway(
 
     const route = classifyDynamicRoute(request, requestUrl);
     if (route === "large-asset") {
+      try {
+        const staticResponse = await serveCompressedLargeAsset(request, env);
+        if (staticResponse) return staticResponse;
+      } catch {
+        // Missing or unreadable sidecars continue to R2.
+      }
       const r2Response = await serveR2LargeAsset(request, env);
       if (r2Response) return r2Response;
     }

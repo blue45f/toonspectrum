@@ -25,7 +25,7 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 | playground | `/api/fortune`, `/api/play` | `PLAYGROUND_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
 | admin | `/api/admin` | `ADMIN_API_ORIGIN` | 단일 권위, 자동 failover 없음 |
 | realtime | `/socket.io`, `/api/realtime`, `/api/studio-live` | `REALTIME_API_ORIGIN` | 단일 권위, WebSocket handle 그대로 전달 |
-| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | R2 `LARGE_ASSETS` binding | R2 직접 스트리밍·Range 지원, 객체 누락/장애 시 선택적 `LARGE_ASSET_ORIGIN`으로 안전하게 폴백 |
+| large asset | Static Assets의 25 MiB 제한을 넘는 검토된 WASM/GLB 경로 | 압축 Static Assets + R2 `LARGE_ASSETS` binding | 일반 읽기는 Brotli/gzip sidecar, Range·압축 미지원은 R2, 두 계층 누락/장애 시 `LARGE_ASSET_ORIGIN`으로 폴백 |
 
 공개 읽기 풀은 `cf-ray + path + query`를 affinity key로 사용해 동일 요청을 안정적으로 origin에 배치한다. 첫 origin이 일시적으로 실패한 경우에만 다음 읽기 origin을 시도한다. `POST`, `PUT`, `PATCH`, `DELETE`와 기타 권위 요청은 복수 공급자에 재전송하지 않는다. 이 규칙은 무료 한도를 병렬로 활용하면서 중복 쓰기와 split-brain을 방지한다.
 
@@ -46,7 +46,7 @@ core·social·playground·admin·realtime 요청의 전달 IP는 클라이언트
 - `x-toonspectrum-edge: cloudflare-static-gateway-v2`
 - `x-toonspectrum-edge-route: core | public-read | social | playground | admin | realtime | large-asset`
 - `x-toonspectrum-edge-attempt: 0..n`
-- R2 대형 파일 응답의 `x-toonspectrum-large-asset-source: r2`
+- 대형 파일 응답의 `x-toonspectrum-large-asset-source: static-br | static-gzip | r2`
 
 사용자 credential을 Worker 변수에 저장하지 않는다.
 
@@ -93,11 +93,11 @@ pnpm run cloudflare:static:dry-run
 
 ### 25 MiB 초과 정적 파일
 
-Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB만 `.assetsignore`에 기록한다. 다른 파일이 한도를 넘으면 배포는 실패한다.
+Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB의 Brotli(`.br`)·gzip(`.gz`) sidecar를 생성한다. 원본 대형 파일만 `.assetsignore`에서 제외하고, sidecar가 25 MiB를 넘거나 새로운 미검토 파일이 한도를 넘으면 배포를 중단한다.
 
-두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. 전체 GET, HEAD, byte Range와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. R2 객체가 없거나 일시적으로 읽히지 않을 때만 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다.
+일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다.
 
-`sync:cloudflare-r2-assets:dry-run`은 빌드 산출물과 허용 목록을 검증하고 원격 쓰기를 하지 않는다. 운영 배포에서는 `sync:cloudflare-r2-assets`가 승인된 초과 파일을 R2에 먼저 업로드한 뒤 Worker를 배포한다.
+`sync:cloudflare-r2-assets:dry-run`은 빌드 산출물과 허용 목록을 검증하고 원격 쓰기를 하지 않는다. 운영 배포에서는 `prepare:cloudflare-static-assets`가 sidecar를 만든 뒤 `sync:cloudflare-r2-assets`가 승인된 원본 초과 파일을 R2에 먼저 업로드하고 Worker를 배포한다.
 
 ## 수동 운영 배포
 

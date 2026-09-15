@@ -9,6 +9,10 @@ export const CLOUDFLARE_OVERSIZED_ASSET_IGNORE_PATTERNS = [
   "assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
 ] as const;
 
+export const CLOUDFLARE_LARGE_ASSET_ENCODINGS = ["br", "gzip"] as const;
+export type CloudflareLargeAssetEncoding =
+  (typeof CLOUDFLARE_LARGE_ASSET_ENCODINGS)[number];
+
 export interface CloudflareLargeAssetDescriptor {
   readonly contentType: string;
 }
@@ -38,4 +42,11 @@ export function cloudflareLargeAssetKey(pathname: string): string | null {
   return cloudflareLargeAssetDescriptor(pathname)
     ? pathname.replace(/^\/+/, "")
     : null;
+}
+
+export function cloudflareLargeAssetSidecarPath(
+  pathname: string,
+  encoding: CloudflareLargeAssetEncoding,
+): string {
+  return `${pathname}.${encoding === "br" ? "br" : "gz"}`;
 }
