@@ -17,6 +17,9 @@ import { pingVisit } from "@/shared/lib/visits-api";
 
 import "@toonspectrum/core/fx/fx.css";
 
+const AccessibleTooltipLayer = lazy(() =>
+  import("@/shared/components/AccessibleTooltipLayer").then((mod) => ({ default: mod.AccessibleTooltipLayer })),
+);
 const SiteCreationCompass = lazy(() =>
   import("@/shared/components/site-experience/SiteCreationCompass").then((mod) => ({ default: mod.SiteCreationCompass })),
 );
@@ -109,6 +112,7 @@ export function AppShell({
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname);
   return (
     <AuthSessionProvider>
+      <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
       <RouteScrollRestoration />
       <CreatorContinuityTracker />

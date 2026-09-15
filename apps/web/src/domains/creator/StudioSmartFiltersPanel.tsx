@@ -732,7 +732,7 @@ export function StudioSmartFiltersPanel({
                         title: entry.title,
                         description: entry.description,
                         preview: "filter",
-                        tip: "원본을 보존한 채 스택에 추가되며 나중에 값을 다시 바꿀 수 있어요.",
+                        tip: "모든 계산은 브라우저의 로컬 Worker에서 우선 실행됩니다. 원본을 보존한 채 스택에 추가되며 나중에 값을 다시 바꿀 수 있어요.",
                       }}
                     >
                       <button

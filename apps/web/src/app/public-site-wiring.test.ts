@@ -36,6 +36,12 @@ describe("public shell integration", () => {
     expect(app).not.toContain("sessionStorage.setItem");
   });
 
+  it("loads global tooltip guidance as an immediate non-blocking chunk", () => {
+    expect(shell).toContain("const AccessibleTooltipLayer = lazy(");
+    expect(shell).not.toContain('import { AccessibleTooltipLayer }');
+    expect(shell).toContain("<Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>");
+  });
+
   it("keeps the alternate onward chapter out of the initial application bundle", () => {
     expect(shell).toContain("const SiteNextSteps = lazy(");
     expect(shell).not.toContain('from "@/shared/components/site-experience/site-experience-model"');
