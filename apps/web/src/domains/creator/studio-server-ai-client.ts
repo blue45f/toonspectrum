@@ -1,7 +1,4 @@
-import {
-  completeWithUserTextKey,
-  loadOpenAiCompatibleSettings,
-} from "@/shared/ai/unified-ai-settings";
+import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 
 export type StudioServerAiTask = "composition" | "scenario" | "translation" | "dialogue" | "palette";
 export type StudioServerAiProvider = "zai" | "deepseek" | "openrouter" | "user";
@@ -116,13 +113,12 @@ export async function completeStudioServerText(
   if (!operationId) return { ok: false, code: "invalid_input", error: "AI 요청 식별자가 올바르지 않아요." };
   const result = await completeWithUserTextKey(input.system, input.user, signal);
   if (!result.ok) return { ok: false, code: signal?.aborted ? "network_error" : "http_error", error: result.error };
-  const settings = loadOpenAiCompatibleSettings();
   return {
     ok: true,
     data: {
       content: result.content,
       provider: "user",
-      model: result.model || settings.textModel,
+      model: result.model,
       requestId: `byok:${operationId}`.slice(0, 240),
     },
   };

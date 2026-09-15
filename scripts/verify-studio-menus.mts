@@ -355,21 +355,25 @@ function presentedTitleFor(catalogueGroupId: string): string {
   return group?.caption ?? catalogueGroupId;
 }
 
-/** Left vertical rail — primary tool surface on desktop. */
-const RAIL_TOOLS = [
+/** Left vertical rail — tools that remain while the ninth slot is customized. */
+const PERSISTENT_RAIL_TOOLS = [
   "선택 (V)",
   "펜 (B)",
   "지우개 (E)",
   // Fill: when no raster is selected the aria-label becomes the guard reason (still exposed).
   { anyOf: ["색 채우기 (G)", "래스터 이미지 레이어를 먼저 선택하세요."] },
   "색 가져오기 (I / Alt+클릭)",
-  "스마트 도형",
-  "사각형 도형",
-  "타원 도형",
   "텍스트",
   "말풍선",
   "이미지 추가",
-  "참고 이미지",
+] as const;
+
+/** Optional tools occupy the replaceable ninth slot and therefore cannot coexist. */
+const OPTIONAL_RAIL_TOOLS = [
+  ["smart-shape", "스마트 도형"],
+  ["shape-rect", "사각형 도형"],
+  ["shape-ellipse", "타원 도형"],
+  ["reference", "참고 이미지"],
 ] as const;
 
 /**
@@ -779,25 +783,34 @@ async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
 }
 
 async function assertRailTools(page: Page): Promise<string[]> {
-  // Optional tools start hidden. Expose them through the shipped toolbar settings before
-  // checking the same complete rail; changing preferences directly would bypass this journey.
-  for (const [id, label] of [
-    ["smart-shape", "스마트 도형"],
-    ["shape-rect", "사각형 도형"],
-    ["shape-ellipse", "타원 도형"],
-    ["reference", "참고 이미지"],
-  ]) {
-    const tool = page.locator(`[data-studio-rail-tool-id="${id}"]`);
-    if (await tool.isVisible()) continue;
-    await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
-    const hiddenTools = page.getByRole("dialog", { name: "추가 도구", exact: true });
-    await hiddenTools.getByRole("button", { name: label, exact: true }).click();
-    await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
-    await tool.waitFor({ state: "visible", timeout: 5_000 });
-  }
   const rail = page.locator('[data-studio-tool-rail="true"]');
   const failures: string[] = [];
-  for (const entry of RAIL_TOOLS) {
+
+  // The compact rail has nine visible slots. Adding an optional tool replaces the ninth
+  // slot, so each real More-dialog journey must be verified before the next replacement.
+  for (const [id, label] of OPTIONAL_RAIL_TOOLS) {
+    const tool = rail.locator(`[data-studio-rail-tool-id="${id}"]`);
+    try {
+      if (!(await tool.isVisible().catch(() => false))) {
+        await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
+        const hiddenTools = page.getByRole("dialog", { name: "추가 도구", exact: true });
+        await hiddenTools.getByRole("button", { name: label, exact: true }).click();
+        await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
+        await tool.waitFor({ state: "visible", timeout: 5_000 });
+      }
+      const exposedLabel = await tool.getAttribute("aria-label");
+      if (exposedLabel !== label) {
+        failures.push(`좌측 레일 추가 도구 라벨 불일치: ${label} / 실제: ${exposedLabel ?? "없음"}`);
+      }
+    } catch (error) {
+      failures.push(
+        `좌측 레일 추가 도구 활성화 실패: ${label} (${error instanceof Error ? error.message : String(error)})`,
+      );
+      await page.keyboard.press("Escape").catch(() => undefined);
+    }
+  }
+
+  for (const entry of PERSISTENT_RAIL_TOOLS) {
     if (typeof entry === "string") {
       const byLabel = rail.getByRole("button", { name: entry, exact: true }).first();
       const byTitle = rail.locator(`[title="${entry}"]`).first();

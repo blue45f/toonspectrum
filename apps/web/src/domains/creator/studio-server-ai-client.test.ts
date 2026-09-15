@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_AI_SETTINGS_STORAGE_KEY } from "@/shared/ai/unified-ai-settings";
+import { setUserAiConfiguration } from "@/shared/ai/user-ai-store";
+import { EMPTY_AI_CONFIGURATION } from "@/shared/ai/user-ai-types";
 
 import {
   canonicalStudioServerAiOperationId,
@@ -12,34 +13,34 @@ import {
 
 const OPERATION_ID = "composition-00000000-0000-4000-8000-000000000001";
 
-function memoryStorage(): Storage {
-  const values = new Map<string, string>();
-  return {
-    get length() { return values.size; },
-    clear: () => values.clear(),
-    getItem: (key) => values.get(key) ?? null,
-    key: (index) => [...values.keys()][index] ?? null,
-    removeItem: (key) => { values.delete(key); },
-    setItem: (key, value) => { values.set(key, String(value)); },
-  };
+function configureFreeTextConnection(): void {
+  setUserAiConfiguration({
+    version: 1,
+    connections: [{
+      id: "test-free-text",
+      label: "Test free text provider",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "user-secret-key",
+      imageModel: "",
+      textModel: "text-model",
+      imageGenerationPath: "/images/generations",
+      imageEditPath: "/images/edits",
+      chatCompletionsPath: "/chat/completions",
+      costPolicy: "provider-free-tier",
+    }],
+    assignments: {
+      text: "test-free-text",
+      image: null,
+      inference: null,
+      "three-d": null,
+    },
+  });
 }
 
-function configureUserKey(): void {
-  globalThis.sessionStorage.setItem(STUDIO_AI_SETTINGS_STORAGE_KEY, JSON.stringify({
-    baseUrl: "https://provider.example/v1",
-    apiKey: "user-secret-key",
-    imageModel: "image-model",
-    textModel: "text-model",
-    imageGenerationPath: "/images/generations",
-    imageEditPath: "/images/edits",
-    chatCompletionsPath: "/chat/completions",
-  }));
-}
-
-describe("studio user-funded AI client", () => {
+describe("studio free-only user AI client", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.stubGlobal("sessionStorage", memoryStorage());
+    setUserAiConfiguration(EMPTY_AI_CONFIGURATION);
   });
 
   it("reports that operator-funded server AI is unavailable", async () => {
@@ -61,7 +62,7 @@ describe("studio user-funded AI client", () => {
     expect(canonicalStudioServerAiOperationId("작업-0000000000000000")).toBeNull();
   });
 
-  it("fails before fetch when the user has not configured a key", async () => {
+  it("fails before fetch when no free text connection is assigned", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(completeStudioServerText({
@@ -73,15 +74,15 @@ describe("studio user-funded AI client", () => {
     })).resolves.toEqual({
       ok: false,
       code: "http_error",
-      error: "통합 AI 설정에서 텍스트 API 키와 모델을 등록하세요.",
+      error: "통합 AI 설정에서 무료 연결과 기능 연결을 선택하세요. 운영측 AI나 유료 모델로 대체하지 않습니다.",
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("calls the configured provider directly with the user's key", async () => {
-    configureUserKey();
+  it("calls the configured free-tier provider directly with the user's key", async () => {
+    configureFreeTextConnection();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe("https://provider.example/v1/chat/completions");
+      expect(String(input)).toBe("https://api.groq.com/openai/v1/chat/completions");
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-secret-key");
       expect(init?.credentials).toBe("omit");
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -107,15 +108,15 @@ describe("studio user-funded AI client", () => {
       data: {
         content: "사용자 키 결과",
         provider: "user",
-        model: "text-model-v2",
+        model: "text-model",
         requestId: `byok:${OPERATION_ID}`,
       },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("never reflects the API key from a provider response", async () => {
-    configureUserKey();
+  it("never reflects the API key from a free-provider response", async () => {
+    configureFreeTextConnection();
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       choices: [{ message: { content: "user-secret-key를 숨긴 결과" } }],
     }), { status: 200 })));
@@ -128,7 +129,7 @@ describe("studio user-funded AI client", () => {
       operationId: "dialogue-00000000-0000-4000-8000-000000000002",
     });
     expect(JSON.stringify(result)).not.toContain("user-secret-key");
-    expect(JSON.stringify(result)).toContain("[secret removed]");
+    expect(JSON.stringify(result)).toContain("[비밀정보 제거]");
   });
 
   it("keeps legacy parser metadata allowlisted", () => {
