@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Header,
@@ -18,21 +19,37 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
-import { hashPassword, verifyPassword } from "../../../../web/src/shared/lib/auth-crypto";
+import {
+  hashPassword,
+  isPasswordVerificationInputBounded,
+  passwordPolicyError,
+  verifyPassword,
+} from "../../server/password";
 import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "../../../../web/src/shared/lib/avatar";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
-import { db, users } from "../../db";
+import { accounts, db, sessions, users } from "../../db";
 import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
 } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
-import { resolveEffectiveAdminRole } from "../../server/admin-emails";
+import { normalizePersistedAuthRole } from "../../server/admin-roles";
+import {
+  AuthEmailConfigurationError,
+  AuthEmailDeliveryError,
+  isAuthEmailDeliveryConfigured,
+  sendAuthEmail,
+} from "../../server/auth-email";
+import {
+  consumeAuthOneTimeToken,
+  issueAuthOneTimeToken,
+  revokeAuthOneTimeTokens,
+} from "../../server/auth-one-time-token";
 import {
   oauthPkceVerifierCookieName,
   oauthStateCookieName,
@@ -60,12 +77,17 @@ import {
   issueState,
   listAuthProviders,
   OAuthAccountBlockedError,
+  OAuthAccountLinkRequiredError,
+  OAuthIdentityAlreadyLinkedError,
+  OAuthProviderAlreadyLinkedError,
   providerMode,
+  readOAuthStateContext,
   verifyBrowserBoundState,
   webAppBaseUrl,
   type OAuthProviderId,
 } from "../../server/oauth";
 import {
+  invalidateSessionUser,
   signSession,
   verifySessionToken,
 } from "../../server/session";
@@ -90,6 +112,7 @@ import {
   createAuthRateLimitSubjectFingerprint,
   LocalAuthRateLimiter,
   type AuthRateLimitAction,
+  type AuthRateLimitSubjectKind,
 } from "./auth-rate-limit";
 import {
   AuthRateLimitDependencyError,
@@ -107,9 +130,9 @@ interface AuthPayload {
   name?: unknown;
   avatar?: unknown;
   image?: unknown;
+  token?: unknown;
 }
 
-type AuthRole = "admin" | "creator" | "operator" | "user";
 type AuthResponseUser = ReturnType<typeof authResponseUser>;
 type AuthCompletionResponse = Readonly<{
   ok: true;
@@ -153,6 +176,40 @@ export class AuthController {
     this.rateLimitDistributed = rateLimitConfig.distributed;
     this.clientIpPolicy = clientIpPolicy;
     this.coordination = coordination;
+  }
+
+  private assertAuthEmailDeliveryConfigured(): void {
+    if (!isAuthEmailDeliveryConfigured()) {
+      throw new ServiceUnavailableException({
+        error: "이메일 인증 서비스 설정이 완료되지 않았어요. 잠시 후 다시 시도해 주세요.",
+      });
+    }
+  }
+
+  private async deliverAuthChallenge(
+    purpose: "verify-email" | "reset-password",
+    userId: string,
+    email: string,
+  ): Promise<void> {
+    const rawToken = await issueAuthOneTimeToken(purpose, userId);
+    try {
+      await sendAuthEmail({ purpose, to: email, token: rawToken });
+      this.logger.log({ event: "auth.email.sent", purpose });
+    } catch (error: unknown) {
+      await revokeAuthOneTimeTokens(purpose, userId).catch(() => undefined);
+      this.logger.error({
+        event: "auth.email.failed",
+        purpose,
+        reasonCode: error instanceof AuthEmailConfigurationError
+          ? "configuration"
+          : error instanceof AuthEmailDeliveryError
+            ? `provider-${error.status ?? "network"}`
+            : "unexpected",
+      });
+      throw new ServiceUnavailableException({
+        error: "인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
+      });
+    }
   }
 
   @Get("providers")
@@ -224,6 +281,53 @@ export class AuthController {
     return res.redirect(url);
   }
 
+  @Get("oauth/:provider/link/start")
+  async oauthLinkStart(
+    @Param("provider") provider: string,
+    @Headers("x-user-id") userId: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({
+        error: "계정을 연결하려면 다시 로그인해 주세요.",
+      });
+    }
+    if (!isOAuthProvider(provider)) {
+      throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
+    }
+    await this.enforceRateLimit("account-link", request, userId);
+    const sessionUser = await resolveAuthSessionUser(userId);
+    if (!sessionUser) {
+      throw new UnauthorizedException({
+        error: "계정을 연결하려면 다시 로그인해 주세요.",
+      });
+    }
+    if (!isAuthorizationCodeFlowConfigured(provider)) {
+      throw new ServiceUnavailableException({
+        error: "이 제공자의 계정 연결이 아직 설정되지 않았어요.",
+      });
+    }
+
+    const state = issueState(provider, { purpose: "link", userId });
+    const pkceVerifier = provider === "github" ? issuePkceVerifier() : undefined;
+    const url = buildAuthorizeUrl(provider, state, {
+      ...(pkceVerifier
+        ? { pkceCodeChallenge: createPkceCodeChallenge(pkceVerifier) }
+        : {}),
+    });
+    if (!url) {
+      throw new ServiceUnavailableException({
+        error: "이 제공자의 계정 연결을 시작하지 못했어요.",
+      });
+    }
+    applyOAuthStateCookie(response, provider, state);
+    if (pkceVerifier) {
+      applyOAuthPkceVerifierCookie(response, provider, pkceVerifier);
+    }
+    return response.redirect(url);
+  }
+
   // 제공자 콜백 — code 교환 → 사용자 upsert → HttpOnly 세션 쿠키 발급 후 프론트 복귀.
   // Vercel serverless 인스턴스 사이에는 프로세스 로컬 Map이 공유되지 않으므로, 이 경로는
   // 핸드오프 토큰을 사용하지 않는다. URL fragment에는 PII나 세션 자격 증명을 넣지 않는다.
@@ -255,6 +359,37 @@ export class AuthController {
     }
     if (!state || !verifyBrowserBoundState(provider, state, browserState))
       return res.redirect(`${web}/auth/callback#error=bad_state`);
+    const stateContext = readOAuthStateContext(provider, state);
+    if (!stateContext) {
+      return res.redirect(`${web}/auth/callback#error=bad_state`);
+    }
+    let linkToUserId: string | undefined;
+    if (stateContext.purpose === "link") {
+      const principal = verifySessionToken(
+        resolveSessionCookieValue(request.headers.cookie),
+      );
+      if (!principal || principal.userId !== stateContext.userId) {
+        return res.redirect(`${web}/auth/callback#error=bad_state`);
+      }
+      const [linkingUser] = await db
+        .select({
+          id: users.id,
+          status: users.status,
+          sessionVersion: users.sessionVersion,
+        })
+        .from(users)
+        .where(eq(users.id, principal.userId))
+        .limit(1);
+      if (
+        !linkingUser
+        || getUserAuthBlock(linkingUser)
+        || normalizeSessionVersion(linkingUser.sessionVersion)
+          !== principal.sessionVersion
+      ) {
+        return res.redirect(`${web}/auth/callback#error=bad_state`);
+      }
+      linkToUserId = linkingUser.id;
+    }
     if (provider === "github" && !isValidPkceVerifier(browserPkceVerifier)) {
       return res.redirect(`${web}/auth/callback#error=bad_state`);
     }
@@ -268,19 +403,41 @@ export class AuthController {
     }
     if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
     try {
-      const user = await handleOAuthCallback(
-        provider,
-        code,
-        state,
-        browserPkceVerifier ?? undefined,
-      );
+      const user = linkToUserId
+        ? await handleOAuthCallback(
+            provider,
+            code,
+            state,
+            browserPkceVerifier ?? undefined,
+            { linkToUserId },
+          )
+        : await handleOAuthCallback(
+            provider,
+            code,
+            state,
+            browserPkceVerifier ?? undefined,
+          );
       const token = signSession(
         user.id,
         normalizeSessionVersion(user.sessionVersion),
       );
       applyAuthSessionCookie(res, token);
-      return res.redirect(`${web}/auth/callback#session=1`);
-    } catch {
+      return linkToUserId
+        ? res.redirect(`${web}/auth/callback#linked=${provider}`)
+        : res.redirect(`${web}/auth/callback#session=1`);
+    } catch (caught: unknown) {
+      if (caught instanceof OAuthAccountLinkRequiredError) {
+        return res.redirect(`${web}/auth/callback#error=account_link_required`);
+      }
+      if (caught instanceof OAuthAccountBlockedError) {
+        return res.redirect(`${web}/auth/callback#error=account_blocked`);
+      }
+      if (caught instanceof OAuthIdentityAlreadyLinkedError) {
+        return res.redirect(`${web}/auth/callback#error=identity_already_linked`);
+      }
+      if (caught instanceof OAuthProviderAlreadyLinkedError) {
+        return res.redirect(`${web}/auth/callback#error=provider_already_linked`);
+      }
       this.logOAuthFailure(
         "authorization-code",
         provider,
@@ -323,6 +480,15 @@ export class AuthController {
       if (err instanceof OAuthAccountBlockedError) {
         throw new ForbiddenException({ error: err.publicMessage });
       }
+      if (err instanceof OAuthAccountLinkRequiredError) {
+        throw new HttpException(
+          {
+            code: "ACCOUNT_LINK_REQUIRED",
+            error: "이미 같은 이메일로 가입된 계정이 있어요. 기존 계정으로 로그인한 뒤 Google 계정을 연결해 주세요.",
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
       // DB·외부 라이브러리의 내부 오류 메시지나 자격 증명 세부정보는 응답에 노출하지 않는다.
       this.logOAuthFailure(
         "google-id-token",
@@ -339,6 +505,70 @@ export class AuthController {
       ok: true,
       user: authResponseUser(user),
     };
+  }
+
+  @Post("oauth/google/link")
+  async linkGoogleAccount(
+    @Body(new ZodValidationPipe(GoogleIdTokenDto)) body: GoogleIdTokenDto,
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({
+        error: "Google 계정을 연결하려면 다시 로그인해 주세요.",
+      });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 연결 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-link", request, userId);
+    if (!await resolveAuthSessionUser(userId)) {
+      throw new UnauthorizedException({
+        error: "Google 계정을 연결하려면 다시 로그인해 주세요.",
+      });
+    }
+    try {
+      await handleGoogleIdToken(body.idToken, { linkToUserId: userId });
+    } catch (error: unknown) {
+      if (error instanceof GoogleAuthConfigurationError) {
+        throw new ServiceUnavailableException({
+          error: "Google 계정 연결이 아직 설정되지 않았어요.",
+        });
+      }
+      if (error instanceof GoogleAuthCredentialError) {
+        throw new UnauthorizedException({
+          error: "Google 인증 정보가 만료되었거나 올바르지 않아요.",
+        });
+      }
+      if (error instanceof OAuthAccountBlockedError) {
+        throw new ForbiddenException({ error: error.publicMessage });
+      }
+      if (error instanceof OAuthIdentityAlreadyLinkedError) {
+        throw new HttpException(
+          { code: "IDENTITY_ALREADY_LINKED", error: "이 Google 계정은 다른 회원에게 연결되어 있어요." },
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (error instanceof OAuthProviderAlreadyLinkedError) {
+        throw new HttpException(
+          { code: "PROVIDER_ALREADY_LINKED", error: "이미 다른 Google 계정이 연결되어 있어요." },
+          HttpStatus.CONFLICT,
+        );
+      }
+      this.logOAuthFailure(
+        "google-id-token",
+        "google",
+        "google-id-token-persistence-failed",
+      );
+      throw new ServiceUnavailableException({
+        error: "Google 계정을 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      });
+    }
+    this.logger.log({ event: "auth.account.linked", provider: "google" });
+    return { ok: true, provider: "google" as const };
   }
 
   /**
@@ -419,46 +649,71 @@ export class AuthController {
     @Body() body: AuthPayload,
     @Req() req: Request,
   ) {
-    await this.enforceRateLimit("signup", req);
-    await ensureUserLifecycleSchema();
-
     const email = normalizeEmail(body.email);
     const password = String(body.password ?? "");
-    const name = String(body.name ?? "").trim() || email.split("@")[0];
-    const avatar = resolveSignupAvatar(body.avatar);
-    const image = resolveSignupAvatarImage(body.image);
+    await this.enforceRateLimit("signup", req, email || undefined);
+    await ensureUserLifecycleSchema();
+    this.assertAuthEmailDeliveryConfigured();
 
-    if (!isValidSignupEmail(email))
+    if (!isValidSignupEmail(email)) {
       throw new BadRequestException({
         error: "이메일 형식이 올바르지 않아요.",
       });
-    if (password.length < 6)
-      throw new BadRequestException({
-        error: "비밀번호는 6자 이상이어야 해요.",
-      });
-
-    const [existing] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    if (existing) {
-      throw new HttpException(
-        { error: "이미 가입된 이메일이에요." },
-        HttpStatus.CONFLICT,
-      );
+    }
+    const policyError = passwordPolicyError(password);
+    if (policyError) {
+      throw new BadRequestException({ error: policyError });
     }
 
-    await db
+    const requestedName = String(body.name ?? "").trim().slice(0, 80);
+    const name = requestedName || email.split("@")[0].slice(0, 80);
+    const passwordHash = await hashPassword(password);
+    const [inserted] = await db
       .insert(users)
       .values({
         email,
+        emailVerified: null,
         name,
-        image,
-        avatar,
-        passwordHash: hashPassword(password),
-      });
-    return { ok: true };
+        image: resolveSignupAvatarImage(body.image),
+        avatar: resolveSignupAvatar(body.avatar),
+        passwordHash,
+      })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id, email: users.email });
+
+    if (inserted?.email) {
+      await this.deliverAuthChallenge("verify-email", inserted.id, inserted.email);
+    } else {
+      const [existing] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          emailVerified: users.emailVerified,
+          passwordHash: users.passwordHash,
+          status: users.status,
+        })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (
+        existing?.email
+        && existing.passwordHash
+        && existing.emailVerified === null
+        && existing.status === "active"
+      ) {
+        await this.deliverAuthChallenge(
+          "verify-email",
+          existing.id,
+          existing.email,
+        );
+      }
+    }
+
+    return {
+      ok: true,
+      verificationRequired: true,
+      message: "가입 확인 메일을 확인해 주세요.",
+    };
   }
 
   @Post("login")
@@ -467,22 +722,24 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthCompletionResponse> {
-    await this.enforceRateLimit("login", req);
-    await ensureUserLifecycleSchema();
-
     const email = normalizeEmail(body.email);
     const password = String(body.password ?? "");
-    if (!email || !password)
+    await this.enforceRateLimit("login", req, email || undefined);
+    await ensureUserLifecycleSchema();
+
+    if (!email || !isPasswordVerificationInputBounded(password)) {
       throw new BadRequestException({
         error: "이메일 또는 비밀번호를 확인해 주세요.",
       });
+    }
 
     const [user] = await db
       .select()
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    const credential = await verifyPassword(password, user?.passwordHash);
+    if (!user || !credential.valid) {
       throw new HttpException(
         { error: "이메일 또는 비밀번호를 확인해 주세요." },
         HttpStatus.UNAUTHORIZED,
@@ -490,13 +747,305 @@ export class AuthController {
     }
     const block = getUserAuthBlock(user);
     if (block) throw new HttpException({ error: block }, HttpStatus.FORBIDDEN);
+    if (!user.emailVerified) {
+      throw new HttpException(
+        {
+          code: "EMAIL_VERIFICATION_REQUIRED",
+          error: "이메일 인증을 완료한 뒤 로그인해 주세요.",
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (credential.needsRehash && user.passwordHash) {
+      const upgradedHash = await hashPassword(password);
+      await db
+        .update(users)
+        .set({ passwordHash: upgradedHash })
+        .where(and(
+          eq(users.id, user.id),
+          eq(users.passwordHash, user.passwordHash),
+        ));
+    }
 
     const token = signSession(user.id, normalizeSessionVersion(user.sessionVersion));
     applyAuthSessionCookie(response, token);
+    return { ok: true, user: authResponseUser(user) };
+  }
 
+  @Post("email/verify")
+  async verifyEmail(
+    @Body() body: AuthPayload,
+    @Req() req: Request,
+  ) {
+    const rawToken = typeof body.token === "string" ? body.token.trim() : "";
+    await this.enforceRateLimit(
+      "email-verify",
+      req,
+      rawToken || undefined,
+      "token",
+    );
+    const verifiedUserId = await consumeAuthOneTimeToken(
+      "verify-email",
+      rawToken,
+      async (transaction, userId) => {
+        const [updated] = await transaction
+          .update(users)
+          .set({ emailVerified: new Date() })
+          .where(and(eq(users.id, userId), eq(users.status, "active")))
+          .returning({ id: users.id });
+        return updated?.id ?? null;
+      },
+    );
+    if (!verifiedUserId) {
+      throw new BadRequestException({
+        error: "만료되었거나 이미 사용된 인증 링크예요.",
+      });
+    }
+    invalidateSessionUser(verifiedUserId);
+    this.logger.log({ event: "auth.email.verified" });
+    return { ok: true };
+  }
+
+  @Post("email/verification/resend")
+  async resendEmailVerification(
+    @Body() body: AuthPayload,
+    @Req() req: Request,
+  ) {
+    const email = normalizeEmail(body.email);
+    await this.enforceRateLimit(
+      "email-verification-resend",
+      req,
+      email || undefined,
+    );
+    this.assertAuthEmailDeliveryConfigured();
+    if (isValidSignupEmail(email)) {
+      const [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          emailVerified: users.emailVerified,
+          passwordHash: users.passwordHash,
+          status: users.status,
+        })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (
+        user?.email
+        && user.passwordHash
+        && user.emailVerified === null
+        && user.status === "active"
+      ) {
+        await this.deliverAuthChallenge("verify-email", user.id, user.email);
+      }
+    }
+    return genericEmailDispatchResponse();
+  }
+
+  @Post("password/reset/request")
+  async requestPasswordReset(
+    @Body() body: AuthPayload,
+    @Req() req: Request,
+  ) {
+    const email = normalizeEmail(body.email);
+    await this.enforceRateLimit(
+      "password-reset-request",
+      req,
+      email || undefined,
+    );
+    this.assertAuthEmailDeliveryConfigured();
+    if (isValidSignupEmail(email)) {
+      const [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          emailVerified: users.emailVerified,
+          passwordHash: users.passwordHash,
+          status: users.status,
+        })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (
+        user?.email
+        && user.passwordHash
+        && user.emailVerified
+        && user.status === "active"
+      ) {
+        await this.deliverAuthChallenge("reset-password", user.id, user.email);
+      }
+    }
+    return genericEmailDispatchResponse();
+  }
+
+  @Post("password/reset/confirm")
+  async confirmPasswordReset(
+    @Body() body: AuthPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const rawToken = typeof body.token === "string" ? body.token.trim() : "";
+    const password = String(body.password ?? "");
+    await this.enforceRateLimit(
+      "password-reset-confirm",
+      req,
+      rawToken || undefined,
+      "token",
+    );
+    const policyError = passwordPolicyError(password);
+    if (policyError) throw new BadRequestException({ error: policyError });
+    const passwordHash = await hashPassword(password);
+    const reset = await consumeAuthOneTimeToken(
+      "reset-password",
+      rawToken,
+      async (transaction, userId) => {
+        const [updated] = await transaction
+          .update(users)
+          .set({
+            passwordHash,
+            emailVerified: new Date(),
+            sessionVersion: sql<number>`${users.sessionVersion} + 1`,
+          })
+          .where(and(eq(users.id, userId), eq(users.status, "active")))
+          .returning({
+            id: users.id,
+            sessionVersion: users.sessionVersion,
+          });
+        if (!updated) return null;
+        await transaction.delete(sessions).where(eq(sessions.userId, userId));
+        return updated;
+      },
+    );
+    if (!reset) {
+      throw new BadRequestException({
+        error: "만료되었거나 이미 사용된 비밀번호 재설정 링크예요.",
+      });
+    }
+    invalidateSessionUser(reset.id);
+    clearAuthSessionCookie(response);
+    await this.realtimeRevocation
+      .revokeSessionVersion(reset.id, reset.sessionVersion)
+      .catch(() => this.logger.error({
+        event: "auth.password-reset.realtime-revocation-failed",
+      }));
+    this.logger.log({ event: "auth.password-reset.completed" });
+    return { ok: true };
+  }
+
+  @Get("accounts")
+  async getLinkedAccounts(
+    @Headers("x-user-id") userId: string | undefined,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    const [user] = await db
+      .select({
+        passwordHash: users.passwordHash,
+        emailVerified: users.emailVerified,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user || getUserAuthBlock(user)) {
+      throw new UnauthorizedException({ error: "다시 로그인해 주세요." });
+    }
+    const linked = await db
+      .select({ provider: accounts.provider })
+      .from(accounts)
+      .where(eq(accounts.userId, userId));
+    const providers = [...new Set(
+      linked
+        .map((entry) => entry.provider)
+        .filter((provider): provider is OAuthProviderId => isOAuthProvider(provider)),
+    )];
+    return {
+      password: Boolean(user.passwordHash),
+      emailVerified: Boolean(user.emailVerified),
+      providers,
+      loginMethodCount: providers.length + (user.passwordHash ? 1 : 0),
+    };
+  }
+
+  @Delete("accounts/:provider")
+  async unlinkAccount(
+    @Param("provider") provider: string,
+    @Headers("x-user-id") userId: string | undefined,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isOAuthProvider(provider)) {
+      throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
+    }
+    await this.enforceRateLimit("account-unlink", request, userId);
+    const result = await db.transaction(async (transaction) => {
+      const [user] = await transaction
+        .select({
+          passwordHash: users.passwordHash,
+          status: users.status,
+          sessionVersion: users.sessionVersion,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (!user || getUserAuthBlock(user)) {
+        throw new UnauthorizedException({ error: "다시 로그인해 주세요." });
+      }
+      const links = await transaction
+        .select({ provider: accounts.provider })
+        .from(accounts)
+        .where(eq(accounts.userId, userId));
+      if (!links.some((entry) => entry.provider === provider)) {
+        return { changed: false, sessionVersion: user.sessionVersion };
+      }
+      const methodCount = links.length + (user.passwordHash ? 1 : 0);
+      if (methodCount <= 1) {
+        throw new HttpException(
+          {
+            code: "LAST_LOGIN_METHOD",
+            error: "마지막 로그인 수단은 해제할 수 없어요. 다른 로그인 수단을 먼저 연결해 주세요.",
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+      await transaction
+        .delete(accounts)
+        .where(and(
+          eq(accounts.userId, userId),
+          eq(accounts.provider, provider),
+        ));
+      const [updated] = await transaction
+        .update(users)
+        .set({ sessionVersion: sql<number>`${users.sessionVersion} + 1` })
+        .where(eq(users.id, userId))
+        .returning({ sessionVersion: users.sessionVersion });
+      await transaction.delete(sessions).where(eq(sessions.userId, userId));
+      return {
+        changed: true,
+        sessionVersion: normalizeSessionVersion(updated?.sessionVersion),
+      };
+    });
+
+    if (result.changed) {
+      invalidateSessionUser(userId);
+      clearAuthSessionCookie(response);
+      await this.realtimeRevocation
+        .revokeSessionVersion(userId, result.sessionVersion)
+        .catch(() => this.logger.error({
+          event: "auth.account-unlink.realtime-revocation-failed",
+          provider,
+        }));
+      this.logger.log({ event: "auth.account.unlinked", provider });
+    }
     return {
       ok: true,
-      user: authResponseUser(user),
+      provider,
+      reauthenticationRequired: result.changed,
     };
   }
 
@@ -538,48 +1087,59 @@ export class AuthController {
   private async enforceRateLimit(
     action: AuthRateLimitAction,
     req: Request,
+    secondarySubject?: string,
+    secondaryKind: Exclude<AuthRateLimitSubjectKind, "ip"> = "account",
   ): Promise<void> {
     const policy = AUTH_RATE_LIMIT_POLICIES[action];
     const sourceIp = resolveAuthClientIp(req, this.clientIpPolicy);
-    const identity = `${action}:${sourceIp}`;
+    const subjects: Array<{
+      kind: AuthRateLimitSubjectKind;
+      value: string;
+    }> = [{ kind: "ip", value: sourceIp }];
+    if (secondarySubject?.trim()) {
+      subjects.push({ kind: secondaryKind, value: secondarySubject.trim() });
+    }
 
-    if (!this.rateLimitDistributed) {
-      const decision = AUTH_RATE_LIMIT_LOCAL_LIMITER.consume(
-        identity,
-        policy.limit,
-        AUTH_RATE_LIMIT_WINDOW_MS,
+    for (const subject of subjects) {
+      const fingerprint = createAuthRateLimitSubjectFingerprint(
+        action,
+        subject.value,
+        subject.kind,
       );
-      if (decision.status === "rate-limited") throw authRateLimitExceeded();
-      if (decision.status === "saturated") {
+      if (!this.rateLimitDistributed) {
+        const decision = AUTH_RATE_LIMIT_LOCAL_LIMITER.consume(
+          fingerprint,
+          policy.limit,
+          AUTH_RATE_LIMIT_WINDOW_MS,
+        );
+        if (decision.status === "rate-limited") throw authRateLimitExceeded();
+        if (decision.status === "saturated") {
+          throw new ServiceUnavailableException({
+            error: "인증 요청 한도 검증 용량이 일시적으로 부족합니다.",
+          });
+        }
+        continue;
+      }
+
+      if (!this.coordination) {
         throw new ServiceUnavailableException({
-          error: "인증 요청 한도 검증 용량이 일시적으로 부족합니다.",
+          error: "인증 요청 한도 검증 인프라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.",
         });
       }
-      return;
-    }
-
-    if (!this.coordination) {
-      throw new ServiceUnavailableException({
-        error: "인증 요청 한도 검증 인프라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.",
-      });
-    }
-
-    try {
-      const decision = await this.coordination.consumeRateLimit({
-        scope: "auth",
-        subjectFingerprint: createAuthRateLimitSubjectFingerprint(
-          action,
-          sourceIp,
-        ),
-        maximumRequests: policy.limit,
-        windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
-      });
-      if (!decision.accepted) throw authRateLimitExceeded();
-    } catch (error: unknown) {
-      if (error instanceof HttpException) throw error;
-      throw new ServiceUnavailableException({
-        error: "인증 요청 한도 검증 인프라가 일시적으로 응답하지 않습니다.",
-      });
+      try {
+        const decision = await this.coordination.consumeRateLimit({
+          scope: "auth",
+          subjectFingerprint: fingerprint,
+          maximumRequests: policy.limit,
+          windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+        });
+        if (!decision.accepted) throw authRateLimitExceeded();
+      } catch (error: unknown) {
+        if (error instanceof HttpException) throw error;
+        throw new ServiceUnavailableException({
+          error: "인증 요청 한도 검증 인프라가 일시적으로 응답하지 않습니다.",
+        });
+      }
     }
   }
 }
@@ -588,6 +1148,13 @@ function normalizeEmail(value: unknown) {
   return String(value ?? "")
     .toLowerCase()
     .trim();
+}
+
+function genericEmailDispatchResponse() {
+  return {
+    ok: true,
+    message: "해당 이메일로 처리할 수 있는 계정이 있다면 안내 메일을 보냈어요.",
+  } as const;
 }
 
 function applyOAuthStateCookie(
@@ -657,13 +1224,6 @@ function clearAuthSessionCookie(response: Response): void {
   );
 }
 
-function normalizeRole(value: string | null | undefined): AuthRole {
-  const role = String(value ?? "").toLowerCase();
-  if (role === "admin" || role === "creator" || role === "operator")
-    return role;
-  return "user";
-}
-
 export function authResponseUser(user: {
   readonly id: string;
   readonly name?: string | null;
@@ -671,15 +1231,13 @@ export function authResponseUser(user: {
   readonly image?: string | null;
   readonly role?: string | null;
 }) {
-  // 로그인 직후 응답에도 ADMIN_EMAILS 화이트리스트를 반영한다.
-  // (resolveAuthSessionUser 와 동일 규칙 — 메뉴가 role===admin 만으로도 열리게)
   const email = user.email ?? null;
   return {
     id: user.id,
     name: user.name ?? null,
     email,
     image: user.image ?? null,
-    role: resolveEffectiveAdminRole(normalizeRole(user.role), email),
+    role: normalizePersistedAuthRole(user.role),
   };
 }
 

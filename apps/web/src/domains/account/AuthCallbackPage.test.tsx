@@ -93,6 +93,22 @@ describe("AuthCallbackPage server-issued session completion", () => {
     expect(screen.queryByText("auth.callback.error.failed")).toBeNull();
   });
 
+
+  it("returns an explicit account link callback to security settings", async () => {
+    globalThis.history.replaceState({}, "", "/auth/callback#linked=github");
+    apiRaw.mockResolvedValueOnce(sessionResponse(true));
+
+    render(<AuthCallbackPage />);
+
+    await waitFor(() => expect(completeOAuthLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "google-user-1" }),
+    ));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(
+      "/settings#account-security",
+      { replace: true },
+    ));
+  });
+
   it("fails closed when the marker has no authenticated cookie session", async () => {
     apiRaw.mockResolvedValueOnce(sessionResponse(false));
 

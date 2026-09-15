@@ -32,6 +32,18 @@ const AuthCallbackPage = lazyRetry(
   })),
   "AuthCallbackPage",
 );
+const VerifyEmailPage = lazyRetry(
+  () => import("@/domains/account/VerifyEmailPage").then((module) => ({
+    default: module.VerifyEmailPage,
+  })),
+  "VerifyEmailPage",
+);
+const ResetPasswordPage = lazyRetry(
+  () => import("@/domains/account/ResetPasswordPage").then((module) => ({
+    default: module.ResetPasswordPage,
+  })),
+  "ResetPasswordPage",
+);
 
 const AiSettingsPage = lazyRetry(() => import("@/domains/account/AiSettingsPage").then(module => ({ default: module.AiSettingsPage })), "AiSettingsPage");
 
@@ -45,5 +57,15 @@ export const accountRoutes = defineAppRoutes([
     id: "account-auth-callback",
     path: "/auth/callback",
     element: <AuthCallbackPage />,
+  },
+  {
+    id: "account-verify-email",
+    path: "/auth/verify-email",
+    element: <VerifyEmailPage />,
+  },
+  {
+    id: "account-reset-password",
+    path: "/auth/reset-password",
+    element: <ResetPasswordPage />,
   },
 ]);

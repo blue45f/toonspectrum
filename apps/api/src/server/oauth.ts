@@ -5,8 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 
 import { accounts, db, dbClient, users } from "../db";
 
-import { isWhitelistedAdminEmail, resolveEffectiveAdminRole } from "./admin-emails";
-import { invalidateSessionUser } from "./session";
+import { normalizePersistedAuthRole } from "./admin-roles";
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
 // ── 소셜 로그인(Google·Kakao·Naver·GitHub) ──
@@ -64,6 +63,27 @@ export class OAuthAccountBlockedError extends Error {
   constructor(readonly publicMessage: string) {
     super(publicMessage);
     this.name = "OAuthAccountBlockedError";
+  }
+}
+
+export class OAuthAccountLinkRequiredError extends Error {
+  constructor(readonly provider: OAuthProviderId) {
+    super("an account with this email already exists");
+    this.name = "OAuthAccountLinkRequiredError";
+  }
+}
+
+export class OAuthIdentityAlreadyLinkedError extends Error {
+  constructor(readonly provider: OAuthProviderId) {
+    super("this provider identity is linked to another account");
+    this.name = "OAuthIdentityAlreadyLinkedError";
+  }
+}
+
+export class OAuthProviderAlreadyLinkedError extends Error {
+  constructor(readonly provider: OAuthProviderId) {
+    super("another identity from this provider is already linked");
+    this.name = "OAuthProviderAlreadyLinkedError";
   }
 }
 
@@ -289,9 +309,88 @@ function sign(payload: string): string {
 }
 export const OAUTH_STATE_MAX_LENGTH = 512;
 
-export function issueState(id: OAuthProviderId): string {
-  const payload = `${id}.${randomBytes(16).toString("hex")}.${Date.now()}`;
+export type OAuthStatePurpose = "login" | "link";
+
+export interface OAuthStateContext {
+  readonly purpose: OAuthStatePurpose;
+  readonly userId: string | null;
+}
+
+export function issueState(
+  id: OAuthProviderId,
+  options: { purpose?: OAuthStatePurpose; userId?: string } = {},
+): string {
+  const purpose = options.purpose ?? "login";
+  const userId = options.userId?.trim() || null;
+  if (purpose === "link" && (!userId || userId.length > 128 || /\s/u.test(userId))) {
+    throw new Error("a bounded user id is required for OAuth account linking");
+  }
+  const payload = JSON.stringify({
+    p: id,
+    n: randomBytes(16).toString("hex"),
+    t: Date.now(),
+    m: purpose,
+    ...(userId ? { u: userId } : {}),
+  });
   return `${Buffer.from(payload).toString("base64url")}.${sign(payload)}`;
+}
+
+export function readOAuthStateContext(
+  id: OAuthProviderId,
+  state: string | undefined,
+  maxAgeMs = 10 * 60_000,
+): OAuthStateContext | null {
+  if (!state || state.length > OAUTH_STATE_MAX_LENGTH) return null;
+  const dot = state.lastIndexOf(".");
+  if (dot < 0) return null;
+  const payloadB64 = state.slice(0, dot);
+  const signature = state.slice(dot + 1);
+  let payload: string;
+  try {
+    payload = Buffer.from(payloadB64, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+  const expected = sign(payload);
+  const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  if (
+    actualBytes.length !== expectedBytes.length
+    || !timingSafeEqual(actualBytes, expectedBytes)
+  ) return null;
+
+  let provider: unknown;
+  let nonce: unknown;
+  let issuedAt: unknown;
+  let purpose: unknown = "login";
+  let userId: unknown = null;
+  try {
+    const parsed = JSON.parse(payload) as Record<string, unknown>;
+    provider = parsed.p;
+    nonce = parsed.n;
+    issuedAt = parsed.t;
+    purpose = parsed.m ?? "login";
+    userId = parsed.u ?? null;
+  } catch {
+    const legacy = payload.split(".");
+    [provider, nonce, issuedAt] = legacy;
+  }
+  if (provider !== id || !/^[a-f0-9]{32}$/u.test(String(nonce ?? ""))) {
+    return null;
+  }
+  const issued = Number(issuedAt);
+  const ageMs = Date.now() - issued;
+  if (!Number.isFinite(issued) || ageMs < -60_000 || ageMs >= maxAgeMs) {
+    return null;
+  }
+  if (purpose !== "login" && purpose !== "link") return null;
+  if (purpose === "link") {
+    if (typeof userId !== "string" || !userId || userId.length > 128 || /\s/u.test(userId)) {
+      return null;
+    }
+    return { purpose, userId };
+  }
+  return { purpose: "login", userId: null };
 }
 
 export function verifyState(
@@ -299,30 +398,7 @@ export function verifyState(
   state: string | undefined,
   maxAgeMs = 10 * 60_000,
 ): boolean {
-  if (
-    !state
-    || typeof state !== "string"
-    || state.length > OAUTH_STATE_MAX_LENGTH
-  ) return false;
-  const dot = state.lastIndexOf(".");
-  if (dot < 0) return false;
-  const payloadB64 = state.slice(0, dot);
-  const sig = state.slice(dot + 1);
-  let payload: string;
-  try {
-    payload = Buffer.from(payloadB64, "base64url").toString();
-  } catch {
-    return false;
-  }
-  const expected = sign(payload);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
-  const [pid, nonce, ts] = payload.split(".");
-  if (pid !== id || !/^[a-f0-9]{32}$/u.test(nonce ?? "")) return false;
-  const issued = Number(ts);
-  const ageMs = Date.now() - issued;
-  return Number.isFinite(issued) && ageMs >= -60_000 && ageMs < maxAgeMs;
+  return readOAuthStateContext(id, state, maxAgeMs) !== null;
 }
 
 export function verifyBrowserBoundState(
@@ -403,13 +479,13 @@ interface NormalizedProfile {
 }
 
 export function canAutoLinkOAuthEmail(
-  provider: OAuthProviderId,
-  emailVerified: boolean | undefined,
+  _provider: OAuthProviderId,
+  _emailVerified: boolean | undefined,
 ): boolean {
-  // Naver returns a consented profile email but no provider assertion that the
-  // address is verified. Never merge it into an existing account implicitly;
-  // linking requires a separate authenticated, explicit account-link flow.
-  return provider !== "naver" && emailVerified === true;
+  // Email is mutable profile data, not a stable provider identity. Even a
+  // provider-verified email must never merge into an existing local account
+  // without an authenticated, explicit account-link flow.
+  return false;
 }
 
 function normalizedEmail(value: unknown): string | null {
@@ -619,71 +695,91 @@ function avatarFor(seed: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-// 프로필 → user/account upsert. 검증된 이메일만 기존 계정에 연결하고, 없으면 공급자 ID 기반 계정을 생성.
+// 프로필 → user/account upsert. 제공자 subject만 로그인 정체성으로 사용한다.
+// 검증된 이메일은 새 계정의 연락처로만 저장하며 기존 계정과 자동 병합하지 않는다.
 async function upsertOAuthUser(
   id: OAuthProviderId,
   profile: NormalizedProfile,
 ): Promise<OAuthUser> {
   await ensureOAuthTables();
-  const mayLinkByEmail = canAutoLinkOAuthEmail(id, profile.emailVerified);
-  const email = mayLinkByEmail && profile.email
-    ? profile.email
-    : `${id}_${profile.providerAccountId}@${id}.local`;
+  const trustedEmail = profile.emailVerified === true ? profile.email : null;
+  const email = trustedEmail
+    ?? `${id}_${profile.providerAccountId}@${id}.local`;
   const name = profile.name ?? providerConfig(id).label;
+  const accountPredicate = and(
+    eq(accounts.provider, id),
+    eq(accounts.providerAccountId, profile.providerAccountId),
+  );
 
-  const [linked] = await db
-    .select({ userId: accounts.userId })
-    .from(accounts)
-    .where(and(eq(accounts.provider, id), eq(accounts.providerAccountId, profile.providerAccountId)))
-    .limit(1);
+  const userId = await db.transaction(async (transaction) => {
+    const findLinkedUserId = async (): Promise<string | null> => {
+      const [linked] = await transaction
+        .select({ userId: accounts.userId })
+        .from(accounts)
+        .where(accountPredicate)
+        .limit(1);
+      return linked?.userId ?? null;
+    };
 
-  let userId = linked?.userId;
-  if (!userId) {
-    const [byEmail] = mayLinkByEmail
-      ? await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1)
-      : [];
-    if (byEmail) {
-      userId = byEmail.id;
-    } else {
-      const candidateUserId = randomUUID();
-      const [insertedUser] = await db
-        .insert(users)
-        .values({
-          id: candidateUserId,
-          email,
-          name,
-          image: profile.image ?? null,
-          avatar: avatarFor(email),
-          role: "user",
-        })
-        .onConflictDoNothing({ target: users.email })
-        .returning({ id: users.id });
-      if (insertedUser) {
-        userId = insertedUser.id;
-      } else {
-        // A concurrent first login may have inserted the same unique email.
-        // Only the existing verified-link policy may adopt that authoritative row.
-        const [authoritativeUser] = mayLinkByEmail
-          ? await db
-              .select({ id: users.id })
-              .from(users)
-              .where(eq(users.email, email))
-              .limit(1)
-          : [];
-        if (!authoritativeUser) {
-          throw new Error("oauth user conflict could not be resolved");
-        }
-        userId = authoritativeUser.id;
+    const alreadyLinkedUserId = await findLinkedUserId();
+    if (alreadyLinkedUserId) return alreadyLinkedUserId;
+
+    if (trustedEmail) {
+      const [existingEmailOwner] = await transaction
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, trustedEmail))
+        .limit(1);
+      if (existingEmailOwner) {
+        // A concurrent callback for the same provider subject may have completed
+        // between the first account lookup and the email lookup. Only that exact
+        // provider identity may win automatically; unrelated accounts must link
+        // from an already authenticated session.
+        const racedLinkedUserId = await findLinkedUserId();
+        if (racedLinkedUserId) return racedLinkedUserId;
+        throw new OAuthAccountLinkRequiredError(id);
       }
     }
-    await db
+
+    const candidateUserId = randomUUID();
+    const [insertedUser] = await transaction
+      .insert(users)
+      .values({
+        id: candidateUserId,
+        email,
+        emailVerified: trustedEmail ? new Date() : null,
+        name,
+        image: profile.image ?? null,
+        avatar: avatarFor(email),
+        role: "user",
+      })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
+
+    let accountOwnerCandidateId = insertedUser?.id ?? null;
+    if (!accountOwnerCandidateId) {
+      const racedLinkedUserId = await findLinkedUserId();
+      if (racedLinkedUserId) return racedLinkedUserId;
+      if (trustedEmail) throw new OAuthAccountLinkRequiredError(id);
+
+      // Provider-scoped placeholder addresses are deterministic and cannot be
+      // supplied by the user. Reusing one only repairs a prior interrupted
+      // provider-subject insert; it never merges a user-controlled email.
+      const [providerScopedUser] = await transaction
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (!providerScopedUser) {
+        throw new Error("oauth user conflict could not be resolved");
+      }
+      accountOwnerCandidateId = providerScopedUser.id;
+    }
+
+    await transaction
       .insert(accounts)
       .values({
-        userId,
+        userId: accountOwnerCandidateId,
         type: "oauth",
         provider: id,
         providerAccountId: profile.providerAccountId,
@@ -692,23 +788,16 @@ async function upsertOAuthUser(
         target: [accounts.provider, accounts.providerAccountId],
       });
 
-    // The composite provider key, not this request's candidate user, owns the
-    // final linkage when concurrent valid callbacks race.
-    const [authoritativeAccount] = await db
-      .select({ userId: accounts.userId })
-      .from(accounts)
-      .where(
-        and(
-          eq(accounts.provider, id),
-          eq(accounts.providerAccountId, profile.providerAccountId),
-        ),
-      )
-      .limit(1);
-    if (!authoritativeAccount) {
+    const authoritativeUserId = await findLinkedUserId();
+    if (!authoritativeUserId) {
       throw new Error("oauth account conflict could not be resolved");
     }
-    userId = authoritativeAccount.userId;
-  }
+
+    if (insertedUser && authoritativeUserId !== insertedUser.id) {
+      await transaction.delete(users).where(eq(users.id, insertedUser.id));
+    }
+    return authoritativeUserId;
+  });
 
   // 레거시 구현이 저장했던 공급자 토큰도 해당 계정의 다음 로그인에서 제거한다.
   // 사용자 로그인에는 ToonSpectrum 자체 세션만 필요하며 외부 장기 자격 증명을 보존하지 않는다.
@@ -723,26 +812,14 @@ async function upsertOAuthUser(
       id_token: null,
       session_state: null,
     })
-    .where(
-      and(
-        eq(accounts.provider, id),
-        eq(accounts.providerAccountId, profile.providerAccountId),
-      ),
-    );
+    .where(accountPredicate);
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const block = getUserAuthBlock(user);
   if (block) throw new OAuthAccountBlockedError(block);
 
   const resolvedEmail = user?.email ?? email;
-  const dbRole = normalizeRole(user?.role);
-  const role = resolveEffectiveAdminRole(dbRole, resolvedEmail);
-
-  // 화이트리스트 계정은 로그인 시점에 DB role 을 admin 으로 지연 승격한다.
-  if (role === "admin" && dbRole !== "admin" && isWhitelistedAdminEmail(resolvedEmail)) {
-    await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
-    invalidateSessionUser(userId);
-  }
+  const role = normalizePersistedAuthRole(user?.role);
 
   return {
     id: userId,
@@ -754,24 +831,107 @@ async function upsertOAuthUser(
   };
 }
 
-function normalizeRole(value: string | null | undefined): string {
-  const role = String(value ?? "").toLowerCase();
-  return ["admin", "creator", "operator"].includes(role) ? role : "user";
+async function linkOAuthUser(
+  id: OAuthProviderId,
+  profile: NormalizedProfile,
+  targetUserId: string,
+): Promise<OAuthUser> {
+  await ensureOAuthTables();
+  const [targetUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, targetUserId))
+    .limit(1);
+  const block = getUserAuthBlock(targetUser);
+  if (!targetUser || block) {
+    throw new OAuthAccountBlockedError(
+      block ?? "연결할 사용자 계정을 찾을 수 없어요.",
+    );
+  }
+
+  await db.transaction(async (transaction) => {
+    const [identityOwner] = await transaction
+      .select({ userId: accounts.userId })
+      .from(accounts)
+      .where(and(
+        eq(accounts.provider, id),
+        eq(accounts.providerAccountId, profile.providerAccountId),
+      ))
+      .limit(1);
+    if (identityOwner?.userId === targetUserId) return;
+    if (identityOwner) throw new OAuthIdentityAlreadyLinkedError(id);
+
+    const [existingProviderLink] = await transaction
+      .select({ providerAccountId: accounts.providerAccountId })
+      .from(accounts)
+      .where(and(
+        eq(accounts.userId, targetUserId),
+        eq(accounts.provider, id),
+      ))
+      .limit(1);
+    if (existingProviderLink) throw new OAuthProviderAlreadyLinkedError(id);
+
+    await transaction
+      .insert(accounts)
+      .values({
+        userId: targetUserId,
+        type: "oauth",
+        provider: id,
+        providerAccountId: profile.providerAccountId,
+      })
+      .onConflictDoNothing();
+
+    const [authoritativeIdentity] = await transaction
+      .select({ userId: accounts.userId })
+      .from(accounts)
+      .where(and(
+        eq(accounts.provider, id),
+        eq(accounts.providerAccountId, profile.providerAccountId),
+      ))
+      .limit(1);
+    if (authoritativeIdentity?.userId !== targetUserId) {
+      throw new OAuthIdentityAlreadyLinkedError(id);
+    }
+
+    if (
+      profile.emailVerified === true
+      && profile.email
+      && targetUser.email === profile.email
+      && !targetUser.emailVerified
+    ) {
+      await transaction
+        .update(users)
+        .set({ emailVerified: new Date() })
+        .where(eq(users.id, targetUserId));
+    }
+  });
+
+  return {
+    id: targetUser.id,
+    name: targetUser.name ?? profile.name,
+    email: targetUser.email ?? profile.email,
+    image: targetUser.image ?? profile.image,
+    role: normalizePersistedAuthRole(targetUser.role),
+    sessionVersion: normalizeSessionVersion(targetUser.sessionVersion),
+  };
 }
 
-// 실제 OAuth 콜백 처리: code → token → profile → upsert.
+// 실제 OAuth 콜백 처리: code → token → profile → 로그인 또는 명시적 연결.
 export async function handleOAuthCallback(
   id: OAuthProviderId,
   code: string,
   state: string,
   pkceVerifier?: string,
+  options: { linkToUserId?: string } = {},
 ): Promise<OAuthUser> {
   const tokens = await exchangeCode(id, code, state, pkceVerifier);
   const accessToken = tokens.access_token as string | undefined;
   if (!accessToken) throw new Error("no access_token");
   const profile = await fetchProfile(id, accessToken);
-  // 로그인 전용 OAuth 토큰은 저장하지 않는다. 제공자 신원을 확인한 뒤 자체 HttpOnly 세션을 발급한다.
-  return upsertOAuthUser(id, profile);
+  // 로그인 전용 OAuth 토큰은 저장하지 않는다. 제공자 신원을 확인한 뒤 자체 HttpOnly 세션을 사용한다.
+  return options.linkToUserId
+    ? linkOAuthUser(id, profile, options.linkToUserId)
+    : upsertOAuthUser(id, profile);
 }
 
 // ── Google Identity Services(GIS): ID 토큰 검증 ──
@@ -827,11 +987,16 @@ export async function verifyGoogleIdToken(idToken: string): Promise<NormalizedPr
   };
 }
 
-// GIS 로그인 처리: ID 토큰 검증 → user/account upsert. Google 전용 흐름.
-export async function handleGoogleIdToken(idToken: string): Promise<OAuthUser> {
+// GIS 로그인/연결 처리: ID 토큰 검증 후 제공자 subject만 사용한다.
+export async function handleGoogleIdToken(
+  idToken: string,
+  options: { linkToUserId?: string } = {},
+): Promise<OAuthUser> {
   const profile = await verifyGoogleIdToken(idToken);
   // ID 토큰은 로그인 순간의 검증 증명일 뿐 장기 자격 증명이 아니다. 검증 후 원문을 저장하지 않는다.
-  return upsertOAuthUser("google", profile);
+  return options.linkToUserId
+    ? linkOAuthUser("google", profile, options.linkToUserId)
+    : upsertOAuthUser("google", profile);
 }
 
 // 데모 폴백: 실제 제공자 연동 없이 명확히 [데모] 표시된 사용자 생성/재사용.

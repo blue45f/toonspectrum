@@ -241,12 +241,12 @@ describe("OAuth provider 유틸", () => {
     );
   });
 
-  it("네이버 프로필 이메일은 검증 표시가 있어도 자동 계정 병합에 사용하지 않는다", () => {
+  it("모든 제공자 이메일은 검증 여부와 무관하게 자동 계정 병합에 사용하지 않는다", () => {
     expect(canAutoLinkOAuthEmail("naver", true)).toBe(false);
     expect(canAutoLinkOAuthEmail("naver", false)).toBe(false);
-    expect(canAutoLinkOAuthEmail("google", true)).toBe(true);
-    expect(canAutoLinkOAuthEmail("kakao", true)).toBe(true);
-    expect(canAutoLinkOAuthEmail("github", true)).toBe(true);
+    expect(canAutoLinkOAuthEmail("google", true)).toBe(false);
+    expect(canAutoLinkOAuthEmail("kakao", true)).toBe(false);
+    expect(canAutoLinkOAuthEmail("github", true)).toBe(false);
   });
 
   it("GitHub 이메일은 primary verified를 우선하고 미검증 주소를 거부한다", () => {

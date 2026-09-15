@@ -17,6 +17,7 @@ const SECRET = "fixture-signing-secret-with-at-least-32-bytes";
 const FAKE_DB = "postgresql://fixture:fixture@127.0.0.1:1/fixture";
 const fixtureKeys = [
   "DATABASE_URL", "AUTH_SESSION_SECRET", "AUTH_STATE_SECRET", "AUTH_SECRET", "BETTER_AUTH_SECRET",
+  "AUTH_EMAIL_PROVIDER", "AUTH_EMAIL_FROM", "AUTH_EMAIL_REPLY_TO", "RESEND_API_KEY",
   "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "KAKAO_REST_API_KEY", "KAKAO_CLIENT_SECRET",
   "NAVER_OAUTH_CLIENT_ID", "NAVER_OAUTH_CLIENT_SECRET", "WEB_APP_BASE_URL", "OAUTH_REDIRECT_BASE_URL",
   "KAKAO_OAUTH_CLIENT_ID", "KAKAO_OAUTH_CLIENT_SECRET", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
@@ -313,6 +314,9 @@ describe("production readiness workflow", () => {
     expect(steps.some((step) => /vercel\s+(?:deploy|build)/u.test(step.run ?? ""))).toBe(false);
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_SESSION_SECRET_VALUE).toBe("${{ secrets.AUTH_SESSION_SECRET }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_STATE_SECRET_VALUE).toBe("${{ secrets.AUTH_STATE_SECRET }}");
+    expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_EMAIL_PROVIDER_VALUE).toBe("${{ vars.AUTH_EMAIL_PROVIDER }}");
+    expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_EMAIL_FROM_VALUE).toBe("${{ vars.AUTH_EMAIL_FROM }}");
+    expect(workflow.jobs["reconcile-and-deploy"].env.RESEND_API_KEY_VALUE).toBe("${{ secrets.RESEND_API_KEY }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.GITHUB_OAUTH_CLIENT_ID_VALUE).toBe("${{ secrets.TOONSTUDIO_GITHUB_OAUTH_CLIENT_ID }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.GITHUB_OAUTH_CLIENT_SECRET_VALUE).toBe("${{ secrets.TOONSTUDIO_GITHUB_OAUTH_CLIENT_SECRET }}");
     expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE).toBe(
