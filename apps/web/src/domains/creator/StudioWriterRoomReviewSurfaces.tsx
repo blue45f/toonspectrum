@@ -34,6 +34,9 @@ import type { StudioCharacterBibleEntry } from "./studio-character-bible";
 const FAILOVER_PROVIDER_LABELS = {
   gemini: "Gemini 무료",
   groq: "Groq 무료",
+  sambanova: "SambaNova 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
+  mistral: "Mistral 무료 모드",
   openrouter: "OpenRouter 무료",
   user: "내 무료 AI",
   zai: "Z.ai",

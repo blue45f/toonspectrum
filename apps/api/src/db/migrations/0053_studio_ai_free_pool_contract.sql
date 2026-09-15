@@ -1,8 +1,8 @@
--- Expand the Studio AI persistence contract for the reviewed three-provider
--- shared free pool. The API may attempt Gemini, Groq, then OpenRouter only after
--- a definitive pre-inference free-quota rejection, so receipts and usage rows
--- must permit three attempts. The unified assistant task and free providers are
--- also first-class ledger values.
+-- Expand the Studio AI persistence contract for the reviewed six-provider
+-- shared free pool. The API may attempt Gemini, Groq, SambaNova, Cloudflare,
+-- Mistral, then OpenRouter only after a definitive pre-inference free-quota
+-- rejection, so receipts and usage rows must permit six attempts. The unified
+-- assistant task and free providers are also first-class ledger values.
 
 BEGIN;
 
@@ -13,7 +13,7 @@ ALTER TABLE "studio_ai_request_receipt"
 
 ALTER TABLE "studio_ai_request_receipt"
   ADD CONSTRAINT "studio_ai_request_receipt_attempt_count_check"
-  CHECK ("attemptCount" BETWEEN 0 AND 3) NOT VALID;
+  CHECK ("attemptCount" BETWEEN 0 AND 6) NOT VALID;
 
 ALTER TABLE "studio_ai_request_receipt"
   VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check";
@@ -29,9 +29,12 @@ ALTER TABLE "studio_ai_usage_ledger"
       'assistant', 'composition', 'scenario', 'translation', 'dialogue', 'palette'
     )) NOT VALID,
   ADD CONSTRAINT "studio_ai_usage_provider_check"
-    CHECK (provider IN ('gemini', 'groq', 'openrouter', 'zai', 'deepseek')) NOT VALID,
+    CHECK (provider IN (
+      'gemini', 'groq', 'sambanova', 'cloudflare', 'mistral',
+      'openrouter', 'zai', 'deepseek'
+    )) NOT VALID,
   ADD CONSTRAINT "studio_ai_usage_attempt_count_check"
-    CHECK ("attemptCount" BETWEEN 1 AND 3) NOT VALID;
+    CHECK ("attemptCount" BETWEEN 1 AND 6) NOT VALID;
 
 ALTER TABLE "studio_ai_usage_ledger"
   VALIDATE CONSTRAINT "studio_ai_usage_task_check",

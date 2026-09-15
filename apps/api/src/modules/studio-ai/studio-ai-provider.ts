@@ -1,6 +1,14 @@
 import type { StudioAiProviderPreference } from "./studio-ai.dto";
 
-export const STUDIO_AI_FREE_PROVIDER_IDS = ["gemini", "groq", "openrouter"] as const;
+export const STUDIO_AI_FREE_PROVIDER_IDS = [
+  "gemini",
+  "groq",
+  "sambanova",
+  "cloudflare",
+  "mistral",
+  "openrouter",
+] as const;
+export const STUDIO_AI_MAX_PROVIDER_ATTEMPTS = STUDIO_AI_FREE_PROVIDER_IDS.length;
 const STUDIO_AI_LEGACY_TEST_PROVIDER_IDS = ["zai", "deepseek"] as const;
 export const STUDIO_AI_PROVIDER_IDS = [
   ...STUDIO_AI_FREE_PROVIDER_IDS,
@@ -9,6 +17,12 @@ export const STUDIO_AI_PROVIDER_IDS = [
 
 export type StudioAiProviderId = (typeof STUDIO_AI_PROVIDER_IDS)[number];
 export type StudioAiFreeProviderId = (typeof STUDIO_AI_FREE_PROVIDER_IDS)[number];
+
+function isStudioAiFreeProviderId(
+  id: StudioAiProviderId,
+): id is StudioAiFreeProviderId {
+  return STUDIO_AI_FREE_PROVIDER_IDS.includes(id as StudioAiFreeProviderId);
+}
 
 export interface StudioAiProviderConfig {
   id: StudioAiProviderId;
@@ -47,6 +61,9 @@ type EnvLike = Partial<Record<string, string | undefined>>;
 const DEFAULT_FREE_PROVIDER_ORDER: readonly StudioAiFreeProviderId[] = [
   "gemini",
   "groq",
+  "sambanova",
+  "cloudflare",
+  "mistral",
   "openrouter",
 ];
 const DEFAULT_LEGACY_PROVIDER_ORDER: readonly StudioAiProviderId[] = [
@@ -80,6 +97,22 @@ function isOpenRouterFreeModel(model: string): boolean {
   return normalized === "openrouter/free" || normalized.endsWith(":free");
 }
 
+const CLOUDFLARE_ACCOUNT_ID = /^[a-f0-9]{32}$/iu;
+const CLOUDFLARE_PAID_ONLY_MODELS = new Set([
+  "@cf/moonshotai/kimi-k2.6",
+  "@cf/moonshotai/kimi-k2.7-code",
+  "@cf/zai-org/glm-5.2",
+  "@cf/zai-org/glm-5.3",
+  "@cf/zai-org/glm-5.3-flash",
+  "@cf/deepseek-ai/deepseek-v4-flash-0731",
+  "@cf/deepseek-ai/deepseek-v4-pro-0813",
+]);
+
+function isCloudflareWorkersFreeModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.startsWith("@cf/") && !CLOUDFLARE_PAID_ONLY_MODELS.has(normalized);
+}
+
 function freeProviderConfig(
   id: StudioAiFreeProviderId,
   env: EnvLike,
@@ -106,6 +139,48 @@ function freeProviderConfig(
       endpoint: "https://api.groq.com/openai/v1/chat/completions",
       apiKey,
       model: boundedText(env.STUDIO_AI_FREE_GROQ_MODEL, "openai/gpt-oss-120b", 200),
+      freePool: true,
+    };
+  }
+  if (id === "sambanova") {
+    const apiKey = env.STUDIO_AI_FREE_SAMBANOVA_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "SambaNova 무료",
+      configured: poolEnabled && enabled(env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED) && apiKey.length > 0,
+      endpoint: "https://api.sambanova.ai/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_SAMBANOVA_MODEL, "gpt-oss-120b", 200),
+      freePool: true,
+    };
+  }
+  if (id === "cloudflare") {
+    const apiKey = env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN?.trim() ?? "";
+    const accountId = env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID?.trim() ?? "";
+    const model = boundedText(env.STUDIO_AI_FREE_CLOUDFLARE_MODEL, "@cf/openai/gpt-oss-120b", 200);
+    return {
+      id,
+      label: "Cloudflare Workers AI 무료",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED)
+        && apiKey.length > 0
+        && CLOUDFLARE_ACCOUNT_ID.test(accountId)
+        && isCloudflareWorkersFreeModel(model),
+      endpoint: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`,
+      apiKey,
+      model,
+      freePool: true,
+    };
+  }
+  if (id === "mistral") {
+    const apiKey = env.STUDIO_AI_FREE_MISTRAL_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "Mistral 무료 모드",
+      configured: poolEnabled && enabled(env.STUDIO_AI_FREE_MISTRAL_CONFIRMED) && apiKey.length > 0,
+      endpoint: "https://api.mistral.ai/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_MISTRAL_MODEL, "mistral-small-latest", 200),
       freePool: true,
     };
   }
@@ -166,11 +241,11 @@ function legacyTestProviderConfig(
 }
 
 function providerConfig(id: StudioAiProviderId, env: EnvLike): StudioAiProviderConfig {
-  if (id === "gemini" || id === "groq") return freeProviderConfig(id, env);
-  if (id === "openrouter") {
-    return studioAiFreePoolEnabled(env)
-      ? freeProviderConfig(id, env)
-      : legacyTestProviderConfig(id, env);
+  if (isStudioAiFreeProviderId(id)) {
+    if (id === "openrouter" && !studioAiFreePoolEnabled(env)) {
+      return legacyTestProviderConfig(id, env);
+    }
+    return freeProviderConfig(id, env);
   }
   return legacyTestProviderConfig(id, env);
 }
@@ -241,13 +316,19 @@ export function resolveStudioAiTimeoutMs(
     ? env.STUDIO_AI_FREE_GEMINI_TIMEOUT_MS
     : firstProvider === "groq"
       ? env.STUDIO_AI_FREE_GROQ_TIMEOUT_MS
-      : firstProvider === "openrouter" && studioAiFreePoolEnabled(env)
-        ? env.STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS
-        : firstProvider === "zai"
-          ? env.ZAI_TIMEOUT_MS
-          : firstProvider === "openrouter"
-            ? env.OPENROUTER_TIMEOUT_MS
-            : env.DEEPSEEK_TIMEOUT_MS;
+      : firstProvider === "sambanova"
+        ? env.STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS
+        : firstProvider === "cloudflare"
+          ? env.STUDIO_AI_FREE_CLOUDFLARE_TIMEOUT_MS
+          : firstProvider === "mistral"
+            ? env.STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS
+            : firstProvider === "openrouter" && studioAiFreePoolEnabled(env)
+              ? env.STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS
+              : firstProvider === "zai"
+                ? env.ZAI_TIMEOUT_MS
+                : firstProvider === "openrouter"
+                  ? env.OPENROUTER_TIMEOUT_MS
+                  : env.DEEPSEEK_TIMEOUT_MS;
   const parsed = Number(env.STUDIO_AI_TIMEOUT_MS ?? providerTimeout);
   return Number.isFinite(parsed) && parsed >= 5_000 && parsed <= 120_000
     ? Math.round(parsed)
@@ -289,7 +370,7 @@ export function classifyStudioAiProviderFailure(
   provider: StudioAiProviderId,
   responseStatus: number,
   payload?: unknown,
-  freePool = provider === "gemini" || provider === "groq",
+  freePool = STUDIO_AI_FREE_PROVIDER_IDS.includes(provider as StudioAiFreeProviderId),
 ): StudioAiProviderFailureClassification {
   const businessCode = studioAiProviderBusinessCode(payload);
   const freeProvider = freePool;

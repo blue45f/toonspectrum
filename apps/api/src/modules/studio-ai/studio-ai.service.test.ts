@@ -48,6 +48,20 @@ function configureSharedFreePool(): void {
   process.env.STUDIO_AI_FREE_OPENROUTER_MODEL = "openrouter/free";
 }
 
+function configureExtendedSharedFreePool(): void {
+  configureSharedFreePool();
+  process.env.STUDIO_AI_FREE_PROVIDER_ORDER =
+    "gemini,groq,sambanova,cloudflare,mistral,openrouter";
+  process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY = "sambanova-test-value";
+  process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED = "true";
+  process.env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN = "cloudflare-test-value";
+  process.env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID =
+    "0123456789abcdef0123456789abcdef";
+  process.env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED = "true";
+  process.env.STUDIO_AI_FREE_MISTRAL_API_KEY = "mistral-test-value";
+  process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED = "true";
+}
+
 async function captureHttpException(promise: Promise<unknown>): Promise<HttpException> {
   try {
     await promise;
@@ -185,6 +199,16 @@ describe("StudioAiService", () => {
     delete process.env.STUDIO_AI_FREE_GROQ_API_KEY;
     delete process.env.STUDIO_AI_FREE_GROQ_MODEL;
     delete process.env.STUDIO_AI_FREE_GROQ_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_MODEL;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_MODEL;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_API_KEY;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_MODEL;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_MODEL;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED;
@@ -956,6 +980,56 @@ describe("StudioAiService", () => {
 
     expect(error.getStatus()).toBe(502);
     expect(JSON.stringify(error.getResponse())).not.toContain("postgres release connection detail");
+  });
+
+  it("확장 무료 풀은 다섯 경로 소진 뒤 여섯 번째 OpenRouter까지 안전하게 전환한다", async () => {
+    configureExtendedSharedFreePool();
+    let attempt = 0;
+    const fetchMock = vi.fn(async () => {
+      attempt += 1;
+      if (attempt < 6) {
+        return new Response('{"error":{"message":"free capacity unavailable"}}', {
+          status: 429,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          id: "openrouter-free-request-6",
+          model: "openrouter/free",
+          choices: [{ finish_reason: "stop", message: { content: "여섯 번째 무료 경로 완료" } }],
+          usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, finalize, markSent, markSucceeded } = createService();
+
+    await expect(complete(service, "studio-user-six-free-providers")).resolves.toMatchObject({
+      content: "여섯 번째 무료 경로 완료",
+      provider: "openrouter",
+      requestId: "openrouter-free-request-6",
+      failover: {
+        attemptedProvider: "mistral",
+        actualProvider: "openrouter",
+        reason: "free_quota_exhausted",
+      },
+    });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "https://api.groq.com/openai/v1/chat/completions",
+      "https://api.sambanova.ai/v1/chat/completions",
+      "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1/chat/completions",
+      "https://api.mistral.ai/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
+    ]);
+    expect(markSent).toHaveBeenCalledTimes(6);
+    expect(markSucceeded).toHaveBeenCalledOnce();
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "openrouter",
+      attemptCount: 6,
+      status: "success",
+    }));
   });
 
   it("공유 무료 풀은 Gemini와 Groq 한도 소진 뒤 세 번째 OpenRouter까지 전환한다", async () => {

@@ -220,6 +220,36 @@ describe("Studio AI quota environment validation", () => {
   });
 });
 
+describe("Studio AI shared free provider environment validation", () => {
+  it("accepts the six-provider order and a canonical Cloudflare account ID", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    expect(validateEnv({
+      NODE_ENV: "test",
+      STUDIO_AI_FREE_PROVIDER_ORDER:
+        "gemini,groq,sambanova,cloudflare,mistral,openrouter",
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID:
+        "0123456789abcdef0123456789abcdef",
+      STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+    }, logger)).toMatchObject({
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID:
+        "0123456789abcdef0123456789abcdef",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns non-fatally for an invalid Cloudflare account ID", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    expect(validateEnv({
+      NODE_ENV: "test",
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID: "ACCOUNT_ID",
+    }, logger)).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
 describe("Studio live cluster environment validation", () => {
   it("accepts explicit PostgreSQL adapter settings without logging the direct URL", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };

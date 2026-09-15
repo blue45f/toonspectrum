@@ -84,7 +84,7 @@ describe("studio automatic free AI client", () => {
       providers: [],
       selection: {
         default: "auto",
-        order: ["gemini", "groq", "openrouter"],
+        order: ["gemini", "groq", "sambanova", "cloudflare", "mistral", "openrouter"],
         fallback: true,
         fallbackPolicy: "free_quota_exhausted",
       },
@@ -262,6 +262,19 @@ describe("studio automatic free AI client", () => {
       attemptedModel: "gemini-3.8-flash",
       actualProvider: "groq",
       actualModel: "openai/gpt-oss-120b",
+      reason: "free_quota_exhausted",
+    });
+    expect(parseStudioServerAiFailoverMetadata({
+      attemptedProvider: "sambanova",
+      attemptedModel: "gpt-oss-120b",
+      actualProvider: "cloudflare",
+      actualModel: "@cf/openai/gpt-oss-120b",
+      reason: "free_quota_exhausted",
+    }, { provider: "cloudflare", model: "@cf/openai/gpt-oss-120b" })).toEqual({
+      attemptedProvider: "sambanova",
+      attemptedModel: "gpt-oss-120b",
+      actualProvider: "cloudflare",
+      actualModel: "@cf/openai/gpt-oss-120b",
       reason: "free_quota_exhausted",
     });
     expect(parseStudioServerAiCompletion({

@@ -70,6 +70,16 @@ describe("free-only AI connection policy", () => {
     expect(() => assertFreeAiConnection(groq, "text")).not.toThrow();
     expect(() => assertFreeAiConnection({
       ...groq,
+      baseUrl: "https://api.sambanova.ai/v1",
+      textModel: "gpt-oss-120b",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.mistral.ai/v1",
+      textModel: "mistral-small-latest",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
       baseUrl: "https://api.example.com/v1",
     }, "text")).toThrow(/공식 OpenAI 호환 API/u);
     expect(() => assertFreeAiConnection({
@@ -77,6 +87,29 @@ describe("free-only AI connection policy", () => {
       baseUrl: "https://api.groq.com/v1",
     }, "text")).toThrow(/공식 OpenAI 호환 API/u);
     expect(() => assertFreeAiConnection(groq, "three-d")).toThrow(/텍스트 기능/u);
+  });
+
+  it("allows only Workers Free-compatible Cloudflare paths and models", () => {
+    const cloudflare = {
+      ...connection,
+      baseUrl: "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1",
+      apiKey: "user-key",
+      textModel: "@cf/openai/gpt-oss-120b",
+      costPolicy: "provider-free-tier" as const,
+    };
+    expect(() => assertFreeAiConnection(cloudflare, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...cloudflare,
+      baseUrl: "https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1",
+    }, "text")).toThrow(/공식 OpenAI 호환 API/u);
+    expect(() => assertFreeAiConnection({
+      ...cloudflare,
+      textModel: "@cf/zai-org/glm-5.3",
+    }, "text")).toThrow(/유료 전용/u);
+    expect(() => assertFreeAiConnection({
+      ...cloudflare,
+      textModel: "not-a-cloudflare-model",
+    }, "text")).toThrow(/@cf\//u);
   });
 
   it("does not let public managed APIs masquerade as self-hosted", () => {
@@ -108,8 +141,13 @@ describe("free-only AI connection policy", () => {
   });
 
   it("ships only free-policy presets", () => {
-    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(5);
+    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(8);
     expect(FREE_AI_PRESETS.map((preset) => String(preset.costPolicy))).not.toContain("unverified");
+    expect(FREE_AI_PRESETS.map((preset) => preset.id)).toEqual(expect.arrayContaining([
+      "sambanova-free",
+      "cloudflare-workers-free",
+      "mistral-free",
+    ]));
     expect(FREE_AI_PRESETS.some((preset) => preset.textModel === "openrouter/free")).toBe(true);
     expect(FREE_AI_PRESETS.every((preset) => preset.imageModel === "")).toBe(true);
   });

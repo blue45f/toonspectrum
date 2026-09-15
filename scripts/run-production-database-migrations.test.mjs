@@ -37,7 +37,7 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
   expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(53);
 });
 
-test("Studio AI free pool migration supports three reviewed provider attempts", () => {
+test("Studio AI free pool migration supports six reviewed provider attempts", () => {
   const migration = loadMigrationManifest().find(
     ({ id }) => id === "0053_studio_ai_free_pool_contract",
   );
@@ -45,10 +45,11 @@ test("Studio AI free pool migration supports three reviewed provider attempts", 
   const sql = migration?.contents ?? "";
 
   for (const requiredFragment of [
-    'CHECK ("attemptCount" BETWEEN 0 AND 3)',
+    'CHECK ("attemptCount" BETWEEN 0 AND 6)',
     "'assistant', 'composition', 'scenario', 'translation', 'dialogue', 'palette'",
-    "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'",
-    'CHECK ("attemptCount" BETWEEN 1 AND 3)',
+    "'gemini', 'groq', 'sambanova', 'cloudflare', 'mistral'",
+    "'openrouter', 'zai', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 6)',
     'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
     'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
   ]) {

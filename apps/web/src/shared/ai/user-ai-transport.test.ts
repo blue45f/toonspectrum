@@ -147,4 +147,82 @@ describe("managed free AI transport response limits", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("orders every reviewed personal free provider before OpenRouter and local fallbacks", async () => {
+    const connections: UserAiConnection[] = [
+      {
+        ...managedConnection,
+        id: "openrouter-ranked",
+        label: "OpenRouter free",
+      },
+      {
+        ...managedConnection,
+        id: "mistral-ranked",
+        label: "Mistral free",
+        baseUrl: "https://api.mistral.ai/v1",
+        textModel: "mistral-small-latest",
+        costPolicy: "provider-free-tier",
+      },
+      {
+        ...managedConnection,
+        id: "cloudflare-ranked",
+        label: "Cloudflare free",
+        baseUrl: "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1",
+        textModel: "@cf/openai/gpt-oss-120b",
+        costPolicy: "provider-free-tier",
+      },
+      {
+        ...managedConnection,
+        id: "sambanova-ranked",
+        label: "SambaNova free",
+        baseUrl: "https://api.sambanova.ai/v1",
+        textModel: "gpt-oss-120b",
+        costPolicy: "provider-free-tier",
+      },
+      {
+        ...managedConnection,
+        id: "groq-ranked",
+        label: "Groq free",
+        baseUrl: "https://api.groq.com/openai/v1",
+        textModel: "openai/gpt-oss-120b",
+        costPolicy: "provider-free-tier",
+      },
+      {
+        ...managedConnection,
+        id: "gemini-ranked",
+        label: "Gemini free",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        textModel: "gemini-3.8-flash",
+        costPolicy: "provider-free-tier",
+      },
+    ];
+    setUserAiConfiguration({
+      version: 1,
+      connections,
+      assignments: { text: null, image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("openrouter.ai")) {
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: "OpenRouter final fallback" } }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "free quota" }), { status: 429 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).resolves.toMatchObject({
+      content: "OpenRouter final fallback",
+      attemptedConnectionIds: [
+        "gemini-ranked",
+        "groq-ranked",
+        "sambanova-ranked",
+        "cloudflare-ranked",
+        "mistral-ranked",
+        "openrouter-ranked",
+      ],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
 });

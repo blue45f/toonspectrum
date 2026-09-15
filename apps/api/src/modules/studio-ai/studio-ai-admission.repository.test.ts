@@ -246,7 +246,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
     const [sql, values] = poolQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('"status" = \'sent\'');
     expect(sql).toContain('"attemptCount" = "attemptCount" + 1');
-    expect(sql).toContain('"attemptCount" < 3');
+    expect(sql).toContain('"attemptCount" < 6');
     expect(sql).toContain('"leaseFence" = $4::bigint');
     expect(values).toEqual([
       "user-1",
@@ -422,7 +422,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
     expect(migration).not.toMatch(/"(?:prompt|response|body|content)"/iu);
   });
 
-  it("expands receipts and usage rows for the three-provider shared free pool", () => {
+  it("expands receipts and usage rows for the six-provider shared free pool", () => {
     const receipt = getTableConfig(studioAiRequestReceipts);
     const usage = getTableConfig(studioAiUsageLedger);
     const dialect = new PgDialect();
@@ -437,14 +437,14 @@ describe("PostgresStudioAiAdmissionRepository", () => {
     );
 
     expect(dialect.sqlToQuery(receiptAttemptCheck?.value as never).sql).toContain(
-      '"attemptCount" between 0 and 3'
+      '"attemptCount" between 0 and 6'
     );
     expect(usageChecks.get("studio_ai_usage_task_check")).toContain("'assistant'");
     expect(usageChecks.get("studio_ai_usage_provider_check")).toContain(
-      "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'"
+      "'gemini', 'groq', 'sambanova', 'cloudflare', 'mistral', 'openrouter', 'zai', 'deepseek'"
     );
     expect(usageChecks.get("studio_ai_usage_attempt_count_check")).toContain(
-      '"attemptCount" between 1 and 3'
+      '"attemptCount" between 1 and 6'
     );
 
     const migration = readFileSync(
@@ -454,10 +454,13 @@ describe("PostgresStudioAiAdmissionRepository", () => {
       ),
       "utf8"
     );
-    expect(migration).toContain('CHECK ("attemptCount" BETWEEN 0 AND 3)');
+    expect(migration).toContain('CHECK ("attemptCount" BETWEEN 0 AND 6)');
     expect(migration).toContain("'assistant', 'composition'");
-    expect(migration).toContain("'gemini', 'groq', 'openrouter', 'zai', 'deepseek'");
-    expect(migration).toContain('CHECK ("attemptCount" BETWEEN 1 AND 3)');
+    expect(migration).toContain(
+      "'gemini', 'groq', 'sambanova', 'cloudflare', 'mistral'"
+    );
+    expect(migration).toContain("'openrouter', 'zai', 'deepseek'");
+    expect(migration).toContain('CHECK ("attemptCount" BETWEEN 1 AND 6)');
     expect(migration).toContain(
       'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"'
     );

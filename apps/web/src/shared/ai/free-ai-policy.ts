@@ -18,7 +18,15 @@ export interface FreeAiConnectionLike {
 }
 
 export interface FreeAiPreset {
-  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "mistral-free";
+  id:
+    | "local-openai"
+    | "ollama"
+    | "openrouter-free"
+    | "groq-free"
+    | "gemini-free"
+    | "sambanova-free"
+    | "cloudflare-workers-free"
+    | "mistral-free";
   label: string;
   description: string;
   baseUrl: string;
@@ -31,18 +39,31 @@ export interface FreeAiPreset {
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
-/** Exact OpenAI-compatible base paths reviewed on 2026-09-15. */
+/** Exact OpenAI-compatible base paths reviewed on 2026-09-16. */
 const PROVIDER_FREE_TIER_ENDPOINTS: Readonly<Record<string, string>> = Object.freeze({
   "api.groq.com": "/openai/v1",
   "generativelanguage.googleapis.com": "/v1beta/openai",
   "api.mistral.ai": "/v1",
+  "api.sambanova.ai": "/v1",
 });
+
+const CLOUDFLARE_WORKERS_AI_PATH = /^\/client\/v4\/accounts\/[a-f0-9]{32}\/ai\/v1$/iu;
+const CLOUDFLARE_PAID_ONLY_MODELS = new Set([
+  "@cf/moonshotai/kimi-k2.6",
+  "@cf/moonshotai/kimi-k2.7-code",
+  "@cf/zai-org/glm-5.2",
+  "@cf/zai-org/glm-5.3",
+  "@cf/zai-org/glm-5.3-flash",
+  "@cf/deepseek-ai/deepseek-v4-flash-0731",
+  "@cf/deepseek-ai/deepseek-v4-pro-0813",
+]);
 
 /** Public managed APIs cannot be re-labelled as a user-operated zero-cost server. */
 const KNOWN_PUBLIC_AI_PROVIDER_HOSTS = new Set([
   ...Object.keys(PROVIDER_FREE_TIER_ENDPOINTS),
   "api.anthropic.com",
   "api.cerebras.ai",
+  "api.cloudflare.com",
   "api.cohere.com",
   "api.deepgram.com",
   "api.deepseek.com",
@@ -113,11 +134,33 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     docsUrl: "https://ai.google.dev/gemini-api/docs/openai",
   },
   {
+    id: "sambanova-free",
+    label: "SambaNova 무료 티어",
+    description: "결제수단이 연결되지 않은 Free Tier의 본인 키만 사용합니다. 일일 요청·토큰 한도에서 자동 중지됩니다.",
+    baseUrl: "https://api.sambanova.ai/v1",
+    textModel: "gpt-oss-120b",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://docs.sambanova.ai/docs/en/models/rate-limits",
+  },
+  {
+    id: "cloudflare-workers-free",
+    label: "Cloudflare Workers AI 무료",
+    description: "Workers Free 계정의 일일 10,000 Neurons 하드 한도만 사용합니다. 주소의 ACCOUNT_ID를 본인 32자리 ID로 바꾸세요.",
+    baseUrl: "https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1",
+    textModel: "@cf/openai/gpt-oss-120b",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/",
+  },
+  {
     id: "mistral-free",
     label: "Mistral 무료 모드",
     description: "카드 없는 무료 모드에서 만든 본인 키만 사용합니다. 비공개 원고 전송 여부를 먼저 검토하세요.",
     baseUrl: "https://api.mistral.ai/v1",
-    textModel: "",
+    textModel: "mistral-small-latest",
     imageModel: "",
     costPolicy: "provider-free-tier",
     requiresApiKey: true,
@@ -254,14 +297,18 @@ export function freeAiConnectionPolicyIssue(
     return capabilityModelIssue(connection, capability);
   }
 
+  const path = normalizedApiPath(url);
   const requiredPath = PROVIDER_FREE_TIER_ENDPOINTS[url.hostname];
+  const isCloudflareWorkersAi = url.hostname === "api.cloudflare.com";
+  const reviewedEndpoint = isCloudflareWorkersAi
+    ? CLOUDFLARE_WORKERS_AI_PATH.test(path)
+    : requiredPath !== undefined && path === requiredPath;
   if (
     url.protocol !== "https:"
     || unsafeManagedUrlPart(url)
-    || requiredPath === undefined
-    || normalizedApiPath(url) !== requiredPath
+    || !reviewedEndpoint
   ) {
-    return "무료 티어 정책은 현재 등록된 Groq·Gemini·Mistral 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
+    return "무료 티어 정책은 현재 등록된 Groq·Gemini·SambaNova·Cloudflare Workers AI·Mistral 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
   }
   if (!connection.apiKey.trim()) {
     return "원격 무료 티어 연결에는 본인 API 키가 필요합니다.";
@@ -271,6 +318,12 @@ export function freeAiConnectionPolicyIssue(
   }
   if (connection.imageModel.trim()) {
     return "외부 무료 티어 연결에는 이미지 모델을 등록하지 않습니다. 이미지 생성은 로컬 또는 직접 운영 서버를 사용하세요.";
+  }
+  if (isCloudflareWorkersAi) {
+    const model = connection.textModel.trim().toLowerCase();
+    if (!model.startsWith("@cf/") || CLOUDFLARE_PAID_ONLY_MODELS.has(model)) {
+      return "Cloudflare Workers AI는 @cf/ 모델 중 현재 유료 전용으로 명시되지 않은 모델만 사용할 수 있습니다.";
+    }
   }
   return capabilityModelIssue(connection, capability);
 }

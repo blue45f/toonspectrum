@@ -32,7 +32,7 @@ export const STUDIO_AI_IDEMPOTENCY_CANONICAL_CHECK_DEFINITIONS: Readonly<
   studio_ai_request_receipt_status_check:
     `CHECK ("status" = ANY (ARRAY['admitted'::text, 'sent'::text, 'succeeded'::text, 'ambiguous'::text]::text[]))`,
   studio_ai_request_receipt_attempt_count_check:
-    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= 3)`,
+    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= 6)`,
   studio_ai_request_receipt_expiry_check:
     `CHECK ("expiresAt" > "createdAt")`,
 };

@@ -34,9 +34,12 @@
 
 1. 공용 Gemini 무료 티어
 2. 공용 Groq 무료 티어
-3. 공용 OpenRouter 무료 라우터
-4. 사용자가 명시적으로 선택한 개인 무료 연결
-5. 나머지 유효한 개인 연결: Gemini → Groq → OpenRouter → Mistral → 로컬·직접 운영 서버
+3. 공용 SambaNova Free Tier
+4. 공용 Cloudflare Workers AI의 Workers Free 일일 할당량
+5. 공용 Mistral Free mode
+6. 공용 OpenRouter 무료 라우터
+7. 사용자가 명시적으로 선택한 개인 무료 연결
+8. 나머지 유효한 개인 연결: Gemini → Groq → SambaNova → Cloudflare Workers AI → Mistral → OpenRouter → 로컬·직접 운영 서버
 
 외부 제공자의 `402` 또는 `429`, 또는 브라우저의 로컬 무료 안전 한도 소진처럼 추론 전 무료 용량 거절이 명확할 때만 다음 경로를 시도한다. 네트워크 오류, 타임아웃, `5xx`, 인증 실패, 잘못된 응답에는 같은 프롬프트를 다른 공급자로 자동 재전송하지 않는다.
 
@@ -46,6 +49,8 @@
 
 - 공용 무료 풀은 `STUDIO_AI_FREE_POOL_ENABLED=true`, 서버 전용 키, 공급자별 `STUDIO_AI_FREE_*_CONFIRMED=true`가 모두 있어야 활성화된다.
 - `CONFIRMED` 값은 운영자가 결제 비활성 또는 공급자 측 무료 전용 경계를 직접 확인했다는 배포 승인이다.
+- SambaNova는 결제수단이 연결되지 않은 Free Tier, Mistral은 카드 없는 Free mode에서만 승인한다.
+- Cloudflare는 Workers Free 계정, 32자리 16진수 Account ID, 해당 경로에서 AI Gateway 통합 결제·선불 크레딧 미사용, 유료 전용 차단 목록에 없는 `@cf/` 모델 조건을 모두 만족해야 승인한다.
 - OpenRouter 공용·개인 연결은 `openrouter/free` 또는 `:free` 모델만 허용한다.
 - 공용 텍스트 호출은 로그인 사용자별·서비스 전체 PostgreSQL UTC 일일 한도로 제한하며 저장소 장애 시 호출 전에 닫힌다.
 - 개인 관리형 무료 연결에는 브라우저 로컬 요청·예약 토큰 한도와 회로 차단기를 적용한다.

@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { dbPool } from "../../db";
 
 import { STUDIO_AI_ADMISSION_GATE } from "./studio-ai-admission";
+import { STUDIO_AI_MAX_PROVIDER_ATTEMPTS } from "./studio-ai-provider";
 import {
   isStudioAiSha256Digest,
   STUDIO_AI_IDEMPOTENCY_RECEIPT_RETENTION_MS,
@@ -173,7 +174,7 @@ WHERE "userId" = $1
   AND "requestHash" = $3::bytea
   AND "leaseFence" = $4::bigint
   AND "status" IN ('admitted', 'sent')
-  AND "attemptCount" < 3
+  AND "attemptCount" < ${STUDIO_AI_MAX_PROVIDER_ATTEMPTS}
 RETURNING "userKeyHash"
 `;
 

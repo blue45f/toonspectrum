@@ -278,6 +278,9 @@ export function StudioAiToolPopoverBody({
                           : [
                               { id: "gemini" as const, label: "Gemini 무료", configured: false, model: "" },
                               { id: "groq" as const, label: "Groq 무료", configured: false, model: "" },
+                              { id: "sambanova" as const, label: "SambaNova 무료", configured: false, model: "" },
+                              { id: "cloudflare" as const, label: "Cloudflare Workers AI 무료", configured: false, model: "" },
+                              { id: "mistral" as const, label: "Mistral 무료 모드", configured: false, model: "" },
                               { id: "openrouter" as const, label: "OpenRouter 무료", configured: false, model: "" },
                             ]
                         ).map((provider) => (

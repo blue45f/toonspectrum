@@ -70,11 +70,18 @@ describe("Studio AI provider resolution", () => {
     const freeEnv = {
       NODE_ENV: "production",
       STUDIO_AI_FREE_POOL_ENABLED: "true",
-      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,openrouter",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,cloudflare,mistral,openrouter",
       STUDIO_AI_FREE_GEMINI_API_KEY: "gemini-free-key",
       STUDIO_AI_FREE_GEMINI_CONFIRMED: "true",
       STUDIO_AI_FREE_GROQ_API_KEY: "groq-free-key",
       STUDIO_AI_FREE_GROQ_CONFIRMED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_API_KEY: "sambanova-test-value",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+      STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN: "cloudflare-test-value",
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
+      STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_API_KEY: "mistral-test-value",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_API_KEY: "openrouter-free-key",
       STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_MODEL: "openrouter/free",
@@ -84,16 +91,31 @@ describe("Studio AI provider resolution", () => {
       .toEqual([
         { id: "gemini", model: "gemini-3.8-flash" },
         { id: "groq", model: "openai/gpt-oss-120b" },
+        { id: "sambanova", model: "gpt-oss-120b" },
+        { id: "cloudflare", model: "@cf/openai/gpt-oss-120b" },
+        { id: "mistral", model: "mistral-small-latest" },
         { id: "openrouter", model: "openrouter/free" },
       ]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
       STUDIO_AI_FREE_GROQ_CONFIRMED: "false",
-    }).map(({ id }) => id)).toEqual(["gemini", "openrouter"]);
+    }).map(({ id }) => id)).toEqual([
+      "gemini", "sambanova", "cloudflare", "mistral", "openrouter",
+    ]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
       STUDIO_AI_FREE_OPENROUTER_MODEL: "vendor/paid-model",
-    }).map(({ id }) => id)).toEqual(["gemini", "groq"]);
+    }).map(({ id }) => id)).toEqual([
+      "gemini", "groq", "sambanova", "cloudflare", "mistral",
+    ]);
+    expect(resolveStudioAiProviders("auto", {
+      ...freeEnv,
+      STUDIO_AI_FREE_CLOUDFLARE_MODEL: "@cf/zai-org/glm-5.3",
+    }).map(({ id }) => id)).not.toContain("cloudflare");
+    expect(resolveStudioAiProviders("auto", {
+      ...freeEnv,
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID: "not-an-account-id",
+    }).map(({ id }) => id)).not.toContain("cloudflare");
     expect(classifyStudioAiProviderFailure("gemini", 429)).toMatchObject({
       kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
       billingFailoverEligible: true,
@@ -102,6 +124,18 @@ describe("Studio AI provider resolution", () => {
     expect(classifyStudioAiProviderFailure("groq", 503)).toMatchObject({
       kind: "provider_unavailable",
       billingFailoverEligible: false,
+    });
+    expect(classifyStudioAiProviderFailure("sambanova", 429)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+    });
+    expect(classifyStudioAiProviderFailure("cloudflare", 429)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+    });
+    expect(classifyStudioAiProviderFailure("mistral", 402)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
     });
     expect(classifyStudioAiProviderFailure("openrouter", 402, undefined, true)).toMatchObject({
       kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
@@ -115,6 +149,9 @@ describe("Studio AI provider resolution", () => {
 
   it("공통 timeout을 우선하고 제공자 request ID를 제한해 추출한다", () => {
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000" })).toBe(6000);
+    expect(resolveStudioAiTimeoutMs("cloudflare", {
+      STUDIO_AI_FREE_CLOUDFLARE_TIMEOUT_MS: "6500",
+    })).toBe(6500);
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000", STUDIO_AI_TIMEOUT_MS: "7000" }))
       .toBe(7000);
     expect(studioAiProviderRequestId({ request_id: " req-1 " })).toBe("req-1");

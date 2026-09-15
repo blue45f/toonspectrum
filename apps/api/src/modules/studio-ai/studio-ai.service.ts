@@ -231,6 +231,9 @@ function isStudioAiDistributedFailover(
 function isStudioAiProviderId(value: string | undefined): value is StudioAiProviderId {
   return value === "gemini"
     || value === "groq"
+    || value === "sambanova"
+    || value === "cloudflare"
+    || value === "mistral"
     || value === "openrouter"
     || value === "zai"
     || value === "deepseek";

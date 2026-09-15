@@ -2,7 +2,7 @@ import { HTTPError, api, getApiErrorMessage } from "@/infrastructure/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 
 export type StudioServerAiTask = "assistant" | "composition" | "scenario" | "translation" | "dialogue" | "palette";
-export type StudioFreePoolProvider = "gemini" | "groq" | "openrouter" | "zai" | "deepseek";
+export type StudioFreePoolProvider = "gemini" | "groq" | "sambanova" | "cloudflare" | "mistral" | "openrouter" | "zai" | "deepseek";
 export type StudioServerAiProvider = StudioFreePoolProvider | "user";
 export type StudioServerAiProviderPreference = "auto" | StudioFreePoolProvider;
 export type StudioServerAiFailoverReason = "free_quota_exhausted" | "billing_quota_exhausted";
@@ -10,6 +10,9 @@ export type StudioServerAiFailoverReason = "free_quota_exhausted" | "billing_quo
 const LABELS: Record<StudioServerAiProvider, string> = {
   gemini: "Gemini 무료",
   groq: "Groq 무료",
+  sambanova: "SambaNova 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
+  mistral: "Mistral 무료 모드",
   openrouter: "OpenRouter 무료",
   zai: "Z.ai",
   deepseek: "DeepSeek",
@@ -97,6 +100,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function provider(value: unknown): StudioServerAiProvider | undefined {
   return value === "gemini"
     || value === "groq"
+    || value === "sambanova"
+    || value === "cloudflare"
+    || value === "mistral"
     || value === "openrouter"
     || value === "zai"
     || value === "deepseek"

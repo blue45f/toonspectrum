@@ -9,12 +9,20 @@ Production text AI is free-first and fail-closed. The default shared pool order 
 
 1. Gemini free tier;
 2. Groq free tier;
-3. OpenRouter free router.
+3. SambaNova Free Tier;
+4. Cloudflare Workers AI on Workers Free;
+5. Mistral Free mode;
+6. OpenRouter free router.
 
 `STUDIO_AI_FREE_PROVIDER_ORDER` may reorder only those reviewed providers. A
 provider is eligible only when the shared pool is enabled, its server-side key
-is present, its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is present,
-and—on OpenRouter—the model is `openrouter/free` or ends in `:free`.
+is present, and its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is
+present. SambaNova approval requires a Free Tier account without a payment
+method. Cloudflare additionally requires a 32-character hexadecimal Account ID,
+a Workers Free account without AI Gateway unified billing or prepaid credits
+for this route, and an `@cf/` model outside the reviewed paid-only blocklist.
+Mistral approval requires cardless Free mode. OpenRouter remains limited to
+`openrouter/free` or a model ending in `:free`.
 
 The confirmation flag is a deployment assertion that billing is disabled or a
 provider-side hard free-only boundary exists. It is not an automatic billing
@@ -129,8 +137,8 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 
 Apply the production migration manifest through
 `apps/api/src/db/migrations/0053_studio_ai_free_pool_contract.sql` before deploying
-this API build. Migration `0053` expands idempotency receipts to three provider
-attempts and admits the `assistant`, `gemini`, and `groq` usage-ledger values used
-by the shared free pool. The schema preflight rejects an incomplete contract,
+this API build. Migration `0053` expands idempotency receipts to six provider
+attempts and admits the `assistant`, `gemini`, `groq`, `sambanova`, `cloudflare`,
+and `mistral` usage-ledger values used by the shared free pool. The schema preflight rejects an incomplete contract,
 and quota/admission storage failures return a sanitized error before provider
 use.

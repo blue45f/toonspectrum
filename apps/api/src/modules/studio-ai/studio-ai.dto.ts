@@ -10,7 +10,17 @@ export const StudioAiTaskSchema = z.enum([
   "palette",
 ]);
 
-export const StudioAiProviderPreferenceSchema = z.enum(["auto", "gemini", "groq", "openrouter", "zai", "deepseek"]);
+export const StudioAiProviderPreferenceSchema = z.enum([
+  "auto",
+  "gemini",
+  "groq",
+  "sambanova",
+  "cloudflare",
+  "mistral",
+  "openrouter",
+  "zai",
+  "deepseek",
+]);
 
 export const StudioAiChatSchema = z
   .object({
