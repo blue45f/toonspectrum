@@ -49,7 +49,7 @@ test("loads the runtime health readiness relation and cutover contract", () => {
     "0033_creator_marketplace_cloud_library",
     "0034_creator_marketplace_package_moderation",
     "0051_personal_cloud_connections",
-    "0059_member_messaging",
+    "0058_member_messaging",
   ]);
 });
 
