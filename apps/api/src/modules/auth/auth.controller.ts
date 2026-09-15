@@ -598,7 +598,11 @@ function applyOAuthStateCookie(
   response.cookie(
     oauthStateCookieName(provider),
     state,
-    resolveOAuthStateCookieOptions(provider),
+    {
+      ...resolveOAuthStateCookieOptions(provider),
+      httpOnly: true,
+      secure: true,
+    },
   );
 }
 
@@ -610,7 +614,11 @@ function applyOAuthPkceVerifierCookie(
   response.cookie(
     oauthPkceVerifierCookieName(provider),
     verifier,
-    resolveOAuthPkceVerifierCookieOptions(provider),
+    {
+      ...resolveOAuthPkceVerifierCookieOptions(provider),
+      httpOnly: true,
+      secure: true,
+    },
   );
 }
 

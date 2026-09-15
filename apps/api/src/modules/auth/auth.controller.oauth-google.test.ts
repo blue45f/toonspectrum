@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   oauthPkceVerifierCookieName,
   oauthStateCookieName,
+  resolveOAuthPkceVerifierCookieOptions,
+  resolveOAuthStateCookieOptions,
 } from "../../oauth-state-cookie";
 import {
   createPkceCodeChallenge,
@@ -123,6 +125,27 @@ describe("AuthController Google GIS/code-flow boundary", () => {
       ServiceUnavailableException,
     );
     expect(res.redirect).not.toHaveBeenCalled();
+  });
+
+  it("keeps browser-bound OAuth secrets HttpOnly and Secure outside production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(resolveOAuthStateCookieOptions("github")).toEqual(
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/api/auth/oauth/github",
+      }),
+    );
+    expect(resolveOAuthPkceVerifierCookieOptions("github")).toEqual(
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/api/auth/oauth/github",
+      }),
+    );
   });
 
   it("binds a GitHub redirect start to provider-scoped HttpOnly state and PKCE cookies", () => {

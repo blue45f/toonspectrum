@@ -21,7 +21,7 @@ export function resolveOAuthStateCookieOptions(
 ): CookieOptions {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "lax",
     path: oauthStateCookiePath(provider),
     maxAge: OAUTH_STATE_COOKIE_TTL_MS,
