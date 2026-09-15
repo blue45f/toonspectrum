@@ -62,9 +62,9 @@ test("Studio AI free pool migration supports three reviewed provider attempts", 
 
 test("Studio AI provider expansion supports five reviewed free attempts", () => {
   const migration = loadMigrationManifest().find(
-    ({ id }) => id === "0057_studio_ai_free_provider_expansion",
+    ({ id }) => id === "0058_studio_ai_free_provider_expansion",
   );
-  expect(migration?.id).toBe("0057_studio_ai_free_provider_expansion");
+  expect(migration?.id).toBe("0058_studio_ai_free_provider_expansion");
   const sql = migration?.contents ?? "";
 
   for (const requiredFragment of [

@@ -48,7 +48,7 @@ describe("Studio AI idempotency schema preflight", () => {
   ])("fails closed for %s", async (_label, drift) => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ...healthyRow(), ...drift }] });
     await expect(preflightStudioAiIdempotencySchema({ query } as never)).rejects.toThrow(
-      /0057_studio_ai_free_provider_expansion\.sql/u
+      /0058_studio_ai_free_provider_expansion\.sql/u
     );
   });
 
@@ -71,7 +71,7 @@ describe("Studio AI idempotency schema preflight", () => {
     vi.mocked(dbPool.query).mockResolvedValue({ rows: [] } as never);
 
     await expect(studioAiIdempotencySchemaPreflightProvider.useFactory()).rejects.toThrow(
-      /0057_studio_ai_free_provider_expansion/u
+      /0058_studio_ai_free_provider_expansion/u
     );
   });
 });

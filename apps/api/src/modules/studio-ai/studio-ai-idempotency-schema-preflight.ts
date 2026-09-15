@@ -56,7 +56,7 @@ interface ReceiptSchemaRow {
 type QueryablePool = Pick<Pool, "query">;
 
 const INCOMPLETE_SCHEMA_MESSAGE =
-  "Studio AI idempotency schema is incomplete; apply production migrations through 0057_studio_ai_free_provider_expansion.sql before starting the API";
+  "Studio AI idempotency schema is incomplete; apply production migrations through 0058_studio_ai_free_provider_expansion.sql before starting the API";
 
 function compactDefault(value: unknown): string | null {
   if (typeof value !== "string") return null;
