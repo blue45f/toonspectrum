@@ -124,7 +124,7 @@ pnpm run cloudflare:static:deploy
 
 ## 커스텀 도메인 전환
 
-`workers_dev` URL은 배포 후 독립 canary로 유지한다. 운영 트래픽은 Cloudflare 영역 라우트 `toonstudio.cloud/*`, `www.toonstudio.cloud/*`가 이 Worker를 실행하며 실패 모드는 fail-open이다. `origin.toonstudio.cloud`는 DNS-only Vercel 원본으로 남겨 API와 R2 fallback의 재귀 프록시를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
+`workers_dev` URL은 배포 후 독립 canary로 유지한다. 이 Static Assets Worker는 Cloudflare 영역 라우트 `www.toonstudio.cloud/*`만 담당하며 실패 모드는 fail-open이다. apex `toonstudio.cloud/*`는 [`../cloudflare-apex-redirect`](../cloudflare-apex-redirect/)의 초소형 `308` Worker가 별도로 담당한다. 이 분리는 apex 정본화 때문에 모든 정적 파일 요청을 Worker 코드로 통과시키는 비용·장애 결합을 피한다. `origin.toonstudio.cloud`는 DNS-only Vercel 원본으로 남겨 API와 R2 fallback의 재귀 프록시를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
 
 ## 헤더 계약
 
@@ -135,7 +135,7 @@ pnpm run generate:cloudflare-static-rules
 pnpm run generate:cloudflare-static-rules -- --check
 ```
 
-동적 Worker 응답에는 동일한 공통 보안 헤더를 직접 추가한다. 헤더가 바뀌면 생성 파일과 Worker 테스트가 함께 실패하도록 유지한다.
+동적 Worker 응답에는 동일한 공통 보안 헤더를 직접 추가한다. Cloudflare Web Analytics를 활성화한 운영 영역은 script origin `https://static.cloudflareinsights.com`과 beacon origin `https://cloudflareinsights.com`만 CSP에 허용하며 wildcard나 broad `https:`는 허용하지 않는다. 헤더가 바뀌면 생성 파일과 Worker 테스트가 함께 실패하도록 유지한다.
 
 ## 롤백과 장애 격리
 

@@ -8,6 +8,8 @@ import { Script, runInNewContext } from "node:vm";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const productionSupabaseOrigin = "https://ybsgfhofuvkhywbpytnl.supabase.co";
+const cloudflareAnalyticsScriptOrigin = "https://static.cloudflareinsights.com";
+const cloudflareAnalyticsConnectionOrigin = "https://cloudflareinsights.com";
 
 function directive(csp, name) {
   return csp
@@ -269,6 +271,12 @@ export function verifyStaticCspContract({ html, responsePolicy, bootstrapCompatS
     throw new Error("script-src must not contain unsafe-eval.");
   }
 
+  if (!scriptTokens.includes(cloudflareAnalyticsScriptOrigin)) {
+    throw new Error(
+      "script-src must contain the exact Cloudflare Web Analytics script origin.",
+    );
+  }
+
   const inspected = inspectHtmlScripts(html);
   const bootstrapScripts = inspected.scripts.filter(
     ({ attributes }) => attributes.get("src") === "/bootstrap-compat.js",
@@ -327,6 +335,11 @@ export function verifyStaticCspContract({ html, responsePolicy, bootstrapCompatS
   if (!connections.some((source) => source === "https://realtime.toonstudio.cloud")
     || !connections.some((source) => source === "wss://realtime.toonstudio.cloud")) {
     throw new Error("The exact production realtime origins are missing from connect-src.");
+  }
+  if (!connections.includes(cloudflareAnalyticsConnectionOrigin)) {
+    throw new Error(
+      "connect-src must contain the exact Cloudflare Web Analytics beacon origin.",
+    );
   }
   const supabaseOrigins = connections.filter((origin) =>
     origin.includes("supabase.co"));
