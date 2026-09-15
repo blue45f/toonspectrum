@@ -1,8 +1,8 @@
-# KMAS 오픈 API 연동 설계 (승인 후 구축)
+# KMAS 오픈 API 연동 운영 설계
 
 > 목적: 크롤 의존을 **공식 공공데이터**로 대체/보강하기 위한 KMAS(한국만화영상진흥원 만화규장각)
-> 오픈 API 연동 계획. **인증키(prvKey) 승인(신청 완료, 대기 중) 후** 실제 응답을 보고 구축한다.
-> 필드명은 공개 문서에 정확히 없어 아래 매핑은 **승인 후 실응답으로 확정**한다(추측 구현 금지).
+> 오픈 API 운영 설계. 2026-09-16 로그인된 승인 계정에서 관리자 승인 상태와 인증 만료일 `2027-07-06`을 확인했다.
+> 승인키로 `bookAndWebtoonList`를 실호출해 HTTP 200, `resultState=success`, ISBN·줄거리 필드를 검증했으며 키 값은 서버 비밀 저장소에만 둔다.
 
 ## 1. KMAS API 스펙 (확인됨)
 
@@ -10,6 +10,7 @@
   - `https://www.kmas.or.kr/openapi/search/dcmtDtaList` — 소장 도서·웹툰·잡지·영상 등 통합 조회
   - `https://www.kmas.or.kr/openapi/search/bookAndWebtoonList` — 도서·웹툰 조회(제목/ISBN 검색)
 - **인증**: `prvKey`(발급 인증키) 쿼리 파라미터 필수.
+- **승인 상태**: 관리자 승인 완료. 현재 인증 만료일은 `2027-07-06`; 만료 전 갱신 상태를 운영 점검한다.
 - **요청 파라미터**: `pageNo`, `viewItemCnt`(최대 100), `startDate`/`endDate`, `title`, `isbn`, 작가명, 출판사명.
 - **제공 데이터**: 작품명·작가(글/그림)·출판사·ISBN·장르·줄거리·`imageDownloadUrl`·가격·페이지수 등.
 - **한도**: 일 1,000회 · 활용기간 승인일로부터 12개월.
@@ -38,19 +39,19 @@ scripts/kmas-fetch.mjs / scripts/kmas-update-catalog.mjs
   → catalog:gen → 정적 서빙
 ```
 
-## 3. 필드 매핑 (승인 후 실응답으로 확정 — TODO)
+## 3. 필드 매핑 (승인 계정 실응답 확인)
 
-KMAS item(정확한 JSON 키는 실응답 확인) → `Title`(packages/core/src/types.ts):
+KMAS 승인 계정의 실응답 item → `Title`(packages/core/src/types.ts):
 
-| Title 필드 | KMAS 소스(추정, 확정 필요) | 비고 |
+| Title 필드 | KMAS 소스 | 비고 |
 |---|---|---|
-| `id` | `kmas-${ISBN 또는 자료ID}` | 안정적 고유키 |
-| `title` | 작품명 | |
-| `author` / `artist` | 글작가 / 그림작가 | |
-| `synopsis` | 줄거리 | **공식 시놉시스 → 크롤 원문 대체**(COMPLIANCE §2 갭 해소) |
+| `id` | `mastrId` 또는 `isbn` 기반 식별자 | 안정적 고유키 |
+| `title` | `prdctNm`, 폴백 `title` | |
+| `author` / `artist` | `sntncWritrNm`·`writrNm`·`storyWritrNm` / `pictrWritrNm` | |
+| `synopsis` | `outline` | **공식 시놉시스 → 크롤 원문 대체**(COMPLIANCE §2 갭 해소) |
 | `coverImage` | `imageDownloadUrl` | 기존 크롤 썸네일 URL과 같은 메타데이터로 저장. 이미지 바이너리 저장·서버 프록시 중계 금지 |
-| `genres` | 장르 | 기존 taxonomy로 매핑 |
-| `type` | 도서/웹툰 구분 | webtoon/webnovel |
+| `genres` | `mainGenreCdNm` | 기존 taxonomy로 매핑 |
+| `type` | `listSeCd`·`listSeCdNm` | webtoon/webnovel |
 | `availability` | (KMAS는 유통 아님) | 기존 크롤 availability 유지, KMAS는 미설정 |
 
 `stats`(조회수·평점 등)는 KMAS 미제공 → 기존 크롤/추정값 유지, `statsEstimated` 규약 준수.
@@ -66,14 +67,21 @@ KMAS는 작품의 유통 플랫폼(`availability`)이 아니라 공식 메타데
 
 ```bash
 # 공식 응답을 별도 JSON으로 확인
-KMAS_PRV_KEY=<발급키> pnpm kmas:fetch
+KMAS_PRV_KEY=<서버 비밀> pnpm kmas:fetch
 
 # 기존 catalog.json.gz에 선택적으로 병합하고 정적 파일 재생성
-KMAS_PRV_KEY=<발급키> pnpm kmas:update-catalog
+KMAS_PRV_KEY=<서버 비밀> pnpm kmas:update-catalog
+
+# 사용자 요청 기반 런타임 레퍼런스 검색
+KMAS_PRV_KEY=<서버 비밀>
+KMAS_LIVE_SEARCH=1
+KMAS_MERGE_ON_ACCESS=0
 ```
 
-`KMAS_PRV_KEY`는 로컬 실행 환경 또는 서버의 공식 API 보강 기능에만 둡니다. 카탈로그 파일 변경은
-결과를 검토한 뒤 커밋·재배포하며, KMAS 갱신을 실행하는 GitHub Actions나 주기 작업은 없습니다.
+카탈로그 보강은 운영자가 결과를 검토한 뒤 수동으로 커밋·재배포하며, KMAS 갱신을 실행하는
+GitHub Actions나 주기 작업은 두지 않는다. `/api/kmas/references` 런타임 검색은 사용자 요청이
+있을 때만 호출하고 30분 프로세스 캐시·동시 요청 제한을 적용한다. 일 1,000회 한도와
+`2027-07-06` 만료일을 함께 점검하며, 키가 없으면 기존 카탈로그와 공개 기본 기능을 유지한다.
 
 ## 6. 컴플라이언스 효과
 

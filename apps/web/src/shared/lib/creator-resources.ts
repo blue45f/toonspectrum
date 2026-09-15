@@ -1,5 +1,5 @@
 /** Versioned, dependency-free contracts shared by the API, browser and regression tests. */
-export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo" | "aic" | "cleveland";
+export type ResourceProvider = "met" | "openlibrary" | "googlebooks" | "openbd" | "kakao" | "bizinfo" | "aic" | "cleveland" | "polyhaven";
 export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
 export type ResourceLicense = "CC0" | "metadata-only" | "book-promotion";
 
@@ -55,7 +55,9 @@ export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
   met: "The Met · 공개 미술 자료",
   aic: "시카고 미술관 · 공개 미술 자료",
   cleveland: "클리블랜드 미술관 · 공개 미술 자료",
+  polyhaven: "Poly Haven · 무료 CC0 3D·HDRI·텍스처",
   openlibrary: "Open Library · 글로벌 도서",
+  googlebooks: "Google Books · 무료 글로벌 도서 API",
   openbd: "openBD · 일본 서지",
   kakao: "카카오 · 도서 검색",
   bizinfo: "기업마당 · 지원사업",
@@ -84,7 +86,9 @@ const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   met: ["www.metmuseum.org", "metmuseum.org"],
   aic: ["www.artic.edu", "artic.edu"],
   cleveland: ["www.clevelandart.org", "clevelandart.org"],
+  polyhaven: ["polyhaven.com", "www.polyhaven.com"],
   openlibrary: ["openlibrary.org", "www.openlibrary.org"],
+  googlebooks: ["books.google.com"],
   openbd: ["openbd.jp", "www.openbd.jp"],
   kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
   bizinfo: ["www.bizinfo.go.kr", "bizinfo.go.kr"],
@@ -92,14 +96,16 @@ const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
 
 const MET_IMAGE_HOSTS = ["images.metmuseum.org"] as const;
 const PUBLIC_IMAGE_HOSTS: Partial<Record<ResourceProvider, readonly string[]>> = {
-  met: MET_IMAGE_HOSTS, aic: ["www.artic.edu"], cleveland: ["openaccess-cdn.clevelandart.org"],
+  met: MET_IMAGE_HOSTS, aic: ["www.artic.edu"], cleveland: ["openaccess-cdn.clevelandart.org"], polyhaven: ["cdn.polyhaven.com"],
 };
 
 export function isProvider(value: unknown): value is ResourceProvider {
   return value === "met"
     || value === "aic"
     || value === "cleveland"
+    || value === "polyhaven"
     || value === "openlibrary"
+    || value === "googlebooks"
     || value === "openbd"
     || value === "kakao"
     || value === "bizinfo";
@@ -207,7 +213,7 @@ export function parseResource(value: unknown): CreatorResource | null {
   const sourceUrl = httpsUrl(v.sourceUrl, SOURCE_HOSTS[provider]);
   const fetchedAt = textOf(v.fetchedAt, 40);
   if (!id.startsWith(`${provider}:`) || id.length <= provider.length + 1 || !title || !sourceUrl || !Number.isFinite(Date.parse(fetchedAt))) return null;
-  const license: ResourceLicense = (provider === "met" || provider === "aic" || provider === "cleveland") && v.license === "CC0"
+  const license: ResourceLicense = (provider === "met" || provider === "aic" || provider === "cleveland" || provider === "polyhaven") && v.license === "CC0"
     ? "CC0"
     : provider === "openbd" && v.license === "book-promotion"
       ? "book-promotion"

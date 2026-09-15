@@ -91,9 +91,15 @@ export interface CreatorWorkRevisionComparisonDetail extends CreatorWorkRevision
 export interface CreatorWorkComment {
   id: string;
   workId: string;
+  parentId: string | null;
   author: CreatorAuthor;
   text: string;
+  hidden: boolean;
+  deleted: boolean;
+  likes: number;
+  viewerLiked: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreatorWorkInput {

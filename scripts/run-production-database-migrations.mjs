@@ -126,10 +126,12 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_portfolio_entry",
   "creator_promotion_bookmark",
   "creator_promotion_comment",
+  "creator_promotion_comment_like",
   "creator_promotion_post",
   "creator_promotion_report",
   "creator_work_asset_storage_reference",
   "creator_work_bookmark",
+  "creator_work_comment_like",
   "creator_work_catalog_asset_binding",
   "creator_studio_personal_kit",
   "creator_work_production_workspace",
@@ -232,6 +234,64 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 `;
 }
 
+export function buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.creator_work_comment,
+  public.creator_work_comment_like,
+  public.creator_promotion_comment,
+  public.creator_promotion_comment_like
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.creator_work_comment,
+  public.creator_work_comment_like,
+  public.creator_promotion_comment,
+  public.creator_promotion_comment_like
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.creator_work_comment,
+  public.creator_work_comment_like,
+  public.creator_promotion_comment,
+  public.creator_promotion_comment_like
+TO ${quotedRole};
+`;
+}
+
+export function buildCommunityCommentRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `EXISTS (
+    SELECT 1
+    FROM unnest(ARRAY[
+      'public.creator_work_comment',
+      'public.creator_work_comment_like',
+      'public.creator_promotion_comment',
+      'public.creator_promotion_comment_like'
+    ]::text[]) AS relation_name
+    WHERE NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      relation_name,
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(${roleLiteral}, relation_name, elevated_privilege)
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege('PUBLIC', relation_name, public_privilege)
+    )
+  )`;
+}
+
 export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   const roleLiteral = sqlLiteral(role);
@@ -266,7 +326,7 @@ export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
         'TRIGGER'
       ]::text[]) AS public_privilege
       WHERE pg_catalog.has_table_privilege(
-        'PUBLIC',
+        0::oid,
         'public.personal_cloud_connection',
         public_privilege
       )
@@ -2703,6 +2763,7 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
