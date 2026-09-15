@@ -14,6 +14,7 @@ import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";
 import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
+import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 import {
   StudioProjectShellPage,
@@ -57,6 +58,12 @@ function SectionWorkflow({
       />
       {section === "production" && view === "documents" ? (
         <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />
+      ) : null}
+      {section === "production" && (view === "pipeline" || view === "renders") ? (
+        <StudioProductionToolchainPanel
+          projectId={projectId}
+          view={view}
+        />
       ) : null}
       {section === "story" && view === "localization" ? (
         <StudioLocalizationPanel projectId={projectId} locale={locale} />
