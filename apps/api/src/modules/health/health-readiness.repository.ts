@@ -66,6 +66,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_profile",
   "creator_promotion_bookmark",
   "creator_promotion_comment",
+  "creator_promotion_comment_like",
   "creator_promotion_post",
   "creator_promotion_report",
   "creator_series",
@@ -79,6 +80,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_work_collaboration_event",
   "creator_work_collaborator",
   "creator_work_comment",
+  "creator_work_comment_like",
   "creator_work_crdt_node_load",
   "creator_work_crdt_raster_checkpoint_job",
   "creator_work_crdt_snapshot",
@@ -164,7 +166,7 @@ export const REQUIRED_DATABASE_MIGRATIONS = [
   "0033_creator_marketplace_cloud_library",
   "0034_creator_marketplace_package_moderation",
   "0051_personal_cloud_connections",
-  "0057_member_messaging",
+  "0058_member_messaging",
 ] as const;
 
 interface DatabasePingRow {

@@ -149,7 +149,11 @@
 .fb-reply > p { white-space: pre-wrap; font-size: 12px; color: var(--color-fg-2); line-height: 1.9; margin-top: 8px; }
 .fb-reply[data-official="true"] { border-left: 2px solid var(--color-accent); padding-left: 12px; }
 .fb-nested-replies { padding-left: 10px; border-left: 1px solid var(--color-line); margin-top: 8px; }
+.fb-reply-actions { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .fb-reply-form { margin-top: 18px; }
+.fb-inline-reply-form { margin: 10px 0 3px; padding: 11px; border: 1px solid var(--color-line); border-radius: 9px; background: var(--color-card); }
+.fb-reply-submit-actions { display: inline-flex; align-items: center; gap: 12px; }
+.fb-inline-reply-form .fb-button { min-height: 34px; padding-block: 6px; }
 .fb-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .fb-management { margin-top: 20px; border-block: 1px solid var(--color-line); padding-block: 12px; }
 .fb-management summary { display: flex; align-items: center; gap: 6px; color: var(--color-accent); font-size: 12px; cursor: pointer; }

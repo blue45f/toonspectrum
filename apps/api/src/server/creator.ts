@@ -50,9 +50,12 @@ export {
 export {
   addComment,
   createWork,
+  deleteComment,
   getWork,
   listComments,
+  toggleCommentLike,
   toggleLike,
+  updateComment,
   updateWork,
 } from "./creator/publication-api";
 export { listSeries } from "./creator/publication-list-series";

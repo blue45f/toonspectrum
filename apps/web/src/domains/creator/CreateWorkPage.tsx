@@ -10,7 +10,6 @@ import {
   Mail,
   MessageCircle,
   Pencil,
-  Send,
   Settings2,
   Trash2,
   Trophy,
@@ -40,6 +39,7 @@ import { WorkFxPanel } from "./WorkFxPanel";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
+import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
@@ -47,12 +47,15 @@ import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import {
+  deleteComment,
   deleteWork,
   getWork,
   listChallenges,
   listComments,
   listSeries,
   postComment,
+  toggleCommentLike,
+  updateComment,
   toggleWorkBookmark,
   toggleWorkLike,
   updateWork,
@@ -222,12 +225,10 @@ function WorkCommunityPanel({
 }
 
 function WorkComments({ workId }: { workId: string }) {
-  const userId = useApp((s) => s.userId);
+  const userId = useApp((state) => state.userId);
   const [comments, setComments] = useState<WorkComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -238,9 +239,9 @@ function WorkComments({ workId }: { workId: string }) {
       .then((result) => {
         if (alive) setComments(result);
       })
-      .catch((err: unknown) => {
+      .catch((cause: unknown) => {
         if (!alive || controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "댓글을 불러오지 못했습니다.");
+        setError(cause instanceof Error ? cause.message : "댓글을 불러오지 못했습니다.");
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -249,105 +250,33 @@ function WorkComments({ workId }: { workId: string }) {
       alive = false;
       controller.abort();
     };
-  }, [workId]);
-
-  async function submit() {
-    const text = draft.trim();
-    if (!text || !userId || submitting) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const created = await postComment(workId, text);
-      setComments((current) => [...current, created]);
-      setDraft("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "댓글을 등록하지 못했습니다.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  }, [workId, userId]);
 
   return (
-    <section className="rounded-2xl border border-line bg-panel/30 p-4 sm:p-5">
-      <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-        <MessageCircle size={15} className="text-accent" />
-        댓글
-        <span className="numeral text-fg-3">{comments.length}</span>
-      </h2>
-
-      {userId ? (
-        <div className="mt-3 flex flex-col gap-2">
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value.slice(0, MAX_COMMENT_LENGTH))}
-            placeholder="응원의 한마디를 남겨 보세요."
-            aria-label="댓글 입력"
-            rows={3}
-            className="w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg transition-colors placeholder:text-fg-3 focus:border-accent/50"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <span className="numeral text-[0.7rem] text-fg-3">
-              {draft.length}/{MAX_COMMENT_LENGTH}
-            </span>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!draft.trim() || submitting}
-              className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
-            >
-              <Send size={14} />
-              등록
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-3 rounded-xl border border-dashed border-line bg-card/40 px-3 py-3 text-center text-xs text-fg-3">
-          댓글을 남기려면 로그인해 주세요.
+    <div>
+      {error ? (
+        <p className="mb-3 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad" role="alert">
+          {error}
         </p>
-      )}
-
-      {error && <p className="mt-3 text-xs text-bad">{error}</p>}
-
-      <div className="mt-4 flex flex-col gap-3">
-        {loading ? (
-          Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="flex gap-2.5">
-              <span className="skeleton size-8 shrink-0 rounded-full" />
-              <span className="flex-1 space-y-2 py-0.5">
-                <span className="skeleton block h-3 w-24" />
-                <span className="skeleton block h-3 w-full" />
-              </span>
-            </div>
-          ))
-        ) : comments.length === 0 ? (
-          <p className="py-6 text-center text-xs text-fg-3">아직 댓글이 없습니다. 첫 댓글을 남겨 보세요.</p>
-        ) : (
-          comments.map((comment) => (
-            <div key={comment.id} className="flex gap-2.5">
-              <span className="size-8 shrink-0 overflow-hidden rounded-full bg-raised ring-1 ring-line">
-                {comment.author.avatar ? (
-                  <CoverImage
-                    src={comment.author.avatar}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    fallback={<span className="block h-full w-full bg-raised" />}
-                  />
-                ) : (
-                  <span className="block h-full w-full bg-raised" aria-hidden />
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="truncate text-sm font-medium text-fg">{comment.author.name}</span>
-                  <span className="shrink-0 text-[0.7rem] text-fg-3">{relativeDate(comment.createdAt)}</span>
-                </div>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-fg-2">{comment.text}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
+      ) : null}
+      <ThreadedCommentSection
+        comments={comments}
+        setComments={setComments}
+        viewerId={userId}
+        loading={loading}
+        maxLength={MAX_COMMENT_LENGTH}
+        maxDepth={4}
+        title="댓글"
+        description="작품 감상과 응원을 나누고, 다른 독자의 댓글에도 답해 보세요."
+        placeholder="응원의 한마디를 남겨 보세요."
+        draftStorageKey={`creator-work-comment-drafts:${workId}:${userId ?? "guest"}`}
+        authorHref={(comment) => comment.author.id ? `/u/${encodeURIComponent(comment.author.id)}` : null}
+        onCreate={(text, parentId) => postComment(workId, text, parentId)}
+        onUpdate={(commentId, text) => updateComment(workId, commentId, text)}
+        onDelete={(commentId) => deleteComment(workId, commentId)}
+        onToggleLike={(commentId) => toggleCommentLike(workId, commentId)}
+      />
+    </div>
   );
 }
 

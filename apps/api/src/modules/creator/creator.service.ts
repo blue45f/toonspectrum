@@ -24,6 +24,7 @@ import { StudioRealtimeRevocationService } from "../../infrastructure/studio-rea
 import {
   addComment,
   bumpAssetDownloads,
+  deleteComment,
   bumpViews,
   createCreatorWorkRelease,
   createSeries,
@@ -58,9 +59,11 @@ import {
   reportSharedAsset,
   restoreWorkRevision,
   saveCreatorExternalPublication,
+  toggleCommentLike,
   toggleCreatorWorkBookmark,
   toggleFollow,
   toggleLike,
+  updateComment,
   updateSeries,
   updateWork,
 } from "../../server/creator";
@@ -144,6 +147,19 @@ function creatorDraftCollaborationStatusLockedConflict(): ConflictException {
     code: CREATOR_DRAFT_COLLABORATION_STATUS_LOCKED_CODE,
     message: "임시 작업실의 게시 상태는 저장 승격 단계에서만 변경할 수 있습니다.",
   });
+}
+
+function parseCreatorCommentParentId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new BadRequestException("상위 댓글을 확인해 주세요.");
+  }
+  const parentId = value.trim();
+  if (!parentId) return null;
+  if (!/^[A-Za-z0-9_-]{1,80}$/u.test(parentId)) {
+    throw new BadRequestException("상위 댓글을 확인해 주세요.");
+  }
+  return parentId;
 }
 
 @Injectable()
@@ -607,16 +623,79 @@ export class CreatorService {
     }
   }
 
-  async listComments(workId: string) {
-    return listComments(workId);
+  async listComments(workId: string, viewerId?: string) {
+    return listComments(workId, false, viewerId);
   }
 
   async addComment(userId: string, workId: string, body: unknown) {
+    const input = body as { text?: unknown; parentId?: unknown } | null | undefined;
+    const parentId = parseCreatorCommentParentId(input?.parentId);
+    if (!rateLimit(`creator-work-comment:${userId}`, 40, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 작성이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await addComment(userId, workId, input?.text, parentId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글을 작성할 수 없습니다.",
+      );
+    }
+  }
+
+  async updateComment(userId: string, workId: string, commentId: string, body: unknown) {
+    if (!rateLimit(`creator-work-comment-edit:${userId}`, 80, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 수정이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     const text = (body as { text?: unknown } | null | undefined)?.text;
     try {
-      return await addComment(userId, workId, text);
+      return await updateComment(userId, workId, commentId, text);
     } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "댓글을 작성할 수 없습니다.");
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글을 수정할 수 없습니다.",
+      );
+    }
+  }
+
+  async deleteComment(
+    userId: string,
+    workId: string,
+    commentId: string,
+    canModerate = false,
+  ) {
+    if (!rateLimit(`creator-work-comment-delete:${userId}`, 80, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 삭제 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await deleteComment(userId, workId, commentId, canModerate);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글을 삭제할 수 없습니다.",
+      );
+    }
+  }
+
+  async toggleCommentLike(userId: string, workId: string, commentId: string) {
+    if (!rateLimit(`creator-work-comment-like:${userId}`, 120, 10 * 60_000)) {
+      throw new HttpException(
+        "댓글 반응이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await toggleCommentLike(userId, workId, commentId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "댓글 반응을 처리할 수 없습니다.",
+      );
     }
   }
 

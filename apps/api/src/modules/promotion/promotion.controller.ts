@@ -35,6 +35,10 @@ export class PromotionController {
   bookmark(@Param("id") id: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) { const uid = actor(userId, "bookmark"); return boundary(() => this.service.bookmark(id, uid, body)); }
   @Post("/posts/:id/comments")
   comment(@Param("id") id: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) { const uid = actor(userId, "comment"); return boundary(() => this.service.comment(id, uid, body)); }
+  @Patch("/posts/:id/comments/:commentId")
+  updateComment(@Param("id") id: string, @Param("commentId") commentId: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) { const uid = actor(userId, "edit-comment"); return boundary(() => this.service.updateComment(id, commentId, uid, body)); }
+  @Post("/posts/:id/comments/:commentId/like")
+  toggleCommentLike(@Param("id") id: string, @Param("commentId") commentId: string, @Headers("x-user-id") userId?: string) { const uid = actor(userId, "like-comment"); return boundary(() => this.service.toggleCommentLike(id, commentId, uid)); }
   @Delete("/posts/:id/comments/:commentId")
   deleteComment(@Param("id") id: string, @Param("commentId") commentId: string, @Headers("x-user-id") userId?: string) { const uid = actor(userId, "delete-comment"); return boundary(() => this.service.deleteComment(id, commentId, uid)); }
   @Post("/posts/:id/reports")
