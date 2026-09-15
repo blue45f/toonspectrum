@@ -59,6 +59,24 @@ describe("studio canvas gesture arbitration", () => {
     expect(resolveStudioCanvasGestureDisposition(input)).toBe(expected);
   });
 
+  it("routes horizontal wheel navigation before zoom and brush-size actions", () => {
+    const wheel = sourceBetween(
+      "const onWheel = (e: WheelEvent) => {",
+      'node.addEventListener("wheel", onWheel'
+    );
+    const planner = wheel.indexOf("planStudioCanvasWheelNavigation({");
+    const horizontalScroll = wheel.indexOf("node.scrollLeft += wheelNavigation.deltaX;");
+    const zoom = wheel.indexOf('if (wheelMode === "zoom") {');
+    const brushSize = wheel.indexOf('if (wheelMode === "brush-size") {');
+
+    expect(planner).toBeGreaterThanOrEqual(0);
+    expect(horizontalScroll).toBeGreaterThan(planner);
+    expect(zoom).toBeGreaterThan(horizontalScroll);
+    expect(brushSize).toBeGreaterThan(zoom);
+    expect(wheel).toContain("shiftKey: e.shiftKey,");
+    expect(wheel).toContain("deltaMode: e.deltaMode,");
+  });
+
   it("routes wheel and touchmove through the shared ownership-first policy", () => {
     const wheel = sourceBetween("const onWheel = (e: WheelEvent) => {", "const prefs = appSettingsRef.current.mouse;");
     const touchMove = sourceBetween("const onTouchMove = (e: TouchEvent) => {", "if (e.touches.length !== 2) {");
