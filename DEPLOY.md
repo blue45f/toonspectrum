@@ -105,13 +105,18 @@ Google Identity Services의 승인된 JavaScript origin에는
 
 ## 4. 데이터 갱신
 
-기본 사용자 경로는 정적 카탈로그입니다.
+기본 사용자 경로는 검토된 정적 카탈로그입니다. 배포된 API와 GitHub Actions에는 크롤 실행 경로가
+없으며, 데이터는 아래 수동 절차로만 바뀝니다.
 
-1. 크롤러가 새 `apps/api/data/catalog.json.gz`를 만든다.
-2. `pnpm catalog:gen`이 `public/data/*.json`을 생성한다.
-3. 검토된 다음 Cloudflare 정적 수동 배포에 새 CDN 스냅샷을 포함한다.
+1. 로컬에서 플랫폼별 robots.txt·이용약관·API 정책·호출량 제한을 확인한다.
+2. `pnpm catalog:update:manual`을 실행해 수집 결과를 기존 `apps/api/data/catalog.json.gz`에 병합하고
+   `apps/web/public/data/*.json`을 다시 만든다.
+3. `git diff --stat`과 작품 수·플랫폼별 건수·샘플 상세를 검토한다. 관련 정보가 필요하면
+   `pnpm related:update:manual`도 별도로 실행한다.
+4. 검토된 파일만 커밋하고 Cloudflare 정적 배포와 API 재배포에 포함한다.
 
-로컬 또는 운영 API 폴백 경로에서 DB 스냅샷을 직접 갱신하려면 `pnpm ingest` 또는 `POST /api/catalog/ingest/run`을 사용할 수 있습니다. 운영에서 자동 수집을 켜기 전에는 플랫폼별 robots.txt, 이용약관, API 약관, 호출량 제한, 저장 필드 범위를 별도로 검토해야 합니다.
+운영 서버는 번들된 gz 파일을 부팅 시 한 번 읽습니다. 실행 중 파일 교체, DB 스냅샷 갱신,
+`/api/catalog/ingest/*` 또는 `/api/catalog/refresh` 호출로 반영하는 경로는 없습니다.
 
 ## 5. 배포 후 점검
 

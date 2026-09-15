@@ -15,7 +15,6 @@ vi.mock("../db", async (importOriginal) => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  vi.stubEnv("WEBDEX_CATALOG_FORCE_DB", "0");
   doubles.rows = [];
   doubles.execute.mockImplementation(async (query: string | { sql: string }) => {
     const text = typeof query === "string" ? query : query.sql;
@@ -80,34 +79,4 @@ describe("runtime readiness with a migrated DML-only database", () => {
     expect(doubles.execute).toHaveBeenCalledTimes(completedCount);
   });
 
-  it("checks ingest history in file mode without loading the legacy snapshot table", async () => {
-    const { ensureCatalogIngestSchema } = await import("./catalog-ingest");
-    await expect(ensureCatalogIngestSchema()).resolves.toBeUndefined();
-    expect(doubles.execute).toHaveBeenCalledOnce();
-    expect(doubles.execute.mock.calls[0]?.[0]).toContain('FROM "catalog_ingest_run"');
-  });
-
-  it("validates both catalog tables in explicit database mode", async () => {
-    vi.stubEnv("WEBDEX_CATALOG_FORCE_DB", "1");
-    const { ensureCatalogIngestSchema } = await import("./catalog-ingest");
-    await expect(ensureCatalogIngestSchema()).resolves.toBeUndefined();
-    expect(doubles.execute).toHaveBeenCalledTimes(2);
-    expect(doubles.execute.mock.calls[1]?.[0]).toContain('FROM "catalog_snapshot"');
-  });
-
-  it("retries failed catalog checks while retaining a successful history check", async () => {
-    vi.stubEnv("WEBDEX_CATALOG_FORCE_DB", "1");
-    const { ensureCatalogIngestSchema } = await import("./catalog-ingest");
-    doubles.execute.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(new Error("snapshot unavailable"));
-    await expect(ensureCatalogIngestSchema()).rejects.toThrow("snapshot unavailable");
-    await Promise.all([ensureCatalogIngestSchema(), ensureCatalogIngestSchema()]);
-    expect(doubles.execute).toHaveBeenCalledTimes(3);
-  });
-
-  it("reads the real legacy snapshot identity through a non-owner connection", async () => {
-    doubles.rows = [{ id: "snapshot-from-migrated-database" }];
-    const { getCurrentSnapshotIdFromDb } = await import("./catalog-ingest");
-    await expect(getCurrentSnapshotIdFromDb()).resolves.toBe("snapshot-from-migrated-database");
-    expect(doubles.execute).toHaveBeenCalledOnce();
-  });
 });
