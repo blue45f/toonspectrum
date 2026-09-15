@@ -109,7 +109,7 @@ describe("AllExceptionsFilter credential boundary", () => {
 
   it("redacts nested upstream details from an explicit 5xx HttpException envelope", () => {
     vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
-    const { host, json, status } = boundary("/api/catalog/ingest");
+    const { host, json, status } = boundary("/api/catalog/unknown");
 
     new AllExceptionsFilter().catch(
       new BadGatewayException({
@@ -123,7 +123,7 @@ describe("AllExceptionsFilter credential boundary", () => {
     expect(json).toHaveBeenCalledWith(expect.objectContaining({
       statusCode: 502,
       message: "Request could not be completed",
-      path: "/api/catalog/ingest",
+      path: "/api/catalog/unknown",
     }));
     expect(JSON.stringify(json.mock.calls)).not.toContain("operator");
     expect(JSON.stringify(json.mock.calls)).not.toContain("signature");

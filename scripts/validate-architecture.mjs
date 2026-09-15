@@ -1,10 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  validateNoDuplicateVercelTrigger,
-  validateVercelFallbackWorkflow,
-} from "./vercel-workflow-policy.mjs";
+import { validateVercelFallbackWorkflow } from "./vercel-workflow-policy.mjs";
 
 const ROOT = process.cwd();
 const resolve = (relativePath) => path.join(ROOT, relativePath);
@@ -58,9 +55,7 @@ requirePaths(
     "pnpm-workspace.yaml",
     "tsconfig.json",
     "commitlint.config.cjs",
-    ".github/workflows/catalog-update.yml",
     ".github/workflows/deploy-vercel.yml",
-    ".github/workflows/related-info-update.yml",
     "config/free-infrastructure-policy.json",
     "deploy/cloudflare-static/wrangler.jsonc",
     "docs/FREE_INFRASTRUCTURE.md",
@@ -75,6 +70,15 @@ requirePaths(
     ".husky/commit-msg",
   ],
   "file",
+);
+
+forbidPaths(
+  [
+    ".github/workflows/catalog-update.yml",
+    ".github/workflows/refresh-data.yml",
+    ".github/workflows/related-info-update.yml",
+  ],
+  "automated data collection workflow must stay removed",
 );
 
 // Canonical Vite application and browser-only test assets.
@@ -277,15 +281,6 @@ if (exists(vercelDeployWorkflowPath)) {
   }
 }
 
-for (const workflowPath of [
-  ".github/workflows/catalog-update.yml",
-  ".github/workflows/related-info-update.yml",
-]) {
-  if (!exists(workflowPath)) continue;
-  for (const issue of validateNoDuplicateVercelTrigger(read(workflowPath), { workflow: true })) {
-    issues.push(`${workflowPath}: ${issue}`);
-  }
-}
 if (issues.length > 0) {
   console.error(`architecture validation failed: ${issues.length} issue(s)`);
   for (const issue of issues) console.error(` - ${issue}`);
