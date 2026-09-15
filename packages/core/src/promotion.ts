@@ -27,9 +27,38 @@ export interface PromotionPost extends PromotionInput {
   archived: boolean;
   saved: boolean;
 }
-export interface PromotionComment { id: string; text: string; author: { id: string; name: string }; createdAt: string }
+export interface PromotionComment {
+  id: string;
+  postId: string;
+  parentId: string | null;
+  text: string;
+  author: { id: string; name: string };
+  deleted: boolean;
+  likes: number;
+  viewerLiked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface PromotionPage { items: PromotionPost[]; nextCursor: string | null; hasMore: boolean; canModerate: boolean }
 export interface PromotionDetail { post: PromotionPost; comments: PromotionComment[]; canManage: boolean; canModerate: boolean }
+export function isPromotionComment(value: unknown): value is PromotionComment {
+  const comment = promotionRecord(value);
+  const author = promotionRecord(comment.author);
+  return typeof comment.id === "string"
+    && typeof comment.postId === "string"
+    && (comment.parentId === null || typeof comment.parentId === "string")
+    && typeof comment.text === "string"
+    && typeof author.id === "string"
+    && typeof author.name === "string"
+    && typeof comment.deleted === "boolean"
+    && Number.isSafeInteger(comment.likes)
+    && Number(comment.likes) >= 0
+    && typeof comment.viewerLiked === "boolean"
+    && typeof comment.createdAt === "string"
+    && Number.isFinite(Date.parse(comment.createdAt))
+    && typeof comment.updatedAt === "string"
+    && Number.isFinite(Date.parse(comment.updatedAt));
+}
 export interface PromotionReport { postId: string; title: string; reason: string; createdAt: string; hidden: boolean }
 export type PromotionResult<T> = { value: T; error?: never } | { error: string; value?: never };
 export function promotionRecord(value: unknown): Record<string, unknown> {

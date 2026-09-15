@@ -97,9 +97,22 @@ export interface WorkDetail extends WorkSummary {
 
 export interface WorkComment {
   id: string;
+  workId: string;
+  parentId: string | null;
   author: WorkAuthor;
   text: string;
+  hidden: boolean;
+  deleted: boolean;
+  likes: number;
+  viewerLiked: boolean;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommentDeleteResult {
+  deleted: true;
+  soft: boolean;
+  removedIds: string[];
 }
 
 export type WorkReportReason =
@@ -602,10 +615,49 @@ export async function listComments(id: string, signal?: AbortSignal): Promise<Wo
   return ensureArray<WorkComment>(data);
 }
 
-export async function postComment(id: string, text: string): Promise<WorkComment> {
+export async function postComment(
+  id: string,
+  text: string,
+  parentId: string | null = null
+): Promise<WorkComment> {
   return callOrThrow(
-    () => api.post<WorkComment>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { text }),
+    () => api.post<WorkComment>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { text, parentId }),
     "댓글을 등록하지 못했습니다."
+  );
+}
+
+export async function updateComment(
+  id: string,
+  commentId: string,
+  text: string
+): Promise<WorkComment> {
+  return callOrThrow(
+    () => api.patch<WorkComment>(
+      `${BASE}/works/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`,
+      { text }
+    ),
+    "댓글을 수정하지 못했습니다."
+  );
+}
+
+export async function deleteComment(id: string, commentId: string): Promise<CommentDeleteResult> {
+  return callOrThrow(
+    () => api.delete<CommentDeleteResult>(
+      `${BASE}/works/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`
+    ),
+    "댓글을 삭제하지 못했습니다."
+  );
+}
+
+export async function toggleCommentLike(
+  id: string,
+  commentId: string
+): Promise<{ liked: boolean; likes: number }> {
+  return callOrThrow(
+    () => api.post<{ liked: boolean; likes: number }>(
+      `${BASE}/works/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}/like`
+    ),
+    "댓글 반응을 처리하지 못했습니다."
   );
 }
 
