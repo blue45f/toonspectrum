@@ -37,11 +37,15 @@ async function readSafeFallback(options: StudioNavigationOptions): Promise<Respo
   try {
     const prepared = await options.readPreparedShell?.().catch(() => undefined);
     if (prepared && isUsableStudioShell(prepared, options.isolated)) return markedFallback(prepared);
-    const rescue = await options.readRescue?.().catch(() => undefined);
-    if (rescue && isUsableStudioShell(rescue, false)) return markedFallback(rescue);
+    // Preserve the same Studio surface even when the optional full-pack audit is incomplete.
+    // Runtime cache misses fail feature-by-feature; they must not redirect the artist into a
+    // separate local editor with a different document model.
     const response = await options.readShell();
-    return response && isUsableStudioShell(response, options.isolated)
-      ? markedFallback(response) : undefined;
+    if (response && isUsableStudioShell(response, options.isolated)) return markedFallback(response);
+    // Last-ditch recovery only when no usable Studio document shell survives.
+    const rescue = await options.readRescue?.().catch(() => undefined);
+    return rescue && isUsableStudioShell(rescue, false)
+      ? markedFallback(rescue) : undefined;
   } catch {
     // Storage denial must not replace a real HTTP response with a cache exception.
     return undefined;

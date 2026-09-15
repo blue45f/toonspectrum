@@ -87,10 +87,10 @@ function positionsOf(part: AvatarForgeHairPart) {
 }
 
 describe("createAvatarForgeHairGeometry", () => {
-  it("가닥은 19×7 front/back 그리드의 닫힌 authored clump로 구워진다", () => {
+  it("가닥은 25×9 front/back 그리드의 닫힌 authored clump로 구워진다", () => {
     const strand = planFor("long").find((part) => part.primitive === "tapered-capsule");
     expect(strand).toBeDefined();
-    expect(positionsOf(strand!).count).toBe((18 + 1) * (6 + 1) * 2);
+    expect(positionsOf(strand!).count).toBe((24 + 1) * (8 + 1) * 2);
   });
 
   it("캡은 고밀도 authored shell, 번 파츠는 완전구로 구워진다", () => {
@@ -98,7 +98,7 @@ describe("createAvatarForgeHairGeometry", () => {
     const cap = parts.find((part) => part.role === "cap");
     const bun = parts.find((part) => part.id === "bun");
     expect(positionsOf(cap!).count).toBe(29 * 19);
-    expect(positionsOf(bun!).count).toBe(25 * 17);
+    expect(positionsOf(bun!).count).toBe(29 * 21);
   });
 
   it("모든 스타일의 모든 파츠가 유한한 정점과 색 속성을 만든다", () => {
@@ -143,7 +143,7 @@ describe("createAvatarForgeHairGeometry", () => {
     expect(after.count).toBe(before.count);
 
     const centrelineXs = (values: Float32Array) =>
-      Array.from({ length: 19 }, (_, row) => values[(row * 7 + 3) * 3] ?? 0);
+      Array.from({ length: 25 }, (_, row) => values[(row * 9 + 4) * 3] ?? 0);
     const beforeCenters = centrelineXs(before.array);
     const afterCenters = centrelineXs(after.array);
     const maximumCenterlineShift = Math.max(
@@ -158,7 +158,7 @@ describe("Avatar Forge toon-clump geometry quality", () => {
   it("produces pointed, flattened toon clumps instead of constant-radius tubes", () => {
     const strand = planFor("long").find((part) => part.primitive === "tapered-capsule")!;
     const { array } = positionsOf(strand);
-    const columns = 7;
+    const columns = 9;
 
     const spread = (row: number, axis: 0 | 2) => {
       let minimum = Number.POSITIVE_INFINITY;
@@ -173,7 +173,7 @@ describe("Avatar Forge toon-clump geometry quality", () => {
 
     const rootWidth = spread(1, 0);
     const rootDepth = spread(1, 2);
-    const tipWidth = spread(18, 0);
+    const tipWidth = spread(24, 0);
     expect(rootDepth).toBeLessThan(rootWidth * 0.5);
     expect(tipWidth).toBeLessThan(rootWidth * 0.08);
   });

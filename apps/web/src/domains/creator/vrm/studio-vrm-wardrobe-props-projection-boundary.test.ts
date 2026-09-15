@@ -130,7 +130,7 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     );
 
     expect(propRuntime).toContain("const VRM_FRAME_PROP_PRIORITY = -2;");
-    expect(propRuntime).toContain("new RoundedBoxGeometry(width, height, depth, 3, radius)");
+    expect(propRuntime).toContain("new RoundedBoxGeometry(width, height, depth, 5, radius)");
     expect(propRuntime).toContain("group.scale.setScalar(resolved.scale);");
     expect(propRuntime).toContain(".multiplyScalar(resolved.scale)");
     expect(propRuntime).toContain(".applyQuaternion(group.quaternion)");
