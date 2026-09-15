@@ -49,10 +49,11 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
       <StudioIntegrationsSettingsPanel aiSettings={STUDIO_AI_DEFAULT_SETTINGS} onAiSettingsChange={noopChange} />
     );
 
-    // AI 어시스트 설정 섹션 — 기존 StudioAiSettingsPanel을 그대로 합성했으므로 그 헤더·기본 baseURL이
-    // 그대로 나와야 한다(로직 재구현이 아니라 재사용임을 증명).
+    // Free-only unified AI settings own the AI section now: local zero-cost defaults,
+    // not the legacy OpenAI StudioAiSettings baseURL.
     expect(html).toContain("통합 AI 설정");
-    expect(html).toContain(STUDIO_AI_DEFAULT_SETTINGS.baseUrl);
+    expect(html).toContain("http://localhost:8082/v1");
+    expect(html).toContain("무료 연결 프리셋");
     expect(html).toContain("모델 목록 연결 확인");
 
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.
@@ -74,7 +75,12 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
     const aiSettings: StudioAiSettings = { ...STUDIO_AI_DEFAULT_SETTINGS, apiKey: "sk-test-123" };
     setUserAiConfiguration({
       version: 1,
-      connections: [{ ...aiSettings, id: "integration", label: "Studio 연결" }],
+      connections: [{
+        ...aiSettings,
+        id: "integration",
+        label: "Studio 연결",
+        costPolicy: "provider-free-tier",
+      }],
       assignments: { text: "integration", image: "integration", inference: null, "three-d": null },
     });
 
