@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10151f"><title>ToonStudio · 로컬 드로잉</title><link rel="stylesheet" href="/offline-drawing/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10151f"><title>ToonStudio · 긴급 복구 드로잉</title><link rel="stylesheet" href="/offline-drawing/style.css"></head>
 <body>
-<header><div><strong>ToonStudio <span>LOCAL</span></strong><h1>서버 없이, 계속 그리기</h1></div><a href="/studio">온라인 스튜디오</a></header>
+<header><div><strong>ToonStudio <span>RECOVERY</span></strong><h1>스튜디오 화면을 복구할 수 없을 때</h1></div><a href="/studio">스튜디오 다시 열기</a></header>
 <main>
-<section class="notice" aria-label="저장 안내"><b>로그인·API·서버 상태와 무관하게 이 기기에서 작업합니다.</b><p>이 화면을 온라인에서 한 번 준비한 브라우저에서 사용할 수 있어요. 저장 위치는 이 브라우저이며, 사이트 데이터 삭제·시크릿 모드 종료 시 잃을 수 있습니다. 중요한 작업은 원고 파일로 백업하세요. 서버 원고와 자동 동기화하거나 덮어쓰지 않습니다.</p></section>
-<div class="document-bar"><label>원고 이름 <input id="title" maxlength="100" value="로컬 원고"></label><button id="save">지금 저장</button><button id="backup">원고 파일 백업</button><button id="png">PNG 내보내기</button><button id="portable">독립 실행 HTML 저장</button></div>
+<section class="notice" aria-label="저장 안내"><b>이 화면은 같은 스튜디오를 불러올 수 없을 때만 사용하는 별도 긴급 복구 도구입니다.</b><p>로그인·API·서버와 분리된 임시 원고로 작업합니다. 저장 위치는 이 브라우저이며, 사이트 데이터 삭제·시크릿 모드 종료 시 잃을 수 있습니다. 중요한 작업은 원고 파일로 백업하세요. 기존 스튜디오 원고와 자동 동기화하거나 덮어쓰지 않습니다.</p></section>
+<div class="document-bar"><label>원고 이름 <input id="title" maxlength="100" value="긴급 복구 원고"></label><button id="save">지금 저장</button><button id="backup">원고 파일 백업</button><button id="png">PNG 내보내기</button><button id="portable">독립 실행 HTML 저장</button></div>
 <div class="workspace"><aside aria-label="그리기 도구">
 <div class="row"><button id="pen" aria-pressed="true">펜</button><button id="eraser" aria-pressed="false">지우개</button></div>
 <label>색상 <input id="color" type="color" value="#202632"></label>
@@ -16,7 +16,7 @@
 <label class="file">원고 파일 가져오기<input id="import" type="file" accept=".json,.toonlocal"></label>
 <label class="file">참고 이미지 넣기<input id="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
 <button id="persist">브라우저 저장 유지 요청</button><small>펜 필압 · 터치 · 단축키 Ctrl/⌘ Z 지원<br>캔버스 1600 × 1200 · 최대 8개 레이어</small>
-</aside><section class="canvas-wrap" aria-label="드로잉 작업 영역"><canvas id="canvas" width="1600" height="1200" aria-label="로컬 드로잉 캔버스"></canvas></section></div>
-<footer><p id="status" role="status" aria-live="polite">로컬 드로잉 준비 중…</p><p id="readiness" role="status">오프라인 재실행 준비 상태 확인 중</p></footer>
+</aside><section class="canvas-wrap" aria-label="드로잉 작업 영역"><canvas id="canvas" width="1600" height="1200" aria-label="긴급 복구 드로잉 캔버스"></canvas></section></div>
+<footer><p id="status" role="status" aria-live="polite">긴급 복구 드로잉 준비 중…</p><p id="readiness" role="status">오프라인 재실행 준비 상태 확인 중</p></footer>
 <details><summary>서버 장애가 복구된 다음에는?</summary><p>원고 파일과 PNG를 먼저 백업한 뒤 온라인 스튜디오를 여세요. 이 화면의 원고 파일은 로컬 드로잉 전용 형식입니다. 기존 스튜디오에는 PNG를 가져와 이어서 작업할 수 있어요. 저장하지 못한 서버 원고를 빈 원고로 대신 저장하지 않습니다.</p></details>
 </main><noscript>드로잉에는 JavaScript가 필요합니다.</noscript><script type="module" src="/offline-drawing/app.js"></script></body></html>

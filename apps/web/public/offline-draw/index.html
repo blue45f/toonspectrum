@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#171823"><meta name="robots" content="noindex">
-  <title>툰스튜디오 · 로컬 드로잉</title>
+  <title>툰스튜디오 · 긴급 복구 드로잉</title>
   <link rel="stylesheet" href="/offline-draw/styles.css">
 </head>
 <body>
 <header>
   <a class="brand" href="/studio" title="온라인 스튜디오로 이동">TOON<span>STUDIO</span></a>
-  <span class="badge">LOCAL DRAW</span>
-  <input id="title" aria-label="작업 제목" value="새 로컬 드로잉" maxlength="120">
+  <span class="badge">EMERGENCY DRAW</span>
+  <input id="title" aria-label="작업 제목" value="새 긴급 복구 드로잉" maxlength="120">
   <button id="simple" aria-pressed="true">심플 모드</button>
 </header>
-<div class="notice">서버·로그인 없이 그리는 작업실입니다. 기존 스튜디오 프로젝트는 변경하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
+<div class="notice">스튜디오 화면을 열 수 없을 때만 사용하는 별도 긴급 복구 도구입니다. 기존 스튜디오 프로젝트는 변경하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
 <main>
   <nav class="tools" aria-label="드로잉 도구">
     <button data-tool="pen" aria-pressed="true" title="펜 (B)">펜</button>
@@ -41,7 +41,7 @@
 </main>
 <footer>
   <div><strong id="save-status" role="status" aria-live="polite">로컬 저장소 확인 중…</strong><small id="save-detail">서버를 사용하지 않습니다.</small></div>
-  <a id="portable" href="/offline-draw/portable.html" download="ToonStudio-Offline-Drawing.html">휴대용 작업실 보관</a>
+  <a id="portable" href="/offline-draw/portable.html" download="ToonStudio-Emergency-Drawing.html">긴급 복구 파일 보관</a>
   <button id="save">로컬 저장</button><button id="export-json">복구 파일</button><button id="export-png" class="primary">PNG 내보내기</button>
 </footer>
 <div id="error" role="alert" hidden></div>

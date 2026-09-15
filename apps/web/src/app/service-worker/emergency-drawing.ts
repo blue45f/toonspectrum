@@ -1,6 +1,6 @@
 /** Independent, deliberately small shell: no user data or authenticated requests. */
-export const EMERGENCY_DRAWING_CACHE = "toonstudio-emergency-drawing-shell-v1";
-export const EMERGENCY_DRAWING_READY = "/offline-draw/ready-v1";
+export const EMERGENCY_DRAWING_CACHE = "toonstudio-emergency-drawing-shell-v2";
+export const EMERGENCY_DRAWING_READY = "/offline-draw/ready-v2";
 export const EMERGENCY_DRAWING_FILES = new Set([
   "/offline-draw/index.html", "/offline-draw/portable.html", "/offline-draw/styles.css", "/offline-draw/model.js",
   "/offline-draw/storage.js", "/offline-draw/editor.js", "/offline-draw/cache.js",
