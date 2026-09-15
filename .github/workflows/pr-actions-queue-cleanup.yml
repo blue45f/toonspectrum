@@ -1,4 +1,4 @@
-name: One-shot closed PR Actions cleanup
+name: One-shot repository Actions triage
 
 on:
   push:
@@ -12,22 +12,22 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-actions-queue-cleanup-v3-${{ github.ref }}
+  group: repository-actions-triage-v4-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   cleanup:
-    name: Cancel every remaining run for the superseded branch
+    name: Reserve runners for the CI repair PR
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
-      - name: Cancel all active runs except this cleanup
+      - name: Cancel active runs outside main and PR 1482
         uses: actions/github-script@v8
         with:
           script: |
             const { owner, repo } = context.repo;
-            const headBranch = context.ref.replace(/^refs\/heads\//u, "");
             const currentRunId = Number(context.runId);
+            const keepBranch = "fix/ci-reruns-clean-20260916";
             const activeStatuses = new Set([
               "queued",
               "in_progress",
@@ -38,11 +38,20 @@ jobs:
 
             const runs = await github.paginate(
               github.rest.actions.listWorkflowRunsForRepo,
-              { owner, repo, branch: headBranch, per_page: 100 },
+              { owner, repo, per_page: 100 },
             );
             const cancelled = [];
+            const preserved = [];
             for (const run of runs) {
               if (run.id === currentRunId || !activeStatuses.has(run.status)) continue;
+              const preserve =
+                run.head_branch === keepBranch ||
+                run.head_branch === "main" ||
+                run.event === "schedule";
+              if (preserve) {
+                preserved.push(run.id);
+                continue;
+              }
               await github.rest.actions.cancelWorkflowRun({
                 owner,
                 repo,
@@ -52,7 +61,7 @@ jobs:
             }
 
             await core.summary
-              .addHeading("Closed PR Actions cleanup")
-              .addRaw(`Branch: ${headBranch}\n`)
-              .addRaw(`Cancelled active runs: ${cancelled.join(", ") || "none"}\n`)
+              .addHeading("Repository Actions triage")
+              .addRaw(`Preserved repair/main/scheduled runs: ${preserved.join(", ") || "none"}\n`)
+              .addRaw(`Cancelled other active runs: ${cancelled.join(", ") || "none"}\n`)
               .write();
