@@ -1,4 +1,5 @@
 export const STUDIO_OFFLINE_PREPARE_MESSAGE = "toonspectrum-sw:prepare-offline";
+export const STUDIO_OFFLINE_STATUS_MESSAGE = "toonspectrum-sw:offline-status";
 export const STUDIO_OFFLINE_MAX_RESOURCES = 1024;
 
 export interface StudioOfflinePreparationReport {
@@ -9,6 +10,12 @@ export interface StudioOfflinePreparationReport {
   readonly downloadedBytes: number;
   readonly missing: readonly string[];
   readonly complete: boolean;
+}
+
+export interface StudioOfflineReadinessReport {
+  readonly schema: 1;
+  readonly buildId: string;
+  readonly ready: boolean;
 }
 
 export function normalizeStudioOfflineAssetUrl(value: unknown, origin: string): string | null {
@@ -32,4 +39,12 @@ export function isStudioOfflinePreparationMessage(value: unknown): value is {
   return record.type === STUDIO_OFFLINE_PREPARE_MESSAGE && Array.isArray(record.urls)
     && record.urls.length <= STUDIO_OFFLINE_MAX_RESOURCES
     && record.urls.every((url) => typeof url === "string" && url.length <= 2_048);
+}
+
+export function isStudioOfflineStatusMessage(value: unknown): value is {
+  readonly type: typeof STUDIO_OFFLINE_STATUS_MESSAGE;
+} {
+  return Boolean(value && typeof value === "object"
+    && "type" in value
+    && (value as { readonly type?: unknown }).type === STUDIO_OFFLINE_STATUS_MESSAGE);
 }

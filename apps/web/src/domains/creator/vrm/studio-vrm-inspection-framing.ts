@@ -27,6 +27,25 @@ export const STUDIO_VRM_INSPECTION_VIEWS = [
   { id: "inspectLeftHand", label: "왼손·그립 확대" },
   { id: "inspectRightHand", label: "오른손·그립 확대" },
 ] as const;
+
+export type StudioVrmPropInspectionPreset =
+  | "closeup"
+  | "inspectLeftHand"
+  | "inspectRightHand"
+  | "inspectTorso"
+  | "fullBody";
+
+/** Chooses the closest useful WYSIWYG inspection crop for a prop's attachment point. */
+export function resolveStudioVrmPropInspectionPreset(
+  bone: string | null | undefined,
+): StudioVrmPropInspectionPreset {
+  if (bone === "leftHand") return "inspectLeftHand";
+  if (bone === "rightHand") return "inspectRightHand";
+  if (bone === "head" || bone === "neck") return "closeup";
+  if (bone === "chest" || bone === "spine" || bone === "hips") return "inspectTorso";
+  return "fullBody";
+}
+
 const finite = (value: Vec3 | undefined): value is Vec3 => (
   Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)
 );

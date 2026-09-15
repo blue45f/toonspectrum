@@ -10,8 +10,8 @@ export type StudioVrmAuthoredHairInstance = Readonly<{
 
 const RADIAL_SEGMENTS = 28;
 const CAP_HEIGHT_SEGMENTS = 18;
-const CLUMP_LENGTH_SEGMENTS = 18;
-const CLUMP_CROSS_SEGMENTS = 6;
+const CLUMP_LENGTH_SEGMENTS = 24;
+const CLUMP_CROSS_SEGMENTS = 8;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -46,15 +46,47 @@ function paletteColor(
   return base;
 }
 
-function clumpCenter(part: AvatarForgeHairPart, t: number): readonly [number, number] {
-  const waveAmount = part.wave ?? 0;
-  const waveFrequency = part.waveFrequency ?? 2.4;
-  const aspectX = Math.min(10, Math.max(1, part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0]))));
-  const aspectZ = Math.min(10, Math.max(1, part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2]))));
-  const curveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t
-    + Math.sin(t * Math.PI * waveFrequency) * waveAmount * 0.15 * aspectX * t;
-  const curveZ = Math.sin(t * Math.PI) * part.curl * 0.32
-    + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.055 * aspectZ * t;
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  if (edge0 === edge1) return value < edge0 ? 0 : 1;
+  const t = clamp01((value - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+function safeAspect(longAxis: number, crossAxis: number): number {
+  const safeLongAxis = Number.isFinite(longAxis) ? Math.abs(longAxis) : 1;
+  const safeCrossAxis = Number.isFinite(crossAxis) ? Math.abs(crossAxis) : 1;
+  const ratio = safeLongAxis / Math.max(1e-4, safeCrossAxis);
+  return Math.sqrt(Math.min(5, Math.max(1, ratio)));
+}
+
+/**
+ * Head-local clump centre line. The root is pinned to the authored transform and wave amplitude is
+ * bounded independently of a very thin/tall part's raw aspect ratio. This keeps style switches from
+ * throwing bangs and side locks far away from the skull while retaining visible curl near the tips.
+ */
+export function resolveStudioVrmAuthoredHairClumpCenter(
+  part: AvatarForgeHairPart,
+  t: number,
+): readonly [number, number] {
+  const progress = clamp01(Number.isFinite(t) ? t : 0);
+  const curl = Math.min(1.25, Math.max(-1.25, Number.isFinite(part.curl) ? part.curl : 0));
+  const waveAmount = Math.min(1, Math.max(-1, Number.isFinite(part.wave) ? (part.wave ?? 0) : 0));
+  const waveFrequency = Math.min(6, Math.max(0.5, Number.isFinite(part.waveFrequency)
+    ? (part.waveFrequency ?? 2.4)
+    : 2.4));
+  const aspectX = safeAspect(part.scale[1], part.scale[0]);
+  const aspectZ = safeAspect(part.scale[1], part.scale[2]);
+  const rootEase = smoothstep(0, 0.24, progress);
+  const bodyEnvelope = rootEase * (0.3 + 0.7 * Math.pow(Math.sin(Math.PI * progress), 0.72));
+
+  const curveX = Math.sin(progress * Math.PI * 1.72) * curl * 0.31 * rootEase
+    + Math.sin(progress * Math.PI * waveFrequency) * waveAmount * 0.072 * aspectX * bodyEnvelope;
+  const curveZ = Math.sin(progress * Math.PI) * curl * 0.18 * rootEase
+    + (Math.cos(progress * Math.PI * waveFrequency) - 1)
+      * waveAmount
+      * 0.032
+      * aspectZ
+      * bodyEnvelope;
   return [curveX, curveZ];
 }
 
@@ -84,8 +116,8 @@ export function createStudioVrmAuthoredHairClumpGeometry(
       const t = row / CLUMP_LENGTH_SEGMENTS;
       const y = 1 - t * 2;
       const width = clumpWidth(t, part.taper);
-      const depth = width * (0.12 + 0.08 * (1 - t));
-      const [centerX, centerZ] = clumpCenter(part, t);
+      const depth = width * (0.16 + 0.10 * (1 - t));
+      const [centerX, centerZ] = resolveStudioVrmAuthoredHairClumpCenter(part, t);
       for (let column = 0; column < columns; column += 1) {
         const u = column / CLUMP_CROSS_SEGMENTS;
         const cross = u * 2 - 1;
@@ -174,7 +206,7 @@ function setShellColors(geometry: THREE.BufferGeometry, part: AvatarForgeHairPar
 function createShellGeometry(part: AvatarForgeHairPart): THREE.BufferGeometry {
   const geometry = part.role === "cap"
     ? new THREE.SphereGeometry(1, RADIAL_SEGMENTS, CAP_HEIGHT_SEGMENTS, 0, Math.PI * 2, 0, Math.PI * 0.72)
-    : new THREE.SphereGeometry(1, 24, 16);
+    : new THREE.SphereGeometry(1, 28, 20);
   setShellColors(geometry, part);
   return geometry;
 }
