@@ -4,6 +4,7 @@ import {
   EMPTY_DATABASE_BOOTSTRAP_CONFIRMATION,
   assessBootstrapState,
   buildBootstrapDatabaseInspectionSql,
+  buildForwardMigrationBoundarySql,
   buildResetApplicationSchemasSql,
   buildRuntimeBootstrapAclSql,
   buildRuntimeLoginGateSql,
@@ -287,6 +288,14 @@ describe("bootstrap SQL and repository contract", () => {
     expect(sql).toContain("DROP SCHEMA IF EXISTS public CASCADE");
     expect(sql).toContain("CREATE SCHEMA public AUTHORIZATION CURRENT_USER");
     expect(sql).not.toMatch(/DROP DATABASE|DROP OWNED/u);
+  });
+
+  test("recreates forward-owned relations before IF NOT EXISTS migrations run", () => {
+    const sql = buildForwardMigrationBoundarySql();
+    expect(sql).toContain("public.creator_draft_collaboration_room");
+    expect(sql).toContain("public.personal_cloud_connection");
+    expect(sql).toContain("DROP EXTENSION IF EXISTS pg_trgm");
+    expect(sql).not.toContain('public."user"');
   });
 
   test("runtime ACL preserves migration and object-storage boundaries", () => {

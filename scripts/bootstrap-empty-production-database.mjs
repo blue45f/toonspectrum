@@ -499,6 +499,31 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 `;
 }
 
+export function buildForwardMigrationBoundarySql() {
+  return `
+DROP TABLE IF EXISTS
+  public.admin_announcements,
+  public.admin_audit_logs,
+  public.admin_banned_words,
+  public.admin_content_reports,
+  public.admin_promos,
+  public.admin_security_policies,
+  public.creator_work_asset_storage_reference,
+  public.creator_asset_storage_object,
+  public.creator_marketplace_library_item,
+  public.creator_marketplace_package_moderation,
+  public.creator_marketplace_package_moderation_decision,
+  public.creator_marketplace_publish_gate,
+  public.creator_marketplace_resource_report_gate,
+  public.creator_marketplace_resource_report,
+  public.creator_marketplace_resource,
+  public.creator_draft_collaboration_room,
+  public.personal_cloud_connection
+CASCADE;
+DROP EXTENSION IF EXISTS pg_trgm;
+`;
+}
+
 export function buildRuntimeRoleCreationSql(runtimeDatabaseRole, password) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   validateRuntimeDatabasePassword(password);
@@ -1036,34 +1061,10 @@ function executeBootstrap({
     }
     process.stdout.write("Historical structure through 0019: verified locally\n");
 
-    psql(
-      databaseUrl,
-      `
-        DROP TABLE IF EXISTS
-          public.admin_announcements,
-          public.admin_audit_logs,
-          public.admin_banned_words,
-          public.admin_content_reports,
-          public.admin_promos,
-          public.admin_security_policies,
-          public.creator_work_asset_storage_reference,
-          public.creator_asset_storage_object,
-          public.creator_marketplace_library_item,
-          public.creator_marketplace_package_moderation,
-          public.creator_marketplace_package_moderation_decision,
-          public.creator_marketplace_publish_gate,
-          public.creator_marketplace_resource_report_gate,
-          public.creator_marketplace_resource_report,
-          public.creator_marketplace_resource,
-          public.creator_draft_collaboration_room
-        CASCADE;
-        DROP EXTENSION IF EXISTS pg_trgm;
-      `,
-      {
-        allowLoopback: options.allowLoopback,
-        description: "Forward migration boundary preparation",
-      },
-    );
+    psql(databaseUrl, buildForwardMigrationBoundarySql(), {
+      allowLoopback: options.allowLoopback,
+      description: "Forward migration boundary preparation",
+    });
     assertBootstrapContractUnchanged(contract.fingerprint);
 
     psql(
