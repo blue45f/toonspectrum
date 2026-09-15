@@ -14,7 +14,7 @@ scripts/crawl-related-info.mjs   # 작품별 실링크 수집
   → components/title-external.tsx # 카테고리 탭 + 카드(클릭 시 원본으로 이동)
 ```
 
-- **주기 갱신:** `pnpm related:update`(로컬) 또는 `.github/workflows/related-info-update.yml`(주 1회).
+- **수동 갱신:** 필요할 때 로컬에서 `pnpm related:update:manual`을 실행하고 결과를 검토·커밋한다. 배포·GitHub Actions의 주기 수집은 없다.
 - **additive·resumable·원자적:** 인기 상위부터 넓혀가며, 중단돼도 진행분 보존(tmp→rename).
 - **YouTube 스로틀:** 스크래핑 모드는 Google 이 IP당 ~5~10회 후 `/sorry/` 봇체크로 차단 → best-effort
   (쿨다운으로 최대화). **공식 API 키를 쓰면 스로틀이 없다**(아래).
@@ -35,7 +35,7 @@ scripts/crawl-related-info.mjs   # 작품별 실링크 수집
 ## 공식 API 전환(권장) — 환경변수만 설정하면 자동 우선
 
 키가 설정돼 있으면 크롤러가 **ToS 준수 공식 API 를 우선 사용**하고, 없으면 스크래핑으로 폴백한다.
-코드 변경 없이 env 만 추가하면 된다(로컬 `.env`·CI Secrets).
+코드 변경 없이 로컬 실행 환경에 키를 추가하면 된다. 배포 환경이나 CI에는 수집용 키가 필요하지 않다.
 
 | 소스 | 환경변수 | 발급 | 비고 |
 |---|---|---|---|
@@ -44,7 +44,7 @@ scripts/crawl-related-info.mjs   # 작품별 실링크 수집
 
 ```bash
 # 로컬 예시
-NAVER_CLIENT_ID=xxx NAVER_CLIENT_SECRET=yyy YOUTUBE_API_KEY=zzz pnpm related:update
+NAVER_CLIENT_ID=xxx NAVER_CLIENT_SECRET=yyy YOUTUBE_API_KEY=zzz pnpm related:update:manual
 ```
 
 크롤러는 시작 시 소스별 모드(공식 API / 스크래핑)를 로그로 표시한다.

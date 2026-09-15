@@ -405,7 +405,7 @@ describe("Purpose-specific infrastructure environment validation", () => {
   });
 });
 
-describe("Catalog, asset admission, and KMAS environment validation", () => {
+describe("Catalog file, asset admission, and KMAS environment validation", () => {
   it("accepts the complete bounded operational surface", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
 
@@ -419,16 +419,6 @@ describe("Catalog, asset admission, and KMAS environment validation", () => {
           WEBDEX_PG_IDLE_MS: "10000",
           WEBDEX_CATALOG_FILE: "apps/api/data/catalog.json.gz",
           WEBDEX_CATALOG_GZ: "apps/api/data/catalog-legacy.json.gz",
-          WEBDEX_CATALOG_FORCE_DB: "0",
-          WEBDEX_SOURCE_IDS: "all",
-          CATALOG_INGEST_MODE: "off",
-          CATALOG_INGEST_INTERVAL_SECONDS: "1800",
-          CATALOG_INGEST_TIMEOUT_MS: "600000",
-          CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB: "64",
-          CATALOG_CRAWL_SCRIPT: "scripts/crawl.mjs",
-          CATALOG_INGEST_MIN_RETAIN_RATIO: "0.6",
-          CATALOG_REFRESH_POLL_SECONDS: "0",
-          CATALOG_SNAPSHOT_RETENTION: "5",
           COVER_IMAGE_POLICY: "proxy",
           STUDIO_RASTER_ASSET_ADMISSION:
             "verified-renderer-handoff-v1",
@@ -451,7 +441,6 @@ describe("Catalog, asset admission, and KMAS environment validation", () => {
       )
     ).toMatchObject({
       TZ: "Asia/Seoul",
-      CATALOG_INGEST_MODE: "off",
       COVER_IMAGE_POLICY: "proxy",
       KMAS_CATALOG_SOURCE: "snapshot",
     });
@@ -482,9 +471,6 @@ describe("Catalog, asset admission, and KMAS environment validation", () => {
         {
           NODE_ENV: "test",
           WEBDEX_CATALOG_FILE: " catalog.json.gz ",
-          CATALOG_INGEST_INTERVAL_SECONDS: "5",
-          CATALOG_INGEST_MIN_RETAIN_RATIO: "1.5",
-          CATALOG_REFRESH_POLL_SECONDS: "-1",
           STUDIO_WORK_ASSET_ADMISSION: "skip-validation",
           KMAS_PRV_KEY: kmasSecret,
           KMAS_BASE_URL: "http://www.kmas.or.kr",

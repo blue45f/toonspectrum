@@ -30,10 +30,7 @@ services:
         value: studio-live
       - key: TZ
         value: Asia/Seoul
-      # 기본은 번들 catalog.json.gz를 먼저 로드하고, 필요 시 DB catalog_snapshot으로 폴백한다.
-      # 자동 크롤은 끄고(off) 별도 cron/운영 절차에서 수동 트리거하는 것을 권장한다.
-      - key: CATALOG_INGEST_MODE
-        value: "off"
+      # 카탈로그는 검토 후 배포 번들에 포함되며 런타임에서는 읽기 전용이다.
       # Socket handshake ACL/CRDT 상태 조회용 Neon 연결 문자열. 일반 HTTP API는 이 호스트가 받지 않는다.
       # 시크릿이라 대시보드에서 입력하되 full API 계정을 재사용하지 않고 Studio가 조회·변경하는
       # relation만 GRANT한 전용 DB role을 사용한다.

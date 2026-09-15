@@ -50,9 +50,9 @@ const client = ky.create({
   // fixed by deployment configuration, and credentialed cross-origin access
   // is still constrained by the server's exact CORS/CSRF Origin allowlist.
   credentials: "include",
-  // 타임아웃은 끈다 — 기존 fetch 는 무제한이었고, 수동 크롤(/catalog/ingest/run)은 수 분 걸릴 수 있어 동작을 보존한다.
+  // 기존 fetch 호환성을 유지하기 위해 공통 타임아웃은 두지 않고, 호출 경계가 필요하면 개별 API에서 제한한다.
   timeout: false,
-  // 자동 재시도는 끈다 — 기존 fetch 호출은 재시도가 없었고, 크롤/수집 같은 멱등성 비보장 요청이 있어 동작을 보존한다.
+  // 자동 재시도는 끈다 — 쓰기 요청의 중복 실행을 막고 기존 fetch 동작을 보존한다.
   retry: 0,
   hooks: {
     beforeRequest: [
