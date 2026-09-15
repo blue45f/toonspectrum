@@ -35,9 +35,7 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
   const manifest = loadMigrationManifest();
   expect(manifest).toHaveLength(58);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe(
-    "0058_member_messaging",
-  );
+  expect(manifest.at(-1).id).toBe("0058_member_messaging");
   expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(58);
 });
 
@@ -143,8 +141,12 @@ test("community comments migration provisions threads, edit state, reactions, an
   expect(grant).toContain('public.creator_promotion_comment_like');
   expect(grant).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE');
   expect(grant).toContain('TO "toonspectrum_runtime"');
-  expect(buildCommunityCommentRuntimeAclViolationSql("toonspectrum_runtime"))
-    .toContain("has_table_privilege");
+  const violation = buildCommunityCommentRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(violation).toContain("has_table_privilege");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });
 
 test("member messaging migration provisions request-gated conversations", () => {
@@ -189,7 +191,8 @@ test("member messaging runtime ACL grants bounded DML without PUBLIC access", ()
   expect(grant).toContain("SELECT, INSERT, UPDATE, DELETE");
   expect(grant).toContain("FROM PUBLIC");
   expect(violation).toContain("TRUNCATE");
-  expect(violation).toContain("'PUBLIC'");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });
 
 test("personal cloud runtime ACL grants only bounded credential DML", () => {

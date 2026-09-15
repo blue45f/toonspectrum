@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT pg_advisory_xact_lock(530053);
+SELECT pg_advisory_xact_lock(530058);
 
 CREATE TABLE IF NOT EXISTS public."member_message_thread" (
   "id" text PRIMARY KEY,

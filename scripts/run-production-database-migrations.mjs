@@ -300,7 +300,7 @@ export function buildCommunityCommentRuntimeAclViolationSql(runtimeDatabaseRole)
       FROM unnest(ARRAY[
         'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
       ]::text[]) AS public_privilege
-      WHERE pg_catalog.has_table_privilege('PUBLIC', relation_name, public_privilege)
+      WHERE pg_catalog.has_table_privilege(0::oid, relation_name, public_privilege)
     )
   )`;
 }
@@ -399,7 +399,7 @@ export function buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole) {
         'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
       ]::text[]) AS public_privilege
       WHERE pg_catalog.has_table_privilege(
-        'PUBLIC',
+        0::oid,
         'public.${relation}',
         public_privilege
       )

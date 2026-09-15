@@ -221,5 +221,6 @@ test("production verification includes the member messaging ACL boundary", () =>
   const violation = buildMessagingRuntimeAclViolationSql("webdex_runtime");
   expect(violation).toContain("public.member_message_thread");
   expect(violation).toContain("SELECT, INSERT, UPDATE, DELETE");
-  expect(violation).toContain("'PUBLIC'");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });
