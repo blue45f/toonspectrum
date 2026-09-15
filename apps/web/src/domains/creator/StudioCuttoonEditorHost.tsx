@@ -5590,7 +5590,7 @@ export function StudioCuttoonEditor({
     return (
       root?.querySelector<HTMLButtonElement>('[data-studio-brush-catalog-launcher="true"]')
       ?? root?.querySelector<HTMLButtonElement>('[data-studio-brush-manager-launcher="true"]')
-      ?? root?.querySelector<HTMLButtonElement>('[data-studio-main-menu-trigger="brush"]')
+      ?? root?.querySelector<HTMLButtonElement>('[data-studio-main-menu-trigger="create"]')
       ?? null
     );
   }

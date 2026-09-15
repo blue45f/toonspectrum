@@ -36,6 +36,7 @@ function renderNavigator(
     tone: "neutral" | "accent" | "good" | "warn";
   }>,
   selectionCount = selectedType === null ? 0 : 1,
+  layersIntegrated = false,
 ): string {
   return renderToStaticMarkup(
     <StudioInspectorNavigator
@@ -56,6 +57,7 @@ function renderNavigator(
       imageToolsStatusDescription={imageToolsStatus?.description}
       imageToolsStatusTone={imageToolsStatus?.tone}
       layerCount={128}
+      layersIntegrated={layersIntegrated}
       onChange={noop}
     />
   );
@@ -114,6 +116,22 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain('data-studio-inspector-primary-tab="layers"');
     expect(html).toContain('aria-label="기능·설정 찾기"');
     expect(html).toMatch(/data-studio-inspector-search-trigger="true"[^>]*class="[^"]*lg:hidden/u);
+  });
+
+  it("removes the duplicate layer tab when the desktop split pane already exposes layers", () => {
+    const html = renderNavigator(
+      { primary: "properties", image: "quick", document: "canvas" },
+      "image",
+      true,
+      undefined,
+      1,
+      true,
+    );
+
+    expect(html).not.toContain('data-studio-inspector-primary-tab="layers"');
+    expect(html).toContain('data-studio-inspector-primary-tab="properties"');
+    expect(html).toContain('data-studio-inspector-primary-tab="document"');
+    expect(html.match(/role="tab"/g)).toHaveLength(7);
   });
 
   it("shows the 게시 준비 mode with a way back instead of a fourth tab", () => {

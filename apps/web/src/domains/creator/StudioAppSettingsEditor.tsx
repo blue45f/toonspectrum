@@ -25,7 +25,8 @@ import {
 import { createPortal } from "react-dom";
 
 import {
-  DEFAULT_STUDIO_RAIL_TOOL_ORDER,
+  DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
+  STUDIO_RAIL_VISIBLE_LIMIT,
   formatStudioShortcutChord,
   hideStudioRailTool,
   listStudioShortcutConflicts,
@@ -41,6 +42,7 @@ import {
   studioRailToolLabel,
   type StudioAppSettings,
   type StudioAppSettingsTab,
+  type StudioRailToolId,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
 import { runStudioDestructiveAction } from "./studio-destructive-action-preview";
@@ -211,7 +213,7 @@ export function StudioAppSettingsPanel({
   const visible = settings.toolbar.visibleIds;
   const hidden = studioRailHiddenIds(visible);
   const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
-  const matchesToolbarQuery = (id: (typeof DEFAULT_STUDIO_RAIL_TOOL_ORDER)[number]) =>
+  const matchesToolbarQuery = (id: StudioRailToolId) =>
     !normalizedToolbarQuery
     || studioRailToolLabel(id, t).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
   const visibleMatches = visible.filter(matchesToolbarQuery);
@@ -603,7 +605,7 @@ export function StudioAppSettingsPanel({
                       </p>
                     </div>
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
-                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
+                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length}/${STUDIO_RAIL_VISIBLE_LIMIT} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
                     </span>
                   </div>
                   <label className="relative block">
@@ -736,7 +738,7 @@ export function StudioAppSettingsPanel({
                     )}
                     aria-label={t("studio.settings.toolbar.resetAria")}
                     onClick={() =>
-                      patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } })
+                      patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS] } })
                     }
                   >
                     <RotateCcw className="size-3.5" aria-hidden />

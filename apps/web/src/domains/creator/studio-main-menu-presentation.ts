@@ -2,55 +2,40 @@
  * ToonStudio main-menu information architecture.
  *
  * The command catalogue keeps the complete V5 §15.3 grouping (17 groups + AI).
- * This module changes only how those groups are presented in desktop chrome, so
- * command ids, handlers, search metadata, localization paths and persistence
- * contracts remain stable.
+ * This module only changes presentation: command ids, handlers, search metadata,
+ * localization paths and persistence contracts remain stable.
  *
- * ## Workflow-first ten-title layout (IA audit 2026-09-05)
+ * ## Canvas-first eight-title layout (IA audit 2026-09-15)
  *
- * The former twelve-title layout still required artists to translate product
- * implementation concepts into goals: Selection and Transform were separate from
- * Edit; Canvas and Window were separate from View; Animation was separate from
- * Comic; and a catch-all Tools menu mixed six unrelated domains. Folding AI into
- * Effects was rejected because AI Assist, stock imagery and integrations are not
- * all effects and AI is a primary product capability that must stay discoverable.
+ * The visible application menu is intentionally limited to the document and
+ * creation workflow artists repeatedly scan:
  *
- * The visible workflow is:
+ *   파일 | 편집 | 보기 | 삽입 | 레이어 | 창작 | 효과 | 도움말
  *
- *   파일 | 편집 | 보기 | 삽입 | 레이어 | 그리기 | 만화 | 효과 | AI | 도움말
- *
- * - 파일 = file/project lifecycle + collaboration/review.
- * - 편집 = editing + selection + transform.
- * - 보기 = viewport + canvas guides/settings + workspace/window controls.
- * - 삽입 = text/balloon + vector + 3D reference/content.
- * - 레이어 = layer structure and non-destructive layer operations.
- * - 그리기 = direct mark-making, brushes and drawing style.
- * - 만화 = page/story production + animation.
- * - 효과 = filters, restoration, adjustment and stylization.
- * - AI remains a first-class destination for assist, stock and integrations.
- * - 도움말 stays last.
- *
- * Every source catalogue group remains a labelled section inside a composite
- * dropdown. Unknown/future groups are never dropped; they are inserted immediately
- * before Help until their product owner assigns a durable home.
+ * AI is preserved as a first-class action menu beside Save/Share/Publish instead
+ * of competing with document vocabulary in the primary menubar. Every source
+ * catalogue group remains a labelled section inside its composite dropdown.
  */
 
-/** Presentation order of the ten workflow-oriented menubar titles. */
+/** Presentation order of the eight workflow-oriented primary menu titles. */
 export const STUDIO_MAIN_MENU_PRESENTATION_ORDER = [
   "file",
   "edit",
   "view",
   "insert",
   "layer",
-  "brush",
-  "comic",
+  "create",
   "filter",
-  "ai",
   "help",
 ] as const;
 
+/** Action menus live next to document completion actions, outside the scroll lane. */
+export const STUDIO_MAIN_MENU_ACTION_ORDER = ["ai"] as const;
+
 export type StudioMainMenuPresentedGroupId =
   (typeof STUDIO_MAIN_MENU_PRESENTATION_ORDER)[number];
+export type StudioMainMenuActionGroupId =
+  (typeof STUDIO_MAIN_MENU_ACTION_ORDER)[number];
 
 /** Presented titles and the canonical catalogue groups they absorb. */
 export const STUDIO_MAIN_MENU_COMPOSITE_GROUPS = Object.freeze({
@@ -58,29 +43,33 @@ export const STUDIO_MAIN_MENU_COMPOSITE_GROUPS = Object.freeze({
   edit: Object.freeze(["edit", "select", "transform"] as const),
   view: Object.freeze(["view", "canvas", "window"] as const),
   insert: Object.freeze(["text", "vector", "3d"] as const),
-  comic: Object.freeze(["comic", "animation"] as const),
+  create: Object.freeze(["brush", "comic", "animation"] as const),
   filter: Object.freeze(["filter"] as const),
 });
 
 export type StudioMainMenuCompositeGroupId =
   keyof typeof STUDIO_MAIN_MENU_COMPOSITE_GROUPS;
+export type StudioMainMenuPresentationLabelId =
+  | StudioMainMenuCompositeGroupId
+  | StudioMainMenuActionGroupId;
 
-/** The complete familiar loop, retained for consumers that still reason in tiers. */
+/** The complete primary workflow, retained for consumers that still reason in tiers. */
 export const STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER =
   STUDIO_MAIN_MENU_PRESENTATION_ORDER;
 
-/** Unknown/future catalogue groups appear after AI and before Help. */
+/** Unknown/future catalogue groups appear immediately before Help. */
 const UNKNOWN_GROUP_ANCHOR: StudioMainMenuPresentedGroupId = "help";
 
 const WORKFLOW_LABELS: Readonly<
-  Record<StudioMainMenuCompositeGroupId, { readonly ko: string; readonly en: string }>
+  Record<StudioMainMenuPresentationLabelId, { readonly ko: string; readonly en: string }>
 > = Object.freeze({
   file: { ko: "파일", en: "File" },
   edit: { ko: "편집", en: "Edit" },
   view: { ko: "보기", en: "View" },
   insert: { ko: "삽입", en: "Insert" },
-  comic: { ko: "만화", en: "Comic" },
+  create: { ko: "창작", en: "Create" },
   filter: { ko: "효과", en: "Effects" },
+  ai: { ko: "AI 도우미", en: "AI Assist" },
 });
 
 export interface StudioMainMenuPresentableItem {
@@ -99,26 +88,31 @@ export interface StudioMainMenuPresentableGroup<
 }
 
 export interface StudioMainMenuPresentationOptions {
-  /** Localized titles for workflow composites. */
-  readonly labels?: Partial<Record<StudioMainMenuCompositeGroupId, string>>;
+  /** Localized titles for workflow composites and detached action menus. */
+  readonly labels?: Partial<Record<StudioMainMenuPresentationLabelId, string>>;
 }
 
 export interface StudioMainMenuPresentation<
   TGroup extends StudioMainMenuPresentableGroup,
 > {
-  /** Ten workflow titles in menubar order, plus unknown groups before Help. */
+  /** Eight workflow titles in the primary menubar, plus unknown groups before Help. */
   readonly groups: readonly TGroup[];
+  /** Contextual action menus rendered next to Save/Share/Publish. */
+  readonly actionGroups: readonly TGroup[];
   /** Catalogue groups each composite title absorbed, in section order. */
   readonly compositeSources: Readonly<Record<string, readonly string[]>>;
-  /** Presented ids in order, convenient for tests and overflow consumers. */
+  /** Presented primary ids in order, convenient for tests and overflow consumers. */
   readonly presentedGroupIds: readonly string[];
+  /** Presented action ids in order. */
+  readonly presentedActionGroupIds: readonly string[];
   /** Retained for StudioMainMenu's stable prop contract; workflow tiers need none. */
   readonly specialistBoundaryGroupId: string | null;
 }
 
-const KNOWN_PRESENTED_IDS = new Set<string>(
-  STUDIO_MAIN_MENU_PRESENTATION_ORDER,
-);
+const KNOWN_PRESENTED_IDS = new Set<string>([
+  ...STUDIO_MAIN_MENU_PRESENTATION_ORDER,
+  ...STUDIO_MAIN_MENU_ACTION_ORDER,
+]);
 const COMPOSITE_SOURCE_TO_TITLE = new Map<
   string,
   StudioMainMenuCompositeGroupId
@@ -194,8 +188,8 @@ export function createStudioMainMenuPresentation<
     const primarySourceLabel = sources.find((source) => source.id === title)?.label;
     const firstSourceLabel = sources[0]?.label;
     const defaultLabel = (() => {
-      if (title === "insert") {
-        return WORKFLOW_LABELS.insert[korean ? "ko" : "en"];
+      if (title === "insert" || title === "create") {
+        return WORKFLOW_LABELS[title][korean ? "ko" : "en"];
       }
       if (title === "filter") {
         if (firstSourceLabel === "필터") return WORKFLOW_LABELS.filter.ko;
@@ -229,10 +223,21 @@ export function createStudioMainMenuPresentation<
     if (group) presented.push(group);
   }
 
+  const actionGroups = STUDIO_MAIN_MENU_ACTION_ORDER.flatMap((id) => {
+    const source = byId.get(id);
+    if (!source) return [];
+    return [{
+      ...source,
+      label: options.labels?.[id] ?? WORKFLOW_LABELS[id][korean ? "ko" : "en"],
+    } as TGroup];
+  });
+
   return {
     groups: presented,
+    actionGroups,
     compositeSources,
     presentedGroupIds: presented.map((group) => group.id),
+    presentedActionGroupIds: actionGroups.map((group) => group.id),
     specialistBoundaryGroupId: null,
   };
 }

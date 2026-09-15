@@ -381,6 +381,7 @@ export function StudioInspectorAsideShell({
                     : undefined
             }
             layerCount={elements.length}
+            layersIntegrated={layersSplitWithProperties}
             mobileSheetHandle={
               <StudioMobileSheetHandle
                 active={isMobile && mobileSheet === "props"}

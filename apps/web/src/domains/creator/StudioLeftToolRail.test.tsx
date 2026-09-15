@@ -853,7 +853,7 @@ describe("StudioLeftToolRail", () => {
 
     render(<StudioLeftToolRail {...props} />);
 
-    const dialog = screen.getByRole("dialog", { name: "숨긴 도구" });
+    const dialog = screen.getByRole("dialog", { name: "추가 도구" });
     expect(dialog.parentElement).toBe(document.body);
     expect(dialog.getAttribute("aria-modal")).toBe("false");
     expect(dialog.className).toContain("fixed");
@@ -869,6 +869,30 @@ describe("StudioLeftToolRail", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "더보기 · 툴바 설정" })
     );
+  });
+
+  it("groups additional tools and replaces the last slot at the nine-tool budget", () => {
+    stubAnimationFrame();
+    const appSettings = defaultStudioAppSettings();
+    const visible = new Set(appSettings.toolbar.visibleIds);
+    const props = createProps({
+      appSettings,
+      isRailToolVisible: (id) => visible.has(id),
+      railMoreOpen: true,
+    });
+
+    render(<StudioLeftToolRail {...props} />);
+
+    expect(screen.getByText("선택·이동")).toBeTruthy();
+    expect(screen.getByText(/도구막대 9\/9/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
+
+    expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
+      ...appSettings,
+      toolbar: {
+        visibleIds: [...appSettings.toolbar.visibleIds.slice(0, -1), "hand"],
+      },
+    });
   });
 
   it("opens the toolbar settings tab while preserving the More trigger as modal return focus", () => {
@@ -899,7 +923,7 @@ describe("StudioLeftToolRail", () => {
     });
     const view = render(<StudioLeftToolRail {...escapeProps} />);
 
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "숨긴 도구" }), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "추가 도구" }), { key: "Escape" });
     expect(escapeProps.setRailMoreOpen).toHaveBeenCalledWith(false);
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "더보기 · 툴바 설정" })
@@ -930,6 +954,24 @@ describe("StudioLeftToolRail", () => {
     expect(liveIds.indexOf("pen")).toBeLessThan(liveIds.indexOf("marquee-rect"));
     expect(liveIds.indexOf("marquee-rect")).toBeLessThan(liveIds.indexOf("transform"));
     expect(liveIds.indexOf("vrm3d")).toBeLessThan(liveIds.indexOf("zoom"));
+  });
+
+  it("omits empty group dividers from a compact customized rail", () => {
+    const visible = new Set(["select", "pen"]);
+    render(
+      <StudioLeftToolRail
+        {...createProps({ isRailToolVisible: (id) => visible.has(id) })}
+      />,
+    );
+
+    expect(document.querySelector('[data-studio-rail-group-divider="navigate-select"]'))
+      .not.toBeNull();
+    expect(document.querySelector('[data-studio-rail-group-divider="draw"]'))
+      .not.toBeNull();
+    expect(document.querySelector('[data-studio-rail-group-divider="media-3d"]'))
+      .toBeNull();
+    expect(document.querySelector('[data-studio-rail-group-divider="view"]'))
+      .toBeNull();
   });
 
   it("labels rail group dividers from the chrome IA map (CSP scannable groups)", async () => {

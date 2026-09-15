@@ -70,5 +70,9 @@ export interface StudioMainMenuProps {
   groups: readonly StudioMainMenuGroup[];
   /** First specialist extension group in the already-presented list. */
   specialistBoundaryGroupId?: string | null;
+  /** Accessible name for primary or detached action menubars. */
+  ariaLabel?: string;
+  /** Primary owns the application menu lane; action menus live beside completion CTAs. */
+  surface?: "primary" | "action";
   className?: string;
 }

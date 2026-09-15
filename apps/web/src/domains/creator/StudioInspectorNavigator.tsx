@@ -72,6 +72,8 @@ export interface StudioInspectorNavigatorProps {
   imageToolsStatusDescription?: string;
   imageToolsStatusTone?: "neutral" | "accent" | "good" | "warn";
   layerCount: number;
+  /** Desktop split panes already expose Layers below properties, so avoid a duplicate tab. */
+  layersIntegrated?: boolean;
   mobileSheetHandle?: ReactNode;
   onRequestClose?: () => void;
   onChange: (layout: StudioInspectorLayout) => void;
@@ -252,6 +254,7 @@ export function StudioInspectorNavigator({
   imageToolsStatusDescription,
   imageToolsStatusTone = "neutral",
   layerCount,
+  layersIntegrated = false,
   mobileSheetHandle,
   onRequestClose,
   onChange,
@@ -282,7 +285,9 @@ export function StudioInspectorNavigator({
   const imageToolsStatusId = `${titleId}-image-tools-status`;
   const publishMode = layout.primary === "publish";
   const renderedPrimaryTabs = STUDIO_INSPECTOR_PRIMARY_TABS.filter(
-    (tab) => panelState.visiblePrimaryTabs.includes(tab) || layout.primary === tab,
+    (tab) =>
+      (!layersIntegrated || tab !== "layers" || layout.primary === "layers")
+      && (panelState.visiblePrimaryTabs.includes(tab) || layout.primary === tab),
   );
 
   useEffect(() => {
