@@ -101,7 +101,7 @@ export function personalCloudTokenContext(
   return `toonspectrum.personal-cloud.v1:${kind}:${provider}:${userId}`;
 }
 
-export function issuePersonalCloudOAuthState(
+export function encodePersonalCloudOAuthState(
   payload: PersonalCloudOAuthStatePayload,
   secret: string,
 ): string {

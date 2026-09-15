@@ -20,6 +20,24 @@ describe("personal cloud provider configuration", () => {
     expect(config.scopes).toContain("https://www.googleapis.com/auth/drive.file");
   });
 
+  it("requests the Dropbox metadata scope used by conflict detection", () => {
+    const config = personalCloudProviderConfig("dropbox", {
+      ...common,
+      DROPBOX_OAUTH_CLIENT_ID: "dropbox-client",
+      DROPBOX_OAUTH_CLIENT_SECRET: "dropbox-secret",
+    });
+
+    expect(config.configured).toBe(true);
+    expect(config.scopes).toEqual([
+      "account_info.read",
+      "files.metadata.read",
+      "files.content.read",
+      "files.content.write",
+    ]);
+    expect(config.scopes).not.toContain("files.metadata.write");
+    expect(config.scopes).not.toContain("sharing.write");
+  });
+
   it("fails closed when encryption or provider credentials are incomplete", () => {
     const config = personalCloudProviderConfig("dropbox", {
       DROPBOX_OAUTH_CLIENT_ID: "dropbox-client",

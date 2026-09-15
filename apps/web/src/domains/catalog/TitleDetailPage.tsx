@@ -157,7 +157,13 @@ export function TitleDetailPage() {
           {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (
             <SubscribeButton titleId={title.id} days={title.updateDays} />
           )}
-          <ShareButton title={title.title} slug={title.slug} className="self-start" />
+          <ShareButton
+            title={title.title}
+            slug={title.slug}
+            description={metaDesc ?? undefined}
+            imageUrl={title.coverImage}
+            className="self-start"
+          />
           <div className="rounded-2xl border border-line bg-panel/50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <MapPin size={15} className="text-accent" />

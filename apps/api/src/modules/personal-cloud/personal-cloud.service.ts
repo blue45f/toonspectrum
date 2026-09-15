@@ -9,7 +9,7 @@ import {
   createPersonalCloudPkcePair,
   decryptPersonalCloudSecret,
   encryptPersonalCloudSecret,
-  issuePersonalCloudOAuthState,
+  encodePersonalCloudOAuthState,
   personalCloudTokenContext,
   verifyPersonalCloudOAuthState,
 } from "./personal-cloud.crypto";
@@ -123,7 +123,7 @@ export class PersonalCloudService {
     const nonce = createPersonalCloudNonce();
     const returnTo = safeReturnTo(input.returnTo);
     const pkce = createPersonalCloudPkcePair();
-    const state = issuePersonalCloudOAuthState({
+    const state = encodePersonalCloudOAuthState({
       version: 1,
       provider: input.provider,
       userId: input.userId,

@@ -59,7 +59,7 @@ these need coordinated frontend and metadata/visibility contract changes.
 ## Controls and rollback
 
 - CATALOG_EAGER_INIT=1 restores serverless eager initialization.
-- WEBDEX_CATALOG_FORCE_DB=1 retains the eager legacy DB behavior.
+- Catalog rollback now requires reverting the reviewed snapshot/deployment; the legacy DB catalog fallback has been removed.
 - CATALOG_PUBLIC_CACHE_SECONDS=0 disables the new public HTTP cache.
 - CATALOG_PUBLIC_CACHE_SECONDS accepts integer 0..300, default 30; invalid disables.
 - Existing KMAS_MERGE_ON_ACCESS is respected, not changed.

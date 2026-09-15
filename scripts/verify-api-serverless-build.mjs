@@ -313,7 +313,6 @@ export async function verifyApiServerlessBuild() {
           AUTH_RATE_LIMIT_MODE: "single-instance-local",
           AUTH_SESSION_SECRET: "toonspectrum-artifact-verification-session-only",
           DATABASE_URL: "postgresql://test:test@127.0.0.1:9/toonspectrum_package_test",
-          CATALOG_INGEST_MODE: "off",
           COVER_IMAGE_POLICY: "proxy",
           KMAS_LIVE_SEARCH: "0",
           KMAS_MERGE_ON_ACCESS: "0",
