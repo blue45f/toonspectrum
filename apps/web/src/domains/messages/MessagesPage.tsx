@@ -184,7 +184,9 @@ function MessageBubble({
   message: MessagingMessage;
   onReport: (message: MessagingMessage) => void;
 }) {
-  const context = message.metadata.context;
+  const context = message.type === "work_card" || message.type === "project_card"
+    ? message.metadata.context
+    : null;
   const linkedContext = context && typeof context === "object" && !Array.isArray(context)
     ? context as { label?: unknown; href?: unknown }
     : null;

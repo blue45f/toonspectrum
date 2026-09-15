@@ -205,6 +205,44 @@ function contextHref(type: string, id: string | null, otherUserId: string): stri
   return null;
 }
 
+export function messageTypeForContext(
+  type: MessagingContext["type"]
+): MessagingMessage["type"] {
+  if (type === "work") return "work_card";
+  if (type === "project") return "project_card";
+  return "text";
+}
+
+export function threadContextForViewer(
+  type: MessagingContext["type"],
+  id: string | null,
+  label: string,
+  otherUser: MessagingUser
+): MessagingContext {
+  if (type === "profile") {
+    return {
+      type,
+      id: otherUser.id,
+      label: otherUser.name,
+      href: contextHref(type, otherUser.id, otherUser.id),
+    };
+  }
+  return {
+    type,
+    id,
+    label,
+    href: contextHref(type, id, otherUser.id),
+  };
+}
+
+export function assembleReportEvidence<T>(
+  beforeNewestFirst: readonly T[],
+  target: T,
+  afterOldestFirst: readonly T[]
+): T[] {
+  return [...beforeNewestFirst].reverse().concat(target, afterOldestFirst);
+}
+
 function projectUser(row: {
   otherUserId: string;
   otherName: string | null;
@@ -221,6 +259,8 @@ function projectUser(row: {
 }
 
 function projectSummary(row: ThreadSummaryRow, actorUserId: string): MessagingThreadSummary {
+  const otherUser = projectUser(row);
+  const contextType = row.contextType as MessagingContext["type"];
   const lastMessage = row.lastMessageId && row.lastType && row.lastBody && row.lastCreatedAt
     ? {
         id: row.lastMessageId,
@@ -235,13 +275,13 @@ function projectSummary(row: ThreadSummaryRow, actorUserId: string): MessagingTh
     id: row.id,
     state: row.state as MessagingThreadSummary["state"],
     category: row.requestCategory as MessagingThreadSummary["category"],
-    context: {
-      type: row.contextType as MessagingContext["type"],
-      id: row.contextId,
-      label: row.contextLabel,
-      href: contextHref(row.contextType, row.contextId, row.otherUserId),
-    },
-    otherUser: projectUser(row),
+    context: threadContextForViewer(
+      contextType,
+      row.contextId,
+      row.contextLabel,
+      otherUser
+    ),
+    otherUser,
     createdByMe: row.createdBy === actorUserId,
     incomingRequest: row.state === "pending" && row.requestRecipientId === actorUserId,
     canReply: row.state === "active" && !row.blocked,
@@ -357,6 +397,8 @@ export class PostgresMessagingRepository implements MessagingRepository {
       const now = new Date();
       const threadId = randomUUID();
       const messageId = randomUUID();
+      const messageType = messageTypeForContext(context.type);
+      const messageMetadata = messageType === "text" ? {} : { context };
       await client.query(
         `
           INSERT INTO public."member_message_thread" (
@@ -393,14 +435,15 @@ export class PostgresMessagingRepository implements MessagingRepository {
         `
           INSERT INTO public."member_message" (
             "id", "threadId", "senderId", "type", "body", "metadata", "createdAt"
-          ) VALUES ($1, $2, $3, 'text', $4, $5::jsonb, $6)
+          ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
         `,
         [
           messageId,
           threadId,
           actorUserId,
+          messageType,
           input.text,
-          JSON.stringify({ context }),
+          JSON.stringify(messageMetadata),
           now,
         ]
       );
@@ -638,11 +681,13 @@ export class PostgresMessagingRepository implements MessagingRepository {
               WHERE thread."state" = 'active'
                 AND message."senderId" IS DISTINCT FROM $1
                 AND message."deletedAt" IS NULL
+                AND (participant."mutedUntil" IS NULL OR participant."mutedUntil" <= now())
                 AND (participant."lastReadAt" IS NULL OR message."createdAt" > participant."lastReadAt")
             ) AS "messages",
             count(DISTINCT thread."id") FILTER (
               WHERE thread."state" = 'pending'
                 AND thread."requestRecipientId" = $1
+                AND (participant."mutedUntil" IS NULL OR participant."mutedUntil" <= now())
             ) AS "requests"
           FROM public."member_message_participant" AS participant
           JOIN public."member_message_thread" AS thread
@@ -794,18 +839,10 @@ export class PostgresMessagingRepository implements MessagingRepository {
   ): Promise<{ id: string; status: "open" }> {
     return this.transaction(async (client) => {
       await this.requireActiveUser(client, actorUserId);
-      const messageResult = await client.query<{
-        id: string;
-        threadId: string;
-        senderId: string | null;
-        body: string;
-        type: string;
-        metadata: Record<string, unknown> | null;
-        createdAt: Date | string;
-      }>(
+      const messageResult = await client.query<MessageRow>(
         `
           SELECT message."id", message."threadId", message."senderId", message."body",
-                 message."type", message."metadata", message."createdAt"
+                 message."type", message."metadata", message."createdAt", message."deletedAt"
           FROM public."member_message" AS message
           JOIN public."member_message_participant" AS participant
             ON participant."threadId" = message."threadId"
@@ -820,24 +857,36 @@ export class PostgresMessagingRepository implements MessagingRepository {
       if (!message.senderId || message.senderId === actorUserId) {
         throw new MessagingForbiddenError("report_own_message");
       }
-      const contextResult = await client.query<{
-        id: string;
-        senderId: string | null;
-        type: string;
-        body: string;
-        metadata: Record<string, unknown> | null;
-        createdAt: Date | string;
-      }>(
+      const beforeResult = await client.query<MessageRow>(
         `
-          SELECT "id", "senderId", "type", "body", "metadata", "createdAt"
+          SELECT "id", "threadId", "senderId", "type", "body", "metadata",
+                 "createdAt", "deletedAt"
           FROM public."member_message"
           WHERE "threadId" = $1
-            AND "createdAt" BETWEEN $2::timestamptz - interval '24 hours'
-                                AND $2::timestamptz + interval '24 hours'
-          ORDER BY "createdAt", "id"
-          LIMIT 21
+            AND "createdAt" >= $2::timestamptz - interval '24 hours'
+            AND ("createdAt", "id") < ($2::timestamptz, $3::text)
+          ORDER BY "createdAt" DESC, "id" DESC
+          LIMIT 10
         `,
-        [message.threadId, message.createdAt]
+        [message.threadId, message.createdAt, message.id]
+      );
+      const afterResult = await client.query<MessageRow>(
+        `
+          SELECT "id", "threadId", "senderId", "type", "body", "metadata",
+                 "createdAt", "deletedAt"
+          FROM public."member_message"
+          WHERE "threadId" = $1
+            AND "createdAt" <= $2::timestamptz + interval '24 hours'
+            AND ("createdAt", "id") > ($2::timestamptz, $3::text)
+          ORDER BY "createdAt", "id"
+          LIMIT 10
+        `,
+        [message.threadId, message.createdAt, message.id]
+      );
+      const evidenceMessages = assembleReportEvidence(
+        beforeResult.rows,
+        message,
+        afterResult.rows
       );
       const reportId = randomUUID();
       const evidenceSnapshot = {
@@ -845,7 +894,7 @@ export class PostgresMessagingRepository implements MessagingRepository {
         capturedAt: new Date().toISOString(),
         threadId: message.threadId,
         targetMessageId: message.id,
-        messages: contextResult.rows.map((row) => ({
+        messages: evidenceMessages.map((row) => ({
           id: row.id,
           senderId: row.senderId,
           type: row.type,

@@ -174,7 +174,7 @@ export const messagingClient = {
   },
   reportMessage(messageId: string, reason: MessagingReportReason, details = "") {
     return api.post<{ id: string; status: "open" }>(
-      `/messages/messages/${encodeURIComponent(messageId)}/report`,
+      `/messages/${encodeURIComponent(messageId)}/report`,
       { reason, details }
     );
   },

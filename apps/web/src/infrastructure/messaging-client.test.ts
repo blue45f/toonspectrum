@@ -64,7 +64,7 @@ describe("messagingClient", () => {
     );
     expect(apiPost).toHaveBeenNthCalledWith(
       2,
-      "/messages/messages/message%2F1/report",
+      "/messages/message%2F1/report",
       { reason: "spam", details: "반복 발송" },
     );
   });

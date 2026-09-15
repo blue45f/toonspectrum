@@ -73,22 +73,34 @@ export function AuthMenu({
   }, [status, uid]);
 
   useEffect(() => {
-    if (!menuOpen || status !== "authenticated" || !uid) {
-      if (status !== "authenticated") setUnreadMessageCount(0);
+    if (status !== "authenticated" || !uid) {
+      setUnreadMessageCount(0);
       return;
     }
     let alive = true;
-    messagingClient.unreadCount()
-      .then((result) => {
-        if (alive) setUnreadMessageCount(result.total);
-      })
-      .catch(() => {
-        if (alive) setUnreadMessageCount(0);
-      });
+    const refreshUnreadCount = () => {
+      messagingClient.unreadCount()
+        .then((result) => {
+          if (alive) setUnreadMessageCount(result.total);
+        })
+        .catch(() => {
+          if (alive) setUnreadMessageCount(0);
+        });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshUnreadCount();
+    };
+    refreshUnreadCount();
+    const interval = window.setInterval(refreshWhenVisible, 60_000);
+    window.addEventListener("focus", refreshUnreadCount);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       alive = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshUnreadCount);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [menuOpen, status, uid]);
+  }, [status, uid]);
 
   if (status !== "authenticated") {
     return (
@@ -159,10 +171,20 @@ export function AuthMenu({
   return (
     <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenu.Trigger
-        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
-        aria-label={t("auth.menu.triggerLabel")}
+        className="relative grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
+        aria-label={
+          unreadMessageCount > 0
+            ? `${t("auth.menu.triggerLabel")} · 읽지 않은 메시지 ${unreadMessageCount.toLocaleString("ko-KR")}개`
+            : t("auth.menu.triggerLabel")
+        }
       >
         {imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : initial}
+        {unreadMessageCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="absolute right-0.5 top-0.5 size-2.5 rounded-full border-2 border-panel bg-danger"
+          />
+        ) : null}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

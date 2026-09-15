@@ -161,7 +161,7 @@ export class MessagingController {
     return this.service.unblockUser(requireMessagingUserId(userId), params.userId);
   }
 
-  @Post("messages/:messageId/report")
+  @Post(":messageId/report")
   reportMessage(
     @Headers("x-user-id") userId: string | undefined,
     @Param(new ZodValidationPipe(MessagingMessageParamsDto)) params: MessagingMessageParamsDto,
