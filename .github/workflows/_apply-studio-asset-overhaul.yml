@@ -1,0 +1,62 @@
+name: Apply Studio asset workspace payload
+
+on:
+  push:
+    branches:
+      - feat/studio-asset-workspace-overhaul-20260915
+    paths:
+      - '.github/workflows/_apply-studio-asset-overhaul.yml'
+      - '.github/studio-asset-overhaul-payload-*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-asset-overhaul-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Apply source payload and push the implementation commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/studio-asset-overhaul-payload-* \
+            | base64 --decode \
+            | gzip --decompress \
+            > /tmp/studio-asset-overhaul.patch
+
+          rm -f \
+            .github/workflows/studio-asset-library-regression.yml \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.boundary.test.ts \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary.explicit.test.tsx \
+            apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetPreviewSurface.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.tsx \
+            apps/web/src/domains/creator/studio-insert-hub-drag.background.test.ts \
+            apps/web/src/domains/creator/studio-insert-hub-drag.ts \
+            apps/web/src/domains/creator/studio-unified-asset-preview.test.ts \
+            apps/web/src/domains/creator/studio-unified-asset-preview.ts \
+            docs/studio/studio-asset-workspace-overhaul-2026-09-15.md
+
+          git apply --whitespace=fix /tmp/studio-asset-overhaul.patch
+          rm -f \
+            .github/workflows/_apply-studio-asset-overhaul.yml \
+            .github/studio-asset-overhaul-payload-*
+
+          git add --all
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(studio): overhaul asset and template workspace'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
