@@ -111,7 +111,7 @@
   "studio.settings.shortcuts.reset": "Shortcut defaults",
   "studio.settings.shortcuts.noConflictHint": "Shortcut conflict",
   "studio.settings.mouse.wheelLabel": "Wheel",
-  "studio.settings.mouse.wheelHint": "Action on scroll",
+  "studio.settings.mouse.wheelHint": "Choose the vertical-wheel action. Shift+wheel pans horizontally; Brush size mode keeps its 5 px step.",
   "studio.settings.mouse.wheel.zoom": "Zoom",
   "studio.settings.mouse.wheel.pan": "Pan",
   "studio.settings.mouse.wheel.brushSize": "Brush size",
