@@ -12,13 +12,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-actions-queue-cleanup-${{ github.ref }}
+  group: pr-actions-queue-cleanup-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   cleanup:
     name: Cancel superseded runs for this PR branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
       - name: Preserve the newest run of each workflow and cancel older active runs
@@ -65,7 +65,7 @@ jobs:
               }
             }
 
-            core.summary
+            await core.summary
               .addHeading("PR Actions queue cleanup")
               .addRaw(`Branch: ${headBranch}\n`)
               .addRaw(`Preserved latest active runs: ${preserved.join(", ") || "none"}\n`)
