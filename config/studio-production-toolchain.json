@@ -1,0 +1,825 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "open",
+      "name": "Open 기본",
+      "description": "허용된 permissive 모듈과 별도 설치 엔진을 연결하며 비상업 모듈을 차단합니다."
+    },
+    {
+      "id": "community-gpl",
+      "name": "Community GPL",
+      "description": "GPL/AGPL 도구를 별도 실행기로 적극 연결하고 대응 소스·고지를 유지합니다."
+    },
+    {
+      "id": "research-nc",
+      "name": "Research NC",
+      "description": "비상업 전용 모듈을 명시적으로 허용하는 연구 환경입니다."
+    }
+  ],
+  "categories": [
+    {
+      "id": "effects",
+      "name": "효과·복원"
+    },
+    {
+      "id": "compositing",
+      "name": "합성"
+    },
+    {
+      "id": "scan-ocr",
+      "name": "스캔·OCR"
+    },
+    {
+      "id": "vector",
+      "name": "벡터화"
+    },
+    {
+      "id": "animation",
+      "name": "애니메이션"
+    },
+    {
+      "id": "media",
+      "name": "영상·미디어"
+    },
+    {
+      "id": "three-d",
+      "name": "3D·배경"
+    },
+    {
+      "id": "publishing",
+      "name": "출판·PDF"
+    },
+    {
+      "id": "reference",
+      "name": "사진·레퍼런스"
+    },
+    {
+      "id": "audio-accessibility",
+      "name": "오디오·접근성"
+    },
+    {
+      "id": "operations",
+      "name": "제작 운영"
+    },
+    {
+      "id": "research-nc",
+      "name": "비상업 연구"
+    }
+  ],
+  "tools": [
+    {
+      "id": "gmic",
+      "name": "G’MIC",
+      "category": "effects",
+      "license": "CeCILL-2.1",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "gmic",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://gmic.eu/",
+      "description": "창작·복원·패턴 필터를 고품질 최종 처리로 실행합니다.",
+      "operations": [
+        {
+          "id": "denoise",
+          "name": "노이즈 제거",
+          "input": "image",
+          "output": "image",
+          "executable": true
+        },
+        {
+          "id": "halftone",
+          "name": "하프톤",
+          "input": "image",
+          "output": "image",
+          "executable": true
+        },
+        {
+          "id": "line-art",
+          "name": "선화 추출",
+          "input": "image",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "gegl",
+      "name": "GEGL",
+      "category": "effects",
+      "license": "LGPL-3.0-or-later",
+      "licenseClass": "weak-copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "gegl",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://gegl.org/",
+      "description": "비파괴 효과 그래프의 최종 렌더를 담당합니다.",
+      "operations": [
+        {
+          "id": "render-graph",
+          "name": "효과 그래프 렌더",
+          "input": "image",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "natron",
+      "name": "Natron",
+      "category": "compositing",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "NatronRenderer",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://natrongithub.github.io/",
+      "description": "노드 합성·로토·트래킹 프로젝트를 렌더합니다.",
+      "operations": [
+        {
+          "id": "render-project",
+          "name": "합성 프로젝트 렌더",
+          "input": "project",
+          "output": "sequence",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "tesseract",
+      "name": "Tesseract OCR",
+      "category": "scan-ocr",
+      "license": "Apache-2.0",
+      "licenseClass": "permissive",
+      "deployment": "local-toonbridge",
+      "binary": "tesseract",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed",
+      "source": "https://github.com/tesseract-ocr/tesseract",
+      "description": "스캔 원고에서 대사·텍스트와 위치 정보를 추출합니다.",
+      "operations": [
+        {
+          "id": "ocr-text",
+          "name": "텍스트 추출",
+          "input": "image",
+          "output": "text",
+          "executable": true
+        },
+        {
+          "id": "ocr-tsv",
+          "name": "위치 포함 TSV",
+          "input": "image",
+          "output": "tsv",
+          "executable": true
+        },
+        {
+          "id": "ocr-hocr",
+          "name": "hOCR",
+          "input": "image",
+          "output": "hocr",
+          "executable": true
+        },
+        {
+          "id": "ocr-pdf",
+          "name": "검색 가능한 PDF",
+          "input": "image",
+          "output": "pdf",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "potrace",
+      "name": "Potrace",
+      "category": "vector",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "potrace",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://potrace.sourceforge.net/",
+      "description": "정리된 흑백 선화를 SVG 경로로 변환합니다.",
+      "operations": [
+        {
+          "id": "bitmap-to-svg",
+          "name": "비트맵→SVG",
+          "input": "bitmap",
+          "output": "svg",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "inkscape",
+      "name": "Inkscape",
+      "category": "vector",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "inkscape",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://inkscape.org/",
+      "description": "SVG 경로 정리·변환·PDF 출력을 수행합니다.",
+      "operations": [
+        {
+          "id": "normalize-svg",
+          "name": "SVG 정규화",
+          "input": "svg",
+          "output": "svg",
+          "executable": true
+        },
+        {
+          "id": "export-pdf",
+          "name": "SVG→PDF",
+          "input": "svg",
+          "output": "pdf",
+          "executable": true
+        },
+        {
+          "id": "export-png",
+          "name": "SVG→PNG",
+          "input": "svg",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "opentoonz",
+      "name": "OpenToonz",
+      "category": "animation",
+      "license": "BSD-3-Clause",
+      "licenseClass": "permissive",
+      "deployment": "local-toonbridge",
+      "binary": "tcomposer",
+      "probeArgs": [
+        "-h"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed",
+      "source": "https://opentoonz.github.io/",
+      "description": "Xsheet 기반 2D 장면과 프레임 시퀀스를 렌더합니다.",
+      "operations": [
+        {
+          "id": "render-scene",
+          "name": "OpenToonz 장면 렌더",
+          "input": "project",
+          "output": "sequence",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "synfig",
+      "name": "Synfig",
+      "category": "animation",
+      "license": "GPL-3.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "synfig",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.synfig.org/",
+      "description": "벡터 트윈·본 애니메이션 장면을 렌더합니다.",
+      "operations": [
+        {
+          "id": "render-animation",
+          "name": "Synfig 애니메이션 렌더",
+          "input": "project",
+          "output": "video",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "ffmpeg",
+      "name": "FFmpeg",
+      "category": "media",
+      "license": "LGPL-2.1-or-later",
+      "licenseClass": "weak-copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "ffmpeg",
+      "probeArgs": [
+        "-version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "build-dependent",
+      "source": "https://ffmpeg.org/",
+      "description": "프레임·영상·오디오를 플랫폼별 결과물로 변환합니다.",
+      "operations": [
+        {
+          "id": "encode-mp4",
+          "name": "MP4 출력",
+          "input": "media",
+          "output": "video",
+          "executable": true
+        },
+        {
+          "id": "encode-webm",
+          "name": "WebM 출력",
+          "input": "media",
+          "output": "video",
+          "executable": true
+        },
+        {
+          "id": "encode-gif",
+          "name": "GIF 출력",
+          "input": "media",
+          "output": "image",
+          "executable": true
+        },
+        {
+          "id": "proxy-video",
+          "name": "프록시 영상",
+          "input": "video",
+          "output": "video",
+          "executable": true
+        },
+        {
+          "id": "extract-frame",
+          "name": "대표 프레임",
+          "input": "video",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "category": "three-d",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "blender",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.blender.org/",
+      "description": "3D 장면·Grease Pencil·Line Art·GLB 결과를 생성합니다.",
+      "operations": [
+        {
+          "id": "render-scene",
+          "name": "장면 렌더",
+          "input": "project",
+          "output": "image",
+          "executable": true
+        },
+        {
+          "id": "export-glb",
+          "name": "GLB 내보내기",
+          "input": "project",
+          "output": "model",
+          "executable": true
+        },
+        {
+          "id": "line-art",
+          "name": "Line Art 패스",
+          "input": "project",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "sweethome3d",
+      "name": "Sweet Home 3D",
+      "category": "three-d",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "SweetHome3D",
+      "probeArgs": [
+        "-help"
+      ],
+      "maturity": "manual-adapter",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.sweethome3d.com/",
+      "description": "실내 평면도·가구·카메라 장면을 빠르게 제작합니다.",
+      "operations": [
+        {
+          "id": "export-home",
+          "name": "실내 장면 내보내기",
+          "input": "project",
+          "output": "model",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "qgis",
+      "name": "QGIS",
+      "category": "three-d",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "qgis_process",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "adapter-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://qgis.org/",
+      "description": "실제 지도·지형·도시 데이터를 장면 소재로 변환합니다.",
+      "operations": [
+        {
+          "id": "run-model",
+          "name": "QGIS 처리 모델 실행",
+          "input": "project",
+          "output": "asset",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "openscad",
+      "name": "OpenSCAD",
+      "category": "three-d",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "openscad",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://openscad.org/",
+      "description": "치수 기반 절차적 소품과 건축 부품을 생성합니다.",
+      "operations": [
+        {
+          "id": "export-stl",
+          "name": "STL 생성",
+          "input": "project",
+          "output": "model",
+          "executable": true
+        },
+        {
+          "id": "export-3mf",
+          "name": "3MF 생성",
+          "input": "project",
+          "output": "model",
+          "executable": true
+        },
+        {
+          "id": "export-svg",
+          "name": "2D SVG 생성",
+          "input": "project",
+          "output": "svg",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "scribus",
+      "name": "Scribus",
+      "category": "publishing",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "scribus",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "manual-adapter",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.scribus.net/",
+      "description": "단행본 조판·도련·CMYK·PDF 출력 작업을 연결합니다.",
+      "operations": [
+        {
+          "id": "export-pdf",
+          "name": "조판 PDF 출력",
+          "input": "project",
+          "output": "pdf",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "ghostscript",
+      "name": "Ghostscript",
+      "category": "publishing",
+      "license": "AGPL-3.0-or-later",
+      "licenseClass": "network-copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "gs",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.ghostscript.com/",
+      "description": "PDF 검사·최적화·면배치·규격 변환을 수행합니다.",
+      "operations": [
+        {
+          "id": "optimize-pdf",
+          "name": "PDF 최적화",
+          "input": "pdf",
+          "output": "pdf",
+          "executable": true
+        },
+        {
+          "id": "normalize-pdf",
+          "name": "PDF 정규화",
+          "input": "pdf",
+          "output": "pdf",
+          "executable": true
+        },
+        {
+          "id": "nup-pdf",
+          "name": "N-up 면배치",
+          "input": "pdf",
+          "output": "pdf",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "darktable",
+      "name": "darktable",
+      "category": "reference",
+      "license": "GPL-3.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "darktable-cli",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.darktable.org/",
+      "description": "RAW 레퍼런스·텍스처를 비파괴 현상합니다.",
+      "operations": [
+        {
+          "id": "develop-image",
+          "name": "RAW 현상",
+          "input": "image",
+          "output": "image",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "espeak-ng",
+      "name": "eSpeak NG",
+      "category": "audio-accessibility",
+      "license": "GPL-3.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "espeak-ng",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://github.com/espeak-ng/espeak-ng",
+      "description": "대사 길이 검수·임시 음성·음소 타이밍을 생성합니다.",
+      "operations": [
+        {
+          "id": "synthesize-wav",
+          "name": "대사 WAV 생성",
+          "input": "text",
+          "output": "audio",
+          "executable": true
+        },
+        {
+          "id": "phonemes",
+          "name": "음소 타이밍",
+          "input": "text",
+          "output": "text",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "rubberband",
+      "name": "Rubber Band",
+      "category": "audio-accessibility",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "local-toonbridge",
+      "binary": "rubberband",
+      "probeArgs": [
+        "--version"
+      ],
+      "maturity": "production-candidate",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://breakfastquay.com/rubberband/",
+      "description": "음성·효과음의 길이와 음높이를 독립 조정합니다.",
+      "operations": [
+        {
+          "id": "time-stretch",
+          "name": "시간 늘이기",
+          "input": "audio",
+          "output": "audio",
+          "executable": true
+        },
+        {
+          "id": "pitch-shift",
+          "name": "음높이 변경",
+          "input": "audio",
+          "output": "audio",
+          "executable": true
+        }
+      ]
+    },
+    {
+      "id": "nextcloud",
+      "name": "Nextcloud",
+      "category": "operations",
+      "license": "AGPL-3.0-or-later",
+      "licenseClass": "network-copyleft",
+      "deployment": "connector",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "connector-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://nextcloud.com/",
+      "description": "원본 파일·버전·팀 공유 저장소를 연결합니다.",
+      "operations": [
+        {
+          "id": "sync-assets",
+          "name": "에셋 동기화",
+          "input": "asset",
+          "output": "remote-reference",
+          "executable": false
+        },
+        {
+          "id": "share-upload",
+          "name": "외부 업로드 링크",
+          "input": "asset",
+          "output": "share-link",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "openproject",
+      "name": "OpenProject",
+      "category": "operations",
+      "license": "GPL-3.0-only",
+      "licenseClass": "copyleft",
+      "deployment": "connector",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "connector-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.openproject.org/",
+      "description": "회차·컷·담당자·마감·의존 작업을 동기화합니다.",
+      "operations": [
+        {
+          "id": "sync-work-packages",
+          "name": "작업 패키지 동기화",
+          "input": "project",
+          "output": "remote-reference",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "matrix",
+      "name": "Matrix",
+      "category": "operations",
+      "license": "implementation-dependent",
+      "licenseClass": "mixed",
+      "deployment": "connector",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "connector-ready",
+      "commercialUse": "implementation-dependent",
+      "source": "https://matrix.org/",
+      "description": "프로젝트별 영속 채팅·알림·연합 협업을 연결합니다.",
+      "operations": [
+        {
+          "id": "sync-room",
+          "name": "프로젝트 방 연결",
+          "input": "project",
+          "output": "remote-reference",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "discourse",
+      "name": "Discourse",
+      "category": "operations",
+      "license": "GPL-2.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "connector",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "connector-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://www.discourse.org/",
+      "description": "작품 피드백·질문·튜토리얼 토론을 연결합니다.",
+      "operations": [
+        {
+          "id": "create-topic",
+          "name": "피드백 주제 만들기",
+          "input": "project",
+          "output": "remote-reference",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "matomo",
+      "name": "Matomo",
+      "category": "operations",
+      "license": "GPL-3.0-or-later",
+      "licenseClass": "copyleft",
+      "deployment": "connector",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "connector-ready",
+      "commercialUse": "allowed-with-obligations",
+      "source": "https://matomo.org/",
+      "description": "창작 내용 없이 익명화된 제품 흐름·성능만 분석합니다.",
+      "operations": [
+        {
+          "id": "analytics-connection",
+          "name": "분석 연결",
+          "input": "settings",
+          "output": "remote-reference",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "mixbox",
+      "name": "Mixbox",
+      "category": "research-nc",
+      "license": "CC-BY-NC-4.0",
+      "licenseClass": "noncommercial",
+      "deployment": "optional-module",
+      "binary": null,
+      "probeArgs": [],
+      "maturity": "research-only",
+      "commercialUse": "prohibited",
+      "source": "https://scrtwpns.com/mixbox/",
+      "description": "비상업 연구 프로필에서 안료 혼색 품질을 비교합니다.",
+      "operations": [
+        {
+          "id": "pigment-mix",
+          "name": "안료 혼색",
+          "input": "color",
+          "output": "color",
+          "executable": false
+        }
+      ]
+    },
+    {
+      "id": "openpose",
+      "name": "OpenPose",
+      "category": "research-nc",
+      "license": "noncommercial-license",
+      "licenseClass": "noncommercial",
+      "deployment": "local-toonbridge",
+      "binary": "openpose.bin",
+      "probeArgs": [
+        "--help"
+      ],
+      "maturity": "research-only",
+      "commercialUse": "prohibited-without-separate-license",
+      "source": "https://github.com/CMU-Perceptual-Computing-Lab/openpose",
+      "description": "비상업 연구 프로필에서 인물·손·얼굴 포즈를 추출합니다.",
+      "operations": [
+        {
+          "id": "pose-extract",
+          "name": "포즈 추출",
+          "input": "image",
+          "output": "json",
+          "executable": false
+        }
+      ]
+    }
+  ]
+}

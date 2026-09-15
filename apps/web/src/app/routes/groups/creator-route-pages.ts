@@ -160,6 +160,20 @@ export const StudioImmersiveHubPage = lazyRetry(
   "StudioImmersiveHubPage",
 );
 
+
+export const StudioProductionToolchainPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioProductionToolchainPage })),
+  "StudioProductionToolchainPage",
+);
+export const StudioEngineCenterPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioEngineCenterPage })),
+  "StudioEngineCenterPage",
+);
+export const StudioProductionJobsPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioProductionJobsPage })),
+  "StudioProductionJobsPage",
+);
+
 export const StudioSpatialReaderPage = lazyRetry(
   () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
   "StudioSpatialReaderPage",

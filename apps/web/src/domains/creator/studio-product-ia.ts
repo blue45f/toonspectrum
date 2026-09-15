@@ -213,6 +213,20 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
     aliases: ["AI", "AI 어시스트", "Copilot"],
   },
   {
+    id: "production.toolchain",
+    label: "제작 도구",
+    owner: "production",
+    primaryRoute: "/studio/p/:projectId/production",
+    maturity: "beta",
+    surfaces: [
+      { id: "project-production-pipeline", role: "primary" },
+      { id: "production-toolchain-route", role: "projection" },
+      { id: "production-engine-center", role: "projection" },
+      { id: "production-job-queue", role: "projection" },
+    ],
+    aliases: ["엔진 센터", "작업 큐", "OCR", "벡터화", "영상 변환", "출판 도구"],
+  },
+  {
     id: "three-d.workspace",
     label: "3D",
     owner: "3d",
