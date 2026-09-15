@@ -18,8 +18,11 @@ import {
 } from "./publication";
 import {
   addComment as addPublicationComment,
+  deleteComment as deletePublicationComment,
   listComments as listPublicationComments,
+  toggleCommentLike as togglePublicationCommentLike,
   toggleLike as togglePublicationLike,
+  updateComment as updatePublicationComment,
 } from "./work-social";
 import {
   parseStatus,
@@ -185,20 +188,51 @@ export async function addComment(
   userId: string,
   workId: string,
   text: unknown,
+  parentId: string | null = null,
 ) {
   const policy = await assertReadablePublication(workId);
   if (!creatorPublicationCommentsAllowed(policy.doc)) {
     throw new Error("이 작품은 새 댓글을 받지 않습니다.");
   }
-  return addPublicationComment(userId, workId, text);
+  return addPublicationComment(userId, workId, text, parentId);
 }
 
 export async function listComments(
   workId: string,
   includeHidden = false,
+  viewerId?: string,
 ) {
   if (!(await readablePublicationPolicy(workId))) return [];
-  return listPublicationComments(workId, includeHidden);
+  return listPublicationComments(workId, includeHidden, viewerId);
+}
+
+export async function updateComment(
+  userId: string,
+  workId: string,
+  commentId: string,
+  text: unknown,
+) {
+  await assertReadablePublication(workId);
+  return updatePublicationComment(userId, workId, commentId, text);
+}
+
+export async function deleteComment(
+  userId: string,
+  workId: string,
+  commentId: string,
+  canModerate = false,
+) {
+  await assertReadablePublication(workId);
+  return deletePublicationComment(userId, workId, commentId, canModerate);
+}
+
+export async function toggleCommentLike(
+  userId: string,
+  workId: string,
+  commentId: string,
+) {
+  await assertReadablePublication(workId);
+  return togglePublicationCommentLike(userId, workId, commentId);
 }
 
 export async function toggleLike(userId: string, workId: string) {
