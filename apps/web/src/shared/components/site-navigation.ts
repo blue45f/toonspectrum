@@ -95,8 +95,8 @@ export const SITE_NAVIGATION_ITEMS = {
     "studio-assets",
     "/studio/assets",
     Store,
-    "에셋",
-    "Assets",
+    "소재",
+    "Materials",
     "브러시·캐릭터·배경·오디오를 제작에 연결",
     "Connect brushes, characters, backgrounds and audio to production",
   ),
@@ -131,8 +131,8 @@ export const SITE_NAVIGATION_ITEMS = {
     "market",
     "/market",
     Store,
-    "에셋 마켓",
-    "Asset market",
+    "소재 마켓",
+    "Materials market",
     "호환성과 사용 권리를 확인하고 새 에셋 탐색",
     "Discover assets with compatibility and rights information",
   ),
@@ -316,27 +316,27 @@ export const PRIMARY_SITE_NAVIGATION = TOONSPECTRUM_PRIMARY_NAVIGATION;
 export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
   {
     id: "studio-work",
-    label: { ko: "작업", en: "Work" },
-    description: { ko: "시작하고 이어서 완성하기", en: "Start, continue and finish" },
+    label: { ko: "만들기", en: "Create" },
+    description: { ko: "새 작품을 시작하고 이어서 완성하기", en: "Start, continue and finish your work" },
     items: [I.studio, I.make, I.studioAssets, I.learn],
   },
   {
-    id: "studio-create",
-    label: { ko: "바로 만들기", en: "Quick create" },
+    id: "studio-inspiration",
+    label: { ko: "영감 찾기", en: "Find inspiration" },
     description: {
-      ko: "결과에서 시작하는 제작 도구",
-      en: "Production tools that start from an outcome",
+      ko: "작품과 참고자료를 다음 장면으로 연결",
+      en: "Connect stories and references to your next scene",
     },
-    items: [I.comic, I.shaper, I.research, I.now],
+    items: [I.research, I.explore, I.now],
   },
   {
-    id: "studio-ecosystem",
-    label: { ko: "에셋·공개", en: "Assets & publishing" },
+    id: "studio-community",
+    label: { ko: "커뮤니티", en: "Community" },
     description: {
-      ko: "에셋을 찾고 결과를 세상과 연결",
-      en: "Find assets and connect finished work to people",
+      ko: "작품을 보여주고 경험과 협업을 나누기",
+      en: "Share work, experience and collaboration",
     },
-    items: [I.market, I.gallery, I.collaborate, I.opportunities, I.insights],
+    items: [I.gallery, I.community, I.collaborate],
   },
 ];
 
@@ -404,6 +404,7 @@ export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
 export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 
 const STUDIO_CONTEXT_PREFIXES = [
+  "/",
   "/studio",
   "/make",
   "/brush-lab",
