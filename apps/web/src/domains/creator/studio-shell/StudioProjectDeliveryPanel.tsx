@@ -4,14 +4,21 @@ import {
   CircleAlert,
   Download,
   FileArchive,
+  FileCheck2,
   Globe2,
   KeyRound,
   PackageCheck,
   Send,
+  Smartphone,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import Link from "@/compat/router-link";
+import {
+  WEBTOON_PLATFORM_SPECS,
+  type WebtoonImageFormat,
+  type WebtoonPlatformId,
+} from "../assistant/webtoon-platform-spec-validator";
 import {
   planStudioArchiveRestore,
   validateStudioArchiveManifest,
@@ -31,6 +38,12 @@ import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
+import {
+  createStudioPlatformDeliveryPlan,
+  STUDIO_PLATFORM_DELIVERY_IDS,
+  type StudioPlatformSourceStatus,
+} from "./studio-platform-delivery-plan";
+import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
 type Locale = "ko" | "en";
@@ -74,7 +87,7 @@ function statusTone(status: string): string {
   if (["ready", "valid", "pass", "allowed"].includes(status)) {
     return "border-success/30 bg-success-soft/15 text-success";
   }
-  if (["blocked", "invalid"].includes(status)) {
+  if (["blocked", "invalid", "fail"].includes(status)) {
     return "border-danger/35 bg-danger-soft/15 text-danger";
   }
   return "border-warning/35 bg-warning-soft/15 text-warning";
@@ -88,6 +101,9 @@ function labelForStatus(status: string, locale: Locale): string {
     blocked: "수정 필요",
     valid: "문제 없음",
     invalid: "수정 필요",
+    pass: "규격 적합",
+    warn: "확인 필요",
+    fail: "수정 필요",
   };
   const en: Readonly<Record<string, string>> = {
     ready: "Ready",
@@ -96,8 +112,38 @@ function labelForStatus(status: string, locale: Locale): string {
     blocked: "Blocked",
     valid: "Valid",
     invalid: "Invalid",
+    pass: "Pass",
+    warn: "Review",
+    fail: "Fix required",
   };
   return (locale === "ko" ? ko[status] : en[status]) ?? status;
+}
+
+function sourceLabel(
+  status: StudioPlatformSourceStatus,
+  requiresOfficialRecheck: boolean,
+  locale: Locale,
+): string {
+  if (status === "official") {
+    if (requiresOfficialRecheck) {
+      return locale === "ko" ? "공식 문서 간 차이" : "Official sources differ";
+    }
+    return locale === "ko" ? "공식 출처" : "Official source";
+  }
+  if (status === "unverified") {
+    return locale === "ko" ? "미검증 수치 포함" : "Includes unverified values";
+  }
+  return locale === "ko" ? "외부 출처 포함" : "Includes external sources";
+}
+
+function documentSizeLabel(
+  document: { readonly width: number | null; readonly height: number | null } | null,
+  locale: Locale,
+): string {
+  if (!document || document.width === null || document.height === null) {
+    return locale === "ko" ? "크기 정보 없음" : "Dimensions unavailable";
+  }
+  return `${document.width.toLocaleString()} × ${document.height.toLocaleString()}px`;
 }
 
 function downloadJson(fileName: string, value: unknown): void {
@@ -171,7 +217,11 @@ export function StudioProjectDeliveryPanel({
   readonly locale: Locale;
 }) {
   const workspace = useStudioProjectWorkspace(projectId, locale);
+  const documents = useStudioProjectDocuments(projectId, locale, "active");
   const [deliveryView, setDeliveryView] = useState<DeliveryView>(() => defaultDeliveryView(section, view));
+  const [platformId, setPlatformId] = useState<WebtoonPlatformId>("webtoon-canvas");
+  const [platformDocumentId, setPlatformDocumentId] = useState("");
+  const [outputFormat, setOutputFormat] = useState<WebtoonImageFormat>("jpg");
   const [connectorId, setConnectorId] = useState<(typeof CONNECTORS)[number]["id"]>(
     CONNECTORS[1].id,
   );
@@ -183,11 +233,37 @@ export function StudioProjectDeliveryPanel({
   const state = workspace.state;
   const preflight = state?.exportPreflights.at(-1) ?? null;
   const connector = CONNECTORS.find((candidate) => candidate.id === connectorId) ?? CONNECTORS[1];
+  const webtoonDocuments = useMemo(() => documents.documents.filter((document) => (
+    document.kind === "webtoon" || document.defaultWorkspace === "comic"
+  )), [documents.documents]);
+  const selectedDocument = useMemo(() => {
+    const explicit = webtoonDocuments.find((document) => document.id === platformDocumentId);
+    if (explicit) return explicit;
+    const reviewDocument = webtoonDocuments.find(
+      (document) => document.id === state?.reviewSession.documentId,
+    );
+    return reviewDocument ?? webtoonDocuments[0] ?? null;
+  }, [platformDocumentId, state?.reviewSession.documentId, webtoonDocuments]);
+  const platformSpec = WEBTOON_PLATFORM_SPECS[platformId];
+  const selectedFormat: WebtoonImageFormat = platformSpec.allowedFormats.includes(outputFormat)
+    ? outputFormat
+    : platformSpec.allowedFormats[0] ?? "png";
+  const documentId = selectedDocument?.id
+    ?? state?.reviewSession.documentId
+    ?? `document:${projectId}:episode-1`;
+  const platformDeliveryPlan = useMemo(() => createStudioPlatformDeliveryPlan({
+    projectId,
+    document: selectedDocument,
+    platformId,
+    format: selectedFormat,
+    generatedAt: requestedAt,
+  }), [platformId, projectId, requestedAt, selectedDocument, selectedFormat]);
+  const platformBlocksDelivery = platformDeliveryPlan.status === "blocked"
+    || platformDeliveryPlan.status === "needs-document-size";
   const locales = useMemo(() => {
     const values = state?.localization.map((item) => item.locale).filter(Boolean) ?? [];
     return Object.freeze(values.length > 0 ? [...new Set(values)] : ["ko-KR"]);
   }, [state?.localization]);
-  const documentId = state?.reviewSession.documentId || `document:${projectId}:episode-1`;
 
   const publishPlan: StudioPublishPlan | null = useMemo(() => {
     if (!preflight) return null;
@@ -205,6 +281,14 @@ export function StudioProjectDeliveryPanel({
       return null;
     }
   }, [connector, credentialsAvailable, documentId, externalWriteConfirmed, locales, preflight, projectId, requestedAt, scheduledAt]);
+
+  const publishDeliveryStatus = publishPlan === null
+    ? null
+    : platformBlocksDelivery
+      ? "blocked"
+      : platformDeliveryPlan.status === "warning" && publishPlan.status === "ready"
+        ? "review"
+        : publishPlan.status;
 
   const rights = useMemo(() => auditStudioRightsGraph({
     nodes: [{
@@ -233,7 +317,7 @@ export function StudioProjectDeliveryPanel({
       return planStudioPublishingPackage({
         projectId,
         documentId,
-        targetId: connector.id,
+        targetId: `${platformId}:${connector.id}`,
         policyVersion: connector.policyVersion,
         preflight,
         rights,
@@ -284,7 +368,15 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, locale, preflight, projectId, requestedAt, rights, state]);
+  }, [connector.id, connector.policyVersion, documentId, locale, platformId, preflight, projectId, requestedAt, rights, state]);
+
+  const packageDeliveryStatus = packagePlan === null
+    ? null
+    : platformBlocksDelivery
+      ? "blocked"
+      : platformDeliveryPlan.status === "warning" && packagePlan.status === "ready"
+        ? "review"
+        : packagePlan.status;
 
   const archiveManifest: StudioArchiveManifest = useMemo(() => ({
     schemaVersion: 1,
@@ -395,8 +487,208 @@ export function StudioProjectDeliveryPanel({
       </div>
 
       {deliveryView === "publish" ? (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
-          <div className="space-y-4">
+        <div className="mt-5 space-y-5">
+          <section
+            className="rounded-2xl border border-line bg-panel/45 p-4 sm:p-5"
+            aria-labelledby="platform-readiness-title"
+            data-platform-delivery-readiness
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">
+                  <FileCheck2 size={14} aria-hidden="true" /> 1. PLATFORM CHECK
+                </p>
+                <h3 id="platform-readiness-title" className="mt-1 text-lg font-black text-fg">
+                  {locale === "ko" ? "올릴 곳을 고르고 규격부터 확인" : "Choose a destination and check its rules"}
+                </h3>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-fg-3">
+                  {locale === "ko"
+                    ? "실제 원고 크기를 플랫폼별 규격표와 비교합니다. 출처가 약한 수치는 원고를 막지 않고 공식 안내 재확인으로 구분합니다."
+                    : "Compare real manuscript dimensions with platform rules. Low-confidence values never block delivery and are marked for official re-check."}
+                </p>
+              </div>
+              <span className={cn(
+                "w-fit rounded-full border px-2.5 py-1 text-[0.65rem] font-black",
+                platformDeliveryPlan.requiresOfficialRecheck
+                  ? "border-warning/35 bg-warning-soft/15 text-warning"
+                  : "border-success/30 bg-success-soft/15 text-success",
+              )}>
+                {sourceLabel(
+                  platformDeliveryPlan.sourceStatus,
+                  platformDeliveryPlan.requiresOfficialRecheck,
+                  locale,
+                )}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
+              <div className="space-y-4">
+                <label className="block text-xs font-black text-fg-2">
+                  {locale === "ko" ? "원고" : "Manuscript"}
+                  <select
+                    value={selectedDocument?.id ?? ""}
+                    disabled={webtoonDocuments.length === 0}
+                    onChange={(event) => setPlatformDocumentId(event.target.value)}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg disabled:opacity-60"
+                  >
+                    {webtoonDocuments.length === 0 ? (
+                      <option value="">{locale === "ko" ? "웹툰 원고 없음" : "No webtoon manuscript"}</option>
+                    ) : null}
+                    {webtoonDocuments.map((document) => (
+                      <option key={document.id} value={document.id}>
+                        {document.title} · {documentSizeLabel(document, locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs font-black text-fg-2">
+                  {locale === "ko" ? "게시 플랫폼" : "Publishing platform"}
+                  <select
+                    value={platformId}
+                    onChange={(event) => {
+                      const nextId = event.target.value as WebtoonPlatformId;
+                      const nextSpec = WEBTOON_PLATFORM_SPECS[nextId];
+                      setPlatformId(nextId);
+                      if (!nextSpec.allowedFormats.includes(outputFormat)) {
+                        setOutputFormat(nextSpec.allowedFormats[0] ?? "png");
+                      }
+                    }}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg"
+                  >
+                    {STUDIO_PLATFORM_DELIVERY_IDS.map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {WEBTOON_PLATFORM_SPECS[candidate].name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs font-black text-fg-2">
+                  {locale === "ko" ? "출력 형식" : "Output format"}
+                  <select
+                    value={selectedFormat}
+                    onChange={(event) => setOutputFormat(event.target.value as WebtoonImageFormat)}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm uppercase text-fg"
+                  >
+                    {platformSpec.allowedFormats.map((format) => (
+                      <option key={format} value={format}>{format.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                {documents.error ? (
+                  <p role="alert" className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">
+                    {documents.error}
+                  </p>
+                ) : null}
+                {!selectedDocument ? (
+                  <div className="rounded-2xl border border-warning/35 bg-warning-soft/15 p-4">
+                    <h4 className="flex items-center gap-2 text-sm font-black text-fg">
+                      <Smartphone size={17} className="text-warning" aria-hidden="true" />
+                      {locale === "ko" ? "확인할 웹툰 원고가 없어요" : "No webtoon manuscript to validate"}
+                    </h4>
+                    <p className="mt-2 text-xs leading-5 text-fg-2">
+                      {locale === "ko"
+                        ? "웹툰 원고를 만들거나 가져온 뒤 실제 크기로 플랫폼 규격을 검사할 수 있습니다. 임의 크기를 대신 넣지 않습니다."
+                        : "Create or import a webtoon manuscript to validate its real dimensions. ToonStudio does not substitute invented dimensions."}
+                    </p>
+                    <Link
+                      href="/studio/new?kind=webtoon&template=webtoon-vertical"
+                      className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-accent px-3 text-xs font-bold text-on-accent"
+                    >
+                      {locale === "ko" ? "웹툰 원고 만들기" : "Create a webtoon"}
+                    </Link>
+                  </div>
+                ) : platformDeliveryPlan.status === "needs-document-size" ? (
+                  <div className="rounded-2xl border border-warning/35 bg-warning-soft/15 p-4">
+                    <h4 className="flex items-center gap-2 text-sm font-black text-fg">
+                      <CircleAlert size={17} className="text-warning" aria-hidden="true" />
+                      {locale === "ko" ? "원고 크기 정보가 필요해요" : "Manuscript dimensions are required"}
+                    </h4>
+                    <p className="mt-2 text-xs leading-5 text-fg-2">
+                      {locale === "ko"
+                        ? "이 문서에는 가로·세로 크기가 기록되지 않아 규격 적합 여부를 계산하지 않았습니다. 편집기에서 원고 크기를 확인한 뒤 다시 계산하세요."
+                        : "This document has no recorded width or height, so no compatibility result was inferred. Confirm the canvas size in the editor and recalculate."}
+                    </p>
+                    <Link
+                      href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
+                      className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")}
+                    >
+                      {locale === "ko" ? "원고 크기 확인" : "Check manuscript size"}
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <StatusPanel
+                      title={platformDeliveryPlan.platformName}
+                      status={platformDeliveryPlan.grade ?? "review"}
+                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, locale)} · ${selectedFormat.toUpperCase()}`}
+                      locale={locale}
+                    />
+                    <div className="grid gap-3 sm:grid-cols-4">
+                      <Metric label={locale === "ko" ? "현재 가로" : "Current width"} value={selectedDocument.width === null ? "—" : `${selectedDocument.width}px`} />
+                      <Metric label={locale === "ko" ? "권장 가로" : "Recommended width"} value={`${platformSpec.recommendedWidthPx}px`} />
+                      <Metric label={locale === "ko" ? "권장 분할" : "Suggested slices"} value={platformDeliveryPlan.recommendedSliceCount ?? "—"} />
+                      <Metric label={locale === "ko" ? "문서 페이지" : "Document pages"} value={selectedDocument.pageCount} />
+                    </div>
+                    {platformDeliveryPlan.issues.length === 0 ? (
+                      <div className="flex items-start gap-3 rounded-xl border border-success/30 bg-success-soft/12 p-3">
+                        <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+                        <p className="text-xs leading-5 text-fg-2">
+                          {locale === "ko"
+                            ? "현재 확인 가능한 폭·높이·형식 규격에 맞습니다. 파일 용량과 썸네일은 실제 출력 후 마지막으로 확인하세요."
+                            : "The available width, height and format checks pass. Verify final file size and thumbnails after rendering."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {platformDeliveryPlan.issues.slice(0, 5).map((issue, index) => (
+                          <article
+                            key={`${issue.field}-${index}`}
+                            className={cn("rounded-xl border px-3 py-2", statusTone(issue.grade))}
+                          >
+                            <p className="text-xs font-bold">{issue.message}</p>
+                            <p className="mt-1 text-[0.68rem] leading-5 opacity-90">{issue.recommendation}</p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={!platformDeliveryPlan.checklist}
+                        onClick={() => platformDeliveryPlan.checklist && downloadJson(
+                          `${projectId}-${platformId}-delivery-checklist.json`,
+                          platformDeliveryPlan.checklist,
+                        )}
+                        className={buttonClass({ variant: "outline", size: "sm", className: "gap-2" })}
+                      >
+                        <Download size={15} aria-hidden="true" />
+                        {locale === "ko" ? "플랫폼 체크리스트 받기" : "Download platform checklist"}
+                      </button>
+                      <Link
+                        href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
+                        className={buttonClass({ variant: "quiet", size: "sm" })}
+                      >
+                        {locale === "ko" ? "원고 열기" : "Open manuscript"}
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="border-t border-line pt-5" aria-labelledby="delivery-method-title">
+            <div>
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">2. DELIVERY METHOD</p>
+              <h3 id="delivery-method-title" className="mt-1 text-lg font-black text-fg">
+                {locale === "ko" ? "검사 결과를 어떻게 전달할까요?" : "How should the validated work be delivered?"}
+              </h3>
+            </div>
+            <div className="mt-4 grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
+              <div className="space-y-4">
             <label className="block text-xs font-black text-fg-2">
               {locale === "ko" ? "연결 방식" : "Connection mode"}
               <select
@@ -463,8 +755,8 @@ export function StudioProjectDeliveryPanel({
             ) : publishPlan ? (
               <>
                 <StatusPanel
-                  title={connector.platformName}
-                  status={publishPlan.status}
+                  title={`${platformDeliveryPlan.platformName} · ${connector.platformName}`}
+                  status={publishDeliveryStatus ?? publishPlan.status}
                   description={locale === "ko"
                     ? `실행 방식: ${publishPlan.action} · 게시 언어 ${publishPlan.publishLocales.length}개`
                     : `Action: ${publishPlan.action} · ${publishPlan.publishLocales.length} publishing locales`}
@@ -475,10 +767,17 @@ export function StudioProjectDeliveryPanel({
                   <Metric label={locale === "ko" ? "제외 언어" : "Excluded locales"} value={publishPlan.unsupportedLocales.length} />
                   <Metric label={locale === "ko" ? "확인 사항" : "Warnings"} value={publishPlan.warnings.length} />
                 </div>
+                {platformBlocksDelivery ? (
+                  <p className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">
+                    {locale === "ko"
+                      ? "플랫폼 규격 점검에서 수정이 필요합니다. 원고 크기·형식을 고친 뒤 다시 계산하세요."
+                      : "The platform check requires changes. Fix manuscript dimensions or format, then recalculate."}
+                  </p>
+                ) : null}
                 {publishPlan.blockingReasons.map((reason) => (
                   <p key={reason} className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">{reason}</p>
                 ))}
-                {publishPlan.status === "ready" ? (
+                {publishDeliveryStatus === "ready" ? (
                   <div className="flex items-start gap-3 rounded-xl border border-success/30 bg-success-soft/12 p-3">
                     <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
                     <p className="text-xs leading-5 text-fg-2">
@@ -498,11 +797,26 @@ export function StudioProjectDeliveryPanel({
               />
             )}
           </div>
+            </div>
+          </section>
         </div>
       ) : null}
 
       {deliveryView === "package" ? (
         <div className="mt-5 space-y-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-line bg-panel/55 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[0.65rem] font-semibold text-fg-3">{locale === "ko" ? "대상 플랫폼" : "Target platform"}</p>
+              <p className="mt-1 text-sm font-black text-fg">{platformSpec.name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeliveryView("publish")}
+              className={buttonClass({ variant: "quiet", size: "sm" })}
+            >
+              {locale === "ko" ? "플랫폼·규격 변경" : "Change platform and rules"}
+            </button>
+          </div>
           {!packagePlan ? (
             <StatusPanel
               title={locale === "ko" ? "게시 패키지를 만들기 전에 사전검사가 필요해요" : "Preflight is required before packaging"}
@@ -513,13 +827,22 @@ export function StudioProjectDeliveryPanel({
           ) : (
             <>
               <StatusPanel
-                title={locale === "ko" ? "재현 가능한 게시 패키지" : "Reproducible publishing package"}
-                status={packagePlan.status}
+                title={locale === "ko"
+                  ? `${platformSpec.name} 게시 패키지`
+                  : `${platformSpec.name} publishing package`}
+                status={packageDeliveryStatus ?? packagePlan.status}
                 description={locale === "ko"
                   ? "파일 checksum, 언어별 메타데이터, 사용 권리, 출처와 정책 버전을 함께 보관합니다."
                   : "Store checksums, localized metadata, rights, attribution and policy version together."}
                 locale={locale}
               />
+              {platformBlocksDelivery ? (
+                <p className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">
+                  {locale === "ko"
+                    ? "플랫폼 규격 점검을 통과하기 전에는 업로드용 Manifest를 준비 완료로 표시하지 않습니다."
+                    : "The upload manifest is not marked ready until the platform check passes."}
+                </p>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-4">
                 <Metric label={locale === "ko" ? "파일" : "Files"} value={packagePlan.manifest?.files.length ?? 0} />
                 <Metric label={locale === "ko" ? "언어" : "Locales"} value={packagePlan.manifest?.locales.length ?? 0} />
@@ -529,8 +852,11 @@ export function StudioProjectDeliveryPanel({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={!packagePlan.manifest || packagePlan.status === "blocked"}
-                  onClick={() => packagePlan.manifest && downloadJson(`${projectId}-publish-manifest.json`, packagePlan.manifest)}
+                  disabled={!packagePlan.manifest || packageDeliveryStatus === "blocked"}
+                  onClick={() => packagePlan.manifest && downloadJson(
+                    `${projectId}-${platformId}-publish-manifest.json`,
+                    packagePlan.manifest,
+                  )}
                   className={buttonClass({ className: "gap-2" })}
                 >
                   <Download size={16} aria-hidden="true" />
