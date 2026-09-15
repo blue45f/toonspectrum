@@ -169,7 +169,8 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     setIkEndJointSelection, morphTargetSelection, setMorphTargetSelection, deletingModelId,
     setDeletingModelId, isRestoringScene, setIsRestoringScene, sceneRestoreAbortRef,
     templateLibrary, setTemplateLibrary, templateLibraryStatus, setTemplateLibraryStatus,
-    isSavingTemplate, setIsSavingTemplate, applyingTemplateId, setApplyingTemplateId,
+    setTemplateLibraryNotice, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
+    setApplyingTemplateId,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds,
     unbatchableModelIds, setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument,
     savedShots, shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals,
@@ -307,6 +308,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setTemplateLibrary(entries);
         setTemplateLibraryStatus("ready");
+        setTemplateLibraryNotice(null);
         setError(null);
       });
       return true;
@@ -331,6 +333,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setTemplateLibrary(entries);
         setTemplateLibraryStatus("ready");
+        setTemplateLibraryNotice(null);
       });
     } catch (err) {
       console.error(err);

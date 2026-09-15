@@ -48,6 +48,14 @@ export interface Bg3dTemplateLibraryEntry extends Bg3dTemplateLibraryDraft {
   readonly commercialUse: boolean;
 }
 
+export interface Bg3dTemplateLibraryLoadResult {
+  readonly entries: readonly Bg3dTemplateLibraryEntry[];
+  readonly legacyMigration: Readonly<{
+    readonly status: "already-complete" | "completed";
+    readonly importedCount: number;
+  }>;
+}
+
 export interface Bg3dInstantiatedTemplate {
   /** Canonical document containing fresh nodes and no template-local storyboard state. */
   readonly document: StudioBg3dSceneDocument;
@@ -60,6 +68,7 @@ export type Bg3dTemplateLibraryErrorCode =
   | "max-entries"
   | "storage-unavailable"
   | "storage-blocked"
+  | "migration-failed"
   | "transaction-failed";
 
 export class Bg3dTemplateLibraryError extends Error {
@@ -206,18 +215,27 @@ function entryFromStoredRecord(raw: unknown): Bg3dTemplateLibraryEntry | null {
   });
 }
 
-function entriesFromStoredRecords(rawRecords: readonly unknown[]): Bg3dTemplateLibraryEntry[] {
+function scanStoredRecords(rawRecords: readonly unknown[]): {
+  readonly entries: Bg3dTemplateLibraryEntry[];
+  readonly rejectedCount: number;
+} {
   const entries: Bg3dTemplateLibraryEntry[] = [];
+  let rejectedCount = 0;
   for (const raw of rawRecords.slice(0, MAX_STORED_ROW_SCAN)) {
     const entry = entryFromStoredRecord(raw);
     if (entry) entries.push(entry);
+    else rejectedCount += 1;
     if (entries.length >= BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES) break;
   }
   entries.sort((left, right) => {
     if (left.createdAt !== right.createdAt) return right.createdAt - left.createdAt;
     return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
   });
-  return entries;
+  return { entries, rejectedCount };
+}
+
+function entriesFromStoredRecords(rawRecords: readonly unknown[]): Bg3dTemplateLibraryEntry[] {
+  return scanStoredRecords(rawRecords).entries;
 }
 
 function getDb(): Promise<IDBDatabase> {
@@ -287,12 +305,17 @@ function transactionFailure(transaction: IDBTransaction, fallback: string): Bg3d
   return libraryError("transaction-failed", fallback, transaction.error);
 }
 
-/** Reads only validated current-format rows and waits for the readonly transaction to complete. */
-export async function legacyListBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
+interface LegacyBg3dTemplateRows {
+  readonly records: readonly unknown[];
+  readonly totalCount: number;
+}
+
+async function readLegacyBg3dTemplateRows(): Promise<LegacyBg3dTemplateRows> {
   const database = await getDb();
   return new Promise((resolve, reject) => {
     let settled = false;
     let records: readonly unknown[] | null = null;
+    let totalCount: number | null = null;
     const fail = (error: unknown) => {
       if (settled) return;
       settled = true;
@@ -300,14 +323,15 @@ export async function legacyListBg3dTemplates(): Promise<Bg3dTemplateLibraryEntr
     };
     try {
       const transaction = database.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
       transaction.oncomplete = () => {
         if (settled) return;
-        if (!records) {
+        if (records === null || totalCount === null) {
           fail(transactionFailure(transaction, "The BG3D template read did not complete."));
           return;
         }
         settled = true;
-        resolve(entriesFromStoredRecords(records));
+        resolve({ records, totalCount });
       };
       transaction.onerror = () => fail(transactionFailure(
         transaction,
@@ -317,22 +341,33 @@ export async function legacyListBg3dTemplates(): Promise<Bg3dTemplateLibraryEntr
         transaction,
         "The BG3D template read was aborted.",
       ));
-      const request = transaction.objectStore(STORE_NAME).getAll(
-        undefined,
-        MAX_STORED_ROW_SCAN,
-      );
-      request.onsuccess = () => {
-        records = request.result as readonly unknown[];
+      const listRequest = store.getAll(undefined, MAX_STORED_ROW_SCAN);
+      listRequest.onsuccess = () => {
+        records = listRequest.result as readonly unknown[];
       };
-      request.onerror = () => fail(libraryError(
+      listRequest.onerror = () => fail(libraryError(
         "transaction-failed",
         "Unable to read BG3D template rows.",
-        request.error,
+        listRequest.error,
+      ));
+      const countRequest = store.count();
+      countRequest.onsuccess = () => {
+        totalCount = countRequest.result;
+      };
+      countRequest.onerror = () => fail(libraryError(
+        "transaction-failed",
+        "Unable to count BG3D template rows.",
+        countRequest.error,
       ));
     } catch (error) {
       fail(libraryError("transaction-failed", "Unable to start the BG3D template read.", error));
     }
   });
+}
+
+/** Reads only validated current-format rows and waits for the readonly transaction to complete. */
+export async function legacyListBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
+  return entriesFromStoredRecords((await readLegacyBg3dTemplateRows()).records);
 }
 
 /**
@@ -646,6 +681,117 @@ export async function listBg3dTemplatesV12(
     await v12TemplateAuthority(options).readManifest("templates"),
   );
   return entriesFromV12TemplateManifest(manifest);
+}
+
+function loadResult(
+  manifest: Bg3dTemplateLibraryV12Manifest,
+  status: Bg3dTemplateLibraryLoadResult["legacyMigration"]["status"],
+  importedCount: number,
+): Bg3dTemplateLibraryLoadResult {
+  return Object.freeze({
+    entries: Object.freeze(entriesFromV12TemplateManifest(manifest)),
+    legacyMigration: Object.freeze({ status, importedCount }),
+  });
+}
+
+/**
+ * Imports the validated legacy IndexedDB library exactly once. A durable V12 manifest, including
+ * an intentionally empty one, is the completion marker. Legacy rows are retained as a recovery
+ * copy; later V12 deletion therefore cannot resurrect them because the marker remains present.
+ */
+export async function loadBg3dTemplatesV12WithLegacyMigration(
+  options: Bg3dTemplateLibraryV12Options = {},
+): Promise<Bg3dTemplateLibraryLoadResult> {
+  const authority = v12TemplateAuthority(options);
+  const existingRaw = await authority.readManifest("templates");
+  if (existingRaw !== null) {
+    return loadResult(parseV12TemplateManifest(existingRaw), "already-complete", 0);
+  }
+
+  try {
+    return await authority.mutate("templates", () => [], async (context) => {
+      if (context.currentRaw !== null) {
+        return {
+          nextRaw: context.currentRaw,
+          nextRefs: [],
+          result: loadResult(
+            parseV12TemplateManifest(context.currentRaw),
+            "already-complete",
+            0,
+          ),
+        };
+      }
+
+      let legacyRows: LegacyBg3dTemplateRows;
+      try {
+        legacyRows = await readLegacyBg3dTemplateRows();
+      } catch (cause) {
+        throw libraryError(
+          "migration-failed",
+          "기존 IndexedDB 3D 템플릿을 SQLite/OPFS로 이전하지 못했습니다.",
+          cause,
+        );
+      }
+
+      const scanned = scanStoredRecords(legacyRows.records);
+      if (
+        legacyRows.totalCount > MAX_STORED_ROW_SCAN ||
+        scanned.rejectedCount > 0 ||
+        scanned.entries.length !== legacyRows.totalCount
+      ) {
+        throw libraryError(
+          "migration-failed",
+          "기존 3D 템플릿 저장소에 손상되거나 지원하지 않는 행이 있어 자동 이전을 중단했습니다.",
+        );
+      }
+
+      const records = scanned.entries.map((entry) => recordFromDraft({
+        id: entry.id,
+        name: entry.name,
+        createdAt: entry.createdAt,
+        document: entry.document,
+      }));
+      if (records.some((record) => record === null)) {
+        throw libraryError(
+          "migration-failed",
+          "기존 3D 템플릿을 정규 V12 행으로 변환하지 못했습니다.",
+        );
+      }
+      const canonicalRecords = records as StoredBg3dTemplateRecord[];
+      const totalBytes = canonicalRecords.reduce(
+        (sum, record) => sum + UTF8_ENCODER.encode(record.sceneJson).byteLength,
+        0,
+      );
+      if (totalBytes > BG3D_TEMPLATE_LIBRARY_V12_MAX_TOTAL_BYTES) {
+        throw libraryError(
+          "migration-failed",
+          "기존 3D 템플릿의 전체 크기가 V12 이전 한도를 초과했습니다.",
+        );
+      }
+
+      const next = canonicalV12TemplateManifest({
+        kind: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND,
+        version: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION,
+        revision: 1,
+        updatedAt: context.now,
+        records: canonicalRecords,
+      });
+      return {
+        nextRaw: serializeV12TemplateManifest(next),
+        nextRefs: [],
+        result: loadResult(next, "completed", canonicalRecords.length),
+      };
+    });
+  } catch (cause) {
+    if (cause instanceof Bg3dTemplateLibraryError && cause.code === "migration-failed") {
+      throw cause;
+    }
+    throw libraryError(
+      "migration-failed",
+      "기존 3D 템플릿을 SQLite/OPFS manifest에 최종 게시하지 못했습니다.",
+      cause,
+    );
+  }
 }
 
 export async function saveBg3dTemplateV12(

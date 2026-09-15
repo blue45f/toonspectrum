@@ -10,6 +10,7 @@ import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import type { StudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 
 const HASH_A = `sha256:${"a".repeat(64)}`;
 
@@ -128,6 +129,34 @@ async function getRawTemplate(database: IDBDatabase, id: string): Promise<unknow
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+function createTemplateAuthorityHarness(now = 1_000) {
+  let raw: string | null = null;
+  const authority = {
+    readManifest: vi.fn(async () => raw),
+    readBlob: vi.fn(async () => {
+      throw new Error("template manifests do not read blobs");
+    }),
+    mutate: vi.fn(async (_slot, _currentRefs, operation) => {
+      const mutation = await operation({
+        now,
+        currentRaw: raw,
+        putBlob: async () => {
+          throw new Error("template manifests do not write blobs");
+        },
+        getBlob: async () => {
+          throw new Error("template manifests do not read blobs");
+        },
+      });
+      raw = mutation.nextRaw;
+      return mutation.result;
+    }),
+  } as unknown as StudioBg3dLibrariesAuthority;
+  return {
+    authority,
+    manifest: () => raw,
+  };
 }
 
 afterEach(() => {
@@ -302,6 +331,133 @@ describe("BG3D template library persistence", () => {
     await expect(library.listBg3dTemplates()).rejects.toMatchObject({
       code: "storage-blocked",
     });
+  });
+});
+
+describe("BG3D V12 legacy template migration", () => {
+  it("imports validated IndexedDB templates once and never resurrects them after V12 deletion", async () => {
+    const { library } = await loadLibrary();
+    await library.legacySaveBg3dTemplate({
+      id: "legacy-template-a",
+      name: "Legacy A",
+      createdAt: 700,
+      document: canonicalScene({ commercialUse: true }),
+    });
+    const harness = createTemplateAuthorityHarness();
+
+    const first = await library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    });
+    expect(first.legacyMigration).toEqual({ status: "completed", importedCount: 1 });
+    expect(first.entries).toMatchObject([{ id: "legacy-template-a", name: "Legacy A" }]);
+    expect(harness.manifest()).toContain(library.BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND);
+
+    await library.deleteBg3dTemplateV12("legacy-template-a", { authority: harness.authority });
+    await library.legacySaveBg3dTemplate({
+      id: "legacy-template-b",
+      name: "Legacy B",
+      createdAt: 800,
+      document: canonicalScene(),
+    });
+    const second = await library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    });
+    expect(second.legacyMigration).toEqual({
+      status: "already-complete",
+      importedCount: 0,
+    });
+    expect(second.entries).toEqual([]);
+  });
+
+  it("commits an empty manifest as the durable completion marker", async () => {
+    const { library } = await loadLibrary();
+    const harness = createTemplateAuthorityHarness();
+
+    const first = await library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    });
+    expect(first.legacyMigration).toEqual({ status: "completed", importedCount: 0 });
+    expect(first.entries).toEqual([]);
+    expect(harness.manifest()).not.toBeNull();
+
+    await library.legacySaveBg3dTemplate({
+      id: "late-legacy-template",
+      name: "Late legacy",
+      createdAt: 900,
+      document: canonicalScene(),
+    });
+    const second = await library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    });
+    expect(second.legacyMigration.status).toBe("already-complete");
+    expect(second.entries).toEqual([]);
+  });
+
+  it("keeps V12 unmarked when the legacy database is blocked", async () => {
+    const request = {} as IDBOpenDBRequest;
+    const blockedFactory = {
+      open: vi.fn(() => {
+        queueMicrotask(() => request.onblocked?.call(
+          request,
+          new Event("blocked") as IDBVersionChangeEvent,
+        ));
+        return request;
+      }),
+    } as unknown as IDBFactory;
+    const { library } = await loadLibrary(blockedFactory);
+    const harness = createTemplateAuthorityHarness();
+
+    await expect(library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    })).rejects.toMatchObject({ code: "migration-failed" });
+    expect(harness.manifest()).toBeNull();
+  });
+
+  it("maps V12 publication failures to an explicit migration error", async () => {
+    const { library } = await loadLibrary();
+    const authority = {
+      readManifest: vi.fn(async () => null),
+      readBlob: vi.fn(async () => {
+        throw new Error("template manifests do not read blobs");
+      }),
+      mutate: vi.fn(async () => {
+        throw new Error("sqlite publication failed");
+      }),
+    } as unknown as StudioBg3dLibrariesAuthority;
+
+    await expect(library.loadBg3dTemplatesV12WithLegacyMigration({ authority }))
+      .rejects.toMatchObject({
+        code: "migration-failed",
+        message: "기존 3D 템플릿을 SQLite/OPFS manifest에 최종 게시하지 못했습니다.",
+      });
+  });
+
+  it("refuses partial migration when any legacy row is invalid", async () => {
+    const { factory, library } = await loadLibrary();
+    await library.legacySaveBg3dTemplate({
+      id: "valid-before-invalid",
+      name: "Valid before invalid",
+      createdAt: 999,
+      document: canonicalScene(),
+    });
+    const database = await openTemplateDatabase(
+      factory,
+      library.BG3D_TEMPLATE_LIBRARY_DATABASE_NAME,
+      library.BG3D_TEMPLATE_LIBRARY_DATABASE_VERSION,
+    );
+    await putRawTemplate(database, {
+      id: "unsupported-legacy-template",
+      name: "Unsupported",
+      createdAt: 1_000,
+      template: { customModels: [{ modelId: "private-id" }] },
+    });
+    database.close();
+    const harness = createTemplateAuthorityHarness();
+
+    await expect(library.loadBg3dTemplatesV12WithLegacyMigration({
+      authority: harness.authority,
+    })).rejects.toMatchObject({ code: "migration-failed" });
+    expect(harness.manifest()).toBeNull();
   });
 });
 

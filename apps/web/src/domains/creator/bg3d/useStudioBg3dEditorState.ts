@@ -329,7 +329,13 @@ export function useStudioBg3dEditorState(props) {
   const [isRestoringScene, setIsRestoringScene] = useState(true);
   const sceneRestoreAbortRef = useRef<AbortController | null>(null);
   const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
-  const [templateLibraryStatus, setTemplateLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [templateLibraryStatus, setTemplateLibraryStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [templateLibraryNotice, setTemplateLibraryNotice] = useState<{
+    readonly tone: "success" | "error";
+    readonly message: string;
+  } | null>(null);
+  const [templateLibraryLoadRevision, setTemplateLibraryLoadRevision] = useState(0);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
 
@@ -668,6 +674,10 @@ export function useStudioBg3dEditorState(props) {
     setTemplateLibrary,
     templateLibraryStatus,
     setTemplateLibraryStatus,
+    templateLibraryNotice,
+    setTemplateLibraryNotice,
+    templateLibraryLoadRevision,
+    setTemplateLibraryLoadRevision,
     isSavingTemplate,
     setIsSavingTemplate,
     applyingTemplateId,

@@ -814,9 +814,12 @@ export function attachStudioBg3dEditorPlacementHost(h) {
     } catch (templateFailure) {
       if (isModalAssetSessionCurrent(session)) {
         setError(
-          templateFailure instanceof StudioBg3dThreeOperationError
-            ? templateFailure.message
-            : "템플릿의 모든 모델 원본과 무결성을 확인하지 못해 장면을 변경하지 않았습니다.",
+          templateFailure instanceof Error &&
+            templateFailure.message === "template-attachment-missing"
+            ? "이 템플릿이 참조하는 3D 모델 원본을 현재 기기에서 찾을 수 없습니다. 모델 라이브러리에서 원본을 다시 가져온 뒤 재시도해 주세요."
+            : templateFailure instanceof StudioBg3dThreeOperationError
+              ? templateFailure.message
+              : "템플릿의 모든 모델 원본과 무결성을 확인하지 못해 장면을 변경하지 않았습니다.",
         );
       }
     } finally {

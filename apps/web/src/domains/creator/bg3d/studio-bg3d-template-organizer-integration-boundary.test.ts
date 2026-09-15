@@ -10,6 +10,8 @@ const sceneOpsSource = source("./studio-bg3d-editor-scene-ops-host.ts");
 const placementSource = source("./studio-bg3d-editor-placement-host.ts");
 const transformSource = source("./studio-bg3d-editor-transform-host.ts");
 const sidebarSource = source("./StudioBg3dEditorSidebar.tsx");
+const sidebarExtrasSource = source("./StudioBg3dEditorSidebarExtras.tsx");
+const userTemplatePanelSource = source("./StudioBg3dUserTemplateLibraryPanel.tsx");
 const effectsSource = source("./useStudioBg3dEditorEffects.ts");
 const runtimeBindingsSource = source("./studio-bg3d-editor-runtime-bindings.ts");
 const organizerRuntimeSource = source("./studio-bg3d-template-organizer-runtime.ts");
@@ -103,6 +105,19 @@ describe("Studio BG3D template organizer integration boundary", () => {
     expect(sidebarSource).toContain("onDeleteAllTemplateInstances={h.deleteAllTemplateInstances}");
   });
 
+  it("owns saved user templates in the Templates tab instead of the Models tab", () => {
+    expect(sidebarSource).toContain("<StudioBg3dUserTemplateLibraryPanel");
+    expect(sidebarSource).toContain("entries={templateLibrary}");
+    expect(sidebarSource).toContain("status={templateLibraryStatus}");
+    expect(sidebarSource).toContain("notice={templateLibraryNotice}");
+    expect(sidebarSource).toContain("onApply={(entry) => void applyUserTemplate(entry)}");
+    expect(sidebarSource).toContain("onDelete={(id) => void handleDeleteTemplate(id)}");
+    expect(sidebarSource).toContain("setTemplateLibraryLoadRevision((revision) => revision + 1)");
+    expect(sidebarExtrasSource).not.toContain("내 템플릿");
+    expect(userTemplatePanelSource).toContain("현재 장면을 내 템플릿으로 저장");
+    expect(userTemplatePanelSource).toContain("다시 불러오기");
+  });
+
   it("keeps the template surface out of initial BG3D activation until its tab opens", () => {
     expect(runtimeBindingsSource).not.toContain(
       'export { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel"',
@@ -110,17 +125,24 @@ describe("Studio BG3D template organizer integration boundary", () => {
     expect(runtimeBindingsSource).toContain(
       'import("./StudioBg3dSceneTemplatePanel")',
     );
+    expect(runtimeBindingsSource).toContain(
+      'import("./StudioBg3dUserTemplateLibraryPanel")',
+    );
     expect(sidebarSource).toContain('activePanelTab === "templates" ? (');
     expect(sidebarSource).toContain("<Suspense fallback={(");
     expect(sceneOpsSource).toContain('import("./studio-bg3d-template-organizer-runtime")');
   });
 
-  it("hydrates user-template labels when either the Models or Templates tab owns the surface", () => {
+  it("loads and retries user templates only while the Templates tab owns the surface", () => {
     expect(effectsSource).toContain(
-      'if (!open || (!modelsPanelActivated && activePanelTab !== "templates")) return;',
+      'if (!open || activePanelTab !== "templates") return;',
     );
-    expect(effectsSource).toContain(
-      "[activePanelTab, modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]",
+    expect(effectsSource).toContain("loadBg3dTemplates()");
+    expect(effectsSource).toContain("templateLibraryLoadRevision,");
+    expect(effectsSource).toContain("setTemplateLibraryNotice(null)");
+    expect(effectsSource).toContain('cause.code === "migration-failed"');
+    expect(effectsSource).not.toContain(
+      '(!modelsPanelActivated && activePanelTab !== "templates")',
     );
   });
 });
