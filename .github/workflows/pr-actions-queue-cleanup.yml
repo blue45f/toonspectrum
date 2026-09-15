@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: repository-actions-triage-v4-${{ github.ref }}
+  group: repository-actions-triage-v5-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
-      - name: Cancel active runs outside main and PR 1482
+      - name: Cancel active runs outside main and PR 1482 in parallel
         uses: actions/github-script@v8
         with:
           script: |
@@ -40,28 +40,37 @@ jobs:
               github.rest.actions.listWorkflowRunsForRepo,
               { owner, repo, per_page: 100 },
             );
+            const cancellable = runs.filter((run) =>
+              run.id !== currentRunId &&
+              activeStatuses.has(run.status) &&
+              run.head_branch !== keepBranch &&
+              run.head_branch !== "main" &&
+              run.event !== "schedule"
+            );
             const cancelled = [];
-            const preserved = [];
-            for (const run of runs) {
-              if (run.id === currentRunId || !activeStatuses.has(run.status)) continue;
-              const preserve =
-                run.head_branch === keepBranch ||
-                run.head_branch === "main" ||
-                run.event === "schedule";
-              if (preserve) {
-                preserved.push(run.id);
-                continue;
-              }
-              await github.rest.actions.cancelWorkflowRun({
-                owner,
-                repo,
-                run_id: run.id,
+            const failed = [];
+            const chunkSize = 20;
+            for (let index = 0; index < cancellable.length; index += chunkSize) {
+              const chunk = cancellable.slice(index, index + chunkSize);
+              const results = await Promise.allSettled(
+                chunk.map((run) => github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                })),
+              );
+              results.forEach((result, resultIndex) => {
+                const runId = chunk[resultIndex].id;
+                if (result.status === "fulfilled") cancelled.push(runId);
+                else failed.push(`${runId}: ${result.reason?.message ?? result.reason}`);
               });
-              cancelled.push(run.id);
             }
 
             await core.summary
               .addHeading("Repository Actions triage")
-              .addRaw(`Preserved repair/main/scheduled runs: ${preserved.join(", ") || "none"}\n`)
-              .addRaw(`Cancelled other active runs: ${cancelled.join(", ") || "none"}\n`)
+              .addRaw(`Cancellation candidates: ${cancellable.length}\n`)
+              .addRaw(`Cancelled: ${cancelled.length}\n`)
+              .addRaw(`Failed: ${failed.length}\n`)
+              .addCodeBlock(failed.join("\n") || "none")
               .write();
+            if (failed.length > 0) core.setFailed(`Failed to cancel ${failed.length} runs`);
