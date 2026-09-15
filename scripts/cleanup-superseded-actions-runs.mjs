@@ -35,6 +35,14 @@ export function selectSupersededActionsRuns(
 
   for (const run of active) {
     if (run.event !== "pull_request") continue;
+
+    // A rerun is an explicit diagnostic request even after its PR has closed.
+    // Cancelling it on the next main push makes GitHub's "Re-run jobs" action
+    // impossible to use for post-merge verification and leaves immutable red
+    // checks without evidence. Duplicate/superseded reruns are still selected
+    // by the workflow/event/head grouping above.
+    if (Number(run.run_attempt ?? 1) > 1) continue;
+
     const number = run.pull_requests?.[0]?.number;
     const state = Number.isInteger(number) ? pullRequestStates.get(number) : undefined;
     if (state && state !== "open") {

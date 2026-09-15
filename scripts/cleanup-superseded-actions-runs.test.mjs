@@ -9,6 +9,7 @@ function run({
   branch = "feature/a",
   createdAt,
   pr = 10,
+  attempt = 1,
 }) {
   return {
     id,
@@ -17,6 +18,7 @@ function run({
     head_branch: branch,
     head_sha: `sha-${id}`,
     created_at: createdAt,
+    run_attempt: attempt,
     pull_requests: event === "pull_request" && pr !== null ? [{ number: pr }] : [],
     name: `workflow-${workflow}`,
   };
@@ -55,6 +57,30 @@ describe("selectSupersededActionsRuns", () => {
     );
     expect(selected).toHaveLength(1);
     expect(selected[0]).toMatchObject({ reason: "pull-request-closed" });
+  });
+
+  it("preserves an explicitly requested rerun after its PR closes", () => {
+    const selected = selectSupersededActionsRuns(
+      [run({ id: 10, createdAt: "2026-09-10T00:03:00Z", pr: 77, attempt: 2 })],
+      { pullRequestStates: new Map([[77, "closed"]]) },
+    );
+    expect(selected).toEqual([]);
+  });
+
+  it("preserves an explicitly requested unlinked rerun after branch cleanup", () => {
+    const selected = selectSupersededActionsRuns(
+      [
+        run({
+          id: 11,
+          branch: "feature/merged-and-deleted",
+          createdAt: "2026-09-10T00:03:00Z",
+          pr: null,
+          attempt: 2,
+        }),
+      ],
+      { openPullHeadBranches: new Set() },
+    );
+    expect(selected).toEqual([]);
   });
 
   it("cancels an unlinked PR run when its head is no longer open", () => {
