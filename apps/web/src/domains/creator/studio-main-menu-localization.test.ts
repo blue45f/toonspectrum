@@ -102,6 +102,20 @@ describe("localizeStudioMainMenuGroups", () => {
     );
 
     expect(item(projected, "file", "save-draft").label).toBe("초안 저장");
+
+    const saveFirst = localizeStudioMainMenuGroups(
+      [{
+        id: "file",
+        label: "파일",
+        items: [{ id: "save-draft", label: "저장하기", onSelect: vi.fn() }],
+      }],
+      BASE_STATE,
+      translator({
+        "studio.mainMenu.item.file.save-draft": "임시저장",
+      }),
+    );
+
+    expect(item(saveFirst, "file", "save-draft").label).toBe("저장하기");
   });
 
   it("keeps the Korean reference-window checkbox label stable across toggle states", () => {

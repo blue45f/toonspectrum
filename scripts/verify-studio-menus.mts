@@ -52,7 +52,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     id: "file",
     caption: "파일",
     items: [
-      "초안 저장",
+      "저장하기",
       "게시",
       "프로젝트 가져오기…",
       "PSD 가져오기…",
@@ -499,7 +499,10 @@ async function visibleMenuItemRowTexts(menu: Locator): Promise<string[]> {
       ) {
         return [];
       }
-      return [element.innerText];
+      const label = element.querySelector<HTMLElement>(
+        '[data-studio-main-menu-item-label="true"]',
+      )?.textContent?.trim();
+      return label ? [label] : [];
     }),
   );
 }

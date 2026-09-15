@@ -1,6 +1,7 @@
 import {
   CheckCircle2,
   CloudOff,
+  Copy,
   Download,
   ExternalLink,
   FileArchive,
@@ -263,7 +264,15 @@ export function StudioSaveFirstProjectLibraryPage({ initialView }: { readonly in
                         <Link href={`/studio/p/${encodeURIComponent(project.id)}/overview`} onClick={() => { library.touch(project.id, project.lastOpenedDocumentId); }} className={buttonClass({ size: "sm", className: "flex-1 gap-1.5" })}><FolderOpen size={15} aria-hidden="true" />{locale === "ko" ? "이어서 작업" : "Continue"}</Link>
                         <button type="button" onClick={() => { void savePackage(project); }} disabled={busyProjectId === project.id} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><Download size={15} aria-hidden="true" />{locale === "ko" ? "저장" : "Save"}</button>
                       </div>
-                      <div className="mt-2 flex justify-end gap-2">
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { library.duplicate(project.id); }}
+                          className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-fg-3 hover:text-fg"
+                        >
+                          <Copy size={12} aria-hidden="true" />
+                          {locale === "ko" ? "프로젝트 복제" : "Duplicate project"}
+                        </button>
                         <button type="button" onClick={() => { library.archive(project.id); }} className="text-[0.68rem] font-semibold text-fg-3 hover:text-fg">{locale === "ko" ? "보관" : "Archive"}</button>
                         <button type="button" onClick={() => { library.trash(project.id); }} className="text-[0.68rem] font-semibold text-danger">{locale === "ko" ? "휴지통" : "Trash"}</button>
                       </div>

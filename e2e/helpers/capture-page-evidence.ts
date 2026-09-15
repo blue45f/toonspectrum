@@ -51,12 +51,17 @@ async function restorePageScroll(
  */
 export async function capturePageEvidence(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   await page.evaluate(async () => { await document.fonts.ready; });
-  await waitForStableDocumentBounds(page);
+  // Freeze the evidence boundary after the page has been quiet. Infinite feeds may append
+  // another batch when a tile reaches the fold; chasing that new height turns evidence
+  // capture into an unbounded crawler instead of a snapshot of the tested route.
+  const snapshotBounds = await waitForStableDocumentBounds(page);
   const original = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   const tiles: { file: string; x: number; y: number; width: number; height: number }[] = [];
   let coveredHeight = 0;
-  let documentHeight = 0;
-  let documentWidth = 0;
+  const documentHeight = snapshotBounds.height;
+  let documentWidth = snapshotBounds.width;
+  let observedDocumentHeight = snapshotBounds.height;
+  let observedDocumentWidth = snapshotBounds.width;
   let targetY = 0;
   let gapRewinds = 0;
   try {
@@ -68,13 +73,14 @@ export async function capturePageEvidence(page: Page, testInfo: TestInfo, name: 
           documentWidth: Math.ceil(Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, innerWidth)),
           documentHeight: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, innerHeight)) };
       }, targetY);
-      documentHeight = frame.documentHeight;
-      documentWidth = frame.documentWidth;
+      observedDocumentHeight = Math.max(observedDocumentHeight, frame.documentHeight);
+      observedDocumentWidth = Math.max(observedDocumentWidth, frame.documentWidth);
+      documentWidth = Math.max(documentWidth, frame.documentWidth);
       if (documentWidth < 1 || documentWidth > 8192 || documentHeight < 1 || documentHeight > 200_000) {
         throw new Error(`Unexpected screenshot dimensions: ${documentWidth} x ${documentHeight}`);
       }
-      if (frame.x > 1 || frame.width < documentWidth - 2) {
-        throw new Error(`Screenshot horizontal overflow: ${documentWidth}px document in ${frame.width}px viewport at ${frame.x}, ${frame.y}`);
+      if (frame.x > 1 || frame.width < frame.documentWidth - 2) {
+        throw new Error(`Screenshot horizontal overflow: ${frame.documentWidth}px document in ${frame.width}px viewport at ${frame.x}, ${frame.y}`);
       }
       if (frame.y > coveredHeight + 1) {
         if (gapRewinds >= 8) throw new Error(`Screenshot coverage gap at ${frame.x}, ${frame.y}`);
@@ -93,24 +99,23 @@ export async function capturePageEvidence(page: Page, testInfo: TestInfo, name: 
       tiles.push({ file, x: frame.x, y: frame.y, width: frame.width, height: frame.height });
       coveredHeight = Math.max(coveredHeight, Math.min(documentHeight, frame.y + frame.height));
       const overlap = Math.min(160, Math.floor(frame.height / 3));
-      if (coveredHeight >= documentHeight) {
-        const settled = await waitForStableDocumentBounds(page, 300, 2_000);
-        documentHeight = settled.height;
-        documentWidth = settled.width;
-        if (frame.width < documentWidth - 2) {
-          throw new Error(`Screenshot horizontal overflow: ${documentWidth}px document in ${frame.width}px viewport at ${frame.x}, ${frame.y}`);
-        }
-        if (coveredHeight >= documentHeight) break;
-        targetY = Math.max(0, coveredHeight - overlap);
-        continue;
-      }
+      if (coveredHeight >= documentHeight) break;
       const next = Math.max(0, coveredHeight - overlap);
       if (next <= frame.y) throw new Error("Screenshot scroll made no forward progress");
       targetY = next;
     }
     if (coveredHeight < documentHeight) throw new Error("Screenshot coverage limit reached before the document end");
     await testInfo.attach(`${name}-coverage`, {
-      body: JSON.stringify({ url: page.url(), width: documentWidth, height: documentHeight, coveredHeight, tiles }, null, 2),
+      body: JSON.stringify({
+        url: page.url(),
+        width: documentWidth,
+        height: documentHeight,
+        coveredHeight,
+        observedDocumentWidth,
+        observedDocumentHeight,
+        grewDuringCapture: observedDocumentHeight > documentHeight,
+        tiles,
+      }, null, 2),
       contentType: "application/json",
     });
   } finally {

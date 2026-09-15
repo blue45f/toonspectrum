@@ -164,6 +164,31 @@ test("directory search supports real navigation, a shared query, Back and recove
 });
 
 
+test("evidence snapshots terminate when an infinite feed grows at the fold", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.setContent('<main id="feed" style="height:2400px;background:linear-gradient(white,gray)"><h1>Growing feed</h1></main>');
+  await page.evaluate(() => {
+    const feed = document.querySelector<HTMLElement>("#feed")!;
+    addEventListener("scroll", () => {
+      feed.style.height = `${feed.offsetHeight + 900}px`;
+    }, { passive: true });
+  });
+
+  await capturePageEvidence(page, info, "growing-feed");
+  const attachment = info.attachments.find((item) => item.name === "growing-feed-coverage");
+  expect(attachment?.body).toBeTruthy();
+  const coverage = JSON.parse(attachment!.body!.toString()) as {
+    height: number;
+    coveredHeight: number;
+    observedDocumentHeight: number;
+    grewDuringCapture: boolean;
+  };
+  expect(coverage.coveredHeight).toBe(coverage.height);
+  expect(coverage.observedDocumentHeight).toBeGreaterThan(coverage.height);
+  expect(coverage.grewDuringCapture).toBe(true);
+});
+
+
 test("long-page evidence covers every vertical region without changing the viewport or losing scroll", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.setContent('<main style="height:5100px;background:linear-gradient(white,gray)"><h1>Complete page evidence</h1></main>');

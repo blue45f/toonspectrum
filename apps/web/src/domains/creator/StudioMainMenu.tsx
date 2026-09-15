@@ -573,7 +573,7 @@ function MenuDropdown({
             ) : (
               <span aria-hidden className="size-[15px] shrink-0" />
             )}
-            <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
+            <span data-studio-main-menu-item-label="true" className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
             {item.checked ? (
               <Check
                 size={STUDIO_ICON_SIZE.subtab}
