@@ -129,7 +129,7 @@ test("vote and retract show acknowledged server counts", async ({ page }) => {
 test("failed comments retain text and report errors; Enter in textarea does not submit", async ({ page }) => {
   const state = await setup(page, { sendFail: true }); await open(page);
   await page.getByRole("button", { name: "필터 적용 후 브러시가 멈춰요", exact: true }).click();
-  const field = page.getByLabel("공개 댓글"); await field.fill("저도 같은 증상을 겪었어요."); await field.press("Enter");
+  const field = page.getByRole("textbox", { name: "공개 댓글" }); await field.fill("저도 같은 증상을 겪었어요."); await field.press("Enter");
   expect(state.writes).toHaveLength(0);
   await page.getByRole("button", { name: "댓글 등록", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("댓글 전송 실패"); await expect(field).toHaveValue("저도 같은 증상을 겪었어요.\n");
