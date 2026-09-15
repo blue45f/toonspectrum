@@ -9,7 +9,7 @@ const PUBLIC_PAGES = new Set([
   "/discover", "/discover/works", "/search", "/explore", "/ranking", "/recommend",
   "/calendar", "/compare", "/random", "/tags", "/authors", "/insights", "/insights/resources", "/news", "/guide",
   "/research", "/research/assets", "/research/books", "/references", "/now", "/opportunities", "/story-lab",
-  "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio",
+  "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio", "/learn/process", "/learn/careers", "/learn/education",
   "/market", "/market/browse", "/market/fit", "/market/compare",
   "/showcase", "/showcase/challenges", "/showcase/promo", "/create", "/create/challenges", "/create/promo",
   "/community", "/community/cafes", "/community/title", "/community/author", "/community/pencafe", "/reviews",
