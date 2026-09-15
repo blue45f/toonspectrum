@@ -21,16 +21,20 @@ describe("resource source cost visibility", () => {
     renderPage();
     const google = screen.getByRole("heading", { name: "Google Books" }).closest("article");
     const commons = screen.getByRole("heading", { name: "Wikidata·Wikimedia" }).closest("article");
+    const kmas = screen.getByRole("heading", { name: "만화규장각 KMAS" }).closest("article");
     expect(google).not.toBeNull();
     expect(commons).not.toBeNull();
+    expect(kmas).not.toBeNull();
     expect(within(google!).getByText("무료 · 키/신청 필요")).toBeTruthy();
     expect(within(commons!).getByText("무료 · 키 없음")).toBeTruthy();
+    expect(within(kmas!).getByText("무료 · 키/신청 필요")).toBeTruthy();
   });
 
   it("filters free providers separately from keyless providers", () => {
     renderPage();
     fireEvent.click(screen.getByRole("checkbox", { name: "무료 제공처만 보기" }));
     expect(screen.getByRole("heading", { name: "Google Books" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "만화규장각 KMAS" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "TMDB" })).toBeNull();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "가입·키 없는 제공처만 보기" }));

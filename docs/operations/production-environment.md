@@ -42,6 +42,7 @@ Vercel 비상 fallback을 실제로 실행할 때만 필요한 권한:
 - 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`
 - 개인 저장소 OAuth의 `GOOGLE_DRIVE_OAUTH_*`, `DROPBOX_OAUTH_*`, `ONEDRIVE_OAUTH_*`,
   `PERSONAL_CLOUD_OAUTH_STATE_SECRET`, `PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY`
+- `KMAS_PRV_KEY` — 승인된 만화규장각 서버 전용 키; 브라우저 `VITE_*`에는 금지
 - `OPENAI_API_KEY`
 - `OPENROUTER_API_KEY`
 - `BLOB_READ_WRITE_TOKEN`

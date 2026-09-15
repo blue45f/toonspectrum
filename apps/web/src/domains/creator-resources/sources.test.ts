@@ -17,6 +17,7 @@ describe("creator resource cost labels", () => {
     expect(resourceSourceCostLabel(source("Wikidata·Wikimedia"))).toBe("무료 · 키 없음");
     expect(resourceSourceCostLabel(source("Google Books"))).toBe("무료 · 키/신청 필요");
     expect(resourceSourceCostLabel(source("기업마당"))).toBe("무료 · 키/신청 필요");
+    expect(resourceSourceCostLabel(source("만화규장각 KMAS"))).toBe("무료 · 키/신청 필요");
     expect(resourceSourceCostLabel(source("YouTube Data API"))).toBe("무료 · 키/신청 필요");
   });
 
@@ -25,6 +26,7 @@ describe("creator resource cost labels", () => {
     expect(resourceSourceCostLabel(source("Jikan·비공식 웹툰 API"))).toBe("운영 제외");
     expect(isFreeResourceSource(source("TMDB"))).toBe(false);
     expect(isFreeResourceSource(source("Google Books"))).toBe(true);
+    expect(isFreeResourceSource(source("만화규장각 KMAS"))).toBe(true);
   });
 
   it("treats every keyless source as free", () => {
