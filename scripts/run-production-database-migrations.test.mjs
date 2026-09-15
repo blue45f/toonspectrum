@@ -35,7 +35,7 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
   const manifest = loadMigrationManifest();
   expect(manifest).toHaveLength(58);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0059_member_messaging");
+  expect(manifest.at(-1).id).toBe("0058_member_messaging");
   expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(58);
 });
 
@@ -151,9 +151,9 @@ test("community comments migration provisions threads, edit state, reactions, an
 
 test("member messaging migration provisions request-gated conversations", () => {
   const migration = loadMigrationManifest().find(
-    ({ id }) => id === "0059_member_messaging",
+    ({ id }) => id === "0058_member_messaging",
   );
-  expect(migration?.id).toBe("0059_member_messaging");
+  expect(migration?.id).toBe("0058_member_messaging");
   const sql = migration?.contents ?? "";
 
   for (const requiredFragment of [
