@@ -11,6 +11,7 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/research/catalog": "작품 리서치 랩",
   "/research/catalog/notebook": "작품 비교·기획 노트",
   "/research/books": "글로벌 만화·도서 판본 탐색",
+  "/research/3d-assets": "무료 3D·HDRI·텍스처 재료실",
   "/creator-hub": "창작 허브",
   "/opportunities": "작가 기회센터",
   "/creator-hub/references": "창작 레퍼런스 아틀라스",

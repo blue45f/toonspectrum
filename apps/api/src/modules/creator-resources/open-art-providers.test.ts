@@ -56,10 +56,11 @@ describe("keyless museum adapters", () => {
     expect(localizeReferenceProviderQuery({ provider: "kakao", q: "갑옷" }).q).toBe("갑옷");
   });
   it("accepts complete old and new status contracts during staggered rollout", () => {
-    const all = providerAvailability({ kakao: false, bizinfo: false });
-    expect(all).toHaveLength(7); expect(parseProviderAvailability(all)).toHaveLength(7);
+    const all = providerAvailability({ kakao: false, bizinfo: false, googlebooks: false });
+    expect(all).toHaveLength(9); expect(parseProviderAvailability(all)).toHaveLength(9);
     expect(parseProviderAvailability(all.slice(0, 5))).toHaveLength(5);
-    expect(parseProviderAvailability(all.slice(0, 6))).toBeNull();
+    expect(parseProviderAvailability(all.slice(0, 7))).toHaveLength(7);
+    expect(parseProviderAvailability(all.slice(0, 8))).toBeNull();
   });
   it("enforces a shared per-host request ceiling across client identifiers", async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json(body([])));

@@ -15,16 +15,18 @@ vi.mock("./ProviderStatus", () => ({ ProviderStatus: () => null }));
 const request = vi.fn<typeof fetch>();
 const now = "2026-09-07T12:00:00.000Z";
 
-function book(provider: "openlibrary" | "openbd", title = "Drawing reference"): CreatorResource {
+type BookProvider = "openlibrary" | "googlebooks" | "openbd";
+
+function book(provider: BookProvider, title = "Drawing reference"): CreatorResource {
   return {
     id: `${provider}:${title}`, provider, title, creator: "Artist", description: "Edition notes",
-    sourceUrl: provider === "openbd" ? "https://openbd.jp/" : "https://openlibrary.org/works/OL1W",
+    sourceUrl: provider === "openbd" ? "https://openbd.jp/" : provider === "googlebooks" ? "https://books.google.com/books?id=GB1" : "https://openlibrary.org/works/OL1W",
     license: provider === "openbd" ? "book-promotion" : "metadata-only", licenseUrl: "",
     credit: "Publisher", fetchedAt: now, dateLabel: "2026", isbn: "9784088820118",
   };
 }
 
-function response(provider: "openlibrary" | "openbd", options: Partial<ResourceSearchResult> = {}) {
+function response(provider: BookProvider, options: Partial<ResourceSearchResult> = {}) {
   return Response.json({ provider, status: "ready", items: [book(provider)], page: 1,
     hasMore: false, fetchedAt: now, message: "", ...options });
 }
@@ -41,7 +43,10 @@ function submit(query: string) {
 
 beforeEach(() => {
   localStorage.clear();
-  request.mockReset().mockResolvedValue(response("openlibrary"));
+  request.mockReset().mockImplementation(async (raw) => {
+    const provider = new URL(String(raw), "https://local.test").searchParams.get("provider") as BookProvider;
+    return response(provider, provider === "googlebooks" ? { items: [] } : {});
+  });
   vi.stubGlobal("fetch", request);
   vi.stubGlobal("navigator", Object.assign(Object.create(navigator), {
     locks: { request: async (_name: string, _options: unknown, operation: () => unknown) => operation() },
@@ -76,6 +81,7 @@ describe("global book search and saved sources", () => {
 
   it("queries both ISBN providers, keeps a partial result, and retries the failed provider", async () => {
     request.mockResolvedValueOnce(response("openlibrary", { message: "English editions" }))
+      .mockResolvedValueOnce(response("googlebooks", { items: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 429 }));
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "9784088820118" }));
@@ -83,8 +89,9 @@ describe("global book search and saved sources", () => {
     expect(screen.getByText(/일부 제공처는 응답하지 않았지만/u)).toBeTruthy();
     expect(screen.getByText(/English editions/u)).toBeTruthy();
     expect(request.mock.calls.map(([url]) => new URL(String(url), "https://local.test").searchParams.get("provider")))
-      .toEqual(["openlibrary", "openbd"]);
+      .toEqual(["openlibrary", "googlebooks", "openbd"]);
     request.mockResolvedValueOnce(response("openlibrary"))
+      .mockResolvedValueOnce(response("googlebooks", { items: [] }))
       .mockResolvedValueOnce(response("openbd", { items: [book("openbd", "Japanese edition")] }));
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByRole("heading", { name: "Japanese edition" })).toBeTruthy();
@@ -93,10 +100,12 @@ describe("global book search and saved sources", () => {
   });
 
   it.each(["http", "wrong-provider", "malformed", "non-error"])("recovers from a provider %s failure", async (failure) => {
-    if (failure === "http") request.mockResolvedValueOnce(new Response(null, { status: 503 }));
-    if (failure === "wrong-provider") request.mockResolvedValueOnce(response("openbd"));
-    if (failure === "malformed") request.mockResolvedValueOnce(Response.json({ items: "invalid" }));
-    if (failure === "non-error") request.mockRejectedValueOnce("network unavailable");
+    for (let index = 0; index < 2; index++) {
+      if (failure === "http") request.mockResolvedValueOnce(new Response(null, { status: 503 }));
+      if (failure === "wrong-provider") request.mockResolvedValueOnce(response("openbd"));
+      if (failure === "malformed") request.mockResolvedValueOnce(Response.json({ items: "invalid" }));
+      if (failure === "non-error") request.mockRejectedValueOnce("network unavailable");
+    }
     renderPage("?q=graphic+novel");
     expect((await screen.findByRole("alert")).textContent).toContain("모든 제공처");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
@@ -122,7 +131,7 @@ describe("global book search and saved sources", () => {
     request.mockResolvedValueOnce(response("openlibrary", { hasMore: true, page: 2 }));
     renderPage("?q=9784088820118&page=2");
     expect(await screen.findByText("2 페이지")).toBeTruthy();
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledTimes(2);
     request.mockResolvedValueOnce(response("openlibrary", { hasMore: true, page: 3 }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     expect(await screen.findByText("3 페이지")).toBeTruthy();

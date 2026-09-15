@@ -66,7 +66,7 @@ import {
   ProductionProjectByWorkParamsSchema,
   ProductionProjectParamsSchema,
   type ExecuteProductionCommand,
-  type ProductionCommand, CreateProductionProjectDto 
+  type ProductionCommand, CreateProductionProjectDto
 } from "./production-collaboration.dto";
 import {
   ProductionCollaborationRepository,
