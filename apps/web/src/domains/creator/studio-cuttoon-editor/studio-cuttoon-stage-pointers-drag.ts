@@ -243,6 +243,7 @@ export function bindStudioCuttoonStagePointersDrag(
   const {
     canvasInteractionUnitIds,
     commit,
+    duplicateSelected,
     currentPageIdRef,
     endLiveResourceEdit,
     gridSize,
@@ -334,6 +335,7 @@ export function bindStudioCuttoonStagePointersDrag(
             lastX: currentX,
             lastY: currentY,
             selectedIds: [...candidateGroupIds],
+            duplicate: e.evt.altKey === true,
           };
           groupDragRef.current = activeGroupDrag;
           const initialDx = currentX - x0;
@@ -601,12 +603,29 @@ export function bindStudioCuttoonStagePointersDrag(
     let dx = 0;
     let dy = 0;
     let committed = false;
+    let previewRestored = false;
     try {
       if (dnode && g.selectedIds.length > 1) {
         dx = dnode.x() - g.x0;
         dy = dnode.y() - g.y0;
         if (dx === 0 && dy === 0) {
           committed = true;
+          return;
+        }
+        if (g.duplicate) {
+          // Return every authored node before the clone commit so one paint never shows both the
+          // moved source and the newly inserted copy. The clipboard planner translates every
+          // selected member (including draw points and grouped metadata) in one history step.
+          restoreGroupDragPreview(g, dx, dy);
+          previewRestored = true;
+          committed = duplicateSelected({
+            placement: "in-place",
+            translation: { deltaX: dx, deltaY: dy },
+            announcement: "선택 항목을 복제하여 이동",
+          }) === true;
+          if (!committed) {
+            setError("선택 항목을 복제할 수 없어요. 잠금 또는 문서 상태를 확인하세요.");
+          }
           return;
         }
         const next = planAtomicSelectionTranslation({
@@ -636,7 +655,7 @@ export function bindStudioCuttoonStagePointersDrag(
         }
       }
     } finally {
-      if (!committed && dnode && (dx !== 0 || dy !== 0)) {
+      if (!committed && !previewRestored && dnode && (dx !== 0 || dy !== 0)) {
         // 실패한 commit의 imperative preview가 화면에 남지 않게 원점으로 복구한다.
         restoreGroupDragPreview(g, dx, dy);
       }

@@ -73,6 +73,7 @@ export type StudioCuttoonStagePointersHost = {
   draftPreviewStoreRef: any;
   drawMode: any;
   drawShape: any;
+  duplicateSelected: any;
   drawingCrdtPublishErrorRef: any;
   drawingCrdtPublisherRef: any;
   drawingCrdtStrokeActiveRef: any;

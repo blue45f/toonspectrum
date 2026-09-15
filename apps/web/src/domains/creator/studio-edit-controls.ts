@@ -55,7 +55,6 @@ export const STUDIO_EDIT_MENU_COMMANDS = {
     id: "deselect",
     label: "선택 해제",
     labelKey: "studio.mainMenu.edit.command.deselect",
-    shortcut: "⌘D",
   },
   "invert-selection": {
     id: "invert-selection",
@@ -73,7 +72,7 @@ export const STUDIO_EDIT_MENU_COMMANDS = {
     id: "duplicate",
     label: "복제",
     labelKey: "studio.mainMenu.edit.command.duplicate",
-    shortcut: "⌘J",
+    shortcut: "⌘D",
   },
   "bring-front": {
     id: "bring-front",
@@ -247,6 +246,7 @@ export type StudioEditShortcut =
   | "paste-in-place"
   | "select-all"
   | "deselect"
+  | "duplicate-or-deselect"
   | "invert-selection"
   | "duplicate"
   | "bring-front"
@@ -288,7 +288,7 @@ export function resolveStudioEditShortcut(
   if (code === "KeyC" && !event.shiftKey) return "copy";
   if (code === "KeyV" && event.shiftKey) return "paste-in-place";
   if (code === "KeyA" && !event.shiftKey) return "select-all";
-  if (code === "KeyD" && !event.shiftKey) return "deselect";
+  if (code === "KeyD" && !event.shiftKey) return "duplicate-or-deselect";
   if (code === "KeyI" && event.shiftKey) return "invert-selection";
   if (code === "KeyJ" && !event.shiftKey) return "duplicate";
   // 두 브래킷 쌍은 반드시 대칭이다 — ⇧ 가 "맨 끝까지", 무수식이 "한 칸".

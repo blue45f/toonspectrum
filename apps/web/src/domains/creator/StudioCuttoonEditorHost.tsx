@@ -4097,6 +4097,7 @@ export function StudioCuttoonEditor({
     lastX: number;
     lastY: number;
     selectedIds: string[];
+    duplicate: boolean;
   } | null>(null);
   // draw 요소는 문서 좌표를 points에 보관하고 Konva wrapper x/y는 라이브 그룹 이동 preview에만
   // 사용한다. 성공 커밋 직후 새 elements가 렌더되기 전에는 wrapper를 먼저 0으로 돌리면 화면이
@@ -23563,6 +23564,7 @@ No text, logo, watermark, or copyrighted character.`;
     currentRawPenInkPreviewEligibility,
     disarmAllPixelTools,
     discardDrawingPointerSession,
+    duplicateSelected,
     documentSaveInFlightRef,
     dodgeBurnActive,
     dodgeBurnDragRef,

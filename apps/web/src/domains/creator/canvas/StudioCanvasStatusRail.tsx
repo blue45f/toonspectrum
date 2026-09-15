@@ -133,6 +133,12 @@ const SELECTION_LAYOUT_HINTS = {
     preview: "selection-layout",
     previewVariant: "distribute-vertical",
   },
+  duplicate: {
+    id: "selection-layout-duplicate",
+    title: "선택 복제",
+    description: "선택 항목을 복제합니다. Alt/Option을 누른 채 드래그하면 복제와 배치를 한 번에 끝낼 수 있어요.",
+    tip: "⌘/Ctrl+D · Alt/⌥+드래그",
+  },
   zoomToSelection: {
     id: "selection-layout-zoom-to-selection",
     title: "선택 영역으로 확대",
@@ -565,8 +571,8 @@ export function StudioCanvasStatusRail({
           </span>
           <span className="hidden shrink-0 text-fg-3 xl:inline">
             {selectionGroupName
-              ? "드래그·방향키 전체 이동 · 더블클릭 내부 편집"
-              : "드래그·방향키 이동 · 정렬·분배"}
+              ? "드래그·방향키 이동 · Alt/⌥ 드래그 복제 · 더블클릭 내부 편집"
+              : "드래그 이동 · Shift 비율·15° · Alt/⌥ 중심·드래그 복제"}
           </span>
           <div className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]">
             {selectionGroupName && onUngroupSelection ? (
@@ -727,13 +733,15 @@ export function StudioCanvasStatusRail({
               </div>
             ) : null)}
             <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
-            <button
-              type="button"
+            <SelectionLayoutAction
+              hint={SELECTION_LAYOUT_HINTS.duplicate}
+              label="선택 복제"
               onClick={onDuplicateSelection}
+              ariaKeyShortcuts="Control+D Meta+D"
               className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
               복제
-            </button>
+            </SelectionLayoutAction>
             <button
               type="button"
               onClick={onRemoveSelection}

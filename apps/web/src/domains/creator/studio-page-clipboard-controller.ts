@@ -7,6 +7,7 @@ import {
   isStudioPasteScopeCurrent,
   shouldHandleStudioEditEvent,
 } from "./studio-edit-controls";
+import { planAtomicSelectionTranslation } from "./studio-group-selection";
 import { uid } from "./studio-id";
 import { createLayerGroup, missingLayerGroupIds, type LayerGroup } from "./studio-layers";
 import { loadStudioCanvasImageFile } from "./studio-legacy-editor-runtime-helpers";
@@ -32,6 +33,16 @@ import type { El, ImageEl } from "./studio-element-model";
 import type { CanvasImagePlacement } from "./studio-image-placement";
 import type { PageState } from "./studio-page-state";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
+
+export interface StudioDuplicateSelectionOptions {
+  readonly placement?: "cascade" | "in-place";
+  readonly patch?: Partial<El>;
+  readonly translation?: {
+    readonly deltaX: number;
+    readonly deltaY: number;
+  };
+  readonly announcement?: string;
+}
 
 export interface UseStudioPageClipboardOptions {
   readonly activePage: PageState;
@@ -228,6 +239,8 @@ export function useStudioPageClipboard({
     payload: StudioClipboardPayload,
     placement: "cascade" | "in-place",
     announcement?: string,
+    singleElementPatch?: Partial<El>,
+    translation?: StudioDuplicateSelectionOptions["translation"],
   ): boolean {
     if (activeSurfaceReviewLocked) return false;
     const samePage = payload.source.pageId === activePage.id;
@@ -249,7 +262,34 @@ export function useStudioPageClipboard({
     );
     if (!plan) return false;
     const plannedElements = plan.els as unknown as El[];
-    const insertedElements = remapStudioBg3dLtCopiedBundles(plannedElements, masterEditMode);
+    const patchedPlannedElements = singleElementPatch && plannedElements.length === 1
+      ? [{
+          ...plannedElements[0],
+          ...singleElementPatch,
+          // The clipboard planner owns identity remapping; gesture patches may never restore the source id.
+          id: plannedElements[0]!.id,
+        } as El]
+      : plannedElements;
+    if (
+      translation
+      && (!Number.isFinite(translation.deltaX) || !Number.isFinite(translation.deltaY))
+    ) {
+      return false;
+    }
+    const placedPlannedElements = translation
+      ? planAtomicSelectionTranslation({
+          items: patchedPlannedElements,
+          selectedIds: patchedPlannedElements.map((element) => element.id),
+          deltaX: translation.deltaX,
+          deltaY: translation.deltaY,
+          isLocked: () => false,
+        })
+      : patchedPlannedElements;
+    // Place the selected anchor before bundle remapping so linked 3D companions inherit it too.
+    const insertedElements = remapStudioBg3dLtCopiedBundles(
+      placedPlannedElements,
+      masterEditMode,
+    );
     const insertedGroupIds = new Set(
       insertedElements.flatMap((element) => (element.groupId ? [element.groupId] : [])),
     );
@@ -365,10 +405,20 @@ export function useStudioPageClipboard({
     return false;
   }
 
-  function duplicateSelected() {
+  function duplicateSelected(options?: StudioDuplicateSelectionOptions): boolean {
     const captured = captureSelectedStudioClipboard();
-    if (!captured) return;
-    applyStudioClipboardPayload(captured.payload, "cascade", "복제");
+    if (!captured) return false;
+    // Keep the established keyboard/menu path byte-for-byte visible to boundary tests and callers.
+    if (!options) {
+      return applyStudioClipboardPayload(captured.payload, "cascade", "복제");
+    }
+    return applyStudioClipboardPayload(
+      captured.payload,
+      options.placement ?? "cascade",
+      options.announcement ?? "복제",
+      options.patch,
+      options.translation,
+    );
   }
 
   const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});

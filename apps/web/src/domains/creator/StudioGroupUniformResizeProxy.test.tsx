@@ -462,9 +462,12 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(anchor.hitStrokeWidth).toHaveBeenCalledWith(22);
 
     const oldBox = { x: 0, y: 0, width: 100, height: 50, rotation: 0 };
-    const tooSmall = { x: 0, y: 0, width: 11, height: 30, rotation: 0 };
-    const valid = { x: 0, y: 0, width: 12, height: 12, rotation: 0 };
-    expect(coarse.boundBoxFunc(oldBox, tooSmall)).toBe(oldBox);
+    const tooSmall = { x: 0, y: 0, width: 0.25, height: 50, rotation: 0 };
+    const valid = { x: 0, y: 0, width: 0.75, height: 0.75, rotation: 0 };
+    const constrained = coarse.boundBoxFunc(oldBox, tooSmall);
+    expect(constrained).not.toBe(oldBox);
+    expect(constrained.width).toBeCloseTo(0.5);
+    expect(constrained.height).toBeCloseTo(50);
     expect(coarse.boundBoxFunc(oldBox, valid)).toBe(valid);
   });
 
@@ -549,7 +552,8 @@ describe("StudioGroupUniformResizeProxy", () => {
       "top-center",
       "bottom-center",
     ]);
-    expect(transformer.rotationSnaps).toEqual([0, 45, 90, 135, 180, 225, 270, 315]);
+    expect(transformer.rotationSnaps).toEqual([]);
+    expect(transformer.shiftBehavior).toBe("default");
   });
 
   it("rotatable 커밋은 회전각을 박스와 함께 넘기고 proxy를 원복한다", () => {
@@ -600,6 +604,7 @@ describe("StudioGroupUniformResizeProxy", () => {
 
     expect(transformer.rotateEnabled).toBe(false);
     expect(transformer.keepRatio).toBe(true);
+    expect(transformer.shiftBehavior).toBe("none");
     expect(transformer.rotationSnaps).toEqual([]);
   });
 
