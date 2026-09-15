@@ -37,7 +37,7 @@ describe("Studio template catalog", () => {
       .toEqual(["presentation-webtoon-pitch"]);
     expect(searchStudioTemplates({ text: "animatic" }).map((item) => item.id))
       .toEqual(["storyboard-animatic"]);
-    expect(searchStudioTemplates({ category: "webtoon" })).toHaveLength(2);
+    expect(searchStudioTemplates({ category: "webtoon" })).toHaveLength(6);
     expect(searchStudioTemplates({
       category: "all",
       favoritesOnly: true,
@@ -45,8 +45,14 @@ describe("Studio template catalog", () => {
     }).map((item) => item.id)).toEqual(["webtoon-four-panel"]);
   });
 
-  it("validates every catalog template with its safe defaults", () => {
-    for (const template of searchStudioTemplates()) {
+  it("validates every catalog template with its visual composition and safe defaults", () => {
+    const templates = searchStudioTemplates();
+    expect(templates).toHaveLength(18);
+    for (const template of templates) {
+      const composition = template.definition.composition;
+      expect(composition).toBeTruthy();
+      expect(composition?.pages.length).toBeGreaterThan(0);
+      expect(composition?.layerLabels.length).toBeGreaterThan(0);
       expect(planStudioTemplateApplication(
         template.definition,
         defaultStudioTemplateValues(template),

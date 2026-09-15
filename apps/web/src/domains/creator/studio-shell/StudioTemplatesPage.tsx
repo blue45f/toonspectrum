@@ -27,6 +27,7 @@ import {
   type StudioTemplateCategory,
 } from "../studio-template-catalog";
 import { planStudioTemplateApplication } from "../studio-template-system";
+import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
 
 type Locale = "ko" | "en";
 
@@ -72,6 +73,13 @@ function TemplatePreview({
     [template],
   );
   const title = templateTitle(template, locale);
+  const composition = template.definition.composition;
+  const pageCount = composition?.pages.length ?? 0;
+  const panelCount = composition?.pages.reduce(
+    (total, page) => total + page.panelCount,
+    0,
+  ) ?? 0;
+  const statusReady = plan.status === "ready";
 
   const prepareHandoff = () => {
     if (typeof window === "undefined") return;
@@ -104,6 +112,12 @@ function TemplatePreview({
         </button>
       </div>
 
+      <StudioTemplateVisualPreview
+        template={template}
+        locale={locale}
+        showNavigation
+        className="mt-4"
+      />
       <p className="mt-5 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
         {CATEGORY_LABELS[template.category][locale]}
       </p>
@@ -112,7 +126,7 @@ function TemplatePreview({
         {templateDescription(template, locale)}
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {template.tags.map((tag) => (
           <span key={tag} className="rounded-full border border-line bg-panel px-2.5 py-1 text-[0.68rem] font-bold text-fg-2">
             {tag}
@@ -120,42 +134,76 @@ function TemplatePreview({
         ))}
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+      <dl className="mt-5 grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "권장 작업공간" : "Workspace"}
+            {locale === "ko" ? "페이지" : "Pages"}
           </dt>
-          <dd className="mt-1 text-sm font-black text-fg">{template.recommendedWorkspace}</dd>
+          <dd className="mt-1 text-sm font-black text-fg">{pageCount}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "채울 항목" : "Editable slots"}
+            {locale === "ko" ? "컷·구성 영역" : "Panels"}
+          </dt>
+          <dd className="mt-1 text-sm font-black text-fg">{panelCount}</dd>
+        </div>
+        <div className="rounded-xl border border-line bg-panel p-3">
+          <dt className="text-[0.65rem] font-semibold text-fg-3">
+            {locale === "ko" ? "편집 슬롯" : "Editable slots"}
           </dt>
           <dd className="mt-1 text-sm font-black text-fg">{template.definition.slots.length}</dd>
         </div>
+        <div className="rounded-xl border border-line bg-panel p-3">
+          <dt className="text-[0.65rem] font-semibold text-fg-3">
+            {locale === "ko" ? "레이어" : "Layers"}
+          </dt>
+          <dd className="mt-1 text-sm font-black text-fg">{composition?.layerLabels.length ?? 0}</dd>
+        </div>
       </dl>
 
+      {composition ? (
+        <div className="mt-4 rounded-xl border border-line bg-panel p-3">
+          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-fg-3">
+            {locale === "ko" ? "출력·구조" : "Output & structure"}
+          </p>
+          <p className="mt-1 text-sm font-black text-fg">
+            {locale === "ko" ? composition.canvasLabelKo : composition.canvasLabelEn}
+          </p>
+          <p className="mt-1 text-xs text-fg-3">
+            {locale === "ko"
+              ? `새 프로젝트 · 포함 에셋 ${composition.includedAssetCount}개`
+              : `New project · ${composition.includedAssetCount} included assets`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {composition.layerLabels.slice(0, 8).map((label) => (
+              <span key={label} className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold text-fg-3">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className={cn(
         "mt-4 flex items-start gap-3 rounded-xl border p-3",
-        plan.status === "ready"
+        statusReady
           ? "border-success/30 bg-success-soft/15"
           : "border-warning/35 bg-warning-soft/15",
       )}>
         <CheckCircle2
           size={18}
-          className={plan.status === "ready" ? "mt-0.5 shrink-0 text-success" : "mt-0.5 shrink-0 text-warning"}
+          className={statusReady ? "mt-0.5 shrink-0 text-success" : "mt-0.5 shrink-0 text-warning"}
           aria-hidden="true"
         />
         <div>
           <p className="text-sm font-black text-fg">
-            {plan.status === "ready"
+            {statusReady
               ? (locale === "ko" ? "안전한 기본값으로 바로 시작할 수 있어요" : "Ready with safe defaults")
-              : (locale === "ko" ? "시작 전에 채울 항목이 있어요" : "Some fields need attention")}
+              : (locale === "ko" ? "이미지 사용 조건을 시작 전에 확인해요" : "Review image rights before starting")}
           </p>
           <p className="mt-1 text-xs leading-5 text-fg-3">
             {locale === "ko"
-              ? "원본을 덮어쓰지 않고 새 프로젝트·문서에서 시작합니다. 이미지 에셋의 사용 권리는 적용 전에 다시 확인합니다."
-              : "Starts in a new project or document without replacing originals. Image rights are checked again before use."}
+              ? "미리보기와 같은 페이지·컷·레이어 구조를 새 프로젝트에 전달합니다. 원본 프로젝트는 변경하지 않습니다."
+              : "The previewed pages, panels and layer structure are handed to a new project without changing originals."}
           </p>
         </div>
       </div>
@@ -296,7 +344,19 @@ export function StudioTemplatesPage() {
                         active ? "border-accent/55 ring-2 ring-accent/15" : "border-line hover:border-accent/35",
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(template.id)}
+                        aria-label={`${templateTitle(template, locale)} ${locale === "ko" ? "시각 미리보기" : "visual preview"}`}
+                        className="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                      >
+                        <StudioTemplateVisualPreview
+                          template={template}
+                          locale={locale}
+                          compact
+                        />
+                      </button>
+                      <div className="mt-3 flex items-start justify-between gap-2">
                         <button
                           type="button"
                           onClick={() => setSelectedId(template.id)}
@@ -322,6 +382,13 @@ export function StudioTemplatesPage() {
                       <p className="mt-2 line-clamp-3 text-xs leading-5 text-fg-2">
                         {templateDescription(template, locale)}
                       </p>
+                      {template.definition.composition ? (
+                        <p className="mt-3 text-[0.68rem] font-semibold text-fg-3">
+                          {locale === "ko"
+                            ? `${template.definition.composition.pages.length}페이지 · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)}컷·영역 · 편집 슬롯 ${template.definition.slots.length}`
+                            : `${template.definition.composition.pages.length} pages · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)} panels · ${template.definition.slots.length} slots`}
+                        </p>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => setSelectedId(template.id)}

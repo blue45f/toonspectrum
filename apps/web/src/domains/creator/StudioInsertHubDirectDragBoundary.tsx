@@ -8,13 +8,19 @@ import {
 } from "react";
 
 import { CANVAS_W } from "./studio-assets";
+import { BG_SCENES } from "./studio-bg-scenes";
+import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { listStudioElementLibrary } from "./studio-elements-catalog";
-import { STUDIO_GENERATED_ELEMENT_ITEMS } from "./studio-generated-2d-catalog";
+import {
+  STUDIO_GENERATED_BG_SCENES,
+  STUDIO_GENERATED_ELEMENT_ITEMS,
+} from "./studio-generated-2d-catalog";
 import {
   canDragStudioInsertHubEntry,
   writeStudioInsertHubDragPayload,
 } from "./studio-insert-hub-drag";
 import { buildStudioInsertHubEntries } from "./studio-insert-hub-model";
+import { SCENE_TEMPLATES } from "./studio-scene-templates";
 import { buildStudioUnifiedAssetCatalog } from "./studio-unified-asset-catalog";
 
 import type { StudioInsertHubEntry } from "./studio-insert-hub-model";
@@ -39,16 +45,26 @@ function describedByWithoutToken(value: string | null, token: string): string {
 }
 
 function buildDirectDragEntries(
-  localAssets: StudioToolBeltContentProps["assets"],
+  toolBelt: StudioToolBeltContentProps,
 ): readonly StudioInsertHubEntry[] {
   const items = buildStudioUnifiedAssetCatalog({
-    backgrounds: [],
-    sceneTemplates: [],
+    backgrounds: [
+      ...STUDIO_GENERATED_BG_SCENES,
+      ...BG_SCENES,
+      ...BG_SCENES_EXTRA,
+      ...toolBelt.studioOptionalAssets.bgSceneSections.flatMap(
+        (section) => section.scenes,
+      ),
+    ],
+    sceneTemplates: [
+      ...SCENE_TEMPLATES,
+      ...toolBelt.sceneTemplates.templates,
+    ],
     elements: [
       ...STUDIO_GENERATED_ELEMENT_ITEMS,
       ...listStudioElementLibrary(),
     ],
-    localAssets,
+    localAssets: toolBelt.assets,
   });
   return buildStudioInsertHubEntries(items);
 }
@@ -67,6 +83,15 @@ function restoreOriginalTitle(button: HTMLButtonElement): void {
   delete button.dataset.studioInsertDirectDragOriginalTitle;
 }
 
+function dragHandleForCard(card: HTMLElement): HTMLButtonElement | null {
+  const explicit = card.querySelector<HTMLButtonElement>(
+    "button[data-studio-insert-drag-handle]",
+  );
+  if (explicit) return explicit;
+  const buttons = card.querySelectorAll<HTMLButtonElement>("button");
+  return buttons.item(buttons.length - 1);
+}
+
 function synchronizeButtons(
   root: HTMLElement,
   entriesById: ReadonlyMap<string, StudioInsertHubEntry>,
@@ -78,8 +103,7 @@ function synchronizeButtons(
   )) {
     const entryId = card.dataset.studioInsertEntry;
     const entry = entryId ? entriesById.get(entryId) : undefined;
-    const buttons = card.querySelectorAll<HTMLButtonElement>("button");
-    const button = buttons.item(buttons.length - 1);
+    const button = dragHandleForCard(card);
     if (!button) continue;
     const draggable = Boolean(
       allowed && entry && canDragStudioInsertHubEntry(entry),
@@ -115,8 +139,8 @@ export function StudioInsertHubDirectDragBoundary({
   const helpId = useId();
   const allowed = !toolBelt.activeSurfaceReviewLocked;
   const entries = useMemo(
-    () => buildDirectDragEntries(toolBelt.assets),
-    [toolBelt.assets],
+    () => buildDirectDragEntries(toolBelt),
+    [toolBelt],
   );
   const entriesById = useMemo(
     () => new Map(entries.map((entry) => [entry.id, entry] as const)),
@@ -130,7 +154,12 @@ export function StudioInsertHubDirectDragBoundary({
       synchronizeButtons(root, entriesById, allowed, helpId);
     synchronize();
     const observer = new MutationObserver(synchronize);
-    observer.observe(root, { childList: true, subtree: true });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-studio-insert-entry", "data-studio-insert-drag-handle"],
+    });
     return () => {
       observer.disconnect();
       synchronizeButtons(root, entriesById, false, helpId);
@@ -148,9 +177,9 @@ export function StudioInsertHubDirectDragBoundary({
     const entryId = card?.dataset.studioInsertEntry;
     const entry = entryId ? entriesById.get(entryId) : undefined;
     if (
-      !allowed ||
-      !entry ||
-      !writeStudioInsertHubDragPayload(event.dataTransfer, {
+      !allowed
+      || !entry
+      || !writeStudioInsertHubDragPayload(event.dataTransfer, {
         entry,
         canvasWidth: CANVAS_W,
         canvasHeight: toolBelt.canvasH,
