@@ -254,6 +254,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             viewerId={userId}
             canModerate={data.canModerate}
             disabled={post.hidden || post.archived}
+            allowDeleteWhenDisabled
             maxLength={1000}
             maxDepth={4}
             title="응원·피드백"

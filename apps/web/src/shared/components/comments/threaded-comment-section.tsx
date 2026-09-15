@@ -49,6 +49,7 @@ export interface ThreadedCommentSectionProps<T extends ThreadedCommentRecord> {
   canModerate?: boolean;
   loading?: boolean;
   disabled?: boolean;
+  allowDeleteWhenDisabled?: boolean;
   maxLength?: number;
   maxDepth?: number;
   title?: string;
@@ -198,6 +199,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
   canModerate = false,
   loading = false,
   disabled = false,
+  allowDeleteWhenDisabled = false,
   maxLength = 1000,
   maxDepth = 4,
   title = "댓글",
@@ -335,7 +337,8 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
   }
 
   async function removeComment(commentId: string) {
-    if (disabled || !window.confirm("이 댓글을 삭제할까요? 대댓글이 있으면 삭제 표시로 남습니다.")) return;
+    if ((disabled && !allowDeleteWhenDisabled)
+      || !window.confirm("이 댓글을 삭제할까요? 대댓글이 있으면 삭제 표시로 남습니다.")) return;
     const busyKey = `delete:${commentId}`;
     if (!startBusy(busyKey)) return;
     setError(null);
@@ -393,7 +396,9 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     const deleted = comment.deleted || comment.hidden;
     const ownComment = Boolean(viewerId) && comment.author.id === viewerId;
     const canEdit = ownComment && !deleted && !disabled;
-    const canDelete = (ownComment || canModerate) && !deleted && !disabled;
+    const canDelete = (ownComment || canModerate)
+      && !deleted
+      && (!disabled || allowDeleteWhenDisabled);
     const canReply = Boolean(viewerId) && !deleted && !disabled && depth < maxDepth;
     const replyDraftKey = draftKeyForReply(comment.id);
     const editDraftKey = draftKeyForEdit(comment.id);

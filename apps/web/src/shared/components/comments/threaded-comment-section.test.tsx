@@ -43,6 +43,8 @@ interface HarnessProps {
   onUpdate?: (commentId: string, text: string) => Promise<ThreadedCommentRecord>;
   onDelete?: (commentId: string) => Promise<{ deleted: true; soft: boolean; removedIds: string[] }>;
   onToggleLike?: (commentId: string) => Promise<{ liked: boolean; likes: number }>;
+  disabled?: boolean;
+  allowDeleteWhenDisabled?: boolean;
 }
 
 function Harness({
@@ -51,6 +53,8 @@ function Harness({
   onUpdate = async (commentId, text) => comment(commentId, text),
   onDelete = async (commentId) => ({ deleted: true, soft: false, removedIds: [commentId] }),
   onToggleLike = async () => ({ liked: true, likes: 1 }),
+  disabled = false,
+  allowDeleteWhenDisabled = false,
 }: HarnessProps) {
   const [comments, setComments] = useState(initial);
   return (
@@ -62,6 +66,8 @@ function Harness({
       onUpdate={onUpdate}
       onDelete={onDelete}
       onToggleLike={onToggleLike}
+      disabled={disabled}
+      allowDeleteWhenDisabled={allowDeleteWhenDisabled}
       placeholder="댓글 입력"
       draftStorageKey="threaded-comment-test-draft"
     />
@@ -114,6 +120,32 @@ describe("ThreadedCommentSection interactions", () => {
     const deepest = screen.getByText("깊이 4").closest("article");
     expect(deepest).toBeTruthy();
     expect(within(deepest as HTMLElement).queryByRole("button", { name: "답글" })).toBeNull();
+  });
+
+  it("keeps authorized deletion available when a thread is read-only", async () => {
+    const remove = vi.fn(async (commentId: string) => ({
+      deleted: true as const,
+      soft: false,
+      removedIds: [commentId],
+    }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(
+      <Harness
+        initial={[comment("comment-1", "정리할 댓글")]}
+        onCreate={async () => comment("unused", "unused")}
+        onDelete={remove}
+        disabled
+        allowDeleteWhenDisabled
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "등록" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "답글" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "수정" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("comment-1"));
+    expect(screen.queryByText("정리할 댓글")).toBeNull();
   });
 
   it("updates, reacts to, and deletes an owned comment without a full reload", async () => {
