@@ -52,7 +52,7 @@ describe("planStudioAiExecutionPreflight", () => {
       connectionOk: true,
     });
 
-    expect(plan.costCategory).toBe("서버 쿼터");
+    expect(plan.costCategory).toBe("공용 무료 쿼터");
     expect(plan.outputCountLabel).toBe("구도 제안 1세트");
   });
 
@@ -126,6 +126,11 @@ describe("planStudioAiExecutionPreflight", () => {
       expect(plan.outputCount).toBe(1);
       expect(plan.outputCountLabel).toContain("1");
       expect(plan.fallbackRetryPolicy).toContain("자동 재시도 없음");
+      if (["composition", "dialogue", "palette"].includes(tool.id)) {
+        expect(plan.fallbackRetryPolicy).toContain("다음 무료 경로로 자동 전환");
+      } else {
+        expect(plan.fallbackRetryPolicy).toContain("자동 fallback");
+      }
       expect(plan.sourceNonDestructivePolicy).toMatch(/자동 변경하지 않고|덮어쓰지 않고|바꾸지 않고/);
       expect(STUDIO_AI_EXECUTION_COST_CATEGORIES).toContain(plan.costCategory);
     }
@@ -135,7 +140,7 @@ describe("planStudioAiExecutionPreflight", () => {
     expect(STUDIO_AI_EXECUTION_COST_CATEGORIES).toEqual([
       "로컬 0원",
       "제공자 과금 가능",
-      "서버 쿼터",
+      "공용 무료 쿼터",
     ]);
   });
 });

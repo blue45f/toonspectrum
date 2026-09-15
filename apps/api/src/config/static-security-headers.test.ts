@@ -5,18 +5,21 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
-const VERCEL_CONFIG_URL = new URL("../../../../vercel.json", import.meta.url);
+const RESPONSE_POLICY_URL = new URL(
+  "../../../../config/http-response-headers.json",
+  import.meta.url,
+);
 const INDEX_HTML_URL = new URL("../../../../apps/web/index.html", import.meta.url);
 
 type Header = Readonly<{ key: string; value: string }>;
-type VercelConfig = Readonly<{
+type ResponsePolicy = Readonly<{
   headers?: readonly Readonly<{ source: string; headers: readonly Header[] }>[];
 }>;
 
 function rootHeaders(): readonly Header[] {
   const config = JSON.parse(
-    readFileSync(fileURLToPath(VERCEL_CONFIG_URL), "utf8"),
-  ) as VercelConfig;
+    readFileSync(fileURLToPath(RESPONSE_POLICY_URL), "utf8"),
+  ) as ResponsePolicy;
   return config.headers?.find((entry) => entry.source === "/(.*)")?.headers ?? [];
 }
 
@@ -39,7 +42,7 @@ function inlineJsonLdHash(): string {
   return `'sha256-${createHash("sha256").update(content).digest("base64")}'`;
 }
 
-describe("Vercel static security headers", () => {
+describe("provider-neutral static security headers", () => {
   it("ships a Studio-aware CSP without reopening active content", () => {
     const csp = headerValue("Content-Security-Policy");
     expect(csp).toContain("default-src 'self'");

@@ -179,7 +179,7 @@ const STUDIO_VRM_SECONDARY_HAND_MAX_STEP_PER_SECOND = 7.2;
 const STUDIO_VRM_PROP_MAX_FRAME_DELTA = 0.1;
 const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
   roundedBox: (width: number, height: number, depth: number, radius: number) => (
-    new RoundedBoxGeometry(width, height, depth, 3, radius)
+    new RoundedBoxGeometry(width, height, depth, 5, radius)
   ),
 });
 

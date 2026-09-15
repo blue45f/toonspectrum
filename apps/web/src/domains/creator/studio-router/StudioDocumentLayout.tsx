@@ -9,6 +9,7 @@ import {
 } from "../live/studio-live-jam-session";
 import { StudioDocumentWorkspaceDock } from "../studio-shell/StudioDocumentWorkspaceDock";
 import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
+import { startStudioConnectivityRuntime } from "../offline/studio-connectivity";
 
 import {
   StudioDocumentLayoutContext,
@@ -55,6 +56,7 @@ export function StudioDocumentLayout({
 }: StudioDocumentLayoutProps) {
   const { documentKey } = useStudioDocumentRuntime();
   const [params, setSearchParams] = useSearchParams();
+  useEffect(() => startStudioConnectivityRuntime(), []);
   const liveRoomParam = readStudioLiveRoomQuery(params);
   const workId = studioRoute.workId;
   const remixId = studioRoute.remixSourceWorkId;

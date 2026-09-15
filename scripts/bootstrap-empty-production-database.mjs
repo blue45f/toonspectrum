@@ -59,6 +59,7 @@ const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "apps/api/src/db/creator-asset-object-storage.schema.ts",
   "apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
   "apps/api/src/db/studio-raster-asset.schema.ts",
+  "apps/api/src/db/schema/production.schema.ts",
 ]);
 const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "package.json",

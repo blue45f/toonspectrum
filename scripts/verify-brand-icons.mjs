@@ -156,7 +156,7 @@ brandIconChecks.push(["HTML: versioned static icon links and SVG after fallbacks
 brandIconChecks.push(["Manifest: matching revision, real dimensions, separate any/maskable roles", () => {
   const manifest = JSON.parse(read("manifest.webmanifest").toString("utf8"));
   assert.equal(manifest.id, "/");
-  assert.equal(manifest.start_url, "/");
+  assert.equal(manifest.start_url, "/studio");
   assert.equal(manifest.icons.length, 5);
   for (const icon of manifest.icons) {
     const url = new URL(icon.src, "https://www.toonstudio.cloud");

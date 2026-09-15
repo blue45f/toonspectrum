@@ -110,6 +110,7 @@ const envSchema = z.object({
   API_LOCAL_ENV_FILE_ENABLED: z.enum(["true", "false"]).optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
+  CLOUDFLARE_EDGE_ORIGIN_SECRET: z.string().min(32).optional(),
   // 인증/요청 경계: production은 topology를 명시하고, development/test만 Upstash 유무에
   // 따라 자동 선택합니다. 신뢰 프록시는 항상 별도로 명시해야 합니다.
   AUTH_RATE_LIMIT_MODE: z
@@ -361,6 +362,25 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   CREATOR_IMAGE_AI_ENABLED: z.enum(["true", "false"]).optional(),
+  // Text-only shared free pool. Each provider must be explicitly confirmed as
+  // billing-disabled/free-tier before it can become configured.
+  STUDIO_AI_FREE_POOL_ENABLED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_PROVIDER_ORDER: z
+    .string()
+    .regex(/^(gemini|groq|openrouter)(,(gemini|groq|openrouter))*$/u, "STUDIO_AI_FREE_PROVIDER_ORDER must be a free provider CSV")
+    .optional(),
+  STUDIO_AI_FREE_GEMINI_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_GEMINI_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_GEMINI_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_GEMINI_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_GEMINI_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_GROQ_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_GROQ_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_GROQ_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_GROQ_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_GROQ_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_FREE_OPENROUTER_API_KEY: z.string().min(1).optional(),
+  STUDIO_AI_FREE_OPENROUTER_MODEL: z.string().min(1).max(200).optional(),
+  STUDIO_AI_FREE_OPENROUTER_CONFIRMED: z.enum(["true", "false"]).optional(),
+  STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS: z.string().regex(/^\d+$/u, "STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS must be numeric").optional(),
   DEEPSEEK_API_KEY: z.string().min(1).optional(),
   DEEPSEEK_MODEL: z.string().min(1).max(200).optional(),
   DEEPSEEK_TIMEOUT_MS: z.string().regex(/^\d+$/, "DEEPSEEK_TIMEOUT_MS must be numeric").optional(),
@@ -458,6 +478,7 @@ const UNSAFE_DEFAULTS: ReadonlyArray<string> = [
 const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "AUTH_SESSION_SECRET",
   "AUTH_STATE_SECRET",
+  "CLOUDFLARE_EDGE_ORIGIN_SECRET",
   "DATABASE_URL",
   "STUDIO_LIVE_POSTGRES_URL",
   "STUDIO_LIVE_POSTGRES_INTEGRATION_URL",
@@ -472,6 +493,9 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "OPENAI_API_KEY",
   "OPENROUTER_API_KEY",
   "GEMINI_API_KEY",
+  "STUDIO_AI_FREE_GEMINI_API_KEY",
+  "STUDIO_AI_FREE_GROQ_API_KEY",
+  "STUDIO_AI_FREE_OPENROUTER_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",
   "ZAI_API_KEY",

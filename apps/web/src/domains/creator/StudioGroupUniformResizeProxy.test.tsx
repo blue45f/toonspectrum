@@ -787,17 +787,31 @@ describe("StudioGroupUniformResizeProxy", () => {
           element: LIVE_DRAW,
           elements: [LIVE_DRAW],
           transformLiftLayerRef: {
-            current: {
-              batchDraw: vi.fn(),
-              drawScene: vi.fn(),
-              getNativeCanvasElement: vi.fn(() => ({
-                width: 1_920,
-                height: 1_080,
-              })),
-              getCanvas: vi.fn(() => ({
-                getPixelRatio: vi.fn(() => 1),
-              })),
-            } as unknown as Konva.Layer,
+            current: (() => {
+              const children: unknown[] = [];
+              const layer = {
+                batchDraw: vi.fn(),
+                drawScene: vi.fn(),
+                getNativeCanvasElement: vi.fn(() => ({
+                  width: 1_920,
+                  height: 1_080,
+                })),
+                getCanvas: vi.fn(() => ({
+                  getPixelRatio: vi.fn(() => 1),
+                })),
+                // Wireframe fallback attaches a centre-line guide to the isolated Layer.
+                add: vi.fn((node: { getParent?: () => unknown }) => {
+                  children.push(node);
+                  if (typeof node === "object" && node && "getParent" in node) {
+                    // no-op parent wiring for Konva doubles
+                  }
+                  return layer;
+                }),
+                findOne: vi.fn(() => undefined),
+                children,
+              };
+              return layer;
+            })() as unknown as Konva.Layer,
           },
         },
       };

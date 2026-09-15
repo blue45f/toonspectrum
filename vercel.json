@@ -237,10 +237,6 @@
         {
           "key": "CDN-Cache-Control",
           "value": "no-cache"
-        },
-        {
-          "key": "Vercel-CDN-Cache-Control",
-          "value": "no-cache"
         }
       ]
     },

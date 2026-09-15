@@ -50,3 +50,7 @@ apps/api/src/db/migrations/0049_creator_community_publishing.sql
 apps/api/src/db/migrations/0050_studio_production_workspace_review_links_personal_kit.sql
 apps/api/src/db/migrations/0051_personal_cloud_connections.sql
 apps/api/src/db/migrations/0052_studio_ai_comic_director.sql
+apps/api/src/db/migrations/0053_production_collaboration_core.sql
+apps/api/src/db/migrations/0054_production_external_integrations.sql
+apps/api/src/db/migrations/0055_personal_cloud_cutover_marker.sql
+apps/api/src/db/migrations/0056_studio_ai_free_pool_contract.sql

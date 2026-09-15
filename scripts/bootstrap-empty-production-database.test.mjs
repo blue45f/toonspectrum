@@ -399,6 +399,10 @@ describe("bootstrap SQL and repository contract", () => {
       "0050_studio_production_workspace_review_links_personal_kit",
       "0051_personal_cloud_connections",
       "0052_studio_ai_comic_director",
+      "0053_production_collaboration_core",
+      "0054_production_external_integrations",
+      "0055_personal_cloud_cutover_marker",
+      "0056_studio_ai_free_pool_contract",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

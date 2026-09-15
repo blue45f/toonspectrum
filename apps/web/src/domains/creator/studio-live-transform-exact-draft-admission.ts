@@ -53,7 +53,7 @@ export const STUDIO_LIVE_TRANSFORM_EXACT_MAX_ANGLED_RIBBON_SAMPLES = 2_048;
  * 8k reaches the budget, so half of it keeps the 2x headroom the per-stroke lanes are set with.
  * Deliberately its own constant rather than a second use of the path-operation ceiling: that one
  * grades ONE renderer's emission, and reusing it here made two ordinary 700px strokes -- the
- * commonest multi-selection there is -- fall back to commit-at-release.
+ * commonest multi-selection there is -- unnecessarily leave the commit-equivalent lane.
  */
 export const STUDIO_LIVE_TRANSFORM_EXACT_MAX_SELECTION_WORK = 4_096;
 /**
@@ -67,7 +67,8 @@ export const STUDIO_LIVE_TRANSFORM_EXACT_MAX_SELECTION_WORK = 4_096;
  * can be refused, which is the long task the per-element compilation gate exists to prevent.
  *
  * 64 is above any hand-made selection — commercial editors' multi-select is a handful of objects,
- * and a whole-page select is exactly the case that should stand down — and it keeps the begin-time
+ * and a whole-page select is exactly the case that should skip exact compilation for the bounded
+ * guide — and it keeps the begin-time
  * work inside the same 8ms target the frame budget is set against.
  */
 export const STUDIO_LIVE_TRANSFORM_EXACT_MAX_SELECTION_MEMBERS = 64;
