@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { appSettings, db, users } from "../db";
 
-import { isWhitelistedAdminEmail } from "./admin-emails";
+import { isPersistedAdminRole } from "./admin-roles";
 import { getSessionUserCached } from "./session";
 import { createSchemaReadinessCheck } from "./schema-readiness";
 import {
@@ -12,7 +12,7 @@ import {
   normalizeUserAccountStatus,
 } from "./user-lifecycle";
 
-// 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
+// 관리자(admin/operator 역할) 여부 — admin-authed 라우트 공용.
 // 세션 마이크로캐시(TTL 30초) 적용: admin-authed 요청마다 나가던 users SELECT 를 흡수한다.
 // 역할 변경 경로는 invalidateSessionUser 로 즉시 무효화된다(admin.service·me 갱신 참조).
 export async function isAdminUser(
@@ -31,9 +31,7 @@ export async function isAdminUser(
     });
     if (!user) return false;
     if (normalizeUserAccountStatus(user.status) !== "active") return false;
-    const role = String(user.role ?? "").toLowerCase();
-    if (role === "admin" || role === "operator") return true;
-    return isWhitelistedAdminEmail(user.email);
+    return isPersistedAdminRole(user.role);
   } catch {
     return false; // DB(Neon) 불가 시 관리자 아님으로 안전 폴백.
   }

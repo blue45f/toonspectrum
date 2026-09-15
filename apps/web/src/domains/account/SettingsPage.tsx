@@ -2,6 +2,7 @@ import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, D
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
 import { LibraryBackupImport } from "./LibraryBackupImport";
 
 import { AppearanceSettings } from "@/shared/components/appearance/AppearanceSettings";
@@ -423,7 +424,10 @@ export function SettingsPage() {
 
       {/* 계정 */}
       <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
-      <section className="rounded-2xl border border-line bg-panel/40 px-5">
+      <section
+        id="account-security"
+        className="scroll-mt-24 rounded-2xl border border-line bg-panel/40 px-5"
+      >
         <Row
           icon={UserCog}
           title={t("settings.account.title")}
@@ -436,6 +440,9 @@ export function SettingsPage() {
             {t("settings.account.toProfile")} <ChevronRight size={14} />
           </Link>
         </Row>
+        <ConnectedAccountsSettings
+          userId={typeof userId === "string" && userId ? userId : null}
+        />
       </section>
     </Container>
   );

@@ -42,7 +42,7 @@ Render dashboard에서 암호화하여 저장하고 로컬 임시 파일은 전�
 
 선택적 공급자 값:
 
-- 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`
+- 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`, `GITHUB_OAUTH_*`
 - 개인 저장소 OAuth의 `GOOGLE_DRIVE_OAUTH_*`, `DROPBOX_OAUTH_*`, `ONEDRIVE_OAUTH_*`,
   `PERSONAL_CLOUD_OAUTH_STATE_SECRET`, `PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY`
 - `KMAS_PRV_KEY` — 승인된 만화규장각 서버 전용 키; 브라우저 `VITE_*`에는 금지

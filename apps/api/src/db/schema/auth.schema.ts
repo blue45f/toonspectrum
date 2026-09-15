@@ -1,4 +1,12 @@
-import { index, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
@@ -56,7 +64,11 @@ export const accounts = pgTable(
     id_token: text("id_token"),
     session_state: text("session_state"),
   },
-  (a) => [primaryKey({ columns: [a.provider, a.providerAccountId] }), index("idx_account_user").on(a.userId)]
+  (a) => [
+    primaryKey({ columns: [a.provider, a.providerAccountId] }),
+    index("idx_account_user").on(a.userId),
+    uniqueIndex("idx_account_user_provider_unique").on(a.userId, a.provider),
+  ]
 );
 
 
@@ -80,5 +92,9 @@ export const verificationTokens = pgTable(
     token: text("token").notNull(),
     expires: timestamp("expires", { mode: "date" }).notNull(),
   },
-  (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })]
+  (vt) => [
+    primaryKey({ columns: [vt.identifier, vt.token] }),
+    index("idx_verification_token_token").on(vt.token),
+    index("idx_verification_token_expires").on(vt.expires),
+  ]
 );

@@ -110,6 +110,10 @@ function initializeGoogleIdentity(clientId: string): void {
 type GoogleIdentityButtonProps = {
   clientId: string;
   onSuccess: () => void;
+  submitCredential?: (
+    credential: string,
+    options: { signal: AbortSignal },
+  ) => Promise<{ ok: boolean; error?: string | null }>;
   /** Signed-state authorization-code fallback, supplied only from verified discovery. */
   onRedirectFallback?: () => void;
 };
@@ -125,6 +129,7 @@ type GoogleIdentityState =
 export function GoogleIdentityButton({
   clientId,
   onSuccess,
+  submitCredential,
   onRedirectFallback,
 }: GoogleIdentityButtonProps) {
   const holderRef = useRef<HTMLDivElement | null>(null);
@@ -153,16 +158,21 @@ export function GoogleIdentityButton({
       }
       inFlight = true;
       setState({ status: "submitting" });
-      const result = await signInWithGoogleIdToken(credential, {
-        signal: requestController.signal,
-      });
+      const result = submitCredential
+        ? await submitCredential(credential, { signal: requestController.signal })
+        : await signInWithGoogleIdToken(credential, {
+            signal: requestController.signal,
+          });
       inFlight = false;
       if (!active) return;
       if (result.ok) {
         onSuccess();
         return;
       }
-      fail("signin", result.error);
+      fail(
+        "signin",
+        result.error ?? "Google 계정을 확인하지 못했어요. 다시 시도해 주세요.",
+      );
     };
 
     const renderButton = () => {
@@ -209,7 +219,7 @@ export function GoogleIdentityButton({
       observer?.disconnect();
       if (activeCredentialHandler === handleCredential) activeCredentialHandler = null;
     };
-  }, [attempt, clientId, onSuccess]);
+  }, [attempt, clientId, onSuccess, submitCredential]);
 
   const buttonVisible = state.status === "ready" || state.status === "submitting";
 
