@@ -14,6 +14,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
 import {
@@ -90,7 +91,7 @@ export interface StudioMannequinSceneOptions {
   readonly initialPose?: StudioMannequinPose;
   /** 뷰포트에서 몸통/팔다리를 클릭해 관절을 고르면 호출된다(빈 곳 클릭 시 null). */
   readonly onSelectJoint?: (jointId: StudioMannequinJointId | null) => void;
-  /** IK 드래그가 끝날 때 최종 포즈로 1회 호출된다(프레임당 React 갱신 금지 계약). */
+  /** IK 또는 직접 관절 드래그가 끝날 때 최종 포즈로 1회 호출된다(프레임당 React 갱신 금지 계약). */
   readonly onPoseEdited?: (pose: StudioMannequinPose) => void;
 }
 
@@ -170,6 +171,40 @@ function toVec3(value: StudioMannequinVec3): THREE.Vector3 {
   return new THREE.Vector3(value[0], value[1], value[2]);
 }
 
+export interface StudioMannequinPointerRotationInput {
+  readonly jointId: StudioMannequinJointId;
+  readonly startRotation: StudioMannequinVec3;
+  readonly deltaX: number;
+  readonly deltaY: number;
+  readonly viewportWidth: number;
+  readonly viewportHeight: number;
+  /** Alt-drag: horizontal motion twists around the local Y axis. */
+  readonly twistMode?: boolean;
+  /** Shift precision modifier for mouse/pen; touch keeps the regular direct-manipulation rate. */
+  readonly fine?: boolean;
+}
+
+/**
+ * Converts a screen-space drag into a limited local joint rotation. Default dragging bends in the
+ * camera plane (vertical → X, horizontal → Z); Alt uses horizontal motion for Y-axis twist.
+ * The function is deterministic and shared by mouse, pen and touch pointer events.
+ */
+export function resolveStudioMannequinPointerRotation(
+  input: StudioMannequinPointerRotationInput,
+): StudioMannequinVec3 {
+  const width = Number.isFinite(input.viewportWidth) ? Math.max(1, input.viewportWidth) : 1;
+  const height = Number.isFinite(input.viewportHeight) ? Math.max(1, input.viewportHeight) : 1;
+  const span = Math.max(180, Math.min(width, height));
+  const rate = (Math.PI / span) * (input.fine ? 0.28 : 1);
+  const deltaX = Number.isFinite(input.deltaX) ? input.deltaX : 0;
+  const deltaY = Number.isFinite(input.deltaY) ? input.deltaY : 0;
+  const start = input.startRotation.map((value) => Number.isFinite(value) ? value : 0) as [number, number, number];
+  const next: StudioMannequinVec3 = input.twistMode
+    ? [start[0] - deltaY * rate, start[1] + deltaX * rate, start[2]]
+    : [start[0] - deltaY * rate, start[1], start[2] + deltaX * rate];
+  return clampStudioMannequinJointRotation(input.jointId, next);
+}
+
 /** 4스텝 절차 생성 툰 그라디언트 — 외부 matcap 에셋 없이 CSP 인형풍 셰이딩을 만든다. */
 function createToonGradientTexture(): THREE.DataTexture {
   const data = new Uint8Array([88, 88, 88, 255, 148, 148, 148, 255, 208, 208, 208, 255, 244, 244, 244, 255]);
@@ -200,12 +235,14 @@ export function createStudioMannequinScene(
     antialias: true,
     alpha: true,
     preserveDrawingBuffer: false,
-    powerPreference: "low-power",
+    powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.08;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const initialWidth = Math.max(1, container.clientWidth || 1);
   const initialHeight = Math.max(1, container.clientHeight || 1);
   renderer.setSize(initialWidth, initialHeight, false);
@@ -220,19 +257,37 @@ export function createStudioMannequinScene(
 
   // 조명 — warm-ink 팔레트에 맞춘 은은한 3점 구성.
   const hemisphere = new THREE.HemisphereLight(0xfff4e6, 0x38322b, 0.95);
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
   keyLight.position.set(2.4, 4.2, 3.1);
-  const fillLight = new THREE.DirectionalLight(0xffe9d4, 0.35);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.near = 0.1;
+  keyLight.shadow.camera.far = 12;
+  keyLight.shadow.camera.left = -2.6;
+  keyLight.shadow.camera.right = 2.6;
+  keyLight.shadow.camera.top = 3.2;
+  keyLight.shadow.camera.bottom = -0.4;
+  keyLight.shadow.bias = -0.0002;
+  keyLight.shadow.normalBias = 0.018;
+  const fillLight = new THREE.DirectionalLight(0xffe9d4, 0.42);
   fillLight.position.set(-2.2, 1.6, -2.4);
-  scene.add(hemisphere, keyLight, fillLight);
+  const rimLight = new THREE.DirectionalLight(0xcfe8ff, 0.28);
+  rimLight.position.set(-1.6, 2.8, 3.5);
+  scene.add(hemisphere, keyLight, fillLight, rimLight);
 
-  // 바닥 그리드(캡처 시 숨김).
+  // 바닥 그리드와 접지 그림자(캡처 시 숨김).
   const helpers = new THREE.Group();
   const grid = new THREE.GridHelper(4, 20, 0x766c5d, 0x3d3831);
   const gridMaterial = grid.material as THREE.Material;
   gridMaterial.transparent = true;
-  gridMaterial.opacity = 0.55;
-  helpers.add(grid);
+  gridMaterial.opacity = 0.48;
+  const shadowCatcherGeometry = new THREE.PlaneGeometry(4.5, 4.5);
+  const shadowCatcherMaterial = new THREE.ShadowMaterial({ color: 0x241d18, opacity: 0.22 });
+  const shadowCatcher = new THREE.Mesh(shadowCatcherGeometry, shadowCatcherMaterial);
+  shadowCatcher.rotation.x = -Math.PI / 2;
+  shadowCatcher.position.y = -0.002;
+  shadowCatcher.receiveShadow = true;
+  helpers.add(grid, shadowCatcher);
   scene.add(helpers);
 
   // 머티리얼 — 기본은 실제 목조 인형에 가까운 따뜻한 무광 재질(선택 시 accent 틴트).
@@ -250,7 +305,7 @@ export function createStudioMannequinScene(
     opacity: 0.85,
     depthTest: false,
   });
-  const handleGeometry = new THREE.SphereGeometry(1, 12, 10);
+  const handleGeometry = new THREE.SphereGeometry(1, 20, 14);
 
   const mannequinRoot = new THREE.Group();
   scene.add(mannequinRoot);
@@ -346,7 +401,7 @@ export function createStudioMannequinScene(
   ): THREE.Mesh {
     if (primitive.kind === "sphere") {
       const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(primitive.radius, 32, 24),
+        new THREE.SphereGeometry(primitive.radius, 48, 32),
         bodyMaterial,
       );
       mesh.position.copy(toVec3(primitive.center));
@@ -354,8 +409,16 @@ export function createStudioMannequinScene(
       return mesh;
     }
     if (primitive.kind === "box") {
+      const minimumSize = Math.min(...primitive.size);
+      const radius = Math.min(minimumSize * 0.24, spec.headUnit * 0.08);
       const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(primitive.size[0], primitive.size[1], primitive.size[2]),
+        new RoundedBoxGeometry(
+          primitive.size[0],
+          primitive.size[1],
+          primitive.size[2],
+          5,
+          Math.max(0.001, radius),
+        ),
         bodyMaterial,
       );
       mesh.position.copy(toVec3(primitive.center));
@@ -365,8 +428,9 @@ export function createStudioMannequinScene(
     const to = toVec3(primitive.to);
     const segment = new THREE.Vector3().subVectors(to, from);
     const segmentLength = segment.length();
+    const middleLength = Math.max(0.001, segmentLength - primitive.radius * 2);
     const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(primitive.radius, Math.max(0.001, segmentLength), 8, 20),
+      new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28),
       bodyMaterial,
     );
     mesh.position.copy(from).addScaledVector(segment, 0.5);
@@ -397,6 +461,8 @@ export function createStudioMannequinScene(
       if (!jointGroup) continue;
       const mesh = buildPrimitiveMesh(primitive);
       (mesh.userData as BodyMeshUserData).studioMannequinJointId = primitive.jointId;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       jointGroup.add(mesh);
       bodyMeshes.push(mesh);
     }
@@ -469,6 +535,16 @@ export function createStudioMannequinScene(
   const dragPoint = new THREE.Vector3();
   let draggingChain: StudioMannequinChainSpec | null = null;
   let dragPointerId: number | null = null;
+  let dragStartPose: StudioMannequinPose | null = null;
+  let directDrag: {
+    pointerId: number;
+    jointId: StudioMannequinJointId;
+    startClientX: number;
+    startClientY: number;
+    startRotation: StudioMannequinVec3;
+    twistMode: boolean;
+    didMove: boolean;
+  } | null = null;
 
   function updatePointerNdc(event: PointerEvent): void {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -526,7 +602,7 @@ export function createStudioMannequinScene(
   }
 
   function handlePointerDown(event: PointerEvent): void {
-    if (disposed || event.button !== 0) return;
+    if (disposed || event.button !== 0 || !event.isPrimary || directDrag || draggingChain) return;
     updatePointerNdc(event);
     raycaster.setFromCamera(pointerNdc, activeCamera);
 
@@ -537,12 +613,14 @@ export function createStudioMannequinScene(
         .studioMannequinChainId;
       draggingChain = spec.chains[chainId];
       dragPointerId = event.pointerId;
+      dragStartPose = readPoseFromGraph();
       const cameraDirection = new THREE.Vector3();
       activeCamera.getWorldDirection(cameraDirection);
       const handleWorld = new THREE.Vector3();
       handleHit.object.getWorldPosition(handleWorld);
       dragPlane.setFromNormalAndCoplanarPoint(cameraDirection, handleWorld);
       if (controls) controls.enabled = false;
+      renderer.domElement.style.cursor = "grabbing";
       renderer.domElement.setPointerCapture(event.pointerId);
       event.preventDefault();
       return;
@@ -553,16 +631,60 @@ export function createStudioMannequinScene(
     const jointId = bodyHit
       ? (bodyHit.object.userData as BodyMeshUserData).studioMannequinJointId
       : null;
-    if (isStudioMannequinJointId(jointId) || jointId === null) {
+    if (isStudioMannequinJointId(jointId)) {
       selectedJointId = jointId;
       applySelectionTint();
-      invalidate();
       options.onSelectJoint?.(jointId);
+      const group = joints.get(jointId);
+      if (group) {
+        directDrag = {
+          pointerId: event.pointerId,
+          jointId,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          startRotation: [group.rotation.x, group.rotation.y, group.rotation.z],
+          twistMode: event.altKey,
+          didMove: false,
+        };
+        if (controls) controls.enabled = false;
+        renderer.domElement.style.cursor = "grabbing";
+        renderer.domElement.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }
+      invalidate();
+      return;
     }
+    selectedJointId = null;
+    applySelectionTint();
+    invalidate();
+    options.onSelectJoint?.(null);
   }
 
   function handlePointerMove(event: PointerEvent): void {
-    if (disposed || !draggingChain || event.pointerId !== dragPointerId) return;
+    if (disposed) return;
+    if (directDrag && event.pointerId === directDrag.pointerId) {
+      const deltaX = event.clientX - directDrag.startClientX;
+      const deltaY = event.clientY - directDrag.startClientY;
+      if (!directDrag.didMove && Math.hypot(deltaX, deltaY) < 3) return;
+      const group = joints.get(directDrag.jointId);
+      if (!group) return;
+      const rotation = resolveStudioMannequinPointerRotation({
+        jointId: directDrag.jointId,
+        startRotation: directDrag.startRotation,
+        deltaX,
+        deltaY,
+        viewportWidth: viewWidth,
+        viewportHeight: viewHeight,
+        twistMode: directDrag.twistMode,
+        fine: event.shiftKey,
+      });
+      directDrag.didMove = true;
+      group.rotation.set(rotation[0], rotation[1], rotation[2]);
+      invalidate();
+      event.preventDefault();
+      return;
+    }
+    if (!draggingChain || event.pointerId !== dragPointerId) return;
     updatePointerNdc(event);
     raycaster.setFromCamera(pointerNdc, activeCamera);
     if (!raycaster.ray.intersectPlane(dragPlane, dragPoint)) return;
@@ -571,22 +693,92 @@ export function createStudioMannequinScene(
     event.preventDefault();
   }
 
-  function finishDrag(event: PointerEvent): void {
+  function finishPointerInteraction(event: PointerEvent, cancelled = false): void {
+    if (directDrag && event.pointerId === directDrag.pointerId) {
+      const session = directDrag;
+      directDrag = null;
+      const group = joints.get(session.jointId);
+      if (cancelled && group) {
+        group.rotation.set(...session.startRotation);
+        invalidate();
+      } else if (session.didMove) {
+        currentPose = readPoseFromGraph();
+        options.onPoseEdited?.(currentPose);
+      }
+      if (controls) controls.enabled = true;
+      renderer.domElement.style.cursor = "grab";
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
     if (!draggingChain || event.pointerId !== dragPointerId) return;
+    const startPose = dragStartPose;
     draggingChain = null;
     dragPointerId = null;
+    dragStartPose = null;
     if (controls) controls.enabled = true;
+    renderer.domElement.style.cursor = "grab";
     if (renderer.domElement.hasPointerCapture(event.pointerId)) {
       renderer.domElement.releasePointerCapture(event.pointerId);
+    }
+    if (cancelled && startPose) {
+      currentPose = startPose;
+      applyPoseToGraph(currentPose);
+      invalidate();
+      return;
     }
     currentPose = readPoseFromGraph();
     options.onPoseEdited?.(currentPose);
   }
 
+  function handlePointerUp(event: PointerEvent): void {
+    finishPointerInteraction(event, false);
+  }
+
+  function handlePointerCancel(event: PointerEvent): void {
+    finishPointerInteraction(event, true);
+  }
+
+  function handleLostPointerCapture(event: PointerEvent): void {
+    finishPointerInteraction(event, true);
+  }
+
+  function handleDoubleClick(event: MouseEvent): void {
+    if (disposed) return;
+    updatePointerNdc(event as PointerEvent);
+    raycaster.setFromCamera(pointerNdc, activeCamera);
+    const bodyHit = raycaster.intersectObjects(bodyMeshes, false)[0];
+    const jointId = bodyHit
+      ? (bodyHit.object.userData as BodyMeshUserData).studioMannequinJointId
+      : null;
+    if (!isStudioMannequinJointId(jointId)) return;
+    const group = joints.get(jointId);
+    if (!group) return;
+    const worldTarget = group.getWorldPosition(new THREE.Vector3());
+    const offset = activeCamera.position.clone().sub(cameraTarget);
+    const minimumDistance = Math.max(spec.headUnit * 2.2, 0.28);
+    offset.setLength(Math.max(minimumDistance, offset.length() * 0.58));
+    cameraTarget.copy(worldTarget);
+    activeCamera.position.copy(cameraTarget).add(offset);
+    activeCamera.lookAt(cameraTarget);
+    controls?.target.copy(cameraTarget);
+    controls?.update();
+    if (projection === "orthographic") updateOrthographicFrustum();
+    selectedJointId = jointId;
+    applySelectionTint();
+    options.onSelectJoint?.(jointId);
+    invalidate();
+    event.preventDefault();
+  }
+
+  renderer.domElement.style.cursor = "grab";
   renderer.domElement.addEventListener("pointerdown", handlePointerDown);
-  renderer.domElement.addEventListener("pointermove", handlePointerMove, { passive: true });
-  renderer.domElement.addEventListener("pointerup", finishDrag, { passive: true });
-  renderer.domElement.addEventListener("pointercancel", finishDrag, { passive: true });
+  renderer.domElement.addEventListener("pointermove", handlePointerMove, { passive: false });
+  renderer.domElement.addEventListener("pointerup", handlePointerUp, { passive: true });
+  renderer.domElement.addEventListener("pointercancel", handlePointerCancel, { passive: true });
+  renderer.domElement.addEventListener("lostpointercapture", handleLostPointerCapture, { passive: true });
+  renderer.domElement.addEventListener("dblclick", handleDoubleClick);
 
   // ── 캡처 ─────────────────────────────────────────────────────────────────
 
@@ -803,8 +995,10 @@ export function createStudioMannequinScene(
       }
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
-      renderer.domElement.removeEventListener("pointerup", finishDrag);
-      renderer.domElement.removeEventListener("pointercancel", finishDrag);
+      renderer.domElement.removeEventListener("pointerup", handlePointerUp);
+      renderer.domElement.removeEventListener("pointercancel", handlePointerCancel);
+      renderer.domElement.removeEventListener("lostpointercapture", handleLostPointerCapture);
+      renderer.domElement.removeEventListener("dblclick", handleDoubleClick);
       controls?.dispose();
       controls = null;
       disposeMannequinGraph();
@@ -815,6 +1009,8 @@ export function createStudioMannequinScene(
       gradientMap.dispose();
       grid.geometry.dispose();
       gridMaterial.dispose();
+      shadowCatcherGeometry.dispose();
+      shadowCatcherMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },
