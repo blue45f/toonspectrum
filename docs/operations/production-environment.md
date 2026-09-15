@@ -43,14 +43,25 @@ Render dashboard에서 암호화하여 저장하고 로컬 임시 파일은 전�
 선택적 공급자 값:
 
 - 현재 API 공급자 설정에 맞는 `GOOGLE_OAUTH_*`, `KAKAO_*`, `NAVER_*`
+- 개인 저장소 OAuth의 `GOOGLE_DRIVE_OAUTH_*`, `DROPBOX_OAUTH_*`, `ONEDRIVE_OAUTH_*`,
+  `PERSONAL_CLOUD_OAUTH_STATE_SECRET`, `PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY`
 - 사용자 키가 아닌 운영자 제공 AI 경로를 실제 활성화할 때만 해당 provider key
-- `PRIVATE_OBJECT_STORAGE_*`, `R2_OBJECT_STORAGE_*`, `B2_OBJECT_STORAGE_*`,
-  `SUPABASE_OBJECT_STORAGE_*`
+- `OPENAI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `BLOB_READ_WRITE_TOKEN`
+- `PRIVATE_OBJECT_STORAGE_ENABLED`, `PRIVATE_OBJECT_STORAGE_*_PROVIDER`,
+  `PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT`
+- `R2_OBJECT_STORAGE_*` — R2가 선택된 purpose만 구성
+- `B2_OBJECT_STORAGE_*` — B2가 선택된 purpose만 구성
+- `SUPABASE_OBJECT_STORAGE_*` — legacy 또는 선택된 Supabase purpose
+- 기존 `R2_*`, `S3_*`, `CREATOR_ASSET_OBJECT_STORAGE_*` — 해당 레거시 코드가 실제 참조할 때만 유지
 - `UPSTASH_COORDINATION_*`
 - Cloudflare realtime ticket issuer·audience·secret·TTL
 
 선택값이 없으면 해당 기능은 명시적으로 비활성 또는 구성되지 않음 상태를 표시해야 하며, 공개 페이지와
 로컬 Studio 기능을 중단해서는 안 된다.
+
+개인 저장소 공급자의 콘솔 등록값, 최소 scope, 운영·로컬 콜백은 [`personal-cloud-provider-registration.md`](./personal-cloud-provider-registration.md)를 따른다.
 
 ## Render 전환 검증
 
