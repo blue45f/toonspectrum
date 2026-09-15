@@ -368,6 +368,34 @@ describe("provider-neutral CSP build contract", () => {
     }
   });
 
+  it("pins Cloudflare Web Analytics to exact script and beacon origins", () => {
+    const current = fixture();
+    expect(() => verifyStaticCspContract(current)).not.toThrow();
+
+    const mutations = [
+      [
+        "https://static.cloudflareinsights.com",
+        "https://static.cloudflareinsights.com.attacker.invalid",
+        "exact Cloudflare Web Analytics script origin",
+      ],
+      [
+        "https://cloudflareinsights.com",
+        "https://cloudflareinsights.com.attacker.invalid",
+        "exact Cloudflare Web Analytics beacon origin",
+      ],
+    ];
+    for (const [source, replacement, expectedError] of mutations) {
+      const changed = JSON.parse(JSON.stringify(current.responsePolicy));
+      const cspHeader = rootCspHeader(changed);
+      cspHeader.value = cspHeader.value.replace(source, replacement);
+      expect(() => verifyStaticCspContract({
+        html: current.html,
+        responsePolicy: changed,
+        bootstrapCompatSource: current.bootstrapCompatSource,
+      }), source).toThrow(expectedError);
+    }
+  });
+
   it("rejects JavaScript eval permission without confusing wasm-unsafe-eval", () => {
     const current = fixture();
     expect(() => verifyStaticCspContract(current)).not.toThrow();
