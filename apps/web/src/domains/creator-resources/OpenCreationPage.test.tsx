@@ -27,6 +27,18 @@ test("explicit search, local board and editable brief preserve provenance", asyn
   search(); await waitFor(() => expect(screen.getByText(/24시간 캐시/u)).toBeTruthy());
   expect(request).toHaveBeenCalledTimes(1);
 });
+test("Commons search sends the browser API user agent", async () => {
+  request.mockResolvedValueOnce(Response.json({ query: { pages: [] } }));
+  mount();
+  fireEvent.change(screen.getByLabelText("무료 제공처"), { target: { value: "commons" } });
+  fireEvent.change(screen.getByLabelText("찾을 소재"), { target: { value: "갑옷" } });
+  search();
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+  const [rawUrl, init] = request.mock.calls[0];
+  expect(new URL(String(rawUrl)).hostname).toBe("commons.wikimedia.org");
+  expect(new Headers(init?.headers).get("Api-User-Agent")).toContain("ToonSpectrum/1.0");
+});
+
 test("429 imposes a cooldown without automatic retries or paid fallback", async () => {
   request.mockResolvedValueOnce(new Response(null, { status: 429, headers: { "Retry-After": "60" } }));
   mount(); fireEvent.change(screen.getByLabelText("찾을 소재"), { target: { value: "갑옷" } }); search();

@@ -27,6 +27,7 @@ const artwork: OpenReference = {
 test("Korean single-character topics are supported and dictionary mappings are transparent", () => {
   assert.equal(openSearchQuery("artic", "꽃"), "flowers");
   assert.equal(openSearchQuery("cleveland", "한복 가구"), "Korean clothing furniture");
+  assert.equal(openSearchQuery("commons", "한복 가구"), "Korean clothing furniture");
   assert.equal(openSearchQuery("wikipedia", "한복 가구"), "한복 가구");
   assert.equal(openSearchQuery("artic", "미등록단어"), "미등록단어");
 });
@@ -45,6 +46,15 @@ test("requests target fixed HTTPS APIs and request public-domain filtering", () 
   const cma = new URL(openSearchUrl("cleveland", "Korea", 3));
   assert.equal(cma.searchParams.get("skip"), "36");
   assert.equal(cma.searchParams.get("cc0"), "1");
+  const commons = new URL(openSearchUrl("commons", "한복", 2));
+  assert.equal(commons.origin, "https://commons.wikimedia.org");
+  assert.equal(commons.searchParams.get("origin"), "*");
+  assert.equal(commons.searchParams.get("generator"), "search");
+  assert.equal(commons.searchParams.get("gsrnamespace"), "6");
+  assert.equal(commons.searchParams.get("gsroffset"), "18");
+  assert.ok(commons.searchParams.get("gsrsearch")?.includes('incategory:"CC-Zero"'));
+  assert.equal(commons.searchParams.get("iiprop"), "url|extmetadata");
+  assert.ok(commons.searchParams.get("iiextmetadatafilter")?.includes("LicenseShortName"));
   const wiki = new URL(openSearchUrl("wikipedia", "한복"));
   assert.equal(wiki.searchParams.get("origin"), "*");
   assert.equal(wiki.searchParams.get("srprop"), "timestamp");
@@ -77,6 +87,34 @@ test("Cleveland requires explicit image CC0, not merely CC0 metadata", () => {
   ] }, NOW);
   assert.equal(parsed.length, 1); assert.equal(parsed[0].rights, "CC0");
 });
+test("Wikimedia Commons accepts only exact CC0 files from trusted source and preview hosts", () => {
+  const info = {
+    descriptionurl: "https://commons.wikimedia.org/wiki/File:Open_armor.jpg",
+    thumburl: "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Open_armor.jpg/400px-Open_armor.jpg",
+    extmetadata: {
+      LicenseShortName: { value: "CC0" }, License: { value: "cc0" }, AttributionRequired: { value: "false" }, Restrictions: { value: "" },
+      Artist: { value: "<span>Open Artist</span>" }, Credit: { value: "Own work" }, DateTimeOriginal: { value: "2024-01-02<div style=\"display: none;\">date QS:P571,+2024-01-02T00:00:00Z/11</div>" },
+    },
+  };
+  const page = { pageid: 42, title: "File:Open armor.jpg", imageinfo: [info] };
+  const [item] = parseOpenReferences("commons", { query: { pages: [page] } }, NOW);
+  assert.equal(item.id, "commons:42"); assert.equal(item.title, "Open armor.jpg");
+  assert.equal(item.creator, "Open Artist"); assert.equal(item.date, "2024-01-02");
+  assert.equal(item.credit, "Own work"); assert.equal(item.rights, "CC0");
+  assert.ok(item.sourceUrl.startsWith("https://commons.wikimedia.org/"));
+  assert.ok(item.imageUrl.startsWith("https://thumb.wikimedia.org/"));
+  const denied = [
+    { ...page, pageid: 43, imageinfo: [{ ...info, extmetadata: { ...info.extmetadata, LicenseShortName: { value: "CC BY-SA 4.0" } } }] },
+    { ...page, pageid: 44, imageinfo: [{ ...info, extmetadata: { ...info.extmetadata, AttributionRequired: { value: "true" } } }] },
+    { ...page, pageid: 45, imageinfo: [{ ...info, extmetadata: { ...info.extmetadata, Restrictions: { value: "trademark" } } }] },
+    { ...page, pageid: 451, imageinfo: [{ ...info, extmetadata: { ...info.extmetadata, Restrictions: undefined } }] },
+    { ...page, pageid: 452, imageinfo: [{ ...info, extmetadata: { ...info.extmetadata, License: { value: "by-sa" } } }] },
+    { ...page, pageid: 46, imageinfo: [{ ...info, descriptionurl: "https://untrusted.invalid/wiki/File:Open.jpg" }] },
+    { ...page, pageid: 47, imageinfo: [{ ...info, thumburl: "https://untrusted.invalid/open.jpg" }] },
+  ];
+  assert.equal(parseOpenReferences("commons", { query: { pages: denied } }, NOW).length, 0);
+});
+
 test("Wikipedia emits title/link metadata, never snippets or implied image permissions", () => {
   const [item] = parseOpenReferences("wikipedia", { query: { search: [{ pageid: 10, title: "한복", snippet: "Do not redistribute me", timestamp: NOW }] } }, NOW);
   assert.equal(item.rights, "원문 확인"); assert.equal(item.imageUrl, "");
@@ -110,6 +148,13 @@ test("stored references validate IDs, dates, provider consistency and image host
   assert.equal(parseSavedOpenReference({ ...artwork, imageUrl: "https://evil.example/a.jpg" })?.imageUrl, "");
   const wiki = parseSavedOpenReference({ ...artwork, id: "wikipedia:1", provider: "wikipedia" });
   assert.equal(wiki?.rights, "원문 확인"); assert.equal(wiki?.imageUrl, "");
+  const commons = parseSavedOpenReference({ ...artwork,
+    id: "commons:1", provider: "commons", title: "Open file",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Open_file.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Open_file.jpg",
+  });
+  assert.equal(commons?.rights, "CC0");
+  assert.ok(commons?.imageUrl.startsWith("https://upload.wikimedia.org/"));
 });
 test("per-item board writes preserve existing workspace data and other tabs' additions", () => {
   const storage = new MemoryStorage(); storage.setItem("existing-workspace", "keep");
