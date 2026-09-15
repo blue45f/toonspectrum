@@ -2,7 +2,7 @@ name: Studio production integrity
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
@@ -23,6 +23,7 @@ on:
       - '.github/workflows/studio-production-integrity.yml'
       - 'scripts/ci-executed-gates.test.mjs'
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'

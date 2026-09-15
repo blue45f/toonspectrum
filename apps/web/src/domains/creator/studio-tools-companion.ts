@@ -6,6 +6,8 @@
  * Not a CRDT — no document merge.
  */
 
+import type { StudioCompanionOpenMode } from "./studio-companion-browser-workspace";
+
 import { studioCompanionPopupGuidance } from "./studio-companion-popup-guidance";
 import {
   STUDIO_COMPANION_REFERENCE_FAILURE_BACKOFF_MS,
@@ -1927,11 +1929,13 @@ export function openStudioCompanionSurfaceWindow(
   openWindow: (url: string, name: string, features: string) => Window | null = (url, name, features) =>
     typeof window !== "undefined" ? window.open(url, name, features) : null,
   routeWorkId?: string | null,
+  openMode: StudioCompanionOpenMode = "window",
 ): Window | null {
   if (!isStudioCompanionSessionId(sessionId)) return null;
   let expectedUrl: string;
   try {
     expectedUrl = studioCompanionUrl(sessionId, undefined, undefined, surface, routeWorkId);
+    if (openMode === "tab") expectedUrl += "&display=tab";
   } catch {
     return null;
   }
@@ -1948,7 +1952,7 @@ export function openStudioCompanionSurfaceWindow(
     const win = openWindow(
       expectedUrl,
       studioCompanionWindowName(sessionId, surface),
-      studioCompanionDefaultWindowFeatures(surface)
+      openMode === "tab" ? "" : studioCompanionDefaultWindowFeatures(surface)
     );
     if (!win) return null;
     severStudioCompanionOpener(win);
@@ -2099,6 +2103,8 @@ export type StudioCompanionChannel = {
   onmessage: ((ev: MessageEvent) => void) | null;
 };
 
+export type StudioCompanionChannelFactory = (sessionId: string) => StudioCompanionChannel | null;
+
 export function createStudioCompanionChannel(
   sessionId: string,
   factory?: (name: string) => StudioCompanionChannel
@@ -2248,13 +2254,16 @@ export function startStudioCompanionPrimaryRuntime(input: {
   onControl?: (control: StudioCompanionReviewControl) => void;
   onReferenceControl?: (control: StudioCompanionReferenceControl) => void;
   onReferenceDemandChange?: (active: boolean) => void;
+  channelFactory?: StudioCompanionChannelFactory;
 }): StudioCompanionPrimaryRuntime | null {
   const sessionId = parseStudioCompanionSessionId(input.search) ?? createStudioCompanionSessionId();
   const primaryInstanceId = createStudioCompanionInstanceId();
   if (!sessionId || !primaryInstanceId) return null;
 
   const binding = new StudioCompanionPrimaryBinding();
-  const channel = createStudioCompanionChannel(sessionId);
+  const channel = input.channelFactory
+    ? input.channelFactory(sessionId)
+    : createStudioCompanionChannel(sessionId);
   if (!channel) return null;
   const referenceChannel: StudioCompanionChannel = channel;
 

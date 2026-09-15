@@ -99,6 +99,15 @@ else:
         def execute(self, _context):
             return _run_operator(self, "validate_character")
 
+    class ToonstudioOtExportCurrentCharacter(Operator):
+        bl_idname = "toonstudio.export_current_character"
+        bl_label = "Export Edited Character Package"
+        bl_description = "Validate the current character and save a new revision without regenerating or re-importing it"
+        bl_options = {"REGISTER"}
+
+        def execute(self, _context):
+            return _run_operator(self, "export_current_character_package")
+
     class ToonstudioPtCharacterPipeline(Panel):
         bl_label = "Character Pipeline"
         bl_idname = "TOONSTUDIO_PT_character_pipeline"
@@ -117,6 +126,7 @@ else:
             layout.operator("toonstudio.create_semantic_face_shapes", icon="SHAPEKEY_DATA")
             layout.separator()
             layout.operator("toonstudio.run_character_pipeline", icon="EXPORT")
+            layout.operator("toonstudio.export_current_character", icon="FILE_TICK")
             if scene.toonstudio_character_pipeline_last_result:
                 box = layout.box()
                 box.label(text="Last result stored on scene", icon="INFO")
@@ -127,6 +137,7 @@ else:
         ToonstudioOtBuildAuthoredHair,
         ToonstudioOtCreateSemanticFaceShapes,
         ToonstudioOtValidateCharacter,
+        ToonstudioOtExportCurrentCharacter,
         ToonstudioPtCharacterPipeline,
     )
 

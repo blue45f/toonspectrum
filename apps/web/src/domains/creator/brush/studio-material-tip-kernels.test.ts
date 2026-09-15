@@ -16,9 +16,9 @@ const maps = STUDIO_MATERIAL_TIP_PROGRAMS.map((program) => ({
 }));
 
 describe("original material morphology atlas", () => {
-  it("has 32 programs with exactly one independently compiled field per identity", () => {
-    expect(STUDIO_MATERIAL_TIP_PROGRAMS).toHaveLength(32);
-    expect(new Set(STUDIO_MATERIAL_TIP_PROGRAMS).size).toBe(32);
+  it("has 40 programs with exactly one independently compiled field per identity", () => {
+    expect(STUDIO_MATERIAL_TIP_PROGRAMS).toHaveLength(40);
+    expect(new Set(STUDIO_MATERIAL_TIP_PROGRAMS).size).toBe(40);
     expect(Object.keys(atlas)).toEqual([...STUDIO_MATERIAL_TIP_PROGRAMS]);
     expect(isStudioMaterialTipProgram("invented-morphology")).toBe(false);
     expect(isStudioMaterialTipProgram(null)).toBe(false);

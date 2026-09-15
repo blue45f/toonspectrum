@@ -56,6 +56,8 @@ describe("studio bundle ratchet gate", () => {
     expect(gateSource).toContain("references are telemetry, not release vetoes");
     expect(gateSource).toContain("UPDATE_BUNDLE_BASELINE");
     expect(gateSource).toContain("TIGHTEN_BUNDLE_BASELINE");
+    expect(gateSource).toContain("const recordedAt = new Date().toISOString();");
+    expect(gateSource).toMatch(/nextRuntime = \{\s*recordedAt,/u);
   });
 
   it("measures eager-dynamic chunks in a browser rather than trusting the manifest", () => {
@@ -65,6 +67,8 @@ describe("studio bundle ratchet gate", () => {
     expect(gateSource).toContain("eager-dynamic requests");
     expect(gateSource).toContain("eager-dynamic decoded bytes");
     expect(gateSource).toMatch(/--runtime/u);
+    expect(gateSource).toContain('const runtimeProbePath = "/studio/canvas";');
+    expect(gateSource).toContain("`${baseUrl}${runtimeProbePath}`");
   });
 
   it("ships a committed baseline with plausible measurements", () => {

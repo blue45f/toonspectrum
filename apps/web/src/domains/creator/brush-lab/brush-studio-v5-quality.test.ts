@@ -12,10 +12,10 @@ import {
 } from "./brush-studio-v5-quality";
 
 describe("Brush Studio quality authority", () => {
-  it("ships the same 80 materially distinct product brushes as the normal picker", () => {
-    expect(BRUSH_QUALITY_CATALOG).toHaveLength(80);
+  it("ships the same 88 materially distinct product brushes as the normal picker", () => {
+    expect(BRUSH_QUALITY_CATALOG).toHaveLength(88);
     expect(new Set(BRUSH_QUALITY_CATALOG.map((entry) => entry.id)).size).toBe(
-      80,
+      88,
     );
     expect(
       new Set(BRUSH_QUALITY_CATALOG.map((entry) => entry.group)).size,

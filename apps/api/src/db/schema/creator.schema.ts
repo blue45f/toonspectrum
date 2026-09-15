@@ -641,6 +641,184 @@ export const creatorWorkCollaborators = pgTable(
 );
 
 
+// 웹툰 제작 운영 데이터. 원고 문서 revision과 독립된 낙관적 revision을 사용해
+// 역할·작업·에피소드/시퀀스/장면 계층·인계 브리프를 안전하게 저장한다.
+export const creatorWorkProductionWorkspaces = pgTable(
+  "creator_work_production_workspace",
+  {
+    workId: text("workId")
+      .primaryKey()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
+    updatedBy: text("updatedBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_production_updated_by").on(t.updatedBy, t.updatedAt.desc()),
+    check("creator_work_production_revision_check", sql`${t.revision} between 0 and 2147483647`),
+    check(
+      "creator_work_production_document_check",
+      sql`jsonb_typeof(${t.document}) = 'object'
+        and ${t.document}->>'schemaVersion' = '3'
+        and jsonb_typeof(${t.document}->'tasks') = 'array'
+        and jsonb_typeof(${t.document}->'reviews') = 'array'
+        and jsonb_typeof(${t.document}->'hierarchy') = 'array'
+        and jsonb_typeof(${t.document}->'roleAssignments') = 'array'
+        and jsonb_typeof(${t.document}->'handoffs') = 'array'`
+    ),
+    check("creator_work_production_timestamp_check", sql`${t.updatedAt} >= ${t.createdAt}`),
+  ]
+);
+
+
+// 장치 간 Studio 개인 설정 동기화. API 키·원고·클립보드는 계약에서 허용하지 않으며
+// 작업공간/빠른 액세스/제스처/즐겨찾기처럼 작은 개인화 메타데이터만 저장한다.
+export const creatorStudioPersonalKits = pgTable(
+  "creator_studio_personal_kit",
+  {
+    userId: text("userId")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("creator_studio_personal_kit_revision_check", sql`${t.revision} between 0 and 2147483647`),
+    check(
+      "creator_studio_personal_kit_document_check",
+      sql`jsonb_typeof(${t.document}) = 'object'
+        and ${t.document}->>'schemaVersion' = '1'
+        and jsonb_typeof(${t.document}->'quickAccess') = 'object'
+        and jsonb_typeof(${t.document}->'gestureMap') = 'object'
+        and jsonb_typeof(${t.document}->'favoriteRefs') = 'array'`
+    ),
+    check("creator_studio_personal_kit_timestamp_check", sql`${t.updatedAt} >= ${t.createdAt}`),
+  ]
+);
+
+
+// 외부 검토 링크는 원문 토큰 대신 SHA-256만 저장한다. 페이지 범위·만료·워터마크·
+// 다운로드 허용을 서버가 검증하며 폐기 후에는 동일 토큰을 다시 활성화하지 않는다.
+export const creatorWorkReviewLinks = pgTable(
+  "creator_work_review_link",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    tokenHash: text("tokenHash").notNull().unique(),
+    role: text("role").notNull().default("viewer"),
+    pageIds: jsonb("pageIds").$type<string[]>().notNull().default([]),
+    watermark: boolean("watermark").notNull().default(true),
+    allowDownload: boolean("allowDownload").notNull().default(false),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    revokedAt: timestamp("revokedAt", { mode: "date", withTimezone: true }),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_review_link_work_created").on(t.workId, t.createdAt.desc()),
+    index("idx_creator_work_review_link_active_expiry")
+      .on(t.expiresAt, t.id)
+      .where(sql`${t.revokedAt} is null`),
+    index("idx_creator_work_review_link_created_by").on(t.createdBy, t.createdAt.desc()),
+    check("creator_work_review_link_id_check", sql`length(${t.id}) between 1 and 160`),
+    check("creator_work_review_link_hash_check", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("creator_work_review_link_role_check", sql`${t.role} in ('viewer', 'commenter')`),
+    check(
+      "creator_work_review_link_page_ids_check",
+      sql`jsonb_typeof(${t.pageIds}) = 'array' and jsonb_array_length(${t.pageIds}) <= 500`
+    ),
+    check(
+      "creator_work_review_link_time_check",
+      sql`${t.expiresAt} > ${t.createdAt}
+        and ${t.updatedAt} >= ${t.createdAt}
+        and (${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt})`
+    ),
+  ]
+);
+
+
+export const creatorWorkReviewFeedback = pgTable(
+  "creator_work_review_feedback",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    reviewLinkId: text("reviewLinkId")
+      .notNull()
+      .references(() => creatorWorkReviewLinks.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    reviewerName: text("reviewerName").notNull(),
+    reviewerUserId: text("reviewerUserId").references(() => users.id, { onDelete: "set null" }),
+    anchor: jsonb("anchor").$type<{ pageId: string; x?: number; y?: number } | null>(),
+    body: text("body").notNull().default(""),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_review_feedback_link_created").on(
+      t.reviewLinkId,
+      t.createdAt,
+      t.id
+    ),
+    index("idx_creator_work_review_feedback_user_created").on(
+      t.reviewerUserId,
+      t.createdAt.desc()
+    ),
+    check("creator_work_review_feedback_id_check", sql`length(${t.id}) between 1 and 160`),
+    check(
+      "creator_work_review_feedback_kind_check",
+      sql`${t.kind} in ('comment', 'approve', 'reject')`
+    ),
+    check(
+      "creator_work_review_feedback_name_check",
+      sql`length(${t.reviewerName}) between 1 and 120 and ${t.reviewerName} = btrim(${t.reviewerName})`
+    ),
+    check(
+      "creator_work_review_feedback_body_check",
+      sql`length(${t.body}) <= 4000 and (${t.kind} = 'approve' or length(btrim(${t.body})) >= 1)`
+    ),
+    check(
+      "creator_work_review_feedback_anchor_check",
+      sql`(${t.anchor} is null or (
+        jsonb_typeof(${t.anchor}) = 'object'
+        and ${t.anchor} ? 'pageId'
+        and jsonb_typeof(${t.anchor}->'pageId') = 'string'
+        and length(${t.anchor}->>'pageId') between 1 and 160
+        and not (${t.anchor} ? 'x') = not (${t.anchor} ? 'y')
+        and (not (${t.anchor} ? 'x') or (
+          jsonb_typeof(${t.anchor}->'x') = 'number'
+          and jsonb_typeof(${t.anchor}->'y') = 'number'
+          and (${t.anchor}->>'x')::numeric between 0 and 1
+          and (${t.anchor}->>'y')::numeric between 0 and 1
+        ))
+      )) is true`
+    ),
+  ]
+);
+
+
 // 팀 변경 이력은 멤버십 행과 달리 append-only로 보존한다. 개인정보 이름·초대 동의 토큰은
 // 저장하지 않고, 조회 시 현재 사용자 행을 조인한다. 사용자 hard delete 뒤 FK는 SET NULL이 된다.
 // UUID는 공개 식별자, sequence는 동일 시각/clock skew에도 안정적인 DB 삽입 순서다.
@@ -1140,6 +1318,288 @@ export const creatorWorkLikes = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.workId] }),
     index("idx_creator_work_like_work").on(t.workId), // 작품별 좋아요 집계
+  ]
+);
+
+
+export const creatorWorkBookmarks = pgTable(
+  "creator_work_bookmark",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.workId] }),
+    index("idx_creator_work_bookmark_work").on(t.workId),
+    index("idx_creator_work_bookmark_user_created").on(t.userId, t.createdAt.desc()),
+  ]
+);
+
+
+export const creatorWorkReleases = pgTable(
+  "creator_work_release",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    ownerUserId: text("ownerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    releaseNo: integer("releaseNo").notNull(),
+    workRevision: integer("workRevision").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    manifest: jsonb("manifest").$type<Record<string, unknown>>().notNull(),
+    state: text("state").notNull().default("review"),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_work_release_work_no_unique").on(t.workId, t.releaseNo),
+    unique("creator_work_release_work_id_unique").on(t.workId, t.id),
+    unique("creator_work_release_work_revision_unique").on(t.workId, t.workRevision),
+    unique("creator_work_release_fingerprint_unique").on(t.workId, t.fingerprint),
+    index("idx_creator_work_release_published").on(t.workId, t.publishedAt.desc()),
+    index("idx_creator_work_release_owner_created").on(t.ownerUserId, t.createdAt.desc()),
+    index("idx_creator_work_release_state_created").on(t.state, t.createdAt.desc()),
+    check("creator_work_release_no_positive_check", sql`${t.releaseNo} >= 1`),
+    check("creator_work_release_revision_positive_check", sql`${t.workRevision} >= 1`),
+    check("creator_work_release_manifest_object_check", sql`jsonb_typeof(${t.manifest}) = 'object'`),
+    check("creator_work_release_fingerprint_check", sql`${t.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check("creator_work_release_state_check", sql`${t.state} in ('review', 'approved', 'published', 'superseded', 'withdrawn')`),
+  ]
+);
+
+
+export const creatorWorkReleaseApprovals = pgTable(
+  "creator_work_release_approval",
+  {
+    releaseId: text("releaseId")
+      .notNull()
+      .references(() => creatorWorkReleases.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    state: text("state").notNull().default("pending"),
+    note: text("note").notNull().default(""),
+    decidedAt: timestamp("decidedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_work_release_approval_pkey",
+      columns: [t.releaseId, t.userId],
+    }),
+    index("idx_creator_work_release_approval_user_state").on(
+      t.userId,
+      t.state,
+      t.updatedAt.desc()
+    ),
+    check(
+      "creator_work_release_approval_state_check",
+      sql`${t.state} in ('pending', 'approved', 'rejected')`
+    ),
+    check(
+      "creator_work_release_approval_decision_check",
+      sql`(${t.state} = 'pending' and ${t.decidedAt} is null) or (${t.state} in ('approved', 'rejected') and ${t.decidedAt} is not null)`
+    ),
+  ]
+);
+
+
+export const creatorWorkPublications = pgTable(
+  "creator_work_publication",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    state: text("state").notNull().default("unpublished"),
+    visibility: text("visibility").notNull().default("private"),
+    canonicalSlug: text("canonicalSlug").notNull().default(""),
+    scheduledAt: timestamp("scheduledAt", { mode: "date", withTimezone: true }),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    unpublishedAt: timestamp("unpublishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_work_publication_work_unique").on(t.workId),
+    foreignKey({
+      name: "creator_work_publication_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_work_publication_release").on(t.releaseId),
+    index("idx_creator_work_publication_discovery").on(
+      t.state,
+      t.visibility,
+      t.publishedAt.desc()
+    ),
+    uniqueIndex("creator_work_publication_slug_unique")
+      .on(t.canonicalSlug)
+      .where(
+        sql`${t.canonicalSlug} <> '' and ${t.state} = 'published' and ${t.visibility} = 'public'`
+      ),
+    check(
+      "creator_work_publication_state_check",
+      sql`${t.state} in ('scheduled', 'published', 'unpublished')`
+    ),
+    check(
+      "creator_work_publication_visibility_check",
+      sql`${t.visibility} in ('public', 'unlisted', 'private')`
+    ),
+    check(
+      "creator_work_publication_lifecycle_check",
+      sql`(${t.state} = 'scheduled' and ${t.scheduledAt} is not null and ${t.publishedAt} is null) or (${t.state} = 'published' and ${t.publishedAt} is not null) or (${t.state} = 'unpublished')`
+    ),
+  ]
+);
+
+
+export const creatorPortfolioEntries = pgTable(
+  "creator_portfolio_entry",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    position: integer("position").notNull().default(0),
+    featured: boolean("featured").notNull().default(false),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_portfolio_entry_pkey",
+      columns: [t.userId, t.workId],
+    }),
+    foreignKey({
+      name: "creator_portfolio_entry_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_portfolio_user_order").on(
+      t.userId,
+      t.featured.desc(),
+      t.position,
+      t.updatedAt.desc()
+    ),
+    check(
+      "creator_portfolio_position_check",
+      sql`${t.position} between 0 and 10000`
+    ),
+  ]
+);
+
+
+export const creatorExternalPublications = pgTable(
+  "creator_external_publication",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    releaseId: text("releaseId").notNull(),
+    platform: text("platform").notNull(),
+    externalUrl: text("externalUrl").notNull(),
+    status: text("status").notNull().default("draft"),
+    publishedAt: timestamp("publishedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_external_publication_work_platform_url_unique").on(
+      t.workId,
+      t.platform,
+      t.externalUrl
+    ),
+    foreignKey({
+      name: "creator_external_publication_release_fkey",
+      columns: [t.workId, t.releaseId],
+      foreignColumns: [creatorWorkReleases.workId, creatorWorkReleases.id],
+    }).onDelete("cascade"),
+    index("idx_creator_external_publication_release").on(t.releaseId),
+    index("idx_creator_external_publication_work_updated").on(t.workId, t.updatedAt.desc()),
+    check(
+      "creator_external_publication_platform_check",
+      sql`${t.platform} in ('naver', 'webtoon_canvas', 'tapas', 'postype', 'pixiv', 'globalcomix', 'other')`
+    ),
+    check(
+      "creator_external_publication_status_check",
+      sql`${t.status} in ('draft', 'published', 'updated', 'removed')`
+    ),
+  ]
+);
+
+
+export const creatorWorkReports = pgTable(
+  "creator_work_report",
+  {
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    reporterId: text("reporterId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    details: text("details").notNull().default(""),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolvedAt", { mode: "date", withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workId, t.reporterId] }),
+    index("idx_creator_work_report_status_created").on(t.status, t.createdAt),
+    check(
+      "creator_work_report_reason_check",
+      sql`${t.reason} in ('copyright', 'unsafe', 'spam', 'misleading', 'ai_disclosure', 'other')`
+    ),
+    check(
+      "creator_work_report_status_check",
+      sql`${t.status} in ('open', 'resolved', 'dismissed')`
+    ),
   ]
 );
 

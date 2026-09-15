@@ -82,4 +82,13 @@ describe("Studio AI on-demand codec boundary", () => {
       'return { ok: false, code: "network_error", error: networkErrorMessage(error) };',
     );
   });
+  it("loads Writer Room prompts only after transport admission through the bounded codec loader", () => {
+    const writer = functionSource("export async function generateStudioWriterRoomDraft", "export async function translateDialogueBatch");
+    expect(source).toContain('import type { StudioWriterRoomAiDraft } from "../studio-writer-room-ai";');
+    expect(source).not.toMatch(/import\s*\{[^}]*buildStudioWriterRoomAiPrompt[^}]*\}\s*from\s*"\.\.\/studio-writer-room-ai"/u);
+    expect(writer).toContain('import("../studio-writer-room-ai")');
+    expect(writer.indexOf("if (!isStudioTextAiConfigured(settings, transport))")).toBeLessThan(writer.indexOf("loadOptionalStudioAiCodec(importWriterRoomCodec, signal)"));
+    expect(writer).toContain('return { ok: false, code: "network_error", error: networkErrorMessage(error) };');
+  });
+
 });

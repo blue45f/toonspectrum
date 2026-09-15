@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 
 import {
   BUBBLE_OUTLINE_STYLE_OPTIONS,
@@ -13,7 +13,7 @@ import {
   StudioBubbleStylePresetPanel,
   StudioGradientEnginePanel,
 } from "./studio-page-lazy-ui";
-import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
+import { StudioColorField } from "./StudioColorField";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
 import type { BubbleEl } from "./studio-element-model";
@@ -45,19 +45,27 @@ export type BubbleAppearancePatch = Partial<
 
 export interface StudioInspectorBubbleAppearanceControlsProps {
   readonly recentColors: readonly string[];
+  readonly documentColors?: readonly string[];
   readonly selected: BubbleEl;
   readonly webtoonTheme: "classic" | "soft" | "vivid";
   readonly onEnsureRecentColorsLoaded: () => void;
   readonly onPatch: (patch: BubbleAppearancePatch) => void;
+  readonly onPreviewPatch?: (patch: BubbleAppearancePatch, key: string) => void;
+  readonly onFinishColorPreview?: () => void;
+  readonly onRequestColorSample?: (applyColor: (color: string) => void) => void;
   readonly onRememberColor: (color: string) => void;
 }
 
 export function StudioInspectorBubbleAppearanceControls({
   recentColors,
+  documentColors = [],
   selected,
   webtoonTheme,
   onEnsureRecentColorsLoaded,
   onPatch,
+  onPreviewPatch,
+  onFinishColorPreview,
+  onRequestColorSample,
   onRememberColor,
 }: StudioInspectorBubbleAppearanceControlsProps) {
   const previewLineHeight =
@@ -70,6 +78,41 @@ export function StudioInspectorBubbleAppearanceControls({
           ? 1.2
           : 1.25);
   const autoShrinkFit = bubbleAutoShrinkPreview(selected, previewLineHeight);
+  const previewAppearancePatch = onPreviewPatch ?? ((patch: BubbleAppearancePatch) => onPatch(patch));
+  const lastStrokeRef = useRef({
+    color: selected.stroke || "#16100c",
+    width: selected.strokeWidth && selected.strokeWidth > 0 ? selected.strokeWidth : 3,
+  });
+  const lastShadowRef = useRef({
+    color: selected.shadowColor || "#000000",
+    blur: selected.shadowBlur ?? 6,
+    offsetX: selected.shadowOffsetX ?? 2,
+    offsetY: selected.shadowOffsetY ?? 3,
+    opacity: selected.shadowOpacity ?? 0.15,
+  });
+  useEffect(() => {
+    if (!selected.stroke) return;
+    lastStrokeRef.current = {
+      color: selected.stroke,
+      width: selected.strokeWidth && selected.strokeWidth > 0 ? selected.strokeWidth : 3,
+    };
+  }, [selected.stroke, selected.strokeWidth]);
+  useEffect(() => {
+    if (selected.shadowColor === undefined) return;
+    lastShadowRef.current = {
+      color: selected.shadowColor || "#000000",
+      blur: selected.shadowBlur ?? 6,
+      offsetX: selected.shadowOffsetX ?? 2,
+      offsetY: selected.shadowOffsetY ?? 3,
+      opacity: selected.shadowOpacity ?? 0.15,
+    };
+  }, [
+    selected.shadowBlur,
+    selected.shadowColor,
+    selected.shadowOffsetX,
+    selected.shadowOffsetY,
+    selected.shadowOpacity,
+  ]);
 
   return (
     <>
@@ -140,18 +183,29 @@ export function StudioInspectorBubbleAppearanceControls({
       </div>
 
       {selected.fill !== "transparent" && (
-        <span className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-          말풍선색
-          <LazyStudioColorPopover
+        <div className="mt-2">
+          <StudioColorField
+            label="말풍선 색상"
             value={selected.fill}
-            onChange={(color) => onPatch({ fill: color })}
+            purpose="bubble-fill"
             recentColors={recentColors}
+            documentColors={documentColors}
+            onChange={(color) => onPatch({ fill: color ?? "#ffffff" })}
+            onPreview={(color) => previewAppearancePatch({ fill: color }, `color:${selected.id}:fill`)}
             onUseColor={onRememberColor}
             onLoadRecentColors={onEnsureRecentColorsLoaded}
-            label="말풍선 색상"
-            purpose="bubble-fill"
+            onInteractionEnd={onFinishColorPreview}
+            onRequestCanvasEyedropper={
+              onRequestColorSample
+                ? () =>
+                    onRequestColorSample((color) => {
+                      onPatch({ fill: color });
+                      onRememberColor(color);
+                    })
+                : undefined
+            }
           />
-        </span>
+        </div>
       )}
 
       {selected.fill !== "transparent" && (
@@ -182,9 +236,18 @@ export function StudioInspectorBubbleAppearanceControls({
             aria-label="말풍선 테두리 커스텀"
             onChange={(event) => {
               const enabled = event.currentTarget.checked;
+              if (!enabled && selected.stroke) {
+                lastStrokeRef.current = {
+                  color: selected.stroke,
+                  width:
+                    selected.strokeWidth && selected.strokeWidth > 0
+                      ? selected.strokeWidth
+                      : 3,
+                };
+              }
               onPatch({
-                stroke: enabled ? selected.stroke || "#16100c" : undefined,
-                strokeWidth: enabled ? selected.strokeWidth || 3 : undefined,
+                stroke: enabled ? lastStrokeRef.current.color : undefined,
+                strokeWidth: enabled ? lastStrokeRef.current.width : undefined,
               });
             }}
             className="size-4 cursor-pointer accent-accent"
@@ -193,16 +256,27 @@ export function StudioInspectorBubbleAppearanceControls({
 
         {selected.stroke && (
           <>
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              테두리 색상
-              <input
-                type="color"
-                aria-label="테두리 색상"
-                value={selected.stroke}
-                onChange={(event) => onPatch({ stroke: event.currentTarget.value })}
-                className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-              />
-            </label>
+            <StudioColorField
+              label="테두리 색상"
+              value={selected.stroke}
+              purpose="bubble-stroke"
+              recentColors={recentColors}
+              documentColors={documentColors}
+              onChange={(color) => onPatch({ stroke: color ?? undefined })}
+              onPreview={(color) => previewAppearancePatch({ stroke: color }, `color:${selected.id}:stroke`)}
+              onUseColor={onRememberColor}
+              onLoadRecentColors={onEnsureRecentColorsLoaded}
+              onInteractionEnd={onFinishColorPreview}
+              onRequestCanvasEyedropper={
+                onRequestColorSample
+                  ? () =>
+                      onRequestColorSample((color) => {
+                        onPatch({ stroke: color });
+                        onRememberColor(color);
+                      })
+                  : undefined
+              }
+            />
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
               테두리 두께
@@ -293,12 +367,21 @@ export function StudioInspectorBubbleAppearanceControls({
             aria-label="말풍선 그림자 사용"
             onChange={(event) => {
               const enabled = event.currentTarget.checked;
+              if (!enabled && selected.shadowColor !== undefined) {
+                lastShadowRef.current = {
+                  color: selected.shadowColor || "#000000",
+                  blur: selected.shadowBlur ?? 6,
+                  offsetX: selected.shadowOffsetX ?? 2,
+                  offsetY: selected.shadowOffsetY ?? 3,
+                  opacity: selected.shadowOpacity ?? 0.15,
+                };
+              }
               onPatch({
-                shadowColor: enabled ? selected.shadowColor || "#000000" : undefined,
-                shadowBlur: enabled ? selected.shadowBlur || 6 : undefined,
-                shadowOffsetX: enabled ? selected.shadowOffsetX || 2 : undefined,
-                shadowOffsetY: enabled ? selected.shadowOffsetY || 3 : undefined,
-                shadowOpacity: enabled ? selected.shadowOpacity || 0.15 : undefined,
+                shadowColor: enabled ? lastShadowRef.current.color : undefined,
+                shadowBlur: enabled ? lastShadowRef.current.blur : undefined,
+                shadowOffsetX: enabled ? lastShadowRef.current.offsetX : undefined,
+                shadowOffsetY: enabled ? lastShadowRef.current.offsetY : undefined,
+                shadowOpacity: enabled ? lastShadowRef.current.opacity : undefined,
               });
             }}
             className="size-4 cursor-pointer accent-accent"
@@ -307,16 +390,28 @@ export function StudioInspectorBubbleAppearanceControls({
 
         {selected.shadowColor !== undefined && (
           <>
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              그림자 색상
-              <input
-                type="color"
-                aria-label="그림자 색상"
-                value={selected.shadowColor || "#000000"}
-                onChange={(event) => onPatch({ shadowColor: event.currentTarget.value })}
-                className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-              />
-            </label>
+            <StudioColorField
+              label="그림자 색상"
+              value={selected.shadowColor ?? null}
+              fallbackColor="#000000"
+              purpose="shadow"
+              recentColors={recentColors}
+              documentColors={documentColors}
+              onChange={(color) => onPatch({ shadowColor: color ?? undefined })}
+              onPreview={(color) => previewAppearancePatch({ shadowColor: color }, `color:${selected.id}:shadow`)}
+              onUseColor={onRememberColor}
+              onLoadRecentColors={onEnsureRecentColorsLoaded}
+              onInteractionEnd={onFinishColorPreview}
+              onRequestCanvasEyedropper={
+                onRequestColorSample
+                  ? () =>
+                      onRequestColorSample((color) => {
+                        onPatch({ shadowColor: color });
+                        onRememberColor(color);
+                      })
+                  : undefined
+              }
+            />
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
               흐림 정도 (Blur)

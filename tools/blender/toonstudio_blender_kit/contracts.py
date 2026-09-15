@@ -591,6 +591,7 @@ MCP_ALLOWED_COMMANDS = frozenset(
         "render_quality_views",
         "validate_character",
         "export_character_package",
+        "export_current_character_package",
         "run_pipeline",
     }
 )

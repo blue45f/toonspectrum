@@ -131,6 +131,20 @@ export const StudioRouter = lazyRetry(
   "StudioRouter",
 );
 
+
+export const CreatorEcosystemPage = lazyRetry(
+  () => import("@/domains/creator/ecosystem/CreatorEcosystemPage").then((module) => ({
+    default: module.CreatorEcosystemPage,
+  })),
+  "CreatorEcosystemPage",
+);
+export const CreatorEcosystemViewerPage = lazyRetry(
+  () => import("@/domains/creator/ecosystem/CreatorEcosystemViewerPage").then((module) => ({
+    default: module.CreatorEcosystemViewerPage,
+  })),
+  "CreatorEcosystemViewerPage",
+);
+
 export const CreatorInferencePage = lazyRetry(
   () => import("@/domains/creator/ai/CreatorInferencePage").then((module) => ({ default: module.CreatorInferencePage })),
   "CreatorInferencePage",
@@ -141,7 +155,45 @@ export const StudioGenerativePage = lazyRetry(
   "StudioGenerativePage",
 );
 
+export const StudioImmersiveHubPage = lazyRetry(
+  () => import("@/domains/creator/spatial/StudioImmersiveHubPage").then((module) => ({ default: module.StudioImmersiveHubPage })),
+  "StudioImmersiveHubPage",
+);
+
+
+export const StudioProductionToolchainPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioProductionToolchainPage })),
+  "StudioProductionToolchainPage",
+);
+export const StudioEngineCenterPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioEngineCenterPage })),
+  "StudioEngineCenterPage",
+);
+export const StudioProductionJobsPage = lazyRetry(
+  () => import("@/domains/creator/toolchain/StudioProductionToolchainPage").then((module) => ({ default: module.StudioProductionJobsPage })),
+  "StudioProductionJobsPage",
+);
+
 export const StudioSpatialReaderPage = lazyRetry(
   () => import("@/domains/creator/spatial-reader/StudioSpatialReaderPage").then((module) => ({ default: module.StudioSpatialReaderPage })),
   "StudioSpatialReaderPage",
+);
+export const StudioCharacterConversionPage = lazyRetry(
+  () => import("@/domains/creator/character-conversion/StudioCharacterConversionPage").then((module) => ({
+    default: module.StudioCharacterConversionPage,
+  })),
+  "StudioCharacterConversionPage",
+);
+
+export const PersonalInferencePage = lazyRetry(
+  () => import("@/domains/creator/ai/PersonalInferencePage").then((module) => ({
+    default: module.PersonalInferencePage,
+  })),
+  "PersonalInferencePage",
+);
+export const StudioAiSettingsPage = lazyRetry(
+  () => import("@/domains/creator/ai/StudioAiSettingsPage").then((module) => ({
+    default: module.StudioAiSettingsPage,
+  })),
+  "StudioAiSettingsPage",
 );

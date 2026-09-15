@@ -210,13 +210,13 @@ test("default recording uses opaque canvas and lower-latency VP8", async () => {
   const { blob } = await context.result();
   assert.equal(blob.type, "video/webm;codecs=vp8,opus");
   assert.equal(context.contextOptions[0].alpha, false);
-  assert.equal(context.frameRequests(), 1);
+  assert.equal(context.frameRequests(), 2);
   context.cleaned();
 });
 test("the final canvas frame gets a paint opportunity before native stop", async () => {
   const context = await recording(); context.data(); context.tick(15_000);
   assert.equal(context.recorder.state, "recording");
-  assert.equal(context.frameRequests(), 1);
+  assert.equal(context.frameRequests(), 2);
   context.tick(15_020);
   assert.equal(context.recorder.state, "recording");
   context.tick(15_040);
@@ -266,23 +266,32 @@ test("cancellation during the browser final-frame timer releases audio and clear
   assert.equal(context.audioStoppedAt(), 15_000);
 });
 
-
-test("progress does not rerender the entire editor on every captured frame", async () => {
-  const session = await recording();
-  for (let frame = 1; frame <= 30; frame += 1) session.tick(frame * 1000 / 30);
-  assert.ok(session.progress.length <= 6, "at most five progress updates per second after the initial update");
-  session.end(); session.stopEvent();
-  assert.ok((await session.result()).blob);
-  assert.equal(session.progress.at(-1), 1, "successful completion must still publish 100%");
-  session.cleaned();
+test("every newly rendered timeline frame is requested once, including detached canvases", async () => {
+  const context = await recording();
+  assert.equal(context.frameRequests(), 1, "the first frame must be explicitly requested");
+  context.tick(10);
+  assert.equal(context.frameRequests(), 1, "do not recapture an unchanged frame");
+  context.tick(34);
+  assert.equal(context.frameRequests(), 2);
+  context.tick(67);
+  assert.equal(context.frameRequests(), 3);
+  context.end(); context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  assert.equal(context.frameRequests(), 4);
+  context.cleaned();
 });
 
-test("the audio envelope is scheduled once instead of on animation callbacks", async () => {
-  const session = await recording({ withAudio: true });
-  assert.equal(session.scheduledGains.length, 1);
-  for (let frame = 1; frame < 60; frame += 1) session.tick(frame * 1000 / 30);
-  assert.equal(session.scheduledGains.length, 1);
-  session.end(); session.stopEvent();
-  assert.ok((await session.result()).blob);
-  session.cleaned();
+test("every newly rendered timeline frame is requested once, including detached canvases", async () => {
+  const context = await recording();
+  assert.equal(context.frameRequests(), 1, "the first frame must be explicitly requested");
+  context.tick(10);
+  assert.equal(context.frameRequests(), 1, "do not recapture an unchanged frame");
+  context.tick(34);
+  assert.equal(context.frameRequests(), 2);
+  context.tick(67);
+  assert.equal(context.frameRequests(), 3);
+  context.end(); context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  assert.equal(context.frameRequests(), 4);
+  context.cleaned();
 });

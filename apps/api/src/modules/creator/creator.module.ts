@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
-import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
+import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import { CreatorCollaborationRepository } from "./creator-collaboration.repository";
@@ -35,6 +35,9 @@ import {
   studioLiveSessionAuthenticatorProvider,
   studioLiveSessionRevalidatorProvider,
 } from "./studio-live.protocol";
+import { StudioProductionController } from "./studio-production.controller";
+import { studioProductionRepositoryProvider } from "./studio-production.repository";
+import { StudioProductionService } from "./studio-production.service";
 import { StudioRasterAssetController } from "./studio-raster-asset.controller";
 import { studioRasterAssetRepositoryProvider } from "./studio-raster-asset.repository";
 import { StudioRasterAssetService } from "./studio-raster-asset.service";
@@ -58,19 +61,20 @@ import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import { studioWorkAssetRepositoryProvider } from "./studio-work-asset.repository";
 import { StudioWorkAssetService } from "./studio-work-asset.service";
 
-const supabaseObjectStorageModule =
-  SupabaseObjectStorageModule.fromEnvironment(process.env);
+const privateObjectStorageModule =
+  PrivateObjectStorageModule.fromEnvironment(process.env);
 
 @Module({
   imports: [
     StudioRealtimeRevocationModule,
-    ...(supabaseObjectStorageModule ? [supabaseObjectStorageModule] : []),
+    ...(privateObjectStorageModule ? [privateObjectStorageModule] : []),
   ],
   controllers: [
     CreatorController,
     StudioLiveAuthTicketController,
     StudioRasterAssetController,
     StudioRemoteReferenceImageController,
+    StudioProductionController,
     StudioTeamCommentController,
     StudioVoiceIcePolicyController,
     StudioWorkAssetController,
@@ -89,6 +93,7 @@ const supabaseObjectStorageModule =
     studioRemoteReferenceDnsResolverProvider,
     studioRemoteReferenceHttpRequesterProvider,
     studioRemoteReferenceImageDeliveryLimiterProvider,
+    studioProductionRepositoryProvider,
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
@@ -96,6 +101,7 @@ const supabaseObjectStorageModule =
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,
+    StudioProductionService,
     StudioTeamCommentLivePublisher,
     StudioTeamCommentService,
     StudioVoiceIcePolicyService,

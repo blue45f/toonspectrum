@@ -35,6 +35,7 @@ export interface StudioBackground3DProps {
    * `onSeedObjectInsertConsumed`.
    */
   seedSceneTemplateId?: string | null;
+  marketplaceModelId?: string | null;
   /** One-shot seed: spawn a primitive kind after open. */
   seedPrimitiveKind?: BgPrimitiveKind | null;
   onSeedObjectInsertConsumed?: () => void;
@@ -62,6 +63,8 @@ export interface StudioBackground3DProps {
   onUseAsAiMethodReference?: (
     capture: StudioBg3dAiMethodReferenceCapture,
   ) => boolean | void | Promise<boolean | void>;
+  /** Opens the authoritative editable-mesh/CAD workspace after preserving this canonical scene. */
+  onOpenPrecisionModeler?: (scene: StudioBg3dSceneDocument) => void;
   /** 편집 중인 문서 캔버스 크기. 주어지면 "문서 캔버스 비율" 캡처 프리셋이 목록에 추가된다. */
   documentCanvasSize?: { readonly width: number; readonly height: number };
 }

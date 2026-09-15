@@ -30,10 +30,13 @@ import {
   db,
 } from "../../db";
 import {
-  SupabaseObjectReferenceSchema,
-  type SupabaseObjectPurpose,
-  type SupabaseObjectReference,
-} from "../../infrastructure/supabase-object-storage/supabase-object-storage.contract";
+  PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
+  PrivateObjectReferenceSchema,
+  isLocatedPrivateObjectReference,
+  samePrivateObjectContent,
+  type PrivateObjectPurpose,
+  type PrivateObjectReference,
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {
@@ -124,7 +127,7 @@ export class StudioWorkAssetStorageReferenceConflictError extends Error {
 }
 
 export type StudioWorkAssetGeneratedObjectPurpose = Exclude<
-  SupabaseObjectPurpose,
+  PrivateObjectPurpose,
   "source"
 >;
 
@@ -132,7 +135,7 @@ export interface StudioWorkAssetStorageReference {
   readonly workId: string;
   readonly sourceAssetId: string;
   readonly referenceId: string;
-  readonly object: SupabaseObjectReference;
+  readonly object: PrivateObjectReference;
 }
 
 export interface StudioWorkAssetGeneratedDeletePlan {
@@ -150,7 +153,7 @@ export interface StudioWorkAssetWrite {
   payload: Uint8Array;
   sha256: string;
   intrinsicImage: StudioWorkAssetIntrinsicImage | null;
-  storageObject: SupabaseObjectReference;
+  storageObject: PrivateObjectReference;
 }
 
 export interface StudioWorkAssetContent {
@@ -166,8 +169,8 @@ export interface StudioWorkAssetRepository {
     sourceAssetId: string,
   ): Promise<void>;
   findReusableStorageObject(
-    object: SupabaseObjectReference,
-  ): Promise<SupabaseObjectReference | null>;
+    object: PrivateObjectReference,
+  ): Promise<PrivateObjectReference | null>;
   upsert(actorUserId: string, input: StudioWorkAssetWrite): Promise<StudioWorkAssetManifest>;
   upsertBatch(
     actorUserId: string,
@@ -218,7 +221,7 @@ export interface StudioWorkAssetRepository {
     actorUserId: string,
     workId: string,
     sourceAssetId: string,
-    purpose: SupabaseObjectPurpose,
+    purpose: PrivateObjectPurpose,
     referenceId: string,
     sourceElementType?: StudioWorkAssetType,
   ): Promise<StudioWorkAssetStorageReference>;
@@ -603,15 +606,17 @@ function storageObjectFromRow(
   row: Pick<
     StudioWorkAssetStorageObjectRow,
     | "contractVersion"
+    | "providerId"
     | "purpose"
     | "digest"
     | "objectPath"
     | "byteLength"
     | "contentType"
   >,
-): SupabaseObjectReference {
-  return SupabaseObjectReferenceSchema.parse({
+): PrivateObjectReference {
+  return PrivateObjectReferenceSchema.parse({
     contractVersion: row.contractVersion,
+    providerId: row.providerId,
     purpose: row.purpose,
     digest: row.digest,
     objectPath: row.objectPath,
@@ -621,15 +626,15 @@ function storageObjectFromRow(
 }
 
 export function isExactStudioWorkAssetStorageObject(
-  actual: SupabaseObjectReference,
-  expected: SupabaseObjectReference,
+  actualValue: PrivateObjectReference,
+  expectedValue: PrivateObjectReference,
 ): boolean {
-  return actual.contractVersion === expected.contractVersion
-    && actual.purpose === expected.purpose
-    && actual.digest === expected.digest
-    && actual.objectPath === expected.objectPath
-    && actual.byteLength === expected.byteLength
-    && actual.contentType === expected.contentType;
+  const actual = PrivateObjectReferenceSchema.parse(actualValue);
+  const expected = PrivateObjectReferenceSchema.parse(expectedValue);
+  if (!samePrivateObjectContent(actual, expected)) return false;
+  if (!isLocatedPrivateObjectReference(expected)) return true;
+  return isLocatedPrivateObjectReference(actual)
+    && actual.providerId === expected.providerId;
 }
 
 export function assertStudioWorkAssetSourceStorageObject(
@@ -637,14 +642,14 @@ export function assertStudioWorkAssetSourceStorageObject(
     StudioWorkAssetWrite,
     "mimeType" | "payload" | "sha256" | "storageObject"
   >,
-): SupabaseObjectReference {
-  const object = SupabaseObjectReferenceSchema.parse(write.storageObject);
+): PrivateObjectReference {
+  const object = PrivateObjectReferenceSchema.parse(write.storageObject);
   const payloadSha256 = createHash("sha256").update(write.payload).digest("hex");
   if (payloadSha256 !== write.sha256) {
     throw new StudioWorkAssetStorageReferenceConflictError();
   }
-  const expected = SupabaseObjectReferenceSchema.parse({
-    contractVersion: "toonspectrum.supabase-object-storage.v1",
+  const expected = PrivateObjectReferenceSchema.parse({
+    contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
     purpose: "source",
     digest: `sha256:${write.sha256}`,
     objectPath: `sha256/${write.sha256.slice(0, 2)}/${write.sha256}`,
@@ -659,7 +664,7 @@ export function assertStudioWorkAssetSourceStorageObject(
 
 async function lockStorageObject(
   transaction: DrizzleStudioWorkAssetTransaction,
-  purpose: SupabaseObjectPurpose,
+  purpose: PrivateObjectPurpose,
   digest: string,
 ): Promise<StudioWorkAssetStorageObjectRow | null> {
   const [row] = await transaction
@@ -678,16 +683,20 @@ async function lockStorageObject(
 
 async function registerStorageObjectInTransaction(
   transaction: DrizzleStudioWorkAssetTransaction,
-  objectValue: SupabaseObjectReference,
+  objectValue: PrivateObjectReference,
   reactivateDeletedObject: boolean,
-): Promise<SupabaseObjectReference> {
-  const object = SupabaseObjectReferenceSchema.parse(objectValue);
+): Promise<PrivateObjectReference> {
+  const object = PrivateObjectReferenceSchema.parse(objectValue);
+  if (!isLocatedPrivateObjectReference(object)) {
+    throw new StudioWorkAssetStorageReferenceConflictError();
+  }
   await transaction
     .insert(creatorAssetStorageObjects)
     .values({
       purpose: object.purpose,
       digest: object.digest,
       contractVersion: object.contractVersion,
+      providerId: object.providerId,
       objectPath: object.objectPath,
       byteLength: object.byteLength,
       contentType: object.contentType,
@@ -728,7 +737,7 @@ async function registerStorageReferenceInTransaction(
   actorUserId: string,
   input: StudioWorkAssetStorageReference,
 ): Promise<StudioWorkAssetStorageReference> {
-  const object = SupabaseObjectReferenceSchema.parse(input.object);
+  const object = PrivateObjectReferenceSchema.parse(input.object);
   await transaction
     .insert(creatorWorkAssetStorageReferences)
     .values({
@@ -774,7 +783,7 @@ async function readActiveStorageReferenceInTransaction(
   input: {
     workId: string;
     sourceAssetId: string;
-    purpose: SupabaseObjectPurpose;
+    purpose: PrivateObjectPurpose;
     referenceId: string;
     sourceElementType?: StudioWorkAssetType;
   },
@@ -785,6 +794,7 @@ async function readActiveStorageReferenceInTransaction(
       sourceAssetId: creatorWorkAssetStorageReferences.sourceAssetId,
       referenceId: creatorWorkAssetStorageReferences.referenceId,
       contractVersion: creatorAssetStorageObjects.contractVersion,
+      providerId: creatorAssetStorageObjects.providerId,
       purpose: creatorAssetStorageObjects.purpose,
       digest: creatorAssetStorageObjects.digest,
       objectPath: creatorAssetStorageObjects.objectPath,
@@ -1001,9 +1011,9 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
   }
 
   async findReusableStorageObject(
-    objectValue: SupabaseObjectReference,
-  ): Promise<SupabaseObjectReference | null> {
-    const object = SupabaseObjectReferenceSchema.parse(objectValue);
+    objectValue: PrivateObjectReference,
+  ): Promise<PrivateObjectReference | null> {
+    const object = PrivateObjectReferenceSchema.parse(objectValue);
     const [row] = await db
       .select()
       .from(creatorAssetStorageObjects)
@@ -1267,7 +1277,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     actorUserId: string,
     workId: string,
     sourceAssetId: string,
-    purpose: SupabaseObjectPurpose,
+    purpose: PrivateObjectPurpose,
     referenceId: string,
     sourceElementType?: StudioWorkAssetType,
   ): Promise<StudioWorkAssetStorageReference> {
@@ -1291,7 +1301,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     input: StudioWorkAssetStorageReference,
     reactivateDeletedObject: boolean,
   ): Promise<StudioWorkAssetStorageReference> {
-    const object = SupabaseObjectReferenceSchema.parse(input.object);
+    const object = PrivateObjectReferenceSchema.parse(input.object);
     if (object.purpose === "source") {
       throw new StudioWorkAssetStorageReferenceConflictError();
     }
@@ -1340,6 +1350,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
           sourceAssetId: creatorWorkAssetStorageReferences.sourceAssetId,
           referenceId: creatorWorkAssetStorageReferences.referenceId,
           contractVersion: creatorAssetStorageObjects.contractVersion,
+          providerId: creatorAssetStorageObjects.providerId,
           purpose: creatorAssetStorageObjects.purpose,
           digest: creatorAssetStorageObjects.digest,
           objectPath: creatorAssetStorageObjects.objectPath,
@@ -1394,7 +1405,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     },
     allowAdminOverride = false,
   ): Promise<StudioWorkAssetGeneratedDeletePlan> {
-    if (input.purpose === ("source" as SupabaseObjectPurpose)) {
+    if (input.purpose === ("source" as PrivateObjectPurpose)) {
       throw new StudioWorkAssetStorageReferenceConflictError();
     }
     return db.transaction(async (transaction) => {

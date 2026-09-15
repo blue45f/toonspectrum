@@ -1,9 +1,10 @@
 // 정적 카탈로그 페이로드 슬리밍 — 목록(카드) 경로와 상세 전용 데이터의 분리 규약.
 //
-// public/data/catalog.json 은 클라이언트 인메모리 엔진(검색·탐색·랭킹·추천)의 입력으로
-// 24k+ 작품 전체를 싣는다. 목록·검색이 읽지 않는 무거운 필드는 여기서 떼어내
-// public/data/detail/<bucket>.json 샤드(해시 버킷)로 옮기고, 상세/비교 화면에서만 작은
-// 샤드 1개를 추가로 받아 합친다.
+// public/data/catalog/manifest.json + catalog/<bucket>.json 은 클라이언트 인메모리
+// 엔진(검색·탐색·랭킹·추천)의 입력으로 전체 작품을 싣는다. 단일 catalog.json 은 무료
+// Static Assets의 개별 파일 제한을 넘을 수 있으므로 고정 개수의 순서 보존 샤드로 나눈다.
+// 목록·검색이 읽지 않는 무거운 필드는 public/data/detail/<bucket>.json 해시 샤드로 옮기고,
+// 상세/비교 화면에서만 작은 상세 샤드 1개를 추가로 받아 합친다.
 //
 //   분리 대상(상세 전용):
 //     - synopsis 원문(목록 카드는 SYNOPSIS_CARD_MAX 자로 축약 — 카드 line-clamp 노출 범위)
@@ -19,6 +20,69 @@ export const SYNOPSIS_CARD_MAX = 160;
 
 // 상세 샤드 버킷 수 — 24k 작품 기준 버킷당 ~190편, 원시 ~30KB(전송 시 압축 ~7KB).
 export const DETAIL_SHARD_COUNT = 128;
+
+// 목록 카탈로그는 source order를 보존하는 연속 샤드로 분리한다. 16개면 현재 약 47MiB
+// 카탈로그가 파일당 약 3MiB가 되어 Cloudflare Static Assets 25MiB 제한에 넉넉한 여유가 있다.
+export const CATALOG_SHARD_COUNT = 16;
+export const CATALOG_SHARD_MANIFEST_VERSION =
+  "toonspectrum.catalog-shards.v1" as const;
+
+export interface CatalogShardDescriptor {
+  readonly file: string;
+  readonly count: number;
+}
+
+export interface CatalogShardManifest {
+  readonly version: typeof CATALOG_SHARD_MANIFEST_VERSION;
+  readonly count: number;
+  readonly shards: readonly CatalogShardDescriptor[];
+}
+
+export function catalogShardFileForBucket(bucket: number): string {
+  if (!Number.isInteger(bucket) || bucket < 0 || bucket > 0xff) {
+    throw new RangeError("catalog shard bucket must be an integer between 0 and 255");
+  }
+  return `catalog/${bucket.toString(16).padStart(2, "0")}.json`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseCatalogShardManifest(value: unknown): CatalogShardManifest {
+  if (!isRecord(value)
+    || value.version !== CATALOG_SHARD_MANIFEST_VERSION
+    || !Number.isSafeInteger(value.count)
+    || (value.count as number) < 0
+    || !Array.isArray(value.shards)
+    || value.shards.length < 1
+    || value.shards.length > 0x100) {
+    throw new TypeError("invalid catalog shard manifest");
+  }
+
+  const seen = new Set<string>();
+  const shards = value.shards.map((entry) => {
+    if (!isRecord(entry)
+      || typeof entry.file !== "string"
+      || !/^catalog\/[0-9a-f]{2}\.json$/u.test(entry.file)
+      || !Number.isSafeInteger(entry.count)
+      || (entry.count as number) <= 0
+      || seen.has(entry.file)) {
+      throw new TypeError("invalid catalog shard descriptor");
+    }
+    seen.add(entry.file);
+    return { file: entry.file, count: entry.count as number };
+  });
+  const total = shards.reduce((sum, shard) => sum + shard.count, 0);
+  if (total !== value.count) {
+    throw new TypeError("catalog shard count does not match manifest");
+  }
+  return {
+    version: CATALOG_SHARD_MANIFEST_VERSION,
+    count: value.count as number,
+    shards,
+  };
+}
 
 // 상세 전용 필드 묶음(샤드 항목). 키는 페이로드 절약을 위해 1글자.
 export interface TitleDetailExtra {
@@ -69,7 +133,7 @@ function slimStats(stats: TitleStats): TitleCard["stats"] {
   return rest;
 }
 
-// 목록/검색용 카드 — catalog.json·ranking/*.json 항목. 카드 컴포넌트(title-card·rank-row·
+// 목록/검색용 카드 — catalog/*.json·ranking/*.json 항목. 카드 컴포넌트(title-card·rank-row·
 // ranking-board)와 검색 점수기가 읽는 필드는 모두 유지하고 상세 전용 필드만 줄인다.
 export function toListTitle(title: Title): TitleCard {
   return {

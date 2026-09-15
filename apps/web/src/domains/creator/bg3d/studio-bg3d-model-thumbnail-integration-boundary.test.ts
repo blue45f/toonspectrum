@@ -66,6 +66,14 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 }
 
 describe("Studio BG3D imported-model thumbnail integration boundary", () => {
+  it("delegates file-picker and marketplace imports to the same verified pipeline", () => {
+    expect(functionSource("handleUploadModelFiles")).toContain("await importModelFiles(files, rights)");
+    const importer = functionSource("importModelFiles");
+    expect(importer).toContain("signal?.aborted");
+    expect(importer).toContain('signal?.addEventListener("abort", abortImport, { once: true })');
+    expect(importer).toContain('signal?.removeEventListener("abort", abortImport)');
+  });
+
   it("keeps capture and isolated Three thumbnail runtimes behind the post-import lazy boundary", () => {
     const loader = functionSource("loadStudioBg3dModelThumbnailRuntime");
     const capture = functionSource("startModelThumbnailCaptureBatch");
@@ -87,7 +95,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("loads the model conversion runtime only after a user selects files and fences the await", () => {
-    const upload = functionSource("handleUploadModelFiles");
+    const upload = functionSource("importModelFiles");
 
     expect(source).toContain(
       'import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";',
@@ -105,7 +113,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("commits import and scene placement before starting best-effort thumbnail work", () => {
-    const upload = functionSource("handleUploadModelFiles");
+    const upload = functionSource("importModelFiles");
 
     expectInOrder(upload, [
       "await importVerifiedBg3dModelsAtomically",
@@ -173,7 +181,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("invalidates thumbnail generations on new import, delete, modal close, and unmount", () => {
-    const upload = functionSource("handleUploadModelFiles");
+    const upload = functionSource("importModelFiles");
     const remove = functionSource("handleDeleteModelFromLibrary");
 
     expectInOrder(upload, [
@@ -183,7 +191,8 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
     expectInOrder(remove, [
       "const thumbnailLeaseReleased = invalidateModelThumbnailCaptures()",
       "if (thumbnailLeaseReleased) await thumbnailLeaseReleased",
-      "if (!isModalAssetSessionCurrent(session) || captureInFlightRef.current) return",
+      "if (!isModalAssetSessionCurrent(session)) return",
+      "if (captureInFlightRef.current || sceneRestoreAbortRef.current !== null)",
       "preflightAndDeleteStudioBg3dPersistedModel({",
     ]);
     expect(source).toContain("modelThumbnailCaptureControllerRef.current?.invalidate()");

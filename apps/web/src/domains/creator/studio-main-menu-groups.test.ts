@@ -415,7 +415,7 @@ describe("buildStudioMainMenuGroups", () => {
       disabled: true,
     });
     expect(menuItem(groups, "file", "publish")).toMatchObject({
-      label: "수정 게시",
+      label: "ToonSpectrum 게시 수정…",
       disabled: true,
     });
     expect(menuItem(groups, "file", "export-archive").disabled).toBe(true);

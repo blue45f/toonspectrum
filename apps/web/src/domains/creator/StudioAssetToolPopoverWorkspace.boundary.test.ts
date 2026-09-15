@@ -8,12 +8,14 @@ function read(relativePath: string): string {
 
 const wrapperSource = read("./StudioAssetToolPopoverWorkspace.tsx");
 const contentSource = read("./StudioUnifiedAssetToolPopoverContent.tsx");
-const insertWorkspaceSource = read("./StudioInsertHubWorkspace.tsx");
+const workspaceSource = read("./StudioUnifiedAssetWorkspace.tsx");
+const previewSource = read("./StudioUnifiedAssetPreviewSurface.tsx");
+const previewModelSource = read("./studio-unified-asset-preview.ts");
 const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 
-describe("Studio insertion hub review boundaries", () => {
-  it("loads unified catalogs and the insertion hub only after the asset subtab is active", () => {
+describe("Studio asset workspace boundaries", () => {
+  it("loads unified catalogs and the visual workspace only after the asset menu is active", () => {
     expect(wrapperSource).toContain('if (toolBelt.menu !== "asset")');
     expect(wrapperSource).toContain(
       "<LazyStudioUnifiedAssetToolPopoverContent toolBelt={toolBelt} />",
@@ -29,24 +31,24 @@ describe("Studio insertion hub review boundaries", () => {
       "./studio-scene-templates",
       "./studio-unified-asset-catalog",
       "./studio-insert-hub-model",
-      "./StudioInsertHubWorkspace",
+      "./StudioUnifiedAssetWorkspace",
     ]) {
       expect(wrapperSource).not.toContain(heavyModule);
       expect(contentSource).toContain(heavyModule);
     }
-    expect(contentSource).not.toContain("./StudioUnifiedAssetWorkspace");
+    expect(contentSource).not.toContain("./StudioInsertHubWorkspace");
   });
 
-  it("keeps browser storage and discovery state inside the lazy insertion workspace", () => {
+  it("keeps browser storage and discovery state inside the lazy visual workspace", () => {
     expect(contentSource).not.toContain("window.localStorage");
-    expect(insertWorkspaceSource).toContain("window.localStorage");
-    expect(insertWorkspaceSource).toContain("loadStudioInsertHubPreferences");
-    expect(insertWorkspaceSource).toContain("saveStudioInsertHubPreferences");
+    expect(workspaceSource).toContain("window.localStorage");
+    expect(workspaceSource).toContain("loadStudioInsertHubPreferences");
+    expect(workspaceSource).toContain("saveStudioInsertHubPreferences");
     expect(insertModelSource).toContain("STUDIO_INSERT_HUB_MAX_RECENTS");
     expect(insertModelSource).toContain("STUDIO_INSERT_HUB_MAX_FAVORITES");
   });
 
-  it("ships cold-entry scene catalogs without requiring legacy tab visits", () => {
+  it("ships cold-entry 2D, template, and 3D catalogs without legacy tab visits", () => {
     expect(contentSource).toContain(
       'import { BG_SCENES } from "./studio-bg-scenes"',
     );
@@ -59,6 +61,17 @@ describe("Studio insertion hub review boundaries", () => {
     expect(contentSource).toContain("...BG_SCENES");
     expect(contentSource).toContain("...BG_SCENES_EXTRA");
     expect(contentSource).toContain("...SCENE_TEMPLATES");
+    expect(previewModelSource).toContain('kind: "three"');
+    expect(previewModelSource).toContain('kind: "scene-template"');
+  });
+
+  it("uses actual template maps and lazy Three.js previews instead of generic icons", () => {
+    expect(previewSource).toContain("<StudioSceneTemplateMap");
+    expect(previewSource).toContain('import("three")');
+    expect(previewSource).toContain('import("three/examples/jsm/loaders/GLTFLoader.js")');
+    expect(previewSource).toContain("toDataURL(\"image/webp\"");
+    expect(previewSource).toContain("disposeObject");
+    expect(workspaceSource).toContain("<StudioUnifiedAssetPreviewSurface");
   });
 
   it("hands zero-result context to the prompt actually consumed by AI Assist", () => {
@@ -67,9 +80,9 @@ describe("Studio insertion hub review boundaries", () => {
     expect(contentSource).not.toContain("setAssetPrompt(prompt)");
   });
 
-  it("opens community deep links without unmounting the unified insertion surface", () => {
+  it("opens community deep links without unmounting the visual workspace", () => {
     expect(contentSource).toContain(
-      'toolBelt.assetTab === "community" ? "library" : "insert"',
+      'toolBelt.assetTab === "community" ? "library" : "discover"',
     );
     expect(contentSource).toContain(
       "<StudioAssetLegacyPanel toolBelt={toolBelt} />",
@@ -79,13 +92,20 @@ describe("Studio insertion hub review boundaries", () => {
     );
   });
 
-  it("routes scene templates through their owned preview surface", () => {
+  it("applies scene recipes directly after their visual preview", () => {
     expect(contentSource).toContain('case "scene-template":');
-    expect(contentSource).toContain('toolBelt.setMenu("scene")');
-    expect(contentSource).toContain('useLabel: "장면 도구 열기"');
-    expect(contentSource).not.toContain(
+    expect(contentSource).toContain(
       "handlers.addSceneTemplate(item.source.value)",
     );
+    expect(contentSource).not.toContain('useLabel: "장면 도구 열기"');
+  });
+
+  it("removes the duplicate pre-result tab and review stack", () => {
+    expect(contentSource).not.toContain("StudioMenuSubtabs");
+    expect(contentSource).not.toContain("StudioInsertBatchPreflight");
+    expect(contentSource).not.toContain("StudioUnifiedAssetSmartLibrary");
+    expect(contentSource).not.toContain("StudioAssetLibraryCollections");
+    expect(workspaceSource).toContain("responsive-three-pane");
   });
 
   it("routes native semantic assets to their owned editor", () => {
@@ -101,5 +121,6 @@ describe("Studio insertion hub review boundaries", () => {
     expect(contentSource).toContain(
       "await toolBelt.stableHandlers.onPickImage(event)",
     );
+    expect(workspaceSource).toContain("reviewLocked");
   });
 });

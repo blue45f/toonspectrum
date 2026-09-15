@@ -191,13 +191,8 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
       });
       return ready ? readShell() : undefined;
     } : undefined,
-    readRescue: routeClass === "studio-navigation" ? async () => {
-      // A fully prepared Studio remains first. Otherwise prefer the prepared
-      // layered editor, keeping the small rescue for browsers without it.
-      const emergency = await readEmergencyDrawing();
-      if (emergency) return emergency;
-      return await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined;
-    } : undefined,
+    readRescue: routeClass === "studio-navigation" ? async () =>
+      await localDrawingRescueReady() ? cachedLocalDrawingRescue() : undefined : undefined,
     readShell,
     refreshShell: (response) => persist("precache", shellRequest(pathname), response),
     waitUntil: (promise) => event.waitUntil(promise),

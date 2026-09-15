@@ -42,11 +42,11 @@ export function MarketHomePage() {
   const hasLatestItems = latest.items.length > 0;
   const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
-  useDocumentTitle("리소스 마켓");
+  useDocumentTitle("소재 마켓");
   useMetaDescription(MARKET_HOME_DESCRIPTION);
   usePageSocialMeta({
     canonicalPath: "/market",
-    title: "리소스 마켓 · 툰스튜디오",
+    title: "소재 마켓 · 툰스튜디오",
     description: MARKET_HOME_DESCRIPTION,
   });
   useJsonLd(marketHomeJsonLd(latest.items));
@@ -79,7 +79,7 @@ export function MarketHomePage() {
                 웹툰의 한 컷을,<br />더 깊게 만드는 재료.
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
-                리소스 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.
+                소재 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.
               </p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-3">
                 템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
@@ -87,7 +87,7 @@ export function MarketHomePage() {
               <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
                 <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
                   <Store className="h-4 w-4" aria-hidden="true" />
-                  리소스 찾기
+                  소재 찾기
                 </Link>
                 <Link
                   href="/market/publish"
@@ -98,7 +98,7 @@ export function MarketHomePage() {
                   })}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
-                  리소스 배포하기
+                  소재 공유하기
                 </Link>
                 <Link
                   href="/studio?assetMarket=community&communityView=share"
@@ -108,7 +108,7 @@ export function MarketHomePage() {
                   Studio에서 공유
                 </Link>
                 <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
-                  현재 모든 리소스 무료
+                  현재 모든 소재 무료
                 </span>
               </div>
             </div>
@@ -125,7 +125,7 @@ export function MarketHomePage() {
               "선화·채색 도구는 브러시, 작품의 색감과 마감은 색·보정에서 찾습니다.",
               "미리보기에서 결과와 사용권을 확인한 뒤 Studio에서 시험하거나 내 리소스에 저장합니다.",
             ]}
-            actionLabel="전체 리소스 둘러보기"
+            actionLabel="전체 소재 둘러보기"
             actionHref="/market/browse"
           />
         </Container>
@@ -172,7 +172,7 @@ export function MarketHomePage() {
                     <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">{theme.subtitle}</p>
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-2.5 text-[0.7rem] font-medium text-fg-2">
-                    <span className="font-semibold text-accent">#{theme.tag} 리소스 찾기</span>
+                    <span className="font-semibold text-accent">#{theme.tag} 소재 찾기</span>
                     <span className="flex items-center gap-1 text-fg-3 transition-transform group-hover:translate-x-1">
                       보러가기 <ArrowRight className="size-3" aria-hidden="true" />
                     </span>

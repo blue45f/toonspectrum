@@ -108,6 +108,7 @@ import type {
 import type { StudioWriterRoomDocument } from "./studio-writer-room";
 import type { WorkDetail } from "@/infrastructure/creator-client";
 
+import { AppearanceTrigger } from "@/shared/components/appearance/AppearanceTrigger";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -164,9 +165,9 @@ const MENUBAR_HINTS = {
   assets: {
     id: "menubar-assets",
     title: "템플릿·에셋",
-    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 에셋 라이브러리를 엽니다.",
+    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 소재를 엽니다.",
     preview: "assets",
-    tip: "자주 쓰는 소재는 내 에셋에 모아 반복 작업 시간을 줄여보세요.",
+    tip: "자주 쓰는 소재는 내 소재에 모아 반복 작업 시간을 줄여보세요.",
   },
   bubbles: {
     id: "menubar-bubbles",
@@ -183,7 +184,7 @@ const MENUBAR_HINTS = {
   },
   download: {
     id: "menubar-download",
-    title: "현재 페이지 다운로드",
+    title: "다운로드",
     description: "현재 페이지를 선택한 배율과 이미지 형식으로 즉시 내보냅니다.",
     preview: "export",
     tip: "인쇄·후편집은 고배율, 빠른 검토 공유는 1×를 권장해요.",
@@ -1118,15 +1119,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   // Composite titles take a shipped translation when the pack has one and fall back to
   // the catalogue's own language otherwise (same escape hatch the Help group uses).
   const menuT = useT();
-  const compositeMenuLabel = (id: "insert"): string | undefined => {
+  const compositeMenuLabel = (id: "insert" | "create"): string | undefined => {
     const key = `studio.mainMenu.group.${id}.label`;
     const translated = menuT(key);
     return translated === key ? undefined : translated;
   };
   const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups, {
-    labels: { insert: compositeMenuLabel("insert") },
+    labels: {
+      insert: compositeMenuLabel("insert"),
+      create: compositeMenuLabel("create"),
+    },
   });
   const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
+  const actionStudioMainMenuGroups = mainMenuPresentation.actionGroups;
 
   // Unified search executes only explicitly reviewed rows, using the menu's own closure.
   // This is the first safe slice of the CommandRegistry strangler: no second implementation.
@@ -1295,7 +1300,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
         : "현재 저장 작업이 끝난 뒤 다시 시도하세요.",
     },
     publish: {
-      label: workId ? "수정 게시" : COMMAND_BAR_COMMAND_LABELS.publish,
+      label: workId ? "공개 수정" : COMMAND_BAR_COMMAND_LABELS.publish,
       labelKey: workId
         ? "studio.mainMenu.item.file.publish.has-work"
         : "studio.commandBar.command.publish",
@@ -1408,6 +1413,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
             {activePageLabel}
           </span>
+          <AppearanceTrigger scope="studio" showLabel className="shrink-0" />
           {displayLinkedTitleId ? (
             <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
               링크됨
@@ -1517,10 +1523,20 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
             // Immersive pill is content-width only — keep a real 4px gap so buttons never
-            // paint under each other (the old sticky canvas ring used to cover "초안 저장").
+            // paint under each other (the old sticky canvas ring used to cover "작업 저장").
             mobileImmersive && "min-w-0 gap-1"
           )}
         >
+          {!isMobile && actionStudioMainMenuGroups.length > 0 ? (
+            <Suspense fallback={null}>
+              <StudioMainMenu
+                groups={actionStudioMainMenuGroups}
+                ariaLabel={actionStudioMainMenuGroups[0]?.label ?? "AI 도우미"}
+                surface="action"
+                className={cn("shrink-0", mobileImmersive && "hidden")}
+              />
+            </Suspense>
+          ) : null}
           {isMobile ? (
             <StudioToolHintTarget
               hint={mobileImmersive ? MENUBAR_HINTS.immersiveExit : MENUBAR_HINTS.immersive}
@@ -1785,6 +1801,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                         : "개인 작업"}
                     </span>
                   </div>
+                  <AppearanceTrigger scope="studio" showLabel className="mt-2" />
                   <StudioProjectCenterSearch />
                 </div>
                 <StudioProjectCenterSection
@@ -2026,22 +2043,27 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <button
             type="button"
             data-project-keep-open
-            onClick={() => psdImportInputRef.current?.click()}
-            disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
+            onClick={() => {
+              if (psdImportBusy) { cancelInterchangeImport(); return; }
+              psdImportInputRef.current?.click();
+            }}
+            disabled={interchangeImportBusy || (collaborationDocumentLocked && !psdImportBusy)}
             className={cn(
               buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5" }),
-              (psdImportBusy || interchangeImportBusy) && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
+              interchangeImportBusy && "cursor-wait opacity-60",
+              psdImportBusy && "border-warn/30 bg-warn/10 text-warn",
+              collaborationDocumentLocked && !psdImportBusy && "cursor-not-allowed opacity-50"
             )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
+            title={psdImportBusy ? "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다." : collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
           >
-            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            PSD 가져오기
+            {psdImportBusy ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+            {psdImportBusy ? "PSD 검사 취소" : "PSD 가져오기"}
           </button>
           {psdImportStatus && (
             <span
+              role="status"
               className={cn(
-                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
+                "min-w-0 max-w-80 rounded-md border px-2 py-1 text-xs leading-relaxed wrap-anywhere",
                 psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
                 psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
               )}
@@ -2233,7 +2255,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <StudioToolHintTarget
               hint={{
                 ...MENUBAR_HINTS.publish,
-                title: workId ? "수정 게시" : "게시하기",
+                title: workId ? "공개 수정" : "게시하기",
               }}
               disabled={saving || collaborationDocumentLocked}
               unavailableReason={
@@ -2250,7 +2272,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 data-testid="studio-publish"
                 onClick={() => handleSave("published")}
                 disabled={saving || collaborationDocumentLocked}
-                aria-label={workId ? "수정 게시" : "게시하기"}
+                aria-label={workId ? "공개 수정" : "게시하기"}
                 className={cn(
                   buttonClass({
                     size: "sm",
@@ -2268,7 +2290,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   <Send size={14} className="hidden max-[429px]:block" aria-hidden />
                 )}
                 <span className="max-[429px]:sr-only">
-                  {workId ? "수정 게시" : "게시하기"}
+                  {workId ? "공개 수정" : "게시하기"}
                 </span>
               </button>
             </StudioToolHintTarget>

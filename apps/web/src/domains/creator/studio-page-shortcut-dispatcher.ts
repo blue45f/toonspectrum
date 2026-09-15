@@ -841,6 +841,15 @@ export function buildStudioShortcutHandler(
       } else if (editShortcut === "deselect") {
         e.preventDefault();
         deselectForEdit();
+      } else if (editShortcut === "duplicate-or-deselect") {
+        e.preventDefault();
+        const pixelSelectionOwnsChord = Boolean(pixelTool || pixelSel || quickMaskActive);
+        const hasElementSelection = marqueeIds.length > 0 || selectedId !== null;
+        if (pixelSelectionOwnsChord || !hasElementSelection) {
+          deselectForEdit();
+        } else if (!activeSurfaceReviewLocked) {
+          duplicateSelected();
+        }
       } else if (editShortcut === "invert-selection") {
         e.preventDefault();
         invertSelectionForEdit();

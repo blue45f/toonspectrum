@@ -13,14 +13,15 @@ import {
   STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
 } from "./studio-marketplace-runtime-compatibility";
 import {
-  findStudioOriginalFreeAsset,
-} from "./studio-original-free-asset-packs";
+  findStudioMarketplaceImageAsset,
+  type StudioMarketplaceImageAsset,
+} from "./studio-marketplace-assets";
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
 import { sha256HexPortable } from "./studio-sha256";
-import { findStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-catalog";
-import type { StudioCommunityImageAsset } from "./studio-community-marketplace-asset";
+import { studioMarketplaceCc0EntrySourceMatches } from "./studio-marketplace-cc0-provenance";
+import { resolveStudioMarketplaceCc0Entry } from "./studio-marketplace-cc0-assets";
 
 import type {
   StudioCreatorPackDefinition,
@@ -126,7 +127,7 @@ export type StudioCommunityPackProjection =
     }>;
 
 export interface StudioCommunityAssetProjection {
-  readonly assets: readonly StudioCommunityImageAsset[];
+  readonly assets: readonly StudioMarketplaceImageAsset[];
   readonly unsupportedCount: number;
   readonly reason: string | null;
 }
@@ -393,6 +394,18 @@ export function projectCreatorMarketplaceRecordToStudioPack(
       reason: "이 리소스의 릴리스 버전을 안전하게 해석할 수 없습니다.",
     };
   }
+  if (
+    record.kind === "3d-asset"
+    && !record.entries.every((entry) =>
+      resolveStudioMarketplaceCc0Entry(record, entry) !== null
+    )
+  ) {
+    return {
+      status: "unsupported",
+      pack: null,
+      reason: "검증된 CC0 3D 모델 참조와 원본 출처가 일치하지 않습니다.",
+    };
+  }
   const entries = record.entries.map((entry) => projectEntry(kind, entry));
   if (entries.some((entry) => entry === null)) {
     return {
@@ -487,12 +500,17 @@ export function projectCreatorMarketplaceRecordToAssets(
     };
   }
   // See the pack projection above: product calls never guess a missing runtime authority.
-  const assets: StudioCommunityImageAsset[] = [];
+  const assets: StudioMarketplaceImageAsset[] = [];
   let unsupportedCount = 0;
   for (const entry of record.entries) {
+    if (!studioMarketplaceCc0EntrySourceMatches(record, entry)) {
+      unsupportedCount += 1;
+      continue;
+    }
     const assetId = originalAssetIdFromEntry(entry);
-    const asset = assetId ? (findStudioOriginalFreeAsset(assetId) ?? findStudioMarketplaceCc0Asset(assetId)) : null;
-    if (!asset || asset.kind === "model") {
+    const asset = (assetId ? findStudioMarketplaceImageAsset(assetId) : null)
+      ?? resolveStudioMarketplaceCc0Entry(record, entry);
+    if (!asset) {
       unsupportedCount += 1;
       continue;
     }
@@ -503,7 +521,7 @@ export function projectCreatorMarketplaceRecordToAssets(
     unsupportedCount,
     reason: assets.length > 0
       ? null
-      : "현재 기기에 검증된 절차형 2D recipe가 없어 삽입할 수 없습니다.",
+      : "현재 기기에 검증된 2D 에셋 참조가 없어 삽입할 수 없습니다.",
   };
 }
 

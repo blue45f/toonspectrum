@@ -6,7 +6,12 @@ import { getRandomData } from "@toonspectrum/core/server";
 // a request cannot be served from precomputed CDN files.
 import type { PlatformId, ReadState, Title, TitleCard } from "@/shared/lib/types";
 
-import { detailShardFile, mergeDetailExtra, type DetailShardFile } from "@/shared/lib/catalog-slim";
+import {
+  detailShardFile,
+  mergeDetailExtra,
+  parseCatalogShardManifest,
+  type DetailShardFile,
+} from "@/shared/lib/catalog-slim";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "@/shared/lib/recommend";
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "@/shared/lib/search";
 import { getAuthorData } from "@/shared/lib/server/author";
@@ -26,19 +31,46 @@ const JSON_HEADERS = { "content-type": "application/json" };
 const NOT_FOUND = Symbol("not-found");
 
 let catalogPromise: Promise<void> | null = null;
+async function loadCatalogShards(origFetch: typeof fetch): Promise<TitleCard[]> {
+  const manifestResponse = await origFetch("/data/catalog/manifest.json", {
+    cache: "default",
+  });
+  if (!manifestResponse.ok) {
+    throw new Error(`catalog manifest ${manifestResponse.status}`);
+  }
+  const manifest = parseCatalogShardManifest(await manifestResponse.json());
+  const shards = await Promise.all(manifest.shards.map(async (descriptor) => {
+    const response = await origFetch(`/data/${descriptor.file}`, {
+      cache: "default",
+    });
+    if (!response.ok) {
+      throw new Error(`catalog shard ${descriptor.file} ${response.status}`);
+    }
+    const value: unknown = await response.json();
+    if (!Array.isArray(value) || value.length !== descriptor.count) {
+      throw new Error(`catalog shard ${descriptor.file} count mismatch`);
+    }
+    return value as TitleCard[];
+  }));
+  const titles = shards.flat();
+  if (titles.length !== manifest.count) {
+    throw new Error("catalog shard aggregate count mismatch");
+  }
+  return titles;
+}
+
 function ensureCatalog(origFetch: typeof fetch): Promise<void> {
   if (!catalogPromise) {
     // 표준 HTTP 캐시(max-age=600, ETag 재검증) 사용 — force-cache 는 스냅샷 갱신(신규 작품·
     // 영상화 등)을 재방문자에게 무기한 숨기므로 쓰지 않는다. 세션 내 1회만 로드(catalogPromise 메모).
-    // catalog.json 은 경량 카드(TitleCard — 축약 시놉시스, url/ratingDist 없음)를 싣는다.
-    // 상세 전용 필드는 /data/detail/<bucket>.json 샤드에서 필요할 때 병합(loadDetailExtra).
-    catalogPromise = origFetch("/data/catalog.json", { cache: "default" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`catalog.json ${r.status}`);
-        return r.json() as Promise<TitleCard[]>;
-      })
+    // manifest + 순서 보존 경량 카드 샤드는 Static Assets 개별 파일 제한을 피하면서 Worker를
+    // 실행하지 않는다. 상세 전용 필드는 /data/detail/<bucket>.json 샤드에서 필요할 때 병합한다.
+    catalogPromise = loadCatalogShards(origFetch)
       .then((titles) => {
-        replaceCatalogData(titles, { source: "database-snapshot", sourceVersion: "static-catalog" });
+        replaceCatalogData(titles, {
+          source: "database-snapshot",
+          sourceVersion: "static-catalog-shards-v1",
+        });
       })
       .catch((error) => {
         catalogPromise = null; // 다음 호출에서 재시도

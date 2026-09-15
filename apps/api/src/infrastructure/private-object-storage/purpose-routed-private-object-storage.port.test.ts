@@ -1,0 +1,279 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
+  locatePrivateObjectReference,
+  type PrivateObjectPurpose,
+  type PrivateObjectReference,
+} from "./private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "./private-object-storage.port";
+import type { PrivateObjectStorageWriteAdmission } from "./private-object-storage-write-admission";
+import {
+  PurposeRoutedPrivateObjectStoragePort,
+  type PrivateObjectStorageProviderId,
+} from "./purpose-routed-private-object-storage.port";
+
+const ALL_PURPOSES = ["source", "derived", "export"] as const;
+
+function reference(
+  purpose: PrivateObjectPurpose,
+): PrivateObjectReference {
+  const hash = purpose === "source"
+    ? "a".repeat(64)
+    : purpose === "derived"
+      ? "b".repeat(64)
+      : "c".repeat(64);
+  return {
+    contractVersion: PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
+    purpose,
+    digest: `sha256:${hash}`,
+    objectPath: `sha256/${hash.slice(0, 2)}/${hash}`,
+    byteLength: 3,
+    contentType: "image/png",
+  };
+}
+
+function createPort() {
+  const port = {
+    verifyPrivatePurposeBuckets: vi.fn(
+      async (_options = {}, purposes = ALL_PURPOSES) => ({
+        ready: true as const,
+        privatePurposeBuckets: new Set(purposes).size,
+      }),
+    ),
+    uploadImmutable: vi.fn(async (input) => reference(input.purpose)),
+    createSignedReadUrl: vi.fn(async () => ({
+      url: "https://download.example/signed",
+      expiresAtEpochMs: 1_800_000_060_000,
+    })),
+    deleteGeneratedObject: vi.fn(async () => undefined),
+  } satisfies PrivateObjectStoragePort;
+  return port;
+}
+
+const routing = {
+  source: "cloudflare-r2",
+  derived: "supabase",
+  export: "supabase",
+} as const;
+describe("purpose-routed private object storage", () => {
+  it("groups readiness checks by provider without probing unused buckets", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+    );
+
+    await expect(client.verifyPrivatePurposeBuckets()).resolves.toEqual({
+      ready: true,
+      privatePurposeBuckets: 3,
+    });
+    expect(r2.verifyPrivatePurposeBuckets).toHaveBeenCalledWith(
+      {},
+      ["source"],
+    );
+    expect(supabase.verifyPrivatePurposeBuckets).toHaveBeenCalledWith(
+      {},
+      ["derived", "export"],
+    );
+  });
+
+  it("routes object operations by purpose and preserves the provider-neutral contract", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+    );
+    const sourceUpload = {
+      purpose: "source" as const,
+      contentType: "image/png" as const,
+      bytes: new Uint8Array([1, 2, 3]),
+      controlMetadata: {
+        documentId: "work:1",
+        operationId: "upload:1",
+      },
+    };
+    const derived = reference("derived");
+
+    await expect(client.uploadImmutable(sourceUpload)).resolves.toEqual(
+      locatePrivateObjectReference("cloudflare-r2", reference("source")),
+    );
+    await client.createSignedReadUrl({
+      object: derived,
+      expiresInSeconds: 60,
+    });
+    await client.deleteGeneratedObject({ object: derived });
+
+    expect(r2.uploadImmutable).toHaveBeenCalledWith(sourceUpload, {});
+    expect(supabase.createSignedReadUrl).toHaveBeenCalledWith(
+      { object: derived, expiresInSeconds: 60 },
+      {},
+    );
+    expect(supabase.deleteGeneratedObject).toHaveBeenCalledWith(
+      { object: derived },
+      {},
+    );
+    expect(supabase.uploadImmutable).not.toHaveBeenCalled();
+  });
+
+
+  it("keeps reads and deletes pinned to the recorded provider after routing changes", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+    );
+    const historical = locatePrivateObjectReference(
+      "cloudflare-r2",
+      reference("derived"),
+    );
+
+    await client.createSignedReadUrl({
+      object: historical,
+      expiresInSeconds: 60,
+    });
+    await client.deleteGeneratedObject({ object: historical });
+
+    expect(r2.createSignedReadUrl).toHaveBeenCalledWith(
+      { object: reference("derived"), expiresInSeconds: 60 },
+      {},
+    );
+    expect(r2.deleteGeneratedObject).toHaveBeenCalledWith(
+      { object: reference("derived") },
+      {},
+    );
+    expect(supabase.createSignedReadUrl).not.toHaveBeenCalled();
+    expect(supabase.deleteGeneratedObject).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when a recorded historical provider is no longer configured", async () => {
+    const supabaseOnlyRouting = {
+      source: "supabase",
+      derived: "supabase",
+      export: "supabase",
+    } as const;
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      supabaseOnlyRouting,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["supabase", supabase],
+      ]),
+    );
+    const historical = locatePrivateObjectReference(
+      "cloudflare-r2",
+      reference("derived"),
+    );
+
+    await expect(client.createSignedReadUrl({
+      object: historical,
+      expiresInSeconds: 60,
+    })).rejects.toMatchObject({ code: "PROVIDER_NOT_CONFIGURED" });
+    expect(supabase.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it("runs write admission before sending bytes to the routed provider", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const admission: PrivateObjectStorageWriteAdmission = {
+      assertUploadAllowed: vi.fn(async () => undefined),
+    };
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+      admission,
+    );
+    const sourceUpload = {
+      purpose: "source" as const,
+      contentType: "image/png" as const,
+      bytes: new Uint8Array([1, 2, 3]),
+      controlMetadata: {
+        documentId: "work:1",
+        operationId: "upload:admission",
+      },
+    };
+
+    await client.uploadImmutable(sourceUpload);
+
+    expect(admission.assertUploadAllowed).toHaveBeenCalledWith(
+      "cloudflare-r2",
+      sourceUpload,
+    );
+    expect(r2.uploadImmutable).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call a provider when write admission rejects the upload", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const admission: PrivateObjectStorageWriteAdmission = {
+      assertUploadAllowed: vi.fn(async () => {
+        throw new Error("quota rejected");
+      }),
+    };
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+      admission,
+    );
+
+    await expect(client.uploadImmutable({
+      purpose: "derived",
+      contentType: "image/png",
+      bytes: new Uint8Array([1, 2, 3]),
+      controlMetadata: {
+        documentId: "work:1",
+        operationId: "upload:rejected",
+      },
+    })).rejects.toThrow("quota rejected");
+    expect(supabase.uploadImmutable).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when a routed provider is not configured", () => {
+    const r2 = createPort();
+    expect(
+      () => new PurposeRoutedPrivateObjectStoragePort(
+        routing,
+        new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+          ["cloudflare-r2", r2],
+        ]),
+      ),
+    ).toThrow(expect.objectContaining({
+      code: "PROVIDER_NOT_CONFIGURED",
+    }));
+  });
+
+  it("rejects empty readiness requests instead of reporting a false ready state", async () => {
+    const r2 = createPort();
+    const supabase = createPort();
+    const client = new PurposeRoutedPrivateObjectStoragePort(
+      routing,
+      new Map<PrivateObjectStorageProviderId, PrivateObjectStoragePort>([
+        ["cloudflare-r2", r2],
+        ["supabase", supabase],
+      ]),
+    );
+
+    await expect(
+      client.verifyPrivatePurposeBuckets({}, []),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    expect(r2.verifyPrivatePurposeBuckets).not.toHaveBeenCalled();
+    expect(supabase.verifyPrivatePurposeBuckets).not.toHaveBeenCalled();
+  });
+});

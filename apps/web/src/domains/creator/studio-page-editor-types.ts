@@ -48,6 +48,12 @@ export const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
 export type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
 
+export type StudioToolOperationMemoryController = ReturnType<
+  (typeof import("./studio-tool-operation-memory-sqlite"))[
+    "getProductStudioToolOperationMemoryController"
+  ]
+>;
+
 export type StudioLiveStrokeBackendAuditSession = {
   readonly coordinator: StudioLiveStrokeRenderBackendCoordinator;
   readonly epoch: number;

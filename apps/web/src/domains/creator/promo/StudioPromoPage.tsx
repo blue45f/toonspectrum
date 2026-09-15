@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { completeStudioServerText, getStudioServerAiStatus } from "../studio-server-ai-client";
+import { completeUserAiText } from "@/shared/ai/user-ai-transport";
+import { useUserAi } from "@/shared/ai/user-ai-store";
 
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
@@ -11,6 +12,7 @@ import { downloadPromoRemotion } from "./promo-downloads";
 import { downloadPromoBlob, importPromoPanel, promoRecorderMime, recordPromoVideo } from "./promo-media";
 import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoShotList, promoSrt, promoTimeline, promoVtt } from "./promo-model";
 import { PromoPanelEditor } from "./PromoPanelEditor";
+import { PromoPreflight } from "./PromoPreflight";
 import { PromoPreview } from "./PromoPreview";
 
 import type { PromoPanel, PromoProject } from "./promo-model";
@@ -18,17 +20,18 @@ import type { PromoPanel, PromoProject } from "./promo-model";
 import "./promo-studio.css";
 
 export function StudioPromoPage() {
+  const userAi = useUserAi();
+  const configured = Boolean(userAi.configuration.assignments.text);
+  const aiStatus = configured ? "내 API 키 연결됨" : "내 API 키 미설정 · 로컬 템플릿 사용 가능";
   const [project, setProject] = useState<PromoProject>(emptyPromoProject);
   const [undo, setUndo] = useState<PromoProject[]>([]);
   const [redo, setRedo] = useState<PromoProject[]>([]);
-  const [splitParts, setSplitParts] = useState(1);
+  const [splitParts, setSplitParts] = useState<number | "auto">(1);
   const [seekRequest, setSeekRequest] = useState<{ frame: number; token: number }>();
   const draft = usePromoDraft(project, setProject);
   const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record" | "poster">("idle");
   const [message, setMessage] = useState("컷을 추가하고 원하는 분위기를 골라보세요.");
   const [error, setError] = useState("");
-  const [configured, setConfigured] = useState(false);
-  const [aiStatus, setAiStatus] = useState("서버 AI 연결 확인 중");
   const [progress, setProgress] = useState(0);
   const [quality, setQuality] = useState<720 | 1080>(720);
   const operation = useRef<AbortController | null>(null);
@@ -37,13 +40,7 @@ export function StudioPromoPage() {
   const mime = promoRecorderMime();
   useEffect(() => {
     mounted.current = true;
-    const controller = new AbortController();
-    getStudioServerAiStatus(controller.signal).then((status) => {
-      if (controller.signal.aborted) return;
-      setConfigured(status.configured);
-      setAiStatus(status.configured ? "서버 AI 사용 가능 · 로그인 필요" : "서버 AI 미설정 · 로컬 템플릿 사용 가능");
-    }).catch(() => { if (!controller.signal.aborted) setAiStatus("AI 연결 확인 실패 · 로컬 템플릿 사용 가능"); });
-    return () => { mounted.current = false; controller.abort(); operation.current?.abort(); };
+    return () => { mounted.current = false; operation.current?.abort(); };
   }, []);
   useEffect(() => {
     if (!project.panels.length) return;
@@ -82,7 +79,7 @@ export function StudioPromoPage() {
     const controller = start("import");
     if (!controller) return;
     try {
-      if (project.panels.length + files.length * splitParts > PROMO_MAX_PANELS) throw new Error(`최대 ${PROMO_MAX_PANELS}컷까지 추가할 수 있어요.`);
+      if (project.panels.length + files.length * (splitParts === "auto" ? 1 : splitParts) > PROMO_MAX_PANELS) throw new Error(`최대 ${PROMO_MAX_PANELS}컷까지 추가할 수 있어요.`);
       const panels: PromoPanel[] = [];
       for (const file of Array.from(files).sort((a, b) => a.name.localeCompare(b.name, "ko", { numeric: true }))) panels.push(...await importPromoPanels(file, project.panels.length + panels.length, splitParts, controller.signal));
       if (!controller.signal.aborted) { patch({ panels: [...project.panels, ...panels] }); setMessage(`${panels.length}컷을 추가했어요. 컷 설명을 입력하면 AI가 더 정확하게 구성할 수 있어요.`); }
@@ -139,12 +136,11 @@ export function StudioPromoPage() {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     try {
       const prompt = promoAiPrompt(project);
-      const result = await completeStudioServerText({ task: "composition", promptVersion: 1, ...prompt, operationId: `promo-${crypto.randomUUID()}` }, controller.signal);
+      const content = await completeUserAiText(prompt.system, prompt.user, controller.signal);
       if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
-      if (!result.ok) throw new Error(result.error);
-      const panels = parsePromoAiPlan(result.data.content, project);
+      const panels = parsePromoAiPlan(content, project);
       patch({ panels });
-      setMessage(`AI 구성 적용 · ${result.data.provider} / ${result.data.model}. 컷 설명 기반 제안이며 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.`);
+      setMessage("내 API 키의 텍스트 AI 구성 적용 · 원본 이미지는 전송하지 않았어요. 공개 전 자막과 순서를 검토해 주세요.");
     } catch (reason) { failed(reason, controller.signal); } finally { clearTimeout(timeout); finish(controller); }
   };
   const exportVideo = async () => {
@@ -176,7 +172,6 @@ export function StudioPromoPage() {
         <span className="promo-badge">15 / 30 / 60초</span>
       </header>
       <p className="promo-draft-status" role="status">{draft.status}</p>
-      <nav className="promo-button-row" aria-label="확장 제작실"><a href="/studio/ai-lab">실제 프레임을 생성하는 AI 애니메이션 제작실 →</a><a href="/read/spatial">공간형 웹툰 감상 →</a></nav>
       <div className="promo-workspace">
         <div className="promo-editing">
           <fieldset className="promo-card" disabled={busy}>
@@ -193,19 +188,19 @@ export function StudioPromoPage() {
           <PromoDirectorControls project={project} disabled={busy} onApply={(next) => { apply(next); setError(""); setMessage("연출 프리셋을 적용했어요. 컷별 카메라·자막·효과를 추가로 조절할 수 있어요."); }} onPatch={patch} />
           <section className="promo-card" aria-labelledby="promo-cuts-title">
             <div className="promo-section-head"><h2 id="promo-cuts-title">02 · 컷과 장면 구성</h2><span>{project.panels.length} / {PROMO_MAX_PANELS}컷</span></div>
-            <label htmlFor="promo-split">세로 원고 분할<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(Number(event.target.value))}>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? "파일 1개 = 컷 1개" : `파일마다 세로 ${parts}등분`}</option>)}</select></label>
+            <label htmlFor="promo-split">세로 원고 분할<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(event.target.value === "auto" ? "auto" : Number(event.target.value))}><option value="auto">흰 여백 자동 감지 · 원본 보존</option>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? "파일 1개 = 컷 1개" : `파일마다 세로 ${parts}등분`}</option>)}</select></label>
             <label htmlFor="promo-panels" className="promo-upload-label">웹툰 컷 추가 · PNG, JPEG, WebP · 컷당 10MB 이하</label>
             <input id="promo-panels" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onChange={(event) => { void uploadPanels(event.target.files); event.target.value = ""; }} />
-            <p className="promo-muted">긴 원고는 선택한 개수로 균등 분할한 다음 컷별 최대 2048px로 정리합니다. 자동 칸 검출은 아니므로 말풍선 경계를 확인하세요. 파일명 숫자 순으로 추가하며 원본 파일은 수정하지 않습니다.</p>
+            <p className="promo-muted">자동 감지는 가로로 이어진 흰색·투명 여백을 기준으로 분할합니다. 경계가 불확실하면 원고를 한 컷으로 유지합니다. 균등 분할도 선택할 수 있으며 말풍선 경계는 직접 확인하세요. 원본 파일은 수정하지 않습니다.</p>
             <div className="promo-button-row">
               <button type="button" className="promo-primary" disabled={busy || !configured || !project.panels.length} onClick={() => void generate()}>AI로 홍보 콘티 구성</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => { patch({ panels: localPromoPlan(project) }); setMessage("로컬 연출 템플릿을 적용했어요. AI 생성 결과가 아니며 네트워크 요청 없이 동작해요."); }}>로컬 연출 템플릿</button>
               <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
               <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
-            <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 서버의 기존 사용량 제한이 적용됩니다.</p>
+            <p className="promo-muted">{aiStatus}. AI에는 제목·줄거리·컷 설명·자막만 전송합니다. 요청 비용은 연결한 API 키 소유자에게 청구되며 운영측 유료 AI로 자동 전환하지 않습니다.</p>
             {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
-            <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
+            <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeekFrame={(frame) => setSeekRequest({ frame, token: Date.now() })} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
               if (project.panels.length >= PROMO_MAX_PANELS) return;
               const panels = [...project.panels]; panels.splice(index + 1, 0, { ...scene.panel, id: crypto.randomUUID() }); patch({ panels });
             }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
@@ -228,6 +223,7 @@ export function StudioPromoPage() {
         </div>
         <aside className="promo-output">
           <PromoPreview project={project} disabled={busy} seekRequest={seekRequest} />
+          <PromoPreflight project={project} disabled={busy} onSeek={(frame) => setSeekRequest({ frame, token: Date.now() })} />
           <section className="promo-card" aria-labelledby="promo-export-title">
             <h2 id="promo-export-title">04 · 내보내기</h2>
             <label htmlFor="promo-quality">브라우저 영상 해상도<select id="promo-quality" value={quality} disabled={busy} onChange={(event) => setQuality(Number(event.target.value) as 720 | 1080)}><option value={720}>720p · 빠른 저장</option><option value={1080}>1080p · 높은 해상도</option></select></label>

@@ -34,6 +34,25 @@ import {
   type StudioLiveDirectPort,
 } from "./studio-live-direct-port";
 import { bindStudioLiveP2pChannelLifecycle } from "./studio-live-p2p-channel-lifecycle";
+import {
+  createStudioPeerBulkExchange,
+  type StudioPeerBulkExchangePort,
+} from "./studio-peer-bulk-exchange";
+import {
+  createStudioPeerFabric,
+  type StudioPeerFabricLinkPort,
+  type StudioPeerFabricPeer,
+  type StudioPeerFabricPort,
+} from "./studio-peer-fabric";
+import {
+  STUDIO_PEER_CAPABILITIES,
+  STUDIO_PEER_FABRIC_WIRE,
+  STUDIO_PEER_VIEWER_SAFE_CAPABILITIES,
+  isStudioPeerCapability,
+  parseStudioPeerFabricPacket,
+  type StudioPeerCapability,
+  type StudioPeerTrafficClass,
+} from "./studio-peer-fabric-protocol";
 
 import type {
   StudioLiveTransport,
@@ -62,6 +81,12 @@ export const STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS = 480;
 export const STUDIO_LIVE_P2P_INK_INBOUND_MAX_BYTES = 4 * 1024 * 1024;
 
 const STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES = 8;
+const STUDIO_LIVE_P2P_MAX_ADVERTISED_PEER_CAPABILITIES = 32;
+const STUDIO_LIVE_P2P_FABRIC_BUFFER_LIMITS = Object.freeze({
+  control: 128 * 1024,
+  realtime: 96 * 1024,
+  bulk: 512 * 1024,
+} satisfies Readonly<Record<StudioPeerTrafficClass, number>>);
 const STUDIO_LIVE_P2P_MAX_LANE_NAME_LENGTH = 64;
 const STUDIO_LIVE_P2P_NO_BINARY_LANES: readonly string[] = Object.freeze([]);
 const STUDIO_LIVE_P2P_RELIABLE_INK_LANES: readonly string[] = Object.freeze([STUDIO_LIVE_INK_CAPABILITY]);
@@ -128,6 +153,7 @@ export interface StudioLiveP2pOverlayOptions {
   readonly createPeerConnection?: StudioLiveP2pPeerConnectionFactory;
   readonly now?: () => number;
   readonly maxPeers?: number;
+  readonly peerCapabilities?: readonly StudioPeerCapability[];
 }
 
 function firstNonNullCrdtSyncResponse(
@@ -182,7 +208,9 @@ interface StudioLiveP2pPeerLink {
   pendingIce: RTCIceCandidateInit[];
   /** Binary lanes this peer announced over its channel; empty until a caps message arrives. */
   peerBinaryLanes: readonly string[];
-  /** True once our own lane announcement reached this peer's channel. */
+  /** Capability-scoped feature lanes advertised by this authenticated peer. */
+  peerCapabilities: readonly StudioPeerCapability[];
+  /** True once our own capability announcement reached this peer's channel. */
   announcedBinaryLanes: boolean;
   inkInboundWindow: StudioLiveP2pInkInboundWindow | null;
   directInboundWindow?: { startedAt: number; count: number; bytes: number };
@@ -195,20 +223,35 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseStudioLiveP2pCapsMessage(value: unknown): readonly string[] | null {
+interface StudioLiveP2pCapsMessage {
+  readonly binaryLanes: readonly string[];
+  readonly peerCapabilities: readonly StudioPeerCapability[];
+}
+
+function parseStudioLiveP2pCapsMessage(value: unknown): StudioLiveP2pCapsMessage | null {
   if (!isPlainRecord(value) || value.wire !== STUDIO_LIVE_P2P_CAPS_WIRE) return null;
   const lanes = value.binaryLanes;
-  if (!Array.isArray(lanes) || lanes.length > STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES) return null;
-  const parsed: string[] = [];
+  const capabilities = value.peerCapabilities ?? [];
+  if (
+    !Array.isArray(lanes)
+    || lanes.length > STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES
+    || !Array.isArray(capabilities)
+    || capabilities.length > STUDIO_LIVE_P2P_MAX_ADVERTISED_PEER_CAPABILITIES
+  ) return null;
+  const parsedLanes: string[] = [];
   for (const lane of lanes) {
     if (
       typeof lane !== "string"
       || lane.length === 0
       || lane.length > STUDIO_LIVE_P2P_MAX_LANE_NAME_LENGTH
     ) return null;
-    parsed.push(lane);
+    parsedLanes.push(lane);
   }
-  return Object.freeze(parsed);
+  if (!capabilities.every(isStudioPeerCapability)) return null;
+  return {
+    binaryLanes: Object.freeze(parsedLanes),
+    peerCapabilities: Object.freeze([...new Set(capabilities)]),
+  };
 }
 
 /**
@@ -273,7 +316,10 @@ function decodeStudioLiveP2pInkFrame(data: ArrayBuffer): Record<string, unknown>
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   readonly direct: StudioLiveDirectPort;
+  readonly peerFabric: StudioPeerFabricPort;
+  readonly peerBulk: StudioPeerBulkExchangePort;
   private readonly directListeners = new Set<(sender: StudioLiveParticipant, payload: string) => void>();
+  private readonly fabricListeners = new Set<(sender: StudioPeerFabricPeer, payload: string) => void>();
   readonly mode: StudioLiveTransport["mode"];
   readonly crdtFanout: NonNullable<StudioLiveTransport["crdtFanout"]>;
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
@@ -283,6 +329,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly createPeerConnection: StudioLiveP2pPeerConnectionFactory;
   private readonly now: () => number;
   private readonly maxPeers: number;
+  private readonly localPeerCapabilities: readonly StudioPeerCapability[];
   private readonly knownPeerSessionIds = new Set<string>();
   private readonly peers = new Map<string, StudioLiveP2pPeerLink>();
   private readonly listeners = new Set<(value: unknown) => void>();
@@ -307,6 +354,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     createPeerConnection: StudioLiveP2pPeerConnectionFactory,
     now: () => number,
     maxPeers: number,
+    peerCapabilities: readonly StudioPeerCapability[],
   ) {
     this.direct = {
       getPeers: () => !this.closed && this.ready
@@ -334,8 +382,26 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.createPeerConnection = createPeerConnection;
     this.now = now;
     this.maxPeers = maxPeers;
+    this.localPeerCapabilities = Object.freeze([
+      ...new Set(peerCapabilities.filter(isStudioPeerCapability)),
+    ]);
     this.canonicalSessionId = primary.canonicalSessionId?.bind(primary);
     this.transportSessionId = primary.transportSessionId?.bind(primary);
+    const fabricLink: StudioPeerFabricLinkPort = {
+      getPeers: () => this.fabricPeers(),
+      send: (targetSessionId, payload, trafficClass) =>
+        this.sendFabricRaw(targetSessionId, payload, trafficClass),
+      subscribe: (listener) => {
+        if (this.closed) return () => undefined;
+        this.fabricListeners.add(listener);
+        return () => { this.fabricListeners.delete(listener); };
+      },
+    };
+    this.peerFabric = createStudioPeerFabric(fabricLink, {
+      capabilities: this.localPeerCapabilities,
+      now: this.now,
+    });
+    this.peerBulk = createStudioPeerBulkExchange(this.peerFabric, { now: this.now });
   }
 
   get ready(): boolean {
@@ -527,7 +593,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.peerBulk.close();
+    this.peerFabric.close();
     this.directListeners.clear();
+    this.fabricListeners.clear();
     this.unsubscribePrimary?.();
     this.unsubscribePrimary = null;
     for (const pending of this.pendingCrdtSync.values()) {
@@ -860,12 +929,16 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     const lanes = this.usesPeerInkLane()
       ? (this.isReliableMeshLink(link) ? STUDIO_LIVE_P2P_RELIABLE_INK_LANES : STUDIO_LIVE_P2P_NO_BINARY_LANES)
       : this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
-    if (lanes.length === 0) return;
+    if (lanes.length === 0 && this.localPeerCapabilities.length === 0) return;
     // Set before send: a synchronous adapter can answer during send, otherwise recursing forever.
     link.announcedBinaryLanes = true;
     if (!this.sendSerializedToPeer(
       link,
-      JSON.stringify({ wire: STUDIO_LIVE_P2P_CAPS_WIRE, binaryLanes: [...lanes] }),
+      JSON.stringify({
+        wire: STUDIO_LIVE_P2P_CAPS_WIRE,
+        binaryLanes: [...lanes],
+        peerCapabilities: [...this.localPeerCapabilities],
+      }),
     )) link.announcedBinaryLanes = false;
   }
 
@@ -957,6 +1030,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       remoteDescriptionSet: false,
       pendingIce: [],
       peerBinaryLanes: STUDIO_LIVE_P2P_NO_BINARY_LANES,
+      peerCapabilities: Object.freeze([]),
       announcedBinaryLanes: false,
       inkInboundWindow: null,
       closed: false,
@@ -1055,6 +1129,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       resetNegotiation: () => {
         link.announcedBinaryLanes = false;
         link.peerBinaryLanes = STUDIO_LIVE_P2P_NO_BINARY_LANES;
+        link.peerCapabilities = Object.freeze([]);
         link.inkInboundWindow = null;
       },
       onOpen: () => {
@@ -1084,6 +1159,93 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
         }
       }
     });
+  }
+
+  private capabilityRoleAllowed(
+    peer: StudioLiveP2pPeerLink,
+    capability: StudioPeerCapability,
+  ): boolean {
+    return (
+      this.context.participant.role !== "viewer"
+      && peer.participant.role !== "viewer"
+    ) || STUDIO_PEER_VIEWER_SAFE_CAPABILITIES.has(capability);
+  }
+
+  private fabricCapabilitiesForPeer(
+    peer: StudioLiveP2pPeerLink,
+  ): readonly StudioPeerCapability[] {
+    if (
+      !this.ready
+      || !this.knownPeerSessionIds.has(peer.sessionId)
+      || !this.isReliableMeshLink(peer)
+    ) return [];
+    return peer.peerCapabilities.filter(
+      (capability) =>
+        this.localPeerCapabilities.includes(capability)
+        && this.capabilityRoleAllowed(peer, capability),
+    );
+  }
+
+  private fabricPeers(): readonly StudioPeerFabricPeer[] {
+    if (this.closed || !this.ready) return [];
+    return [...this.peers.values()].flatMap((peer) => {
+      const capabilities = this.fabricCapabilitiesForPeer(peer);
+      return capabilities.length > 0
+        ? [{ ...peer.participant, capabilities: Object.freeze([...capabilities]) }]
+        : [];
+    });
+  }
+
+  private sendFabricRaw(
+    targetSessionId: string,
+    raw: string,
+    trafficClass: StudioPeerTrafficClass,
+  ): boolean {
+    if (this.closed || !this.ready) return false;
+    let candidate: unknown;
+    try {
+      candidate = JSON.parse(raw) as unknown;
+    } catch {
+      return false;
+    }
+    const packet = parseStudioPeerFabricPacket(candidate, { now: this.now() });
+    if (
+      !packet
+      || packet.trafficClass !== trafficClass
+      || !this.localPeerCapabilities.includes(packet.capability)
+    ) return false;
+    const peer = this.peers.get(targetSessionId);
+    if (
+      !peer
+      || !this.fabricCapabilitiesForPeer(peer).includes(packet.capability)
+      || !this.channelCanCarry(
+        peer,
+        studioLiveUtf8ByteLength(raw),
+        STUDIO_LIVE_P2P_FABRIC_BUFFER_LIMITS[trafficClass],
+      )
+    ) return false;
+    return this.sendSerializedToPeer(peer, raw);
+  }
+
+  private receiveFabric(
+    link: StudioLiveP2pPeerLink,
+    raw: string,
+    candidate: unknown,
+  ): void {
+    const packet = parseStudioPeerFabricPacket(candidate, { now: this.now() });
+    const capabilities = this.fabricCapabilitiesForPeer(link);
+    if (
+      !packet
+      || !capabilities.includes(packet.capability)
+      || studioLiveUtf8ByteLength(raw) > STUDIO_DIRECT_MAX_BYTES
+    ) return;
+    const sender: StudioPeerFabricPeer = {
+      ...link.participant,
+      capabilities: Object.freeze([...capabilities]),
+    };
+    for (const listener of this.fabricListeners) {
+      try { listener(sender, raw); } catch { /* Isolate feature observers. */ }
+    }
   }
 
   private directPeerReady(peer: StudioLiveP2pPeerLink): boolean {
@@ -1119,13 +1281,18 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     } catch {
       return;
     }
+    if (isPlainRecord(parsed) && parsed.wire === STUDIO_PEER_FABRIC_WIRE) {
+      this.receiveFabric(link, data, parsed);
+      return;
+    }
     if (isPlainRecord(parsed) && parsed.wire === STUDIO_DIRECT_WIRE) {
       this.receiveDirect(link, parsed, studioLiveUtf8ByteLength(data));
       return;
     }
-    const peerLanes = parseStudioLiveP2pCapsMessage(parsed);
-    if (peerLanes) {
-      link.peerBinaryLanes = peerLanes;
+    const peerCaps = parseStudioLiveP2pCapsMessage(parsed);
+    if (peerCaps) {
+      link.peerBinaryLanes = peerCaps.binaryLanes;
+      link.peerCapabilities = peerCaps.peerCapabilities;
       // Announcements can race the channel opening (the offerer's greeting may fire while the
       // answerer is still connecting). Answer a peer's caps so the exchange always converges.
       this.announceMeshBinaryLanes(link);
@@ -1289,6 +1456,7 @@ export function applyStudioLiveP2pOverlay(
       createPeerConnection,
       options.now ?? Date.now,
       options.maxPeers ?? STUDIO_LIVE_P2P_MAX_PEERS,
+      options.peerCapabilities ?? STUDIO_PEER_CAPABILITIES,
     );
   };
 }

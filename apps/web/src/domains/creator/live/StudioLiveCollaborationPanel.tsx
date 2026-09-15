@@ -41,6 +41,10 @@ import {
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
 import {
+  createStudioPeerScreenSignalingRoom,
+  type StudioPeerScreenSignalingRoom,
+} from "./studio-peer-screen-signaling-room";
+import {
   presentStudioLiveCursorQuality,
   type StudioLiveCursorQualitySnapshot,
 } from "./studio-live-cursor-quality";
@@ -1015,6 +1019,7 @@ export function StudioLiveCollaborationPanel({
     const room = live.room;
     let cancelled = false;
     let screenController: StudioScreenShareController | null = null;
+    let peerScreenRoom: StudioPeerScreenSignalingRoom | null = null;
     let unsubscribeRoom: () => void = () => undefined;
     let unsubscribeScreen: () => void = () => undefined;
     setBusyAction(null);
@@ -1028,8 +1033,13 @@ export function StudioLiveCollaborationPanel({
     if (!room) return;
 
     const attachController = (): StudioScreenShareController => {
+      const peerFabric = room.peerFabric;
+      const screenRoom = peerFabric
+        ? createStudioPeerScreenSignalingRoom(room, peerFabric, room.workId)
+        : room;
+      if ("closePeerSignaling" in screenRoom) peerScreenRoom = screenRoom;
       const controller = new StudioScreenShareController(
-        room,
+        screenRoom,
         live.mode === "server"
           ? {
               createPeerConnection: () => {
@@ -1044,7 +1054,7 @@ export function StudioLiveCollaborationPanel({
       );
       screenController = controller;
       screenControllerRef.current = controller;
-      unsubscribeRoom = room.subscribe((event) => {
+      unsubscribeRoom = screenRoom.subscribe((event) => {
         if (cancelled || event.type !== "transport-status" || event.status.recoverable) return;
         // The room outlives this panel, but a terminal ACL revocation must still stop every capture
         // track and P2P connection immediately.
@@ -1080,6 +1090,8 @@ export function StudioLiveCollaborationPanel({
       unsubscribeScreen();
       unsubscribeRoom();
       screenController?.close();
+      peerScreenRoom?.closePeerSignaling();
+      peerScreenRoom = null;
       const iceEntry = screenIceSessionRef.current;
       if (iceEntry && iceEntry.controller === screenController) {
         iceEntry.unsubscribe();

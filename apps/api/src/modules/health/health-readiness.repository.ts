@@ -41,10 +41,16 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_asset_report",
   "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_storage_replica",
   "creator_asset_upload_session",
   "creator_campaign",
   "creator_challenge",
+  "creator_collab_application",
+  "creator_collab_bookmark",
+  "creator_collab_post",
+  "creator_collab_report",
   "creator_draft_collaboration_room",
+  "creator_external_publication",
   "creator_follow",
   "creator_marketplace_draft",
   "creator_marketplace_draft_revision",
@@ -58,12 +64,19 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_marketplace_resource",
   "creator_marketplace_resource_report",
   "creator_marketplace_resource_report_gate",
+  "creator_portfolio_entry",
   "creator_profile",
+  "creator_promotion_bookmark",
+  "creator_promotion_comment",
+  "creator_promotion_post",
+  "creator_promotion_report",
   "creator_series",
+  "creator_studio_personal_kit",
   "creator_work",
   "creator_work_asset",
   "creator_work_asset_storage_reference",
   "creator_work_asset_tombstone",
+  "creator_work_bookmark",
   "creator_work_catalog_asset_binding",
   "creator_work_collaboration_event",
   "creator_work_collaborator",
@@ -76,7 +89,14 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_work_like",
   "creator_work_live_lock",
   "creator_work_live_lock_clock",
+  "creator_work_production_workspace",
+  "creator_work_publication",
   "creator_work_raster_asset",
+  "creator_work_release",
+  "creator_work_release_approval",
+  "creator_work_report",
+  "creator_work_review_feedback",
+  "creator_work_review_link",
   "creator_work_revision",
   "creator_work_team_comment_activity",
   "creator_work_team_comment_message",
@@ -89,6 +109,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "feedback_reply",
   "feedback_vote",
   "monetization_plan",
+  "personal_cloud_connection",
   "rating",
   "read",
   "revenue_ledger",
@@ -131,6 +152,7 @@ export const REQUIRED_DATABASE_MIGRATIONS = [
   "0032_creator_marketplace_release_lifecycle",
   "0033_creator_marketplace_cloud_library",
   "0034_creator_marketplace_package_moderation",
+  "0051_personal_cloud_connections",
 ] as const;
 
 interface DatabasePingRow {
@@ -147,6 +169,7 @@ interface SchemaCatalogRow {
   authAccountConstraintsReady: boolean;
   authAccountUserIndexReady: boolean;
   authRuntimeDmlReady: boolean;
+  personalCloudConnectionAclReady: boolean;
   marketplaceResourceAclReady: boolean;
   marketplaceResourceLifecycleTriggerReady: boolean;
   marketplaceResourceTimestampPrecisionReady: boolean;
@@ -448,6 +471,11 @@ export class PostgresHealthReadinessRepository
                 'public.account',
                 'SELECT, INSERT, UPDATE, DELETE'
               ) AS "authRuntimeDmlReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.personal_cloud_connection',
+              'SELECT, INSERT, UPDATE, DELETE'
+            ) AS "personalCloudConnectionAclReady",
             NOT EXISTS (
               SELECT 1
               FROM (VALUES
@@ -1527,6 +1555,7 @@ export class PostgresHealthReadinessRepository
       state.authAccountConstraintsReady !== true ||
       state.authAccountUserIndexReady !== true ||
       state.authRuntimeDmlReady !== true ||
+      state.personalCloudConnectionAclReady !== true ||
       state.marketplaceResourceAclReady !== true ||
       state.marketplaceResourceLifecycleTriggerReady !== true ||
       state.marketplaceResourceTimestampPrecisionReady !== true ||

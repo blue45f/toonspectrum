@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BRUSH_STUDIO_V6_RECIPES, createBrushStudioV6Program, patchBrushStudioV6Tuning } from "./brush-studio-v6-engine";
-import { brushStudioV6MaterialActiveTuningKeys, brushStudioV6MaterialMarksToSvg, createBrushStudioV6MaterialStroke, isBrushStudioV6MaterialNodeImplemented, mapBrushStudioV6Pressure, mixBrushStudioV6MaterialColors, normalizeBrushStudioV6MaterialConfig, renderBrushStudioV6MaterialMarks, sampleBrushStudioV6PaperContact, type BrushStudioV6MaterialMark, type BrushStudioV6MaterialPoint } from "./brush-studio-v6-material-engine";
+import { brushStudioV6MaterialActiveTuningKeys, brushStudioV6MaterialMarksToSvg, brushStudioV6MaterialNodeExecution, createBrushStudioV6MaterialStroke, isBrushStudioV6MaterialNodeImplemented, mapBrushStudioV6Pressure, mixBrushStudioV6MaterialColors, normalizeBrushStudioV6MaterialConfig, renderBrushStudioV6MaterialMarks, sampleBrushStudioV6PaperContact, type BrushStudioV6MaterialMark, type BrushStudioV6MaterialPoint } from "./brush-studio-v6-material-engine";
 
 const line = (steps: number, length = 180): BrushStudioV6MaterialPoint[] => Array.from({ length: steps + 1 }, (_, index) => ({ x: index * length / steps, y: 30, pressure: 0.65, tilt: 0.3, twist: 20 }));
 function paint(id: string, points: readonly BrushStudioV6MaterialPoint[]): readonly BrushStudioV6MaterialMark[] {
@@ -262,4 +262,55 @@ describe("portable V6 material contacts", () => {
     expect(brushStudioV6MaterialMarksToSvg([mark])).toContain(`fill="${mark.color}"`);
     expect(brushStudioV6MaterialMarksToSvg([mark])).toContain('<ellipse');
   });
+  it("renders Mixbox through the selected provider without spectral substitution", () => {
+    const mixbox = createBrushStudioV6Program("mixbox-watercolor-bloom");
+    const spectral = {
+      ...mixbox,
+      slots: { ...mixbox.slots, pigment: "pigment-spectral" },
+    };
+    const render = (program: typeof mixbox) => {
+      const stroke = createBrushStudioV6MaterialStroke(program);
+      return line(30).flatMap((point) => stroke.push(point));
+    };
+    const mixboxMarks = render(mixbox);
+    const spectralMarks = render(spectral);
+    expect(mixboxMarks.length).toBe(spectralMarks.length);
+    expect(mixboxMarks.map((mark) => mark.color)).not.toEqual(
+      spectralMarks.map((mark) => mark.color),
+    );
+    expect(brushStudioV6MaterialNodeExecution("pigment-mixbox")).toBe("native");
+  });
+
+  it("keeps GPL-derived selections explicit as compatibility adapters", () => {
+    expect(brushStudioV6MaterialNodeExecution("carrier-krita-hairy")).toBe("adapter");
+    expect(brushStudioV6MaterialNodeExecution("tip-krita-dual")).toBe("adapter");
+    expect(brushStudioV6MaterialNodeExecution("pickup-krita-smudge")).toBe("adapter");
+    expect(brushStudioV6MaterialNodeExecution("future-krita-node")).toBe("unavailable");
+  });
+
+  it("applies deterministic dual-tip and stroke-local smudge adapters", () => {
+    const dual = createBrushStudioV6Program("mixbox-pastel-smudge");
+    const single = {
+      ...dual,
+      slots: { ...dual.slots, tip: "tip-grain-exemplar" },
+    };
+    const render = (program: typeof dual) => {
+      const stroke = createBrushStudioV6MaterialStroke(program);
+      return line(24).flatMap((point) => stroke.push(point));
+    };
+    const dualMarks = render(dual);
+    const singleMarks = render(single);
+    const legacyStroke = createBrushStudioV6MaterialStroke({ ...dual, version: 1 });
+    const legacyMarks = line(24).flatMap((point) => legacyStroke.push(point));
+    expect(dualMarks.length).toBeGreaterThan(singleMarks.length);
+    expect(dualMarks.length).toBeGreaterThan(legacyMarks.length);
+    expect(render(dual)).toEqual(dualMarks);
+    const noSmudge = render({
+      ...dual,
+      slots: { ...dual.slots, pickup: "pickup-none" },
+    });
+    expect(dualMarks.map((mark) => [mark.color, mark.secondaryMix]))
+      .not.toEqual(noSmudge.map((mark) => [mark.color, mark.secondaryMix]));
+  });
+
 });

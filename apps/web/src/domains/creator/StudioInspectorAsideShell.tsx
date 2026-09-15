@@ -381,6 +381,7 @@ export function StudioInspectorAsideShell({
                     : undefined
             }
             layerCount={elements.length}
+            layersIntegrated={layersSplitWithProperties}
             mobileSheetHandle={
               <StudioMobileSheetHandle
                 active={isMobile && mobileSheet === "props"}
@@ -690,7 +691,7 @@ export function StudioInspectorAsideShell({
               </div>
             </div>
 
-            {/* CSP Sub View (서브 뷰 팔레트) */}
+            {/* 참고 이미지 창 (CSP Sub View 호환) */}
             <div className="mt-3">
               <StudioSubViewPanel onPickColor={(hex) => setColor(hex)} />
             </div>

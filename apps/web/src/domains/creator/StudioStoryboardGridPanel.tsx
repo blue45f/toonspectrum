@@ -605,7 +605,7 @@ export function StudioStoryboardGridPanel({
                 value={reviewFilter}
                 onChange={(event) => setReviewFilter(event.target.value as StoryboardControlFilter)}
                 aria-label="스토리보드 상태 필터"
-                className="min-h-9 bg-transparent text-xs font-semibold text-fg outline-none"
+                className="min-h-11 bg-transparent text-xs font-semibold text-fg outline-none"
               >
                 {STORYBOARD_CONTROL_FILTERS.map((filter) => (
                   <option key={filter} value={filter}>{FILTER_LABELS[filter]}</option>

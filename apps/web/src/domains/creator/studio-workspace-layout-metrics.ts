@@ -16,7 +16,7 @@ export const STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH = 48;
 export const STUDIO_CANVAS_DOCK_GAP_OPEN = 8;
 
 /**
- * 오른쪽 패널이 이 폭 이상이면 인스펙터가 대상 속성 아래에 레이어 목록을 함께 그린다
- * (속성↔레이어 탭 왕복 제거, UX 감사 2026-09-02 §5.8).
+ * 기본 320px 데스크톱 패널부터 대상 속성 아래에 레이어 목록을 함께 그린다.
+ * 속성↔레이어 탭 왕복을 없애되 모바일 시트는 기존 탭 모델을 유지한다.
  */
-export const STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH = 420;
+export const STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH = 320;

@@ -13,6 +13,10 @@ const assetLibrarySource = readFileSync(
   new URL("./StudioBg3dAssetLibraryPanel.tsx", import.meta.url),
   "utf8",
 );
+const userTemplateLibrarySource = readFileSync(
+  new URL("./StudioBg3dUserTemplateLibraryPanel.tsx", import.meta.url),
+  "utf8",
+);
 const controlSource = readFileSync(new URL("./studio-bg3d-control-fields.tsx", import.meta.url), "utf8");
 const shapesPanelSource = readFileSync(
   new URL("./StudioBg3dShapesPanel.tsx", import.meta.url),
@@ -51,15 +55,16 @@ describe("Studio BG3D accessibility boundary", () => {
 
   it("names imported model files and template deletion with a touch-size target", () => {
     expect(assetLibrarySource).toContain('aria-label="3D 모델 및 연결 파일 선택"');
-    expect(editorSource).toContain('aria-label={`${entry.name} 템플릿 삭제`}');
-    expect(editorSource).toContain('title="템플릿 삭제"');
-    expect(editorSource).toMatch(/템플릿 삭제[\s\S]*?className="[^"]*size-11[^"]*sm:size-7/u);
+    expect(userTemplateLibrarySource).toContain('aria-label={`${entry.name} 템플릿 삭제`}');
+    expect(userTemplateLibrarySource).toContain('title="템플릿 삭제"');
+    expect(userTemplateLibrarySource).toMatch(/템플릿 삭제[\s\S]*?className="[^"]*size-11[^"]*sm:size-7/u);
   });
 
   it("never removes a keyboard focus outline without a visible replacement", () => {
     for (const source of [
       editorSource,
       assetLibrarySource,
+      userTemplateLibrarySource,
       controlSource,
       shapesPanelSource,
       viewPanelSource,

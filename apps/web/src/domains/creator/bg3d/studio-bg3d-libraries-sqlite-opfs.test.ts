@@ -20,6 +20,7 @@ import {
 import {
   deleteBg3dTemplateV12,
   listBg3dTemplatesV12,
+  loadBg3dTemplatesV12WithLegacyMigration,
   saveBg3dTemplateV12,
 } from "./bg3d-template-library";
 import {
@@ -655,7 +656,7 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
       .rejects.toMatchObject({ code: "invalid-stored-metadata" });
   });
 
-  it("round-trips canonical templates and rejects automatic legacy IndexedDB reads", async () => {
+  it("round-trips canonical templates and skips legacy IndexedDB after the V12 marker exists", async () => {
     const open = vi.fn(() => { throw new Error("legacy-db-must-not-open"); });
     vi.stubGlobal("indexedDB", { open });
     const filename = `bg3d-template-${crypto.randomUUID()}.sqlite3`;
@@ -672,8 +673,18 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     const reopenedAuthority = authorityFor(reopenedDatabase, fileSystem);
     expect(await listBg3dTemplatesV12({ authority: reopenedAuthority }))
       .toMatchObject([{ id: "template-a", name: "A" }]);
+    expect(await loadBg3dTemplatesV12WithLegacyMigration({ authority: reopenedAuthority }))
+      .toMatchObject({
+        entries: [{ id: "template-a", name: "A" }],
+        legacyMigration: { status: "already-complete", importedCount: 0 },
+      });
     expect(await deleteBg3dTemplateV12("template-a", { authority: reopenedAuthority }))
       .toEqual([]);
+    expect(await loadBg3dTemplatesV12WithLegacyMigration({ authority: reopenedAuthority }))
+      .toMatchObject({
+        entries: [],
+        legacyMigration: { status: "already-complete", importedCount: 0 },
+      });
     expect(open).not.toHaveBeenCalled();
   });
 
@@ -726,7 +737,9 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     expect(studio).toContain(
       "getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash",
     );
-    expect(studio).toContain("listBg3dTemplatesV12 as listBg3dTemplates");
+    expect(studio).toContain(
+      "loadBg3dTemplatesV12WithLegacyMigration as loadBg3dTemplates",
+    );
     expect(project).toContain(
       "importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically",
     );

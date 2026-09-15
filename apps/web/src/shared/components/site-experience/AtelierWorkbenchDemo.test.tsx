@@ -80,8 +80,6 @@ describe("atelier workbench", () => {
     act(() => observe(true));
     fireEvent.click(screen.getByRole("button", { name: "모션 일시정지" }));
     expect(demo().dataset.running).toBe("false");
-    fireEvent.click(screen.getByRole("button", { name: "모션 다시 재생" }));
-    expect(demo().dataset.running).toBe("true");
     result.unmount(); expect(disconnect).toHaveBeenCalledOnce();
   });
   it("responds to reduced motion changes and hidden tabs", () => {

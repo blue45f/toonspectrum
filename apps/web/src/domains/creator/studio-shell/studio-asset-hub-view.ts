@@ -1,5 +1,6 @@
 export const ASSET_HUB_VIEWS = [
   "overview",
+  "essentials",
   "series-kit",
   "library",
   "market",

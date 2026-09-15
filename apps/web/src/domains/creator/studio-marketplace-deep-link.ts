@@ -95,7 +95,6 @@ export interface StudioMarketplaceDeepLinkDependencies<TPack, TAsset> {
   readonly projectAssets: (
     record: CreatorMarketplaceResourceRecord,
   ) => AssetProjection<TAsset>;
-  /** Async implementations recheck their live document/mutation guard before inserting. */
   readonly insertAsset: (asset: TAsset) => boolean | Promise<boolean>;
 }
 

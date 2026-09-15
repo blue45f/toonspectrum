@@ -114,6 +114,7 @@ export function createStudioPsdImportLossPreview(
   options: StudioDocumentInterchangePreviewOptions,
 ): StudioInterchangeLossPreviewInput {
   const displayed = scaledDimensions(result.sourceWidth, result.sourceHeight, options.canvasWidth);
+  const originalLayerPixels = result.layerPixelStorage === "native-png";
   const constraints: StudioInterchangeLossConstraint[] =
     result.lossManifest?.decisions
       .filter((decision) => decision.disposition !== "preserved")
@@ -126,6 +127,10 @@ export function createStudioPsdImportLossPreview(
           : decision.message,
       })) ?? [];
   constraints.push(...boundedMessages(result.skipped, "editability"));
+  if (originalLayerPixels) constraints.push({
+    category: "resolution", severity: "notice",
+    message: "각 레이어의 원본 픽셀을 무손실 PNG로 보관합니다. 페이지에 맞춘 배치 크기는 저장 픽셀 크기와 다르며, 원본 PSD의 모든 편집 구조를 보존한다는 의미는 아닙니다.",
+  });
   const embeddedBytes = result.elements.reduce(
     (total, element) =>
       total
@@ -163,10 +168,12 @@ export function createStudioPsdImportLossPreview(
       editability: "layered",
     },
     proxy: {
-      enabled: result.scale < 1 || result.sourceWidth > 1_280 || result.sourceHeight > 1_280,
-      format: result.elements.some((element) => element.maskSrc)
-        ? "WebP 레이어 + 무손실 PNG 마스크"
-        : "WebP 레이어",
+      enabled: !originalLayerPixels && (result.scale < 1 || result.sourceWidth > 1_280 || result.sourceHeight > 1_280),
+      format: originalLayerPixels
+        ? "원본 해상도 PNG 레이어"
+        : result.elements.some((element) => element.maskSrc)
+          ? "WebP 레이어 + 무손실 PNG 마스크"
+          : "WebP 레이어",
       width: displayed.width,
       height: displayed.height,
       originalRetained: false,

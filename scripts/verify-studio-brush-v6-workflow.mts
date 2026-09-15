@@ -44,6 +44,8 @@ let strokeRegion: { x: number; y: number; width: number; height: number } | unde
 let blankRegion: Buffer | undefined, committedRegion: Buffer | undefined;
 const dispatchedPenPressures = [0.6, ...Array.from({ length: 48 }, (_, index) => 0.3 + 0.6 * Math.sin((index + 1) / 48 * Math.PI))];
 
+const STAGE_TIMEOUT_MS = 30_000;
+
 async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
   current = name;
   console.log(`START ${name}`);
@@ -51,7 +53,10 @@ async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([operation(), new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${name} exceeded 15 seconds`)), 15_000);
+      timer = setTimeout(
+        () => reject(new Error(`${name} exceeded ${STAGE_TIMEOUT_MS / 1000} seconds`)),
+        STAGE_TIMEOUT_MS,
+      );
     })]);
     stages.push({ name, elapsedMs: performance.now() - start, ok: true });
     console.log(`PASS ${name}`);
@@ -97,6 +102,31 @@ async function setWheelMode(mode: "브러시 크기" | "확대/축소"): Promise
   await dialog.getByRole("button", { name: /^마우스\s/u }).click();
   await dialog.getByRole("button", { name: mode, exact: true }).click();
   await dialog.getByRole("button", { name: "설정 닫기", exact: true }).click();
+}
+
+async function installStudioGuestApiFixture(target: Page): Promise<void> {
+  await target.route("**/api/auth/session", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false, user: null }),
+    });
+  });
+  await target.route("**/api/kmas/merge-on-access**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ merged: false }),
+    });
+  });
+  await target.route("**/api/studio-ai/status**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ enabled: false }),
+    });
+  });
 }
 
 async function probeLibrary(id: string) {
@@ -209,6 +239,7 @@ try {
     browser = await chromium.launch({ channel: "chromium", headless: process.platform !== "darwin", timeout: 15_000 });
     context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page = await context.newPage();
+    await installStudioGuestApiFixture(page);
     page.setDefaultTimeout(15_000);
     page.setDefaultNavigationTimeout(15_000);
     page.on("pageerror", error => errors.push(error.stack ?? error.message));

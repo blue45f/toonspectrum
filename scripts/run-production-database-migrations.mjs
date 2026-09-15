@@ -105,8 +105,14 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_asset_qa_report",
   "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_storage_replica",
   "creator_asset_upload_session",
+  "creator_collab_application",
+  "creator_collab_bookmark",
+  "creator_collab_post",
+  "creator_collab_report",
   "creator_draft_collaboration_room",
+  "creator_external_publication",
   "creator_marketplace_draft",
   "creator_marketplace_draft_revision",
   "creator_marketplace_entitlement_grant",
@@ -119,8 +125,23 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_marketplace_resource",
   "creator_marketplace_resource_report",
   "creator_marketplace_resource_report_gate",
+  "creator_portfolio_entry",
+  "creator_promotion_bookmark",
+  "creator_promotion_comment",
+  "creator_promotion_post",
+  "creator_promotion_report",
   "creator_work_asset_storage_reference",
+  "creator_work_bookmark",
   "creator_work_catalog_asset_binding",
+  "creator_studio_personal_kit",
+  "creator_work_production_workspace",
+  "creator_work_publication",
+  "creator_work_release",
+  "creator_work_release_approval",
+  "creator_work_report",
+  "creator_work_review_feedback",
+  "creator_work_review_link",
+  "personal_cloud_connection",
   "studio_ai_comic_director_approval",
   "studio_ai_comic_director_artifact",
   "studio_ai_comic_director_job",
@@ -201,6 +222,60 @@ GRANT SELECT, INSERT, UPDATE, DELETE
  * Keep this condition beside the GRANT builder so migration normalization and
  * the production verifier cannot drift apart.
  */
+export function buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE public.personal_cloud_connection FROM PUBLIC;
+REVOKE ALL ON TABLE public.personal_cloud_connection FROM ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.personal_cloud_connection
+  TO ${quotedRole};
+`;
+}
+
+export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.personal_cloud_connection',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.personal_cloud_connection',
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        'PUBLIC',
+        'public.personal_cloud_connection',
+        public_privilege
+      )
+    )
+  )`;
+}
+
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   return `(
@@ -334,6 +409,239 @@ export function buildRuntimeCutoverLedgerAclViolationSql(
         0::oid,
         'public.toonspectrum_schema_migration',
         public_table_privilege
+      )
+    )
+  )`;
+}
+
+export function buildStudioProductionRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+DO $studio_production_acl$
+DECLARE
+  relation_name text;
+  column_list text;
+BEGIN
+  FOREACH relation_name IN ARRAY ARRAY[
+    'creator_work_production_workspace',
+    'creator_studio_personal_kit',
+    'creator_work_review_link',
+    'creator_work_review_feedback'
+  ]::text[] LOOP
+    SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
+    INTO column_list
+    FROM pg_catalog.pg_attribute AS attribute
+    WHERE attribute.attrelid = format('public.%I', relation_name)::regclass
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped;
+
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM %I',
+      column_list,
+      relation_name,
+      ${sqlLiteral(role)}
+    );
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC',
+      column_list,
+      relation_name
+    );
+  END LOOP;
+END
+$studio_production_acl$;
+
+REVOKE ALL ON TABLE
+  public.creator_work_production_workspace,
+  public.creator_studio_personal_kit,
+  public.creator_work_review_link,
+  public.creator_work_review_feedback
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.creator_work_production_workspace,
+  public.creator_studio_personal_kit,
+  public.creator_work_review_link,
+  public.creator_work_review_feedback
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT
+  ON TABLE
+    public.creator_work_production_workspace,
+    public.creator_studio_personal_kit,
+    public.creator_work_review_link,
+    public.creator_work_review_feedback
+  TO ${quotedRole};
+
+GRANT UPDATE ("revision", "document", "updatedBy", "updatedAt")
+  ON TABLE public.creator_work_production_workspace
+  TO ${quotedRole};
+GRANT UPDATE ("revision", "document", "updatedAt")
+  ON TABLE public.creator_studio_personal_kit
+  TO ${quotedRole};
+GRANT UPDATE ("revokedAt", "updatedAt")
+  ON TABLE public.creator_work_review_link
+  TO ${quotedRole};
+`;
+}
+
+/**
+ * Production workspaces and Personal Kit documents use optimistic revisions. Review-link records
+ * are append-only except for revocation, and external feedback is fully append-only. Keep those
+ * boundaries at the database role as well as in the repositories so a compromised API query cannot
+ * rewrite identities, tokens, reviewer evidence, or creation timestamps.
+ */
+export function buildStudioProductionRuntimeAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    EXISTS (
+      SELECT 1
+      FROM (VALUES
+        (
+          'creator_work_production_workspace'::text,
+          ARRAY['revision', 'document', 'updatedBy', 'updatedAt']::text[]
+        ),
+        (
+          'creator_studio_personal_kit'::text,
+          ARRAY['revision', 'document', 'updatedAt']::text[]
+        ),
+        (
+          'creator_work_review_link'::text,
+          ARRAY['revokedAt', 'updatedAt']::text[]
+        ),
+        (
+          'creator_work_review_feedback'::text,
+          ARRAY[]::text[]
+        )
+      ) AS production_contract(relation_name, mutable_columns)
+      WHERE NOT pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'SELECT'
+      )
+      OR NOT pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'INSERT'
+      )
+      OR pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'UPDATE'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'DELETE',
+          'TRUNCATE',
+          'REFERENCES',
+          'TRIGGER'
+        ]::text[]) AS unexpected_table_privilege
+        WHERE pg_catalog.has_table_privilege(
+          ${roleLiteral},
+          format('public.%I', production_contract.relation_name),
+          unexpected_table_privilege
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'SELECT WITH GRANT OPTION',
+          'INSERT WITH GRANT OPTION',
+          'UPDATE WITH GRANT OPTION',
+          'DELETE WITH GRANT OPTION',
+          'TRUNCATE WITH GRANT OPTION',
+          'REFERENCES WITH GRANT OPTION',
+          'TRIGGER WITH GRANT OPTION'
+        ]::text[]) AS delegable_table_privilege
+        WHERE pg_catalog.has_table_privilege(
+          ${roleLiteral},
+          format('public.%I', production_contract.relation_name),
+          delegable_table_privilege
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_attribute AS production_attribute
+        WHERE production_attribute.attrelid =
+          format('public.%I', production_contract.relation_name)::regclass
+          AND production_attribute.attnum > 0
+          AND NOT production_attribute.attisdropped
+          AND (
+            (
+              production_attribute.attname = ANY(production_contract.mutable_columns)
+              AND NOT pg_catalog.has_column_privilege(
+                ${roleLiteral},
+                format('public.%I', production_contract.relation_name),
+                production_attribute.attname,
+                'UPDATE'
+              )
+            )
+            OR (
+              production_attribute.attname <> ALL(production_contract.mutable_columns)
+              AND pg_catalog.has_column_privilege(
+                ${roleLiteral},
+                format('public.%I', production_contract.relation_name),
+                production_attribute.attname,
+                'UPDATE'
+              )
+            )
+            OR pg_catalog.has_column_privilege(
+              ${roleLiteral},
+              format('public.%I', production_contract.relation_name),
+              production_attribute.attname,
+              'UPDATE WITH GRANT OPTION'
+            )
+          )
+      )
+      OR pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'REFERENCES'
+      )
+      OR pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'SELECT WITH GRANT OPTION'
+      )
+      OR pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        format('public.%I', production_contract.relation_name),
+        'INSERT WITH GRANT OPTION'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'SELECT',
+          'INSERT',
+          'UPDATE',
+          'DELETE',
+          'TRUNCATE',
+          'REFERENCES',
+          'TRIGGER'
+        ]::text[]) AS public_table_privilege
+        WHERE pg_catalog.has_table_privilege(
+          0::oid,
+          format('public.%I', production_contract.relation_name),
+          public_table_privilege
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'SELECT',
+          'INSERT',
+          'UPDATE',
+          'REFERENCES'
+        ]::text[]) AS public_column_privilege
+        WHERE pg_catalog.has_any_column_privilege(
+          0::oid,
+          format('public.%I', production_contract.relation_name),
+          public_column_privilege
+        )
       )
     )
   )`;
@@ -1061,6 +1369,7 @@ GRANT INSERT (
   "purpose",
   "digest",
   "contractVersion",
+  "providerId",
   "objectPath",
   "byteLength",
   "contentType"
@@ -1117,6 +1426,7 @@ export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
         'purpose',
         'digest',
         'contractVersion',
+        'providerId',
         'objectPath',
         'byteLength',
         'contentType'
@@ -1165,6 +1475,7 @@ export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
         'purpose',
         'digest',
         'contractVersion',
+        'providerId',
         'objectPath',
         'byteLength',
         'contentType',
@@ -2393,11 +2704,13 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
     psql(
       databaseUrl,
       buildCreatorMarketplaceRuntimeAclSql(runtimeDatabaseRole),

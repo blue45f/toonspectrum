@@ -12,12 +12,12 @@ name: catalog-update
 #    92% 게이트에서 거의 항상 거부된다 → 이 워크플로는 사실상 모니터/게이트/알림 역할이고,
 #    실제 갱신은 로컬(KR)에서 `pnpm catalog:update` 후 커밋한다. 그래서 일 1회로만 돈다(러너/요청
 #    낭비·알림 스팸 방지). 러너 egress가 좋아지거나 임계값(validate-catalog.mjs 노브)을 낮추면
-#    cron 이 자동으로 커밋·배포까지 이어간다.
+#    cron 이 자동으로 커밋까지 이어간다. 운영 배포는 항상 별도 수동 승인이다.
 #
 # 선택 Secrets (미설정 시 안전하게 skip/notice):
 #   DISCORD_WEBHOOK_URL      신작·영상화 다이제스트 + 검증 실패 알림 대상
-# 성공한 main 푸시는 Vercel Git Integration이 자동 배포한다. 별도 hook/CLI를 호출하지
-# 않아 중복 빌드와 러너 비용을 막는다.
+# main 커밋은 배포를 만들지 않는다. 데이터 갱신은 다음 검토된 수동 Cloudflare 정적
+# 릴리스에 포함하며, 이 워크플로에서 deploy hook/CLI를 호출하지 않아 빌드·배포 비용을 막는다.
 
 on:
   schedule:

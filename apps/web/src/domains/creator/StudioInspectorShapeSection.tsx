@@ -12,6 +12,7 @@ import {
   DEFAULT_STUDIO_SKETCH_STYLE,
   studioSketchStyleOfElement,
 } from "./studio-rough-shape";
+import { StudioColorField } from "./StudioColorField";
 import { StudioInspectorFreehandPathControls } from "./StudioInspectorFreehandPathControls";
 import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
@@ -50,6 +51,13 @@ interface StudioInspectorShapeSectionProps {
   applyPaperVectorRefinement: (operation: "simplify" | "smooth") => void;
   cancelPaperVectorRefinement: () => void;
   replaceDrawWithHokusaiNaturalMedia: StudioHokusaiNaturalMediaReplaceHandler;
+  recentColors: readonly string[];
+  documentColors: readonly string[];
+  ensureRecentColorsLoaded: () => void;
+  rememberColor: (color: string) => void;
+  previewColorPatch: (id: string, patch: Partial<El>, key: string) => void;
+  onFinishColorPreview?: () => void;
+  onRequestColorSample?: (applyColor: (color: string) => void) => void;
 }
 
 export function StudioInspectorShapeSection({
@@ -75,6 +83,13 @@ export function StudioInspectorShapeSection({
   applyPaperVectorRefinement,
   cancelPaperVectorRefinement,
   replaceDrawWithHokusaiNaturalMedia,
+  recentColors,
+  documentColors,
+  ensureRecentColorsLoaded,
+  rememberColor,
+  previewColorPatch,
+  onFinishColorPreview,
+  onRequestColorSample,
 }: StudioInspectorShapeSectionProps) {
   return (
     <StudioInspectorSection sectionId="element.shape-style" loadingLabel="도형 스타일을 여는 중...">
@@ -82,6 +97,13 @@ export function StudioInspectorShapeSection({
         <StudioInspectorSelectionStrokeControls
           selected={selected}
           patchEl={patchEl}
+          previewPatch={previewColorPatch}
+          recentColors={recentColors}
+          documentColors={documentColors}
+          onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
+          onRememberColor={rememberColor}
+          onFinishColorPreview={onFinishColorPreview}
+          onRequestColorSample={onRequestColorSample}
         />
         {(selected.kind === "rect" ||
           selected.kind === "ellipse" ||
@@ -90,16 +112,38 @@ export function StudioInspectorShapeSection({
           selected.kind === "polygon") && (
           <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
             <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기</p>
-            <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              채우기 색상
-              <input
-                type="color"
-                value={selected.fill || "#ffffff"}
-                aria-label="채우기 색상"
-                onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)}
-                className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-              />
-            </div>
+            <StudioColorField
+              label="채우기 색상"
+              value={selected.fill ?? null}
+              fallbackColor="#ffffff"
+              purpose="fill"
+              recentColors={recentColors}
+              documentColors={documentColors}
+              allowNone
+              noneLabel="채우기 없음"
+              onChange={(color) =>
+                patchEl(selected.id, { fill: color ?? undefined } as Partial<El>)
+              }
+              onPreview={(color) =>
+                previewColorPatch(
+                  selected.id,
+                  { fill: color } as Partial<El>,
+                  `color:${selected.id}:fill`,
+                )
+              }
+              onUseColor={rememberColor}
+              onLoadRecentColors={ensureRecentColorsLoaded}
+              onInteractionEnd={onFinishColorPreview}
+              onRequestCanvasEyedropper={
+                onRequestColorSample
+                  ? () =>
+                      onRequestColorSample((color) => {
+                        patchEl(selected.id, { fill: color } as Partial<El>);
+                        rememberColor(color);
+                      })
+                  : undefined
+              }
+            />
             {(selected.kind === "rect" || selected.kind === "ellipse" || selected.kind === "star") && (
               <StudioGradientEnginePanel
                 value={selected.gradient ?? null}

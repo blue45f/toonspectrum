@@ -1,3 +1,5 @@
+import { StudioBrushV6ProviderPlan } from "./StudioBrushV6ProviderPlan";
+import { StudioBrushV6RecipeShelf } from "./StudioBrushV6RecipeShelf";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import { isBrushStudioV6TopologyNodeCompatible } from "./brush-studio-v6-topology-material";
 import {
@@ -18,7 +20,7 @@ import {
 } from "./brush-studio-v6-experiments";
 import {
   brushStudioV6MaterialActiveTuningKeys,
-  isBrushStudioV6MaterialNodeImplemented,
+  brushStudioV6MaterialNodeExecution,
   mapBrushStudioV6Pressure,
 } from "./brush-studio-v6-material-engine";
 import {
@@ -114,7 +116,10 @@ function materialNodeStatus(id: string, activeTuning: ReadonlySet<keyof BrushStu
   if (id === "pickup-pigment-reservoir" && !activeTuning.has("pickup")) {
     return "강모 조합에서만 적용 · 현재 재료에서는 사용하지 않음";
   }
-  return isBrushStudioV6MaterialNodeImplemented(id) ? "공통 재료 계산기에 연결됨" : "설계 기록 · 현재 획에는 적용되지 않음";
+  const execution = brushStudioV6MaterialNodeExecution(id);
+  if (execution === "native") return "공통 재료 계산기에 네이티브 연결됨";
+  if (execution === "adapter") return "명시적 호환 어댑터로 연결됨 · 원본 엔진과 구분해 저장";
+  return "설계 기록 · 현재 획에는 적용되지 않음";
 }
 
 function readProgram(key: string): BrushStudioV6Program {
@@ -197,11 +202,18 @@ function Select({ id, label, value, options, onChange }: { readonly id: string; 
 }
 
 function ToggleNode({ node, selected, onChange, topology = false }: { readonly node: BrushStudioV6NodeDescriptor; readonly selected: boolean; readonly onChange: () => void; readonly topology?: boolean }) {
-  const connected = isBrushStudioV6MaterialNodeImplemented(node.id) && (!topology || isBrushStudioV6TopologyNodeCompatible(node.id));
+  const execution = brushStudioV6MaterialNodeExecution(node.id);
+  const connected = execution !== "unavailable" && (!topology || isBrushStudioV6TopologyNodeCompatible(node.id));
+  const badge = execution === "native" ? "네이티브" : execution === "adapter" ? "호환 어댑터" : "설계 기록";
+  const detail = execution === "native"
+    ? "공통 접촉 계산에 직접 적용합니다. 관련 재료·촉 조합에 따라 표현이 달라집니다."
+    : execution === "adapter"
+      ? "외부 엔진의 선택 의미를 보존한 명시적 호환 경로입니다. 네이티브 실행과 구분해 저장합니다."
+      : "현재 획에는 적용되지 않습니다. 가져온 설정은 보관합니다.";
   return (
     <button type="button" aria-pressed={selected} disabled={!connected && !selected} onClick={onChange} className={`${SUB} min-h-[92px] text-left transition-colors disabled:opacity-50 ${selected ? "border-accent/60 bg-accent/10" : "hover:border-line-strong"} ${STUDIO_FOCUS_RING}`}>
-      <span className="flex items-start justify-between gap-2"><span className="text-sm font-black text-fg">{node.label}</span><span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[0.62rem] font-black text-accent">{connected ? "재료 획 연결" : "설계 기록"}</span></span>
-      <span className="mt-1 block text-xs leading-relaxed text-fg-3">{connected ? "공통 접촉 계산에 적용합니다. 관련 재료·촉 조합에 따라 표현이 달라집니다." : "현재 획에는 적용되지 않습니다. 가져온 설정은 보관합니다."}</span>
+      <span className="flex items-start justify-between gap-2"><span className="text-sm font-black text-fg">{node.label}</span><span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[0.62rem] font-black text-accent">{badge}</span></span>
+      <span className="mt-1 block text-xs leading-relaxed text-fg-3">{detail}</span>
     </button>
   );
 }
@@ -216,9 +228,12 @@ function Issue({ issue }: { readonly issue: BrushStudioV6Issue }) {
 }
 
 function nodeOptions(slot: BrushStudioV6Slot, topology = false): readonly { id: string; label: string; disabled: boolean }[] {
-  return brushStudioV6NodesForSlot(slot).map((node) => ({ id: node.id,
-    label: `${node.label}${isBrushStudioV6MaterialNodeImplemented(node.id) ? "" : " · 설계 기록"}`,
-    disabled: !isBrushStudioV6MaterialNodeImplemented(node.id) || topology && slot !== "carrier" && !isBrushStudioV6TopologyNodeCompatible(node.id) }));
+  return brushStudioV6NodesForSlot(slot).map((node) => {
+    const execution = brushStudioV6MaterialNodeExecution(node.id);
+    const suffix = execution === "adapter" ? " · 호환 어댑터" : execution === "unavailable" ? " · 설계 기록" : "";
+    return { id: node.id, label: `${node.label}${suffix}`,
+      disabled: execution === "unavailable" || topology && slot !== "carrier" && !isBrushStudioV6TopologyNodeCompatible(node.id) };
+  });
 }
 
 function capabilityRows(capabilities: BrushStudioV6Capabilities): readonly { label: string; enabled: boolean }[] {
@@ -251,7 +266,6 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   currentRef.current = program;
 
   const analysis = analyzeBrushStudioV6Program(program, capabilities);
-  const recipeGroups = [...new Set(BRUSH_STUDIO_V6_RECIPES.map((recipe) => recipe.group))];
   const physicsNodes = brushStudioV6NodesForSlot("physics");
   const finishNodes = brushStudioV6NodesForSlot("finish");
   const activeTuning = brushStudioV6MaterialActiveTuningKeys(program);
@@ -334,7 +348,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
     setStatus(type === "undo" ? "이전 브러시 설정으로 되돌렸습니다." : "브러시 설정 변경을 다시 적용했습니다.");
   };
   const saveToStudio = async () => {
-    if (saving) return;
+    if (saving || !analysis.valid) return;
     const generation = editGenerationRef.current;
     setSaving(true);
     try {
@@ -365,7 +379,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             <p className="mt-1 text-xs leading-relaxed text-fg-3">{BRUSH_STUDIO_V6_RECIPES.length}개 시그니처 레시피에서 시작해 재료와 물리를 조절하세요. 같은 궤적으로 비교하고, 실제 입력 패드에서 손맛을 확인할 수 있습니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "스튜디오에 브러시 저장"}</button>
+            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving || !analysis.valid} title={analysis.valid ? undefined : "실행할 수 없는 엔진 조합은 저장하지 않습니다."} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "스튜디오에 브러시 저장"}</button>
             {savedHref ? <a href={savedHref} className={PRIMARY}>원고에서 사용하기</a> : null}
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.past.length} onClick={() => moveHistory("undo")} title="실행 취소 (⌘/Ctrl+Z)">실행 취소</button>
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.future.length} onClick={() => moveHistory("redo")} title="다시 실행 (⌘/Ctrl+Shift+Z)">다시 실행</button>
@@ -395,7 +409,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             onPin={() => { setReference(program); setStatus("현재 브러시 전체 설정을 비교 기준으로 고정했습니다."); }}
             onRestore={() => replace(reference, "비교 기준의 전체 설정을 복원했습니다. 실행 취소로 돌아갈 수 있습니다.")}
             onChange={replace} /> : null}
-          {tab === "recipes" ? <Panel title="시그니처 레시피" description="이름만 다른 프리셋이 아니라 실제 재료·물리·패턴 결과가 다른 조합입니다."><div className="space-y-5">{recipeGroups.map((group) => <section key={group}><h3 className="mb-2 text-xs font-black text-fg-2">{group}</h3><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{BRUSH_STUDIO_V6_RECIPES.filter((recipe) => recipe.group === group).map((recipe) => <button key={recipe.id} type="button" onClick={() => chooseRecipe(recipe.id)} className={`${SUB} min-h-[108px] text-left hover:border-accent/50 hover:bg-accent/10 ${STUDIO_FOCUS_RING}`}><span className="text-sm font-black text-fg">{recipe.label}</span><span className="mt-2 block text-xs leading-relaxed text-fg-3">{recipe.description}</span></button>)}</div></section>)}</div></Panel> : null}
+          {tab === "recipes" ? <Panel title="시그니처 레시피" description="이름·용도·영문 ID로 찾아 실제 질감과 조절값을 확인하세요."><StudioBrushV6RecipeShelf selectedId={program.id} onChoose={chooseRecipe} /></Panel> : null}
 
           {tab === "graph" ? <Panel title="Engine Graph" description="실제 획은 공통 CPU 접촉 계산기를 사용합니다. 회색 항목은 아직 연결되지 않은 설계 기록이며, 외부 엔진을 실행하지 않습니다."><div className="grid gap-4 lg:grid-cols-2">{SINGLE_SLOTS.map(({ slot, label, description }) => { const selected = program.slots[slot]; const node = brushStudioV6Node(selected); return <div key={slot} className={SUB}><Select id={`brush-v6-slot-${slot}`} label={label} value={selected} options={nodeOptions(slot, Boolean(topology))} onChange={(id) => choose(slot, id)} /><p className="mt-2 text-xs text-fg-3">{description}</p><p className="mt-1 text-[0.68rem] font-bold text-accent">{materialNodeStatus(node.id, activeTuning, Boolean(topology))}</p></div>; })}</div></Panel> : null}
           {tab === "graph" && topology ? <Panel title={`${topology.label} · 구조 설정`} description={`${topology.description} 구조 전환 시 미지원 물리·패턴은 해제됩니다. 종이·도포·안료·네온은 재조합할 수 있습니다.`}><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{topology.controls.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div></Panel> : null}
@@ -411,7 +425,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
 
           {tab === "pattern" ? <><Panel title="패턴·문양" description="반복 토폴로지와 문서 위상이 다른 패턴은 독립 브러시 정체성으로 유지합니다."><Select id="brush-v6-pattern" label="패턴 프로그램" value={program.slots.pattern} options={nodeOptions("pattern", Boolean(topology))} onChange={(id) => choose("pattern", id)} /><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{PATTERN.map((spec) => <Slider key={spec.key} spec={spec} value={program.tuning[spec.key]} inactive={!activeTuning.has(spec.key)} onChange={(value) => patchTuning(spec.key, value)} />)}</div><p className="mt-3 text-xs leading-5 text-fg-3">같은 개성 시드와 접촉 간격은 저장·다시 열기·내보내기에도 보존됩니다.</p></Panel></> : null}
 
-          {tab === "runtime" ? <><Panel title="실행 패스" description="선택한 그래프의 실행 설계입니다. 아래 비용과 백엔드는 설계 추정이며 측정된 실행 결과가 아닙니다."><div className="space-y-2">{analysis.passes.map((pass) => <article key={pass.id} className={SUB}><div className="flex flex-wrap justify-between gap-2"><h3 className="text-xs font-black text-fg">{pass.label}</h3><span className="text-[0.65rem] font-black text-accent">{pass.phase} · {pass.domain} · {pass.budgetMs.toFixed(2)}ms</span></div><p className="mt-1 text-[0.68rem] text-fg-3">{pass.nodeIds.map((id) => brushStudioV6Node(id).provider).filter((value, index, values) => values.indexOf(value) === index).join(" + ")} · {pass.nodeIds.join(" → ") || "presentation"}</p></article>)}</div></Panel><Panel title="설계상 리소스 추정" description="그래프 모델에서 산출한 예상 필드와 메모리입니다. 현재 브라우저가 실제 할당한 메모리와 다를 수 있습니다."><div className="grid gap-2 sm:grid-cols-2">{analysis.resources.map((resource) => <div key={resource.id} className={SUB}><div className="flex justify-between text-xs font-black text-fg"><span>{resource.id}</span><span>{resource.format}</span></div><p className="mt-1 text-xs text-fg-3">{resource.owner} · scale {resource.scale}</p><p className="mt-1 text-[0.68rem] font-bold text-fg-2">약 {resource.estimatedMb.toFixed(1)}MB</p></div>)}</div></Panel><Panel title="브라우저 능력" description="브라우저가 제공하는 API 유무입니다. API 지원이 개별 외부 엔진의 연결이나 실행을 보장하지는 않습니다."><div className="flex flex-wrap gap-2">{capabilityRows(capabilities).map((item) => <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[0.68rem] font-bold ${item.enabled ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-bg-2 text-fg-3"}`}>{item.label} · {item.enabled ? "YES" : "NO"}</span>)}</div></Panel></> : null}
+          {tab === "runtime" ? <><StudioBrushV6ProviderPlan plan={analysis.providerPlan} /><Panel title="실행 패스" description="선택한 그래프의 실행 설계입니다. 아래 비용과 백엔드는 설계 추정이며 측정된 실행 결과가 아닙니다."><div className="space-y-2">{analysis.passes.map((pass) => <article key={pass.id} className={SUB}><div className="flex flex-wrap justify-between gap-2"><h3 className="text-xs font-black text-fg">{pass.label}</h3><span className="text-[0.65rem] font-black text-accent">{pass.phase} · {pass.domain} · {pass.budgetMs.toFixed(2)}ms</span></div><p className="mt-1 text-[0.68rem] text-fg-3">{pass.nodeIds.map((id) => brushStudioV6Node(id).provider).filter((value, index, values) => values.indexOf(value) === index).join(" + ")} · {pass.nodeIds.join(" → ") || "presentation"}</p></article>)}</div></Panel><Panel title="설계상 리소스 추정" description="그래프 모델에서 산출한 예상 필드와 메모리입니다. 현재 브라우저가 실제 할당한 메모리와 다를 수 있습니다."><div className="grid gap-2 sm:grid-cols-2">{analysis.resources.map((resource) => <div key={resource.id} className={SUB}><div className="flex justify-between text-xs font-black text-fg"><span>{resource.id}</span><span>{resource.format}</span></div><p className="mt-1 text-xs text-fg-3">{resource.owner} · scale {resource.scale}</p><p className="mt-1 text-[0.68rem] font-bold text-fg-2">약 {resource.estimatedMb.toFixed(1)}MB</p></div>)}</div></Panel><Panel title="브라우저 능력" description="브라우저가 제공하는 API 유무입니다. API 지원이 개별 외부 엔진의 연결이나 실행을 보장하지는 않습니다."><div className="flex flex-wrap gap-2">{capabilityRows(capabilities).map((item) => <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[0.68rem] font-bold ${item.enabled ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-bg-2 text-fg-3"}`}>{item.label} · {item.enabled ? "YES" : "NO"}</span>)}</div></Panel></> : null}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">

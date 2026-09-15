@@ -1,7 +1,7 @@
 name: Feedback community validation
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/api/src/**'
@@ -14,6 +14,7 @@ on:
       - '*feedback*.ts'
       - '.github/workflows/feedback-community-validation.yml'
   push:
+    branches: ["main", "release/salvage-integration-20260908"]
     paths:
       - 'apps/api/src/**'
       - 'packages/core/src/**'

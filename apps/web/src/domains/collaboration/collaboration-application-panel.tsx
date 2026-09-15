@@ -57,7 +57,7 @@ export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean
   }, [id]);
   return <section className="rounded-2xl border border-line bg-panel p-6">
     <h2 className="text-xl font-bold text-fg">받은 지원·제안</h2>
-    <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 접수 중인 지원서 최대 200건을 우선 표시합니다. 지원서를 외부에 공유하지 마세요.</p>
+    <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 최근 200건까지 표시합니다. 지원서를 외부에 공유하지 마세요.</p>
     {error && <div className="mt-4"><CollabNotice error>{error}</CollabNotice></div>}
     {!items && !error && <p role="status" className="mt-4 text-sm text-fg-3">지원서를 불러오고 있어요.</p>}
     {items?.length === 0 && <p className="mt-5 text-sm text-fg-3">아직 접수된 지원서가 없어요.</p>}

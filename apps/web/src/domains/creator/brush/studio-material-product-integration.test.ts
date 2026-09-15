@@ -19,11 +19,11 @@ import {
 
 describe("original material product integration", () => {
   it("shares exact ordered identities across the picker, quality editor and curated inventory", () => {
-    expect(STUDIO_MATERIAL_BRUSH_IDS).toHaveLength(32);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(80);
+    expect(STUDIO_MATERIAL_BRUSH_IDS).toHaveLength(40);
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(88);
     expect(BRUSH_QUALITY_CATALOG.map(({ id }) => id)).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
     expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id)).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(({ operation }) => operation === "paint")).toHaveLength(78);
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(({ operation }) => operation === "paint")).toHaveLength(86);
     expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(({ operation }) => operation === "erase")).toHaveLength(2);
   });
 

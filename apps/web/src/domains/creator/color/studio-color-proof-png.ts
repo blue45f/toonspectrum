@@ -40,6 +40,7 @@ export async function encodeStudioColorProofPng(input: {
   rgba: Uint8ClampedArray; width: number; height: number; profileBytes: Uint8Array; signal?: AbortSignal;
 }): Promise<Blob> {
   const { rgba, width, height, profileBytes, signal } = input;
+  signal?.throwIfAborted();
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1
     || width * height > 16_777_216 || rgba.length !== width * height * 4) throw new Error("ICC PNG 크기가 올바르지 않습니다.");
   const ihdr = new Uint8Array(13); const view = new DataView(ihdr.buffer);

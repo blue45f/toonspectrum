@@ -392,6 +392,12 @@ describe("bootstrap SQL and repository contract", () => {
       "0043_admin_runtime_schema",
       "0044_creator_work_entitlement_authorization",
       "0045_studio_media_inference_jobs",
+      "0046_creator_promotion_community",
+      "0047_creator_collaboration_board",
+      "0048_creator_asset_storage_locations",
+      "0049_creator_community_publishing",
+      "0050_studio_production_workspace_review_links_personal_kit",
+      "0051_personal_cloud_connections",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

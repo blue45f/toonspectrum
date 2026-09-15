@@ -135,17 +135,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           (isFullscreen || maximized) && "min-h-0"
         )}
       >
-        <StudioWorkspaceRegion
-          surfaceId="top-chrome"
-          label="상단 메뉴·도구"
-          defaultLayout={CHROME_LAYOUT}
-          minWidth={560}
-          minHeight={160}
-          disabled={isMobile || canvasOnlyMode || mobileImmersive}
-          className="w-full"
-        >
-          <StudioCuttoonEditorChrome {...s} />
-        </StudioWorkspaceRegion>
+        <StudioCuttoonEditorChrome {...s} />
         <Suspense fallback={null}>
         <StudioDraftSaveCenter
           key={JSON.stringify([s.saveIntentScope, s.effectiveWorkId ?? s.workId ?? "new-work"])}

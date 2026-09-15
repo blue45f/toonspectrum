@@ -161,7 +161,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     seedPrimitiveKind, onSeedObjectInsertConsumed, sharedSceneSession, sharedStageResolution,
     sharedStageSessionScopeKey, sharedCharactersLinkedToOtherBackgroundCount, operation,
     recoveryScope, validateRecoveryAccess, onWebXrCleanupPendingChange, onClose, onInsert,
-    onUseAsAiMethodReference, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
+    onUseAsAiMethodReference, handleOpenPrecisionModeler, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
     setAdaptiveDprScale, sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey, readSharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKeyRef, sharedCharacterCaptureAuthorityRevisionRef,
@@ -571,6 +571,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
                 engineFrameTimeMs={engineFrameTimeMs}
                 onEnginePreferenceChange={engineRuntime.setPreference}
+                onOpenPrecisionModeler={handleOpenPrecisionModeler}
                 aiReferenceBusy={isCapturing}
                 aiReferenceDisabled={
                   insertBlocked || (primitives.length === 0 && customModels.length === 0)
@@ -856,73 +857,6 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                     </p>
                   </div>
                 )}
-
-                <div className="mb-4 border-t border-line pt-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    내 템플릿
-                  </h3>
-                  <span className="text-[0.68rem] text-fg-3">
-                    {templateLibrary.length}개
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className={cx(CONTROL_BUTTON, "mb-4 w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
-                  disabled={isSavingTemplate || applyingTemplateId !== null || (primitives.length === 0 && customModels.length === 0)}
-                  onClick={() => void handleSaveSceneAsTemplate()}
-                >
-                  {isSavingTemplate ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
-                  현재 장면을 내 템플릿으로 저장
-                </button>
-                
-                <div className="mb-6 grid grid-cols-2 gap-2">
-                  {templateLibraryStatus === "loading" ? (
-                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">템플릿을 불러오는 중입니다.</div>
-                  ) : null}
-                  {templateLibraryStatus === "error" ? (
-                    <p className="col-span-2 mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">템플릿 목록을 불러오지 못했습니다.</p>
-                  ) : null}
-                  {templateLibraryStatus === "ready" && templateLibrary.length === 0 ? (
-                    <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-                      저장된 템플릿이 없습니다.
-                    </div>
-                  ) : null}
-                  {templateLibrary.map((entry) => (
-                    <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
-                      <button
-                        type="button"
-                        className="grid min-h-[5rem] w-full gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-                        disabled={applyingTemplateId !== null || isRestoringScene || isUploadingModel}
-                        onClick={() => void applyUserTemplate(entry)}
-                      >
-                        <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-fg">
-                          {applyingTemplateId === entry.id ? (
-                            <Loader2 className="shrink-0 animate-spin" size={13} aria-hidden />
-                          ) : null}
-                          <span className="block truncate">{entry.name}</span>
-                        </span>
-                        <span className="mt-1 flex flex-wrap gap-1">
-                          <span className={cx("inline-flex rounded-full px-1.5 py-0.5 text-[0.64rem] font-bold", entry.commercialUse ? "bg-[oklch(0.80_0.15_150/0.14)] text-good" : "bg-raised text-fg-3")}>
-                            {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`${entry.name} 템플릿 삭제`}
-                        title="템플릿 삭제"
-                        className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-7"
-                        disabled={applyingTemplateId !== null}
-                        onClick={(e) => { e.stopPropagation(); void handleDeleteTemplate(entry.id); }}
-                      >
-                        <Trash2 size={13} aria-hidden />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                </div>
-                
 
                 {modelsPanelActivated ? (
                   <Suspense

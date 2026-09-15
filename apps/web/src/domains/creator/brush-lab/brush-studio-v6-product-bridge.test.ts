@@ -24,10 +24,22 @@ describe("Brush Editor product save", () => {
     repository.put.mockImplementation(async (brush) => brush);
     repository.getById.mockImplementation(async (id) => ({ ...createBrushStudioV6ProductBrush(program), id }));
     const saved = await saveBrushStudioV6ProductBrush(program);
-    expect(saved.enginePrograms?.material?.version).toBe(1);
+    expect(saved.enginePrograms?.material?.version).toBe(2);
+    expect(saved.enginePrograms?.material?.runtime).toMatchObject({
+      fallbackPolicy: "none",
+      licenseProfile: "noncommercial-full",
+    });
     expect(repository.getById).toHaveBeenLastCalledWith(saved.id);
     expect(saved.pressureCurve).toBe(1);
     expect(saved.enginePrograms?.material?.input.pressureGamma).toBe(program.input.pressureGamma);
+  });
+
+  it("refuses an unavailable engine instead of changing the selected recipe", () => {
+    const base = createBrushStudioV6Program("clean-ink");
+    expect(() => createBrushStudioV6ProductBrush({
+      ...base,
+      slots: { ...base.slots, pigment: "pigment-painter-lut" },
+    })).toThrow(/pigment-painter-lut/u);
   });
 
   it("propagates storage failure and refuses a recipe lost during readback", async () => {

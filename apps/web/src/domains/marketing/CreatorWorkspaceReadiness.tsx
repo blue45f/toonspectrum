@@ -16,7 +16,7 @@ const COPY = {
     protect: "기기 저장 보호 요청", protecting: "저장 보호 요청 중…", granted: "브라우저가 저장 보호를 허용했어요.",
     denied: "저장 보호가 허용되지 않았어요. 프로젝트 파일을 별도로 백업하세요.",
     unsupported: "이 환경에서는 저장 보호를 요청할 수 없어요. 프로젝트 파일 백업을 이용하세요.",
-    used: "이 사이트의 사용량", of: "/", open: "심플 모드로 프로젝트 열기",
+    used: "이 사이트의 사용량", of: "/", open: "기본 작업으로 새 그림 시작",
     caveat: "이 점검은 프로젝트 저장 완료나 전체 오프라인 실행을 보장하지 않습니다. 사용할 프로젝트를 온라인에서 먼저 열고, 로컬 저장과 프로젝트 파일 백업을 확인하세요. 클라우드 AI·새 자료 검색·협업에는 인터넷이 필요합니다.",
     clear: "저장 보호를 허용해도 직접 사이트 데이터를 지우면 작업이 삭제될 수 있습니다.",
     dependencies: "앱 시작 파일·한영 사전", cached: "검사한 파일은 캐시됨", missing: "일부 파일이 캐시에 없음",
@@ -106,7 +106,7 @@ export function CreatorWorkspaceReadiness({ locale }: { locale: "ko" | "en" }) {
         <p><a className="cf-link" href="/offline-draw/">{locale === "ko" ? "서버 없이 로컬 드로잉 열기" : "Open server-independent local drawing"}</a></p>
         <p><Link className="cf-link" href="/studio/ai-lab">{locale === "ko" ? "생성형 애니메이션 · 2D↔3D 제작실" : "Generative animation and 2D/3D studio"}</Link></p>
         <p><a className="cf-link" href="/spatial-reader/">{locale === "ko" ? "공간형 웹툰 감상" : "Spatial webtoon reader"}</a></p>
-        <Link className="cf-link" href="/studio?uiMode=simple">{copy.open}<ArrowRight size={17} aria-hidden="true" /></Link>
+        <Link className="cf-link" href="/studio/new#quick-draw">{copy.open}<ArrowRight size={17} aria-hidden="true" /></Link>
         <details className="cf-storage-note"><summary>{copy.stepsTitle}</summary><ol>{copy.steps.map((step) => <li key={step}>{step}</li>)}</ol></details>
       </div>
       <div className="cf-storage-card" aria-busy={busy}>

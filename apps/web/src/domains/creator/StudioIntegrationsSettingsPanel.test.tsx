@@ -11,6 +11,7 @@ import { describe, expect, it, afterEach } from "vitest";
 
 import { STUDIO_AI_DEFAULT_SETTINGS, type StudioAiSettings } from "./ai/studio-ai-client";
 import { STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY } from "./studio-stock-image-client";
+import { lockUserAi, setUserAiConfiguration } from "@/shared/ai/user-ai-store";
 import { StudioIntegrationsSettingsPanel } from "./StudioIntegrationsSettingsPanel";
 
 // StudioStockImagePanel.test.tsx의 fakeStorage와 동일한 최소 stub(중복 정의 — 두 BYOK 기능을 코드
@@ -35,6 +36,7 @@ const noopChange = (_next: StudioAiSettings) => {
 
 describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
   afterEach(() => {
+    lockUserAi(false);
     Reflect.deleteProperty(globalThis, "localStorage");
     Reflect.deleteProperty(globalThis, "sessionStorage");
   });
@@ -47,16 +49,17 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
       <StudioIntegrationsSettingsPanel aiSettings={STUDIO_AI_DEFAULT_SETTINGS} onAiSettingsChange={noopChange} />
     );
 
-    // AI 어시스트 설정 섹션 — 기존 StudioAiSettingsPanel을 그대로 합성했으므로 그 헤더·기본 baseURL이
-    // 그대로 나와야 한다(로직 재구현이 아니라 재사용임을 증명).
-    expect(html).toContain("AI 어시스트 설정");
-    expect(html).toContain(STUDIO_AI_DEFAULT_SETTINGS.baseUrl);
-    expect(html).toContain("연결 테스트");
+    // Free-only unified AI settings own the AI section now: local zero-cost defaults,
+    // not the legacy OpenAI StudioAiSettings baseURL.
+    expect(html).toContain("통합 AI 설정");
+    expect(html).toContain("http://localhost:8082/v1");
+    expect(html).toContain("무료 연결 프리셋");
+    expect(html).toContain("모델 목록 연결 확인");
 
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.
     expect(html).toContain("무료 스톡 이미지 (Unsplash)");
     expect(html).toContain("Unsplash Access Key");
-    expect(html).toContain("AI 키와 Unsplash 키는 현재 탭 세션에만");
+    expect(html).toContain("AI 연결은 통합 설정에서");
     expect(html).toContain("min-h-11 w-full");
     expect(html).toContain("size-11");
     expect(html).not.toContain("Access Key 등록됨");
@@ -70,14 +73,25 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
       [STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY]: "unsplash-existing-key",
     }) as unknown as Storage;
     const aiSettings: StudioAiSettings = { ...STUDIO_AI_DEFAULT_SETTINGS, apiKey: "sk-test-123" };
+    setUserAiConfiguration({
+      version: 1,
+      connections: [{
+        ...aiSettings,
+        id: "integration",
+        label: "Studio 연결",
+        costPolicy: "provider-free-tier",
+      }],
+      assignments: { text: "integration", image: "integration", inference: null, "three-d": null },
+    });
 
     const html = renderToStaticMarkup(
       <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={noopChange} />
     );
 
-    // AI 섹션에 전달한 apiKey가 (마스킹되어도) 실제로 그 값으로 채워졌는지 — type="password" 필드라
-    // 화면엔 점으로 보이지만 DOM value 속성 자체엔 원문이 들어간다.
-    expect(html).toContain('value="sk-test-123"');
+    // 통합 보관함은 등록 상태만 렌더하고 비밀 값은 서버 렌더 HTML에 다시 싣지 않는다.
+    expect(html).toContain("Studio 연결");
+    expect(html).toContain("키 등록됨");
+    expect(html).not.toContain("sk-test-123");
     // 스톡 이미지 섹션은 현재 탭의 sessionStorage 값만 반영해 "등록됨" 배지가 뜬다.
     expect(html).toContain("Access Key 등록됨");
     expect(html).toContain('value="unsplash-existing-key"');

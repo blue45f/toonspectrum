@@ -62,7 +62,7 @@ function CollaborationEditorForm({ id, userId, initial, version }: { id?: string
     setInput(collaborationTemplate(kind)); setConfirmed(false); setError("");
   }
   async function submit() {
-    if (submitting.current || useApp.getState().userId !== userId) return;
+    if (submitting.current) return;
     const candidate = { ...input, details: { ...input.details, tools: input.details.tools.map((tool) => tool.trim()).filter(Boolean) } };
     const parsed = validateCollaborationInput(candidate);
     if (!parsed.value) { setError(parsed.error); return; }
@@ -73,7 +73,7 @@ function CollaborationEditorForm({ id, userId, initial, version }: { id?: string
       if (id) await collaborationClient.update(id, parsed.value, version);
       else { const created = await collaborationClient.create(parsed.value); if (!created?.id) throw new Error("등록 결과를 확인하지 못했어요. 내 공고를 먼저 확인해 주세요."); postId = created.id; }
       if (!id) { try { localStorage.removeItem(collaborationDraftKey(userId)); } catch { /* A successful publication must not be reported as failed because storage is blocked. */ } }
-      if (useApp.getState().userId === userId) navigate(`/collaborate/${postId}`);
+      navigate(`/collaborate/${postId}`);
     } catch (reason) { setError(await getApiErrorMessage(reason, "공고를 저장하지 못했어요. 입력 내용은 유지됩니다.")); }
     finally { submitting.current = false; setBusy(false); }
   }
@@ -97,7 +97,7 @@ function CollaborationEditorForm({ id, userId, initial, version }: { id?: string
     <fieldset disabled={busy} className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-7"><legend className="px-2 text-lg font-bold text-fg">03 · 함께 지킬 약속</legend>
       <CollabField label="저작권·크레딧·수정 범위"><textarea className={collabInput} rows={4} minLength={5} maxLength={1000} required value={input.details.terms} onChange={(event) => detail("terms", event.target.value)} /></CollabField>
       <CollabField label="공개 포트폴리오 주소 (선택)" hint="갤러리 작품 또는 외부 포트폴리오의 http/https 주소"><input className={collabInput} type="url" maxLength={500} value={input.details.portfolioUrl} onChange={(event) => detail("portfolioUrl", event.target.value)} placeholder="https://" /></CollabField>
-      <label className="flex cursor-pointer items-start gap-3 text-sm leading-7 text-fg-2"><input className="mt-1.5 size-5 shrink-0" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>공개할 내용과 보수·권리 조건을 확인했습니다. 최근 24시간 5개·보관 공고 100개 한도를 확인했으며, 개인정보·타인의 미공개 자료를 게시하지 않고, 실제 계약과 대금 지급은 당사자끼리 별도로 합의합니다.</span></label>
+      <label className="flex cursor-pointer items-start gap-3 text-sm leading-7 text-fg-2"><input className="mt-1.5 size-5 shrink-0" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>공개할 내용과 보수·권리 조건을 확인했습니다. 개인정보·타인의 미공개 자료를 게시하지 않으며, 실제 계약과 대금 지급은 당사자끼리 별도로 합의합니다.</span></label>
     </fieldset>
     {error && <CollabNotice error>{error}</CollabNotice>}
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-panel p-5"><p className="inline-flex max-w-xl items-center gap-2 text-xs leading-6 text-fg-3"><Save size={15} className="shrink-0" aria-hidden="true" />{id ? "수정한 내용은 저장 버튼을 눌러야 반영돼요." : draftStatus || "초안 임시저장 준비 중"}</p><button disabled={busy} type="submit" className={collabPrimary}><CheckCircle2 size={17} aria-hidden="true" />{busy ? "저장 중…" : id ? "수정 내용 저장" : "공고 공개 등록"}</button></div>

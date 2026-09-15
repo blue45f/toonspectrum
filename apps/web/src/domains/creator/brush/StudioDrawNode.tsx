@@ -1,4 +1,3 @@
-import { renderStudioMaterialBrush } from "./studio-material-brush-runtime";
 import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
@@ -111,6 +110,8 @@ import {
   studioSketchStyleOfElement,
 } from "../studio-rough-shape";
 import { StudioStampDrawShape } from "../StudioStampDrawShape";
+
+import { StudioMaterialBrushShape } from "./StudioMaterialBrushShape";
 
 import {
   applyStudioBrushAliasWatercolorMaterial,
@@ -844,8 +845,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
         if (kind === "freehand") {
           if (runtimeEnginePrograms?.material && !isEraserOperation) {
-            return <Shape key={index} listening={false}
-              sceneFunc={(context) => renderStudioMaterialBrush(context._context, { ...el, points, brushEnginePrograms: runtimeEnginePrograms })} />;
+            return (
+              <StudioMaterialBrushShape
+                key={index}
+                element={el}
+                points={points}
+                enginePrograms={runtimeEnginePrograms}
+              />
+            );
           }
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);

@@ -148,7 +148,8 @@ describe("market interactive preview accessibility", () => {
     expect(screen.getByRole("region", { name: "3D 에셋 미리보기 (휴머노이드 모델)" })).toBeTruthy();
     expect(screen.getByText("3개 파라미터")).toBeTruthy();
     expect(screen.getByText("3D 에셋")).toBeTruthy();
-    expect(screen.getByText("회전 가능")).toBeTruthy();
-    expect(screen.getByText(/3D 에셋의 구조를 설명하기 위한 단순화된 일러스트이며/u)).toBeTruthy();
+    expect(screen.queryByText("회전 가능")).toBeNull();
+    expect(screen.getByText(/미리보기가 없는 모델을 임의의 도형으로 대체하지 않습니다/u)).toBeTruthy();
+    expect(document.querySelector("svg")).toBeNull();
   });
 });

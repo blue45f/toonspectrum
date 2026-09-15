@@ -609,6 +609,94 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(scene.wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR)).toBeUndefined();
   });
 
+  it.each(["line", "arrow"] as const)(
+    "keeps a z-order-blocked %s moving through the exact vector overlay fallback",
+    (kind) => {
+      // A painting sibling above the selected vector makes a source Layer lift dishonest: moving
+      // the wrapper to the transform Layer would change authored stacking. Office-style vector
+      // transforms instead hide the authored copy once and put the exact draft above the page.
+      scene.mainLayer.add(new studioKonvaRuntime.Rect({ width: 10, height: 10, fill: "#fff" }));
+      const element: DrawEl = { ...sourceElement, kind };
+      const { gesture, store, clock } = beginGesture(undefined, element);
+      const sourceDrawScene = vi.spyOn(scene.mainLayer, "drawScene");
+      const transformDrawScene = vi.spyOn(scene.dragLayer, "drawScene");
+      const firstFrame = {
+        targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+        rotationDeg: 15,
+      };
+
+      gesture.offer(firstFrame);
+      clock.flush();
+
+      expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+      expect(scene.wrapper.visible()).toBe(false);
+      expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
+      expect(store.getSnapshot()?.entries[0]?.element).toEqual(
+        planStudioDrawObjectTransform({ el: element, sourceBounds, ...firstFrame }),
+      );
+      // The first frame removes the authored copy once and paints the exact vector overlay.
+      expect(sourceDrawScene).toHaveBeenCalledTimes(1);
+      expect(transformDrawScene).toHaveBeenCalledTimes(1);
+
+      sourceDrawScene.mockClear();
+      transformDrawScene.mockClear();
+      const secondFrame = {
+        targetBounds: { x: 45, y: 55, width: 80, height: 130 },
+        rotationDeg: -30,
+      };
+      gesture.offer(secondFrame);
+      clock.flush();
+
+      expect(store.getSnapshot()?.entries[0]?.element).toEqual(
+        planStudioDrawObjectTransform({ el: element, sourceBounds, ...secondFrame }),
+      );
+      expect(scene.wrapper.visible()).toBe(false);
+      // Steady pointer frames never repaint the full document Layer.
+      expect(sourceDrawScene).not.toHaveBeenCalled();
+      expect(transformDrawScene).toHaveBeenCalledTimes(1);
+
+      gesture.close({ kind: "cancel", reason: "escape" });
+      expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+      expect(scene.wrapper.visible()).toBe(true);
+      expect(store.getSnapshot()).toBeNull();
+      expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
+      expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
+    },
+  );
+
+  it("retains a vector overlay through commit handoff and restores authored stacking on receipt", () => {
+    scene.mainLayer.add(new studioKonvaRuntime.Rect({ width: 10, height: 10, fill: "#fff" }));
+    const element: DrawEl = { ...sourceElement, kind: "line" };
+    const { gesture, store } = beginGesture(undefined, element);
+    const terminalFrame = {
+      targetBounds: { x: 25, y: 35, width: 175, height: 80 },
+      rotationDeg: 30,
+    };
+    const expected = planStudioDrawObjectTransform({
+      el: element,
+      sourceBounds,
+      ...terminalFrame,
+    });
+    expect(expected).not.toBeNull();
+
+    gesture.close({ kind: "commit", terminalFrame });
+
+    // The exact overlay remains the visual authority until the durable document render acks it.
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(scene.wrapper.visible()).toBe(false);
+    expect(store.getSnapshot()?.entries[0]?.element).toEqual(expected);
+    expect(store.getSnapshot()?.phase).toBe("active");
+    expect(gesture.settle?.({ kind: "commit", committed: true })).toBe(false);
+    expect(store.getSnapshot()?.phase).toBe("handoff");
+
+    expect(store.acknowledgeAuthoritative(draftScope, [expected!])).toBe(true);
+    expect(scene.wrapper.visible()).toBe(true);
+    expect(store.getSnapshot()).toBeNull();
+    expect(gesture.settle?.({ kind: "commit", committed: true })).toBe(true);
+    expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
+  });
+
   it("retains the exact terminal candidate until authoritative receipt, then restores source", () => {
     const { gesture, store } = beginGesture();
     const terminalFrame = {

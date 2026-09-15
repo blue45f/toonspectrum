@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
+import { isStudioAuthoredAttachment } from "./studio-vrm-authored-attachment";
 import {
   buildBodySilhouette,
   type BodySilhouette,
@@ -498,21 +499,8 @@ const TORSO_SILHOUETTE_BONES: readonly VRMHumanBoneName[] = ["hips", "spine", "c
  */
 const TORSO_MESH_VERTEX_BUDGET = 12_000;
 
-/** 씬 전체 상한(48k). vrm.scene 순회 순서가 결정적이라 예산이 어디서 끊기는지도 결정적이다. */
-/** 이 스튜디오가 만들어 붙인 노드의 이름 규약 — 의상은 `wardrobe:<slot>:<id>`, 소품은 `prop:<id>`. */
-const STUDIO_ATTACHMENT_NAME = /^(wardrobe:(outer|top|bottom|shoes)\b|prop:)/u;
-const STUDIO_ATTACHMENT_ANCESTRY_DEPTH = 32;
-
-/** 이름(또는 조상의 이름)이 스튜디오 부착물이면 실측 대상이 아니다. */
-// eslint-disable-next-line react-refresh/only-export-components -- Pure predicate shared with its colocated test.
-export function isStudioAuthoredAttachment(object: THREE.Object3D): boolean {
-  let node: THREE.Object3D | null = object;
-  for (let depth = 0; node && depth < STUDIO_ATTACHMENT_ANCESTRY_DEPTH; depth += 1) {
-    if (node.name && STUDIO_ATTACHMENT_NAME.test(node.name)) return true;
-    node = node.parent;
-  }
-  return false;
-}
+// eslint-disable-next-line react-refresh/only-export-components -- Preserve the existing measurement test API.
+export { isStudioAuthoredAttachment } from "./studio-vrm-authored-attachment";
 
 const TORSO_SCENE_VERTEX_BUDGET = 48_000;
 

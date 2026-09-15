@@ -8,16 +8,13 @@ import {
   studioProjectDocumentStorageKey,
   validIdentity,
   validTimestamp,
-} from "./studio-project-document-reader";
-
-import type {
-  CreateStudioProjectDocumentInput,
-  StudioDocumentKind,
-  StudioDocumentWorkspace,
-  StudioProjectDocumentEntry,
-  StudioProjectDocumentEventTarget,
-  StudioProjectDocumentState,
-  StudioProjectDocumentStorage,
+  type CreateStudioProjectDocumentInput,
+  type StudioDocumentKind,
+  type StudioDocumentWorkspace,
+  type StudioProjectDocumentEntry,
+  type StudioProjectDocumentEventTarget,
+  type StudioProjectDocumentState,
+  type StudioProjectDocumentStorage,
 } from "./studio-project-document-reader";
 import type { StudioProjectKind } from "./studio-project-library-store";
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   runStudioBg3dBabylonSerializedReadbacks,
+  readStudioBg3dBabylonDepthTopDown,
   StudioBg3dBabylonCaptureError,
 } from "./studio-bg3d-babylon-artifact-capture";
 
@@ -141,5 +142,17 @@ describe("Studio Babylon serialized GPU readback lease", () => {
       stage: "depth",
     });
     expect(error.message).toContain("depth readback");
+  });
+});
+
+
+describe("Studio Babylon canonical depth readback", () => {
+  it.each([1, 4])("normalizes bottom-up %s-channel RTT data on either backend without moving columns", (channels) => {
+    const bottomUp = [0.75, 1, 0.25, 0.5];
+    const source = Float32Array.from(bottomUp.flatMap((depth) => channels === 1 ? [depth] : [depth, 0, 0, 1]));
+    const result = readStudioBg3dBabylonDepthTopDown(source, 2, 2);
+    expect([...result]).toEqual([0.25, 0.5, 0.75, 1]);
+    expect(source[0]).toBe(0.75);
+    expect(result.buffer).not.toBe(source.buffer);
   });
 });

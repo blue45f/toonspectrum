@@ -1,7 +1,7 @@
-import { supportsSiteExperience } from "./site-experience-policy";
+import { supportsSiteExperience } from "./site-experience-policy.ts";
 
 // Retain the existing public model contract while keeping shell policy lightweight.
-export { EXPERIENCE_MODE_KEY, parseExperienceMode, supportsSiteExperience, type ExperienceMode, type ExperienceLocale } from "./site-experience-policy";
+export { EXPERIENCE_MODE_KEY, parseExperienceMode, supportsSiteExperience, type ExperienceMode, type ExperienceLocale } from "./site-experience-policy.ts";
 
 export const EXPERIENCE_DESTINATIONS = {
   discover: { href: "/discover", icon: "discover", ko: ["영감 찾기", "취향에 맞는 작품에서 다음 장면의 힌트를 찾으세요."], en: ["Find inspiration", "Discover a story that sparks your next scene."] },

@@ -579,6 +579,23 @@ function mergeDiagnostics(target: BrowserDiagnostics, source: BrowserDiagnostics
   target.fiveHundredResponses.push(...source.fiveHundredResponses);
 }
 
+/** Static production preview has no auth API. Make the unauthenticated session explicit so the
+ * shipped local-durability gate evaluates the same guest boundary it receives in production.
+ * This fixtures transport only; OPFS/checkpoint/reload behavior remains the real browser runtime. */
+async function installStudioGuestSessionBoundary(page: Page): Promise<void> {
+  await page.route("**/api/auth/session", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false, user: null }),
+    });
+  });
+}
+
 async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
   const monitorBootstrap = (input: Readonly<{
     appSettingsKey: string;
@@ -1083,19 +1100,94 @@ function pointerSampleCount(contact: TrustedPointerContactEvidence | undefined):
   return contact ? 1 + contact.moves.length : 0;
 }
 
+async function reopenStudioAfterDurableWriterRelease(
+  page: Page,
+  studioUrl: string,
+): Promise<void> {
+  log("unmounting Studio before Hokusai durable recovery proof");
+  // A hard reload can kill the document before asynchronous OPFS writer cleanup finishes. Move
+  // through a shipped Studio companion route first, then prove every recovery writer lease and
+  // Web Lock is released before opening a fresh editor document.
+  await page.evaluate(() => {
+    globalThis.history.pushState(
+      {},
+      "",
+      "/studio/tools-companion?studio-hokusai-verifier-release=1",
+    );
+    globalThis.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await page.locator('[data-studio-editor="true"]').waitFor({
+    state: "detached",
+    timeout: 12_000,
+  });
+  const inspectDurableWriters = () => page.evaluate(async () => {
+    type DirectoryWithEntries = FileSystemDirectoryHandle & {
+      entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+    };
+    if (typeof navigator.storage?.getDirectory !== "function") {
+      return { writerPaths: ["OPFS-unavailable"], recoveryLockCount: 0 };
+    }
+    type QueryableLockManager = LockManager & {
+      query?: () => Promise<{
+        held: Array<{ name?: string }>;
+        pending: Array<{ name?: string }>;
+      }>;
+    };
+    const lockManager = navigator.locks as QueryableLockManager | undefined;
+    const lockSnapshot = await lockManager?.query?.();
+    const recoveryLockCount = [
+      ...(lockSnapshot?.held ?? []),
+      ...(lockSnapshot?.pending ?? []),
+    ].filter(({ name }) => name?.startsWith("toonspectrum-opfs-recovery:") === true).length;
+    const opfsRoot = await navigator.storage.getDirectory();
+    const writerPaths: string[] = [];
+    const pending: Array<{ directory: FileSystemDirectoryHandle; prefix: string }> = [{
+      directory: opfsRoot,
+      prefix: "",
+    }];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (!current) break;
+      for await (const [name, handle] of (current.directory as DirectoryWithEntries).entries()) {
+        const path = current.prefix ? `${current.prefix}/${name}` : name;
+        if (handle.kind === "file" && name === "writer-lease.bin") writerPaths.push(path);
+        if (handle.kind === "directory") {
+          pending.push({ directory: handle as FileSystemDirectoryHandle, prefix: path });
+        }
+      }
+    }
+    return { writerPaths: writerPaths.sort(), recoveryLockCount };
+  });
+  let leaseFreeSince: number | null = null;
+  let latest = await inspectDurableWriters();
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    latest = await inspectDurableWriters();
+    if (latest.writerPaths.length === 0 && latest.recoveryLockCount === 0) {
+      leaseFreeSince ??= Date.now();
+      if (Date.now() - leaseFreeSince >= 1_500) break;
+    } else {
+      leaseFreeSince = null;
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  invariant(
+    leaseFreeSince !== null
+      && Date.now() - leaseFreeSince >= 1_500
+      && latest.writerPaths.length === 0
+      && latest.recoveryLockCount === 0,
+    `Hokusai durable writers did not release stably: ${JSON.stringify(latest)}`,
+  );
+  log("Hokusai durable writers stayed released for 1.5s; opening a fresh editor document");
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 25_000 });
+}
+
 async function restoreAutosaveAfterReload(page: Page): Promise<void> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
   const banner = page.locator("[data-studio-recovery-notice]");
   await banner.waitFor({ state: "visible", timeout: 10_000 });
-  await banner.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-  try {
-    await banner.waitFor({ state: "detached", timeout: 10_000 });
-  } catch (cause) {
-    const detail = await page.locator('[data-studio-sheet-id="props"], [data-studio-recovery-notice], [role="alert"]').allTextContents();
-    await page.screenshot({ path: join(SCRATCH, "explicit-inspector-restore-failed.png"), animations: "disabled" });
-    writeFileSync(join(SCRATCH, "explicit-inspector-restore-failed.json"), JSON.stringify({ detail }, null, 2));
-    throw new Error(`Recovery UI did not complete: ${detail.join(" | ")}`, { cause });
-  }
+  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
+  await banner.waitFor({ state: "detached", timeout: 10_000 });
 }
 
 async function runDefaultShelfScenario(
@@ -1109,6 +1201,7 @@ async function runDefaultShelfScenario(
   const diagnostics = collectBrowserDiagnostics(page, scenario.presetId, studioUrl);
   const screenshot = join(SCRATCH, `${scenario.presetId}-blocked-shelf-vector.png`);
   try {
+    await installStudioGuestSessionBoundary(page);
     await installInstrumentedCleanStudioState(page);
     await prepareStudio(page, studioUrl);
     await activatePen(page);
@@ -1179,6 +1272,7 @@ async function runExplicitInspectorScenario(
   const screenshotConverted = join(SCRATCH, "explicit-inspector-01-converted.png");
   const screenshotReloaded = join(SCRATCH, "explicit-inspector-02-reloaded.png");
   try {
+    await installStudioGuestSessionBoundary(page);
     await installInstrumentedCleanStudioState(page);
     await prepareStudio(page, studioUrl);
     await activatePen(page);
@@ -1331,7 +1425,7 @@ async function runExplicitInspectorScenario(
     // Studio's durable OPFS/SQLite autosave starts after a 1.5-second debounce. Let that write
     // settle before reload; the recovery banner plus exact restored IDs below is the durable proof.
     await page.waitForTimeout(3_500);
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 25_000 });
+    await reopenStudioAfterDurableWriterRelease(page, studioUrl);
     await restoreAutosaveAfterReload(page);
     await openLayerNavigator(page);
     const reloaded = await waitForLayerRows(

@@ -14,6 +14,56 @@ import {
 
 const CreatorReferenceIdSchema = z.string().trim().min(1).max(160).nullable();
 const CreatorWorkRevisionSchema = z.number().int().min(1).max(2_147_483_647);
+
+export const CreatorWorkListQuerySchema = z
+  .object({
+    titleId: z.string().trim().min(1).max(160).optional(),
+    userId: z.string().trim().min(1).max(160).optional(),
+    sort: z.enum(["recent", "likes", "views"]).optional(),
+    tag: z.string().trim().max(24).optional(),
+    seriesId: z.string().trim().min(1).max(160).optional(),
+    challengeId: z.string().trim().min(1).max(160).optional(),
+    contentType: z.enum(["all", "illustration", "webtoon", "process"]).optional(),
+    portfolio: z.enum(["1", "true"]).optional(),
+    provenance: z.enum(["human", "ai_assisted", "ai_generated", "mixed"]).optional(),
+    bookmarked: z.enum(["1", "true"]).optional(),
+  })
+  .strict();
+
+export const CreatorWorkParamsSchema = z
+  .object({ id: z.string().trim().min(1).max(160) })
+  .strict();
+
+export const CreatorExternalPublicationParamsSchema = CreatorWorkParamsSchema.extend({
+  publicationId: z.string().uuid(),
+}).strict();
+
+export const SaveCreatorExternalPublicationSchema = z
+  .object({
+    releaseId: z.string().uuid().optional(),
+    platform: z.enum([
+      "naver",
+      "webtoon_canvas",
+      "tapas",
+      "postype",
+      "pixiv",
+      "globalcomix",
+      "other",
+    ]),
+    externalUrl: z.url().max(2_048).refine((value) => value.startsWith("https://"), {
+      message: "외부 게시 주소는 HTTPS URL이어야 합니다.",
+    }),
+    status: z.enum(["draft", "published", "updated", "removed"]).default("published"),
+    publishedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  })
+  .strict();
+
+export const ReportCreatorWorkSchema = z
+  .object({
+    reason: z.enum(["copyright", "unsafe", "spam", "misleading", "ai_disclosure", "other"]),
+    details: z.string().trim().max(1_000).default(""),
+  })
+  .strict();
 const CreatorCrdtServerSequenceSchema = z
   .string()
   .regex(/^(?:0|[1-9]\d{0,18})$/)
@@ -383,6 +433,15 @@ export const ModerateCreatorAssetSchema = z
   })
   .strict();
 
+export class CreatorWorkListQueryDto extends createZodDto(CreatorWorkListQuerySchema) {}
+export class CreatorWorkParamsDto extends createZodDto(CreatorWorkParamsSchema) {}
+export class CreatorExternalPublicationParamsDto extends createZodDto(
+  CreatorExternalPublicationParamsSchema
+) {}
+export class SaveCreatorExternalPublicationDto extends createZodDto(
+  SaveCreatorExternalPublicationSchema
+) {}
+export class ReportCreatorWorkDto extends createZodDto(ReportCreatorWorkSchema) {}
 export class CreateCreatorWorkDto extends createZodDto(CreateCreatorWorkSchema) {}
 export class UpdateCreatorWorkDto extends createZodDto(UpdateCreatorWorkSchema) {}
 export class UpdateCreatorSharedDocumentDto extends createZodDto(UpdateCreatorSharedDocumentSchema) {}

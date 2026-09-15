@@ -11,6 +11,8 @@ import {
   updateCustomPublishedResource,
 } from "./market-custom-registry";
 
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
+
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 describe("market-custom-registry", () => {
@@ -19,28 +21,10 @@ describe("market-custom-registry", () => {
   });
 
   const sample: CreatorMarketplaceResourceRecord = {
-    schemaVersion: 1,
-    id: "test-custom-1",
-    packageId: "user/brush/pen",
+    ...CREATOR_MARKETPLACE_STARTER_RECORDS[0],
+    id: "123e4567-e89b-42d3-a456-426614174333",
     name: "테스트용 G펜",
-    description: "테스트 브러시",
-    kind: "brush",
-    resourceVersion: "1.0.0",
-    minimumStudioVersion: "0.1.0",
-    tags: ["선화", "G펜"],
-    license: "toonspectrum-standard",
-    attributionText: "",
-    containsAi: false,
-    provenance: { origin: "original", authoredByPublisher: true },
-    compatibility: { engines: ["canvas2d"] },
-    entries: [],
-    manifestHash: "0".repeat(64),
-    manifestByteSize: 100,
-    publisher: { id: "user-1", name: "테스트 작가", avatar: null },
-    createdAt: "2026-09-01T00:00:00.000Z",
-    updatedAt: "2026-09-01T00:00:00.000Z",
     isOwner: true,
-    access: "free",
   };
 
   it("saves, updates, and deletes custom published resource", () => {
@@ -50,7 +34,7 @@ describe("market-custom-registry", () => {
     expect(list[0].name).toBe("테스트용 G펜");
 
     // Update
-    const updated = updateCustomPublishedResource("test-custom-1", {
+    const updated = updateCustomPublishedResource(sample.id, {
       name: "업데이트된 G펜",
       resourceVersion: "1.1.0",
     });
@@ -58,11 +42,11 @@ describe("market-custom-registry", () => {
     expect(updated?.resourceVersion).toBe("1.1.0");
 
     // Retrieve via merged finder
-    const found = findMergedMarketResourceById("test-custom-1");
+    const found = findMergedMarketResourceById(sample.id);
     expect(found?.name).toBe("업데이트된 G펜");
 
     // Delete
-    deleteCustomPublishedResource("test-custom-1");
+    deleteCustomPublishedResource(sample.id);
     expect(getCustomPublishedResources()).toHaveLength(0);
   });
 
@@ -70,6 +54,6 @@ describe("market-custom-registry", () => {
     saveCustomPublishedResource(sample);
     const all = getAllMergedMarketResources();
     expect(all.length).toBeGreaterThan(1);
-    expect(all[0].id).toBe("test-custom-1"); // prepended
+    expect(all[0].id).toBe(sample.id); // prepended
   });
 });

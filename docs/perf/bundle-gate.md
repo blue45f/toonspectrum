@@ -133,7 +133,7 @@ git add scripts/bundle-baseline.json
 
 1. `dist/`를 `vite preview`로 서빙(127.0.0.1 고정 — macOS에서 `localhost`는 ::1로 풀린다)
 2. Playwright Chromium 1440×900, 온보딩 오버레이는 `localStorage`로 미리 닫음
-3. `/studio` 콜드 진입 → Konva 표면이 붙을 때까지 대기 → 추가 settle(기본 5초)
+3. `/studio/canvas` 편집기 콜드 진입 → Konva 표면이 붙을 때까지 대기 → 추가 settle(기본 5초)
 4. `performance.getEntriesByType("resource")`의 `.js` 전량을 수집
    (Resource Timing 버퍼를 3000으로 올린다 — 기본값 250은 Studio에서 **잘린다**)
 5. manifest 정적 폐포(StudioPage ∪ index.html)의 파일명 집합과 차집합
@@ -225,3 +225,36 @@ studio bundle check failed: app entry raw regressed to 2354.2 KiB
 받아들인 대가: dry-media 커널·carrier ribbon·검증 엔진 레인이 studio route에 원본 약 100 KiB,
 gzip 약 33 KiB를 더한다. main의 living-ink WGSL 분할로는 상쇄되지 않는다. 다음 웨이브의 ratchet은
 이 올라간 바닥에서 시작하므로, 이 표가 그 바닥이 공짜가 아니었다는 기록이다.
+
+### 2026-09-14 — 통합 PR #1427 기능 웨이브
+
+미병합 작업 브랜치와 복구 워킹트리를 하나의 PR로 합친 뒤 프로덕션 번들을 다시 측정했다.
+PSD 진행 문구가 디코더 모듈을 정적 그래프로 끌어오던 회귀는 별도 표시 전용 모듈로 분리해
+구조 게이트를 복구했다. 따라서 아래 증가는 SVG/PSD 엔진을 다시 eager 로드한 결과가 아니라,
+이번 통합에서 실제 제품 경로에 연결된 Studio·BG3D 기능 폭을 반영한다.
+
+| 키 | 이전 기준선 | 통합 실측 | 변화 |
+| --- | ---: | ---: | ---: |
+| Studio route raw | 5,963,162 B | 6,292,698 B | +5.53% |
+| Studio route gzip | 1,927,782 B | 2,106,996 B | +9.30% |
+| Studio route after app shell raw | 5,384,806 B | 5,702,007 B | +5.89% |
+| Studio route after app shell gzip | 1,740,186 B | 1,915,330 B | +10.06% |
+| BG3D shot-batch runtime after editor gzip | 33,550 B | 34,782 B | +3.67% |
+
+런타임 프로브도 프로젝트 홈 `/studio`가 아니라 실제 편집기 `/studio/canvas`를 측정하도록
+교정했다. 이전 `/studio` 측정은 캔버스가 없는 홈 화면이라 `interactiveMs: null`을 만들었기 때문이다.
+돌아온 사용자 상태의 편집기는 첫 캔버스를 2,047ms에 붙였고 다음 값을 기록했다.
+
+| 런타임 키 | 이전 편집기 기준선 | 통합 편집기 실측 | 변화 |
+| --- | ---: | ---: | ---: |
+| startup JS requests | 274 | 339 | +23.72% |
+| startup JS decoded bytes | 6,377,710 B | 8,281,945 B | +29.86% |
+| eager-dynamic requests | 66 | 107 | +62.12% |
+| eager-dynamic decoded bytes | 1,263,563 B | 1,989,247 B | +57.43% |
+
+같은 빌드에서 분할 구조는 개선됐다. Studio route 정적 청크는 274→232,
+app-shell 이후 청크는 265→223, 앱 엔트리는 10→9로 줄었다. 앱 엔트리도
+633,271→590,691 B(raw), 198,263→191,666 B(gzip)로 감소했고 BG3D 활성화 청크는
+68→62로 줄었다. 전체 프로덕션 빌드, CSP 검증, OG 60,229편 메타데이터 생성과 구조 게이트를
+통과한 산출물만 기준선으로 기록했다. 이 수용은 reference budget을 완화하지 않으며 이후 변경은
+새 기준선의 +2% 래칫을 다시 적용받는다.

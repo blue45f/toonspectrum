@@ -92,17 +92,16 @@ export interface CharacterShadingLayers {
 }
 
 /**
- * Derive Multiply then Screen layers that reconstruct opaque beauty from opaque flat RGB.
+ * Derive Multiply then Screen factors inside the PSD's opaque isolated colour group.
  * For each normalized channel F/B, darkening uses M=B/F and brightening uses S=(B-F)/(1-F).
  * Unchanged/opposite-direction channels are neutral (Multiply white, Screen black), allowing
  * one pixel to darken red while brightening blue. Strict comparisons avoid division by zero
  * at black/white. RGBA8 factor quantization introduces at most one byte of reconstruction error.
  *
- * Unchanged pixels and pixels without shared coverage remain transparent. Changed layers carry
- * min(flat alpha, beauty alpha); this preserves a bounded silhouette but does not invert general
- * source-over compositing at antialiased/translucent edges. Exact reconstruction assumes opaque
- * pixels and the same RGB blend space as these captures. Different alpha, clipping/group rules,
- * gamma settings, extra line layers, and translucent materials require separate composite QA.
+ * Changed factors are opaque and unchanged pixels transparent. The parent group applies Beauty
+ * alpha once after colour compositing; repeating silhouette alpha here would thicken edges and
+ * dilute the factors. The split also handles differing flat/Beauty coverage. This contract uses
+ * captured byte/sRGB colour space, not application-specific linear-light blending preferences.
  */
 export function deriveCharacterShadingLayers(
   flat: Uint8ClampedArray,
@@ -115,8 +114,7 @@ export function deriveCharacterShadingLayers(
   const shadow = new Uint8ClampedArray(flat.length);
   const highlight = new Uint8ClampedArray(flat.length);
   for (let i = 0; i < flat.length; i += 4) {
-    const coverage = Math.min(flat[i + 3], beauty[i + 3]);
-    if (coverage === 0) continue;
+    if (beauty[i + 3] === 0) continue;
     let darkened = false;
     let brightened = false;
     for (let channel = 0; channel < 3; channel += 1) {
@@ -127,8 +125,8 @@ export function deriveCharacterShadingLayers(
       darkened ||= target < source;
       brightened ||= target > source;
     }
-    shadow[i + 3] = darkened ? coverage : 0;
-    highlight[i + 3] = brightened ? coverage : 0;
+    shadow[i + 3] = darkened ? 255 : 0;
+    highlight[i + 3] = brightened ? 255 : 0;
   }
   return { shadow, highlight };
 }

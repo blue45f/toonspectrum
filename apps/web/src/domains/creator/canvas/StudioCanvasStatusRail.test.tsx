@@ -305,7 +305,7 @@ describe("StudioCanvasStatusRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 아래쪽 정렬" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 가로 균등 분배" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 세로 균등 분배" }));
-    fireEvent.click(screen.getByRole("button", { name: "복제" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 복제" }));
     fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "해제" }));
 

@@ -13,15 +13,11 @@ import { StudioAssetToolPopoverWorkspace } from "./StudioAssetToolPopoverWorkspa
 
 const mocks = vi.hoisted(() => ({
   catalog: [] as StudioUnifiedAssetItem[],
-  preload: vi.fn(),
 }));
 
 vi.mock("./studio-bg-scenes", () => ({ BG_SCENES: [] }));
 vi.mock("./studio-bg-scenes-extra", () => ({ BG_SCENES_EXTRA: [] }));
 vi.mock("./studio-scene-templates", () => ({ SCENE_TEMPLATES: [] }));
-vi.mock("./studio-page-lazy-ui", () => ({
-  preloadStudioAssetMenuPanel: mocks.preload,
-}));
 vi.mock("./StudioAssetLegacyPanel", () => ({
   StudioAssetLegacyPanel: () => (
     <div data-testid="legacy-panel">기존 보관함</div>
@@ -34,14 +30,10 @@ vi.mock("./StudioAssetToolPopoverBody", () => ({
 }));
 vi.mock("./studio-chrome-ui", () => ({
   StudioMenuPopoverHeader: () => <div data-testid="menu-header" />,
-  StudioMenuSubtabs: ({
-    onSelect,
-  }: {
-    readonly onSelect: (id: string) => void;
-  }) => (
-    <button type="button" onClick={() => onSelect("asset")}>
-      에셋 탭
-    </button>
+}));
+vi.mock("./StudioUnifiedAssetPreviewSurface", () => ({
+  StudioUnifiedAssetPreviewSurface: ({ preview }: { preview: { kind: string } }) => (
+    <div data-testid={`preview-${preview.kind}`}>미리보기</div>
   ),
 }));
 vi.mock("./studio-unified-asset-catalog", async (importOriginal) => {
@@ -54,7 +46,24 @@ vi.mock("./studio-unified-asset-catalog", async (importOriginal) => {
   };
 });
 
+function contractForSource(source: StudioUnifiedAssetSource): {
+  useMode: StudioUnifiedAssetItem["useMode"];
+  useLabel: string;
+} {
+  if (source.kind === "scene-template") {
+    return { useMode: "apply", useLabel: "장면 배치" };
+  }
+  if (source.kind === "object-3d") {
+    return { useMode: "open", useLabel: "3D 도구 열기" };
+  }
+  if (source.kind === "native-tool") {
+    return { useMode: "open", useLabel: "도구 열기" };
+  }
+  return { useMode: "insert", useLabel: "캔버스에 삽입" };
+}
+
 function createItem(source: StudioUnifiedAssetSource): StudioUnifiedAssetItem {
+  const contract = contractForSource(source);
   return {
     id: "test:item",
     category:
@@ -62,7 +71,9 @@ function createItem(source: StudioUnifiedAssetSource): StudioUnifiedAssetItem {
         ? "3d"
         : source.kind === "local"
           ? "mine"
-          : "element",
+          : source.kind === "background" || source.kind === "scene-template"
+            ? "scene"
+            : "element",
     scope: source.kind === "local" ? "mine" : "studio",
     title: "테스트 에셋",
     description: "테스트 설명",
@@ -70,11 +81,7 @@ function createItem(source: StudioUnifiedAssetSource): StudioUnifiedAssetItem {
     keywords: ["테스트"],
     badges: ["검증"],
     preview: { kind: "none" },
-    useMode:
-      source.kind === "native-tool" || source.kind === "object-3d"
-        ? "open"
-        : "insert",
-    useLabel: "사용",
+    ...contract,
     discoverability: "standard",
     sortPriority: 1,
     source,
@@ -86,6 +93,7 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
     addBgScene: vi.fn(),
     addCatalogElement: vi.fn(),
     addRenderedImage: vi.fn(() => true),
+    addSceneTemplate: vi.fn(async () => undefined),
     addText: vi.fn(),
     applyAiAssistPresetPrompt: vi.fn(),
     onPickImage: vi.fn(async () => undefined),
@@ -109,18 +117,23 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
   return { toolBelt, stableHandlers, setMenu };
 }
 
-async function renderRoute(source: StudioUnifiedAssetSource) {
-  mocks.catalog = [createItem(source)];
-  const context = createToolBelt();
-  render(<StudioAssetToolPopoverWorkspace toolBelt={context.toolBelt} />);
+async function clickAssetUseButton(item: StudioUnifiedAssetItem): Promise<void> {
   fireEvent.click(
-    await screen.findByRole("button", { name: /테스트 에셋/ }),
+    await screen.findByRole("button", {
+      name: `${item.title} ${item.useLabel}`,
+    }),
   );
-  return context;
 }
 
-// Route assertions measure behavior after loading, not CI module-transform speed.
-// Await both real lazy-entry modules without mocking their exports or relaxing DOM timeouts.
+async function renderRoute(source: StudioUnifiedAssetSource) {
+  const item = createItem(source);
+  mocks.catalog = [item];
+  const context = createToolBelt();
+  render(<StudioAssetToolPopoverWorkspace toolBelt={context.toolBelt} />);
+  await clickAssetUseButton(item);
+  return { ...context, item };
+}
+
 beforeAll(async () => {
   await Promise.all([
     import("./StudioUnifiedAssetToolPopoverContent"),
@@ -131,27 +144,39 @@ beforeAll(async () => {
 afterEach(cleanup);
 beforeEach(() => {
   mocks.catalog = [];
-  mocks.preload.mockReset();
   window.localStorage.clear();
 });
 
 describe("StudioAssetToolPopoverWorkspace", () => {
   it.each([
-    ["background", false], ["element", false],
-    ["background", true], ["element", true],
+    ["background", false],
+    ["element", false],
+    ["background", true],
+    ["element", true],
   ] as const)("reports the actual %s insertion outcome: %s", async (kind, accepted) => {
     const source: StudioUnifiedAssetSource = kind === "background"
       ? { kind, value: { id: "bg", label: "배경", genre: "학원" } }
-      : { kind, value: {
-          id: "element", label: "요소", category: "shape", keywords: [],
-          width: 10, height: 10, svg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
-        } };
-    mocks.catalog = [createItem(source)];
+      : {
+          kind,
+          value: {
+            id: "element",
+            label: "요소",
+            category: "shape",
+            keywords: [],
+            width: 10,
+            height: 10,
+            svg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
+          },
+        };
+    const item = createItem(source);
+    mocks.catalog = [item];
     const { toolBelt, stableHandlers } = createToolBelt();
-    const insert = kind === "background" ? stableHandlers.addBgScene : stableHandlers.addCatalogElement;
+    const insert = kind === "background"
+      ? stableHandlers.addBgScene
+      : stableHandlers.addCatalogElement;
     insert.mockReturnValue(accepted);
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
-    fireEvent.click(await screen.findByRole("button", { name: /테스트 에셋/ }));
+    await clickAssetUseButton(item);
     if (accepted) {
       expect(await screen.findByText("테스트 에셋을(를) 캔버스에 삽입했습니다.")).toBeTruthy();
     } else {
@@ -160,23 +185,14 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     }
   });
 
-  it("keeps the workspace mounted while legacy asset tabs switch", async () => {
-    const first = createToolBelt({ assetTab: "community" });
-    const { rerender } = render(
-      <StudioAssetToolPopoverWorkspace toolBelt={first.toolBelt} />,
-    );
+  it("opens community deep links inside the same workspace", async () => {
+    const { toolBelt } = createToolBelt({ assetTab: "community" });
+    render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
+
     expect(await screen.findByTestId("legacy-panel")).toBeTruthy();
-
-    const second = {
-      ...first.toolBelt,
-      assetTab: "mine",
-    } as StudioToolBeltContentProps;
-    rerender(<StudioAssetToolPopoverWorkspace toolBelt={second} />);
-
-    expect(screen.getByTestId("legacy-panel")).toBeTruthy();
-    expect(
-      screen.queryByRole("searchbox", { name: "에셋 통합 검색" }),
-    ).toBeNull();
+    expect(screen.getByRole("button", { name: "보관함 · 마켓" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "통합 탐색" }));
+    expect(await screen.findByRole("searchbox", { name: "에셋 통합 검색" })).toBeTruthy();
   });
 
   it("falls back to the owned legacy body outside the asset menu", () => {
@@ -185,14 +201,12 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     expect(screen.getByTestId("legacy-body")).toBeTruthy();
   });
 
-  it("preloads the legacy asset surface from the active subtab", async () => {
-    const { toolBelt, setMenu } = createToolBelt();
+  it("renders one integrated workspace without the previous duplicate subtabs", async () => {
+    const { toolBelt } = createToolBelt();
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "에셋 탭" }),
-    );
-    expect(mocks.preload).toHaveBeenCalledTimes(1);
-    expect(setMenu).toHaveBeenCalledWith("asset");
+    expect(await screen.findByRole("region", { name: "통합 에셋 작업 공간" })).toBeTruthy();
+    expect(screen.getByTestId("menu-header")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "에셋 탭" })).toBeNull();
   });
 
   it("routes backgrounds through the existing background inserter", async () => {
@@ -206,7 +220,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     );
   });
 
-  it("routes scene templates to their preview surface", async () => {
+  it("applies scene templates directly to the current page", async () => {
     const source = {
       kind: "scene-template" as const,
       value: {
@@ -217,8 +231,11 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         build: () => [],
       },
     };
-    const { setMenu } = await renderRoute(source);
-    await waitFor(() => expect(setMenu).toHaveBeenCalledWith("scene"));
+    const { stableHandlers, setMenu } = await renderRoute(source);
+    await waitFor(() =>
+      expect(stableHandlers.addSceneTemplate).toHaveBeenCalledWith(source.value),
+    );
+    expect(setMenu).not.toHaveBeenCalledWith("scene");
   });
 
   it("routes vector elements through the catalog inserter", async () => {
@@ -236,13 +253,11 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     };
     const { stableHandlers } = await renderRoute(source);
     await waitFor(() =>
-      expect(stableHandlers.addCatalogElement).toHaveBeenCalledWith(
-        source.value,
-      ),
+      expect(stableHandlers.addCatalogElement).toHaveBeenCalledWith(source.value),
     );
   });
 
-  it("routes 3D objects through the owned insert surface", async () => {
+  it("routes 3D objects through the owned editable insert surface", async () => {
     const source = {
       kind: "object-3d" as const,
       value: {
@@ -306,38 +321,27 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     await waitFor(() => expect(setMenu).toHaveBeenCalledWith("bubble"));
   });
 
-  it("blocks immediate text insertion while the active surface is review-locked", async () => {
+  it("disables immediate mutations while the active surface is review-locked", async () => {
     const { toolBelt, stableHandlers } = createToolBelt({
       activeSurfaceReviewLocked: true,
     });
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "텍스트 텍스트 추가" }),
-    );
-
-    expect(
-      await screen.findByText(
-        "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.",
-      ),
-    ).toBeTruthy();
+    const textButton = await screen.findByRole("button", { name: "텍스트" });
+    expect((textButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(textButton);
     expect(stableHandlers.addText).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: /최근 사용 0/u }),
-    ).toBeTruthy();
   });
 
-  it("blocks image upload before invoking the owned importer while review-locked", async () => {
+  it("blocks direct file input changes while review-locked", async () => {
     const { toolBelt, stableHandlers } = createToolBelt({
       activeSurfaceReviewLocked: true,
     });
-    const view = render(
-      <StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />,
-    );
+    const view = render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
     await screen.findByRole("searchbox", { name: "에셋 통합 검색" });
     const input = view.container.querySelector('input[type="file"]');
     if (!(input instanceof HTMLInputElement)) {
-      throw new Error("삽입 허브 파일 입력이 없습니다.");
+      throw new Error("에셋 워크스페이스 파일 입력이 없습니다.");
     }
 
     fireEvent.change(input, {
@@ -347,14 +351,9 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     });
 
     expect(
-      await screen.findByText(
-        "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.",
-      ),
+      await screen.findByText("검토 잠금을 해제한 뒤 이미지를 가져와 주세요."),
     ).toBeTruthy();
     expect(stableHandlers.onPickImage).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: /최근 사용 0/u }),
-    ).toBeTruthy();
   });
 
   it("hands empty-search context to the AI background tool", async () => {

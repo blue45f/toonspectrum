@@ -1,6 +1,9 @@
 import { Boxes, SlidersHorizontal } from "lucide-react";
+import { MarketBuiltinAssetPreview } from "./MarketBuiltinAssetPreview";
 
 import { MarketVerifiedAssetPreview } from "./MarketVerifiedAssetPreview";
+
+import { findStudioMarketplaceCc0Asset } from "@/domains/creator/studio-marketplace-cc0-catalog";
 
 import type { RecipePreviewData } from "../models/market-preview";
 
@@ -30,6 +33,8 @@ export function MarketAssetRecipePreview({
   className,
 }: MarketAssetRecipePreviewProps) {
   const parameters = Object.entries(recipe.parameters ?? {}).slice(0, 8);
+  const reference = recipe.runtimeRef ?? recipe.recipeId;
+  const verifiedAsset = findStudioMarketplaceCc0Asset(reference);
   const deliveryLabel = recipe.runtimeRef ? "Studio 내장 에셋 참조" : "절차형 에셋 레시피";
 
   return (
@@ -50,7 +55,9 @@ export function MarketAssetRecipePreview({
         </span>
       </div>
 
-      <MarketVerifiedAssetPreview reference={recipe.recipeId} />
+      {verifiedAsset
+        ? <MarketVerifiedAssetPreview reference={reference} />
+        : <MarketBuiltinAssetPreview runtimeRef={reference} />}
       <dl className="divide-y divide-line px-4">
         <div className="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
           <dt className="text-xs text-fg-3">레시피 식별자</dt>

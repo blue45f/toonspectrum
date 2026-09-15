@@ -1,10 +1,11 @@
 export const RESOURCE_PAGES = [
   { path: "/research", title: "리서치 데스크", description: "하나의 질문에서 자료 탐색, 출처 점검, 기획 진행도, 제작 전환까지 관리하세요." },
+  { path: "/research/open-creation", title: "무료 창작 재료실", description: "공개 자료와 저장 보드를 6종의 편집 가능한 제작 초안으로 연결하세요." },
   { path: "/research/packs", title: "오픈 콘텐츠 제작실", description: "무료 공개 자료와 출처를 묶어 콘티·설정집·비교 노트를 만드세요." },
   { path: "/now", title: "오늘의 영감", description: "매일 하나의 사물·공간·빛·소리와 5컷 미션으로 창작을 시작하세요." },
   { path: "/opportunities", title: "작가 기회센터", description: "지원사업을 찾아 저장하고 접수 준비를 시작하세요." },
   { path: "/research/assets", title: "창작 레퍼런스", description: "복식·소품·공간 자료를 권리·시대·재료 정보와 함께 탐색하고 비교하세요." },
-  { path: "/research/materials", title: "배경·소품 소재", description: "무료 공개 소재를 한글로 탐색하고 장면별 목록과 출처 명세서로 정리하세요." },
+  { path: "/research/catalog", title: "작품 리서치 랩", description: "수집된 작품의 장르·소재·플랫폼을 비교하고 나만의 기획 노트로 연결하세요." },
   { path: "/research/books", title: "글로벌 판본 탐색", description: "Open Library와 openBD에서 작품명·작가·ISBN으로 판본을 조사하세요." },
   { path: "/learn/recipes", title: "웹툰 제작 레시피", description: "작은 실험으로 연출의 차이를 확인하세요." },
   { path: "/story-lab", title: "스토리 연구실", description: "인물의 욕망과 갈등에서 첫 화를 설계하세요." },

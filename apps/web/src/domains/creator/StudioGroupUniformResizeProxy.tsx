@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useLayoutEffect, useRef } from "react";
-import { Rect, Transformer } from "react-konva/lib/ReactKonvaCore";
+import { Rect } from "react-konva/lib/ReactKonvaCore";
 
 import {
   beginStudioLiveCanvasGesture,
@@ -12,6 +12,11 @@ import { beginStudioKonvaGroupDrawTransformGesture } from "./studio-live-transfo
 import {
   mirrorStudioDrawElementTranslation,
 } from "./studio-selection-chrome-mirror";
+import {
+  constrainStudioTransformBox,
+  studioTransformMinimumDocumentSize,
+} from "./studio-transform-interaction";
+import { StudioNaturalTransformer } from "./StudioNaturalTransformer";
 
 import type { DrawEl, El } from "./studio-element-model";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
@@ -23,9 +28,9 @@ import type {
 import type { StudioLiveTransformDraftStore } from "./studio-live-transform-draft-store";
 import type { StudioLiveTransformPreviewScheduler } from "./studio-live-transform-preview-session";
 import type Konva from "konva";
+import type { Box as KonvaTransformerBox } from "konva/lib/shapes/Transformer";
 import type { RefObject } from "react";
 
-const MINIMUM_VISUAL_SIZE_PX = 24;
 const DESKTOP_ANCHOR_VISUAL_SIZE_PX = 13;
 const COARSE_ANCHOR_VISUAL_SIZE_PX = 14;
 const DESKTOP_ANCHOR_HIT_SIZE_PX = 22;
@@ -510,7 +515,7 @@ export function StudioGroupUniformResizeProxy({
     };
   }, [mirroredDragElementId, bounds.x, bounds.y, validBounds]);
 
-  const minimumSize = MINIMUM_VISUAL_SIZE_PX / scale;
+  const minimumSize = studioTransformMinimumDocumentSize(scale);
 
   return (
     <Fragment>
@@ -530,18 +535,17 @@ export function StudioGroupUniformResizeProxy({
         onTransform={handleTransform}
         onTransformEnd={handleTransformEnd}
       />
-      <Transformer
+      <StudioNaturalTransformer
         ref={transformerRef}
         name="studio-group-uniform-resize-transformer"
         visible={enabled && validBounds}
         resizeEnabled={enabled && validBounds}
         rotateEnabled={rotatable && enabled && validBounds}
-        rotationSnaps={rotatable ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
-        rotationSnapTolerance={6}
+        naturalRotationEnabled={rotatable}
+        naturalRatioMode={freeTransform ? "shift" : "always"}
         flipEnabled={false}
-        keepRatio={!freeTransform}
-        centeredScaling={false}
         shouldOverdrawWholeArea={false}
+        rotateAnchorOffset={26 / scale}
         enabledAnchors={
           freeTransform
             ? [
@@ -564,22 +568,15 @@ export function StudioGroupUniformResizeProxy({
         borderStroke={GROUP_SELECTION_ACCENT}
         borderStrokeWidth={1.35 / scale}
         borderDash={[2 / scale, 3 / scale]}
-        anchorStyleFunc={(anchor) => {
+        anchorStyleFunc={(anchor: Konva.Rect) => {
           anchor.hitStrokeWidth(anchorHitSize);
           anchor.shadowColor("#111827");
           anchor.shadowBlur(4 / scale);
           anchor.shadowOpacity(0.32);
           anchor.shadowOffsetY(1 / scale);
         }}
-        boundBoxFunc={(oldBox, newBox) =>
-          !Number.isFinite(newBox.x) ||
-          !Number.isFinite(newBox.y) ||
-          !Number.isFinite(newBox.width) ||
-          !Number.isFinite(newBox.height) ||
-          newBox.width < minimumSize ||
-          newBox.height < minimumSize
-            ? oldBox
-            : newBox
+        boundBoxFunc={(oldBox: KonvaTransformerBox, newBox: KonvaTransformerBox) =>
+          constrainStudioTransformBox(oldBox, newBox, minimumSize)
         }
       />
     </Fragment>

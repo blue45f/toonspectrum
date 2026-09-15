@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { STUDIO_CREATION_PRESETS, studioCreationPreset } from "./studio-creation-presets";
-import { readStudioLocalCanvasSeed } from "./studio-local-canvas-seed";
-import { readStudioLaunchDensity } from "./studio-launch-mode";
+import { readStudioLocalCanvasSeed, studioLocalCanvasSeedPage } from "./studio-local-canvas-seed";
+import { readStudioLaunchDensity, readStudioLaunchPrimaryTool } from "./studio-launch-mode";
 import { createStudioProjectWithInitialDocument } from "./studio-project-creation";
 import { ensureInitialStudioProjectDocument } from "./studio-project-document-store";
 import { preserveStudioTaskToolbarPreference, projectStudioTaskAppSettings } from "./studio-task-tools";
@@ -34,6 +34,26 @@ describe("quick and task-specific studio workspaces", () => {
       templateId: "different-template",
     }).id).toBe(document.id);
   });
+  it("seeds four editable frames only for a new four-cut webtoon document", () => {
+    const storage = new MemoryStorage();
+    const { project, document } = createStudioProjectWithInitialDocument(storage, {
+      title: "Four cut", kind: "webtoon", templateId: "webtoon-four-cut",
+    });
+    const seed = readStudioLocalCanvasSeed({
+      projectId: project.id, documentId: document.id, workId: null, remixSourceWorkId: null,
+    }, storage);
+    expect(seed).not.toBeNull();
+    if (!seed) return;
+    const page = studioLocalCanvasSeedPage(seed, "page-a");
+    expect(page.name).toBe(document.title);
+    expect(page.elements).toHaveLength(4);
+    for (const [index, frame] of page.elements.entries()) {
+      expect(frame).toMatchObject({ id: `page-a-initial-frame-${index + 1}`, type: "frame" });
+      if (frame.type !== "frame") throw new Error("expected an initial frame");
+      expect(frame.x + frame.width).toBeLessThan(STUDIO_CANVAS_WIDTH);
+      expect(frame.y + frame.height).toBeLessThan(seed.canvasH);
+    }
+  });
   it("rejects unavailable storage and does not borrow another task's template", () => {
     const route = { projectId: "test", documentId: "test", workId: null, remixSourceWorkId: null };
     expect(readStudioLocalCanvasSeed(route, null)).toBeNull();
@@ -44,11 +64,11 @@ describe("quick and task-specific studio workspaces", () => {
     const initial = createStudioWorkspaceDefaultState(null);
     const before = JSON.stringify(initial);
     const layouts = ["draw", "comic", "design"] as const;
-    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task)).activeWorkspaceId))
+    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple")).activeWorkspaceId))
       .toEqual(["lineart", "pro-comic", "vector-design"]);
     expect(JSON.stringify(initial)).toBe(before);
-    expect(studioTaskWorkspaceId(null)).toBeNull();
-    expect(studioTaskWorkspaceId("3d")).toBeNull();
+    expect(studioTaskWorkspaceId(null, "simple")).toBeNull();
+    expect(studioTaskWorkspaceId("3d", "simple")).toBeNull();
   });
   it("preserves custom layouts and edits to the current task profile", () => {
     const initial = createStudioWorkspaceDefaultState(null);
@@ -89,10 +109,17 @@ describe("quick and task-specific studio workspaces", () => {
     expect(preserveStudioTaskToolbarPreference(stored, presented, customized)).toBe(customized);
   });
   it("distinguishes quick, standard and complete launch modes", () => {
+    expect(readStudioLaunchDensity("?uiMode=focus")).toBe("focus");
     expect(readStudioLaunchDensity("?uiMode=simple")).toBe("focus");
+    expect(readStudioLaunchDensity("?uiMode=basic")).toBe("simple");
     expect(readStudioLaunchDensity("?uiMode=standard")).toBe("simple");
+    expect(readStudioLaunchDensity("?uiMode=full")).toBe("full");
     expect(readStudioLaunchDensity("?uiMode=studio")).toBe("full");
     expect(readStudioLaunchDensity("?uiMode=unknown")).toBeNull();
     expect(readStudioLaunchDensity("?uiMode=simple&uiMode=studio")).toBeNull();
+    expect(readStudioLaunchPrimaryTool("?startTool=draw")).toBe("draw");
+    expect(readStudioLaunchPrimaryTool("?startTool=select")).toBe("select");
+    expect(readStudioLaunchPrimaryTool("?startTool=hand")).toBeNull();
+    expect(readStudioLaunchPrimaryTool("?startTool=draw&startTool=select")).toBeNull();
   });
 });

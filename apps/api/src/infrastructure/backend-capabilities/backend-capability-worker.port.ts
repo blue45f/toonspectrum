@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { SupabaseObjectReferenceSchema } from "../supabase-object-storage/supabase-object-storage.contract";
+import { PrivateObjectReferenceSchema } from "../private-object-storage/private-object-storage.contract";
 
 import {
   BackendCapabilityIdempotencyKeySchema,
@@ -27,7 +27,7 @@ export const BackendCapabilityThumbnailCommandSchema = z
     tenantId: BackendCapabilityTenantIdSchema,
     idempotencyKey: BackendCapabilityIdempotencyKeySchema,
     sourceAssetId: z.string().min(1).max(256),
-    sourceObject: SupabaseObjectReferenceSchema.refine(
+    sourceObject: PrivateObjectReferenceSchema.refine(
       (object) => object.purpose === "source",
       "thumbnail input must be an immutable source object",
     ),

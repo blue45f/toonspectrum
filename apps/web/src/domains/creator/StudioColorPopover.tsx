@@ -2,6 +2,7 @@
 // (큐레이션 팔레트, 색상환 휠, 조화 배색, 웹툰 음영 어시스턴트, 슬라이더, 최근 색, 명도 그라데이션).
 import { Check, Copy, Pipette, Plus, X } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -23,10 +24,12 @@ import {
   studioPaletteFamilyHint,
   type StudioColorPopoverPurpose,
 } from "./studio-color-popover-hints";
-import { isValidHexColor, normalizeHexColor } from "./studio-color-utils";
+import { normalizeHexColor } from "./studio-color-utils";
 import { createPalette, type StudioNamedPalette } from "./studio-palette-library";
 import { getProductStudioPaletteSqliteRepository } from "./studio-palette-sqlite-repository";
 import { StudioColorDiscPicker } from "./StudioColorDiscPicker";
+import { StudioColorQuickPicker } from "./StudioColorQuickPicker";
+import { StudioColorTrigger, type StudioColorTriggerVariant } from "./StudioColorTrigger";
 import { StudioColorHarmoniesPanel } from "./StudioColorHarmoniesPanel";
 import { StudioColorSlidersPanel } from "./StudioColorSlidersPanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -40,7 +43,7 @@ type EyeDropperResult = { sRGBHex: string };
 type EyeDropperLike = { open: () => Promise<EyeDropperResult> };
 type EyeDropperCtor = new () => EyeDropperLike;
 
-const POPOVER_WIDTH_PX = 268;
+const POPOVER_WIDTH_PX = 304;
 const POPOVER_MAX_HEIGHT_PX = 460;
 const POPOVER_GAP_PX = 6;
 const VIEWPORT_PADDING_PX = 8;
@@ -56,13 +59,35 @@ function selectedSwatchIndex(colors: readonly string[], value: string): number {
   return normalized === null ? -1 : colors.findIndex((color) => normalizeHexColor(color) === normalized);
 }
 
-export type StudioColorPopoverTab = "palettes" | "wheel" | "harmonies" | "cel-shade" | "sliders";
+function normalizeSelection(raw: string): string {
+  return normalizeHexColor(raw) ?? raw;
+}
+
+function normalizedUniqueColors(colors: readonly string[], max = 16): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const color of colors) {
+    const normalized = normalizeHexColor(color);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(normalized);
+    if (unique.length >= max) break;
+  }
+  return unique;
+}
+
+export type StudioColorPopoverTab = "quick" | "palettes" | "wheel" | "harmonies" | "cel-shade" | "sliders";
 
 export type StudioColorPopoverProps = {
   value: string;
   onChange: (color: string) => void;
   recentColors: readonly string[];
+  documentColors?: readonly string[];
   onUseColor?: (color: string) => void;
+  onPreviewColor?: (color: string) => void;
+  onCommitColor?: (color: string) => void;
+  onCancelColor?: (color: string) => void;
+  onInteractionEnd?: () => void;
   /** Always-available authored-canvas sampler. Independent of the optional browser EyeDropper API. */
   onRequestCanvasEyedropper?: () => void;
   /** Accessible trigger name. Kept separate from native `title` tooltips. */
@@ -71,22 +96,39 @@ export type StudioColorPopoverProps = {
   purpose?: StudioColorPopoverPurpose;
   className?: string;
   initialOpen?: boolean;
+  initialTab?: StudioColorPopoverTab;
+  triggerVariant?: StudioColorTriggerVariant;
+  triggerNone?: boolean;
+  triggerMixed?: boolean;
+  disabled?: boolean;
+  controlId?: string;
 };
 
 export function StudioColorPopover({
   value,
   onChange,
   recentColors,
+  documentColors = [],
   onUseColor,
+  onPreviewColor,
+  onCommitColor,
+  onCancelColor,
+  onInteractionEnd,
   onRequestCanvasEyedropper,
   label = "색상 선택",
   purpose = "generic",
   className,
   initialOpen = false,
+  initialTab = "palettes",
+  triggerVariant = "swatch",
+  triggerNone = false,
+  triggerMixed = false,
+  disabled = false,
+  controlId,
 }: StudioColorPopoverProps): React.ReactElement {
   const [open, setOpen] = useState(initialOpen);
-  const [activeTab, setActiveTab] = useState<StudioColorPopoverTab>("palettes");
-  const [initialColor] = useState(value);
+  const [activeTab, setActiveTab] = useState<StudioColorPopoverTab>(initialTab);
+  const [initialColor, setInitialColor] = useState(value);
   const [copied, setCopied] = useState(false);
   const [addedNotice, setAddedNotice] = useState<{ text: string; tone: "good" | "warn" } | null>(null);
 
@@ -107,16 +149,62 @@ export function StudioColorPopover({
   const hexInputRef = useRef<HTMLInputElement>(null);
   const addedNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paletteSaveRequest = useRef(0);
+  const sessionChangedRef = useRef(false);
+  const sessionColorRef = useRef(value);
+  const sessionPendingCommitRef = useRef(false);
   const popupId = `studio-color-popover-${useId().replaceAll(":", "")}`;
 
   useEffect(() => {
     setHexDraft(value);
-  }, [value]);
+    if (!open || !sessionChangedRef.current) sessionColorRef.current = value;
+  }, [open, value]);
 
   useEffect(() => () => {
     paletteSaveRequest.current += 1;
     if (addedNoticeTimeout.current !== null) clearTimeout(addedNoticeTimeout.current);
   }, []);
+
+  const restoreTriggerFocus = useCallback(() => {
+    globalThis.requestAnimationFrame?.(() =>
+      triggerRef.current?.focus({ preventScroll: true }),
+    );
+  }, []);
+
+  const finishSession = useCallback((restoreFocus = true) => {
+    const finalColor = normalizeSelection(sessionColorRef.current);
+    if (sessionPendingCommitRef.current) {
+      onCommitColor?.(finalColor);
+      onUseColor?.(finalColor);
+    }
+    sessionChangedRef.current = false;
+    sessionPendingCommitRef.current = false;
+    onInteractionEnd?.();
+    setOpen(false);
+    if (restoreFocus) restoreTriggerFocus();
+  }, [onCommitColor, onInteractionEnd, onUseColor, restoreTriggerFocus]);
+
+  const cancelSession = useCallback(() => {
+    if (sessionChangedRef.current) {
+      const restore = normalizeSelection(initialColor);
+      sessionColorRef.current = restore;
+      if (onPreviewColor) onPreviewColor(restore);
+      else onChange(restore);
+      onCancelColor?.(restore);
+      setHexDraft(restore);
+    }
+    sessionChangedRef.current = false;
+    sessionPendingCommitRef.current = false;
+    onInteractionEnd?.();
+    setOpen(false);
+    restoreTriggerFocus();
+  }, [
+    initialColor,
+    onCancelColor,
+    onChange,
+    onInteractionEnd,
+    onPreviewColor,
+    restoreTriggerFocus,
+  ]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -127,51 +215,58 @@ export function StudioColorPopover({
       if (!anchor || !popup) return;
       const viewportWidth = Math.max(1, globalThis.innerWidth || 320);
       const viewportHeight = Math.max(1, globalThis.innerHeight || 320);
+      const bottomSheet = viewportWidth <= 640;
       const width = Math.max(
         1,
-        Math.min(POPOVER_WIDTH_PX, viewportWidth - VIEWPORT_PADDING_PX * 2)
+        bottomSheet
+          ? viewportWidth - VIEWPORT_PADDING_PX * 2
+          : Math.min(POPOVER_WIDTH_PX, viewportWidth - VIEWPORT_PADDING_PX * 2),
       );
+      const mobileHeightCap = Math.max(220, Math.floor(viewportHeight * 0.64));
       const naturalHeight = Math.min(
         Math.max(1, popup.scrollHeight),
         POPOVER_MAX_HEIGHT_PX,
-        viewportHeight - VIEWPORT_PADDING_PX * 2
+        bottomSheet ? mobileHeightCap : viewportHeight - VIEWPORT_PADDING_PX * 2,
       );
       const spaceBelow = Math.max(
         0,
-        viewportHeight - anchor.bottom - POPOVER_GAP_PX - VIEWPORT_PADDING_PX
+        viewportHeight - anchor.bottom - POPOVER_GAP_PX - VIEWPORT_PADDING_PX,
       );
       const spaceAbove = Math.max(
         0,
-        anchor.top - POPOVER_GAP_PX - VIEWPORT_PADDING_PX
+        anchor.top - POPOVER_GAP_PX - VIEWPORT_PADDING_PX,
       );
       const placeBelow =
         spaceBelow >= Math.min(naturalHeight, 220) || spaceBelow >= spaceAbove;
       const availableHeight = placeBelow ? spaceBelow : spaceAbove;
-      const effectiveHeight = Math.max(
-        1,
-        Math.min(naturalHeight, availableHeight, POPOVER_MAX_HEIGHT_PX)
-      );
-      const maxHeight = effectiveHeight;
+      const maxHeight = bottomSheet
+        ? naturalHeight
+        : Math.max(1, Math.min(naturalHeight, availableHeight, POPOVER_MAX_HEIGHT_PX));
       const preferredLeft =
         anchor.left + anchor.width / 2 > viewportWidth / 2
           ? anchor.right - width
           : anchor.left;
-      const left = Math.min(
-        Math.max(VIEWPORT_PADDING_PX, preferredLeft),
-        viewportWidth - width - VIEWPORT_PADDING_PX
-      );
-      const top = placeBelow
-        ? Math.max(
-            VIEWPORT_PADDING_PX,
-            Math.min(
-              anchor.bottom + POPOVER_GAP_PX,
-              viewportHeight - VIEWPORT_PADDING_PX - maxHeight
-            )
-          )
-        : Math.max(
-            VIEWPORT_PADDING_PX,
-            anchor.top - POPOVER_GAP_PX - effectiveHeight
+      const left = bottomSheet
+        ? VIEWPORT_PADDING_PX
+        : Math.min(
+            Math.max(VIEWPORT_PADDING_PX, preferredLeft),
+            viewportWidth - width - VIEWPORT_PADDING_PX,
           );
+      const top = bottomSheet
+        ? Math.max(VIEWPORT_PADDING_PX, viewportHeight - VIEWPORT_PADDING_PX - maxHeight)
+        : placeBelow
+          ? Math.max(
+              VIEWPORT_PADDING_PX,
+              Math.min(
+                anchor.bottom + POPOVER_GAP_PX,
+                viewportHeight - VIEWPORT_PADDING_PX - maxHeight,
+              ),
+            )
+          : Math.max(
+              VIEWPORT_PADDING_PX,
+              anchor.top - POPOVER_GAP_PX - maxHeight,
+            );
+      popup.dataset.layout = bottomSheet ? "sheet" : "popover";
       setPopupStyle((current) => {
         if (
           current.left === left &&
@@ -225,13 +320,12 @@ export function StudioColorPopover({
     const onDocPointerDown = (event: PointerEvent) => {
       if (!(event.target instanceof Node)) return;
       if (rootRef.current?.contains(event.target) || popupRef.current?.contains(event.target)) return;
-      setOpen(false);
+      finishSession(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      setOpen(false);
-      globalThis.requestAnimationFrame?.(() => triggerRef.current?.focus({ preventScroll: true }));
+      cancelSession();
     };
     document.addEventListener("pointerdown", onDocPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
@@ -239,30 +333,39 @@ export function StudioColorPopover({
       document.removeEventListener("pointerdown", onDocPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [cancelSession, finishSession, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || (globalThis.innerWidth || 0) <= 640) return;
     const frame = globalThis.requestAnimationFrame?.(() =>
       hexInputRef.current?.focus({ preventScroll: true })
     );
     return () => globalThis.cancelAnimationFrame?.(frame ?? 0);
   }, [open]);
 
+  const handlePreview = (raw: string): void => {
+    const color = normalizeSelection(raw);
+    sessionChangedRef.current = true;
+    sessionColorRef.current = color;
+    sessionPendingCommitRef.current = true;
+    setHexDraft(color);
+    if (onPreviewColor) onPreviewColor(color);
+    else onChange(color);
+  };
+
   const handleSelect = (raw: string): void => {
-    const c = normalizeHexColor(raw) ?? raw;
-    onChange(c);
-    onUseColor?.(c);
+    const color = normalizeSelection(raw);
+    sessionChangedRef.current = true;
+    sessionColorRef.current = color;
+    sessionPendingCommitRef.current = true;
+    setHexDraft(color);
+    if (onPreviewColor) onPreviewColor(color);
+    else onChange(color);
   };
 
   const activePalette: StudioPalette | null = palettes.find((p) => p.id === paletteId) ?? palettes[0] ?? null;
   const eyeDropperCtor = getEyeDropperCtor();
   const triggerHint = studioColorPopoverTriggerHint(label, purpose);
-
-  const closeAndRestoreFocus = () => {
-    setOpen(false);
-    globalThis.requestAnimationFrame?.(() => triggerRef.current?.focus({ preventScroll: true }));
-  };
 
   const handleCopyHex = () => {
     navigator.clipboard?.writeText(value).then(() => {
@@ -298,21 +401,37 @@ export function StudioColorPopover({
   const selectedTintIndex = selectedSwatchIndex(tintsAndShades, value);
   const selectedPaletteIndex = selectedSwatchIndex(activePalette?.colors ?? [], value);
   const selectedRecentIndex = selectedSwatchIndex(recentColors, value);
+  const documentColorOptions = normalizedUniqueColors(documentColors);
+  const selectedDocumentIndex = selectedSwatchIndex(documentColorOptions, value);
 
   return (
     <div ref={rootRef} className={cx("relative inline-block", className)}>
-      {/* 트리거 — 현재 색 스와치 */}
+      {/* 트리거 — 현재 색 스와치 또는 Inspector 필드 */}
       <StudioToolHintTarget hint={triggerHint} preferredSide="bottom">
-        <button
+        <StudioColorTrigger
           ref={triggerRef}
-          type="button"
-          aria-label={label}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          aria-controls={open ? popupId : undefined}
-          onClick={() => setOpen((v) => !v)}
-          className="h-7 w-7 cursor-pointer rounded-lg border border-white/20 shadow-sm pointer-coarse:size-11 transition-transform hover:scale-105 active:scale-95"
-          style={{ background: value }}
+          value={value}
+          label={label}
+          variant={triggerVariant}
+          expanded={open}
+          controls={open ? popupId : undefined}
+          disabled={disabled}
+          isNone={triggerNone}
+          mixed={triggerMixed}
+          controlId={controlId}
+          onClick={() => {
+            if (open) {
+              finishSession();
+              return;
+            }
+            setInitialColor(value);
+            setHexDraft(value);
+            setActiveTab(initialTab);
+            sessionChangedRef.current = false;
+            sessionColorRef.current = value;
+            sessionPendingCommitRef.current = false;
+            setOpen(true);
+          }}
         />
       </StudioToolHintTarget>
 
@@ -363,7 +482,7 @@ export function StudioColorPopover({
               <button
                 type="button"
                 aria-label="닫기"
-                onClick={closeAndRestoreFocus}
+                onClick={() => finishSession()}
                 className="grid size-7 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg active:scale-95"
               >
                 <X className="size-4" aria-hidden />
@@ -371,13 +490,14 @@ export function StudioColorPopover({
             </div>
           </div>
 
-          {/* Mode Tabs (팔레트 / 휠 / 조화 / 웹툰 / 슬라이더) */}
+          {/* 빠른 선택과 전문 색상 도구를 한 단계 안에서 전환합니다. */}
           <div
             role="tablist"
             aria-label="색상 도구 탭"
-            className="mb-2.5 grid grid-cols-5 gap-1 rounded-xl border border-line/60 bg-raised/60 p-1 text-center backdrop-blur-sm"
+            className="mb-2.5 grid grid-cols-6 gap-1 rounded-xl border border-line/60 bg-raised/60 p-1 text-center backdrop-blur-sm"
           >
             {[
+              { id: "quick", label: "빠른" },
               { id: "palettes", label: "팔레트" },
               { id: "wheel", label: "휠" },
               { id: "harmonies", label: "조화" },
@@ -406,7 +526,15 @@ export function StudioColorPopover({
             })}
           </div>
 
-          {/* Tab 1: Palettes (Curated sets) */}
+          {activeTab === "quick" && (
+            <StudioColorQuickPicker
+              value={value}
+              onPreview={handlePreview}
+              onCommit={handleSelect}
+            />
+          )}
+
+          {/* Curated palettes */}
           {activeTab === "palettes" && (
             <div className="space-y-2">
               {activePalette ? (
@@ -537,15 +665,9 @@ export function StudioColorPopover({
             </div>
           </div>
 
-          {/* Native Color + Hex input + Eyedropper + Quick Copy */}
+          {/* Hex input + eyedropper + quick copy. The custom quick picker is the default,
+              so browser-native color dialogs never interrupt the Studio interaction model. */}
           <div className="mt-2.5 flex items-center gap-1.5">
-            <input
-              type="color"
-              value={isValidHexColor(value) ? value : "#000000"}
-              onChange={(e) => handleSelect(e.target.value)}
-              aria-label="색상 휠"
-              className="size-8 shrink-0 cursor-pointer rounded-lg border border-white/20 bg-transparent p-0 shadow-sm transition-transform hover:scale-105 active:scale-95"
-            />
             <input
               ref={hexInputRef}
               type="text"
@@ -584,7 +706,7 @@ export function StudioColorPopover({
                   aria-label="캔버스에서 정밀 색 가져오기"
                   aria-keyshortcuts="I"
                   onClick={() => {
-                    setOpen(false);
+                    finishSession(false);
                     onRequestCanvasEyedropper();
                   }}
                   className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent active:scale-95 shadow-sm transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -638,6 +760,29 @@ export function StudioColorPopover({
                     onClick={() => handleSelect(c)}
                     className="size-7 cursor-pointer rounded-lg border border-white/20 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform hover:scale-105 active:scale-95 shadow-sm"
                     style={{ background: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {documentColorOptions.length > 0 && (
+            <div className="mt-2.5 border-t border-line/50 pt-2">
+              <div className="mb-1 flex items-center justify-between px-0.5">
+                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">이 원고에서 사용 중</p>
+                <span className="text-[0.56rem] text-fg-3">빈도순</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="원고 사용 색상">
+                {documentColorOptions.map((color, index) => (
+                  <button
+                    key={`${color}-${index}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={index === selectedDocumentIndex}
+                    aria-label={`원고 색상 ${color} 선택`}
+                    onClick={() => handleSelect(color)}
+                    className="size-7 rounded-lg border border-white/20 shadow-sm transition-transform hover:scale-105 active:scale-95 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card"
+                    style={{ background: color }}
                   />
                 ))}
               </div>

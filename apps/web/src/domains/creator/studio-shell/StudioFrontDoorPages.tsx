@@ -73,7 +73,7 @@ const HOME_ACTIONS: readonly FrontDoorCard[] = [
   {
     href: "/studio/assets",
     icon: Boxes,
-    title: { ko: "에셋", en: "Assets" },
+    title: { ko: "소재", en: "Assets" },
     description: {
       ko: "브러시, 캐릭터, 배경, 글꼴과 오디오를 찾고 제작에 연결합니다.",
       en: "Find brushes, characters, backgrounds, fonts and audio for your project.",
@@ -165,6 +165,12 @@ const NEW_DOCUMENTS: readonly FrontDoorCard[] = [
 
 const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
+    href: "/studio/assets?view=essentials", icon: Boxes,
+    title: { ko: "무료 제작 소재 48종", en: "48 free creator essentials" },
+    description: { ko: "말풍선·효과·2D 포즈 시트와 3D 데생 인형·소품을 원본 파일로 저장합니다.", en: "Download original balloons, effects, 2D pose sheets, 3D mannequins and props." },
+    badge: { ko: "CC0 · 무료", en: "CC0 · Free" },
+  },
+  {
     href: "/studio/brushes",
     icon: Brush,
     title: { ko: "브러시", en: "Brushes" },
@@ -197,8 +203,8 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
     href: "/market",
     icon: Store,
-    title: { ko: "에셋 마켓", en: "Asset market" },
-    description: { ko: "상업 이용·호환성을 확인하고 새 에셋을 찾습니다.", en: "Find assets with clear commercial-use and compatibility information." },
+    title: { ko: "소재 마켓", en: "Asset market" },
+    description: { ko: "상업 이용·호환성을 확인하고 새 소재를 찾습니다.", en: "Find assets with clear commercial-use and compatibility information." },
   },
 ];
 

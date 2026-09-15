@@ -113,7 +113,7 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(source).toContain("installStudioCreatorPack");
     expect(source).toContain("uninstallStudioCreatorPack");
     expect(source).toContain("projectCreatorMarketplaceRecordToAssets");
-    expect(source).toContain("createStudioCommunityMarketplaceAssetRecord");
+    expect(source).toContain("createStudioMarketplaceImageRecord");
     expect(source).toContain("CreatorMarketplaceReportAction");
     expect(lifecycleSource).toContain("StudioOwnedReleaseLifecycleActions");
     expect(lifecycleSource).toContain("목록에서 내리기");

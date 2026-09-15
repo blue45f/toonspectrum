@@ -30,6 +30,7 @@ import {
   studioShared3dStageReusableHiddenCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
 
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
 import type {
   StudioLazyPanelStackHandlers,
@@ -87,6 +88,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "bg3dBatchRecoveryScope"
   | "validateRecoveryAccess"
   | "bg3dOpen"
+  | "bg3dMarketplaceModelId"
   | "bg3dSeedTemplateId"
   | "bg3dSeedPrimitiveKind"
   | "onSeedObjectInsertConsumed"
@@ -128,6 +130,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "timelapseOpen"
   | "title"
 > & {
+  onOpenPrecisionModeler?: (scene: StudioBg3dSceneDocument) => void;
   stableHandlers: StudioThreeDPreviewPanelStackHandlers;
 };
 
@@ -252,9 +255,11 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
+  bg3dMarketplaceModelId = null,
   bg3dSeedTemplateId = null,
   bg3dSeedPrimitiveKind = null,
   onSeedObjectInsertConsumed,
+  onOpenPrecisionModeler,
   composeWorkAssetPreviewPage,
   currentPageId,
   elementById,
@@ -429,9 +434,11 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
       open={bg3dOpen}
       initialDataUrl={bg3dInitialDataUrl}
       initialScene={bg3dInitialScene}
+      marketplaceModelId={bg3dMarketplaceModelId}
       seedSceneTemplateId={bg3dSeedTemplateId}
       seedPrimitiveKind={asBgPrimitiveKindOrNull(bg3dSeedPrimitiveKind)}
       onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
+      {...(onOpenPrecisionModeler ? { onOpenPrecisionModeler } : {})}
       sharedSceneSession={shared3dSceneSession}
       sharedStageResolution={masterEditMode ? undefined : shared3dStageResolution}
       sharedStageSessionScopeKey={sharedStageSessionScopeKey}

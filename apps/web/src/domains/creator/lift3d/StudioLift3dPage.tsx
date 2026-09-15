@@ -476,6 +476,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href="/studio/character-convert" className={SECONDARY_BUTTON_CLASS}>캐릭터 AI 2D ↔ 3D</Link>
             <button
               type="button"
               data-studio-route-exit="editor"

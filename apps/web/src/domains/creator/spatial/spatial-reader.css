@@ -57,13 +57,13 @@
 .spatial-reader details p { margin: 8px 0; }
 .spatial-reader-page-jump { font-size: 12px; padding-top: 14px; margin-top: 8px; border-top: 1px solid var(--sr-line); }
 /* Empty overlay space remains transparent to native AR selection. */
-.spatial-reader-overlay:xr-overlay { background: transparent; pointer-events: none; color: #fff; }
-.spatial-reader-overlay:xr-overlay .spatial-reader-toolbar { pointer-events: auto; position: absolute; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); padding: 12px; border-radius: 14px; background: #101923e8; max-height: 45vh; overflow: auto; }
-.spatial-reader-overlay:xr-overlay button { min-height: 44px; background: #203342; color: #fff; border: 1px solid #6c8597; border-radius: 9px; padding: 8px 12px; }
-.spatial-reader-overlay:xr-overlay .spatial-reader-message { color: #dae7ed; }
-.spatial-reader-overlay:xr-overlay .spatial-reader-navigation, .spatial-reader-overlay:xr-overlay .spatial-reader-mode-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
-.spatial-reader-overlay:xr-overlay .spatial-reader-mode-buttons { margin-top: 10px; }
-.spatial-reader-overlay:xr-overlay .spatial-reader-error { color: #fff; }
+.spatial-reader-overlay[data-xr-presenting=true] { background: transparent; pointer-events: none; color: #fff; }
+.spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-toolbar { pointer-events: auto; position: absolute; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); padding: 12px; border-radius: 14px; background: #101923e8; max-height: 45vh; overflow: auto; }
+.spatial-reader-overlay[data-xr-presenting=true] button { min-height: 44px; background: #203342; color: #fff; border: 1px solid #6c8597; border-radius: 9px; padding: 8px 12px; }
+.spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-message { color: #dae7ed; }
+.spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-navigation, .spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-mode-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-mode-buttons { margin-top: 10px; }
+.spatial-reader-overlay[data-xr-presenting=true] .spatial-reader-error { color: #fff; }
 @media (max-width: 760px) {
   .spatial-reader { width: calc(100vw - 12px); max-height: 96dvh; border-radius: 14px; }
   .spatial-reader-header { padding: 18px 16px 10px; gap: 10px; }

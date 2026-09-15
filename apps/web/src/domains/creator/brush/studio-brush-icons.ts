@@ -272,6 +272,14 @@ export const STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID = {
   "material-guilloche-rosette": "spline",
   "material-fish-scale": "waves",
   "material-sequin-paillettes": "circle-dot",
+  "material-sakura-petal": "flower",
+  "material-bamboo-joint": "wheat",
+  "material-feather-quill": "feather",
+  "material-lightning-fork": "sparkles",
+  "material-zipper-teeth": "rows",
+  "material-cobblestone-joints": "grid-2x2",
+  "material-knit-cable": "waves",
+  "material-wave-seigaiha": "waves",
 } as const satisfies Readonly<
   Record<StudioBrushPackCatalogId, StudioBrushIconId>
 >;

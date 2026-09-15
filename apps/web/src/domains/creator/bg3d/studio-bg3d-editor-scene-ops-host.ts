@@ -7,6 +7,11 @@
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import {
+  commitStudioBg3dHistoryTransition,
+  resetStudioBg3dCommandHistory,
+  stepStudioBg3dCommandHistory,
+} from "./studio-bg3d-history-command-adapter";
+import {
   allocateStudioBg3dTemplateInstanceNodeIds,
   collectStudioBg3dTemplateInstances,
   orderStudioBg3dHierarchySelectionRootsFirst,
@@ -164,7 +169,8 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     setIkEndJointSelection, morphTargetSelection, setMorphTargetSelection, deletingModelId,
     setDeletingModelId, isRestoringScene, setIsRestoringScene, sceneRestoreAbortRef,
     templateLibrary, setTemplateLibrary, templateLibraryStatus, setTemplateLibraryStatus,
-    isSavingTemplate, setIsSavingTemplate, applyingTemplateId, setApplyingTemplateId,
+    setTemplateLibraryNotice, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
+    setApplyingTemplateId,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds,
     unbatchableModelIds, setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument,
     savedShots, shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals,
@@ -185,7 +191,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     getModelThumbnailCaptureController, acquireModelThumbnailGpuLease, startModelThumbnailCaptureBatch, invalidateModalAssetSession,
     cancelSurfaceSnap, handleViewportReady, resetWebXrPresentationUi, finishWebXrControllerCleanup,
     disposeCurrentWebXrControllerGeneration, disposeWebXrControllerForOpenChange, handleWebXrControllerReady, handleWebXrSessionStateChange,
-    historyRef, historyIndexRef, deviceQuality, hasCloneFailure,
+    historyRef, historyIndexRef, historyCommandTimelineRef, deviceQuality, hasCloneFailure,
     hasPendingClone, hasPendingSharedCharacter, hasUnavailableSharedCharacter, physicsInteractionLocked,
     insertBlocked, magicLayerSelectedPrimitive, magicLayerLensShift, magicLayerUnavailableReason,
     shotBatchBlockedReason, transitionPhysicsPhase, proceduralStarterDisabledReason, objectInsertSeedKeyRef,
@@ -302,6 +308,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setTemplateLibrary(entries);
         setTemplateLibraryStatus("ready");
+        setTemplateLibraryNotice(null);
         setError(null);
       });
       return true;
@@ -326,6 +333,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setTemplateLibrary(entries);
         setTemplateLibraryStatus("ready");
+        setTemplateLibraryNotice(null);
       });
     } catch (err) {
       console.error(err);
@@ -335,12 +343,22 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     }
   };
   h.handleDeleteTemplate = handleDeleteTemplate;
+  const commandHistoryRefs = {
+    historyRef,
+    historyIndexRef,
+    historyCommandTimelineRef,
+  };
   function commitImmediateHistoryTransition(
     nextPrimitives: readonly BgPrimitive[],
     nextCustomModels: readonly BgCustomModelInstance[],
     nextDocument: StudioBg3dSceneDocument,
     beforeOverride?: StudioBg3dHistorySnapshot,
-    options: { readonly preserveBeforeCamera?: boolean } = {},
+    options: {
+      readonly preserveBeforeCamera?: boolean;
+      readonly commandId?: string;
+      readonly label?: string;
+      readonly source?: "canvas" | "inspector" | "keyboard" | "menu" | "palette" | "system";
+    } = {},
   ): void {
     const liveView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
     const rawBefore = beforeOverride ?? createStudioBg3dHistorySnapshot({
@@ -363,28 +381,23 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
         ? nextDocument
         : studioBg3dHistoryDocumentAtView(nextDocument, liveView),
     });
-    const base = historyRef.current.slice(0, historyIndexRef.current + 1);
-    const appendIfChanged = (snapshot: StudioBg3dHistorySnapshot) => {
-      const last = base[base.length - 1];
-      if (!last || JSON.stringify(last) !== JSON.stringify(snapshot)) base.push(snapshot);
-    };
-    // Preserve edits made inside the 400ms debounce window, then append the command result. Undo is
-    // immediately available and returns to the exact pre-command constraint/physics state.
-    appendIfChanged(before);
-    appendIfChanged(after);
-    while (base.length > 60) base.shift();
-    historyRef.current = base;
-    historyIndexRef.current = base.length - 1;
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(false);
+    const receipt = commitStudioBg3dHistoryTransition(commandHistoryRefs, {
+      before,
+      after,
+      commandId: options.commandId,
+      label: options.label,
+      source: options.source,
+    });
+    setCanUndo(receipt.canUndo);
+    setCanRedo(receipt.canRedo);
   }
   h.commitImmediateHistoryTransition = commitImmediateHistoryTransition;
-  const doUndo = () => {
+  const applyCommandHistoryStep = (direction: "undo" | "redo"): void => {
     if (!isStudioBg3dSceneEditReady(h)) return;
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
-    if (historyIndexRef.current <= 0) return;
-    historyIndexRef.current -= 1;
-    const snap = historyRef.current[historyIndexRef.current];
+    const receipt = stepStudioBg3dCommandHistory(commandHistoryRefs, direction);
+    if (!receipt || receipt.status !== "applied") return;
+    const snap = receipt.state;
     const nextPrimitives = clonePrimitives(snap.primitives);
     const nextCustomModels = cloneBgCustomModelInstances(snap.customModels);
     physicsRuntimeSourceRef.current = {
@@ -400,34 +413,13 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       pendingInitialCameraRef,
       snap.document.camera,
     );
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+    const timeline = historyCommandTimelineRef.current;
+    setCanUndo(timeline?.canUndo ?? false);
+    setCanRedo(timeline?.canRedo ?? false);
   };
+  const doUndo = () => applyCommandHistoryStep("undo");
   h.doUndo = doUndo;
-  const doRedo = () => {
-    if (!isStudioBg3dSceneEditReady(h)) return;
-    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    historyIndexRef.current += 1;
-    const snap = historyRef.current[historyIndexRef.current];
-    const nextPrimitives = clonePrimitives(snap.primitives);
-    const nextCustomModels = cloneBgCustomModelInstances(snap.customModels);
-    physicsRuntimeSourceRef.current = {
-      primitives: nextPrimitives,
-      customModels: nextCustomModels,
-      document: snap.document,
-    };
-    setPrimitives(nextPrimitives);
-    setCustomModels(nextCustomModels);
-    setSceneBaseDocument(snap.document);
-    applyOrDeferStudioBg3dHistoryCamera(
-      viewportApiRef.current,
-      pendingInitialCameraRef,
-      snap.document.camera,
-    );
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-  };
+  const doRedo = () => applyCommandHistoryStep("redo");
   h.doRedo = doRedo;
   const canAdmitSceneNodes = (additionalNodeCount: number): boolean => {
     if (!isStudioBg3dSceneEditReady(h)) return false;
@@ -583,8 +575,10 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     if (options.resetHistory) {
       // Deleting the backing IndexedDB bytes is intentionally irreversible. Retaining older
       // snapshots would let Undo resurrect an instance whose attachment and cache no longer exist.
-      historyRef.current = [createStudioBg3dHistorySnapshot(next)];
-      historyIndexRef.current = 0;
+      resetStudioBg3dCommandHistory(
+        commandHistoryRefs,
+        createStudioBg3dHistorySnapshot(next),
+      );
       setCanUndo(false);
       setCanRedo(false);
     }

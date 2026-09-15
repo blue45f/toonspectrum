@@ -107,8 +107,8 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expect(selectionDecorationsSource).not.toContain("previewCanvasSelectionResize");
     expect(proxySource).not.toContain("previewCanvasSelectionResize");
 
-    expect(occurrences(selectionDecorationsSource, "<Transformer")).toBeGreaterThanOrEqual(1);
-    expect(occurrences(proxySource, "<Transformer")).toBe(1);
+    expect(occurrences(selectionDecorationsSource, "<StudioNaturalTransformer")).toBeGreaterThanOrEqual(1);
+    expect(occurrences(proxySource, "<StudioNaturalTransformer")).toBe(1);
     expectSourceToken(proxySource, "transformer.nodes([proxy])", "group Transformer");
     expectSourceToken(selectionDecorationsSource, "ref={trRef}", "single-object Transformer");
     // A panel frame stores no angle, and its transformend commits only {x, y, width, height} --

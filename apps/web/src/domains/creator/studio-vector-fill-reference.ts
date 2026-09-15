@@ -513,7 +513,7 @@ function assertSourceBudget(
   if (sourceByteLength > budgets.maxSourceBytes) {
     throw new StudioVectorReferenceError(
       "source-budget-exceeded",
-      "벡터 선화 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합한 뒤 다시 시도해 주세요.",
+      "벡터 선화 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 표시 획 수를 줄인 뒤 다시 시도해 주세요.",
     );
   }
 }
@@ -526,7 +526,7 @@ function assertSvgResult(
   if (result.skipped.length > 0) {
     throw new StudioVectorReferenceError(
       "unsupported-vector-fidelity",
-      "일부 벡터 획을 원본과 같게 참조 이미지로 만들 수 없습니다. 지우개 획이나 지원되지 않는 합성을 병합한 뒤 다시 시도해 주세요.",
+      "일부 레이어의 현재 모습을 정확한 참조 이미지로 만들 수 없습니다. 영향을 받는 레이어의 지원되지 않는 합성 설정을 해제하거나 잠시 숨긴 뒤 다시 시도해 주세요.",
     );
   }
   const svgBytes = UTF8_ENCODER.encode(result.svg);
@@ -534,7 +534,7 @@ function assertSvgResult(
   if (svgByteLength > maxSvgBytes) {
     throw new StudioVectorReferenceError(
       "svg-budget-exceeded",
-      "벡터 선화의 렌더 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합한 뒤 다시 시도해 주세요.",
+      "벡터 선화의 렌더 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 표시 획 수를 줄인 뒤 다시 시도해 주세요.",
     );
   }
   return {
@@ -1036,24 +1036,12 @@ function strokeBounds(element: StudioDrawStroke): {
 }
 
 /**
- * 참조 이미지 합성에 아무 기여도 하지 않는 지우개 획을 뺀다.
+ * Removes eraser strokes that provably have no visual effect.
  *
- * 왜 필요한가
- * -----------
- * 공유 SVG 직렬화기는 지우개 획을 재현할 수 없어 통째로 `skipped` 처리한다
- * (`studio-svg-export.ts` `serializeDraw`). 그래서 이 모듈은 "지우개 획이 하나라도 있으면"
- * 참조 이미지가 화면과 달라진다고 보고 fail-closed 했다 — 진입 단계에서 통째로 막고
- * "지우개 벡터 획은 … 정확히 재현할 수 없습니다" 배너를 띄웠다.
- *
- * 그런데 **"지우개 획이 있다"와 "지우개가 화면을 바꾼다"는 다르다.** 지우개는 자기보다 아래
- * (먼저 그려진) 잉크만 지운다. 아래에 겹치는 잉크가 없는 지우개 획 — 빈 곳을 문지른 획,
- * 잉크를 다 지우고 이어서 그은 꼬리, 잉크보다 먼저 놓인 획 — 은 합성 결과에 흔적을 남기지
- * 않는다. 그런 획을 직렬화 입력에서 빼면 SVG 는 화면을 **정확히** 재현하고 `skipped` 도 비므로,
- * 사유 배너를 띄울 근거 자체가 사라진다. 반대로 실제로 잉크를 지운 획이 하나라도 남으면
- * 예전과 똑같이 막힌다 — 배너 문구가 참인 경우는 그대로 지킨다.
- *
- * 판정은 보수적이다. 바운딩 박스가 조금이라도 겹치면 "영향 있음"으로 본다(실제 획 모양이
- * 겹치는지는 보지 않는다). 즉 이 함수가 빼는 것은 **확실히 무해한 획**뿐이다.
+ * The shared SVG renderer now preserves active erasers with causal destination-out masks. This
+ * pass remains useful as a bounded source/markup optimization: an eraser before any ink, or one
+ * whose conservative bounds cannot touch earlier ink, contributes no pixels and needs no mask.
+ * Ambiguous or overlapping strokes stay in the source and are rendered exactly.
  */
 function dropInertEraserStrokes(
   elements: readonly StudioDrawStroke[],
@@ -1068,7 +1056,7 @@ function dropInertEraserStrokes(
       continue;
     }
     const eraser = boundsByIndex[i];
-    // 좌표를 못 읽는 획은 판정할 수 없다 — 예전처럼 남겨 fail-closed 를 유지한다.
+    // 좌표를 읽을 수 없으면 무해함을 증명할 수 없으므로 정확한 합성 경로에 남긴다.
     let affectsInk = eraser === null;
     if (eraser) {
       for (let below = 0; below < i; below += 1) {
@@ -1160,14 +1148,6 @@ export function planStudioAdvancedFillVectorTarget(
 ): StudioAdvancedFillVectorTargetPlan {
   const prepared = prepareAdvancedFillVectorInput(input);
   if ("ok" in prepared) return prepared;
-  if (prepared.elements.some((element) => element.mode === "eraser")) {
-    return {
-      ok: false,
-      code: "unsupported-vector-fidelity",
-      reason: "지우개 벡터 획은 선화 참조 이미지에서 원본 합성을 정확히 재현할 수 없습니다. 먼저 레이어를 병합해 주세요.",
-      insertionIndex: prepared.insertionIndex,
-    };
-  }
   const sourcePayload = JSON.stringify({
     width: prepared.width,
     height: prepared.height,
@@ -1181,7 +1161,7 @@ export function planStudioAdvancedFillVectorTarget(
     return {
       ok: false,
       code: "svg-budget-exceeded",
-      reason: "벡터 선화의 최소 직렬화 크기가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합해 주세요.",
+      reason: "벡터 선화의 최소 직렬화 크기가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 표시 획 수를 줄여 주세요.",
       insertionIndex: prepared.insertionIndex,
     };
   }
@@ -1206,24 +1186,14 @@ export function planStudioAdvancedFillVectorTarget(
 /**
  * 래스터 대상 채우기에서 벡터 선화 참조를 만들지 못했을 때 쓸 정직한 제외 문구.
  *
- * 왜 던지지 않는가
- * ----------------
- * 벡터 대상(`virtual-vector-fill`)에서 이 참조는 채우기 경계 **그 자체**라 없으면 할 일이
- * 없다. 하지만 래스터 대상에서는 래스터 경계 위에 얹는 **추가** 경계일 뿐이다. 참조를 못
- * 만든다고 래스터 채우기가 틀려지지는 않는다 — 경계가 하나 줄어들 뿐이다. 그런데도 실패를
- * 던지면 페이지 어딘가의 지우개 획 하나가 무관한 래스터 레이어의 채우기를 통째로 막고,
- * 배너는 "먼저 레이어를 병합해 주세요" 라며 파괴적인 작업을 요구한다.
- *
- * 그래서 이 경로는 `studio-svg-export.ts` 의 정직성 규약을 그대로 따른다 — 완벽 재현이
- * 불가한 것은 그리지 않고, 대신 무엇을 왜 뺐는지 전부 알린다. 채우기 결과는 명시적 적용
- * 전까지 미리보기라, 경계가 하나 빠진 결과를 사용자가 눈으로 보고 판단할 수 있다.
- *
- * 근사본을 대신 넣지 않는 이유도 같은 규약이다. 지우개를 뺀 SVG 는 화면에 없는 선을 경계로
- * 세운다. 채우기가 보이지 않는 벽에서 멈추면 미리보기로도 확인할 방법이 없다. 아예 빼면
- * 채우기가 선화를 넘어 번지는 모습이 그대로 보이므로 적용 전에 알아챌 수 있다.
+ * 벡터 대상(`virtual-vector-fill`)에서 이 참조는 채우기 경계 그 자체지만, 래스터 대상에서는
+ * 래스터 경계 위에 얹는 추가 경계다. 지우개 합성은 이제 정확히 지원하므로 정상적인 그리기
+ * 기록은 이 경로로 떨어지지 않는다. 남은 구조 손상·미지원 합성·예산 초과 같은 예외에서는
+ * 래스터 채우기를 통째로 막지 않고 참조만 제외하며, 미리보기에서 결과를 확인할 수 있게 한다.
  *
  * @returns 뺄 것이 애초에 없으면(`no-visible-vector-draw`) null — 알릴 사실이 없다.
  */
+
 export function describeStudioAdvancedFillVectorReferenceExclusion(
   failure: Extract<StudioAdvancedFillVectorTargetPlan, { readonly ok: false }>,
 ): string | null {

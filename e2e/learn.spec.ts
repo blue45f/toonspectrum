@@ -3,27 +3,40 @@ import { expect, test } from "@playwright/test";
 import { LESSONS, TERMS } from "../apps/web/src/domains/learn/learning-content";
 import { STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
 
- test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+  await page.route("**/api/auth/session**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false, user: null }),
+    });
+  });
 });
 
-test("curriculum, all lessons, glossary and invalid addresses render", async ({ page }) => {
+test("curriculum, glossary and invalid addresses render", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/learn");
   await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
-  for (const lesson of LESSONS) {
-    await page.goto(`/learn/lessons/${lesson.id}`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(lesson.title);
-    await expect(page.locator(".learn-page").getByRole("slider")).toHaveCount(2);
-    await expect(page.getByRole("button", { name: "이 강좌 학습 완료", exact: true })).toBeDisabled();
-  }
   await page.goto("/learn/glossary");
   await expect(page.locator(".learn-term-card")).toHaveCount(TERMS.length);
   await page.goto("/learn/lessons/does-not-exist");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("학습 페이지를 찾을 수 없습니다.");
   expect(errors).toEqual([]);
 });
+
+for (const lesson of LESSONS) {
+  test(`lesson ${lesson.id} renders its complete exercise`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(`/learn/lessons/${lesson.id}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(lesson.title);
+    await expect(page.locator(".learn-page").getByRole("slider")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "이 강좌 학습 완료", exact: true })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+}
 
 test("Korean and English search, bookmarks, deep links and back navigation", async ({ page }) => {
   await page.goto("/learn/glossary");

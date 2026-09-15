@@ -6,6 +6,8 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 
+import type { StudioBg3dHistoryCommandTimeline } from "./studio-bg3d-history-command-adapter";
+
 import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
 
 export function useStudioBg3dEditorState(props) {
@@ -327,7 +329,13 @@ export function useStudioBg3dEditorState(props) {
   const [isRestoringScene, setIsRestoringScene] = useState(true);
   const sceneRestoreAbortRef = useRef<AbortController | null>(null);
   const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
-  const [templateLibraryStatus, setTemplateLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [templateLibraryStatus, setTemplateLibraryStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [templateLibraryNotice, setTemplateLibraryNotice] = useState<{
+    readonly tone: "success" | "error";
+    readonly message: string;
+  } | null>(null);
+  const [templateLibraryLoadRevision, setTemplateLibraryLoadRevision] = useState(0);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
 
@@ -445,6 +453,7 @@ export function useStudioBg3dEditorState(props) {
 
   const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
+  const historyCommandTimelineRef = useRef<StudioBg3dHistoryCommandTimeline | null>(null);
 
   Object.assign(h, {
     primitiveGeometryPool,
@@ -665,6 +674,10 @@ export function useStudioBg3dEditorState(props) {
     setTemplateLibrary,
     templateLibraryStatus,
     setTemplateLibraryStatus,
+    templateLibraryNotice,
+    setTemplateLibraryNotice,
+    templateLibraryLoadRevision,
+    setTemplateLibraryLoadRevision,
     isSavingTemplate,
     setIsSavingTemplate,
     applyingTemplateId,
@@ -737,6 +750,7 @@ export function useStudioBg3dEditorState(props) {
     setRefTick,
     historyRef,
     historyIndexRef,
+    historyCommandTimelineRef,
     commitSharedCharacterTransform,
     effectiveSelectedSharedCharacter,
     effectiveSelectedSharedCharacterElementId,

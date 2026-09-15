@@ -222,7 +222,7 @@ describe("studio primary action reachability", () => {
     }
 
     const presentation = createStudioMainMenuPresentation(groups);
-    expect(presentation.presentedGroupIds).toContain("brush");
+    expect(presentation.presentedGroupIds).toContain("create");
     expect(presentation.presentedGroupIds).toContain("file");
     expect(presentation.presentedGroupIds).toContain("edit");
 

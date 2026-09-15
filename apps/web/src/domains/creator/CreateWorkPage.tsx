@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Bookmark,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -19,6 +20,14 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-reader";
 import { useCreatorPublicationPageMeta } from "./creator-publication-page-meta";
+import {
+  CREATOR_COMMUNITY_KIND_LABEL,
+  CREATOR_COMMUNITY_PROVENANCE_LABEL,
+} from "./creator-community-labels";
+import {
+  CreatorCommunityPublicationPanel,
+  CreatorWorkReportControl,
+} from "./CreatorCommunityPublicationPanel";
 import { PublishedWorkReader } from "./PublishedWorkReader";
 import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import { BUBBLE_VARIANTS } from "./studio-assets";
@@ -43,6 +52,7 @@ import {
   listComments,
   listSeries,
   postComment,
+  toggleWorkBookmark,
   toggleWorkLike,
   updateWork,
   type ChallengeSummary,
@@ -513,6 +523,7 @@ export function CreateWorkPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const [liking, setLiking] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const publicationPolicy = useMemo(
@@ -573,6 +584,30 @@ export function CreateWorkPage() {
       setActionError(err instanceof Error ? err.message : "좋아요를 처리하지 못했습니다.");
     } finally {
       setLiking(false);
+    }
+  }
+
+  async function onToggleBookmark() {
+    if (!work || !userId || bookmarking) return;
+    setBookmarking(true);
+    setActionError(null);
+    const previous = {
+      bookmarked: Boolean(work.bookmarked),
+      bookmarks: work.bookmarks ?? 0,
+    };
+    setWork({
+      ...work,
+      bookmarked: !previous.bookmarked,
+      bookmarks: Math.max(0, previous.bookmarks + (previous.bookmarked ? -1 : 1)),
+    });
+    try {
+      const result = await toggleWorkBookmark(work.id);
+      setWork((current) => current ? { ...current, ...result } : current);
+    } catch (caught) {
+      setWork((current) => current ? { ...current, ...previous } : current);
+      setActionError(caught instanceof Error ? caught.message : "북마크를 처리하지 못했습니다.");
+    } finally {
+      setBookmarking(false);
     }
   }
 
@@ -665,6 +700,26 @@ export function CreateWorkPage() {
         <h1 className="text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
           {work.title}
         </h1>
+        {work.community && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-medium text-fg-2">
+              {CREATOR_COMMUNITY_KIND_LABEL[work.community.kind]}
+            </span>
+            <span className={cn(
+              "rounded-full border px-2.5 py-1 text-[0.7rem] font-medium",
+              work.community.provenance === "human"
+                ? "border-line bg-card text-fg-2"
+                : "border-cool/40 bg-[oklch(0.8_0.11_232/0.1)] text-cool",
+            )}>
+              {CREATOR_COMMUNITY_PROVENANCE_LABEL[work.community.provenance]}
+            </span>
+            {work.community.portfolio && (
+              <span className="rounded-full border border-accent/35 bg-accent-soft/30 px-2.5 py-1 text-[0.7rem] font-medium text-accent">
+                포트폴리오
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="mt-3 flex items-center gap-2.5">
           <span className="size-9 shrink-0 overflow-hidden rounded-full bg-raised ring-1 ring-line">
@@ -752,6 +807,21 @@ export function CreateWorkPage() {
             <Heart size={14} className={cn(work.liked && "fill-current")} />
             <span className="numeral">{formatCount(work.likes)}</span>
           </button>
+          <button
+            type="button"
+            onClick={onToggleBookmark}
+            disabled={!userId || bookmarking}
+            aria-pressed={Boolean(work.bookmarked)}
+            title={userId ? undefined : "로그인 후 북마크할 수 있습니다."}
+            className={buttonClass({
+              size: "sm",
+              variant: work.bookmarked ? "solid" : "outline",
+              className: "gap-1.5",
+            })}
+          >
+            <Bookmark size={14} className={cn(work.bookmarked && "fill-current")} />
+            <span className="numeral">{formatCount(work.bookmarks ?? 0)}</span>
+          </button>
           <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
             <Eye size={14} />
             <span className="numeral">{formatCount(work.views)}</span> 조회
@@ -775,6 +845,12 @@ export function CreateWorkPage() {
               리믹스 비허용
             </span>
           ) : null}
+
+          {!work.isOwner && (
+            <div className="ml-auto">
+              <CreatorWorkReportControl workId={work.id} authenticated={Boolean(userId)} />
+            </div>
+          )}
 
           {work.isOwner && (
             <div className="ml-auto flex items-center gap-2">
@@ -812,6 +888,16 @@ export function CreateWorkPage() {
               setWork((current) => (current ? { ...current, ...patch } : current));
               setReloadKey((value) => value + 1); // 시리즈/회차·이웃 회차 정보 새로고침
             }}
+          />
+        )}
+
+        {/* 작성자 전용: 저장본 메타데이터·불변 릴리스·외부 게시 이력 */}
+        {work.isOwner && (
+          <CreatorCommunityPublicationPanel
+            work={work}
+            onUpdated={(patch) =>
+              setWork((current) => current ? { ...current, ...patch } : current)
+            }
           />
         )}
 

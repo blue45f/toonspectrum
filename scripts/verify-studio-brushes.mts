@@ -3962,11 +3962,39 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
     await page.locator('[data-studio-view-tool-trigger="zoom"]').click();
     const hud = page.getByRole("toolbar", { name: "캔버스 확대 및 축소 보기 도구", exact: true });
     const step = hud.getByRole("button", { name: zoomAction, exact: true });
+    const zoomInput = hud.getByRole("textbox", { name: "캔버스 확대율 입력", exact: true });
     for (let count = 0; count < 30 && await step.getAttribute("aria-disabled") !== "true"; count += 1) {
-      await step.click();
+      const before = await zoomInput.inputValue();
+      try {
+        // A busy Linux runner can deliver this state-only click and update the zoom before
+        // Playwright receives the action-complete acknowledgement. Bound that acknowledgement;
+        // the observable zoom/disabled state below remains the authority.
+        await step.click({ noWaitAfter: true, timeout: 2_500 });
+      } catch (cause: unknown) {
+        if (!(cause instanceof Error) || cause.name !== "TimeoutError") throw cause;
+        const delivered = await step.getAttribute("aria-disabled") === "true"
+          || await zoomInput.inputValue() !== before;
+        if (!delivered) {
+          // Preserve the same button click contract, but bypass only Playwright's pointer-action
+          // acknowledgement after the real hit-tested attempt failed to report completion.
+          await step.dispatchEvent("click");
+        }
+      }
+      const transitionDeadline = performance.now() + 2_500;
+      while (
+        performance.now() < transitionDeadline
+        && await step.getAttribute("aria-disabled") !== "true"
+        && await zoomInput.inputValue() === before
+      ) {
+        await page.waitForTimeout(50);
+      }
+      invariant(
+        await step.getAttribute("aria-disabled") === "true" || await zoomInput.inputValue() !== before,
+        `${zoomAction} did not update the zoom state`,
+      );
     }
     invariant(await step.getAttribute("aria-disabled") === "true", "Smart Shape edge audit did not reach the real zoom limit");
-    const zoomValue = await hud.getByRole("textbox", { name: "캔버스 확대율 입력", exact: true }).inputValue();
+    const zoomValue = await zoomInput.inputValue();
     invariant(/^\d+(?:\.\d+)?$/.test(zoomValue) && Number.isFinite(Number(zoomValue)) && Number(zoomValue) > 0,
       `Smart Shape edge audit received an invalid zoom percentage: ${JSON.stringify(zoomValue)}`);
     const zoom = `${zoomValue}%`;

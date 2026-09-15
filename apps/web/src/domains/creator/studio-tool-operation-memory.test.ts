@@ -687,7 +687,7 @@ describe("studio tool operation memory SQLite controller", () => {
 
     expect(hydrationStart).toBeGreaterThan(-1);
     expect(pageSource).not.toMatch(
-      /import\s+[^;]*from\s+["']\.\/studio-tool-operation-memory-sqlite["']/,
+      /import\s+(?!type\b)[^;]*from\s+["']\.\/studio-tool-operation-memory-sqlite["']/,
     );
     expect(hydration).toContain('"./studio-tool-operation-memory-sqlite"');
     expect(pageSource).toContain("pendingToolOperationMemorySaveRef.current = memory");

@@ -14,6 +14,10 @@ import {
 import {
   CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
 } from "../../../../web/src/shared/lib/creator-asset-contract";
+import {
+  parseCreatorCommunityContentGroup,
+  parseCreatorCommunityProvenance,
+} from "../../../../web/src/shared/lib/creator-community-publication-contract";
 import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { StudioLinked3dPassAssetFenceError } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
 import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
@@ -21,6 +25,7 @@ import {
   addComment,
   bumpAssetDownloads,
   bumpViews,
+  createCreatorWorkRelease,
   createSeries,
   createWork,
   deleteSeries,
@@ -37,6 +42,8 @@ import {
   listAssetModerationQueue,
   listChallenges,
   listComments,
+  listCreatorExternalPublications,
+  listCreatorWorkReleases,
   listSeries,
   listSharedAssets,
   listSharedAssetCatalog,
@@ -46,8 +53,12 @@ import {
   parseSeriesSort,
   moderateSharedAsset,
   publishAsset,
+  removeCreatorExternalPublication,
+  reportCreatorWork,
   reportSharedAsset,
   restoreWorkRevision,
+  saveCreatorExternalPublication,
+  toggleCreatorWorkBookmark,
   toggleFollow,
   toggleLike,
   updateSeries,
@@ -104,24 +115,19 @@ import type {
 import type {
   CreatorAssetListQueryDto,
   CreatorAssetModerationQueryDto,
+  CreatorWorkListQueryDto,
   CreateCreatorWorkDto,
   ModerateCreatorAssetDto,
   PromoteCreatorDraftCollaborationRoomDto,
   PublishCreatorAssetDto,
   ProvisionCreatorDraftCollaborationRoomDto,
   ReportCreatorAssetDto,
+  ReportCreatorWorkDto,
+  SaveCreatorExternalPublicationDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorWorkDto,
 } from "./creator.dto";
 
-interface ListQuery {
-  titleId?: string | null;
-  userId?: string | null;
-  sort?: string | null;
-  tag?: string | null;
-  seriesId?: string | null;
-  challengeId?: string | null;
-}
 
 function creatorLinked3dPassAssetFenceConflict(
   error: StudioLinked3dPassAssetFenceError
@@ -156,7 +162,8 @@ export class CreatorService {
       new StudioRealtimeRevocationService({ enabled: false }),
   ) {}
 
-  async listWorks(q: ListQuery, viewerId?: string) {
+  async listWorks(q: CreatorWorkListQueryDto, viewerId?: string) {
+    if (q.bookmarked && !viewerId) throw new ForbiddenException("북마크 목록은 로그인 후 볼 수 있습니다.");
     return listWorks({
       titleId: q.titleId ?? undefined,
       userId: q.userId ?? undefined,
@@ -164,6 +171,10 @@ export class CreatorService {
       tag: q.tag ?? undefined,
       seriesId: q.seriesId ?? undefined,
       challengeId: q.challengeId ?? undefined,
+      contentType: parseCreatorCommunityContentGroup(q.contentType),
+      portfolio: Boolean(q.portfolio),
+      provenance: parseCreatorCommunityProvenance(q.provenance) ?? undefined,
+      bookmarkedBy: q.bookmarked ? viewerId : undefined,
       viewerId: viewerId ?? undefined,
     });
   }
@@ -496,6 +507,103 @@ export class CreatorService {
       return await toggleLike(userId, workId);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "좋아요를 처리할 수 없습니다.");
+    }
+  }
+
+
+  async toggleBookmark(userId: string, workId: string) {
+    if (!rateLimit(`creator-work-bookmark:${userId}`, 240, 60 * 60_000)) {
+      throw new HttpException(
+        "북마크 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await toggleCreatorWorkBookmark(userId, workId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "북마크를 처리할 수 없습니다.",
+      );
+    }
+  }
+
+  async listWorkReleases(workId: string, viewerId?: string) {
+    try {
+      return await listCreatorWorkReleases(workId, viewerId);
+    } catch (error) {
+      throw new NotFoundException(
+        error instanceof Error ? error.message : "작품 릴리스를 찾을 수 없습니다.",
+      );
+    }
+  }
+
+  async createWorkRelease(userId: string, workId: string) {
+    try {
+      return await createCreatorWorkRelease(userId, workId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "작품 릴리스를 만들 수 없습니다.",
+      );
+    }
+  }
+
+  async listExternalPublications(workId: string, viewerId?: string) {
+    try {
+      return await listCreatorExternalPublications(workId, viewerId);
+    } catch (error) {
+      throw new NotFoundException(
+        error instanceof Error ? error.message : "외부 게시 기록을 찾을 수 없습니다.",
+      );
+    }
+  }
+
+  async saveExternalPublication(
+    userId: string,
+    workId: string,
+    body: SaveCreatorExternalPublicationDto,
+  ) {
+    if (!rateLimit(`creator-external-publication:${userId}`, 120, 60 * 60_000)) {
+      throw new HttpException(
+        "외부 게시 기록 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await saveCreatorExternalPublication(userId, workId, body);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "외부 게시 기록을 저장할 수 없습니다.",
+      );
+    }
+  }
+
+  async removeExternalPublication(
+    userId: string,
+    workId: string,
+    publicationId: string,
+  ) {
+    try {
+      return await removeCreatorExternalPublication(userId, workId, publicationId);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "외부 게시 기록을 정리할 수 없습니다.",
+      );
+    }
+  }
+
+  async reportWork(userId: string, workId: string, body: ReportCreatorWorkDto) {
+    if (!rateLimit(`creator-work-report:${userId}`, 20, 24 * 60 * 60_000)) {
+      throw new HttpException(
+        "오늘 제출할 수 있는 작품 신고 수를 초과했습니다.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+      return await reportCreatorWork(userId, workId, body);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "작품을 신고할 수 없습니다.",
+      );
     }
   }
 

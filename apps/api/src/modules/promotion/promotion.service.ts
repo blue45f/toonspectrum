@@ -1,12 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { and, desc, eq, or, sql } from "drizzle-orm";
-
 import { PROMOTION_KINDS, PROMOTION_STAGES, PROMOTION_GENRES, promotionCursor, promotionKey, promotionRecord, promotionText, validatePromotion } from "../../../../../packages/core/src/promotion";
-import { db, users } from "../../db";
-import { promotionBookmarks, promotionComments, promotionPosts, promotionReports } from "../../db/schema/promotion.schema";
+import { db, promotionBookmarks, promotionComments, promotionPosts, promotionReports, users } from "../../db";
 import { isOfficialUser } from "../../server/feedback";
 import { escapeLikePattern } from "../../server/sql-like";
-
 import type { PromotionPost } from "../../../../../packages/core/src/promotion";
 
 const visible = () => and(eq(promotionPosts.hidden, false), eq(promotionPosts.archived, false));
@@ -16,7 +13,8 @@ function fields(viewerId?: string) {
     hidden: promotionPosts.hidden, archived: promotionPosts.archived,
     saved: viewerId ? sql<boolean>`exists (select 1 from ${promotionBookmarks} where ${promotionBookmarks.postId} = ${promotionPosts.id} and ${promotionBookmarks.userId} = ${viewerId})` : sql<boolean>`false` };
 }
-function mapped(row: { payload: typeof promotionPosts.$inferSelect.payload; id: string; userId: string; authorName: string | null; createdAt: Date; updatedAt: Date; version: number; hidden: boolean; archived: boolean; saved: boolean }): PromotionPost {
+function mapped(row: { payload: typeof promotionPosts.$inferSelect.payload;
+  id: string; userId: string; authorName: string | null; createdAt: Date; updatedAt: Date; version: number; hidden: boolean; archived: boolean; saved: boolean }): PromotionPost {
   return { ...row.payload, id: row.id, author: { id: row.userId, name: row.authorName ?? "작가" }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), version: row.version, hidden: row.hidden, archived: row.archived, saved: row.saved };
 }
 function validVersion(value: unknown): number {
@@ -68,6 +66,7 @@ export class PromotionService {
     const parsed = validatePromotion(input);
     if (!parsed.value) throw new BadRequestException(parsed.error);
     const value = parsed.value, id = crypto.randomUUID(), now = new Date();
+    // Cross-instance per-author publishing quota. The advisory lock prevents parallel quota races.
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'promotion:' + userId}))`);
       const [count] = await tx.select({ total: sql<number>`count(*)::int`, daily: sql<number>`count(*) filter (where ${promotionPosts.createdAt} >= ${new Date(now.getTime() - 86400000)})::int` }).from(promotionPosts).where(eq(promotionPosts.userId, userId));
@@ -103,13 +102,9 @@ export class PromotionService {
   async comment(id: string, userId: string, input: unknown) {
     const text = promotionText(promotionRecord(input).text);
     if (text.length < 1 || text.length > 1000) throw new BadRequestException("댓글은 1~1000자로 입력해 주세요.");
-    await db.transaction(async (tx) => {
-      const [post] = await tx.select({ id: promotionPosts.id, hidden: promotionPosts.hidden, archived: promotionPosts.archived }).from(promotionPosts).where(eq(promotionPosts.id, id)).for("update");
-      if (!post || post.hidden || post.archived) throw new NotFoundException("댓글을 작성할 수 있는 공개 게시물이 아니에요.");
-      const [count] = await tx.select({ value: sql<number>`count(*)::int` }).from(promotionComments).where(eq(promotionComments.postId, id));
-      if (count.value >= 1000) throw new HttpException("이 게시물의 댓글 한도에 도달했어요.", 429);
-      await tx.insert(promotionComments).values({ id: crypto.randomUUID(), postId: id, userId, text, createdAt: new Date() });
-    });
+    const { post } = await this.accessible(id, userId);
+    if (post.hidden || post.archived) throw new ConflictException("비공개 게시물에는 댓글을 작성할 수 없어요.");
+    await db.insert(promotionComments).values({ id: crypto.randomUUID(), postId: id, userId, text, createdAt: new Date() });
     return { created: true };
   }
   async deleteComment(id: string, commentId: string, userId: string) {

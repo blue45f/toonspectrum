@@ -63,6 +63,18 @@ describe("ToonStudio final product IA", () => {
     ]));
   });
 
+  it("owns production tools under the existing project production stage", () => {
+    const toolchain = studioCapabilityById("production.toolchain");
+    expect(toolchain?.owner).toBe("production");
+    expect(toolchain?.primaryRoute).toBe("/studio/p/:projectId/production");
+    expect(toolchain?.surfaces).toEqual([
+      { id: "project-production-pipeline", role: "primary" },
+      { id: "production-toolchain-route", role: "projection" },
+      { id: "production-engine-center", role: "projection" },
+      { id: "production-job-queue", role: "projection" },
+    ]);
+  });
+
   it("keeps user-facing save and collaboration language consequence-based", () => {
     expect(STUDIO_USER_WORK_STATES.map((state) => state.label)).toEqual([
       "저장됨",

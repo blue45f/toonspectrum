@@ -7,6 +7,7 @@ import {
   StudioProductionHubPage,
   type StudioProductionSurface,
 } from "./StudioProductionHubPage";
+import { createEmptyProductionWorkspace } from "./studio-production-workspace";
 
 const database = vi.hoisted(() => ({
   kvGet: vi.fn<(_namespace: string, _key: string) => Promise<string | null>>(async () => null),
@@ -16,10 +17,55 @@ vi.mock("../studio-local-database-runtime", () => ({
   acquireStudioLocalDatabase: async () => database,
 }));
 
+const server = vi.hoisted(() => ({
+  loadWorkspace: vi.fn(),
+  saveWorkspace: vi.fn(),
+  listReviewLinks: vi.fn(),
+  createReviewLink: vi.fn(),
+  revokeReviewLink: vi.fn(),
+  loadExternalReview: vi.fn(),
+  addExternalFeedback: vi.fn(),
+}));
+vi.mock("./studio-production-server-client", () => {
+  class StudioProductionServerConflictError extends Error {
+    constructor(readonly currentRevision: number) {
+      super("conflict");
+    }
+  }
+  return {
+    loadStudioServerProductionWorkspace: server.loadWorkspace,
+    saveStudioServerProductionWorkspace: server.saveWorkspace,
+    listStudioServerReviewLinks: server.listReviewLinks,
+    createStudioServerReviewLink: server.createReviewLink,
+    revokeStudioServerReviewLink: server.revokeReviewLink,
+    loadStudioExternalReview: server.loadExternalReview,
+    addStudioExternalReviewFeedback: server.addExternalFeedback,
+    StudioProductionServerConflictError,
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   database.kvGet.mockResolvedValue(null);
   database.kvSet.mockResolvedValue(undefined);
+  server.loadWorkspace.mockImplementation(async (workId: string) => {
+    const document = createEmptyProductionWorkspace(`work:${workId}`);
+    return {
+      workId,
+      revision: document.revision,
+      updatedAt: document.updatedAt,
+      capabilities: {
+        view: true,
+        edit: true,
+        manageLinks: true,
+        manageRoles: true,
+        approve: true,
+        publish: true,
+      },
+      document,
+    };
+  });
+  server.listReviewLinks.mockResolvedValue([]);
 });
 afterEach(cleanup);
 
@@ -39,11 +85,17 @@ function LocationProbe() {
 describe("production scope at the actual React page", () => {
   it.each(["work", "remix"])("loads %s query identity and retains every destination", async (kind) => {
     mount(`/studio/share?scope=${kind}%3Achapter-1`);
-    await screen.findByText("SQLite/OPFS 저장됨");
-    expect(database.kvGet).toHaveBeenCalledWith(
-      "studio-production-command-center-v1",
-      `${kind}:chapter-1`,
-    );
+    await screen.findByText(kind === "work" ? "서버 저장됨" : "SQLite/OPFS 저장됨");
+    if (kind === "work") {
+      expect(server.loadWorkspace).toHaveBeenCalledWith("chapter-1");
+      expect(database.kvGet).not.toHaveBeenCalled();
+    } else {
+      expect(database.kvGet).toHaveBeenCalledWith(
+        "studio-production-command-center-v1",
+        "remix:chapter-1",
+      );
+      expect(server.loadWorkspace).not.toHaveBeenCalled();
+    }
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(
       `/studio/${kind}/chapter-1/canvas`,
     );
@@ -71,13 +123,13 @@ describe("production scope at the actual React page", () => {
       const navigate = useNavigate();
       return (
         <>
-          <button onClick={() => navigate("/studio/share?scope=work%3Ab")}>다른 작품</button>
+          <button onClick={() => navigate("/studio/share?scope=remix%3Ab")}>다른 작품</button>
           <StudioProductionHubPage surface="share" onOpenStudio={vi.fn()} />
         </>
       );
     }
     render(
-      <MemoryRouter initialEntries={["/studio/share?scope=work%3Aa"]}>
+      <MemoryRouter initialEntries={["/studio/share?scope=remix%3Aa"]}>
         <Harness />
       </MemoryRouter>,
     );
@@ -85,20 +137,20 @@ describe("production scope at the actual React page", () => {
     fireEvent.click(screen.getByRole("button", { name: "다른 작품" }));
     await waitFor(() => expect(database.kvGet).toHaveBeenLastCalledWith(
       "studio-production-command-center-v1",
-      "work:b",
+      "remix:b",
     ));
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(
-      "/studio/work/b/canvas",
+      "/studio/remix/b/canvas",
     );
     expect(database.kvSet).not.toHaveBeenCalled();
   });
 
   it("does not steal typing or IME keyboard events for workspace shortcuts", async () => {
-    mount("/studio/share?scope=work%3Aa");
+    mount("/studio/share?scope=remix%3Aa");
     await screen.findByText("SQLite/OPFS 저장됨");
     const input = screen.getByRole("textbox", { name: "프로젝트 제목" });
     fireEvent.keyDown(input, { key: "1", altKey: true });
-    expect(document.querySelector("[data-scope-key]")?.getAttribute("data-scope-key")).toBe("work:a");
+    expect(document.querySelector("[data-scope-key]")?.getAttribute("data-scope-key")).toBe("remix:a");
     expect(screen.getByRole("link", { name: "공유" }).getAttribute("aria-current")).toBe("page");
     const event = new KeyboardEvent("keydown", {
       key: "1",
@@ -112,13 +164,13 @@ describe("production scope at the actual React page", () => {
 
   it("does not seed fake work or review data into a real work scope", async () => {
     mount("/studio/projects?scope=work%3Achapter-1", "projects");
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("서버 저장됨");
 
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
-      "linked-local",
+      "server-work",
     );
     expect(screen.getByText("등록된 제작 작업이 없습니다")).toBeTruthy();
-    expect(screen.queryByText("콘티와 대사 확정")).toBeNull();
+    expect(screen.queryByText("대사와 장면 의도 확정")).toBeNull();
     expect(screen.queryByText("3컷 시선 방향 불일치")).toBeNull();
     expect(database.kvSet).not.toHaveBeenCalled();
   });
@@ -130,7 +182,7 @@ describe("production scope at the actual React page", () => {
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
       "demo",
     );
-    expect(screen.getByText("콘티와 대사 확정")).toBeTruthy();
+    expect(screen.getByText("대사와 장면 의도 확정")).toBeTruthy();
     expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
       "/studio/review?demo=1",
     );
@@ -161,19 +213,19 @@ describe("production scope at the actual React page", () => {
 
   it("ignores a demo query for saved work scopes", async () => {
     mount("/studio/projects?scope=work%3Achapter-1&demo=1", "projects");
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("서버 저장됨");
 
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
-      "linked-local",
+      "server-work",
     );
     expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
       "/studio/work/chapter-1/review",
     );
-    expect(screen.queryByText("콘티와 대사 확정")).toBeNull();
+    expect(screen.queryByText("대사와 장면 의도 확정")).toBeNull();
   });
 
   it("fails closed instead of treating local tokens as share authority", async () => {
-    mount("/studio/share?scope=work%3Achapter-1");
+    mount("/studio/share?scope=remix%3Achapter-1");
     await screen.findByText("SQLite/OPFS 저장됨");
 
     expect(screen.getByText("이 모드에서는 초대 링크를 만들 수 없습니다")).toBeTruthy();
@@ -183,7 +235,7 @@ describe("production scope at the actual React page", () => {
 
   it("does not grant membership from an unverified invite parameter", async () => {
     mount("/studio/join?scope=work%3Achapter-1&invite=ts-local-token", "join");
-    await screen.findByText("SQLite/OPFS 저장됨");
+    await screen.findByText("서버 저장됨");
 
     expect(screen.getByText("이 링크는 서버에서 검증되지 않았습니다")).toBeTruthy();
     expect(screen.getByText(/권한 부여 안 됨/u)).toBeTruthy();
@@ -192,7 +244,7 @@ describe("production scope at the actual React page", () => {
 
   it("keeps corrupt local data untouched and exposes a recovery error", async () => {
     database.kvGet.mockResolvedValueOnce("{corrupt");
-    mount("/studio/projects?scope=work%3Achapter-1", "projects");
+    mount("/studio/projects?scope=remix%3Achapter-1", "projects");
 
     await screen.findByText("손상된 값을 빈 데이터로 덮어쓰지 않았습니다.");
     expect(screen.getByRole("alert").textContent).toContain("안전하게 열지 못했습니다");

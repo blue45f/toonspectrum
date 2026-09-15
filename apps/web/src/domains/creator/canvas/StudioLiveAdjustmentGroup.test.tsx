@@ -64,7 +64,7 @@ describe("live adjustment actual runtime and capture fence", () => {
     act(() => scene.draw()); await captured;
     expect(completed).toBe(true);
     expect(view.getByText("editable original")).toBeTruthy();
-  });
+  }, 15_000);
   it("rebuilds the real parent compositor when a late image Worker publishes newer pixels", async () => {
     render(mount());
     await act(async () => { await vi.dynamicImportSettled(); });

@@ -1,193 +1,130 @@
-/**
- * Character Shaper — Blender 캐릭터 패키지 entry point.
- *
- * ToonStudio already ships a Blender authoring pipeline (`tools/blender/toonstudio_blender_kit`)
- * that emits a `character-package.json` next to the runtime asset it built. Nothing in the browser
- * runs Blender: this block only *reads* a finished package, verifies it with the repository's own
- * parser, and hands the selected runtime file to the host's normal model-install path.
- *
- * Fail-closed by construction — an invalid manifest, a failed quality gate or a file whose byte
- * length does not match the manifest never reaches the loader, and the message shown is the
- * parser's own reason rather than a rewritten one.
- */
-
-import { FileJson, Loader2 } from "lucide-react";
-import { useId, useRef, useState } from "react";
+/** Blender package preflight and explicit local model handoff. No Blender/server execution. */
+import { FileJson, FolderOpen, Loader2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
-import {
-  parseStudioVrmBlenderCharacterPackage,
-  selectStudioVrmBlenderRuntimeAsset,
-} from "../vrm/studio-vrm-blender-character-package";
+import { prepareBlenderCharacterPackage } from "../vrm/studio-vrm-blender-package-import";
 
-import type { StudioVrmBlenderRuntimeAsset } from "../vrm/studio-vrm-blender-character-package";
+import type { BlenderPackagePreview } from "../vrm/studio-vrm-blender-package-import";
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 import type { ChangeEvent } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
 export const CHARACTER_SHAPER_BLENDER_DOC_PATH = "docs/studio/blender-character-pipeline.md";
-
-export interface CharacterShaperBlenderPackageProps {
-  readonly h: StudioVrmPoserHost;
-  readonly disabled?: boolean;
-}
-
+export interface CharacterShaperBlenderPackageProps { readonly h: StudioVrmPoserHost; readonly disabled?: boolean }
 type PackageState =
   | { readonly kind: "idle" }
   | { readonly kind: "reading" }
   | { readonly kind: "error"; readonly reason: string }
-  | { readonly kind: "ready"; readonly name: string; readonly note: string };
-
+  | { readonly kind: "preview"; readonly value: BlenderPackagePreview }
+  | { readonly kind: "installing" }
+  | { readonly kind: "sent"; readonly name: string };
 const BUTTON = cn(
   "inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.75rem] font-semibold text-fg-2",
-  "transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none",
-  STUDIO_FOCUS_RING,
+  "transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none", STUDIO_FOCUS_RING,
 );
-
-function baseName(path: string): string {
-  const parts = path.split(/[\\/]/u);
-  return parts[parts.length - 1] ?? path;
-}
-
-function reasonOf(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return "패키지를 읽지 못했습니다.";
-}
-
-async function readText(file: File): Promise<string> {
-  if (typeof file.text === "function") return file.text();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.readAsText(file);
-  });
-}
-
-/** Hex SHA-256, or `null` when the browser exposes no WebCrypto digest (insecure context). */
-async function digestOf(file: File): Promise<string | null> {
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle || typeof file.arrayBuffer !== "function") return null;
-  try {
-    const hash = await subtle.digest("SHA-256", await file.arrayBuffer());
-    return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  } catch {
-    return null;
-  }
-}
+function reasonOf(error: unknown): string { return error instanceof Error && error.message ? error.message : "패키지를 읽지 못했습니다."; }
 
 export function CharacterShaperBlenderPackage({ h, disabled = false }: CharacterShaperBlenderPackageProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
+  const taskRef = useRef<AbortController | null>(null);
+  const installingRef = useRef(false);
   const statusId = useId();
   const [state, setState] = useState<PackageState>({ kind: "idle" });
-
-  const installPackage = async (files: readonly File[]) => {
-    const manifestFile = files.find((file) => file.name.toLowerCase().endsWith(".json"));
-    if (!manifestFile) {
-      setState({ kind: "error", reason: "character-package.json 을 함께 선택해 주세요." });
-      return;
-    }
-
-    let asset: StudioVrmBlenderRuntimeAsset;
-    let displayName: string;
-    try {
-      const parsed = parseStudioVrmBlenderCharacterPackage(JSON.parse(await readText(manifestFile)));
-      asset = selectStudioVrmBlenderRuntimeAsset(parsed);
-      displayName = parsed.displayName;
-    } catch (error: unknown) {
-      // The parser's own reason, verbatim: it names the field that failed.
-      setState({ kind: "error", reason: reasonOf(error) });
-      return;
-    }
-
-    const wanted = baseName(asset.file.path).toLowerCase();
-    const runtimeFile = files.find((file) => file.name.toLowerCase() === wanted);
-    if (!runtimeFile) {
-      setState({ kind: "error", reason: `패키지가 가리키는 ${baseName(asset.file.path)} 파일을 함께 선택해 주세요.` });
-      return;
-    }
-    if (runtimeFile.size !== asset.file.bytes) {
-      setState({
-        kind: "error",
-        reason: `${runtimeFile.name} 크기가 패키지 기록과 다릅니다 (${runtimeFile.size} ≠ ${asset.file.bytes}바이트).`,
-      });
-      return;
-    }
-
-    const digest = await digestOf(runtimeFile);
-    if (digest !== null && digest !== asset.file.sha256) {
-      setState({ kind: "error", reason: `${runtimeFile.name} 의 SHA-256 이 패키지 기록과 다릅니다.` });
-      return;
-    }
-
-    const installModel = h.handleGeneratedVrmFile;
-    if (typeof installModel !== "function") {
-      setState({ kind: "error", reason: "이 화면에서는 모델을 설치할 수 없습니다." });
-      return;
-    }
-    await installModel(runtimeFile);
-
-    const notes: string[] = [];
-    if (asset.role === "glb") notes.push("VRM 대신 GLB를 불러왔습니다. VRM 확장이 없으면 포즈·표정은 제한됩니다.");
-    if (digest === null) notes.push("이 브라우저에서는 SHA-256을 확인하지 못해 파일 크기만 대조했습니다.");
-    setState({ kind: "ready", name: displayName, note: notes.join(" ") });
-  };
+  const [prefer, setPrefer] = useState<"vrm" | "glb">("vrm");
+  useEffect(() => () => { taskRef.current?.abort(); }, []);
+  const busy = state.kind === "reading" || state.kind === "installing";
 
   const onChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = [...(event.currentTarget.files ?? [])];
     event.currentTarget.value = "";
-    if (files.length === 0) return;
+    if (!files.length || disabled || installingRef.current) return;
+    taskRef.current?.abort();
+    const task = new AbortController();
+    taskRef.current = task;
     setState({ kind: "reading" });
-    void installPackage(files).catch((error: unknown) => setState({ kind: "error", reason: reasonOf(error) }));
+    void prepareBlenderCharacterPackage(files, { prefer, signal: task.signal }).then((value) => {
+      if (!task.signal.aborted) setState({ kind: "preview", value });
+    }).catch((error: unknown) => {
+      if (!task.signal.aborted) setState({ kind: "error", reason: reasonOf(error) });
+    });
   };
-
-  const busy = state.kind === "reading";
-
+  const install = async () => {
+    if (disabled || state.kind !== "preview" || installingRef.current) return;
+    const { value } = state;
+    const task = taskRef.current;
+    if (task?.signal.aborted) return;
+    installingRef.current = true;
+    setState({ kind: "installing" });
+    try {
+      if (typeof h.handleGeneratedVrmFile !== "function") throw new Error("이 화면에서는 모델을 설치할 수 없습니다.");
+      await h.handleGeneratedVrmFile(value.runtimeFile);
+      // The host queues loading and may report its own error: do not claim a completed render here.
+      if (!task?.signal.aborted) setState({ kind: "sent", name: value.manifest.displayName });
+    } catch (error: unknown) {
+      if (!task?.signal.aborted) setState({ kind: "error", reason: reasonOf(error) });
+    } finally { installingRef.current = false; }
+  };
   return (
-    <section aria-label="Blender 캐릭터 패키지" className="space-y-2">
+    <section aria-label="Blender 캐릭터 패키지" aria-busy={busy} className="space-y-2">
       <p className="text-[0.7rem] leading-relaxed text-fg-3">
-        Blender 파이프라인이 만든 <code className="rounded bg-raised px-1 text-fg-2">character-package.json</code> 과 같은
-        폴더의 <code className="rounded bg-raised px-1 text-fg-2">.vrm</code> 파일을 함께 고르면 이 셰이퍼에 바로 불러옵니다.
-        만드는 방법은 저장소 문서 <code className="rounded bg-raised px-1 text-fg-2">{CHARACTER_SHAPER_BLENDER_DOC_PATH}</code>
-        에 있습니다. 브라우저에서 Blender를 실행하지는 않습니다.
+        Blender에서 내보낸 <code>character-package.json</code>과 모델 파일, 폴더 또는 <code>.toonchar.zip</code>을 선택하세요.
+        파일은 서버로 보내지 않고 이 기기에서 검증합니다. 브라우저에서 Blender를 실행하지는 않습니다.
       </p>
-      <button
-        type="button"
-        disabled={disabled || busy}
-        aria-describedby={statusId}
-        onClick={() => inputRef.current?.click()}
-        className={BUTTON}
-      >
+      <details className="text-[0.7rem] leading-relaxed text-fg-3">
+        <summary className={cn("cursor-pointer rounded py-2", STUDIO_FOCUS_RING)}>Blender에서 준비하는 방법과 지원 범위</summary>
+        <p>Blender의 ToonStudio 패널에서 Export Edited Character Package를 누르면 현재 수정본이 새 리비전으로 저장됩니다.
+          원본 .blend는 로컬에 보관되며 ZIP에는 실행용 모델과 검토 자료만 포함됩니다.</p>
+        <p>.blend 직접 실행, 실시간 양방향 동기화, Cycles 재질의 완전한 재현은 지원하지 않습니다.
+          GLB는 VRM 전용 포즈·표정 기능이 제한될 수 있습니다. SHA-256은 파일 일치 여부를 확인하며 제작자 신원을 인증하지 않습니다.</p>
+        <p>설치·제작 문서: <code>{CHARACTER_SHAPER_BLENDER_DOC_PATH}</code></p>
+      </details>
+      <label className="block space-y-1 text-[0.7rem] text-fg-3">
+        <span>불러올 모델 우선순위</span>
+        <select value={prefer} disabled={disabled || busy} onChange={(event) => {
+          setPrefer(event.currentTarget.value === "glb" ? "glb" : "vrm");
+          taskRef.current?.abort(); setState({ kind: "idle" });
+        }} className={cn("min-h-11 w-full rounded-lg border border-line bg-card px-2 text-fg", STUDIO_FOCUS_RING)}>
+          <option value="vrm">VRM 우선 · 캐릭터 포즈·표정용</option>
+          <option value="glb">GLB 우선 · 범용 3D 모델용</option>
+        </select>
+      </label>
+      <button type="button" disabled={disabled || busy} aria-describedby={statusId} onClick={() => inputRef.current?.click()} className={BUTTON}>
         {busy ? <Loader2 size={14} aria-hidden className="animate-spin motion-reduce:animate-none" /> : <FileJson size={14} aria-hidden />}
         Blender 캐릭터 패키지 불러오기
       </button>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept=".json,.vrm,.glb,application/json"
-        aria-label="Blender 캐릭터 패키지 파일 선택"
-        className="sr-only"
-        tabIndex={-1}
-        onChange={onChange}
-      />
-      <p
-        id={statusId}
-        role="status"
-        aria-live="polite"
-        className={cn(
-          "text-[0.68rem] leading-relaxed",
-          state.kind === "error" ? "text-bad" : state.kind === "ready" ? "text-good" : "text-fg-3",
-        )}
-      >
-        {state.kind === "error"
-          ? `불러오지 못했습니다 — ${state.reason}`
-          : state.kind === "reading"
-            ? "패키지를 확인하는 중입니다."
-            : state.kind === "ready"
-              ? `${state.name} 을(를) 불러왔습니다.${state.note ? ` ${state.note}` : ""}`
-              : "아직 불러온 패키지가 없습니다."}
+      <button type="button" disabled={disabled || busy} onClick={() => folderRef.current?.click()} className={BUTTON}>
+        <FolderOpen size={14} aria-hidden />패키지 폴더 선택
+      </button>
+      <input ref={inputRef} type="file" multiple accept=".json,.vrm,.glb,.zip,application/json,application/zip" disabled={disabled || busy}
+        aria-label="Blender 캐릭터 패키지 파일 선택" className="sr-only" tabIndex={-1} onChange={onChange} />
+      <input ref={folderRef} type="file" multiple {...{ webkitdirectory: "" }} disabled={disabled || busy}
+        aria-label="Blender 캐릭터 패키지 폴더 선택" className="sr-only" tabIndex={-1} onChange={onChange} />
+      {state.kind === "reading" && <button type="button" className={BUTTON} onClick={() => {
+        taskRef.current?.abort(); setState({ kind: "idle" });
+      }}>검증 취소</button>}
+      {state.kind === "preview" && <div className="space-y-2 rounded-xl border border-line bg-raised p-3" aria-label="검증된 Blender 패키지 정보">
+        <p className="text-sm font-semibold text-fg">{state.value.manifest.displayName}</p>
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.7rem] text-fg-2">
+          <dt>파일</dt><dd>{state.value.asset.role.toUpperCase()} · {(state.value.runtimeFile.size / 1_000_000).toFixed(2)} MB</dd>
+          <dt>품질 점수</dt><dd>{state.value.manifest.quality.score} / 100 · 기준 {state.value.manifest.quality.minimumScore}</dd>
+          <dt>메시 / 스킨</dt><dd>{state.value.meshes} / {state.value.skins}</dd>
+          <dt>변형 타깃 / 애니메이션</dt><dd>{state.value.morphTargets} / {state.value.animations}</dd>
+          <dt>무결성</dt><dd>SHA-256 일치</dd>
+        </dl>
+        {!state.value.hasVrm && <p className="text-[0.7rem] text-fg-3">VRM 확장이 없는 GLB입니다. VRM 전용 포즈·표정 기능은 제한됩니다.</p>}
+        <p className="text-[0.7rem] text-fg-3">아직 현재 모델은 바뀌지 않았습니다. 아래 버튼을 누르면 모델 로더에 전달합니다.</p>
+        <button type="button" disabled={disabled} onClick={() => { void install(); }} className={BUTTON}>검증한 모델을 스튜디오로 가져오기</button>
+      </div>}
+      <p id={statusId} role="status" aria-live="polite" className={cn("text-[0.68rem] leading-relaxed", state.kind === "error" ? "text-bad" : "text-fg-3")}>
+        {state.kind === "error" ? `불러오지 못했습니다 — ${state.reason}`
+          : state.kind === "reading" ? "패키지 구조·품질·SHA-256을 확인하는 중입니다."
+          : state.kind === "preview" ? "검증을 통과했습니다. 모델 정보를 확인하고 가져오기를 눌러 주세요."
+          : state.kind === "installing" ? "검증한 모델을 전달하는 중입니다."
+          : state.kind === "sent" ? `${state.name} 파일을 모델 로더에 전달했습니다. 최종 결과는 모델 화면에서 확인하세요.`
+          : "아직 불러온 패키지가 없습니다."}
       </p>
     </section>
   );

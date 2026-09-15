@@ -67,7 +67,11 @@ function percentile(values: number[], quantile: number): number {
 export async function auditStudioMaterialMorphology() {
   const cases = [], planTimes: number[] = [], submitTimes: number[] = [];
   const renderedShapes: { id: string; rgba: Uint8ClampedArray; mass: number }[] = [];
-  const sheets = [canvas(960, 1600), canvas(960, 1600)];
+  const rowsPerSheet = 16;
+  const sheets = Array.from(
+    { length: Math.ceil(STUDIO_MATERIAL_BRUSH_IDS.length / rowsPerSheet) },
+    () => canvas(960, 1600),
+  );
   for (const sheet of sheets) { const ctx = sheet.getContext("2d")!; ctx.fillStyle = "white"; ctx.fillRect(0, 0, sheet.width, sheet.height); }
   // Warm actual normalization/coverage modules separately from measured rows.
   render(element(STUDIO_MATERIAL_BRUSH_IDS[0]!));
@@ -97,8 +101,8 @@ export async function auditStudioMaterialMorphology() {
     cases.push({ id, replayDifference, liveDifference, tiltDifference, pressureMassRatio: heavy.mass / light.mass,
       visiblePixels: retained.visible, markCount: retained.marks, allocatedBytes: retained.bytes,
       planMs: retained.planningMs, submissionMs: retained.submissionMs });
-    const local = index % 16, x = local % 2 * 480, y = Math.floor(local / 2) * 200;
-    const ctx = sheets[Math.floor(index / 16)]!.getContext("2d")!;
+    const local = index % rowsPerSheet, x = local % 2 * 480, y = Math.floor(local / 2) * 200;
+    const ctx = sheets[Math.floor(index / rowsPerSheet)]!.getContext("2d")!;
     ctx.fillStyle = "#18232d"; ctx.font = "bold 15px sans-serif";
     ctx.fillText(studioMaterialBrushDefinition(id)!.name, x + 16, y + 23);
     ctx.drawImage(retained.target, x + 12, y + 28);
@@ -124,7 +128,8 @@ export async function auditStudioMaterialMorphology() {
       invariant(distance > 0.10, `${a.id}/${b.id}: rendered shapes converge (${distance.toFixed(4)})`);
     }
   }
-  invariant(strokePairs === 496, "incomplete rendered-stroke pair coverage");
+  const expectedStrokePairs = renderedShapes.length * (renderedShapes.length - 1) / 2;
+  invariant(strokePairs === expectedStrokePairs, "incomplete rendered-stroke pair coverage");
   const planningP95 = percentile(planTimes, 0.95), submissionP95 = percentile(submitTimes, 0.95);
   // Freeze guard, not a manufactured 120 Hz or physical-pen latency claim.
   invariant(planningP95 < 33, `planner P95 ${planningP95.toFixed(2)}ms exceeds 33ms`);

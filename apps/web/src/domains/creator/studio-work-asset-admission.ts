@@ -237,10 +237,12 @@ export function createStudioWorkAssetInitialImageDescriptor(
     elementType: "image",
   });
   if (element.adjustmentLayer !== undefined) {
-    // A live graph cannot silently lose its program on immutable-source admission. Leave the
-    // original local document untouched when this descriptor cannot carry the whole graph.
+    // A live graph cannot silently lose its program on immutable-source admission. Reject an
+    // oversized or invalid graph before the source rewrite instead of returning a descriptor with
+    // its authored filters removed.
     return parseStudioWorkAssetDescriptor({ version: 1, element: {
-      ...baseDescriptor.element, smartFilters: StudioWorkAssetSmartFiltersSchema.parse(element.smartFilters),
+      ...baseDescriptor.element,
+      smartFilters: StudioWorkAssetSmartFiltersSchema.parse(element.smartFilters),
     } }, { assetId: element.id, elementType: "image" });
   }
   const smartFilters = StudioWorkAssetSmartFiltersSchema.safeParse(element.smartFilters);

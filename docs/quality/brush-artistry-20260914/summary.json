@@ -1,0 +1,1931 @@
+{
+  "generatedAt": "2026-09-13T20:09:01.794Z",
+  "baseCommit": "f5253816416488d4e4b66c589223e861b4e8d7b2",
+  "backend": "production-v6-canvas2d",
+  "browserVersion": "151.0.7922.34",
+  "scope": "V6 reference and native pen input, actual saved config, main Studio native retained overlay and committed contacts, full SVG document export, JSON roundtrip and PNG decode; vertical/diagonal bristle and wet starts plus bristle relief output. No WebGPU, physical stylus latency or full editor UI automation.",
+  "dimensions": {
+    "width": 420,
+    "height": 180
+  },
+  "normalization": {
+    "size": 26,
+    "opacity": 0.8,
+    "primaryColor": "#243c56",
+    "secondaryColor": "#76532f",
+    "seed": 9122026
+  },
+  "recipeCount": 35,
+  "minimumRequiredDistance": 0.025,
+  "pairsTested": 595,
+  "closestPairs": [
+    {
+      "first": "natural-calligraphy",
+      "second": "alcohol-bloom",
+      "distance": 0.030974844999766937
+    },
+    {
+      "first": "mineral-bloom",
+      "second": "dripping-neon",
+      "distance": 0.031015105225668825
+    },
+    {
+      "first": "natural-calligraphy",
+      "second": "impasto-knife",
+      "distance": 0.052627404458186956
+    },
+    {
+      "first": "alcohol-bloom",
+      "second": "impasto-knife",
+      "distance": 0.056396987413449055
+    },
+    {
+      "first": "clean-ink",
+      "second": "chroma-sumi",
+      "distance": 0.06168040414708011
+    },
+    {
+      "first": "clean-ink",
+      "second": "wax-resist",
+      "distance": 0.09967309046639196
+    },
+    {
+      "first": "chroma-sumi",
+      "second": "wax-resist",
+      "distance": 0.10962848483072812
+    },
+    {
+      "first": "chroma-sumi",
+      "second": "impasto-knife",
+      "distance": 0.11157085999508004
+    },
+    {
+      "first": "clean-ink",
+      "second": "impasto-knife",
+      "distance": 0.12131655131605397
+    },
+    {
+      "first": "mineral-bloom",
+      "second": "holographic-stitch",
+      "distance": 0.12825294032747
+    }
+  ],
+  "failures": [],
+  "diagnostics": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": []
+  },
+  "unitIntegration": {
+    "files": 46,
+    "passed": 1094,
+    "failed": 0,
+    "pending": 0,
+    "success": true
+  },
+  "results": [
+    {
+      "id": "clean-ink",
+      "label": "클린 잉크",
+      "group": "선화",
+      "previewHash": "b747b3bb42466ed07a0a5c36fc4cfe84abe1214da657c228312bf15ddc28e11b",
+      "roundtripHash": "b747b3bb42466ed07a0a5c36fc4cfe84abe1214da657c228312bf15ddc28e11b",
+      "live": {
+        "liveHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "pngHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "paintedPixels": 10168,
+        "inkMass": 5101.716534953564
+      },
+      "settled": {
+        "liveHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "pngHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "paintedPixels": 10168,
+        "inkMass": 5101.716534953564
+      },
+      "replay": {
+        "liveHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "pngHash": "e554e2ab324a7abf1c94c5f55953043aaf52ff5702337a3936eb49cd8479e59d",
+        "paintedPixels": 10168,
+        "inkMass": 5101.716534953564
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 114,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1796617,
+          "alphaSecond": 1796617
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1796617,
+          "alphaSecond": 1796617
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00007673254486979976,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00004063192099373433,
+          "alphaFirst": 1796617,
+          "alphaSecond": 1796690
+        }
+      }
+    },
+    {
+      "id": "manga-gpen",
+      "label": "만화 G펜",
+      "group": "선화",
+      "previewHash": "70581014ddad4dff623e0e71956288378b9cb7546ad004e842af3b611d4abe0b",
+      "roundtripHash": "70581014ddad4dff623e0e71956288378b9cb7546ad004e842af3b611d4abe0b",
+      "live": {
+        "liveHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "pngHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "paintedPixels": 8639,
+        "inkMass": 4289.244606880005
+      },
+      "settled": {
+        "liveHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "pngHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "paintedPixels": 8639,
+        "inkMass": 4289.244606880005
+      },
+      "replay": {
+        "liveHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "pngHash": "d16b64039a89ae29ac16f13a301a81cd3fe3d782cf9efdaf7b58217894869432",
+        "paintedPixels": 8639,
+        "inkMass": 4289.244606880005
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 114,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1511400,
+          "alphaSecond": 1511400
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1511400,
+          "alphaSecond": 1511400
+        },
+        "svgPixels": {
+          "meanChannelError": 0.0000632456686378255,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.000023818975784041287,
+          "alphaFirst": 1511400,
+          "alphaSecond": 1511436
+        }
+      }
+    },
+    {
+      "id": "natural-calligraphy",
+      "label": "자연 캘리그래피",
+      "group": "선화",
+      "previewHash": "db2188e06b6acc5e7a26e8b862a64c911eccfdea216e5dfc9233aadaf9b754e8",
+      "roundtripHash": "db2188e06b6acc5e7a26e8b862a64c911eccfdea216e5dfc9233aadaf9b754e8",
+      "live": {
+        "liveHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "pngHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "paintedPixels": 9150,
+        "inkMass": 2576.0275202207267
+      },
+      "settled": {
+        "liveHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "pngHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "paintedPixels": 9150,
+        "inkMass": 2576.0275202207267
+      },
+      "replay": {
+        "liveHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "pngHash": "aa6d9747d313098d5a9f24ec5ab3351f03f77312d1c8dbce7571ae48fab65a9f",
+        "paintedPixels": 9150,
+        "inkMass": 2576.0275202207267
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 114,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 899135,
+          "alphaSecond": 899135
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 899135,
+          "alphaSecond": 899135
+        },
+        "svgPixels": {
+          "meanChannelError": 4.798215582529308e-7,
+          "maximumChannelError": 5,
+          "relativeAlphaError": 0.0000022243600794096547,
+          "alphaFirst": 899135,
+          "alphaSecond": 899137
+        }
+      }
+    },
+    {
+      "id": "velvet-graphite",
+      "label": "벨벳 그래파이트",
+      "group": "건식",
+      "previewHash": "409e5e63d43a31ba8e32aeef50d6547e20406dae7bfb5edd14287767cfd032a3",
+      "roundtripHash": "409e5e63d43a31ba8e32aeef50d6547e20406dae7bfb5edd14287767cfd032a3",
+      "live": {
+        "liveHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "pngHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "paintedPixels": 6112,
+        "inkMass": 645.0653769690543
+      },
+      "settled": {
+        "liveHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "pngHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "paintedPixels": 6112,
+        "inkMass": 645.0653769690543
+      },
+      "replay": {
+        "liveHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "pngHash": "300dc72781cbed4a21ea5d01573bd592b256027d4c166a7f564c128222cdef2e",
+        "paintedPixels": 6112,
+        "inkMass": 645.0653769690543
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 3140,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 213725,
+          "alphaSecond": 213725
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 213725,
+          "alphaSecond": 213725
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000007456686378255006,
+          "maximumChannelError": 22,
+          "relativeAlphaError": 0.00008889928646625336,
+          "alphaFirst": 213725,
+          "alphaSecond": 213706
+        }
+      }
+    },
+    {
+      "id": "eroding-charcoal",
+      "label": "침식 목탄",
+      "group": "건식",
+      "previewHash": "ee6b0448aeecd8c9ccfe375b8354821f058e416b5af7695ddf9a0791497d42db",
+      "roundtripHash": "ee6b0448aeecd8c9ccfe375b8354821f058e416b5af7695ddf9a0791497d42db",
+      "live": {
+        "liveHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "pngHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "paintedPixels": 7881,
+        "inkMass": 2230.3464637184516
+      },
+      "settled": {
+        "liveHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "pngHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "paintedPixels": 7881,
+        "inkMass": 2230.3464637184516
+      },
+      "replay": {
+        "liveHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "pngHash": "a29c679bf4150236f603e82962f9aa459124cab7d885ec3c1a549eab13110e81",
+        "paintedPixels": 7881,
+        "inkMass": 2230.3464637184516
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 3237,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 769525,
+          "alphaSecond": 769525
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 769525,
+          "alphaSecond": 769525
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000015458035065878203,
+          "maximumChannelError": 36,
+          "relativeAlphaError": 0.000007797017640752411,
+          "alphaFirst": 769525,
+          "alphaSecond": 769531
+        }
+      }
+    },
+    {
+      "id": "alcohol-bloom",
+      "label": "알코올 블룸 마커",
+      "group": "마커",
+      "previewHash": "ea41653209d1cdb14ed0e9754af2acabcbf379bd4823140349d6683a3a67447a",
+      "roundtripHash": "ea41653209d1cdb14ed0e9754af2acabcbf379bd4823140349d6683a3a67447a",
+      "live": {
+        "liveHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "pngHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "paintedPixels": 9147,
+        "inkMass": 2362.67457977077
+      },
+      "settled": {
+        "liveHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "pngHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "paintedPixels": 9147,
+        "inkMass": 2362.67457977077
+      },
+      "replay": {
+        "liveHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "pngHash": "e66206f8e6d30fc2866243532c8c801d38a1d022f0927ed89bf6982e5abda97a",
+        "paintedPixels": 9147,
+        "inkMass": 2362.67457977077
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 228,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 807016,
+          "alphaSecond": 807016
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 807016,
+          "alphaSecond": 807016
+        },
+        "svgPixels": {
+          "meanChannelError": 0.0000050705467372134045,
+          "maximumChannelError": 5,
+          "relativeAlphaError": 0.00007806536673374506,
+          "alphaFirst": 807016,
+          "alphaSecond": 806953
+        }
+      }
+    },
+    {
+      "id": "mineral-bloom",
+      "label": "미네랄 블룸 워시",
+      "group": "습식",
+      "previewHash": "bc0bbb6cd6bce2871fcab67e820e62974b753a7014cd912acc86aa2704310568",
+      "roundtripHash": "bc0bbb6cd6bce2871fcab67e820e62974b753a7014cd912acc86aa2704310568",
+      "live": {
+        "liveHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "pngHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "paintedPixels": 15595,
+        "inkMass": 6269.770162814297
+      },
+      "settled": {
+        "liveHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "pngHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "paintedPixels": 15595,
+        "inkMass": 6269.770162814297
+      },
+      "replay": {
+        "liveHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "pngHash": "c7940c717e4f886b357a97476a34a66347662e0cdf6619bb2410e9a0b38c3ace",
+        "paintedPixels": 15595,
+        "inkMass": 6269.770162814297
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 454,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 2138794,
+          "alphaSecond": 2138794
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 2138794,
+          "alphaSecond": 2138794
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00008622523083307396,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.000023377660494652593,
+          "alphaFirst": 2138794,
+          "alphaSecond": 2138844
+        }
+      }
+    },
+    {
+      "id": "chroma-sumi",
+      "label": "크로마 수묵",
+      "group": "습식",
+      "previewHash": "1a87aeae6abccf3e83ebe954003372479c243314f63a9e6a8f14745fb98fad63",
+      "roundtripHash": "1a87aeae6abccf3e83ebe954003372479c243314f63a9e6a8f14745fb98fad63",
+      "live": {
+        "liveHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "pngHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "paintedPixels": 11243,
+        "inkMass": 5126.9191135470755
+      },
+      "settled": {
+        "liveHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "pngHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "paintedPixels": 11243,
+        "inkMass": 5126.9191135470755
+      },
+      "replay": {
+        "liveHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "pngHash": "c6756fe61ef983f48010e2086de65efde408fd71580d7a82fbe36c1eed6d443b",
+        "paintedPixels": 11243,
+        "inkMass": 5126.9191135470755
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 568,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1754715,
+          "alphaSecond": 1754715
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1754715,
+          "alphaSecond": 1754715
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00009731299927378359,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.000025645190244569633,
+          "alphaFirst": 1754715,
+          "alphaSecond": 1754760
+        }
+      }
+    },
+    {
+      "id": "wax-resist",
+      "label": "왁스 리지스트 수채",
+      "group": "습식",
+      "previewHash": "291fe9677d6593eca1bba3adbe5eedf9fa42b66cfa9aad163bb21fedfc2c14b8",
+      "roundtripHash": "291fe9677d6593eca1bba3adbe5eedf9fa42b66cfa9aad163bb21fedfc2c14b8",
+      "live": {
+        "liveHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "pngHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "paintedPixels": 10332,
+        "inkMass": 3420.4785037431866
+      },
+      "settled": {
+        "liveHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "pngHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "paintedPixels": 10332,
+        "inkMass": 3420.4785037431866
+      },
+      "replay": {
+        "liveHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "pngHash": "306ca21e54d91c0897b55076f6b1b605b1ee7770cfb32e48ef108df2bb0178f7",
+        "paintedPixels": 10332,
+        "inkMass": 3420.4785037431866
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 208,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1152020,
+          "alphaSecond": 1152020
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1152020,
+          "alphaSecond": 1152020
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00008985631289552858,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00005902675300776028,
+          "alphaFirst": 1152020,
+          "alphaSecond": 1152088
+        }
+      }
+    },
+    {
+      "id": "oil-hair-mixer",
+      "label": "오일 헤어 믹서",
+      "group": "페인트",
+      "previewHash": "a675b3dba0cbd17fae542eba55653742f3a697303456e0d1b479f4e74e4ce090",
+      "roundtripHash": "a675b3dba0cbd17fae542eba55653742f3a697303456e0d1b479f4e74e4ce090",
+      "live": {
+        "liveHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "pngHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "paintedPixels": 10981,
+        "inkMass": 3681.8419348844327
+      },
+      "settled": {
+        "liveHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "pngHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "paintedPixels": 10981,
+        "inkMass": 3681.8419348844327
+      },
+      "replay": {
+        "liveHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "pngHash": "89ba36ffef9ac281c670c2a628f8d7cf3e49ceb682352a0db3fde44a632d127e",
+        "paintedPixels": 10981,
+        "inkMass": 3681.8419348844327
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 10936,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1280312,
+          "alphaSecond": 1280312
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1280312,
+          "alphaSecond": 1280312
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00018456271397447867,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.0005943863683227213,
+          "alphaFirst": 1280312,
+          "alphaSecond": 1279551
+        }
+      }
+    },
+    {
+      "id": "impasto-knife",
+      "label": "임파스토 나이프",
+      "group": "페인트",
+      "previewHash": "42ece61ec44dab01d56010a765273aaafb77dda258bf7b2a2f535fd2c9d06efb",
+      "roundtripHash": "42ece61ec44dab01d56010a765273aaafb77dda258bf7b2a2f535fd2c9d06efb",
+      "live": {
+        "liveHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "pngHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "paintedPixels": 9524,
+        "inkMass": 3384.338633115869
+      },
+      "settled": {
+        "liveHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "pngHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "paintedPixels": 9524,
+        "inkMass": 3384.338633115869
+      },
+      "replay": {
+        "liveHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "pngHash": "eeb46b365e2a73d21db0a58ea9aa289bb83f2cf0075a12ed9fbe8736ad7c73e0",
+        "paintedPixels": 9524,
+        "inkMass": 3384.338633115869
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2736,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1067281,
+          "alphaSecond": 1067281
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1067281,
+          "alphaSecond": 1067281
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000003293910156655255,
+          "maximumChannelError": 5,
+          "relativeAlphaError": 0.00003935233551426475,
+          "alphaFirst": 1067281,
+          "alphaSecond": 1067323
+        }
+      }
+    },
+    {
+      "id": "dripping-neon",
+      "label": "드리핑 네온 잉크",
+      "group": "FX",
+      "previewHash": "fcf81e6e4f5c59c4cd873efc57e1f1cde0dbb005b6fe3db92a776644cfbe1de1",
+      "roundtripHash": "fcf81e6e4f5c59c4cd873efc57e1f1cde0dbb005b6fe3db92a776644cfbe1de1",
+      "live": {
+        "liveHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "pngHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "paintedPixels": 17503,
+        "inkMass": 6208.930946039502
+      },
+      "settled": {
+        "liveHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "pngHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "paintedPixels": 17503,
+        "inkMass": 6208.930946039502
+      },
+      "replay": {
+        "liveHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "pngHash": "dbb7e05a28df9eae5dcb24313a84899cee4db8652f7191eeef1aede872a41e51",
+        "paintedPixels": 17503,
+        "inkMass": 6208.930946039502
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 466,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 2074371,
+          "alphaSecond": 2074371
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 2074371,
+          "alphaSecond": 2074371
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00014960058097313,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00000819525533282137,
+          "alphaFirst": 2074371,
+          "alphaSecond": 2074388
+        }
+      }
+    },
+    {
+      "id": "dendritic-copper",
+      "label": "덴드라이트 코퍼",
+      "group": "FX",
+      "previewHash": "3efc5c4721d6c735a562b42e60985965a81e3294fdae05f2282827601750d49a",
+      "roundtripHash": "3efc5c4721d6c735a562b42e60985965a81e3294fdae05f2282827601750d49a",
+      "live": {
+        "liveHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "pngHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "paintedPixels": 9226,
+        "inkMass": 883.0039450409822
+      },
+      "settled": {
+        "liveHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "pngHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "paintedPixels": 9226,
+        "inkMass": 883.0039450409822
+      },
+      "replay": {
+        "liveHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "pngHash": "a760cd49466a99f373d5c9cfc14c8c1b7ac07fc881e4a68e88abd5ed13b7d06e",
+        "paintedPixels": 9226,
+        "inkMass": 883.0039450409822
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 798,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 314137,
+          "alphaSecond": 314137
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 314137,
+          "alphaSecond": 314137
+        },
+        "svgPixels": {
+          "meanChannelError": 8.299616142753398e-7,
+          "maximumChannelError": 12,
+          "relativeAlphaError": 0.000009549973419240649,
+          "alphaFirst": 314137,
+          "alphaSecond": 314134
+        }
+      }
+    },
+    {
+      "id": "holographic-stitch",
+      "label": "홀로그래픽 스티치",
+      "group": "패턴",
+      "previewHash": "d86959b1515868b73bf722451ee1ac5bbc7f09ac6cfd9f7cc3af03c8c13acc74",
+      "roundtripHash": "d86959b1515868b73bf722451ee1ac5bbc7f09ac6cfd9f7cc3af03c8c13acc74",
+      "live": {
+        "liveHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "pngHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "paintedPixels": 16799,
+        "inkMass": 4364.2341159270145
+      },
+      "settled": {
+        "liveHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "pngHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "paintedPixels": 16799,
+        "inkMass": 4364.2341159270145
+      },
+      "replay": {
+        "liveHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "pngHash": "b458b9c66c67e2b6cd4e3b0599955f53999390635a456d7f239c770b53cd00f5",
+        "paintedPixels": 16799,
+        "inkMass": 4364.2341159270145
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 342,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1482614,
+          "alphaSecond": 1482614
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1482614,
+          "alphaSecond": 1482614
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00011902168274717294,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0000013489687808155055,
+          "alphaFirst": 1482614,
+          "alphaSecond": 1482616
+        }
+      }
+    },
+    {
+      "id": "moss-flow",
+      "label": "모스 플로우",
+      "group": "패턴",
+      "previewHash": "5a0b440437b16874af2b3c2fe6f2454d8725cc364d9402206e8f899906ab739c",
+      "roundtripHash": "5a0b440437b16874af2b3c2fe6f2454d8725cc364d9402206e8f899906ab739c",
+      "live": {
+        "liveHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "pngHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "paintedPixels": 9049,
+        "inkMass": 1962.7608381886967
+      },
+      "settled": {
+        "liveHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "pngHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "paintedPixels": 9049,
+        "inkMass": 1962.7608381886967
+      },
+      "replay": {
+        "liveHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "pngHash": "70a917ac66fa91657259b971cbb4831a1b36a3f869c5ea18ffc760de565e277a",
+        "paintedPixels": 9049,
+        "inkMass": 1962.7608381886967
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 684,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 727282,
+          "alphaSecond": 727282
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 727282,
+          "alphaSecond": 727282
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00006076875194522253,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00002337470197254985,
+          "alphaFirst": 727282,
+          "alphaSecond": 727299
+        }
+      }
+    },
+    {
+      "id": "document-halftone",
+      "label": "문서 고정 하프톤",
+      "group": "만화",
+      "previewHash": "59e853415b88641f0fa8e23d55d424136eda3cf8c3c7b638982167a97f19e65a",
+      "roundtripHash": "59e853415b88641f0fa8e23d55d424136eda3cf8c3c7b638982167a97f19e65a",
+      "live": {
+        "liveHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "pngHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "paintedPixels": 2199,
+        "inkMass": 811.5555836809799
+      },
+      "settled": {
+        "liveHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "pngHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "paintedPixels": 2199,
+        "inkMass": 811.5555836809799
+      },
+      "replay": {
+        "liveHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "pngHash": "0dedecde6860494f9eebec853d7fa285e6a4cebbe9fe8522f37908372f6cb4c1",
+        "paintedPixels": 2199,
+        "inkMass": 811.5555836809799
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 587,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 277997,
+          "alphaSecond": 277997
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 277997,
+          "alphaSecond": 277997
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000012138188608776844,
+          "maximumChannelError": 88,
+          "relativeAlphaError": 0.0011403000751806674,
+          "alphaFirst": 277997,
+          "alphaSecond": 278314
+        }
+      }
+    },
+    {
+      "id": "kaleido-swarm",
+      "label": "칼레이도 스웜",
+      "group": "프로시저럴",
+      "previewHash": "c2c9ba154df23badafe2ef02852d05a05200338d0e1967c8140c48462adfee99",
+      "roundtripHash": "c2c9ba154df23badafe2ef02852d05a05200338d0e1967c8140c48462adfee99",
+      "live": {
+        "liveHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "pngHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "paintedPixels": 17750,
+        "inkMass": 4908.206661309116
+      },
+      "settled": {
+        "liveHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "pngHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "paintedPixels": 17750,
+        "inkMass": 4908.206661309116
+      },
+      "replay": {
+        "liveHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "pngHash": "932de20e12b2db0cf670afb3de581783e0a62ee1daed97d000cba08114b723c8",
+        "paintedPixels": 17750,
+        "inkMass": 4908.206661309116
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2166,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1668830,
+          "alphaSecond": 1668830
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1668830,
+          "alphaSecond": 1668830
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00019447038074489053,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.000006591444305291731,
+          "alphaFirst": 1668830,
+          "alphaSecond": 1668819
+        }
+      }
+    },
+    {
+      "id": "elastic-filaments",
+      "label": "탄성 실선",
+      "group": "획 구조·물리",
+      "previewHash": "f01b749d38994e94549e8c3b98f9da3a354f9041bd60fa0956f32851259a13c5",
+      "roundtripHash": "f01b749d38994e94549e8c3b98f9da3a354f9041bd60fa0956f32851259a13c5",
+      "live": {
+        "liveHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "pngHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "paintedPixels": 6351,
+        "inkMass": 901.5229006200098
+      },
+      "settled": {
+        "liveHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "pngHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "paintedPixels": 6351,
+        "inkMass": 901.5229006200098
+      },
+      "replay": {
+        "liveHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "pngHash": "daffc10ee59b05bfb70782d5c0d7dab1bb051cb20c250d4c4ad1635612528f5f",
+        "paintedPixels": 6351,
+        "inkMass": 901.5229006200098
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2894,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 328482,
+          "alphaSecond": 328482
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 328482,
+          "alphaSecond": 328482
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00011395113600995954,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0005936398341461632,
+          "alphaFirst": 328482,
+          "alphaSecond": 328287
+        }
+      }
+    },
+    {
+      "id": "vortex-flow",
+      "label": "소용돌이 흐름",
+      "group": "획 구조·물리",
+      "previewHash": "92f556befc49ff0b467bd0059d91c8c2a9c907180bd42c2abe20c5d5c20a536c",
+      "roundtripHash": "92f556befc49ff0b467bd0059d91c8c2a9c907180bd42c2abe20c5d5c20a536c",
+      "live": {
+        "liveHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "pngHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "paintedPixels": 7108,
+        "inkMass": 706.8575352393091
+      },
+      "settled": {
+        "liveHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "pngHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "paintedPixels": 7108,
+        "inkMass": 706.8575352393091
+      },
+      "replay": {
+        "liveHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "pngHash": "8e7b4016deed4a013621a75ccd3636b54f4a1d35a83f70e4587dc8a7f8fa13f1",
+        "paintedPixels": 7108,
+        "inkMass": 706.8575352393091
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 3636,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 245248,
+          "alphaSecond": 245248
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 245248,
+          "alphaSecond": 245248
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00015716101255316942,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.001137623956158664,
+          "alphaFirst": 245248,
+          "alphaSecond": 244969
+        }
+      }
+    },
+    {
+      "id": "gravity-fountain",
+      "label": "중력 분사",
+      "group": "획 구조·물리",
+      "previewHash": "5f5b46e153fca1a21a6ea2655d6d447027e91871962e96218ce0ecab7c586e6c",
+      "roundtripHash": "5f5b46e153fca1a21a6ea2655d6d447027e91871962e96218ce0ecab7c586e6c",
+      "live": {
+        "liveHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "pngHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "paintedPixels": 11633,
+        "inkMass": 1640.6340313246474
+      },
+      "settled": {
+        "liveHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "pngHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "paintedPixels": 11633,
+        "inkMass": 1640.6340313246474
+      },
+      "replay": {
+        "liveHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "pngHash": "17aa1607101c9966be51cad0c5e5297fd370be92718a40b61352306bea7a3572",
+        "paintedPixels": 11633,
+        "inkMass": 1640.6340313246474
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 6372,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 583872,
+          "alphaSecond": 583872
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 583872,
+          "alphaSecond": 583872
+        },
+        "svgPixels": {
+          "meanChannelError": 0.0001762890341321714,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0005874575249369725,
+          "alphaFirst": 583872,
+          "alphaSecond": 583529
+        }
+      }
+    },
+    {
+      "id": "woven-ribbon",
+      "label": "직조 리본",
+      "group": "획 구조·물리",
+      "previewHash": "4ae3fa1038a7ad52d33a5c5360fa0e769eef21544674909ad58ed3f8ae368a98",
+      "roundtripHash": "4ae3fa1038a7ad52d33a5c5360fa0e769eef21544674909ad58ed3f8ae368a98",
+      "live": {
+        "liveHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "pngHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "paintedPixels": 7333,
+        "inkMass": 1641.156906398479
+      },
+      "settled": {
+        "liveHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "pngHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "paintedPixels": 7333,
+        "inkMass": 1641.156906398479
+      },
+      "replay": {
+        "liveHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "pngHash": "20c00fb1f5988cced7fa9b99020718dbce84480c85bd93a901fccd55a8667924",
+        "paintedPixels": 7333,
+        "inkMass": 1641.156906398479
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2235,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 604196,
+          "alphaSecond": 604196
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 604196,
+          "alphaSecond": 604196
+        },
+        "svgPixels": {
+          "meanChannelError": 0.0001328457308849466,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00042701375050480307,
+          "alphaFirst": 604196,
+          "alphaSecond": 603938
+        }
+      }
+    },
+    {
+      "id": "branching-veins",
+      "label": "가지 성장",
+      "group": "획 구조·물리",
+      "previewHash": "fcca9d7fbc6b5471be541cd9510e00759edcbf16b8b7034395c26b14b229b50a",
+      "roundtripHash": "fcca9d7fbc6b5471be541cd9510e00759edcbf16b8b7034395c26b14b229b50a",
+      "live": {
+        "liveHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "pngHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "paintedPixels": 7127,
+        "inkMass": 1017.4039486241527
+      },
+      "settled": {
+        "liveHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "pngHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "paintedPixels": 7127,
+        "inkMass": 1017.4039486241527
+      },
+      "replay": {
+        "liveHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "pngHash": "2478f1b8aa08b4678aa76670987de2450ab4921416d78b629ca06ba0aff1bc86",
+        "paintedPixels": 7127,
+        "inkMass": 1017.4039486241527
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 3206,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 372240,
+          "alphaSecond": 372240
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 372240,
+          "alphaSecond": 372240
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00016451395372964002,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0008435418009886095,
+          "alphaFirst": 372240,
+          "alphaSecond": 371926
+        }
+      }
+    },
+    {
+      "id": "orbital-lace",
+      "label": "궤도 레이스",
+      "group": "획 구조·물리",
+      "previewHash": "0d7d9200168cab2398098f708ad34f33d760cc56576afc616255e3986c25395d",
+      "roundtripHash": "0d7d9200168cab2398098f708ad34f33d760cc56576afc616255e3986c25395d",
+      "live": {
+        "liveHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "pngHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "paintedPixels": 6735,
+        "inkMass": 1166.5555860679597
+      },
+      "settled": {
+        "liveHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "pngHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "paintedPixels": 6735,
+        "inkMass": 1166.5555860679597
+      },
+      "replay": {
+        "liveHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "pngHash": "f311f558ad5902f43ef3b39d1f657eebcbf0cb9d824be083e4f47ace69bbab50",
+        "paintedPixels": 6735,
+        "inkMass": 1166.5555860679597
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2539,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 427186,
+          "alphaSecond": 427186
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 427186,
+          "alphaSecond": 427186
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00008561572777259051,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.0008474060479510097,
+          "alphaFirst": 427186,
+          "alphaSecond": 426824
+        }
+      }
+    },
+    {
+      "id": "braided-cord",
+      "label": "세 가닥 땋은 끈",
+      "group": "의상·장식",
+      "previewHash": "974e322e85bada1b0b33cfb784b691aef282323e2e542c899f130cbdbd35ae75",
+      "roundtripHash": "974e322e85bada1b0b33cfb784b691aef282323e2e542c899f130cbdbd35ae75",
+      "live": {
+        "liveHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "pngHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "paintedPixels": 7039,
+        "inkMass": 3268.2210189430043
+      },
+      "settled": {
+        "liveHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "pngHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "paintedPixels": 7039,
+        "inkMass": 3268.2210189430043
+      },
+      "replay": {
+        "liveHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "pngHash": "9754eb0fa9c837136955d33b9e8f27053b80ce261621927078ec1228f4f2e165",
+        "paintedPixels": 7039,
+        "inkMass": 3268.2210189430043
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 4176,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1215416,
+          "alphaSecond": 1215416
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1215416,
+          "alphaSecond": 1215416
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000045518207282913165,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00020980470884042994,
+          "alphaFirst": 1215416,
+          "alphaSecond": 1215161
+        }
+      }
+    },
+    {
+      "id": "linked-chain",
+      "label": "교차 금속 체인",
+      "group": "의상·장식",
+      "previewHash": "d05e3e9b5bd8b627a36fa4a3539635656ef1e4fa05d36dcfa77a0dc095846d22",
+      "roundtripHash": "d05e3e9b5bd8b627a36fa4a3539635656ef1e4fa05d36dcfa77a0dc095846d22",
+      "live": {
+        "liveHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "pngHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "paintedPixels": 2985,
+        "inkMass": 589.1516477311961
+      },
+      "settled": {
+        "liveHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "pngHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "paintedPixels": 2985,
+        "inkMass": 589.1516477311961
+      },
+      "replay": {
+        "liveHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "pngHash": "18bb6887595c7de848dc54ab1addae2c976dbc57587e63fc46e889380a6f586f",
+        "paintedPixels": 2985,
+        "inkMass": 589.1516477311961
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1049,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 210183,
+          "alphaSecond": 210183
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 210183,
+          "alphaSecond": 210183
+        },
+        "svgPixels": {
+          "meanChannelError": 0.000013097831725282705,
+          "maximumChannelError": 64,
+          "relativeAlphaError": 0.00005709310458029431,
+          "alphaFirst": 210183,
+          "alphaSecond": 210171
+        }
+      }
+    },
+    {
+      "id": "pearl-strand",
+      "label": "진주 스트랜드",
+      "group": "의상·장식",
+      "previewHash": "3e2b2ec4eca6a813cc3a979e1d3e85886de9a6a6e358f8a3233cda3d2b02dbee",
+      "roundtripHash": "3e2b2ec4eca6a813cc3a979e1d3e85886de9a6a6e358f8a3233cda3d2b02dbee",
+      "live": {
+        "liveHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "pngHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "paintedPixels": 5539,
+        "inkMass": 2634.057603651192
+      },
+      "settled": {
+        "liveHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "pngHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "paintedPixels": 5539,
+        "inkMass": 2634.057603651192
+      },
+      "replay": {
+        "liveHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "pngHash": "9d01efd122e5d2a576655f096a5b7eca22e85d64fd024061f8d7b8a2579634d5",
+        "paintedPixels": 5539,
+        "inkMass": 2634.057603651192
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1089,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 979032,
+          "alphaSecond": 979032
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 979032,
+          "alphaSecond": 979032
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00006207853511775081,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00004392093414719846,
+          "alphaFirst": 979032,
+          "alphaSecond": 979075
+        }
+      }
+    },
+    {
+      "id": "zipper-teeth",
+      "label": "지퍼 이빨",
+      "group": "의상·장식",
+      "previewHash": "a0c802bff13c7d4a5d70a2d4916e255fe72d42283c26e9be470e3776f0a7b31e",
+      "roundtripHash": "a0c802bff13c7d4a5d70a2d4916e255fe72d42283c26e9be470e3776f0a7b31e",
+      "live": {
+        "liveHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "pngHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "paintedPixels": 5806,
+        "inkMass": 1284.2536265603267
+      },
+      "settled": {
+        "liveHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "pngHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "paintedPixels": 5806,
+        "inkMass": 1284.2536265603267
+      },
+      "replay": {
+        "liveHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "pngHash": "2219c1ec37e4fa36c1c8bbb55de615c6f0df5f5fe07bda23f82d2ec5879114c8",
+        "paintedPixels": 5806,
+        "inkMass": 1284.2536265603267
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2522,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 472963,
+          "alphaSecond": 472963
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 472963,
+          "alphaSecond": 472963
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00005485527544351074,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00010360218452606229,
+          "alphaFirst": 472963,
+          "alphaSecond": 472914
+        }
+      }
+    },
+    {
+      "id": "fern-frond",
+      "label": "고사리 잎맥",
+      "group": "배경·자연",
+      "previewHash": "bb4a54ae6774ddc72efbf5cdde2517dc774395693e35640929db94b52d088737",
+      "roundtripHash": "bb4a54ae6774ddc72efbf5cdde2517dc774395693e35640929db94b52d088737",
+      "live": {
+        "liveHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "pngHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "paintedPixels": 5553,
+        "inkMass": 1497.2836896735243
+      },
+      "settled": {
+        "liveHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "pngHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "paintedPixels": 5553,
+        "inkMass": 1497.2836896735243
+      },
+      "replay": {
+        "liveHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "pngHash": "a47edc8f1138c02eb75bbc6c075388981bd2ce6ed9bed370e606101c7cedf5f9",
+        "paintedPixels": 5553,
+        "inkMass": 1497.2836896735243
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1562,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 560287,
+          "alphaSecond": 560287
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 560287,
+          "alphaSecond": 560287
+        },
+        "svgPixels": {
+          "meanChannelError": 0.0001597157381471107,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00017491035844129882,
+          "alphaFirst": 560287,
+          "alphaSecond": 560385
+        }
+      }
+    },
+    {
+      "id": "petal-blossom",
+      "label": "꽃잎 블라썸",
+      "group": "배경·자연",
+      "previewHash": "42fb5778c87e3e4d351381815928772a3ba737d38140dd0aa1e2920dd3d411cb",
+      "roundtripHash": "42fb5778c87e3e4d351381815928772a3ba737d38140dd0aa1e2920dd3d411cb",
+      "live": {
+        "liveHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "pngHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "paintedPixels": 7646,
+        "inkMass": 2897.8536750101484
+      },
+      "settled": {
+        "liveHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "pngHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "paintedPixels": 7646,
+        "inkMass": 2897.8536750101484
+      },
+      "replay": {
+        "liveHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "pngHash": "c8760b87d2ab73be503cbcbdbee512e012c5c04511d57705d6a06222d3fd84ef",
+        "paintedPixels": 7646,
+        "inkMass": 2897.8536750101484
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 286,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1088972,
+          "alphaSecond": 1088972
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 1088972,
+          "alphaSecond": 1088972
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00013773472351903725,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.0000027548917694853496,
+          "alphaFirst": 1088972,
+          "alphaSecond": 1088975
+        }
+      }
+    },
+    {
+      "id": "tapered-fur",
+      "label": "테이퍼 털 다발",
+      "group": "배경·자연",
+      "previewHash": "0ca787fc99efbe01b4ab68f22e65826796b49fb50b432430db6ceb8627bb9f44",
+      "roundtripHash": "0ca787fc99efbe01b4ab68f22e65826796b49fb50b432430db6ceb8627bb9f44",
+      "live": {
+        "liveHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "pngHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "paintedPixels": 4553,
+        "inkMass": 510.32550393464044
+      },
+      "settled": {
+        "liveHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "pngHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "paintedPixels": 4553,
+        "inkMass": 510.32550393464044
+      },
+      "replay": {
+        "liveHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "pngHash": "2432b6c25ebee2ec73a1348080bfe0634f8582eaa1edc3b9600c6e04aab4f1c9",
+        "paintedPixels": 4553,
+        "inkMass": 510.32550393464044
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1056,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 184230,
+          "alphaSecond": 184230
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 184230,
+          "alphaSecond": 184230
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00010378410623508663,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.000738207675188623,
+          "alphaFirst": 184230,
+          "alphaSecond": 184094
+        }
+      }
+    },
+    {
+      "id": "pressure-rake",
+      "label": "필압 레이크",
+      "group": "선화·질감",
+      "previewHash": "538c97a25f1a0f85df9968e65309a217a410c0642a6115c5160bcfd170b2c136",
+      "roundtripHash": "538c97a25f1a0f85df9968e65309a217a410c0642a6115c5160bcfd170b2c136",
+      "live": {
+        "liveHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "pngHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "paintedPixels": 5556,
+        "inkMass": 644.0379242766649
+      },
+      "settled": {
+        "liveHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "pngHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "paintedPixels": 5556,
+        "inkMass": 644.0379242766649
+      },
+      "replay": {
+        "liveHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "pngHash": "cb615b304477585edc43528f0830bfde814d29e929c18132ba7a097c655cb200",
+        "paintedPixels": 5556,
+        "inkMass": 644.0379242766649
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 3550,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 230286,
+          "alphaSecond": 230286
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 230286,
+          "alphaSecond": 230286
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00011618165784832451,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.00014330007034730726,
+          "alphaFirst": 230286,
+          "alphaSecond": 230253
+        }
+      }
+    },
+    {
+      "id": "phyllotaxis-stipple",
+      "label": "균등 분포 점묘",
+      "group": "선화·질감",
+      "previewHash": "818d8af5ce845dcae63f7b6b95bd37487ebc63225e3a21f1194fb97794295606",
+      "roundtripHash": "818d8af5ce845dcae63f7b6b95bd37487ebc63225e3a21f1194fb97794295606",
+      "live": {
+        "liveHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "pngHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "paintedPixels": 2312,
+        "inkMass": 106.45490505360067
+      },
+      "settled": {
+        "liveHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "pngHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "paintedPixels": 2312,
+        "inkMass": 106.45490505360067
+      },
+      "replay": {
+        "liveHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "pngHash": "cfd0a746a7d19131dd70bf9ad0cd31a9f132cc5cb927fbe647a3f81831a2bc92",
+        "paintedPixels": 2312,
+        "inkMass": 106.45490505360067
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1596,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 37137,
+          "alphaSecond": 37137
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 37137,
+          "alphaSecond": 37137
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00014915966386554622,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0004308371704768829,
+          "alphaFirst": 37137,
+          "alphaSecond": 37153
+        }
+      }
+    },
+    {
+      "id": "contour-engraving",
+      "label": "등고선 인그레이빙",
+      "group": "선화·질감",
+      "previewHash": "3dc9ad96fac4d7f05ed07ca9f89eb8efac8bb72d310a2d5c6c2d65d33bb6a3e2",
+      "roundtripHash": "3dc9ad96fac4d7f05ed07ca9f89eb8efac8bb72d310a2d5c6c2d65d33bb6a3e2",
+      "live": {
+        "liveHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "pngHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "paintedPixels": 5116,
+        "inkMass": 608.9503432624042
+      },
+      "settled": {
+        "liveHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "pngHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "paintedPixels": 5116,
+        "inkMass": 608.9503432624042
+      },
+      "replay": {
+        "liveHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "pngHash": "f732edab79e83977152894c6fb8110c93d3e56a41588980a60cc83df3c0cf7e2",
+        "paintedPixels": 5116,
+        "inkMass": 608.9503432624042
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 5132,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 214465,
+          "alphaSecond": 214465
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 214465,
+          "alphaSecond": 214465
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00010313569872393401,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00043829995570372787,
+          "alphaFirst": 214465,
+          "alphaSecond": 214371
+        }
+      }
+    },
+    {
+      "id": "scalloped-scales",
+      "label": "겹비늘 스캘럽",
+      "group": "의상·장식",
+      "previewHash": "f92e1aca4a05862c1b3f7a8487b30c947ab4665e15bacbc16585b69b2fbd5a78",
+      "roundtripHash": "f92e1aca4a05862c1b3f7a8487b30c947ab4665e15bacbc16585b69b2fbd5a78",
+      "live": {
+        "liveHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "pngHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "paintedPixels": 4750,
+        "inkMass": 617.2470737947151
+      },
+      "settled": {
+        "liveHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "pngHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "paintedPixels": 4750,
+        "inkMass": 617.2470737947151
+      },
+      "replay": {
+        "liveHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "pngHash": "0b829cf2081125264b05d83a3fa6e184c79d8b9b072aa7351b973e4e8f94b755",
+        "paintedPixels": 4750,
+        "inkMass": 617.2470737947151
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 1408,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 222826,
+          "alphaSecond": 222826
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 222826,
+          "alphaSecond": 222826
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00009029723000311236,
+          "maximumChannelError": 128,
+          "relativeAlphaError": 0.0009065369391363665,
+          "alphaFirst": 222826,
+          "alphaSecond": 222624
+        }
+      }
+    },
+    {
+      "id": "cross-embroidery",
+      "label": "십자 자수",
+      "group": "의상·장식",
+      "previewHash": "394d1a88b8ae1883415b324d753f4684d5ea371e8aca9fc02b035d45dfef9ade",
+      "roundtripHash": "394d1a88b8ae1883415b324d753f4684d5ea371e8aca9fc02b035d45dfef9ade",
+      "live": {
+        "liveHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "pngHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "paintedPixels": 4534,
+        "inkMass": 899.0510026351549
+      },
+      "settled": {
+        "liveHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "pngHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "paintedPixels": 4534,
+        "inkMass": 899.0510026351549
+      },
+      "replay": {
+        "liveHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "pngHash": "47a12ad9c35f0a39e5760d8566a1e9284ac5534b483fd4998fa4763591135cf3",
+        "paintedPixels": 4534,
+        "inkMass": 899.0510026351549
+      },
+      "production": {
+        "backend": "production-native-retained-canvas2d-and-svg",
+        "markCount": 2488,
+        "failures": [],
+        "liveSettled": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 330055,
+          "alphaSecond": 330055
+        },
+        "liveCommitted": {
+          "meanChannelError": 0,
+          "maximumChannelError": 0,
+          "relativeAlphaError": 0,
+          "alphaFirst": 330055,
+          "alphaSecond": 330055
+        },
+        "svgPixels": {
+          "meanChannelError": 0.00005796763149704326,
+          "maximumChannelError": 85,
+          "relativeAlphaError": 0.00029692021026798564,
+          "alphaFirst": 330055,
+          "alphaSecond": 329957
+        }
+      }
+    }
+  ],
+  "longStroke": {
+    "recipe": "oil-hair-mixer",
+    "sampleCount": 10000,
+    "spacingPx": 0.35,
+    "bristleStrands": 128,
+    "totalMarks": 1279872,
+    "maximumMarksPerAppend": 128,
+    "inputNumericValueCount": 60000,
+    "retainedOutputMarkArrays": 0,
+    "early": {
+      "meanMs": 0.21570000010728835,
+      "p95Ms": 0.20000004768371582,
+      "maximumMs": 11.599999964237213
+    },
+    "late": {
+      "meanMs": 0.21400000005960465,
+      "p95Ms": 0.20000004768371582,
+      "maximumMs": 11.800000011920929
+    },
+    "lateToEarlyMeanRatio": 0.9921186831393689,
+    "totalMs": 2198.600000321865,
+    "failures": [],
+    "committed": {
+      "totalMarks": 1279872,
+      "batches": 9999,
+      "maxBatchMarks": 128,
+      "maxGeneratedBatchMarks": 128,
+      "cacheHit": false,
+      "totalMs": 2191.600000023842,
+      "pixels": {
+        "meanChannelError": 0,
+        "maximumChannelError": 0,
+        "relativeAlphaError": 0,
+        "alphaFirst": 287542,
+        "alphaSecond": 287542
+      },
+      "cache": {
+        "entries": 0,
+        "retainedMarks": 0
+      }
+    },
+    "svg": {
+      "productBudgetRejected": true,
+      "productBudgetMs": 274.2999999523163,
+      "fullStreaming": {
+        "totalMarks": 1279872,
+        "batches": 9999,
+        "maxBatchMarks": 128,
+        "maxGeneratedBatchMarks": 128,
+        "serializedUtf16Bytes": 438812506,
+        "totalMs": 1734.6000000238419,
+        "largestChunkUtf16Bytes": 44400,
+        "sink": "discarding"
+      }
+    },
+    "timingScope": "Production planner append and whole-stroke Canvas2D submission; excludes physical input and GPU presentation. Counts describe held input/transient output, not heap-byte measurements. Full SVG streaming uses a discarding sink; product string export rejects this oversized stroke."
+  },
+  "sourceReportSha256": "ce7733a3c9b8a01f3c7b929e1c14148375ab92d999201c6cf3e92a239a16de32"
+}

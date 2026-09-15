@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Module, type DynamicModule, type Provider } from "@nestjs/common";
 
-import { SupabaseObjectStorageModule } from "../supabase-object-storage/supabase-object-storage.module";
+import { PrivateObjectStorageModule } from "../private-object-storage/private-object-storage.module";
 
 import { BackendCapabilityGatewayController } from "./backend-capability-gateway-controller";
 import {
@@ -38,7 +38,7 @@ export class BackendCapabilityWorkerModule {
       | Readonly<Record<string, string | undefined>>,
   ): DynamicModule {
     const config = resolveBackendCapabilityWorkerConfig(environment);
-    const storageModule = SupabaseObjectStorageModule.fromEnvironment(environment);
+    const storageModule = PrivateObjectStorageModule.fromEnvironment(environment);
     const workerProviders: Provider[] = [];
     if (config && storageModule) {
       workerProviders.push(

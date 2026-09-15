@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs && tsc -p tsconfig.json && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
+    "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs ../../scripts/verify-api-calendar-runtime.test.mjs && tsc -p tsconfig.json && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/apps/api/src/main.js"
   },

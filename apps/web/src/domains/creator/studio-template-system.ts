@@ -10,6 +10,46 @@ export type StudioTemplateSlotKind =
   (typeof STUDIO_TEMPLATE_SLOT_KINDS)[number];
 export type StudioTemplateApplicationStatus = "ready" | "review" | "blocked";
 
+export const STUDIO_TEMPLATE_LAYOUT_KINDS = [
+  "vertical-strip",
+  "panel-grid",
+  "character-sheet",
+  "expression-grid",
+  "environment-board",
+  "poster",
+  "social-carousel",
+  "slide",
+  "storyboard",
+] as const;
+
+export type StudioTemplateLayoutKind =
+  (typeof STUDIO_TEMPLATE_LAYOUT_KINDS)[number];
+export type StudioTemplateStartMode =
+  | "new-project"
+  | "append-pages"
+  | "replace-page"
+  | "layout-only"
+  | "style-only";
+
+export interface StudioTemplateCompositionPage {
+  readonly id: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly layout: StudioTemplateLayoutKind;
+  readonly panelCount: number;
+  readonly editableSlotIds: readonly string[];
+}
+
+export interface StudioTemplateComposition {
+  readonly aspectRatio: number;
+  readonly canvasLabelKo: string;
+  readonly canvasLabelEn: string;
+  readonly pages: readonly StudioTemplateCompositionPage[];
+  readonly layerLabels: readonly string[];
+  readonly includedAssetCount: number;
+  readonly startMode: StudioTemplateStartMode;
+}
+
 export type StudioTemplateValue =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "image"; readonly assetId: string; readonly rightsStatus: "allowed" | "warning" | "blocked" }
@@ -35,6 +75,8 @@ export interface StudioTemplateDefinition {
   readonly title: string;
   readonly documentKind: string;
   readonly slots: readonly StudioTemplateSlot[];
+  /** Canonical visual structure shared by preview and document handoff. */
+  readonly composition?: StudioTemplateComposition;
 }
 
 export interface StudioTemplateFinding {
@@ -109,6 +151,100 @@ export function validateStudioTemplate(
     }
     if (slot.defaultValue && slot.defaultValue.kind !== slot.kind) {
       findings.push(finding("slot-default-kind", "error", slot.id, "기본값 종류가 슬롯과 다릅니다.", "Slot default value has the wrong kind."));
+    }
+  }
+
+  const composition = template.composition;
+  if (composition) {
+    if (!Number.isFinite(composition.aspectRatio) || composition.aspectRatio <= 0) {
+      findings.push(finding(
+        "composition-aspect-ratio",
+        "error",
+        "",
+        "템플릿 미리보기 비율이 올바르지 않습니다.",
+        "Template preview aspect ratio is invalid.",
+      ));
+    }
+    if (!composition.canvasLabelKo.trim() || !composition.canvasLabelEn.trim()) {
+      findings.push(finding(
+        "composition-canvas-label",
+        "error",
+        "",
+        "템플릿 출력 규격 이름이 필요합니다.",
+        "Template canvas labels are required.",
+      ));
+    }
+    if (composition.pages.length === 0) {
+      findings.push(finding(
+        "composition-pages",
+        "error",
+        "",
+        "템플릿에 최소 한 개의 페이지가 필요합니다.",
+        "A template composition requires at least one page.",
+      ));
+    }
+    const declaredSlots = new Set(template.slots.map((slot) => slot.id));
+    const pageIds = new Set<string>();
+    for (const page of composition.pages) {
+      if (!page.id.trim() || !page.labelKo.trim() || !page.labelEn.trim()) {
+        findings.push(finding(
+          "composition-page-required",
+          "error",
+          "",
+          "템플릿 페이지 정보가 완성되지 않았습니다.",
+          "Template page identity is incomplete.",
+        ));
+      }
+      if (pageIds.has(page.id)) {
+        findings.push(finding(
+          "composition-page-duplicate",
+          "error",
+          "",
+          "같은 템플릿 페이지가 두 번 선언됐습니다.",
+          "A template page is declared more than once.",
+        ));
+      }
+      pageIds.add(page.id);
+      if (!Number.isSafeInteger(page.panelCount) || page.panelCount < 0) {
+        findings.push(finding(
+          "composition-panel-count",
+          "error",
+          "",
+          "템플릿 컷 수가 올바르지 않습니다.",
+          "Template panel count is invalid.",
+        ));
+      }
+      for (const slotId of page.editableSlotIds) {
+        if (!declaredSlots.has(slotId)) {
+          findings.push(finding(
+            "composition-slot-reference",
+            "error",
+            slotId,
+            "미리보기 페이지가 존재하지 않는 편집 슬롯을 참조합니다.",
+            "A preview page references an unknown editable slot.",
+          ));
+        }
+      }
+    }
+    if (composition.layerLabels.length === 0
+      || composition.layerLabels.some((label) => !label.trim())) {
+      findings.push(finding(
+        "composition-layers",
+        "error",
+        "",
+        "템플릿 레이어 구성이 필요합니다.",
+        "Template layer metadata is required.",
+      ));
+    }
+    if (!Number.isSafeInteger(composition.includedAssetCount)
+      || composition.includedAssetCount < 0) {
+      findings.push(finding(
+        "composition-assets",
+        "error",
+        "",
+        "포함 에셋 수가 올바르지 않습니다.",
+        "Included asset count is invalid.",
+      ));
     }
   }
   return Object.freeze(findings);

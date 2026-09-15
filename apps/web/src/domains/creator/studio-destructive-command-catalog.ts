@@ -703,7 +703,7 @@ export function studioClearAutosaveRequest(input: {
   return {
     id: "studio.autosave.clear",
     title: "이전 그림을 삭제할까요?",
-    intro: "이 기기의 이전 그림만 영구 삭제합니다. 현재 캔버스와 서버 작품은 유지돼요. 되돌릴 수 없으니 필요하면 취소하고 백업 파일을 먼저 받아 주세요.",
+    intro: "이 기기에 남겨 둔 이전 그림만 삭제합니다. 지금 화면의 그림과 서버에 저장한 작품을 지우는 기능이 아니에요. 삭제하면 되돌릴 수 없으니, 필요하다면 취소하고 백업 파일을 먼저 받아 주세요.",
     losses: [
       {
         label: "이 기기에 남겨 둔 이전 그림",

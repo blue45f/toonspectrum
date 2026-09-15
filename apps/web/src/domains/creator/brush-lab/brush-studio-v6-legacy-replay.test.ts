@@ -25,7 +25,11 @@ const BASELINE = {
 };
 describe("pre-topology V6 replay receipts", () => {
   it.each(Object.entries(BASELINE))("preserves %s SVG byte-for-byte", (id, expected) => {
-    const stroke = createBrushStudioV6MaterialStroke(createBrushStudioV6Program(id));
+    const program = createBrushStudioV6Program(id);
+    const legacyProgram = id === "moss-flow"
+      ? { ...program, slots: { ...program.slots, carrier: "carrier-p5-flow" } }
+      : program;
+    const stroke = createBrushStudioV6MaterialStroke({ ...legacyProgram, version: 1 });
     const points = Array.from({ length: 61 }, (_, i) => ({
       x: 30 + i * 3, y: 60 + Math.sin(i / 9) * 22,
       pressure: 0.15 + 0.8 * Math.sin(Math.PI * i / 60), tilt: 0.3, twist: i * 2,

@@ -30,13 +30,22 @@ def validate(path, native):
     data = probe(path)
     video = next(stream for stream in data["streams"] if stream["codec_type"] == "video")
     assert any(stream["codec_type"] == "audio" for stream in data["streams"]), "Missing mixed audio track"
-    assert video["r_frame_rate"] == "30/1", "Declared capture frame rate must be 30fps"
+    frame_count = int(video["nb_read_frames"])
     if native:
-        assert float(data["format"]["duration"]) == 15.0, "Native recording must be finalized with its duration"
-        assert int(video["nb_read_frames"]) >= 338, "Real captured frames are unexpectedly sparse"
+        duration = float(data["format"]["duration"])
+        assert abs(duration - 15.0) < 0.05, "Native recording must be finalized with its duration"
+        assert frame_count >= 338, "Real captured frames are unexpectedly sparse"
+        # Chromium MediaRecorder WebM reports the millisecond container time base as
+        # r_frame_rate=1000/1 (and avg_frame_rate=0/0), not the requested capture cadence.
+        # Validate the observable frame density instead of treating that metadata field as fps.
+        effective_fps = frame_count / duration
+        assert 22.5 <= effective_fps <= 35.0, (
+            f"Native capture cadence is outside the accepted 30fps envelope: {effective_fps:.3f}fps"
+        )
     else:
         assert video["codec_name"] == "h264"
-        assert int(video["nb_read_frames"]) == 450
+        assert video["r_frame_rate"] == "30/1", "Declared Remotion frame rate must be 30fps"
+        assert frame_count == 450
         assert abs(float(video["duration"]) - 15) < 0.05
     samples = array.array("f")
     samples.frombytes(subprocess.check_output([

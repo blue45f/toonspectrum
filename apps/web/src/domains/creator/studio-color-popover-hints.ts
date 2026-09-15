@@ -1,18 +1,23 @@
 import type { StudioToolHintPreviewVariant } from "./studio-tool-hint-preview-kind";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
-export type StudioColorPopoverPurpose = "brush-shape" | "bubble-fill" | "generic";
+export type StudioColorPopoverPurpose =
+  | "brush-shape"
+  | "bubble-fill"
+  | "stroke"
+  | "fill"
+  | "text"
+  | "bubble-stroke"
+  | "shadow"
+  | "generic";
 
-const PURPOSE_COPY: Readonly<
-  Record<
-    StudioColorPopoverPurpose,
-    Readonly<{
-      description: string;
-      previewVariant: StudioToolHintPreviewVariant<"color-palette">;
-      tip: string;
-    }>
-  >
-> = {
+type PurposeCopy = Readonly<{
+  description: string;
+  previewVariant: StudioToolHintPreviewVariant<"color-palette">;
+  tip: string;
+}>;
+
+const PURPOSE_COPY: Readonly<Record<StudioColorPopoverPurpose, PurposeCopy>> = {
   "brush-shape": {
     description:
       "현재 브러시 선과 새 도형에 사용할 주 색을 고릅니다. 최근 색과 장면별 팔레트도 한곳에서 이어서 선택할 수 있어요.",
@@ -25,6 +30,36 @@ const PURPOSE_COPY: Readonly<
     previewVariant: "bubble-fill",
     tip: "같은 장면의 말풍선은 최근 색에서 다시 고르면 빠르게 통일할 수 있어요.",
   },
+  stroke: {
+    description:
+      "선택한 선화와 도형의 선 색을 바꿉니다. 최근 선색과 원고에서 사용 중인 색을 바로 다시 쓸 수 있어요.",
+    previewVariant: "brush-shape",
+    tip: "없음 버튼으로 선을 끄고 같은 자리에서 마지막 선색으로 되돌릴 수 있어요.",
+  },
+  fill: {
+    description:
+      "선택한 도형의 단색 채우기를 바꿉니다. 최근 색과 원고 색을 비교하며 빠르게 통일할 수 있어요.",
+    previewVariant: "palette-swatch",
+    tip: "그라데이션이나 패턴이 켜져 있어도 이 색은 단색 폴백으로 안전하게 유지됩니다.",
+  },
+  text: {
+    description:
+      "글자와 대사의 기본 색을 바꿉니다. 원고에서 이미 사용한 색과 대비를 확인하며 선택할 수 있어요.",
+    previewVariant: "palette-swatch",
+    tip: "말풍선과 배경 위에서 읽기 좋은 대비인지 현재 톤 배지를 함께 확인하세요.",
+  },
+  "bubble-stroke": {
+    description:
+      "말풍선 외곽선 색을 바꿉니다. 같은 장면의 선색을 재사용해 말풍선 스타일을 빠르게 맞출 수 있어요.",
+    previewVariant: "bubble-fill",
+    tip: "외곽선을 끄면 마지막 색과 두께는 기억되어 다시 켤 때 복원됩니다.",
+  },
+  shadow: {
+    description:
+      "그림자 색을 바꿉니다. 원고색과 명도 단계를 함께 보며 자연스러운 깊이를 만들 수 있어요.",
+    previewVariant: "palette-swatch",
+    tip: "그림자 불투명도는 색상과 별도로 조절하면 재사용하기 쉬운 팔레트를 유지할 수 있어요.",
+  },
   generic: {
     description:
       "현재 항목에 적용할 색을 고릅니다. 직접 입력, 최근 색, 큐레이션 팔레트와 스포이드를 함께 사용할 수 있어요.",
@@ -35,7 +70,7 @@ const PURPOSE_COPY: Readonly<
 
 export function studioColorPopoverTriggerHint(
   label: string,
-  purpose: StudioColorPopoverPurpose
+  purpose: StudioColorPopoverPurpose,
 ): StudioToolHintSpec {
   const copy = PURPOSE_COPY[purpose];
   return {
@@ -87,7 +122,9 @@ export function studioPaletteFamilyHint(
   paletteId?: string,
 ): StudioToolHintSpec {
   const previewVariant = paletteId
-    ? STUDIO_PALETTE_HINT_VARIANT_BY_ID[paletteId as keyof typeof STUDIO_PALETTE_HINT_VARIANT_BY_ID]
+    ? STUDIO_PALETTE_HINT_VARIANT_BY_ID[
+        paletteId as keyof typeof STUDIO_PALETTE_HINT_VARIANT_BY_ID
+      ]
     : undefined;
   return {
     id: `color-popover:palette:${label}`,

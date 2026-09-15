@@ -3,13 +3,19 @@ name: Studio asset library regression
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, consolidation/all-unmerged-20260914]
     paths:
       - 'apps/web/src/domains/creator/*Asset*.tsx'
       - 'apps/web/src/domains/creator/studio-asset-*'
       - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary*'
+      - 'apps/web/src/domains/creator/studio-insert-hub-drag*'
       - 'scripts/verify-studio-vector-environments-v3.mjs'
       - 'apps/web/src/domains/creator/studio-unified-asset-*'
+      - 'apps/web/src/domains/creator/studio-template-*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioTemplate*'
+      - 'scripts/verify-studio-asset-workspace.mts'
+      - 'package.json'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
       - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
       - '.github/workflows/studio-asset-library-regression.yml'
@@ -19,8 +25,14 @@ on:
       - 'apps/web/src/domains/creator/*Asset*.tsx'
       - 'apps/web/src/domains/creator/studio-asset-*'
       - 'apps/web/src/domains/creator/studio-generated-2d-*'
+      - 'apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary*'
+      - 'apps/web/src/domains/creator/studio-insert-hub-drag*'
       - 'scripts/verify-studio-vector-environments-v3.mjs'
       - 'apps/web/src/domains/creator/studio-unified-asset-*'
+      - 'apps/web/src/domains/creator/studio-template-*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioTemplate*'
+      - 'scripts/verify-studio-asset-workspace.mts'
+      - 'package.json'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-asset-library-mutations*'
       - 'apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions*'
       - '.github/workflows/studio-asset-library-regression.yml'
@@ -53,6 +65,8 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Native vector safety contract
         run: node scripts/verify-studio-vector-environments-v3.mjs
+      - name: Asset workspace quality gate
+        run: pnpm run verify:studio-asset-workspace
       - name: Asset library regression tests
         run: |
           pnpm exec vitest run \
@@ -64,7 +78,12 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-editor-model-import-actions.delete.test.ts \
             apps/web/src/domains/creator/studio-generated-2d-catalog.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-catalog.test.ts \
+            apps/web/src/domains/creator/studio-unified-asset-preview.test.ts \
             apps/web/src/domains/creator/studio-unified-asset-intelligence.test.ts \
+            apps/web/src/domains/creator/studio-insert-hub-drag.test.ts \
+            apps/web/src/domains/creator/studio-insert-hub-drag.background.test.ts \
+            apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary.test.tsx \
+            apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary.explicit.test.tsx \
             apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-product-boundary.test.ts \
             apps/web/src/domains/creator/studio-asset-library-sqlite-opfs-repository.test.ts \
             apps/web/src/domains/creator/studio-asset-library.test.ts \
@@ -73,12 +92,27 @@ jobs:
             apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
             apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.boundary.test.ts \
             apps/web/src/domains/creator/bg3d/StudioBg3dAssetLibraryPanel.test.tsx \
-            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx \
+            apps/web/src/domains/creator/studio-template-system.test.ts \
+            apps/web/src/domains/creator/studio-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateVisualPreview.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplatesPage.test.tsx
       - name: Changed library module lint
         run: |
           pnpm exec eslint --max-warnings=0 \
             apps/web/src/domains/creator/StudioAssetLibraryCollections.tsx \
             apps/web/src/domains/creator/StudioLocalAssetManager.tsx \
             apps/web/src/domains/creator/StudioSceneAssetLibrary.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetPreviewSurface.tsx \
+            apps/web/src/domains/creator/StudioInsertHubDirectDragBoundary.tsx \
             apps/web/src/domains/creator/studio-asset-library-management.ts \
-            apps/web/src/domains/creator/studio-unified-asset-library-projection.ts
+            apps/web/src/domains/creator/studio-unified-asset-library-projection.ts \
+            apps/web/src/domains/creator/studio-unified-asset-preview.ts \
+            apps/web/src/domains/creator/studio-insert-hub-drag.ts \
+            apps/web/src/domains/creator/studio-template-system.ts \
+            apps/web/src/domains/creator/studio-template-catalog.ts \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateVisualPreview.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplatesPage.tsx \
+            scripts/verify-studio-asset-workspace.mts

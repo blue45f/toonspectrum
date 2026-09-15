@@ -35,7 +35,10 @@ test.beforeEach(async ({ page }) => {
 // must not consume every subsequent route's budget or prevent their evidence upload.
 for (const width of [390, 1440]) {
   test.describe(`${width}px public route inventory`, () => {
-    test.describe.configure({ mode: "parallel" });
+    test.describe.configure({
+      mode: "parallel",
+      retries: process.env.CI ? 1 : 0,
+    });
     for (const path of routes) {
       test(`${path} remains navigable during API outage`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height: 900 });
@@ -158,6 +161,31 @@ test("directory search supports real navigation, a shared query, Back and recove
   await expect(input).toHaveValue("");
   await expect(input).toBeFocused();
   await expect(page.locator("#sitemap-extended-title")).toBeVisible();
+});
+
+
+test("evidence snapshots terminate when an infinite feed grows at the fold", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.setContent('<main id="feed" style="height:2400px;background:linear-gradient(white,gray)"><h1>Growing feed</h1></main>');
+  await page.evaluate(() => {
+    const feed = document.querySelector<HTMLElement>("#feed")!;
+    addEventListener("scroll", () => {
+      feed.style.height = `${feed.offsetHeight + 900}px`;
+    }, { passive: true });
+  });
+
+  await capturePageEvidence(page, info, "growing-feed");
+  const attachment = info.attachments.find((item) => item.name === "growing-feed-coverage");
+  expect(attachment?.body).toBeTruthy();
+  const coverage = JSON.parse(attachment!.body!.toString()) as {
+    height: number;
+    coveredHeight: number;
+    observedDocumentHeight: number;
+    grewDuringCapture: boolean;
+  };
+  expect(coverage.coveredHeight).toBe(coverage.height);
+  expect(coverage.observedDocumentHeight).toBeGreaterThan(coverage.height);
+  expect(coverage.grewDuringCapture).toBe(true);
 });
 
 

@@ -61,7 +61,7 @@ function expectCode(
 }
 
 describe("captureStudioBg3dBabylonNormals", () => {
-  it("flips WebGL rows and masks far-depth background before octahedral packing", async () => {
+  it.each(["webgl2", "webgpu"] as const)("flips %s RTT rows and masks canonical far-depth background", async (backend) => {
     const normalPass = pass(new Float32Array([
       // Bottom source row: +X. Canonical depth marks this target row as background.
       1, 0, 0, 1,
@@ -69,7 +69,7 @@ describe("captureStudioBg3dBabylonNormals", () => {
       0, 1, 0, 1,
     ]));
 
-    const result = await captureStudioBg3dBabylonNormals(input(), {
+    const result = await captureStudioBg3dBabylonNormals(input({ backend }), {
       createPass: () => normalPass,
     });
 
@@ -81,7 +81,7 @@ describe("captureStudioBg3dBabylonNormals", () => {
     expect(normalPass.dispose).toHaveBeenCalledOnce();
   });
 
-  it("keeps WebGPU rows top-down and accepts unsigned attachment values", async () => {
+  it("normalizes bottom-up WebGPU unsigned attachment values", async () => {
     const normalPass = pass(
       new Float32Array([
         1, 0.5, 0.5, 1,
@@ -99,8 +99,8 @@ describe("captureStudioBg3dBabylonNormals", () => {
     );
 
     expect([...result]).toEqual([
-      255, 128,
       128, 255,
+      255, 128,
     ]);
     expect(normalPass.dispose).toHaveBeenCalledOnce();
   });

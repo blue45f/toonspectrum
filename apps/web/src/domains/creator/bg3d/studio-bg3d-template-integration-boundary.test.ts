@@ -17,7 +17,7 @@ const modelImportActionsSource = readFileSync(
   "utf8",
 );
 const MODEL_IMPORT_ACTIONS_TAIL =
-  "return { handleDeleteModelFromLibrary, handleUploadModelFiles };";
+  "return { handleDeleteModelFromLibrary, handleUploadModelFiles, importModelFiles };";
 
 function sourceBetweenIn(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker);
@@ -46,6 +46,7 @@ describe("Studio BG3D user-template integration boundary", () => {
     expect(save).toContain("adapted.counts.droppedPrimitives > 0");
     expect(save).toContain("adapted.counts.droppedCustomModels > 0");
     expect(save).toContain("document: adapted.document");
+    expect(save).toContain("setTemplateLibraryNotice(null)");
     expect(save).not.toContain("commercialUse: true");
     expect(save).not.toContain("modelId:");
   });
@@ -73,6 +74,9 @@ describe("Studio BG3D user-template integration boundary", () => {
     expect(hydration).toBeGreaterThan(stagedBinding);
     expect(sceneCommit).toBeGreaterThan(hydration);
     expect(apply).toContain("throw new Error(\"template-attachment-missing\")");
+    expect(apply).toContain('templateFailure.message === "template-attachment-missing"');
+    expect(apply).toContain("현재 기기에서 찾을 수 없습니다");
+    expect(apply).toContain("모델 라이브러리에서 원본을 다시 가져온 뒤 재시도해 주세요");
     expect(apply).toContain("hydrated.diagnostics.length > 0");
     expect(apply).toContain("if (!committed)");
     expect(apply).toContain("ownedEntry.dispose()");

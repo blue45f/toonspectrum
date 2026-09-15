@@ -13,8 +13,10 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
+  buildStudioProductionRuntimeAclViolationSql,
   loadMigrationManifest,
 } from "./run-production-database-migrations.mjs";
 import {
@@ -58,6 +60,7 @@ const EXPECTED_SPECIAL_CAPABILITIES = Object.freeze([
   "marketplaceSearchGenerated",
   "marketplaceSearchIndexReady",
   "marketplaceTagIndexReady",
+  "personalCloudConnectionAclReady",
   "relationNames",
   "trigramExtensionReady",
 ]);
@@ -418,9 +421,19 @@ BEGIN
       'runtime role lacks the exact authentication lifecycle privileges';
   END IF;
 
+  IF ${buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact personal cloud connection privileges';
+  END IF;
+
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact cutover-readiness ledger privileges';
+  END IF;
+
+  IF ${buildStudioProductionRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact Studio production privileges';
   END IF;
 
   IF ${buildCreatorMarketplaceRuntimeAclViolationSql(runtimeDatabaseRole)} THEN

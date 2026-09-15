@@ -1,4 +1,4 @@
-import { BookOpen, PenLine, Plus, Sparkles, UserCheck, X } from "lucide-react";
+import { Bookmark, BookOpen, PenLine, Plus, Sparkles, UserCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -9,6 +9,12 @@ import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
 import { Container } from "@/shared/components/section";
 import { CreativeJourneyLinks } from "@/shared/components/public-creative";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  CREATOR_COMMUNITY_CONTENT_GROUPS,
+  CREATOR_COMMUNITY_PROVENANCES,
+  type CreatorCommunityContentGroup,
+  type CreatorCommunityProvenance,
+} from "@/shared/lib/creator-community-publication-contract";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
@@ -30,13 +36,28 @@ const SORTS: { value: WorkSort; label: string }[] = [
   { value: "views", label: "조회" },
 ];
 
-type GalleryTab = "works" | "series" | "following";
+type GalleryTab = "works" | "series" | "following" | "saved";
 
 const TABS: { value: GalleryTab; label: string }[] = [
   { value: "works", label: "전체 작품" },
   { value: "series", label: "시리즈" },
   { value: "following", label: "팔로잉" },
+  { value: "saved", label: "북마크" },
 ];
+
+const CONTENT_GROUP_LABEL: Record<CreatorCommunityContentGroup, string> = {
+  all: "전체",
+  illustration: "일러스트",
+  webtoon: "웹툰·만화",
+  process: "제작 과정·WIP",
+};
+
+const PROVENANCE_FILTER_LABEL: Record<CreatorCommunityProvenance, string> = {
+  human: "직접 제작",
+  ai_assisted: "AI 보조",
+  ai_generated: "AI 생성",
+  mixed: "혼합 제작",
+};
 
 // root-relative 자산은 정적 경로 헬퍼를 거쳐 렌더링합니다.
 const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
@@ -46,7 +67,15 @@ function isSort(value: string | null): value is WorkSort {
 }
 
 function isTab(value: string | null): value is GalleryTab {
-  return value === "works" || value === "series" || value === "following";
+  return value === "works" || value === "series" || value === "following" || value === "saved";
+}
+
+function isContentGroup(value: string | null): value is CreatorCommunityContentGroup {
+  return CREATOR_COMMUNITY_CONTENT_GROUPS.includes(value as CreatorCommunityContentGroup);
+}
+
+function isProvenance(value: string | null): value is CreatorCommunityProvenance {
+  return CREATOR_COMMUNITY_PROVENANCES.includes(value as CreatorCommunityProvenance);
 }
 
 // ── 공용 빈-상태 ─────────────────────────────────────────────────────
@@ -129,18 +158,46 @@ function IllustratedEmptyState({ title, description }: { title: string; descript
 }
 
 // ── 전체 작품 탭 ──────────────────────────────────────────────────────
-function WorksTab({ sort, tag }: { sort: WorkSort; tag: string }) {
+function WorksTab({
+  sort,
+  tag,
+  contentType = "all",
+  provenance,
+  portfolio = false,
+  bookmarked = false,
+}: {
+  sort: WorkSort;
+  tag: string;
+  contentType?: CreatorCommunityContentGroup;
+  provenance?: CreatorCommunityProvenance;
+  portfolio?: boolean;
+  bookmarked?: boolean;
+}) {
+  const userId = useApp((state) => state.userId);
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (bookmarked && !userId) {
+      setWorks([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    listWorks({ sort, tag: tag || undefined }, controller.signal)
+    listWorks({
+      sort,
+      tag: tag || undefined,
+      contentType,
+      provenance,
+      portfolio: portfolio ? "1" : undefined,
+      bookmarked: bookmarked ? "1" : undefined,
+    }, controller.signal)
       .then((result) => {
         if (alive) setWorks(result);
       })
@@ -156,7 +213,7 @@ function WorksTab({ sort, tag }: { sort: WorkSort; tag: string }) {
       alive = false;
       controller.abort();
     };
-  }, [sort, tag, reloadKey]);
+  }, [bookmarked, contentType, portfolio, provenance, reloadKey, sort, tag, userId]);
 
   if (error) {
     return (
@@ -168,11 +225,26 @@ function WorksTab({ sort, tag }: { sort: WorkSort; tag: string }) {
     );
   }
   if (loading) return <WorkGridSkeleton />;
-  if (works.length === 0) {
+  if (bookmarked && !userId) {
     return (
+      <IconEmptyState
+        icon={<Bookmark size={28} />}
+        title="로그인하고 작품을 북마크해 보세요."
+        description="다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다."
+      />
+    );
+  }
+  if (works.length === 0) {
+    return bookmarked ? (
+      <IconEmptyState
+        icon={<Bookmark size={28} />}
+        title="아직 북마크한 작품이 없습니다."
+        description="다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요."
+      />
+    ) : (
       <IllustratedEmptyState
-        title={tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "아직 등록된 창작물이 없습니다."}
-        description="첫 번째 작품을 올려 창작 게시판을 채워 보세요. 스튜디오에서 컷툰을 바로 만들 수 있어요."
+        title={tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "조건에 맞는 창작물이 아직 없습니다."}
+        description="필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요."
       />
     );
   }
@@ -399,6 +471,13 @@ export function CreateGalleryPage() {
   const tabParam = searchParams.get("tab");
   const tab: GalleryTab = isTab(tabParam) ? tabParam : "works";
   const tag = searchParams.get("tag") ?? "";
+  const contentTypeParam = searchParams.get("content");
+  const contentType: CreatorCommunityContentGroup = isContentGroup(contentTypeParam)
+    ? contentTypeParam
+    : "all";
+  const provenanceParam = searchParams.get("provenance");
+  const provenance = isProvenance(provenanceParam) ? provenanceParam : undefined;
+  const portfolio = searchParams.get("portfolio") === "1";
 
   // 정렬 칩은 작품·시리즈 탭에서만, 활성 태그 칩은 작품 탭에서 태그가 있을 때만 노출.
   // (불리언으로 분리해 JSX 안 좁히기(narrowing)가 tab 리터럴 타입을 헷갈리지 않게 한다.)
@@ -463,13 +542,75 @@ export function CreateGalleryPage() {
                 )}
               </div>
             ) : null}
+
+            {tab === "works" && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
+                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">작품 유형</span>
+                {CREATOR_COMMUNITY_CONTENT_GROUPS.map((group) => (
+                  <button
+                    key={group}
+                    type="button"
+                    aria-pressed={contentType === group}
+                    onClick={() => setParam("content", group === "all" ? null : group)}
+                    className={cn(
+                      "min-h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                      contentType === group
+                        ? "border-cool/60 bg-[oklch(0.8_0.11_232/0.12)] text-cool"
+                        : "border-line bg-card text-fg-2 hover:bg-raised",
+                    )}
+                  >
+                    {CONTENT_GROUP_LABEL[group]}
+                  </button>
+                ))}
+                <select
+                  value={provenance ?? ""}
+                  onChange={(event) => setParam("provenance", event.target.value || null)}
+                  aria-label="제작 방식 필터"
+                  className="h-9 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
+                >
+                  <option value="">모든 제작 방식</option>
+                  {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
+                    <option key={value} value={value}>{PROVENANCE_FILTER_LABEL[value]}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  aria-pressed={portfolio}
+                  onClick={() => setParam("portfolio", portfolio ? null : "1")}
+                  className={cn(
+                    "min-h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                    portfolio
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-2 hover:bg-raised",
+                  )}
+                >
+                  대표 포트폴리오
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {tab === "works" && !tag ? <CreateFeaturedSections /> : null}
+      {tab === "works" && !tag && contentType === "all" && !provenance && !portfolio
+        ? <CreateFeaturedSections />
+        : null}
 
-      {tab === "works" ? <WorksTab sort={sort} tag={tag} /> : tab === "series" ? <SeriesTab sort={sort} /> : <FollowingTab />}
+      {tab === "works" ? (
+        <WorksTab
+          sort={sort}
+          tag={tag}
+          contentType={contentType}
+          provenance={provenance}
+          portfolio={portfolio}
+        />
+      ) : tab === "saved" ? (
+        <WorksTab sort={sort} tag="" bookmarked />
+      ) : tab === "series" ? (
+        <SeriesTab sort={sort} />
+      ) : (
+        <FollowingTab />
+      )}
       <CreativeJourneyLinks />
     </Container>
   );

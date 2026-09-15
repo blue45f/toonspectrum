@@ -579,6 +579,12 @@ export function parseStudioWorkspaceRoute({
   });
 }
 
+function studioLegacyWorkIdentity(
+  route: Pick<StudioWorkspaceRoute, "documentId" | "workId">,
+): string | null {
+  return route.workId ?? route.documentId;
+}
+
 export function createStudioDccNavigationState(
   route: StudioWorkspaceRoute,
   location: StudioWorkspaceNavigationLocation,
@@ -593,7 +599,7 @@ export function createStudioDccNavigationState(
       remixSourceWorkId: route.remixSourceWorkId,
       search: location.search,
       version: 1,
-      workId: route.workId,
+      workId: studioLegacyWorkIdentity(route),
     }),
   });
 }
@@ -627,7 +633,7 @@ export function studioWorkspaceReturnHref(
     || typeof search !== "string"
     || (workId !== null && typeof workId !== "string")
     || (remixSourceWorkId !== null && typeof remixSourceWorkId !== "string")
-    || workId !== currentRoute.workId
+    || workId !== studioLegacyWorkIdentity(currentRoute)
     || remixSourceWorkId !== currentRoute.remixSourceWorkId
   ) {
     return null;
@@ -640,7 +646,7 @@ export function studioWorkspaceReturnHref(
   const returnRoute = parseStudioWorkspaceRoute({ pathname: normalizedPathname, search });
   if (!returnRoute.valid || returnRoute.surface === "dcc") return null;
   if (
-    returnRoute.workId !== currentRoute.workId
+    studioLegacyWorkIdentity(returnRoute) !== studioLegacyWorkIdentity(currentRoute)
     || returnRoute.remixSourceWorkId !== currentRoute.remixSourceWorkId
   ) {
     return null;

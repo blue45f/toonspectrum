@@ -161,3 +161,68 @@ parts that previously caused technical quality loss: topology closure, bounded s
 hair construction rules, LODs, material setup, portable rig checks, deterministic rendering,
 provenance, and package verification. Style-specific sculpting can still be performed in the saved
 `.blend`; re-running validation and export then produces the same auditable package contract.
+
+## Edited-scene roundtrip and portable import
+
+The new **Export Edited Character Package** button in `View3D > Sidebar > ToonStudio`
+exports the currently edited character without re-importing the source, regenerating hair,
+rebuilding face keys, or clearing the scene. Rebuild/reinstall the repository extension using
+the setup command above to expose this button in an existing Blender installation.
+
+The original **Run Character Pipeline** button and MCP `export_character_package` command
+still rebuild from the recipe. They are not the edited-scene path. For an edited character,
+use the new button or MCP `export_current_character_package` with the same allowlisted
+`configPath` and `projectRoot` parameters. Its receipt includes `outputDir`, `manifest`,
+and the portable `archive` path.
+
+Export requires Object Mode and the existing quality budgets. It preserves original files,
+mesh edits, shape keys, frame/subframe, active object, selection and visibility. Tagged
+character objects, their untagged children, and legacy authored hair belonging to a single
+character are included; other tagged characters are not silently combined. A shape-key
+model with `export.applyModifiers=true` is rejected rather than silently losing its keys.
+
+Each successful export creates a new sibling directory:
+`<outputDir>/<characterId>-revisions/<UTC timestamp>-<unique suffix>/`.
+The normal rebuild directory and earlier revisions are not overwritten. Failed exports
+remove only the current operation's staging directory. Current-scene export performs
+technical validation but deliberately does not generate new review renders or claim an
+art-direction approval. Existing VRM bindings are exported, not regenerated.
+
+Successful ordinary pipeline runs and edited-scene exports now produce
+`<characterId>.toonchar.zip`. It contains the manifest, declared runtime models, quality
+report and available PNG previews. Private `.blend` sources and HTML are excluded; optional
+source/review entries can remain in the manifest without being included in this runtime ZIP.
+
+In Character Shaper > 정밀 제작, choose one ZIP, a package folder, or the manifest and
+runtime files together. Choose VRM-first for character features, or GLB-first for generic
+models. The importer shows quality score, size, mesh/skin/morph/animation counts and the
+SHA-256 result before enabling an explicit model handoff. Selecting a package alone does
+not replace the current model. Verification can be cancelled; late results are ignored.
+
+The browser requires HTTPS or localhost for WebCrypto verification. It checks exact file
+identity, quality gate consistency, GLB headers and VRM extensions; it refuses external
+texture/buffer references. Manifest limit: 1,000,000 bytes. Runtime entry limit: 256,000,000
+bytes. File count limit: 256. ZIP total uncompressed limit: 512,000,000 bytes. The existing
+bounded ZIP reader also checks CRC, path collisions, unsafe paths and decompression limits.
+Oversized packages are rejected with guidance, never automatically downsampled.
+
+SHA-256 is an integrity receipt, not an author signature or a guarantee of artistic quality.
+No package/model upload, paid conversion service, or AI token call is added by this bridge.
+It does not implement direct `.blend` execution in a browser, live bidirectional sync,
+complete Blender/Cycles material parity, or automatic replacement of poses/paint history.
+Final model-load errors still belong to the existing model loader; the import UI reports a
+handoff rather than incorrectly asserting that a render completed.
+
+### Reproduce the real Blender-to-runtime verification
+
+Run in a dedicated Blender process, not an artist's active scene:
+
+```sh
+blender --background --factory-startup --python-exit-code 1 \
+  --python tests/blender/blender_current_scene_smoke.py
+node --import tsx scripts/verify-blender-package-roundtrip.mts
+```
+
+The first test checks edited geometry, morphs, animation, revision and scene preservation,
+and re-exports real pipeline-authored hair/face shapes. The second opens both actual ZIPs
+through the browser preflight and Three.js GLTFLoader, rather than using a mocked exporter.

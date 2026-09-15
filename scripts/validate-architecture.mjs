@@ -61,8 +61,9 @@ requirePaths(
     ".github/workflows/catalog-update.yml",
     ".github/workflows/deploy-vercel.yml",
     ".github/workflows/related-info-update.yml",
-    "deploy/oci/.env.example",
-    "deploy/oci/crawl-update.sh",
+    "config/free-infrastructure-policy.json",
+    "deploy/cloudflare-static/wrangler.jsonc",
+    "docs/FREE_INFRASTRUCTURE.md",
     "scripts/vercel-workflow-policy.mjs",
     "scripts/vercel-workflow-policy.test.mjs",
     "apps/web/src/app/routes/app-route-definition.ts",
@@ -285,13 +286,6 @@ for (const workflowPath of [
     issues.push(`${workflowPath}: ${issue}`);
   }
 }
-for (const automationPath of ["deploy/oci/crawl-update.sh", "deploy/oci/.env.example"]) {
-  if (!exists(automationPath)) continue;
-  for (const issue of validateNoDuplicateVercelTrigger(read(automationPath))) {
-    issues.push(`${automationPath}: ${issue}`);
-  }
-}
-
 if (issues.length > 0) {
   console.error(`architecture validation failed: ${issues.length} issue(s)`);
   for (const issue of issues) console.error(` - ${issue}`);

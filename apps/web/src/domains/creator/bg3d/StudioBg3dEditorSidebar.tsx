@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { StudioMarketplaceModelImport } from "./StudioMarketplaceModelImport";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 
@@ -149,7 +150,8 @@ export function StudioBg3dEditorSidebar({ h }) {
     BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper, BgPlacementPreview,
     BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController, BgViewportController,
     SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
-    StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent,
+    StudioBg3dSceneTemplatePanel, StudioBg3dUserTemplateLibraryPanel, StudioBg3dShapesPanel,
+    StudioBg3dSharedCharacterSceneContent,
     StudioBg3dSharedCharacterStatusOverlay, StudioBg3dSharedStagePanel, StudioBg3dViewPanel,
     StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge, StudioBg3dCaptureAdapter,
     StudioBg3dCaptureRequest, StudioBg3dImmersiveStagePlan, StudioBg3dImportProgress,
@@ -207,8 +209,10 @@ export function StudioBg3dEditorSidebar({ h }) {
     ikEndJointSelection, setIkEndJointSelection, morphTargetSelection, setMorphTargetSelection,
     deletingModelId, setDeletingModelId, isRestoringScene, setIsRestoringScene,
     sceneRestoreAbortRef, templateLibrary, setTemplateLibrary, templateLibraryStatus,
-    setTemplateLibraryStatus, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
-    setApplyingTemplateId, generateId, handleSaveSceneAsTemplate, handleDeleteTemplate,
+    setTemplateLibraryStatus, templateLibraryNotice, setTemplateLibraryNotice,
+    templateLibraryLoadRevision, setTemplateLibraryLoadRevision, isSavingTemplate,
+    setIsSavingTemplate, applyingTemplateId, setApplyingTemplateId, generateId,
+    handleSaveSceneAsTemplate, handleDeleteTemplate,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds, unbatchableModelIds,
     setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, savedShots,
     shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals, setDeviceSignals, skyPresetId,
@@ -324,6 +328,12 @@ export function StudioBg3dEditorSidebar({ h }) {
   } = { ...R, ...h };
   return (
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
+            <StudioMarketplaceModelImport
+              modelId={h.marketplaceModelId ?? null}
+              scopeKey={h.sharedStageSessionScopeKey}
+              disabled={Boolean(h.isRestoringScene || h.isUploadingModel || h.physicsInteractionLocked || h.immersiveSceneActive || h.sceneRecoveryError)}
+              onImport={h.importMarketplaceModelFiles}
+            />
             <div
               role="tablist"
               aria-label="컨트롤 카테고리"
@@ -529,6 +539,24 @@ export function StudioBg3dEditorSidebar({ h }) {
                       onResetAllTemplateInstances={h.resetAllTemplateInstances}
                       onDeleteTemplateInstance={h.deleteTemplateInstance}
                       onDeleteAllTemplateInstances={h.deleteAllTemplateInstances}
+                    />
+                    <StudioBg3dUserTemplateLibraryPanel
+                      entries={templateLibrary}
+                      status={templateLibraryStatus}
+                      notice={templateLibraryNotice}
+                      isSaving={isSavingTemplate}
+                      applyingTemplateId={applyingTemplateId}
+                      saveDisabled={
+                        isRestoringScene || isUploadingModel ||
+                        (primitives.length === 0 && customModels.length === 0)
+                      }
+                      applyDisabled={isRestoringScene || isUploadingModel}
+                      onSave={() => void handleSaveSceneAsTemplate()}
+                      onApply={(entry) => void applyUserTemplate(entry)}
+                      onDelete={(id) => void handleDeleteTemplate(id)}
+                      onRetry={() => {
+                        setTemplateLibraryLoadRevision((revision) => revision + 1);
+                      }}
                     />
                   </Suspense>
                 ) : null}

@@ -1,3 +1,4 @@
+import { isBrushStudioV6ArtistryModel } from "./brush-studio-v6-artistry-catalog";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import type { BrushStudioV6Tuning } from "./brush-studio-v6-engine";
 import type { BrushStudioV6MaterialMark, BrushStudioV6MaterialProgram } from "./brush-studio-v6-material-engine";
@@ -8,7 +9,7 @@ export function brushStudioV6TopologyActiveTuning(program: BrushStudioV6Material
   if (!topology) return null;
   const keys = new Set<keyof BrushStudioV6Tuning>(["size", "opacity", "flow", "spacing", "primaryColor", "secondaryColor", "surfaceTooth"]);
   for (const control of topology.controls) keys.add(control.key);
-  if (topology.model === "orbit" || topology.model === "weave") keys.delete("spacing");
+  if (topology.model === "orbit" || topology.model === "weave" || isBrushStudioV6ArtistryModel(topology.model)) keys.delete("spacing");
   if (topology.model === "orbit" && program.tuning.patternJitter === 0) keys.delete("patternDensity");
   if (program.slots.deposition === "deposit-dry" || program.slots.tip === "tip-grain-exemplar") keys.add("granulation");
   if (program.slots.deposition === "deposit-wet") for (const key of ["wetness", "diffusion", "absorbency", "granulation"] as const) keys.add(key);
@@ -20,6 +21,14 @@ export function brushStudioV6TopologyActiveTuning(program: BrushStudioV6Material
 /** Curves resolve their highest harmonic independently of the legacy dab-spacing control. */
 export function brushStudioV6TopologyStep(program: BrushStudioV6MaterialProgram, fallback: number): number {
   const topology = brushStudioV6Topology(program.slots.carrier);
+  if (topology && isBrushStudioV6ArtistryModel(topology.model)) {
+    if (![program.tuning.size, program.tuning.patternScale].every(Number.isFinite)) return fallback;
+    const size = Math.max(1, Math.min(240, program.tuning.size));
+    // Motif repeat length never depends on event frequency or pressure.
+    if (topology.model === "stipple") return Math.max(0.35, Math.min(6, size * 0.12));
+    if (topology.model === "rake") return Math.max(0.35, Math.min(3, size * 0.045));
+    return Math.max(0.35, Math.min(3, size * Math.max(0.1, program.tuning.patternScale) / 48));
+  }
   if (!topology || !["orbit", "weave"].includes(topology.model)) return fallback;
   if (![program.tuning.size, program.tuning.patternScale, program.tuning.patternDensity].every(Number.isFinite)) return fallback;
   const harmonics = topology.model === "orbit" ? Math.round(2 + program.tuning.patternDensity * 5) : 1;
@@ -29,10 +38,10 @@ export function brushStudioV6TopologyStep(program: BrushStudioV6MaterialProgram,
 /** Context-sensitive allow-list; disabled nodes never impersonate running providers. */
 export function isBrushStudioV6TopologyNodeCompatible(id: string): boolean {
   return Boolean(brushStudioV6Topology(id)) || [
-    "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar",
+    "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "tip-krita-dual",
     "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous",
     "deposit-ink", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-marker",
-    "pickup-none", "pigment-rgb", "pigment-spectral", "pattern-none", "finish-neon", "output-contact-canvas-svg",
+    "pickup-none", "pickup-krita-smudge", "pigment-rgb", "pigment-spectral", "pigment-mixbox", "pattern-none", "finish-neon", "output-contact-canvas-svg",
   ].includes(id);
 }
 type Emit = (kind: BrushStudioV6MaterialMark["kind"], x: number, y: number, rx: number, ry: number,

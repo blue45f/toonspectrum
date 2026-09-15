@@ -1,10 +1,13 @@
+import { ComicCastPicker, ComicDialogue } from "@/shared/components/comic/ComicCast";
+import { comicCast } from "@/shared/components/comic/comic-cast";
+import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useState } from "react";
 import { ArrowRight, BookOpen, ShieldCheck, Sparkles } from "lucide-react";
 import { FORTUNE_EXPERIENCES, fortuneKstDate } from "@toonspectrum/core/fortune";
 import { FortuneSceneArt } from "./FortuneSceneArt";
 import { FORTUNE_INTENTS } from "./fortune-cinematic-model";
 
-export function FortuneStoryPortal({ onNavigate, compact = false }: { onNavigate: (id: string) => void; compact?: boolean }) {
+export function FortuneStoryPortal({ onNavigate, compact = false, cast = "ara", onCastChange }: { onNavigate: (id: string) => void; compact?: boolean; cast?: ComicCastId; onCastChange?: (id: ComicCastId) => void }) {
   const [intent, setIntent] = useState<(typeof FORTUNE_INTENTS)[number]>(FORTUNE_INTENTS[0]);
   return <header className="fo-cinema-hero" data-theme={intent.theme} data-compact={compact}>
     <div className="fo-cinema-heading">
@@ -13,9 +16,11 @@ export function FortuneStoryPortal({ onNavigate, compact = false }: { onNavigate
       <h1>나의 다음 장면,<br /><em>운세 관측소</em></h1>
       <p className="fo-cinema-lead">운명을 정하는 대신, 이야기를 펼쳐요.<br />사주부터 타로까지, 나를 발견하는 웹툰 같은 시간.</p>
       <div className="fo-hero-actions">
-        <button type="button" className="fo-button fo-primary" onClick={() => onNavigate("saju")}>내 사주 펼치기 <ArrowRight size={17} /></button>
+        <button type="button" className="fo-button fo-primary" onClick={() => onNavigate("today")}>오늘의 웹툰 운세 <ArrowRight size={17} /></button>
         <button type="button" className="fo-button" onClick={() => onNavigate("tarot-three")}><Sparkles size={16} />카드로 시작하기</button>
       </div>
+      {!compact && onCastChange && <ComicCastPicker value={cast} onChange={onCastChange} />}
+      {!compact && <ComicDialogue cast={cast}>{comicCast(cast).intro}</ComicDialogue>}
       <p className="fo-privacy"><ShieldCheck size={15} />로그인 없이 무료 · 관측소 입력은 내 브라우저에서만 계산</p>
     </div>
     <div className="fo-comic-cover" aria-label="달빛 작업실의 오리지널 웹툰 일러스트">

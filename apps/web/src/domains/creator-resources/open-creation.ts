@@ -33,7 +33,7 @@ const KEYWORDS: Record<string, string> = {
   풍경: "landscape", 산: "mountain", 숲: "forest", 문양: "pattern", 초상화: "portrait", 검: "sword", 왕관: "crown", 의자: "chair", 새: "bird",
 };
 export const BOARD_PREFIX = "toonstudio.open-creation.board.v1:";
-const CACHE_KEY = "toonstudio.open-creation.cache.v1";
+const CACHE_KEY = "toonstudio.open-creation.cache.v2";
 export const CACHE_TTL = 24 * 60 * 60 * 1000;
 export const BOARD_LIMIT = 60;
 const PAGE_SIZE = 18;
@@ -49,18 +49,29 @@ export interface KeyValueStorage {
 function row(value: unknown): Row {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
 }
+function hasRestriction(value: unknown): boolean {
+  return value != null && (typeof value !== "string" || value.trim().length > 0);
+}
 function text(value: unknown, max = 300): string {
   if (typeof value !== "string") return "";
-  // Emit plain text only, including for nested or unterminated markup. A single
-  // tag-removal regex can leave executable angle brackets in malformed input.
   let plain = "";
-  let inTag = false;
+  let markupDepth = 0;
+  let pendingSpace = false;
   for (const character of value) {
-    if (character === "<") inTag = true;
-    else if (character === ">") inTag = false;
-    else if (!inTag) plain += character;
+    if (character === "<") { markupDepth += 1; continue; }
+    if (markupDepth > 0) {
+      if (character === ">") markupDepth -= 1;
+      continue;
+    }
+    if (/\s/u.test(character) || character.charCodeAt(0) < 0x20 || character === "\u007f") {
+      pendingSpace = plain.length > 0;
+      continue;
+    }
+    if (pendingSpace) { plain += " "; pendingSpace = false; }
+    plain += character;
+    if (plain.length >= max) break;
   }
-  return plain.replace(/\s+/gu, " ").trim().slice(0, max);
+  return plain.trim().slice(0, max);
 }
 export function safeOpenUrl(value: unknown, hosts?: string[]): string {
   if (typeof value !== "string" || value.length > 2000) return "";
@@ -77,19 +88,20 @@ export function openSearchQuery(provider: OpenProvider, query: string): string {
   if (normalized.length < 1 || normalized.length > 80) throw new Error("검색어를 1~80자로 입력하세요.");
   if (provider === "wikipedia") return normalized;
   // Deliberately a visible dictionary, not an AI translation or fabricated translation service.
-  return normalized.split(" ").map((word) => Object.hasOwn(KEYWORDS, word) ? KEYWORDS[word] : word).join(" ");
+  const expanded = normalized.split(" ").map((word) => Object.hasOwn(KEYWORDS, word) ? KEYWORDS[word] : word).join(" ");
+  return expanded.length <= 80 ? expanded : normalized;
 }
 export function openSearchUrl(provider: OpenProvider, query: string, page = 1): string {
   if (!Number.isInteger(page) || page < 1 || page > 10) throw new Error("검색은 1~10페이지까지 지원합니다.");
   const q = openSearchQuery(provider, query);
   if (provider === "artic") {
     const params = new URLSearchParams({ q, page: String(page), limit: String(PAGE_SIZE),
-      fields: "id,title,artist_display,date_display,image_id,is_public_domain,credit_line", "query[term][is_public_domain]": "true" });
+      fields: "id,title,artist_display,date_display,image_id,is_public_domain,credit_line,copyright_notice", "query[term][is_public_domain]": "true" });
     return `https://api.artic.edu/api/v1/artworks/search?${params}`;
   }
   if (provider === "cleveland") {
     const params = new URLSearchParams({ q, cc0: "1", has_image: "1", limit: String(PAGE_SIZE), skip: String((page - 1) * PAGE_SIZE),
-      fields: "id,title,creators,creation_date,images,share_license_status,creditline,url" });
+      fields: "id,title,creators,creation_date,images,share_license_status,creditline,url,copyright" });
     return `https://openaccess-api.clevelandart.org/api/artworks/?${params}`;
   }
   if (provider !== "wikipedia") throw new Error("지원하지 않는 제공처입니다.");
@@ -109,16 +121,16 @@ export function parseOpenReferences(provider: OpenProvider, payload: unknown, no
     if (!Number.isSafeInteger(rawId) || Number(rawId) <= 0 || !text(item.title)) continue;
     const ref: OpenReference = { id: `${provider}:${rawId}`, provider, title: text(item.title), creator: "", date: "", sourceUrl: "", imageUrl: "", rights: "원문 확인", credit: "", fetchedAt: now };
     if (provider === "artic") {
-      if (item.is_public_domain !== true) continue;
+      if (item.is_public_domain !== true || hasRestriction(item.copyright_notice)) continue;
       ref.sourceUrl = `https://www.artic.edu/artworks/${rawId}`;
       const iiif = safeOpenUrl(row(root.config).iiif_url, ["www.artic.edu", "artic.edu"]);
-      if (iiif && typeof item.image_id === "string" && /^[a-zA-Z0-9-]{1,100}$/u.test(item.image_id)) ref.imageUrl = `${iiif.replace(/\/$/u, "")}/${item.image_id}/full/400,/0/default.jpg`;
+      if (iiif && new URL(iiif).pathname.replace(/\/$/u, "") === "/iiif/2" && typeof item.image_id === "string" && /^[a-zA-Z0-9-]{1,100}$/u.test(item.image_id)) ref.imageUrl = `${iiif.replace(/\/$/u, "")}/${item.image_id}/full/400,/0/default.jpg`;
       ref.creator = text(item.artist_display); ref.date = text(item.date_display); ref.credit = text(item.credit_line); ref.rights = "CC0";
     } else if (provider === "cleveland") {
-      if (item.share_license_status !== "CC0") continue;
+      if (item.share_license_status !== "CC0" || hasRestriction(item.copyright)) continue;
       ref.sourceUrl = safeOpenUrl(item.url, ["www.clevelandart.org", "clevelandart.org"]);
       if (!ref.sourceUrl) continue;
-      ref.imageUrl = safeOpenUrl(row(row(item.images).web).url, ["openaccess-cdn.clevelandart.org", "www.clevelandart.org", "clevelandart.org"]);
+      ref.imageUrl = safeOpenUrl(row(row(item.images).web).url, ["openaccess-cdn.clevelandart.org"]);
       ref.creator = Array.isArray(item.creators) ? item.creators.slice(0, 3).map((creator) => text(row(creator).description)).filter(Boolean).join(" · ") : "";
       ref.date = text(item.creation_date); ref.credit = text(item.creditline); ref.rights = "CC0";
     } else {
@@ -137,9 +149,16 @@ export function parseSavedOpenReference(value: unknown): OpenReference | null {
   const sourceUrl = safeOpenUrl(item.sourceUrl);
   if (!sourceUrl || !text(item.title) || typeof item.fetchedAt !== "string" || !Number.isFinite(Date.parse(item.fetchedAt))) return null;
   // Stored/imported metadata cannot promote a knowledge link into an image licence.
-  const rights = item.rights === "CC0" && item.provider !== "wikipedia" ? "CC0" : "원문 확인";
+  const host = new URL(sourceUrl).hostname;
+  const museum = ["www.artic.edu", "artic.edu"].includes(host) ? "artic"
+    : ["www.clevelandart.org", "clevelandart.org"].includes(host) ? "cleveland"
+    : ["www.metmuseum.org", "metmuseum.org"].includes(host) ? "met" : null;
+  const allowed = item.provider === "saved" ? museum !== null : item.provider === museum;
+  const rights = item.rights === "CC0" && allowed ? "CC0" : "원문 확인";
+  const imageHosts = museum === "artic" ? ["www.artic.edu", "artic.edu"]
+    : museum === "cleveland" ? ["openaccess-cdn.clevelandart.org"] : ["images.metmuseum.org"];
   return { id: item.id, provider: item.provider as OpenReference["provider"], title: text(item.title), creator: text(item.creator), date: text(item.date),
-    sourceUrl, imageUrl: rights === "CC0" ? safeOpenUrl(item.imageUrl, ["www.artic.edu", "artic.edu", "openaccess-cdn.clevelandart.org", "images.metmuseum.org"]) : "",
+    sourceUrl, imageUrl: rights === "CC0" ? safeOpenUrl(item.imageUrl, imageHosts) : "",
     rights, credit: text(item.credit), fetchedAt: item.fetchedAt };
 }
 export function fromExistingResource(value: unknown): OpenReference | null {
@@ -147,7 +166,7 @@ export function fromExistingResource(value: unknown): OpenReference | null {
   const id = text(item.id, 160).replace(/[^a-zA-Z0-9:_-]/gu, "_");
   if (!id) return null;
   return parseSavedOpenReference({ id: `saved:${id}`, provider: "saved", title: item.title, creator: item.creator, date: item.dateLabel,
-    sourceUrl: item.sourceUrl, imageUrl: item.provider === "met" ? item.imageUrl : "", rights: item.provider === "met" && item.license === "CC0" ? "CC0" : "원문 확인",
+    sourceUrl: item.sourceUrl, imageUrl: ["met", "aic", "cleveland"].includes(String(item.provider)) ? item.imageUrl : "", rights: ["met", "aic", "cleveland"].includes(String(item.provider)) && item.license === "CC0" ? "CC0" : "원문 확인",
     credit: `${text(item.provider)} · ${text(item.credit)}`, fetchedAt: item.fetchedAt });
 }
 export function readOpenBoard(storage: KeyValueStorage): OpenReference[] {

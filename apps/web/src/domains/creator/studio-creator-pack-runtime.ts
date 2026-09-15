@@ -39,6 +39,7 @@ import {
   type StudioNamedPalette,
 } from "./studio-palette-library";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
+import { resolveStudioMarketplaceCc0Model } from "./studio-marketplace-cc0-registry";
 
 import type {
   StudioCreatorPackDefinition,
@@ -59,8 +60,6 @@ import {
 import {
   createCreatorMarketplacePortableDelivery,
 } from "@/infrastructure/creator-marketplace-client";
-
-import { findStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-catalog";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;
@@ -352,14 +351,14 @@ function validateBuiltinEntry(entry: StudioCreatorPackEntry): string[] {
       ? []
       : ["알 수 없는 내장 장면 템플릿 참조입니다."];
   }
+  if (entry.kind === "3d-asset") {
+    const approvedModel = resolveStudioMarketplaceCc0Model(entry.delivery.runtimeRef);
+    return approvedModel ? [] : ["검증된 내장 3D 에셋 참조가 아닙니다."];
+  }
   if (entry.kind === "3d-preset") {
     return entry.delivery.runtimeRef === STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID
       ? []
       : ["알 수 없는 내장 3D 팩 참조입니다."];
-  }
-  if (entry.kind === "3d-asset") {
-    return findStudioMarketplaceCc0Asset(entry.delivery.runtimeRef)?.kind === "model"
-      ? [] : ["검수된 내장 3D 에셋 참조가 아닙니다."];
   }
   return ["이 종류는 builtin-ref 설치를 지원하지 않습니다."];
 }

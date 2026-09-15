@@ -74,6 +74,7 @@ describe("ToonStudio integration closure", () => {
     const route = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.tsx");
     const layout = source("apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx");
     const switcher = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceSwitcher.tsx");
+    const windowHub = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWindowHub.tsx");
     const dock = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceDock.tsx");
 
     expect(route).toContain("<StudioEditorRoute resolution={routeResolution} />");
@@ -82,7 +83,9 @@ describe("ToonStudio integration closure", () => {
     expect(layout).toContain("<StudioDocumentWorkspaceSwitcher />");
     expect(layout).toContain("<StudioDocumentWorkspaceDock />");
     expect(switcher).toContain("studioDocumentHref");
-    expect(switcher).toContain("STUDIO_DOCUMENT_WORKSPACES");
+    expect(switcher).toContain("<StudioDocumentWindowHub");
+    expect(windowHub).toContain("STUDIO_DOCUMENT_WORKSPACES");
+    expect(windowHub).toContain("openStudioDocumentWorkspace");
     expect(switcher).toContain("projectId: resolution.projectId");
     expect(switcher).toContain("documentId: resolution.documentId");
     expect(switcher).toContain("draftId: resolution.draftId");

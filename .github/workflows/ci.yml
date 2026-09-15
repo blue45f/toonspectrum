@@ -35,7 +35,9 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
+      - name: Verify deduplicated PR workflow policy
+        run: python3 scripts/verify-pr-workflow-fanout.py
 
   static:
     needs: preflight
@@ -52,6 +54,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Strict lint
+        run: pnpm run lint:strict
+      - name: Typecheck application, API and realtime worker
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm run typecheck:cloudflare-realtime
       - name: P2P browser verification cache regression
         run: node --test scripts/verify-studio-p2p-huddle.test.mjs
       - name: P2P merge source-reader and recovery regressions
@@ -60,7 +69,16 @@ jobs:
             apps/web/src/domains/creator/studio-project-library \
             apps/web/src/domains/creator/studio-project-document \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-editor-document-source.test.ts \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
+      - name: Reconciled branch follow-up regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/app/studio-immersive-shell.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-client.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-codec-lazy-boundary.test.ts \
+            apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts \
+            apps/web/src/domains/creator/studio-marketplace-cc0-provenance.test.ts
       - name: Studio quick start and task workspace regressions
         run: |
           pnpm exec vitest run \
@@ -99,7 +117,7 @@ jobs:
             apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
       - name: Engine preview entry and evidence regressions
         run: |
-          pnpm exec vitest run apps/web/src/app/app-floating-controls-startup.test.ts apps/web/src/domains/creator/studio-editor-document-source.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
+          pnpm exec vitest run apps/web/src/app/app-floating-controls-startup.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-hokusai-live-integration.test.ts scripts/verify-studio-living-ink-integration.test.ts scripts/verify-studio-hybrid-dcc-integration.test.ts scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
       - name: Studio home and production route regressions
         run: |
           set -euo pipefail
@@ -133,13 +151,6 @@ jobs:
           pnpm run verify:toolchain-coverage
       - name: Production menu verifier entry execution
         run: node --test scripts/verify-studio-menus-ci.test.mjs
-      - name: Strict lint
-        run: pnpm run lint:strict
-      - name: Typecheck application, API and realtime worker
-        run: |
-          set -euo pipefail
-          pnpm run typecheck
-          pnpm run typecheck:cloudflare-realtime
       - name: API CPU budget regressions
         run: |
           set -euo pipefail
@@ -203,12 +214,9 @@ jobs:
             apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts \
             apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts \
             apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts \
-            apps/web/src/domains/creator/studio-checkpoints-sqlite.test.ts \
-            apps/web/src/domains/creator/studio-checkpoints.test.ts \
-            apps/web/src/domains/creator/studio-draft-save-center-model.test.ts \
             apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts \
-            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
             apps/web/src/domains/creator/studio-history-granularity-contract.test.ts \
+            apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx \
             apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx \
             apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts \
             apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx \
@@ -269,12 +277,24 @@ jobs:
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts \
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts \
             apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-camera-projection.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-readback.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-normal-capture.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-body-profile.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-contact-projection.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-surface-contact.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-skirt-waist-clearance.test.ts \
+            apps/web/src/domains/creator/vrm/StudioVrmXpbdSkirtAttachment.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts \
             apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx \
             apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
             apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts \
             apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts \
             apps/web/src/app/studio-cross-origin-isolation.test.ts \
-            scripts/verify-studio-3d-console.test.ts
+            scripts/verify-studio-3d-console.test.ts \
+            scripts/lib/character-psd-reference-compositor.test.mjs
       - name: Production menu entry point regressions
         run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 

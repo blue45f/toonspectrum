@@ -576,7 +576,7 @@ export function StudioDraftSaveCenter({
         aria-label={`저장 상태: ${model.compactLabel}`}
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex min-h-10 max-w-[min(17rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
+          "flex min-h-11 max-w-[min(17rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
           "hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
           TONE_CLASS[model.tone],

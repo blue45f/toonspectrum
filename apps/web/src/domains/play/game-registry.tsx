@@ -1,12 +1,18 @@
 // 아케이드 게임 레지스트리 — 새 게임은 여기에 한 줄 추가하면 허브/라우팅에 자동 노출.
 // 게임 본체는 lazy 로드해 무거운 의존(3D/웹캠)이 /play 진입 청크를 부풀리지 않게 한다.
 
-import { Dices, Eye, Grid3x3, Hand, HelpCircle, LayoutGrid, Palette, PenTool, Pencil, TrendingUp } from "lucide-react";
+import { Clapperboard, Dices, Eye, Grid3x3, Hand, HelpCircle, LayoutGrid, Palette, PenTool, Pencil, TrendingUp } from "lucide-react";
 import { lazy } from "react";
 
 import type { PlayGameMeta } from "./play-types";
 
 export const PLAY_GAMES: PlayGameMeta[] = [
+  {
+    id: "motion-panel", label: "모션 컷 실험실", tagline: "내 그림에 카메라 움직임과 말풍선을 더해 웹툰의 한 장면을 연출하세요.",
+    Icon: Clapperboard, hue: 42, category: "스토리", collection: "story",
+    duration: "2–5분", localOnly: true,
+    Component: lazy(() => import("./games/creative/MotionPanel")),
+  },
   {
     id: "sketch-sprint", label: "드로잉 스프린트", tagline: "오늘의 오리지널 주제로 짧게 그리고 PNG·SVG로 간직하세요.",
     Icon: Pencil, hue: 42, category: "드로잉", collection: "draw",

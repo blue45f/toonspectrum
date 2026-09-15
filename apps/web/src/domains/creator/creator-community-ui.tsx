@@ -1,8 +1,12 @@
 // 창작 커뮤니티 공용 UI — 작품 카드(시리즈/챌린지 배지), 시리즈 카드, 시리즈 폼, 아바타.
 // CreateGalleryPage · CreateSeriesPage · CreateChallengesPage · UserProfilePage 에서 재사용한다.
-import { BookOpen, Eye, Heart, Layers, MessageCircle, PenLine, Trophy } from "lucide-react";
+import { Bookmark, BookOpen, Eye, Heart, Layers, MessageCircle, PenLine, Trophy } from "lucide-react";
 import { useState } from "react";
 
+import {
+  CREATOR_COMMUNITY_KIND_LABEL,
+  CREATOR_COMMUNITY_PROVENANCE_LABEL,
+} from "./creator-community-labels";
 import { FORMAT_LABEL, SERIES_STATUS_LABEL } from "./creator-community-utils";
 
 import { CoverImage } from "@/shared/components/cover-image";
@@ -74,7 +78,9 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
           className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[oklch(0.14_0.01_70/0.55)] to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         />
         <span className="absolute left-2 top-2 inline-flex items-center rounded-full border border-line/60 bg-[oklch(0.16_0.01_70/0.7)] px-2 py-0.5 text-[0.72rem] font-medium text-fg-2 backdrop-blur-md">
-          {FORMAT_LABEL[work.format]}
+          {work.community
+            ? CREATOR_COMMUNITY_KIND_LABEL[work.community.kind]
+            : FORMAT_LABEL[work.format]}
         </span>
         {/* 시리즈 회차 배지 */}
         {work.seriesId && (
@@ -88,6 +94,13 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
           <span className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-full border border-accent/45 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.72rem] font-medium text-accent backdrop-blur-md">
             <Trophy size={10} className="shrink-0" />
             <span className="truncate">{work.challengeTitle ?? "챌린지"}</span>
+          </span>
+        )}
+        {work.community && (work.community.provenance !== "human" || work.community.portfolio) && (
+          <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.68rem] font-medium text-cool backdrop-blur-md">
+            {work.community.portfolio
+              ? "포트폴리오"
+              : CREATOR_COMMUNITY_PROVENANCE_LABEL[work.community.provenance]}
           </span>
         )}
       </div>
@@ -111,6 +124,12 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
             <MessageCircle size={12} />
             <span className="numeral">{formatCount(work.comments)}</span>
           </span>
+          {(work.bookmarks ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Bookmark size={12} className={cn(work.bookmarked && "fill-cool text-cool")} />
+              <span className="numeral">{formatCount(work.bookmarks ?? 0)}</span>
+            </span>
+          )}
           <span className="inline-flex items-center gap-1">
             <Eye size={12} />
             <span className="numeral">{formatCount(work.views)}</span>

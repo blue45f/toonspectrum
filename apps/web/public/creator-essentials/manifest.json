@@ -1,0 +1,993 @@
+{
+  "version": 1,
+  "license": "CC0-1.0",
+  "generator": "scripts/generate-creator-essentials.mts",
+  "purpose": "Original construction references; no rigging, animation or automated image reconstruction",
+  "assets": [
+    {
+      "id": "speech-round",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "둥근 말풍선",
+        "en": "Round speech balloon"
+      },
+      "tags": [
+        "dialogue",
+        "말풍선",
+        "대사"
+      ],
+      "url": "/creator-essentials/speech-round.svg",
+      "preview": "/creator-essentials/speech-round.svg",
+      "sha256": "b4713f75247a4983bd5f9787f65a559cd3a693f4641c9ce8a5d7f11fb5a5f6d3",
+      "bytes": 338,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "speech-rect",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "둥근 사각 말풍선",
+        "en": "Rounded rectangle balloon"
+      },
+      "tags": [
+        "dialogue",
+        "말풍선",
+        "대사"
+      ],
+      "url": "/creator-essentials/speech-rect.svg",
+      "preview": "/creator-essentials/speech-rect.svg",
+      "sha256": "46f606b19e0ecaaf99717fe38de87d84efe7012d2d9572adf74707dfa70dfde6",
+      "bytes": 367,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "thought-cloud",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "생각 구름",
+        "en": "Thought cloud"
+      },
+      "tags": [
+        "dialogue",
+        "생각",
+        "독백"
+      ],
+      "url": "/creator-essentials/thought-cloud.svg",
+      "preview": "/creator-essentials/thought-cloud.svg",
+      "sha256": "7a2b48124db02061e89855114531ab6f74d3461ee3090ce7ce42810bbac3fe20",
+      "bytes": 518,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "shout-burst",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "외침 말풍선",
+        "en": "Shout balloon"
+      },
+      "tags": [
+        "dialogue",
+        "외침",
+        "강조"
+      ],
+      "url": "/creator-essentials/shout-burst.svg",
+      "preview": "/creator-essentials/shout-burst.svg",
+      "sha256": "e06503a5c0470d2b680b736cefc7a726e8ba807c54df8ebd3675ac4b473e5917",
+      "bytes": 626,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "whisper-dashed",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "속삭임 말풍선",
+        "en": "Whisper balloon"
+      },
+      "tags": [
+        "dialogue",
+        "속삭임",
+        "점선"
+      ],
+      "url": "/creator-essentials/whisper-dashed.svg",
+      "preview": "/creator-essentials/whisper-dashed.svg",
+      "sha256": "c9e62d6e73802fc8cb617139443925f4da316457c27c0a13b00ebacc28e03830",
+      "bytes": 365,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "narration-paper",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "내레이션 프레임",
+        "en": "Narration frame"
+      },
+      "tags": [
+        "frame",
+        "독백",
+        "설명"
+      ],
+      "url": "/creator-essentials/narration-paper.svg",
+      "preview": "/creator-essentials/narration-paper.svg",
+      "sha256": "80aadc99763c21bf1ff0031fb807e5dd133909d63d925ae5138149935c3be61a",
+      "bytes": 337,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "impact-speed",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "집중 효과선",
+        "en": "Radial impact lines"
+      },
+      "tags": [
+        "action",
+        "집중",
+        "속도선"
+      ],
+      "url": "/creator-essentials/impact-speed.svg",
+      "preview": "/creator-essentials/impact-speed.svg",
+      "sha256": "4c609fb0656bfd2635f487639a903e4a624b7ff5e8c498a4ca42767e3bfe26aa",
+      "bytes": 2127,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "speed-horizontal",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "수평 속도선",
+        "en": "Horizontal speed lines"
+      },
+      "tags": [
+        "action",
+        "속도",
+        "배경"
+      ],
+      "url": "/creator-essentials/speed-horizontal.svg",
+      "preview": "/creator-essentials/speed-horizontal.svg",
+      "sha256": "2ace3c1d49cef843bda0ae952e5c638278dd1b0e28560d7c783ef8f9e7773019",
+      "bytes": 1445,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "speed-diagonal",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "사선 속도선",
+        "en": "Diagonal speed lines"
+      },
+      "tags": [
+        "action",
+        "속도",
+        "사선"
+      ],
+      "url": "/creator-essentials/speed-diagonal.svg",
+      "preview": "/creator-essentials/speed-diagonal.svg",
+      "sha256": "28874c12ccc47a2a866c19a8469f1427bf7169eda252e1b21398603eb12ae2eb",
+      "bytes": 1484,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "rain-diagonal",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "빗줄기",
+        "en": "Rain streaks"
+      },
+      "tags": [
+        "weather",
+        "비",
+        "날씨"
+      ],
+      "url": "/creator-essentials/rain-diagonal.svg",
+      "preview": "/creator-essentials/rain-diagonal.svg",
+      "sha256": "2f5f824e57c334180c450a2f22967e4a420ae6ccb22ae53a35e5e934f15410b0",
+      "bytes": 4968,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "snow-flakes",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "눈 결정",
+        "en": "Snow crystals"
+      },
+      "tags": [
+        "weather",
+        "눈",
+        "겨울"
+      ],
+      "url": "/creator-essentials/snow-flakes.svg",
+      "preview": "/creator-essentials/snow-flakes.svg",
+      "sha256": "ba4e264be2dc524c0c1f1c4fd9ddae2200426eac912433874677ac5cae85ec8f",
+      "bytes": 6261,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "sparkle-cross",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "십자 반짝임",
+        "en": "Cross sparkles"
+      },
+      "tags": [
+        "effect",
+        "빛",
+        "반짝임"
+      ],
+      "url": "/creator-essentials/sparkle-cross.svg",
+      "preview": "/creator-essentials/sparkle-cross.svg",
+      "sha256": "205ab0aa3216806240d3dc7be8b7c4c6d85aab7c9476add93261ef0285d609f6",
+      "bytes": 2584,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "starfield",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "별 장식",
+        "en": "Star field"
+      },
+      "tags": [
+        "effect",
+        "별",
+        "밤"
+      ],
+      "url": "/creator-essentials/starfield.svg",
+      "preview": "/creator-essentials/starfield.svg",
+      "sha256": "acae7a56c7445c93a3114544e01d7b75d29b8521057d54029d77edafb8af4d77",
+      "bytes": 3592,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "heart-scatter",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "하트 장식",
+        "en": "Scattered hearts"
+      },
+      "tags": [
+        "effect",
+        "하트",
+        "감정"
+      ],
+      "url": "/creator-essentials/heart-scatter.svg",
+      "preview": "/creator-essentials/heart-scatter.svg",
+      "sha256": "39688b94ab224cfa9716f59bdc707c2dd5b9698acf9620f116bffa41b3c085bf",
+      "bytes": 2134,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "cherry-petals",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "흩날리는 꽃잎",
+        "en": "Drifting petals"
+      },
+      "tags": [
+        "nature",
+        "꽃",
+        "봄",
+        "벚꽃"
+      ],
+      "url": "/creator-essentials/cherry-petals.svg",
+      "preview": "/creator-essentials/cherry-petals.svg",
+      "sha256": "f4a8408019397c173e065113438fd96b5540f54c590ac29ef3bd4d7f3c067363",
+      "bytes": 3819,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "cloud-bank",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "구름 테두리",
+        "en": "Cloud bank"
+      },
+      "tags": [
+        "weather",
+        "구름",
+        "하늘"
+      ],
+      "url": "/creator-essentials/cloud-bank.svg",
+      "preview": "/creator-essentials/cloud-bank.svg",
+      "sha256": "830945d70367a407de6600eb691e845f36dcf73647e4d6f4dc162cf1e1a10a67",
+      "bytes": 369,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "lightning",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "갈라진 번개",
+        "en": "Forked lightning"
+      },
+      "tags": [
+        "weather",
+        "번개",
+        "긴장"
+      ],
+      "url": "/creator-essentials/lightning.svg",
+      "preview": "/creator-essentials/lightning.svg",
+      "sha256": "79204b5c9272faa9169e0f588036ac0be20639c9ea2e6bb68f9b01670a7d9ebd",
+      "bytes": 369,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "smoke-ribbons",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "연기 곡선",
+        "en": "Smoke ribbons"
+      },
+      "tags": [
+        "effect",
+        "연기",
+        "곡선"
+      ],
+      "url": "/creator-essentials/smoke-ribbons.svg",
+      "preview": "/creator-essentials/smoke-ribbons.svg",
+      "sha256": "561a899b903e47c040f79ea90935efa97a3654bd3934fd495496b10128f98c9e",
+      "bytes": 712,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "tone-light",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "옅은 망점",
+        "en": "Light screentone"
+      },
+      "tags": [
+        "texture",
+        "망점",
+        "톤"
+      ],
+      "url": "/creator-essentials/tone-light.svg",
+      "preview": "/creator-essentials/tone-light.svg",
+      "sha256": "3af140ceb2654e93e1ab6e5805f3ed1f272cb506da8b1554e721465abf30671c",
+      "bytes": 16009,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "tone-gradient",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "그라데이션 망점",
+        "en": "Gradient screentone"
+      },
+      "tags": [
+        "texture",
+        "망점",
+        "음영"
+      ],
+      "url": "/creator-essentials/tone-gradient.svg",
+      "preview": "/creator-essentials/tone-gradient.svg",
+      "sha256": "2440d300a8553a33ec828d3ef28318627aabec8762d93554104d8a1b1d909eb6",
+      "bytes": 16546,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "crosshatch",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "교차 해칭",
+        "en": "Crosshatch field"
+      },
+      "tags": [
+        "texture",
+        "해칭",
+        "음영"
+      ],
+      "url": "/creator-essentials/crosshatch.svg",
+      "preview": "/creator-essentials/crosshatch.svg",
+      "sha256": "0af2e59b1493729fdba22b52af5b4755072839660fe5b486db1ec2b85a7fc989",
+      "bytes": 2216,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "wave-pattern",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "겹물결 무늬",
+        "en": "Overlapping wave pattern"
+      },
+      "tags": [
+        "texture",
+        "물결",
+        "패턴"
+      ],
+      "url": "/creator-essentials/wave-pattern.svg",
+      "preview": "/creator-essentials/wave-pattern.svg",
+      "sha256": "9f0df29b04898b692d59f3c62b0933e03049b3dd3805755172c3a832b9d3de43",
+      "bytes": 15760,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "panel-four",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "4컷 프레임",
+        "en": "Four-panel frame"
+      },
+      "tags": [
+        "frame",
+        "4컷",
+        "컷툰"
+      ],
+      "url": "/creator-essentials/panel-four.svg",
+      "preview": "/creator-essentials/panel-four.svg",
+      "sha256": "a9896eb27fa7aa253dc6feed8074a830439971c619fb9eef8c90275a4ba7df74",
+      "bytes": 502,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "panel-vertical",
+      "kind": "effect-2d",
+      "label": {
+        "ko": "세로 3컷 프레임",
+        "en": "Vertical three-panel frame"
+      },
+      "tags": [
+        "frame",
+        "웹툰",
+        "세로"
+      ],
+      "url": "/creator-essentials/panel-vertical.svg",
+      "preview": "/creator-essentials/panel-vertical.svg",
+      "sha256": "bc627bc7edbb13e67bb441f72b91068fa8d6aafb6c920dba8b6008dcdeaf8544",
+      "bytes": 441,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-neutral-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "기본 서기",
+        "en": "Neutral standing"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-neutral-3d.glb",
+      "preview": "/creator-essentials/pose-neutral-3d.preview.svg",
+      "sha256": "70a9c43ba6952637c676648cd5a79a458965c05d9741f34650e08e0b47eb2426",
+      "bytes": 10764,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-neutral-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "기본 서기",
+        "en": "Neutral standing"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-neutral-2d.svg",
+      "preview": "/creator-essentials/pose-neutral-2d.preview.svg",
+      "sha256": "1bb3c56aa378e40459cf37c799b9802dab826e20e8ef208d684c1e01495c0ca8",
+      "bytes": 363848,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-weight-shift-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "한쪽 체중 싣기",
+        "en": "Weight shift"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-weight-shift-3d.glb",
+      "preview": "/creator-essentials/pose-weight-shift-3d.preview.svg",
+      "sha256": "f09b48a3d6eebebebf23e88bf375f0b5fc9b358a921c935dda5efb50962965d0",
+      "bytes": 10920,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-weight-shift-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "한쪽 체중 싣기",
+        "en": "Weight shift"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-weight-shift-2d.svg",
+      "preview": "/creator-essentials/pose-weight-shift-2d.preview.svg",
+      "sha256": "0abbcb114fcf53cecd65ab7deaf39606e63fad0f306e9e106e7b6f0a392ca9a0",
+      "bytes": 364926,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-walking-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "걷기 키 포즈",
+        "en": "Walking key pose"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-walking-3d.glb",
+      "preview": "/creator-essentials/pose-walking-3d.preview.svg",
+      "sha256": "3c754db479b5b91c200b4b9262f9eddcf8366629adae1291c87da1b08fb87c4f",
+      "bytes": 11028,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-walking-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "걷기 키 포즈",
+        "en": "Walking key pose"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-walking-2d.svg",
+      "preview": "/creator-essentials/pose-walking-2d.preview.svg",
+      "sha256": "fba894888411c65d1ba787d03509291a494e884d47ed64ee11d91fab4088fb62",
+      "bytes": 370825,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-running-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "달리기 키 포즈",
+        "en": "Running key pose"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-running-3d.glb",
+      "preview": "/creator-essentials/pose-running-3d.preview.svg",
+      "sha256": "e8d79ebdacf37f9aebdb8c853918295d1d572d607bc26e2fb6a2650174751696",
+      "bytes": 11004,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-running-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "달리기 키 포즈",
+        "en": "Running key pose"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-running-2d.svg",
+      "preview": "/creator-essentials/pose-running-2d.preview.svg",
+      "sha256": "ed85291a07d6316e25c0cba4910ce0c18a329dc34e4140f48f81202fb46a8654",
+      "bytes": 370606,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-seated-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "앉기 참고",
+        "en": "Seated study"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-seated-3d.glb",
+      "preview": "/creator-essentials/pose-seated-3d.preview.svg",
+      "sha256": "f0659a017fe5321aef91e5d86fa6aa3b0a46e12406c3c46b99e212583abe6263",
+      "bytes": 11016,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-seated-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "앉기 참고",
+        "en": "Seated study"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-seated-2d.svg",
+      "preview": "/creator-essentials/pose-seated-2d.preview.svg",
+      "sha256": "9f196cfe3c849c134d924fcfe23b70272db861318f4e18f755ac7b9258512a4c",
+      "bytes": 370757,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-reaching-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "위로 뻗기",
+        "en": "Overhead reach"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-reaching-3d.glb",
+      "preview": "/creator-essentials/pose-reaching-3d.preview.svg",
+      "sha256": "66601d04c35378779f4dabc669ea5f6f90c6ae284bfcd71dd028e692cdb733c5",
+      "bytes": 10912,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-reaching-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "위로 뻗기",
+        "en": "Overhead reach"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-reaching-2d.svg",
+      "preview": "/creator-essentials/pose-reaching-2d.preview.svg",
+      "sha256": "234f5e9ccc234b83dce23f017ad778f96419f1bce364de53223e9a7c4879f8d4",
+      "bytes": 367228,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-crouching-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "웅크리기 참고",
+        "en": "Crouching study"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-crouching-3d.glb",
+      "preview": "/creator-essentials/pose-crouching-3d.preview.svg",
+      "sha256": "35e95eed9ee697e1105774c06fcc921d4510a6f2f0fe1947cc0a9c39496c915d",
+      "bytes": 11056,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-crouching-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "웅크리기 참고",
+        "en": "Crouching study"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-crouching-2d.svg",
+      "preview": "/creator-essentials/pose-crouching-2d.preview.svg",
+      "sha256": "77cba5e41634a37224f70761b2b85579d1417202411321935e246f6661401b44",
+      "bytes": 370944,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "pose-arm-extension-3d",
+      "kind": "pose-3d",
+      "label": {
+        "ko": "옆으로 팔 뻗기",
+        "en": "Side arm extension"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "mannequin",
+        "캐릭터",
+        "포즈",
+        "데생"
+      ],
+      "url": "/creator-essentials/pose-arm-extension-3d.glb",
+      "preview": "/creator-essentials/pose-arm-extension-3d.preview.svg",
+      "sha256": "cf8116bd21761c367961141f7b853359f5355b4328c1f0c6a344bba747378945",
+      "bytes": 10868,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pose-arm-extension-2d",
+      "kind": "pose-2d",
+      "label": {
+        "ko": "옆으로 팔 뻗기",
+        "en": "Side arm extension"
+      },
+      "tags": [
+        "character",
+        "pose",
+        "turnaround",
+        "캐릭터",
+        "포즈",
+        "3면도"
+      ],
+      "url": "/creator-essentials/pose-arm-extension-2d.svg",
+      "preview": "/creator-essentials/pose-arm-extension-2d.preview.svg",
+      "sha256": "e544fb62b589847fc75d05ac6b84119e2b47d7ed3d5ddc555c9c2f59198456a0",
+      "bytes": 366121,
+      "width": 1440,
+      "height": 550
+    },
+    {
+      "id": "prop-desk",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "작업 책상",
+        "en": "Work desk"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-desk.glb",
+      "preview": "/creator-essentials/prop-desk.preview.svg",
+      "sha256": "2a8bc63abcceaeda4d7cbeed31f7d12151106785ec5915acc4293497ad0e27d8",
+      "bytes": 3552,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-chair",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "등받이 의자",
+        "en": "Slatted chair"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-chair.glb",
+      "preview": "/creator-essentials/prop-chair.preview.svg",
+      "sha256": "6908f3f94e01d8e4532f8ee4c1e95890e99e71ba2e5ad82c4ccb1a8f3200d6c7",
+      "bytes": 4004,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-bench",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "공원 벤치",
+        "en": "Park bench"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-bench.glb",
+      "preview": "/creator-essentials/prop-bench.preview.svg",
+      "sha256": "e9414063a8add28c1d182fea20cbf76b174ad88545431a9b6f425eece88d4d9d",
+      "bytes": 4004,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-bookshelf",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "모듈 책장",
+        "en": "Modular bookshelf"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-bookshelf.glb",
+      "preview": "/creator-essentials/prop-bookshelf.preview.svg",
+      "sha256": "de183331d13b9f053cf523f5d8b7bc211e56147bc670f34a122a7e0450f85812",
+      "bytes": 5944,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-streetlamp",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "거리 가로등",
+        "en": "Street lamp"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-streetlamp.glb",
+      "preview": "/creator-essentials/prop-streetlamp.preview.svg",
+      "sha256": "052bf65b6f990f5a15a59e61da23db02280879dd2af932b14c982705ba704f3e",
+      "bytes": 5480,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-window-wall",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "창문이 있는 벽 모듈",
+        "en": "Window wall module"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-window-wall.glb",
+      "preview": "/creator-essentials/prop-window-wall.preview.svg",
+      "sha256": "6249dad149d0afa4ea289d3f91cf4089e7993c61bbc4416d761d340222a48f94",
+      "bytes": 3948,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-doorway",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "출입문 틀",
+        "en": "Doorway frame"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-doorway.glb",
+      "preview": "/creator-essentials/prop-doorway.preview.svg",
+      "sha256": "51b92c46e58c25505fe6bbf6b7b0b54e6f45c8525ff26c58715d46b0afb97a32",
+      "bytes": 3448,
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "prop-stairs",
+      "kind": "prop-3d",
+      "label": {
+        "ko": "6단 계단 모듈",
+        "en": "Six-step staircase"
+      },
+      "tags": [
+        "background",
+        "prop",
+        "model",
+        "배경",
+        "소품",
+        "모델"
+      ],
+      "url": "/creator-essentials/prop-stairs.glb",
+      "preview": "/creator-essentials/prop-stairs.preview.svg",
+      "sha256": "94f674bc3da2b998fa6f894d288cdef9c616d9d3accd3248c92dbad33227af2f",
+      "bytes": 2496,
+      "width": 480,
+      "height": 480
+    }
+  ]
+}

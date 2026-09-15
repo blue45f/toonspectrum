@@ -63,6 +63,30 @@ describe("StudioDocumentWorkspaceSwitcher", () => {
     });
   });
 
+  it("toggles the draw workspace between quick and ordinary modes without changing document identity", async () => {
+    renderRoute(
+      "/studio/p/project-1/d/document-1?workspace=draw&uiMode=focus&startTool=draw&room=team-a",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "일반 모드" }));
+    await waitFor(() => {
+      const href = screen.getByLabelText("location").textContent ?? "";
+      const url = new URL(href, "https://studio.test");
+      expect(url.pathname).toBe("/studio/p/project-1/d/document-1");
+      expect(url.searchParams.get("workspace")).toBe("draw");
+      expect(url.searchParams.get("uiMode")).toBe("basic");
+      expect(url.searchParams.get("startTool")).toBe("select");
+      expect(url.searchParams.get("room")).toBe("team-a");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "퀵모드" }));
+    await waitFor(() => {
+      const url = new URL(screen.getByLabelText("location").textContent ?? "", "https://studio.test");
+      expect(url.searchParams.get("uiMode")).toBe("focus");
+      expect(url.searchParams.get("startTool")).toBe("draw");
+    });
+  });
+
   it("does not create a second workspace selector on legacy editor URLs", () => {
     renderRoute("/studio/work/document-1/comic");
     expect(screen.queryByRole("combobox")).toBeNull();

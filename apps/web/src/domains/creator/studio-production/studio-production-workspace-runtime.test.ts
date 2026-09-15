@@ -52,7 +52,7 @@ describe("production durable document admission", () => {
   });
 
   it.each([
-    ["invalid JSON", "{"], ["array root", "[]"], ["unsupported version", stored({ schemaVersion: 3 })],
+    ["invalid JSON", "{"], ["array root", "[]"], ["unsupported version", stored({ schemaVersion: 4 })],
     ["cross scope", stored({ scopeKey: "remix:other" })], ["missing title", stored({ title: " " })],
     ["invalid time", stored({ updatedAt: "yesterday" })], ["negative revision", stored({ revision: -1 })],
     ["fractional revision", stored({ revision: 1.2 })], ["missing tasks", stored({ tasks: null })],
@@ -73,6 +73,52 @@ describe("production durable document admission", () => {
     ["unsafe old invite", stored({ inviteToken: "../\\secret" })], ["oversized bytes", " ".repeat(2_000_001)],
   ])("rejects %s instead of dropping data", (_label, raw) => {
     expect(() => parseProductionWorkspace(raw, SCOPE)).toThrow();
+  });
+
+  it("rejects malformed production graphs instead of silently detaching workflow metadata", () => {
+    const hierarchy = [
+      { id: "episode", kind: "episode", parentId: null, title: "1화", order: 0, pageId: null },
+      { id: "sequence", kind: "sequence", parentId: "episode", title: "도입", order: 0, pageId: null },
+      { id: "scene", kind: "scene", parentId: "sequence", title: "등장", order: 0, pageId: null },
+      { id: "page-node", kind: "page", parentId: "scene", title: "1페이지", order: 0, pageId: "page-1" },
+    ];
+    const assignments = [{
+      id: "assignment-1",
+      memberId: "member-1",
+      displayName: "작화 작가",
+      roles: ["lineart"],
+      hierarchyNodeId: "scene",
+    }];
+    const graphTask = {
+      ...task,
+      stage: "lineart",
+      priority: "high",
+      role: "lineart",
+      hierarchyNodeId: "scene",
+      dependencyIds: [],
+      assigneeIds: ["assignment-1"],
+      reviewerIds: ["member-1"],
+      blockedReason: "",
+    };
+    expect(parseProductionWorkspace(stored({ hierarchy, roleAssignments: assignments, tasks: [graphTask] }), SCOPE))
+      .not.toBeNull();
+
+    const invalidCases = [
+      stored({ hierarchy: [{ ...hierarchy[1], parentId: null }] }),
+      stored({ hierarchy, roleAssignments: assignments, tasks: [{ ...graphTask, assigneeIds: ["missing"] }] }),
+      stored({ hierarchy, reviews: [{ ...review, pageId: "missing-page" }] }),
+      stored({
+        hierarchy,
+        roleAssignments: assignments,
+        tasks: [
+          { ...graphTask, id: "task-a", dependencyIds: ["task-b"] },
+          { ...graphTask, id: "task-b", dependencyIds: ["task-a"] },
+        ],
+      }),
+    ];
+    for (const raw of invalidCases) {
+      expect(() => parseProductionWorkspace(raw, SCOPE)).toThrow();
+    }
   });
 
   it("enforces the same admission on commits and leaves the acknowledged row untouched", async () => {
@@ -142,7 +188,7 @@ describe("production mode and broadcast authority", () => {
     expect(resolveStudioProductionWorkspaceMode({ scopeKey: "draft", search: new URLSearchParams("demo=1&demo=1") })).toBe("local-draft");
     expect(resolveStudioProductionWorkspaceMode({ scopeKey: "remix:x", serverBacked: true })).toBe("linked-local");
     expect(resolveStudioProductionWorkspaceMode({ scopeKey: "work:x", serverBacked: true, cacheOnly: true })).toBe("read-only-cache");
-    expect(studioProductionWorkspaceCapabilities("read-only-cache")).toEqual({ canEdit: false, canPersistLocally: false, canInvite: false, canApprove: false, canPublish: false, serverAuthoritative: false });
+    expect(studioProductionWorkspaceCapabilities("read-only-cache")).toEqual({ canEdit: false, canPersistLocally: false, canInvite: false, canManageRoles: false, canApprove: false, canPublish: false, serverAuthoritative: false });
     expect(() => resolveStudioProductionWorkspaceMode({ scopeKey: "other:x" })).toThrow();
     for (const mode of ["local-draft", "linked-local", "server-work", "read-only-cache", "demo"] as const) expect(studioProductionWorkspaceModeLabel(mode)).toBeTruthy();
     expect(createDemoProductionWorkspace().scopeKey).toBe("draft");

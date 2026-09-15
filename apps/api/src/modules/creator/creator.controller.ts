@@ -24,10 +24,13 @@ import {
   CreatorAssetModerationQueryDto,
   CreatorAssetParamsDto,
   CreatorDraftCollaborationRoomParamsDto,
+  CreatorExternalPublicationParamsDto,
   CreatorSharedWorksListQueryDto,
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
   CreatorTeamWorkParamsDto,
+  CreatorWorkListQueryDto,
+  CreatorWorkParamsDto,
   CreatorWorkRevisionListParamsDto,
   CreatorWorkRevisionListQueryDto,
   CreatorWorkRevisionParamsDto,
@@ -37,22 +40,16 @@ import {
   PublishCreatorAssetDto,
   ProvisionCreatorDraftCollaborationRoomDto,
   ReportCreatorAssetDto,
+  ReportCreatorWorkDto,
   RespondCreatorTeamInvitationDto,
   RestoreCreatorWorkRevisionDto,
+  SaveCreatorExternalPublicationDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorTeamMemberDto,
   UpdateCreatorWorkDto,
 } from "./creator.dto";
 import { CreatorService } from "./creator.service";
 
-interface ListQuery {
-  titleId?: string | null;
-  userId?: string | null;
-  sort?: string | null;
-  tag?: string | null;
-  seriesId?: string | null;
-  challengeId?: string | null;
-}
 
 function enforceUserOrError(userId: string | null | undefined) {
   if (!userId) throw new ForbiddenException("로그인이 필요해요.");
@@ -67,7 +64,10 @@ export class CreatorController {
 
   @Get("/creator/works")
   @Header("Cache-Control", "no-store, max-age=0")
-  async listWorks(@Query() query: ListQuery, @Headers("x-user-id") userId?: string) {
+  async listWorks(
+    @Query(new ZodValidationPipe(CreatorWorkListQueryDto)) query: CreatorWorkListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
     return this.creatorService.listWorks(query, userId || undefined);
   }
 
@@ -304,6 +304,78 @@ export class CreatorController {
   async toggleLike(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.toggleLike(uid, id);
+  }
+
+
+  @Post("/creator/works/:id/bookmark")
+  async toggleBookmark(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.toggleBookmark(uid, params.id);
+  }
+
+  @Get("/creator/works/:id/releases")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listWorkReleases(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.creatorService.listWorkReleases(params.id, userId || undefined);
+  }
+
+  @Post("/creator/works/:id/releases")
+  async createWorkRelease(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.createWorkRelease(uid, params.id);
+  }
+
+  @Get("/creator/works/:id/external-publications")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listExternalPublications(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.creatorService.listExternalPublications(params.id, userId || undefined);
+  }
+
+  @Post("/creator/works/:id/external-publications")
+  async saveExternalPublication(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Body(new ZodValidationPipe(SaveCreatorExternalPublicationDto))
+    body: SaveCreatorExternalPublicationDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.saveExternalPublication(uid, params.id, body);
+  }
+
+  @Delete("/creator/works/:id/external-publications/:publicationId")
+  async removeExternalPublication(
+    @Param(new ZodValidationPipe(CreatorExternalPublicationParamsDto))
+    params: CreatorExternalPublicationParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.removeExternalPublication(
+      uid,
+      params.id,
+      params.publicationId
+    );
+  }
+
+  @Post("/creator/works/:id/report")
+  async reportWork(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Body(new ZodValidationPipe(ReportCreatorWorkDto)) body: ReportCreatorWorkDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.reportWork(uid, params.id, body);
   }
 
   @Get("/creator/works/:id/comments")

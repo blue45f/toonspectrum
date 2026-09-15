@@ -3,6 +3,7 @@ export type StudioChunkPredicate = (id: string) => boolean;
 export function createStudioManualChunks(predicates: {
   isInitialIconModule: StudioChunkPredicate;
   isStudioCoreIconModule: StudioChunkPredicate;
+  isStudioWorkspaceIconModule?: StudioChunkPredicate;
 }) {
   const { isInitialIconModule, isStudioCoreIconModule } = predicates;
   return (id: string): string | undefined => {
@@ -169,6 +170,7 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-work-metadata.ts")
       || id.endsWith("/src/domains/creator/studio-page-review.ts")
       || id.endsWith("/src/domains/creator/studio-frame-animation-timing.ts")
+      || id.endsWith("/src/domains/creator/studio-live-adjustment-visibility.ts")
     ) {
       // These pure document models have no runtime dependencies. Review status and frame
       // timing are already needed by the editor and reused by the lazy quality inspector;
@@ -205,6 +207,10 @@ export function createStudioManualChunks(predicates: {
     }
     if (isInitialIconModule(id)) {
       return "lucide-initial-icons";
+    }
+    // These Studio-only leaves must not inflate the icon chunk shared by the app shell.
+    if (predicates.isStudioWorkspaceIconModule?.(id)) {
+      return "lucide-studio-workspace-icons";
     }
     if (isStudioCoreIconModule(id)) {
       return "lucide-studio-core-icons";

@@ -8,6 +8,7 @@ import {
   parseOpenReferences, readOpenBoard, readOpenCache, saveOpenReference, writeOpenCache,
 } from "./open-creation";
 import type { KitFormat, OpenProvider, OpenReference } from "./open-creation";
+import { readOpenJson } from "./open-creation-transport";
 import { ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
@@ -24,7 +25,7 @@ function ReferenceTile({ item, saved, disabled, toggle }: { item: OpenReference;
   const [failed, setFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !failed
-      ? <img src={item.imageUrl} crossOrigin={item.provider === "artic" ? "anonymous" : undefined} alt={item.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-48 w-full bg-raised object-contain p-3" />
+      ? <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-48 w-full bg-raised object-contain p-3" />
       : <div className="flex h-24 items-center justify-center bg-raised px-4 text-center text-sm text-fg-2">{failed ? "이미지를 불러오지 못했습니다 · 원문에서 확인" : "원문 링크로 확인하는 자료"}</div>}
     <div className="flex flex-1 flex-col gap-3 p-4">
       <p className="text-xs font-semibold text-accent">{OPEN_PROVIDERS.find((provider) => provider.id === item.provider)?.name ?? "기존 저장 보드"} · {item.rights}</p>
@@ -105,9 +106,8 @@ export function OpenCreationPage() {
         throw new Error("제공처의 호출 한도에 도달했습니다. 자동 재시도나 유료 전환은 하지 않습니다.");
       }
       if (!response.ok) throw new Error(`제공처에 연결하지 못했습니다 (HTTP ${response.status}).`);
-      const raw = await response.text();
-      if (raw.length > 2000000) throw new Error("검색 응답이 허용 크기를 초과했습니다.");
-      const items = parseOpenReferences(provider, JSON.parse(raw));
+      const payload = await readOpenJson(response, abort.signal);
+      const items = parseOpenReferences(provider, payload);
       if (id !== requestNumber.current) return;
       try { writeOpenCache(window.localStorage, key, items); } catch { /* Optional cache. */ }
       setResult(items); setResultKey(key); setPage(targetPage);
@@ -119,6 +119,10 @@ export function OpenCreationPage() {
       else setStatus("저장 보드·브리프 도구는 외부 검색 서버 없이 사용할 수 있습니다.");
       setSearchError(`${message} ${cached ? "기존 캐시를 표시합니다." : "공식 제공처 링크 또는 다른 검색어를 이용하세요."}`);
     } finally { window.clearTimeout(timeout); if (id === requestNumber.current) setPending(false); }
+  };
+  const exportText = (filename: string, value: string, mime?: string) => {
+    try { downloadText(filename, value, mime); setCopyStatus("파일 다운로드를 요청했습니다. 브라우저 다운로드 목록을 확인하세요."); }
+    catch { setCopyStatus("파일을 내보내지 못했습니다. 초안 텍스트를 선택해 복사하세요. 저장 자료는 삭제하지 않았습니다."); }
   };
   const toggleBoard = (item: OpenReference) => {
     try {
@@ -136,19 +140,19 @@ export function OpenCreationPage() {
       <strong className="text-fg">검색 → 재료 보드 → 제작 브리프 → Studio</strong>
       <p>검색어만 선택한 외부 제공처로 전송합니다. 작품·작가 메모는 전송하지 않습니다. 저장 자료는 이 브라우저에만 보관되며 계정 동기화가 아닙니다.</p>
       <p>저장 메타데이터와 브리프는 페이지가 열린 상태에서 오프라인으로도 사용 가능합니다. 외부 이미지와 최초 페이지 로딩까지 오프라인을 보장하지 않습니다.</p>
-      <div className="mt-3 flex flex-wrap gap-2"><Link className={RESOURCE_BUTTON} to="/insights/resources">API·출처 안내</Link><Link className={RESOURCE_BUTTON} to="/research/assets">기존 Met 자료 검색</Link><Link className={RESOURCE_BUTTON} to="/research/books">도서·판본 검색</Link><Link className={RESOURCE_BUTTON} to="/opportunities">지원사업 찾기</Link></div>
+      <div className="mt-3 flex flex-wrap gap-2"><Link className={RESOURCE_BUTTON} to="/research/packs">12개 장면 팩으로 연습하기</Link><Link className={RESOURCE_BUTTON} to="/insights/resources">API·출처 안내</Link><Link className={RESOURCE_BUTTON} to="/research/assets">기존 Met 자료 검색</Link><Link className={RESOURCE_BUTTON} to="/research/books">도서·판본 검색</Link><Link className={RESOURCE_BUTTON} to="/opportunities">지원사업 찾기</Link></div>
     </section>
     <section aria-labelledby="open-pack-title" className="space-y-3"><h2 id="open-pack-title" className="text-xl font-bold">바로 시작하는 콘텐츠 기획</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{PACKS.map((pack) => <button key={pack.title} className="rounded-2xl border border-line bg-panel p-4 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => { invalidateSearch(); setQuery(pack.query); setSubject(pack.title); setFormat(pack.format); setTab("results"); }}><span className="block font-bold">{pack.title}</span><span className="mt-2 block text-sm leading-6 text-fg-2">{pack.description}</span></button>)}</div>
     </section>
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); void search(); }}>
       <div className="grid gap-3 sm:grid-cols-3"><label className="text-sm font-semibold">무료 제공처<select className={`${RESOURCE_INPUT} mt-2`} value={provider} onChange={(event) => { invalidateSearch(); setProvider(event.target.value as OpenProvider); }}>{OPEN_PROVIDERS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="text-sm font-semibold sm:col-span-2">찾을 소재<input className={`${RESOURCE_INPUT} mt-2`} type="search" value={query} required minLength={1} maxLength={80} placeholder="한복, 갑옷, 도자기, architecture…" onChange={(event) => { invalidateSearch(); setQuery(event.target.value); }} /></label></div>
+        <label className="text-sm font-semibold sm:col-span-2">찾을 소재<input className={`${RESOURCE_INPUT} mt-2`} type="search" onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} value={query} required minLength={1} maxLength={80} placeholder="한복, 갑옷, 도자기, architecture…" onChange={(event) => { invalidateSearch(); setQuery(event.target.value); }} /></label></div>
       <p className="text-xs leading-6 text-fg-2">{OPEN_PROVIDERS.find((item) => item.id === provider)?.detail} · 한글 추천어는 공개된 로컬 사전으로 치환하며, 지원하지 않는 단어는 그대로 검색합니다.</p>
       <div className="flex flex-wrap gap-2">{OPEN_TOPICS.map((topic) => <button key={topic} className={RESOURCE_BUTTON} type="button" onClick={() => { invalidateSearch(); setQuery(topic); }}>{topic}</button>)}</div>
       <div className="flex flex-wrap gap-2"><button className={`${RESOURCE_BUTTON} bg-accent-soft`} type="submit" disabled={pending}>{pending ? "자료 확인 중…" : "무료 자료 검색"}</button><a className={RESOURCE_BUTTON} href={OPEN_PROVIDERS.find((item) => item.id === provider)?.url} target="_blank" rel="noopener noreferrer">제공처 공식 안내 ↗</a></div>
     </form>
-    <div className="flex flex-wrap gap-2" aria-label="자료 보기"><button className={RESOURCE_BUTTON} aria-pressed={tab === "results"} onClick={() => setTab("results")}>검색 결과</button><button className={RESOURCE_BUTTON} aria-pressed={tab === "board"} onClick={() => setTab("board")}>재료 보드 {board.length}/{BOARD_LIMIT}</button><button className={RESOURCE_BUTTON} aria-pressed={tab === "existing"} onClick={() => setTab("existing")}>기존 저장 자료 {existing.length}</button><button className={RESOURCE_BUTTON} disabled={!board.length} onClick={() => downloadText("toonstudio-material-board.json", JSON.stringify({ version: 1, items: board }, null, 2), "application/json;charset=utf-8")}>보드 JSON 백업</button></div>
+    <div className="flex flex-wrap gap-2" aria-label="자료 보기"><button className={RESOURCE_BUTTON} aria-pressed={tab === "results"} onClick={() => setTab("results")}>검색 결과</button><button className={RESOURCE_BUTTON} aria-pressed={tab === "board"} onClick={() => setTab("board")}>재료 보드 {board.length}/{BOARD_LIMIT}</button><button className={RESOURCE_BUTTON} aria-pressed={tab === "existing"} onClick={() => setTab("existing")}>기존 저장 자료 {existing.length}</button><button className={RESOURCE_BUTTON} disabled={!board.length} onClick={() => exportText("toonstudio-material-board.json", JSON.stringify({ version: 1, items: board }, null, 2), "application/json;charset=utf-8")}>보드 JSON 백업</button></div>
     <p role="status" className="text-sm leading-6 text-fg-2">{status}</p>
     {searchError && <p role="alert" className="text-sm text-warn">{searchError}</p>}
     {storageError && <p role="alert" className="text-sm text-warn">{storageError} 성공으로 표시하지 않으며, 검색과 초안 내보내기는 계속 사용할 수 있습니다.</p>}
@@ -166,7 +170,7 @@ export function OpenCreationPage() {
         <div className="grid gap-2 sm:grid-cols-2">{board.map((item) => <label key={item.id} className="flex min-w-0 items-start gap-2 rounded-lg bg-raised p-3 text-sm"><input type="checkbox" className="mt-1" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selectedItems.length >= 12} onChange={(event) => setSelected((ids) => event.target.checked ? [...ids.filter((id) => id !== item.id), item.id].slice(0, 12) : ids.filter((id) => id !== item.id))} /><span className="break-words">{item.title}</span></label>)}</div>
       </fieldset>
       <button className={`${RESOURCE_BUTTON} bg-accent-soft`} onClick={() => { setOutput(buildCreationKit(format, subject, notes, selectedItems)); setCopyStatus("초안을 만들었습니다. 원문 사실과 권리를 확인한 뒤 편집하세요."); }}>무료 제작 브리프 만들기</button>
-      {output && <><label className="block text-sm font-semibold">제작 브리프 (직접 수정 가능)<textarea className={`${RESOURCE_INPUT} mt-2 min-h-96 font-mono text-sm`} value={output} maxLength={60000} onChange={(event) => { setOutput(event.target.value); setCopyStatus(""); }} /></label><div className="flex flex-wrap gap-2"><button className={RESOURCE_BUTTON} onClick={() => downloadText("toonstudio-creation-kit.md", output)}>출처 포함 Markdown 내보내기</button><button className={RESOURCE_BUTTON} onClick={() => { void navigator.clipboard?.writeText(output).then(() => setCopyStatus("초안을 복사했습니다."), () => setCopyStatus("복사를 허용하지 않는 환경입니다. 텍스트를 선택하거나 파일로 내보내세요.")); if (!navigator.clipboard) setCopyStatus("텍스트를 선택하거나 파일로 내보내세요."); }}>초안 복사</button><Link className={RESOURCE_BUTTON} to="/studio/new">Studio에서 새 작업</Link></div><p className="text-xs text-fg-2">Studio에는 자료가 자동 삽입되지 않습니다. 내보낸 초안을 참고해 새 작업을 시작하세요.</p></>}
+      {output && <><label className="block text-sm font-semibold">제작 브리프 (직접 수정 가능)<textarea className={`${RESOURCE_INPUT} mt-2 min-h-96 font-mono text-sm`} value={output} maxLength={60000} onChange={(event) => { setOutput(event.target.value); setCopyStatus(""); }} /></label><div className="flex flex-wrap gap-2"><button className={RESOURCE_BUTTON} onClick={() => exportText("toonstudio-creation-kit.md", output)}>출처 포함 Markdown 내보내기</button><button className={RESOURCE_BUTTON} onClick={() => { void navigator.clipboard?.writeText(output).then(() => setCopyStatus("초안을 복사했습니다."), () => setCopyStatus("복사를 허용하지 않는 환경입니다. 텍스트를 선택하거나 파일로 내보내세요.")); if (!navigator.clipboard) setCopyStatus("텍스트를 선택하거나 파일로 내보내세요."); }}>초안 복사</button><Link className={RESOURCE_BUTTON} to="/studio/new">Studio에서 새 작업</Link></div><p className="text-xs text-fg-2">Studio에는 자료가 자동 삽입되지 않습니다. 내보낸 초안을 참고해 새 작업을 시작하세요.</p></>}
       <p role="status" className="text-sm text-fg-2">{copyStatus}</p>
     </section>
     <p className="text-xs leading-6 text-fg-2">신규 외부 API 사용료와 생성형 모델 비용은 없습니다. 기존 호스팅·도메인·전송량의 비용과 무료 한도는 별도입니다. 호출 한도 초과 시 자동 업그레이드·유료 대체·우회 호출을 하지 않습니다.</p>

@@ -37,6 +37,13 @@ const assets = expected.map(decision => {
 });
 for (const kind of ['model', 'surface-texture', 'background', 'prop-image']) assert(assets.some(asset => asset.kind === kind), `Missing actual ${kind} delivery`);
 for (const decision of decisions.assets.filter(row => row.decision === 'exclude')) assert(!byId.has(decision.id), `Excluded candidate was published: ${decision.id}`);
+for (const decision of decisions.assets.filter(row => row.decision === 'component')) {
+  const asset = byId.get(decision.id);
+  assert(asset, `Reviewed assembly component missing: ${decision.id}`);
+  assert.equal(asset.sha256, decision.sha256);
+  assert.equal(asset.role, 'assembly-component');
+  assert.equal(asset.visualReviewSource, decision.evidence);
+}
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 let totalBytes = 0;
 for (const asset of assets) {

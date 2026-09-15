@@ -98,7 +98,7 @@ describe("versioned collaborative material brushes", () => {
     const programs = extensions.brushEnginePrograms as { version: number; material: { version: number; tuning: Record<string, number> }; unsupported?: string };
     if (kind === "missing") delete extensions.brushEnginePrograms;
     if (kind === "future-program") programs.version = 2;
-    if (kind === "future-material") programs.material.version = 2;
+    if (kind === "future-material") programs.material.version = 3;
     if (kind === "out-of-range") programs.material.tuning.size = 1_000_000;
     if (kind === "missing-tuning") delete programs.material.tuning.flow;
     if (kind === "unknown-field") programs.unsupported = "future-renderer";
@@ -115,7 +115,7 @@ describe("versioned collaborative material brushes", () => {
   it("rejects invalid program data before encoding can silently substitute a generic brush", () => {
     const source = materialStroke();
     const invalid = JSON.parse(JSON.stringify(source)) as StudioCrdtCompatibleDrawElement;
-    Object.assign(invalid.brushEnginePrograms!.material!, { version: 2 });
+    Object.assign(invalid.brushEnginePrograms!.material!, { version: 3 });
     expect(() => studioDrawElementToCrdtStroke("page-a", invalid)).toThrow(/엔진 프로그램/);
   });
 });

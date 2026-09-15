@@ -10,6 +10,13 @@ import { verifyVercelCspContract } from "./verify-vercel-csp.mjs";
 
 const ROOT = new URL("../", import.meta.url);
 
+function rootCspHeader(vercelConfig) {
+  const root = vercelConfig.headers?.find(({ source }) => source === "/(.*)");
+  const header = root?.headers?.find(({ key }) => key === "Content-Security-Policy");
+  if (!header) throw new Error("Vercel root Content-Security-Policy is missing.");
+  return header;
+}
+
 function fixture() {
   return {
     html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
@@ -250,9 +257,7 @@ describe("Vercel CSP build contract", () => {
     })).toThrow("Executable inline script");
 
     const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
-    const cspHeader = broadened.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "connect-src 'self'",
       "connect-src 'self' https:",
@@ -315,9 +320,7 @@ describe("Vercel CSP build contract", () => {
     const content = '{"name":"<!-- literal data -->"}';
     const script = `<script type="application/ld+json">${content}</script>`;
     expect(JSDOM.fragment(script).querySelector("script").textContent).toBe(content);
-    const cspHeader = current.vercelConfig.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const cspHeader = rootCspHeader(current.vercelConfig);
     const hash = createHash("sha256").update(content).digest("base64");
     cspHeader.value = cspHeader.value.replace("script-src ", `script-src 'sha256-${hash}' `);
     expect(verifyVercelCspContract({
@@ -337,9 +340,7 @@ describe("Vercel CSP build contract", () => {
   ]))("requires each complete realtime origin token and rejects %s", (replacement) => {
     const current = fixture();
     const scheme = new URL(replacement).protocol;
-    const cspHeader = current.vercelConfig.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const cspHeader = rootCspHeader(current.vercelConfig);
     cspHeader.value = cspHeader.value.replace(
       `${scheme}//realtime.toonstudio.cloud`,
       replacement,
@@ -354,9 +355,7 @@ describe("Vercel CSP build contract", () => {
       "connect-src 'self' blob: blob:",
     ]) {
       const changed = JSON.parse(JSON.stringify(current.vercelConfig));
-      const cspHeader = changed.headers[0].headers.find(
-        (header) => header.key === "Content-Security-Policy",
-      );
+      const cspHeader = rootCspHeader(changed);
       cspHeader.value = cspHeader.value.replace(
         "connect-src 'self' blob:",
         replacement,
@@ -374,9 +373,7 @@ describe("Vercel CSP build contract", () => {
     expect(() => verifyVercelCspContract(current)).not.toThrow();
 
     const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
-    const cspHeader = broadened.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "'wasm-unsafe-eval'",
       "'wasm-unsafe-eval' 'unsafe-eval'",
@@ -460,9 +457,7 @@ describe("Vercel CSP build contract", () => {
       (value) => value.replace("worker-src 'self' blob:;", "worker-src 'self' blob: data:;"),
     ]) {
       const changed = JSON.parse(JSON.stringify(current.vercelConfig));
-      const cspHeader = changed.headers[0].headers.find(
-        (header) => header.key === "Content-Security-Policy",
-      );
+      const cspHeader = rootCspHeader(changed);
       cspHeader.value = mutate(cspHeader.value);
       expect(() => verifyVercelCspContract({
         html: current.html,
@@ -475,9 +470,7 @@ describe("Vercel CSP build contract", () => {
   it("rejects a wildcard or a second Supabase tenant origin", () => {
     const current = fixture();
     const broadened = JSON.parse(JSON.stringify(current.vercelConfig));
-    const cspHeader = broadened.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const cspHeader = rootCspHeader(broadened);
     cspHeader.value = cspHeader.value.replace(
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
       "https://*.supabase.co",
@@ -489,9 +482,7 @@ describe("Vercel CSP build contract", () => {
     })).toThrow("exact production Supabase origin");
 
     const secondTenant = JSON.parse(JSON.stringify(current.vercelConfig));
-    const secondCsp = secondTenant.headers[0].headers.find(
-      (header) => header.key === "Content-Security-Policy",
-    );
+    const secondCsp = rootCspHeader(secondTenant);
     secondCsp.value = secondCsp.value.replace(
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
       "https://ybsgfhofuvkhywbpytnl.supabase.co https://attacker.supabase.co",

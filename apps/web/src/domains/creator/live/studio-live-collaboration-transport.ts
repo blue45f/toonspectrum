@@ -30,6 +30,8 @@ import type {
 import type { StudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
 
 import type { StudioLiveDirectPort } from "./studio-live-direct-port";
+import type { StudioPeerBulkExchangePort } from "./studio-peer-bulk-exchange";
+import type { StudioPeerFabricPort } from "./studio-peer-fabric";
 
 export type StudioLiveTransportMode = "local" | "server";
 
@@ -79,6 +81,10 @@ export type StudioLiveTransportControlEvent =
 export interface StudioLiveTransport {
   /** Strict RTC-only messages. Absence never grants permission to relay. */
   readonly direct?: StudioLiveDirectPort;
+  /** Capability-scoped RTC-only feature lanes. Never imply durable server acknowledgement. */
+  readonly peerFabric?: StudioPeerFabricPort;
+  /** Routed bulk transfer over the same RTC fabric; never a durable storage receipt. */
+  readonly peerBulk?: StudioPeerBulkExchangePort;
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
   /**

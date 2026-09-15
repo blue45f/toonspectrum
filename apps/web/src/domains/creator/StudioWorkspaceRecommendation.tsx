@@ -27,7 +27,7 @@ export function StudioWorkspaceRecommendation({
       data-workspace-recommendation={recommendation.id}
       className="rounded-xl border border-accent/35 bg-accent-soft/25 p-3"
     >
-      <div className="mb-2 flex items-center gap-1.5 text-[0.65rem] font-bold text-accent">
+      <div className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-bold text-accent">
         <span className="rounded-full bg-accent px-2 py-0.5 text-on-accent">처음이라면 추천</span>
         <span>언제든 다른 작업공간으로 바꿀 수 있어요</span>
       </div>

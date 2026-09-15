@@ -60,6 +60,9 @@ export const useApp = (create<AppState>()(
       setSessionIdentity: (userId, sessionToken) =>
         set((state) => {
           if (state.userId === userId && state.sessionToken === sessionToken) return state;
+          if (state.userId !== userId && typeof globalThis.dispatchEvent === "function") {
+            globalThis.dispatchEvent(new Event("toonspectrum:session-ended"));
+          }
           const claimedLibraryOwner = state.libraryOwnerId ?? state.libraryMergeOwnerId;
           const ownerChanged =
             (state.userId !== null && state.userId !== userId) ||

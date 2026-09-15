@@ -1,24 +1,35 @@
+import { promoGutterCuts } from "./promo-split";
 import { loadPromoImages } from "./promo-canvas";
 import { readPromoFile } from "./promo-media";
 import { promoDataUrl, type PromoPanel } from "./promo-model";
 
 /** Split before downscaling, so long manuscripts do not lose their text resolution. */
-export async function importPromoPanels(file: File, index: number, parts = 1, signal?: AbortSignal): Promise<PromoPanel[]> {
+export async function importPromoPanels(file: File, index: number, parts: number | "auto" = 1, signal?: AbortSignal): Promise<PromoPanel[]> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 10_000_000 || file.size === 0) throw new Error("컷은 10MB 이하 PNG·JPEG·WebP 파일이어야 해요.");
-  if (!Number.isInteger(parts) || parts < 1 || parts > 12) throw new Error("원고 분할 수가 올바르지 않아요.");
+  if (parts !== "auto" && (!Number.isInteger(parts) || parts < 1 || parts > 12)) throw new Error("원고 분할 수가 올바르지 않아요.");
   const src = await readPromoFile(file, signal);
   const original: PromoPanel = { id: crypto.randomUUID(), src, description: "", caption: "", motion: "push-in", fit: "contain", weight: 1 };
   const images = await loadPromoImages({ panels: [original] }, signal);
   const image = images.get(original.id);
   if (!image) throw new Error("이미지를 읽지 못했어요.");
-  if (parts > 1 && image.naturalHeight / parts < 32) throw new Error("분할할 이미지의 높이가 너무 작아요.");
+  if (parts !== "auto" && parts > 1 && image.naturalHeight / parts < 32) throw new Error("분할할 이미지의 높이가 너무 작아요.");
   const canvas = document.createElement("canvas");
   const panels: PromoPanel[] = [];
   try {
-    for (let part = 0; part < parts; part += 1) {
+    let cuts: number[];
+    if (parts === "auto") {
+      canvas.width = Math.min(192, image.naturalWidth);
+      canvas.height = Math.min(8192, Math.max(1, Math.round(image.naturalHeight * canvas.width / image.naturalWidth)));
+      const analysis = canvas.getContext("2d", { willReadFrequently: true });
+      if (!analysis) throw new Error("이 브라우저에서 여백 분석을 지원하지 않아요.");
+      analysis.drawImage(image, 0, 0, canvas.width, canvas.height);
+      cuts = promoGutterCuts(analysis.getImageData(0, 0, canvas.width, canvas.height), image.naturalHeight, 12 - index);
+    } else cuts = Array.from({ length: parts + 1 }, (_, part) => Math.floor(image.naturalHeight * part / parts));
+    if (index + cuts.length - 1 > 12) throw new Error("최대 12컷까지 추가할 수 있어요. 원본은 변경하지 않았어요.");
+    for (let part = 0; part < cuts.length - 1; part += 1) {
       if (signal?.aborted) throw new DOMException("취소했어요.", "AbortError");
-      const top = Math.floor(image.naturalHeight * part / parts);
-      const cropHeight = Math.floor(image.naturalHeight * (part + 1) / parts) - top;
+      const top = cuts[part]!;
+      const cropHeight = cuts[part + 1]! - top;
       const scale = Math.min(1, 2048 / Math.max(image.naturalWidth, cropHeight));
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
       canvas.height = Math.max(1, Math.round(cropHeight * scale));

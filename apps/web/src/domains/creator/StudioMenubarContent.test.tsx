@@ -3,7 +3,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_MAIN_MENU_PRESENTATION_ORDER } from "./studio-main-menu-presentation";
+import {
+  STUDIO_MAIN_MENU_ACTION_ORDER,
+  STUDIO_MAIN_MENU_PRESENTATION_ORDER,
+} from "./studio-main-menu-presentation";
 import {
   StudioMenubarContent,
   resolveStudioMenubarLaneOverflow,
@@ -30,8 +33,20 @@ vi.mock("./studio-page-lazy-ui", () => ({
       <button type="button" onClick={onCopyToClipboard}>내보내기 복사</button>
     </div>
   ),
-  StudioMainMenu: ({ groups }: { groups: readonly { id: string; label: string; }[] }) => (
-    <nav aria-label="데스크톱 앱 메뉴" data-studio-main-menu="true">
+  StudioMainMenu: ({
+    groups,
+    ariaLabel,
+    surface = "primary",
+  }: {
+    groups: readonly { id: string; label: string; }[];
+    ariaLabel?: string;
+    surface?: "primary" | "action";
+  }) => (
+    <nav
+      aria-label={ariaLabel ?? "데스크톱 앱 메뉴"}
+      data-studio-main-menu={surface === "primary" ? "true" : undefined}
+      data-studio-main-menu-action={surface === "action" ? "true" : undefined}
+    >
       {groups.map((group) => (
         <button
           key={group.id}
@@ -54,11 +69,9 @@ const MENU_GROUP_IDS = [
   "vector", "text", "comic", "animation", "3d", "collaboration", "window", "ai", "help",
 ] as const;
 
-/**
- * The ten workflow titles (IA audit 2026-09-05): related catalogue groups fold into
- * task-oriented menus, AI remains visible, and Help is pinned last.
- */
+/** Eight primary workflow titles plus a detached AI action menu. */
 const PRESENTED_MENU_GROUP_IDS = [...STUDIO_MAIN_MENU_PRESENTATION_ORDER] as const;
+const PRESENTED_ACTION_GROUP_IDS = [...STUDIO_MAIN_MENU_ACTION_ORDER] as const;
 
 function createMenuGroups(): StudioMenubarContentProps["studioMainMenuGroups"] {
   return MENU_GROUP_IDS.map((id) => ({ id, label: id.toUpperCase(), items: [] }));
@@ -168,16 +181,26 @@ describe("resolveStudioMenubarLaneOverflow", () => {
 });
 
 describe("StudioMenubarContent menu presentation", () => {
-  it("presents the ten-title workflow menubar with AI visible and Help last", () => {
+  it("presents eight primary workflow titles and a detached AI action menu", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
 
+    const primary = container.querySelector<HTMLElement>(
+      '[data-studio-main-menu="true"]',
+    );
+    const action = container.querySelector<HTMLElement>(
+      '[data-studio-main-menu-action="true"]',
+    );
     expect(
-      [
-        ...container.querySelectorAll<HTMLElement>("[data-studio-main-menu-trigger]"),
-      ].map((trigger) => trigger.dataset.studioMainMenuTrigger)
+      [...(primary?.querySelectorAll<HTMLElement>("[data-studio-main-menu-trigger]") ?? [])]
+        .map((trigger) => trigger.dataset.studioMainMenuTrigger),
     ).toEqual(PRESENTED_MENU_GROUP_IDS);
+    expect(
+      [...(action?.querySelectorAll<HTMLElement>("[data-studio-main-menu-trigger]") ?? [])]
+        .map((trigger) => trigger.dataset.studioMainMenuTrigger),
+    ).toEqual(PRESENTED_ACTION_GROUP_IDS);
+    expect(action?.textContent).toContain("AI Assist");
   });
 
   it("keeps the lane observer subscribed when unrelated props rerender with the same menu catalogue", () => {
@@ -701,7 +724,8 @@ describe("StudioMenubarContent", () => {
     );
     // 마지막 트리거가 레인의 오른쪽 경계를 걸치도록 레인 폭을 트리거 수에서 잡는다 — 제시되는
     // 메뉴 제목 수가 바뀌어도(IA 개편) 이 테스트가 고정 인덱스 때문에 깨지지 않게.
-    const triggerCount = container.querySelectorAll("[data-studio-main-menu-trigger]").length;
+    const triggerCount = container.querySelector("[data-studio-menubar-primary=\"true\"]")
+      ?.querySelectorAll("[data-studio-main-menu-trigger]").length ?? 0;
     const { triggers } = stubMenubarGeometry(container, {
       laneWidth: (triggerCount - 1) * 50 + 45,
       triggerPitch: 50,
@@ -1053,5 +1077,32 @@ describe("StudioMenubarContent", () => {
         expect(control.getAttribute("title")).toBeNull();
       }
     }
+  });
+});
+
+
+describe("PSD original-quality import controls", () => {
+  afterEach(cleanup);
+  it("keeps cancellation available even if document editing permission changes", () => {
+    const stableHandlers = createHandlers();
+    render(<StudioMenubarContent {...createProps({
+      projectActionsOpen: true, psdImportBusy: true,
+      collaborationDocumentLocked: true, stableHandlers,
+    })} />);
+    const cancel = screen.getAllByRole("button", { name: "PSD 검사 취소" })[0];
+    expect(cancel).toHaveProperty("disabled", false);
+    fireEvent.click(cancel);
+    expect(stableHandlers.cancelInterchangeImport).toHaveBeenCalledOnce();
+  });
+  it("announces original-quality progress in a wrapping status region", () => {
+    const text = "원본 화질로 레이어 준비 중 · 4 / 100";
+    render(<StudioMenubarContent {...createProps({
+      projectActionsOpen: true, psdImportBusy: true,
+      psdImportStatus: { tone: "warn", text },
+    })} />);
+    const status = screen.getByText(text);
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.className).not.toContain("whitespace-nowrap");
+    expect(status.className).not.toContain("text-[10px]");
   });
 });

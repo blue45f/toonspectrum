@@ -23,14 +23,17 @@ export async function openStudioMarketplaceCatalog(
   }
   if (resolution.target.kind === "3d-asset-catalog") {
     const { prepareStudioMarketplaceCc0ModelScene } = await import("./studio-marketplace-cc0-model");
-    const prepared = await prepareStudioMarketplaceCc0ModelScene(resolution.target.runtimeRef, actions.isCurrent);
+    const scene = await prepareStudioMarketplaceCc0ModelScene(
+      resolution.target.runtimeRef,
+      { isCurrent: () => actions.isCurrent() && actions.canMutate() },
+    );
     if (!actions.isCurrent() || !actions.canMutate()) {
-      await prepared.cancel();
       return { status: "unsupported", message: "작업 대상이 바뀌어 3D 에셋 열기를 취소했습니다." };
     }
     actions.openBackground3d();
-    actions.setInitialScene(prepared.scene);
-    return { status: "opened", message: `${prepared.name} 모델을 3D 편집기에 불러왔어요. 렌더링을 확인하고 컷에 삽입하세요.` };
+    actions.setInitialScene(scene);
+    const modelName = scene.nodes.find((node) => node.kind === "model")?.name ?? "선택한";
+    return { status: "opened", message: `${modelName} 모델을 3D 편집기에 불러왔어요. 렌더링을 확인하고 컷에 삽입하세요.` };
   }
   actions.openBackground3d();
   return { status: "opened", message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요." };

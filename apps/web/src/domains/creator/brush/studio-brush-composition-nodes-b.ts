@@ -18,7 +18,7 @@ export const STUDIO_BRUSH_COMPOSITION_NODES_B: readonly StudioBrushCompositionNo
     node({ id: "spectral-wgsl", slot: "pigment", label: "Spectral.js WGSL", provider: "Spectral.js", description: "스펙트럼 반사율 기반 안료 혼합", integration: "adapter-ready", rights: "permissive", cost: "balanced" }),
     node({ id: "open-km-wgsl", slot: "pigment", label: "open-km K/S", provider: "open-km", description: "측정 K/S·두께·바탕을 반영하는 KM solver", integration: "lab", rights: "permissive", cost: "intensive" }),
     node({ id: "pigment-painter-lut", slot: "pigment", label: "Pigment LUT", provider: "pigment-painter", description: "WASM 최적화 LUT와 빠른 반복 혼합", integration: "lab", rights: "copyleft", cost: "balanced" }),
-    node({ id: "mixbox-lut", slot: "pigment", label: "Mixbox LUT", provider: "Mixbox", description: "대체 불가능성 검증용 latent 안료 혼합", integration: "lab", rights: "private-grant", cost: "balanced" }),
+    node({ id: "mixbox-lut", slot: "pigment", label: "Mixbox LUT", provider: "Mixbox 2.0.0", description: "비상업 프로필에서 실제 latent 안료 팔레트를 생성하는 Mixbox 경로", integration: "adapter-ready", rights: "noncommercial", cost: "balanced" }),
     node({ id: "inkwash-optical-density", slot: "pigment", label: "Inkwash 광학 밀도", provider: "Inkwash", description: "리빙 잉크의 이동·고정 색소 표시 모델", integration: "adapter-ready", rights: "private-grant", cost: "balanced" }),
     node({ id: "rainbow-arc-length", slot: "pigment", label: "거리 기반 레인보우", provider: "ToonStudio WebGPU", description: "획 진행 거리에 고정된 색상 순환", integration: "connected", rights: "permissive", cost: "light" }),
     node({ id: "no-pickup", slot: "pickup", label: "픽업 없음", provider: "ToonStudio", description: "아래색을 읽지 않는 순수 도포", integration: "connected", rights: "permissive", cost: "light" }),

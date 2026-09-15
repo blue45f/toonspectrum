@@ -24,7 +24,7 @@
 import { CheckCircle2, Eye, EyeOff, ExternalLink, Images } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { StudioAiSettingsPanel } from "./ai/StudioAiSettingsPanel";
+import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
 import {
   discardLegacyStudioStockImageAccessKey,
   isStudioStockImageConfigured,
@@ -55,7 +55,7 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
   }
 }
 
-export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange }: StudioIntegrationsSettingsPanelProps) {
+export function StudioIntegrationsSettingsPanel(_legacyProps: StudioIntegrationsSettingsPanelProps) {
   const [accessKey, setAccessKey] = useState(() =>
     loadStudioStockImageAccessKey(browserStorage("sessionStorage")),
   );
@@ -74,11 +74,11 @@ export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[0.63rem] leading-relaxed text-fg-3">
-        API 키가 필요한 기능을 한 곳에서 관리해요. AI 키와 Unsplash 키는 현재 탭 세션에만
-        저장되며 어느 키도 이 앱 서버로 전송하지 않아요.
+        AI 연결은 통합 설정에서 메모리 전용 또는 암호화 보관함으로 관리해요. 텍스트·이미지·개인
+        추론은 직접 연결하며, Hyper3D/Rodin 키만 작업 중 일시 전달되고 서버 저장·로그 대상에서 제외돼요.
       </p>
 
-      <StudioAiSettingsPanel settings={aiSettings} onChange={onAiSettingsChange} />
+      <UnifiedAiSettings />
 
       <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
         <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
