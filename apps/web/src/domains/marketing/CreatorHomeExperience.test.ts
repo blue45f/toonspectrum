@@ -25,7 +25,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('data-creator-home="studio-first"');
     expect(source).toContain("<ProductIntentStart />");
     expect(source).toContain('href="/studio/new"');
-    expect(source).toContain('href="/studio"');
+    expect(source).toContain('href="/studio/projects"');
     expect(source).toContain('href: "/discover"');
     expect(source).toContain('href: "/learn"');
     expect(source).toContain('href: "/community"');

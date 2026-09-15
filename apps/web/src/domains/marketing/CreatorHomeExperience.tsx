@@ -92,7 +92,7 @@ const COPY = {
         tag: "CREATE",
         title: "그리고 구성하세요.",
         body: "브러시, 컷, 말풍선과 소재는 필요한 순간에만 나타납니다.",
-        href: "/studio",
+        href: "/studio/projects",
         action: "내 작업 열기",
       },
       {
@@ -145,7 +145,7 @@ const COPY = {
     flowBody: "You do not need to learn a feature map before making your first scene.",
     flow: [
       { tag: "CHOOSE", title: "Choose an outcome.", body: "Pick a webtoon, four-panel comic or illustration and the recommended document is prepared.", href: "/studio/new", action: "Create new work" },
-      { tag: "CREATE", title: "Draw and compose.", body: "Brushes, panels, dialogue and materials appear only when you need them.", href: "/studio", action: "Open My work" },
+      { tag: "CREATE", title: "Draw and compose.", body: "Brushes, panels, dialogue and materials appear only when you need them.", href: "/studio/projects", action: "Open My work" },
       { tag: "FINISH", title: "Preview and export.", body: "Check mobile reading flow and platform requirements before creating files.", href: "/help", action: "Learn about export" },
     ],
     supportEyebrow: "WHEN YOU NEED THE NEXT STEP",
@@ -195,7 +195,7 @@ export function CreatorHomeExperience() {
               <Link href="/studio/new" className="cf-button cf-primary">
                 {copy.create}<ArrowRight size={19} aria-hidden="true" />
               </Link>
-              <Link href="/studio" className="cf-button cf-secondary">{copy.continue}</Link>
+              <Link href="/studio/projects" className="cf-button cf-secondary">{copy.continue}</Link>
             </div>
             <div className="cf-trust">
               {copy.trust.map((item) => <span key={item}><Check size={13} aria-hidden="true" />{item}</span>)}
@@ -302,7 +302,7 @@ export function CreatorHomeExperience() {
           <p>{copy.closingBody}</p>
           <div className="cf-actions">
             <Link href="/studio/new" className="cf-button cf-primary">{copy.create}<ArrowRight size={19} aria-hidden="true" /></Link>
-            <Link href="/studio" className="cf-button cf-secondary">{copy.continue}</Link>
+            <Link href="/studio/projects" className="cf-button cf-secondary">{copy.continue}</Link>
           </div>
         </section>
       </div>
