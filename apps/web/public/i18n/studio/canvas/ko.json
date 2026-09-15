@@ -44,7 +44,7 @@
   "studio.canvas.fit": "맞춤",
   "studio.canvas.canvasOnlyModeTitle": "` — 캔버스만 / 도구 토글",
   "studio.canvas.canvasOnlyModeTool": "도구",
-  "studio.canvas.canvasAriaLabel": "작업 캔버스 — 포커스 후 방향키로 스크롤",
+  "studio.canvas.canvasAriaLabel": "작업 캔버스 — 휠로 세로 이동, Shift+휠로 가로 이동, H·스페이스·휠 버튼 드래그 또는 방향키로 자유 이동",
   "studio.canvas.dropPlaceHint": "놓는 위치에 정확히 배치",
   "studio.canvas.copyBadge": "복사",
   "studio.canvas.openQuickStart": "도구 빠른 실행",

@@ -44,7 +44,7 @@
   "studio.canvas.fit": "Fit",
   "studio.canvas.canvasOnlyModeTitle": "` · Canvas only / tool",
   "studio.canvas.canvasOnlyModeTool": "tools",
-  "studio.canvas.canvasAriaLabel": "Canvas workspace — press arrow keys to scroll after focus",
+  "studio.canvas.canvasAriaLabel": "Canvas workspace — wheel vertically, Shift+wheel horizontally, or pan freely with H, Space-drag, wheel-button drag, and arrow keys",
   "studio.canvas.dropPlaceHint": "Place precisely at the drop position",
   "studio.canvas.copyBadge": "Copied",
   "studio.canvas.openQuickStart": "Open quick tool panel",
