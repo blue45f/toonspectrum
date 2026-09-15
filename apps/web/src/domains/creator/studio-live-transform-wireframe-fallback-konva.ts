@@ -130,6 +130,20 @@ export function createStudioLiveTransformWireframeFallback(
     return null;
   }
 
+  // A transform Layer ref can be between host generations (or be a deliberately small test host).
+  // Missing container/draw capabilities must degrade to the existing commit-at-release path rather
+  // than aborting the whole gesture while constructing an optional visual guide.
+  const layerCapabilities = options.dragLayer as Partial<
+    Pick<Konva.Layer, "add" | "findOne" | "drawScene">
+  >;
+  if (
+    typeof layerCapabilities.add !== "function"
+    || typeof layerCapabilities.findOne !== "function"
+    || typeof layerCapabilities.drawScene !== "function"
+  ) {
+    return null;
+  }
+
   const pointsPerMember = Math.max(
     2,
     Math.min(
