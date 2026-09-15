@@ -2,6 +2,11 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  exceedsThreadedCommentReplyDepth,
+  MAX_THREADED_COMMENT_REPLY_DEPTH,
+} from "../../common/threaded-comment-depth";
+
+import {
   creatorWorkCommentLikes,
   creatorWorkComments,
   creatorWorkLikes,
@@ -19,8 +24,6 @@ import {
 import { assertPublicCreatorWork } from "./works";
 
 import type { CreatorWorkComment } from "./works-contract";
-
-const MAX_COMMENT_DEPTH = 4;
 
 interface CommentProjection {
   id: string;
@@ -101,8 +104,8 @@ async function assertReplyParent(
   while (cursor) {
     if (visited.has(cursor)) throw new Error("댓글 연결 구조를 확인해 주세요.");
     visited.add(cursor);
-    if (visited.size >= MAX_COMMENT_DEPTH) {
-      throw new Error(`대댓글은 ${MAX_COMMENT_DEPTH}단계까지 작성할 수 있습니다.`);
+    if (exceedsThreadedCommentReplyDepth(visited.size)) {
+      throw new Error(`대댓글은 ${MAX_THREADED_COMMENT_REPLY_DEPTH}단계까지 작성할 수 있습니다.`);
     }
     const [parent] = await db
       .select({

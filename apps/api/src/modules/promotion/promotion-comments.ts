@@ -1,6 +1,11 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  exceedsThreadedCommentReplyDepth,
+  MAX_THREADED_COMMENT_REPLY_DEPTH,
+} from "../../common/threaded-comment-depth";
+
+import {
   db,
   promotionCommentLikes,
   promotionComments,
@@ -14,7 +19,6 @@ import {
 } from "../../../../../packages/core/src/promotion";
 
 const MAX_COMMENT_LENGTH = 1000;
-const MAX_COMMENT_DEPTH = 4;
 
 function parseCommentParentId(value: unknown): string | null {
   if (value == null || value === "") return null;
@@ -93,8 +97,8 @@ async function assertReplyParent(
   while (cursor) {
     if (visited.has(cursor)) throw new Error("댓글 연결 구조를 확인해 주세요.");
     visited.add(cursor);
-    if (visited.size >= MAX_COMMENT_DEPTH) {
-      throw new Error(`대댓글은 ${MAX_COMMENT_DEPTH}단계까지 작성할 수 있어요.`);
+    if (exceedsThreadedCommentReplyDepth(visited.size)) {
+      throw new Error(`대댓글은 ${MAX_THREADED_COMMENT_REPLY_DEPTH}단계까지 작성할 수 있어요.`);
     }
     const [parent] = await db
       .select({
