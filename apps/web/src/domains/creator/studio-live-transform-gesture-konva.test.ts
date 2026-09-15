@@ -13,6 +13,7 @@ import {
   studioKonvaDrawTransformIsBusy,
 } from "./studio-live-transform-gesture-konva";
 import { attachStudioLiveTransformSurface } from "./studio-live-transform-surface";
+import { STUDIO_LIVE_TRANSFORM_WIREFRAME_FALLBACK_NAME } from "./studio-live-transform-wireframe-fallback-konva";
 import { STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR } from "./studio-selection-chrome-mirror";
 
 import type { DrawEl } from "./studio-element-model";
@@ -163,6 +164,10 @@ function createGesture(
   return { gesture, store, clock };
 }
 
+function fallbackRoot(): Konva.Node | null {
+  return scene.stage.findOne(`.${STUDIO_LIVE_TRANSFORM_WIREFRAME_FALLBACK_NAME}`) ?? null;
+}
+
 function beginGesture(
   existingStore = createStudioLiveTransformDraftStore(),
   element: DrawEl = sourceElement,
@@ -241,7 +246,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(recoveryQueue).toHaveLength(0);
   });
 
-  it("rejects unbounded source arrays before compiler traversal and bounded stylus orientation", () => {
+  it("bounds hostile arrays and routes stylus-oriented ink to the guide", () => {
     const unboundedPoints = new Proxy(new Array<number>(200_000), {
       get: (target, property, receiver) => {
         if (property !== "length") throw new Error(`sample access: ${String(property)}`);
@@ -269,12 +274,28 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
       sampleSpacing: 1,
       points: unboundedPoints,
     })).toBeNull();
-    expect(begin({
+
+    const oriented: DrawEl = {
       ...sourceElement,
       brush: "calligraphy",
       sampleSpacing: 1,
       twists: [30, 30],
-    })).toBeNull();
+    };
+    const { gesture, store, clock } = createGesture(
+      createStudioLiveTransformDraftStore(),
+      oriented,
+    );
+    expect(gesture).not.toBeNull();
+    gesture!.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+    expect(store.getSnapshot()).toBeNull();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    expect(scene.wrapper.opacity()).toBeLessThan(1);
+    gesture!.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrapper.opacity()).toBe(1);
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
   });
 
@@ -452,9 +473,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     gesture.close({ kind: "cancel", reason: "escape" });
   });
 
-  it("keeps a frame release-only when clearing the Layer SceneCanvas exceeds the backing cap", () => {
-    // The object-local transformed AABB is under 0.5M pixels at this scale. The isolated Layer's
-    // 720x1020 Retina-3 SceneCanvas is 6.6M backing pixels, so only the full-clear charge rejects.
+  it("uses the bounded guide when the exact Layer backing store exceeds the cap", () => {
     const sceneCanvas = scene.dragLayer.getCanvas();
     const nativeSceneCanvas = scene.dragLayer.getNativeCanvasElement();
     sceneCanvas.setPixelRatio(3);
@@ -477,8 +496,6 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     const sourceDrawScene = vi.spyOn(scene.mainLayer, "drawScene");
     const sourceBatchDraw = vi.spyOn(scene.mainLayer, "batchDraw");
 
-    // Real Transformer events mutate the proxy before the preview scheduler sees the frame. The
-    // chrome-only claim ensures those writes invalidate only the drag Layer.
     scene.proxy.setAttrs({ x: 30, y: 40, width: 200, height: 75, rotation: 15 });
     gesture.offer({
       targetBounds: { x: 30, y: 40, width: 200, height: 75 },
@@ -489,10 +506,13 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(store.getSnapshot()).toBeNull();
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.visible()).toBe(true);
+    expect(scene.wrapper.opacity()).toBeLessThan(1);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
-    expect(sourceDrawScene).not.toHaveBeenCalled();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    expect(sourceDrawScene).toHaveBeenCalledTimes(1);
     expect(sourceBatchDraw).not.toHaveBeenCalled();
     gesture.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrapper.opacity()).toBe(1);
     expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
     expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
   });
@@ -526,7 +546,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
 
     sourceDrawScene.mockClear();
     sourceBatchDraw.mockClear();
-    // Once release-only, later handle mutations are chrome-only and cannot repaint the source.
+    // Once degraded, later handle mutations stay on the guide Layer and do not repaint source.
     scene.proxy.setAttrs({ x: 50, y: 60, width: 240, height: 120, rotation: 25 });
     gesture.offer({
       targetBounds: { x: 50, y: 60, width: 240, height: 120 },
@@ -578,9 +598,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     gesture.close({ kind: "cancel", reason: "escape" });
   });
 
-  it("isolates chrome while a z-order-rejected source remains release-only in its document Layer", () => {
-    // An authored node above the stroke refuses isolated lifting. Even a retained attr write would
-    // invalidate the full main SceneCanvas, whose sibling renderer cost is unbounded by admission.
+  it("keeps z-order-rejected ink moving without lifting its authored source", () => {
     scene.mainLayer.add(new studioKonvaRuntime.Rect({ width: 10, height: 10, fill: "#fff" }));
     const { gesture, store, clock } = beginGesture();
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
@@ -599,11 +617,14 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
     expect(scene.wrapper.rotation()).toBe(0);
+    expect(scene.wrapper.opacity()).toBeLessThan(1);
     expect(store.getSnapshot()).toBeNull();
-    expect(sourceDrawScene).not.toHaveBeenCalled();
+    expect(fallbackRoot()?.visible()).toBe(true);
+    expect(sourceDrawScene).toHaveBeenCalledTimes(1);
     expect(sourceBatchDraw).not.toHaveBeenCalled();
 
     gesture.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrapper.opacity()).toBe(1);
     expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
     expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR)).toBeUndefined();
@@ -891,7 +912,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(scene.wrapper.visible()).toBe(true);
   });
 
-  it("keeps an over-budget 3,200-sample calligraphy frame out of the main-thread exact lane", () => {
+  it("keeps a 3,200-sample calligraphy transform live outside the exact lane", () => {
     const points = Array.from({ length: 3_200 }, (_, index) => [
       (index % 100),
       (index % 2) * 40,
@@ -902,34 +923,53 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
       sampleSpacing: 1,
       points,
     };
-    const { gesture, store } = createGesture(
+    const { gesture, store, clock } = createGesture(
       createStudioLiveTransformDraftStore(),
       longCalligraphy,
     );
 
-    expect(gesture).toBeNull();
+    expect(gesture).not.toBeNull();
+    gesture!.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+      rotationDeg: 15,
+    });
+    clock.flush();
     expect(store.getSnapshot()).toBeNull();
     expect(scene.wrapper.visible()).toBe(true);
+    expect(scene.wrapper.opacity()).toBeLessThan(1);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
+    expect(fallbackRoot()?.visible()).toBe(true);
+    gesture!.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrapper.opacity()).toBe(1);
   });
 
-  it("keeps an over-budget retained-affine frame out of point and panel scans", () => {
+  it("samples a 100k-point import without entering point or panel scans", () => {
     const points = Array.from({ length: 100_000 }, () => [10, 20]).flat();
     const importedGeneric: DrawEl = {
       ...sourceElement,
       points,
     };
-    const { gesture, store } = createGesture(
+    const compiler = vi.spyOn(drawCompiler, "compileStudioLiveTransformDrawSnapshot");
+    const { gesture, store, clock } = createGesture(
       createStudioLiveTransformDraftStore(),
       importedGeneric,
     );
 
-    // The O(1) begin preflight now rejects before compiler cloning/path measurement, rather than
-    // waiting for a uniform retained frame to reach the per-frame admission gate.
-    expect(gesture).toBeNull();
+    expect(gesture).not.toBeNull();
+    expect(compiler).not.toHaveBeenCalled();
+    gesture!.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+    expect(compiler).not.toHaveBeenCalled();
     expect(store.getSnapshot()).toBeNull();
     expect(scene.wrapper.visible()).toBe(true);
+    expect(scene.wrapper.opacity()).toBeLessThan(1);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
+    expect(fallbackRoot()?.visible()).toBe(true);
+    gesture!.close({ kind: "cancel", reason: "escape" });
+    expect(scene.wrapper.opacity()).toBe(1);
   });
 });
 

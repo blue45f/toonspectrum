@@ -32,6 +32,7 @@ import {
   studioLiveTransformPreviewHasCachedDuplicate,
 } from "./studio-live-transform-preview-konva";
 import { createStudioLiveTransformPreviewSession } from "./studio-live-transform-preview-session";
+import { createStudioLiveTransformWireframeFallback } from "./studio-live-transform-wireframe-fallback-konva";
 import {
   STUDIO_DRAW_SELECTION_INDICATOR_NAME,
   STUDIO_GROUP_SELECTION_OVERLAY_NAME,
@@ -222,29 +223,196 @@ function studioLiveTransformRasterMetrics(
 }
 
 /**
- * Claims one eligible stroke and returns the common transient adapter, or `null` for an honest
- * commit-at-release fallback (missing/cached/duplicate/symmetry-blocked renderer node).
+ * Starts the bounded centre-line lane without compiling or cloning the authored stroke.
+ *
+ * Imported strokes can contain tens of thousands of samples, and cached/brush-specific renderers
+ * may not be safe to move into an isolated Layer. This path samples by stable source index once,
+ * keeps the authored wrapper in its original composition, and applies only one root matrix per
+ * animation frame. It therefore gives those strokes continuous feedback without weakening the
+ * exact-draft main-thread budgets or moving document/history work into pointer events.
+ */
+function beginStudioKonvaDrawWireframeFallbackGesture(
+  options: BeginStudioKonvaDrawTransformGestureOptions,
+  node: Konva.Node,
+): StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame> | null {
+  const { element, dragLayer } = options.preview;
+  const mainLayer = node.getLayer();
+  if (!mainLayer || !dragLayer || mainLayer === dragLayer) return null;
+
+  let parkedIndicators: Konva.Node[] = [];
+  let chromeLift: StudioSingleObjectDragLayerSession | null = null;
+  let fallbackPreview: ReturnType<typeof createStudioLiveTransformWireframeFallback> = null;
+  let previewSession: ReturnType<typeof createStudioLiveTransformPreviewSession> | null = null;
+  let closeState: "open" | "closing" | "closed" = "open";
+  let closeOutcome: Parameters<
+    StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame>["close"]
+  >[0] | null = null;
+
+  const cleanup = (
+    outcome: Parameters<
+      StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame>["close"]
+    >[0],
+  ): void => {
+    if (closeState === "closed") return;
+    if (closeState === "closing") {
+      throw new Error("Konva wireframe transform cleanup is already in progress");
+    }
+    closeOutcome ??= outcome;
+    closeState = "closing";
+    const criticalFailures: unknown[] = [];
+    const critical = (operation: () => void): void => {
+      try {
+        operation();
+      } catch (error) {
+        criticalFailures.push(error);
+      }
+    };
+
+    critical(() => previewSession?.dispose());
+    let fallbackRestored = fallbackPreview === null;
+    if (fallbackPreview) {
+      critical(() => {
+        fallbackPreview?.clear();
+        fallbackRestored = true;
+      });
+    }
+    critical(() => {
+      if (chromeLift && !chromeLift.restored && !restoreStudioSingleObjectDragLayer(chromeLift)) {
+        throw new Error("Failed to restore wireframe transform chrome Layer ownership");
+      }
+    });
+    critical(() => {
+      node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, undefined);
+    });
+    if (fallbackRestored) {
+      critical(() => {
+        fallbackPreview?.dispose();
+        fallbackPreview = null;
+      });
+    }
+    for (const indicator of parkedIndicators) {
+      try {
+        indicator.visible(true);
+      } catch {
+        // Selection chrome may already have been reconciled away.
+      }
+    }
+    try {
+      drainStudioLateParkedChrome(options.stage);
+    } catch {
+      // Cosmetic late chrome never owns renderer authority.
+    }
+    try {
+      mainLayer.drawScene();
+    } catch {
+      // The next authoritative document render will repaint cosmetic chrome.
+    }
+    if (criticalFailures.length > 0) {
+      closeState = "open";
+      throw new AggregateError(
+        criticalFailures,
+        "Failed to completely release a Konva wireframe transform renderer claim",
+      );
+    }
+    closeState = "closed";
+  };
+
+  try {
+    parkedIndicators = [
+      ...options.stage.find(`.${STUDIO_DRAW_SELECTION_INDICATOR_NAME}`),
+      ...options.stage.find(`.${STUDIO_GROUP_SELECTION_OVERLAY_NAME}`),
+    ].filter((indicator) => indicator.visible());
+    for (const indicator of parkedIndicators) indicator.visible(false);
+
+    const autoDrawEnabled = studioKonvaRuntime.autoDrawEnabled;
+    try {
+      studioKonvaRuntime.autoDrawEnabled = false;
+      node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    } finally {
+      studioKonvaRuntime.autoDrawEnabled = autoDrawEnabled;
+    }
+
+    chromeLift = beginStudioSingleDrawTransformChromeLayer({
+      elementId: element.id,
+      wrapper: node,
+      proxy: options.proxy,
+      transformer: options.transformer,
+      dragLayer,
+    });
+    if (!chromeLift) {
+      cleanup({ kind: "cancel", reason: "preview-error" });
+      return null;
+    }
+
+    fallbackPreview = dragLayer
+      ? createStudioLiveTransformWireframeFallback({
+          members: [{ element, node }],
+          sourceBounds: options.sourceBounds,
+          dragLayer,
+          strokeWidthPolicy: "scale",
+        })
+      : null;
+    if (!fallbackPreview) {
+      cleanup({ kind: "cancel", reason: "preview-error" });
+      return null;
+    }
+
+    previewSession = createStudioLiveTransformPreviewSession({
+      sourceBounds: options.sourceBounds,
+      renderRoute: {
+        retainedAffinePolicy: "model-draft-only",
+        strokeWidth: 0,
+        strokeDistance: 0,
+        pointCount: 0,
+      },
+      scheduler: options.preview.scheduler ?? browserFrameScheduler(),
+      adapter: {
+        apply: () => false,
+        applyExact: (frame) => fallbackPreview?.present({
+          targetBounds: frame.targetBounds,
+          rotationDeg: frame.rotationDeg,
+        }) ?? false,
+        neutralize: () => fallbackPreview?.clear(),
+      },
+      ...(options.onError !== undefined ? { onError: options.onError } : {}),
+      ...(options.onFatalError !== undefined
+        ? { onFatalError: options.onFatalError }
+        : {}),
+    });
+
+    return {
+      offer: (frame) => previewSession?.push(frame),
+      close: cleanup,
+      settle: () => true,
+    };
+  } catch (error) {
+    cleanup({ kind: "cancel", reason: "preview-error" });
+    throw error;
+  }
+}
+
+/**
+ * Claims one eligible stroke and returns the common transient adapter. Renderer-ineligible or
+ * compiler-over-budget strokes receive the bounded wireframe lane rather than no moving feedback.
  */
 export function beginStudioKonvaDrawTransformGesture(
   options: BeginStudioKonvaDrawTransformGestureOptions,
 ): StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame> | null {
   const { element, elements, dragLayer } = options.preview;
   const node = findStudioDrawWrapperNode(options.stage, element.id);
+  if (!node) return null;
+
+  // Reject unbounded source payloads before the exact compiler clones or traverses any sample
+  // array, but keep the transform itself live through the bounded sampler. The orientation
+  // predicate stays after this O(1) gate so a 100k-sample import never receives another full scan.
+  const compilation = admitStudioLiveTransformDrawCompilation(element, elements.length);
   if (
-    !node
+    !compilation.admitted
     || !studioLiveTransformPreviewEligible(node)
     || studioLiveTransformPreviewHasCachedDuplicate(options.stage, element.id, node)
-  ) {
-    return null;
-  }
-  // Reject unbounded source payloads before the compiler clones or traverses any sample array.
-  // The orientation predicate is intentionally after this gate: it scans at most 256 calligraphy
-  // samples here, never every calligraphy stroke during an unrelated Stage React render.
-  if (
-    !admitStudioLiveTransformDrawCompilation(element, elements.length).admitted
     || studioDrawHasEffectivePerSampleOrientation(element)
   ) {
-    return null;
+    return beginStudioKonvaDrawWireframeFallbackGesture(options, node);
   }
   const snapshot = compileStudioLiveTransformDrawSnapshot(element);
 
@@ -262,6 +430,8 @@ export function beginStudioKonvaDrawTransformGesture(
   let clipHost: StudioLiveTransformClipHost | null = null;
   let originalClip: StudioLiveTransformClipRect | null = null;
   let previewSession: ReturnType<typeof createStudioLiveTransformPreviewSession> | null = null;
+  let fallbackPreview: ReturnType<typeof createStudioLiveTransformWireframeFallback> = null;
+  let presentationMode: "precise" | "fallback" = "precise";
   let draftClaim: StudioLiveTransformDraftClaim | null = null;
   let terminalDraft: DrawEl | null = null;
   let handoffRegistered = false;
@@ -415,9 +585,9 @@ export function beginStudioKonvaDrawTransformGesture(
   /**
    * End only the source authority claim while leaving proxy/Transformer chrome isolated.
    *
-   * This transition runs once when an admitted presentation falls back to release-only. Later
-   * rejected handle frames mutate only the chrome Layer; the authoritative wrapper stays in its
-   * document Layer and is neither transformed nor included in the chrome canvas redraw.
+   * This transition runs once when an admitted presentation hands authority to the bounded
+   * guide. Later handle frames mutate only the isolated guide/chrome Layer; the authored wrapper
+   * stays in document order and receives no per-frame geometry writes.
    */
   const returnSourceToDocumentLayer = (): void => {
     if (vectorOverlayClaimed) {
@@ -524,6 +694,12 @@ export function beginStudioKonvaDrawTransformGesture(
     return transformed;
   };
 
+  const presentFallback = (frame: StudioLiveSelectionTransformFrame): boolean => {
+    const presented = fallbackPreview?.present(frame) ?? false;
+    if (presented) presentationMode = "fallback";
+    return presented;
+  };
+
   const cleanup = (
     outcome: Parameters<
       StudioLiveCanvasGestureTransientAdapter<StudioLiveSelectionTransformFrame>["close"]
@@ -552,7 +728,9 @@ export function beginStudioKonvaDrawTransformGesture(
     if (!terminalFramePrepared) {
       if (ownedOutcome.kind === "commit") {
         critical(() => {
-          terminalDraft = exactPresentation(ownedOutcome.terminalFrame);
+          terminalDraft = presentationMode === "precise"
+            ? exactPresentation(ownedOutcome.terminalFrame)
+            : null;
           terminalFramePrepared = true;
         });
       } else {
@@ -562,6 +740,13 @@ export function beginStudioKonvaDrawTransformGesture(
         terminalDraft = null;
         terminalFramePrepared = true;
       }
+    }
+    let fallbackRestored = fallbackPreview === null;
+    if (fallbackPreview) {
+      critical(() => {
+        fallbackPreview?.clear();
+        fallbackRestored = true;
+      });
     }
     // Restore the clip BEFORE nodes move home. A wrapper-local clipFunc reads the wrapper transform,
     // which the lift restore and neutralization below are about to change.
@@ -590,6 +775,12 @@ export function beginStudioKonvaDrawTransformGesture(
     if ((ownedOutcome.kind !== "commit" || terminalDraft === null) && ownershipRestored) {
       critical(() => {
         transferAuthorityToSource("release");
+      });
+    }
+    if (fallbackRestored) {
+      critical(() => {
+        fallbackPreview?.dispose();
+        fallbackPreview = null;
       });
     }
     // Selection chrome is cosmetic and can already have been destroyed by React reconciliation.
@@ -647,12 +838,20 @@ export function beginStudioKonvaDrawTransformGesture(
       transformer: options.transformer,
       dragLayer,
     });
-    // Chrome must be isolated even when every source frame is release-only. The wrapper remains in
-    // the document Layer until one real frame passes admission and claims source authority below.
+    // Chrome stays isolated even when every precise source frame is rejected. The wrapper remains
+    // in the document Layer until a precise frame claims it, or the guide takes visual authority.
     if (!chromeLift) {
       cleanup({ kind: "cancel", reason: "preview-error" });
       return null;
     }
+    fallbackPreview = dragLayer
+      ? createStudioLiveTransformWireframeFallback({
+          members: [{ element, node }],
+          sourceBounds: options.sourceBounds,
+          dragLayer,
+          strokeWidthPolicy: "scale",
+        })
+      : null;
     draftClaim = options.preview.draftStore?.claim(
       options.preview.scope,
       [snapshot.elementId],
@@ -673,9 +872,10 @@ export function beginStudioKonvaDrawTransformGesture(
             targetBounds: frame.targetBounds,
             rotationDeg: frame.rotationDeg,
           };
+          if (presentationMode === "fallback") return presentFallback(gestureFrame);
           if (!frameAdmitted(gestureFrame) || !claimPreviewSourceAuthority()) {
             returnSourceToDocumentLayer();
-            return false;
+            return presentFallback(gestureFrame);
           }
           transferAuthorityToSource("clear", () => {
             applyStudioLiveTransformPreviewNodeAttrs(node, attrs);
@@ -695,12 +895,16 @@ export function beginStudioKonvaDrawTransformGesture(
           return true;
         },
         applyExact: (frame) => {
-          return exactPresentation({
+          const gestureFrame = {
             targetBounds: frame.targetBounds,
             rotationDeg: frame.rotationDeg,
-          }) !== null;
+          };
+          if (presentationMode === "fallback") return presentFallback(gestureFrame);
+          if (exactPresentation(gestureFrame) !== null) return true;
+          return presentFallback(gestureFrame);
         },
         neutralize: () => {
+          fallbackPreview?.clear();
           returnSourceToDocumentLayer();
         },
       },
