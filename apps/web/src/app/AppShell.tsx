@@ -6,6 +6,7 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
+import { AccessibleTooltipLayer } from "@/shared/components/AccessibleTooltipLayer";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
@@ -109,6 +110,7 @@ export function AppShell({
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname);
   return (
     <AuthSessionProvider>
+      <AccessibleTooltipLayer />
       <Suspense fallback={null}><StoreSync /></Suspense>
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
