@@ -172,12 +172,30 @@ export function createStudioLiveTransformWireframeFallback(
     return null;
   }
 
-  options.dragLayer.add(root);
-  const exactDraftRoot = options.dragLayer.findOne(".studio-live-transform-draft-root");
-  if (exactDraftRoot?.getParent() === options.dragLayer) {
-    root.zIndex(exactDraftRoot.zIndex() + 1);
-  } else {
-    root.moveToBottom();
+  // Incomplete Layer doubles (tests/hosts without Konva Container APIs) must not abort the
+  // surrounding transform gesture. The wireframe is optional continuous feedback; exact/affine
+  // lanes and commit-at-release remain valid without it.
+  try {
+    if (typeof options.dragLayer.add !== "function") {
+      root.destroy();
+      return null;
+    }
+    options.dragLayer.add(root);
+    const exactDraftRoot = typeof options.dragLayer.findOne === "function"
+      ? options.dragLayer.findOne(".studio-live-transform-draft-root")
+      : null;
+    if (exactDraftRoot?.getParent() === options.dragLayer) {
+      root.zIndex(exactDraftRoot.zIndex() + 1);
+    } else if (typeof root.moveToBottom === "function") {
+      root.moveToBottom();
+    }
+  } catch {
+    try {
+      root.destroy();
+    } catch {
+      // Best-effort: a half-constructed guide must not leak into the gesture Layer.
+    }
+    return null;
   }
 
   const sourceStyles: StudioWireframeSourceStyle[] = options.members.map(({ node }) => ({

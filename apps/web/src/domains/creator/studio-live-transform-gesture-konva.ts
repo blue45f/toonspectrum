@@ -165,6 +165,18 @@ export interface BeginStudioKonvaDrawTransformGestureOptions {
   readonly onFatalError?: (error: unknown) => void;
 }
 
+
+function tryCreateStudioLiveTransformWireframeFallback(
+  options: Parameters<typeof createStudioLiveTransformWireframeFallback>[0],
+): ReturnType<typeof createStudioLiveTransformWireframeFallback> {
+  try {
+    return createStudioLiveTransformWireframeFallback(options);
+  } catch {
+    // Optional feedback only — a Layer/Konva construction fault must not cancel the transform.
+    return null;
+  }
+}
+
 function browserFrameScheduler(): StudioLiveTransformPreviewScheduler {
   return {
     requestFrame: (callback) => {
@@ -345,7 +357,7 @@ function beginStudioKonvaDrawWireframeFallbackGesture(
     }
 
     fallbackPreview = dragLayer
-      ? createStudioLiveTransformWireframeFallback({
+      ? tryCreateStudioLiveTransformWireframeFallback({
           members: [{ element, node }],
           sourceBounds: options.sourceBounds,
           dragLayer,
@@ -845,7 +857,7 @@ export function beginStudioKonvaDrawTransformGesture(
       return null;
     }
     fallbackPreview = dragLayer
-      ? createStudioLiveTransformWireframeFallback({
+      ? tryCreateStudioLiveTransformWireframeFallback({
           members: [{ element, node }],
           sourceBounds: options.sourceBounds,
           dragLayer,
