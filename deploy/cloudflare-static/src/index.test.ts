@@ -57,6 +57,7 @@ describe("Cloudflare static gateway", () => {
     for (const [key, value] of Object.entries(COMMON_SECURITY_HEADERS)) {
       expect(rootHeaders[key]).toBe(value);
     }
+    expect(COMMON_SECURITY_HEADERS["Content-Security-Policy"]).toContain("https://commons.wikimedia.org");
   });
 
   it("keeps the Worker-first route list limited to dynamic and crawler paths", () => {

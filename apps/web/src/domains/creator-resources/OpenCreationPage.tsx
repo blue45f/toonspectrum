@@ -98,7 +98,7 @@ export function OpenCreationPage() {
       if (until > Date.now()) throw new Error(`제공처 보호를 위해 ${Math.ceil((until - Date.now()) / 1000)}초 후 다시 검색하세요.`);
       cooldowns.current[provider] = Date.now() + 1500;
       setStatus(`자료 확인 중 · 실제 검색어: ${effectiveQuery}`);
-      const response = await fetch(url, { signal: abort.signal, credentials: "omit", mode: "cors", redirect: "error", headers: { Accept: "application/json" } });
+      const response = await fetch(url, { signal: abort.signal, credentials: "omit", mode: "cors", redirect: "error", headers: { Accept: "application/json", ...(provider === "commons" ? { "Api-User-Agent": "ToonSpectrum/1.0 (https://www.toonstudio.cloud/about/crawler)" } : {}) } });
       if (response.status === 429) {
         const retry = response.headers.get("Retry-After") ?? "";
         const seconds = /^\d+$/u.test(retry) ? Number(retry) : (Date.parse(retry) - Date.now()) / 1000;
