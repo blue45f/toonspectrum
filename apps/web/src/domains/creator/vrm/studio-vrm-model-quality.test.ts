@@ -4,7 +4,10 @@ import {
   classifyStudioVrmModelTechnicalRejection,
   isStudioVrmProductionModelUrl,
   STUDIO_VRM_MODEL_MAX_BYTES,
+  STUDIO_VRM_MODEL_MAX_PRIMITIVES,
   STUDIO_VRM_MODEL_MAX_TRIANGLES,
+  STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES,
+  summarizeStudioVrmValidatorErrors,
   type StudioVrmModelTechnicalMetrics,
 } from "./studio-vrm-model-quality";
 
@@ -61,6 +64,41 @@ describe("VRM technical quality admission", () => {
     expect(classifyStudioVrmModelTechnicalRejection(healthy)).toBeNull();
   });
 
+  it("admits detailed models above the recommendation but within the hard ceiling", () => {
+    expect(STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES).toBe(128);
+    expect(STUDIO_VRM_MODEL_MAX_PRIMITIVES).toBeGreaterThan(
+      STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES,
+    );
+    expect(classifyStudioVrmModelTechnicalRejection({
+      ...healthy,
+      primitives: STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES + 1,
+    })).toBeNull();
+  });
+
+  it("separates repairable validator findings from blocking or uncaptured errors", () => {
+    const repairable = summarizeStudioVrmValidatorErrors(2, [
+      { code: "GLB_CHUNK_LENGTH_UNALIGNED", severity: 0 },
+      { code: "SKIN_SKELETON_INVALID", severity: 0 },
+    ]);
+    expect(repairable).toMatchObject({ repairableErrors: 2, blockingErrors: 0 });
+    expect(classifyStudioVrmModelTechnicalRejection({
+      ...healthy,
+      validatorErrors: 2,
+      blockingValidatorErrors: repairable.blockingErrors,
+      repairableValidatorErrors: repairable.repairableErrors,
+    })).toBeNull();
+
+    const uncaptured = summarizeStudioVrmValidatorErrors(2, [
+      { code: "GLB_CHUNK_LENGTH_UNALIGNED", severity: 0 },
+    ]);
+    expect(uncaptured.blockingErrors).toBe(1);
+
+    const truncated = summarizeStudioVrmValidatorErrors(1, [
+      { code: "GLB_CHUNK_LENGTH_UNALIGNED", severity: 0 },
+    ], true);
+    expect(truncated.blockingErrors).toBe(1);
+  });
+
   it.each([
     [{ byteSize: 1_000 }, "file-too-small"],
     [{ byteSize: STUDIO_VRM_MODEL_MAX_BYTES + 1 }, "file-too-large"],
@@ -69,7 +107,7 @@ describe("VRM technical quality admission", () => {
     [{ skins: 0 }, "skin-missing"],
     [{ hasVrmExtension: false }, "vrm-extension-missing"],
     [{ triangles: STUDIO_VRM_MODEL_MAX_TRIANGLES + 1 }, "triangles"],
-    [{ primitives: 129 }, "primitives"],
+    [{ primitives: STUDIO_VRM_MODEL_MAX_PRIMITIVES + 1 }, "primitives"],
     [{ materials: 49 }, "materials"],
     [{ textures: 65 }, "textures"],
     [{ joints: 257 }, "joints"],
