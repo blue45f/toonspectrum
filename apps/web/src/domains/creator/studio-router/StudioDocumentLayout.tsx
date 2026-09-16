@@ -9,6 +9,8 @@ import {
 } from "../live/studio-live-jam-session";
 import { StudioDocumentWorkspaceDock } from "../studio-shell/StudioDocumentWorkspaceDock";
 import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
+import { StudioShellFloatingLayoutProvider } from "../studio-shell/StudioShellFloatingLayoutProvider";
+import { StudioShellFloatingLayoutManager } from "../studio-shell/StudioShellFloatingLayoutManager";
 import { startStudioConnectivityRuntime } from "../offline/studio-connectivity";
 
 import {
@@ -107,9 +109,12 @@ export function StudioDocumentLayout({
 
   return (
     <StudioDocumentLayoutContext value={runtime}>
-      <StudioDocumentWorkspaceSwitcher />
-      <StudioDocumentWorkspaceDock />
-      {children}
+      <StudioShellFloatingLayoutProvider>
+        <StudioDocumentWorkspaceSwitcher />
+        <StudioDocumentWorkspaceDock />
+        {children}
+        <StudioShellFloatingLayoutManager />
+      </StudioShellFloatingLayoutProvider>
     </StudioDocumentLayoutContext>
   );
 }

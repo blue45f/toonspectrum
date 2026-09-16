@@ -25,6 +25,7 @@ import {
   MessageSquare,
   Ruler,
   ScanText,
+  SlidersHorizontal,
   Smartphone,
   Stamp,
   StickyNote,
@@ -37,6 +38,7 @@ import type { StudioWebtoonCanvasPresetId } from "./studio-webtoon-canvas-preset
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 import { openStudioViewInspectionPanel } from "./studio-view-inspection-store";
+import { requestStudioShellFloatingLayoutManagerOpen } from "./studio-shell/studio-shell-floating-layout-events";
 
 const STUDIO_PLATFORM_CANVAS_MENU_ITEMS = [
   { id: "new-webtoon-vertical", commandId: "canvas.new-webtoon-vertical", presetId: "webtoon-vertical" },
@@ -54,6 +56,15 @@ export function buildStudioViewSurfaceMenuItems({
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
   return [
+    {
+      id: "floating-layout",
+      commandId: "view.floating-layout",
+      label: "플로팅 UI · 배치 설정…",
+      labelEn: "Floating UI · layout settings…",
+      icon: SlidersHorizontal,
+      separatorAfter: true,
+      onSelect: requestStudioShellFloatingLayoutManagerOpen,
+    },
     {
       id: "navigator",
       commandId: "view.navigator",
