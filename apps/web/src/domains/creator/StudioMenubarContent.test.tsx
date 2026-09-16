@@ -244,6 +244,7 @@ describe("StudioMenubarContent", () => {
 
     let back = screen.getByRole("button", { name: "이전 화면으로 돌아가기" });
     expect(back.getAttribute("data-studio-editor-return")).toBe("lane");
+    expect(back.className).not.toContain("sticky");
     fireEvent.click(back);
     expect(onNavigateBack).toHaveBeenCalledOnce();
 
