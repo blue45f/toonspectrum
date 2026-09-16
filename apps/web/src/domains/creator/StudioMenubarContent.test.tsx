@@ -184,7 +184,7 @@ describe("resolveStudioMenubarLaneOverflow", () => {
 });
 
 describe("StudioMenubarContent menu presentation", () => {
-  it("presents eight primary workflow titles and a detached AI action menu", () => {
+  it("presents nine primary workflow titles and a detached AI action menu", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );

@@ -5,23 +5,24 @@
  * This module only changes presentation: command ids, handlers, search metadata,
  * localization paths and persistence contracts remain stable.
  *
- * ## Canvas-first eight-title layout (IA audit 2026-09-15)
+ * ## Canvas-first nine-title layout (IA follow-up 2026-09-17)
  *
  * The visible application menu is intentionally limited to the document and
  * creation workflow artists repeatedly scan:
  *
- *   파일 | 편집 | 보기 | 삽입 | 레이어 | 창작 | 효과 | 도움말
+ *   파일 | 편집 | 보기 | 캔버스 | 삽입 | 레이어 | 창작 | 효과 | 도움말
  *
  * AI is preserved as a first-class action menu beside Save/Share/Publish instead
  * of competing with document vocabulary in the primary menubar. Every source
  * catalogue group remains a labelled section inside its composite dropdown.
  */
 
-/** Presentation order of the eight workflow-oriented primary menu titles. */
+/** Presentation order of the nine workflow-oriented primary menu titles. */
 export const STUDIO_MAIN_MENU_PRESENTATION_ORDER = [
   "file",
   "edit",
   "view",
+  "canvas",
   "insert",
   "layer",
   "create",
@@ -41,7 +42,7 @@ export type StudioMainMenuActionGroupId =
 export const STUDIO_MAIN_MENU_COMPOSITE_GROUPS = Object.freeze({
   file: Object.freeze(["file", "collaboration"] as const),
   edit: Object.freeze(["edit", "select", "transform"] as const),
-  view: Object.freeze(["view", "canvas", "window"] as const),
+  view: Object.freeze(["view", "window"] as const),
   insert: Object.freeze(["text", "vector", "3d"] as const),
   create: Object.freeze(["brush", "comic", "animation"] as const),
   filter: Object.freeze(["filter"] as const),
@@ -95,7 +96,7 @@ export interface StudioMainMenuPresentationOptions {
 export interface StudioMainMenuPresentation<
   TGroup extends StudioMainMenuPresentableGroup,
 > {
-  /** Eight workflow titles in the primary menubar, plus unknown groups before Help. */
+  /** Nine workflow titles in the primary menubar, plus unknown groups before Help. */
   readonly groups: readonly TGroup[];
   /** Contextual action menus rendered next to Save/Share/Publish. */
   readonly actionGroups: readonly TGroup[];

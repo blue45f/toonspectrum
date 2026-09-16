@@ -2,10 +2,10 @@
  * scripts/verify-studio-menus.mts
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
- * Desktop IA (canvas-first simplification 2026-09-15):
+ * Desktop IA (canvas-first simplification 2026-09-15, discoverability follow-up 2026-09-17):
  * - Catalogue: 17 specification groups + AI remains the complete command inventory.
- * - Presentation: eight primary workflow titles. Fifteen catalogue groups are owned by six
- *   composites: 파일←파일·협업, 편집←편집·선택·변형, 보기←보기·캔버스·창,
+ * - Presentation: nine primary workflow titles. Fourteen catalogue groups are owned by six
+ *   composites: 파일←파일·협업, 편집←편집·선택·변형, 보기←보기·창, 캔버스는 문서 규격의 독립 메뉴,
  *   삽입←텍스트·벡터·3D, 창작←그리기·만화·애니메이션, 효과←필터.
  * - AI remains first-class in a detached action menu beside completion controls.
  * - Every source group keeps its caption, row ids and execution handler.
@@ -13,7 +13,6 @@
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
  * Expects production build in dist/ (vite preview).
  */
-import { spawn, type ChildProcess } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { chromium, type Locator, type Page } from "playwright";
@@ -25,9 +24,10 @@ import {
   studioMainMenuPresentedTitleFor,
 } from "../apps/web/src/domains/creator/studio-main-menu-presentation";
 
-import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
+import { findFreePort, spawnVitePreview, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 import type { StudioMainMenuCompositeGroupId } from "../apps/web/src/domains/creator/studio-main-menu-presentation";
+import type { ChildProcess } from "node:child_process";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 
@@ -101,7 +101,22 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "밑그림 오버레이 (이메레스)",
     ],
   },
-  { id: "canvas", caption: "캔버스", items: ["캔버스 크기 · 문서 설정…"] },
+  {
+    id: "canvas",
+    caption: "캔버스",
+    items: [
+      "캔버스 px 눈금자",
+      "원근 도우미 보기",
+      "캔버스 크기 · 문서 설정…",
+      "웹툰 플랫폼 규격 가이드",
+      "그리드",
+      "새 캔버스 · 범용·고화질 세로 웹툰 · 1080 × 8000px",
+      "새 캔버스 · 네이버 연재형 · 690 × 8000px",
+      "새 캔버스 · 카카오 연재형 · 720 × 8000px",
+      "새 캔버스 · WEBTOON Canvas형 · 800 × 8000px",
+      "스티키 노트",
+    ],
+  },
   {
     id: "layer",
     caption: "레이어",
@@ -229,11 +244,12 @@ interface PresentedMenu {
 const PRESENTED_ORDER: readonly string[] = STUDIO_MAIN_MENU_PRESENTATION_ORDER;
 const ACTION_ORDER: readonly string[] = STUDIO_MAIN_MENU_ACTION_ORDER;
 
-/** Canvas-first IA: eight primary titles, plus AI beside completion actions. */
+/** Canvas-first IA: nine primary titles, plus AI beside completion actions. */
 const PINNED_PRESENTED_TITLES: readonly string[] = [
   "파일",
   "편집",
   "보기",
+  "캔버스",
   "삽입",
   "레이어",
   "창작",
@@ -355,7 +371,7 @@ function presentedTitleFor(catalogueGroupId: string): string {
   return group?.caption ?? catalogueGroupId;
 }
 
-/** Left vertical rail — tools that remain while the ninth slot is customized. */
+/** Left vertical rail — the nine-tool first-run default must remain after more tools are appended. */
 const PERSISTENT_RAIL_TOOLS = [
   "선택 (V)",
   "펜 (B)",
@@ -368,7 +384,7 @@ const PERSISTENT_RAIL_TOOLS = [
   "이미지 추가",
 ] as const;
 
-/** Optional tools occupy the replaceable ninth slot and therefore cannot coexist. */
+/** Optional tools must coexist after the hard nine-tool ceiling is removed. */
 const OPTIONAL_RAIL_TOOLS = [
   ["smart-shape", "스마트 도형"],
   ["shape-rect", "사각형 도형"],
@@ -780,7 +796,7 @@ async function assertMainMenus(page: Page): Promise<string[]> {
 
 async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
   const failures: string[] = [];
-  const panel = page.getByRole("region", { name: "포즈 참고 보드" });
+  const panel = page.getByRole("region", { name: "레퍼런스 캔버스" });
   // 창 is owned by 보기; resolve through the presentation so this check follows the IA.
   const windowTitle = presentedTitleFor("window");
   const openWindowMenu = async (): Promise<Locator> => {
@@ -806,7 +822,7 @@ async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
   await row.click();
   const openedAt = Date.now();
   const immediateFeedback = page.locator(
-    '[data-studio-reference-panel-loading="true"], [role="region"][aria-label="포즈 참고 보드"]',
+    '[data-studio-reference-panel-loading="true"], [role="region"][aria-label="레퍼런스 캔버스"]',
   );
   const feedbackVisible = await immediateFeedback.first()
     .waitFor({ state: "visible", timeout: 1_500 })
@@ -820,7 +836,7 @@ async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
     .then(() => true)
     .catch(() => false);
   if (!panelVisible) {
-    failures.push("창 → 참고 이미지 창으로 포즈 참고 보드를 열 수 없음");
+    failures.push("창 → 참고 이미지 창으로 레퍼런스 캔버스를 열 수 없음");
     return failures;
   }
 
@@ -831,7 +847,7 @@ async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
   await row.click();
   await panel.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
   if (await panel.isVisible().catch(() => false)) {
-    failures.push("창 → 참고 이미지 창으로 포즈 참고 보드를 닫을 수 없음");
+    failures.push("창 → 참고 이미지 창으로 레퍼런스 캔버스를 닫을 수 없음");
   }
 
   if (failures.length === 0) {
@@ -844,8 +860,8 @@ async function assertRailTools(page: Page): Promise<string[]> {
   const rail = page.locator('[data-studio-tool-rail="true"]');
   const failures: string[] = [];
 
-  // The compact rail has nine visible slots. Adding an optional tool replaces the ninth
-  // slot, so each real More-dialog journey must be verified before the next replacement.
+  // The rail starts with nine tools, but every additional choice must remain mounted and
+  // vertically reachable instead of replacing the previous custom slot.
   for (const [id, label] of OPTIONAL_RAIL_TOOLS) {
     const tool = rail.locator(`[data-studio-rail-tool-id="${id}"]`);
     try {
@@ -866,6 +882,19 @@ async function assertRailTools(page: Page): Promise<string[]> {
       );
       await page.keyboard.press("Escape").catch(() => undefined);
     }
+  }
+
+  const expectedToolCount = 9 + OPTIONAL_RAIL_TOOLS.length;
+  const actualToolCount = await rail.locator("[data-studio-rail-tool-id]").count();
+  if (actualToolCount < expectedToolCount) {
+    failures.push(`좌측 레일 도구 누적 실패: 기대 최소 ${expectedToolCount} / 실제 ${actualToolCount}`);
+  }
+  for (const [id, label] of OPTIONAL_RAIL_TOOLS) {
+    const retained = await rail
+      .locator(`[data-studio-rail-tool-id="${id}"]`)
+      .isVisible()
+      .catch(() => false);
+    if (!retained) failures.push(`좌측 레일 추가 도구가 다음 선택 뒤 사라짐: ${label}`);
   }
 
   for (const entry of PERSISTENT_RAIL_TOOLS) {
@@ -1052,11 +1081,10 @@ async function main() {
   let exitCode: number;
 
   try {
-    child = spawn(
-      "pnpm",
-      ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
-      { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] }
-    );
+    child = spawnVitePreview({
+      port,
+      runner: "node-vite-bin",
+    });
     child.stderr?.on("data", (d) => {
       const s = String(d);
       if (!s.includes("ECONNREFUSED") && !s.includes("proxy error")) process.stderr.write(d);
@@ -1111,7 +1139,7 @@ async function main() {
     ];
 
     if (failures.length === 0) {
-      log("PASS: canvas-first menus exposed (8 primary + AI action + sections + rail + popovers)");
+      log("PASS: canvas-first menus exposed (9 primary + AI action + sections + rail + popovers)");
       exitCode = 0;
     } else {
       log(`FAIL (${failures.length}):`);

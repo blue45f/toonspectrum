@@ -1,8 +1,8 @@
 /**
  * StudioMainMenu — ToonStudio's desktop application menubar.
  *
- * The workflow presentation supplies eight primary titles in one row:
- * 파일 · 편집 · 보기 · 삽입 · 레이어 · 창작 · 효과 · 도움말.
+ * The workflow presentation supplies nine primary titles in one row:
+ * 파일 · 편집 · 보기 · 캔버스 · 삽입 · 레이어 · 창작 · 효과 · 도움말.
  * Related catalogue groups remain visible as named role="group" sections. AI is
  * rendered through the same component as a detached action menu beside document CTAs.
  * Rows keep one flat menuitem order for predictable arrows.

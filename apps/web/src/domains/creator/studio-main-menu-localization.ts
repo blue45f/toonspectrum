@@ -84,7 +84,10 @@ function localizeItemLabel(
   state: StudioMainMenuLocalizationState,
   t: StudioMainMenuTranslate,
 ): string {
-  const label = localizeText(t, item.label, itemLabelKey(path, item, state));
+  const fallback = t("studio.canvas.section") === "캔버스"
+    ? item.label
+    : item.labelEn ?? item.label;
+  const label = localizeText(t, fallback, itemLabelKey(path, item, state));
   // 한국어 팩의 기존 용어가 새 서버 초안 명칭이나 save-first 표시어를 되돌리지 않게 한다.
   // 다른 언어의 번역값과 공동 편집자의 `공동 저장`은 그대로 유지한다.
   if (

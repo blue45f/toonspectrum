@@ -77,9 +77,6 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
 
 export type StudioRailToolId = (typeof STUDIO_RAIL_TOOL_CATALOG)[number]["id"];
 
-/** Canvas-first persistent rail budget; extra tools remain available from More. */
-export const STUDIO_RAIL_VISIBLE_LIMIT = 9;
-
 /** Complete professional order used by the toolbar customizer and the “all tools” surface. */
 export const DEFAULT_STUDIO_RAIL_TOOL_ORDER: StudioRailToolId[] = STUDIO_RAIL_TOOL_CATALOG.map(
   (tool) => tool.id
@@ -296,9 +293,9 @@ export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[
       out.push(entry);
     }
   }
-  // New/invalid state gets a compact, predictable creation path. All other tools stay in More.
+  // New/invalid state gets a compact, predictable creation path. Persist every valid user choice.
   if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS];
-  return out.slice(0, STUDIO_RAIL_VISIBLE_LIMIT);
+  return out;
 }
 
 export function studioRailHiddenIds(visibleIds: readonly StudioRailToolId[]): StudioRailToolId[] {
@@ -336,8 +333,7 @@ export function showStudioRailTool(
 ): StudioRailToolId[] {
   const list = normalizeStudioRailVisibleIds(visibleIds);
   if (list.includes(id)) return list;
-  if (list.length < STUDIO_RAIL_VISIBLE_LIMIT) return [...list, id];
-  return [...list.slice(0, STUDIO_RAIL_VISIBLE_LIMIT - 1), id];
+  return [...list, id];
 }
 
 export function normalizeStudioShortcuts(

@@ -261,7 +261,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
     // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
     // 2026-09-08: editable recent-stroke correction.
-    measuredCount: 194,
+    // 2026-09-17: 독립 Canvas 메뉴의 규격 가이드 + 플랫폼 새 캔버스 4행 추가 (194 → 199).
+    measuredCount: 199,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -292,7 +293,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     label: "단축키 도움말",
     file: "apps/web/src/domains/creator/StudioShortcutsHelp.tsx",
     declarationRef: "StudioShortcutsHelp.tsx:34-146 (GROUPS)",
-    measuredCount: 37,
+    measuredCount: 38,
   },
 });
 
@@ -361,9 +362,14 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   // canvas (2) — lifted out of view
   "canvas/canvas-rulers",
   "canvas/perspective-guide",
-  // canvas, Wave E (2) — studio-main-menu-items-authoring.ts
+  // canvas authoring surfaces — current-document controls plus exact platform canvas creators
   "canvas/canvas-settings",
+  "canvas/webtoon-guides",
   "canvas/grid",
+  "canvas/new-webtoon-vertical",
+  "canvas/new-webtoon-naver",
+  "canvas/new-webtoon-kakao",
+  "canvas/new-webtoon-canvas",
   "canvas/sticky-note",
   // layer (9) — lifted out of edit, insert and view; Mask/Clipping is Wave D's own row
   "layer/image",
@@ -571,11 +577,12 @@ export const STUDIO_HELP_ROW_INVENTORY: readonly string[] = Object.freeze([
   "layers.backward",
   "layers.move1px",
   "layers.move10px",
-  // view (8)
+  // view (9) — 화면 이동은 Space+드래그와 Shift+Wheel 두 도움말 행을 가진다.
   "view.zoomIn",
   "view.zoomOut",
   "view.zoomFit",
   "view.zoomAtPointer",
+  "view.pan",
   "view.pan",
   "view.toggleCanvas",
   "view.flipCanvas",
@@ -2278,6 +2285,39 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("캔버스 크기 · 문서 설정"), en("Canvas size and document settings")],
       aliases: [csp("캔버스 사이즈 변경"), ps("Canvas Size"), krita("Resize Canvas"), procreate("Canvas")],
       origins: [menu("canvas/canvas-settings")],
+    }),
+    defineCommand({
+      id: "canvas.webtoon-guides",
+      labels: [
+        ko("웹툰 플랫폼 규격 가이드", "현재 문서 위에 네이버·카카오·WEBTOON 표준폭과 세이프영역을 표시합니다."),
+        en("Webtoon platform width guides"),
+      ],
+      aliases: [ours("웹툰 규격"), ours("네이버 690"), ours("카카오 720"), csp("웹툰 가이드")],
+      origins: [menu("canvas/webtoon-guides")],
+    }),
+    defineCommand({
+      id: "canvas.new-webtoon-vertical",
+      labels: [ko("범용·고화질 웹툰 새 캔버스", "1080 × 8000px 새 작업을 엽니다."), en("New universal high-resolution webtoon canvas")],
+      aliases: [ours("1080 웹툰"), csp("신규 웹툰")],
+      origins: [menu("canvas/new-webtoon-vertical")],
+    }),
+    defineCommand({
+      id: "canvas.new-webtoon-naver",
+      labels: [ko("네이버 새 캔버스", "690 × 8000px 새 작업을 엽니다."), en("New Naver webtoon canvas")],
+      aliases: [ours("네이버 690"), csp("웹툰 원고")],
+      origins: [menu("canvas/new-webtoon-naver")],
+    }),
+    defineCommand({
+      id: "canvas.new-webtoon-kakao",
+      labels: [ko("카카오 새 캔버스", "720 × 8000px 새 작업을 엽니다."), en("New Kakao webtoon canvas")],
+      aliases: [ours("카카오 720"), csp("웹툰 원고")],
+      origins: [menu("canvas/new-webtoon-kakao")],
+    }),
+    defineCommand({
+      id: "canvas.new-webtoon-canvas",
+      labels: [ko("WEBTOON Canvas 새 캔버스", "800 × 8000px 새 작업을 엽니다."), en("New WEBTOON Canvas document")],
+      aliases: [ours("웹툰 캔버스 800"), csp("웹툰 원고")],
+      origins: [menu("canvas/new-webtoon-canvas")],
     }),
     defineCommand({
       id: "canvas.grid",

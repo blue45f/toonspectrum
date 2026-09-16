@@ -65,11 +65,11 @@ function catalogue(
 }
 
 describe("createStudioMainMenuPresentation", () => {
-  it("presents eight primary workflow titles and detaches AI beside completion actions", () => {
+  it("presents nine primary workflow titles and detaches AI beside completion actions", () => {
     const presentation = createStudioMainMenuPresentation(catalogue());
 
     expect(presentation.presentedGroupIds).toEqual([...STUDIO_MAIN_MENU_PRESENTATION_ORDER]);
-    expect(presentation.presentedGroupIds).toHaveLength(8);
+    expect(presentation.presentedGroupIds).toHaveLength(9);
     expect(presentation.presentedGroupIds).not.toContain("ai");
     expect(presentation.presentedGroupIds.at(-1)).toBe("help");
     expect(presentation.presentedActionGroupIds).toEqual([...STUDIO_MAIN_MENU_ACTION_ORDER]);
@@ -102,7 +102,6 @@ describe("createStudioMainMenuPresentation", () => {
       "collaboration",
       "select",
       "transform",
-      "canvas",
       "window",
       "text",
       "vector",
@@ -190,7 +189,7 @@ describe("createStudioMainMenuPresentation", () => {
     const groups = catalogue(2);
     const presentation = createStudioMainMenuPresentation(groups);
 
-    for (const id of ["layer", "help"]) {
+    for (const id of ["canvas", "layer", "help"]) {
       const source = groups.find((group) => group.id === id);
       const presented = presentation.groups.find((group) => group.id === id);
       expect(presented).toBe(source);
@@ -218,7 +217,7 @@ describe("createStudioMainMenuPresentation", () => {
     expect(studioMainMenuPresentedTitleFor("collaboration")).toBe("file");
     expect(studioMainMenuPresentedTitleFor("select")).toBe("edit");
     expect(studioMainMenuPresentedTitleFor("transform")).toBe("edit");
-    expect(studioMainMenuPresentedTitleFor("canvas")).toBe("view");
+    expect(studioMainMenuPresentedTitleFor("canvas")).toBe("canvas");
     expect(studioMainMenuPresentedTitleFor("window")).toBe("view");
     expect(studioMainMenuPresentedTitleFor("text")).toBe("insert");
     expect(studioMainMenuPresentedTitleFor("3d")).toBe("insert");

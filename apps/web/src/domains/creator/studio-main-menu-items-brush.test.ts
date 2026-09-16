@@ -64,6 +64,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   onionSkinEnabled: false,
   documentCommentsOpen: false,
   canvasGridVisible: false,
+  webtoonGuidesVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
   pixelArtEnabled: false,

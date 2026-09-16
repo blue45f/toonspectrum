@@ -11,6 +11,8 @@ export type StudioMainMenuHintKey =
 export interface StudioMainMenuItem {
   id: string;
   label: string;
+  /** English fallback for newly introduced rows before every locale pack gains a dedicated key. */
+  labelEn?: string;
   /**
    * `CommandId` in `studio-command-catalog.ts` this item dispatches. Menu items
    * reference the catalog instead of declaring a second command surface; the
