@@ -24,7 +24,7 @@ export function VrmPoseBoneMarker({
   readonly onDrag: (
     boneName: VRMHumanBoneName,
     target: readonly [number, number, number],
-    phase: "start" | "move" | "end",
+    phase: "start" | "move" | "end" | "cancel",
   ) => void;
 }) {
   const markerRef = useRef<THREE.Mesh>(null);
@@ -41,16 +41,22 @@ export function VrmPoseBoneMarker({
     releasePointerCapture(pointerId: number): void;
   } | null>(null);
   const onDragRef = useRef(onDrag);
-  const finishDragRef = useRef<(target?: THREE.Vector3) => void>(() => undefined);
+  const finishDragRef = useRef<(target?: THREE.Vector3, phase?: "end" | "cancel") => void>(
+    () => undefined,
+  );
 
   useEffect(() => {
     onDragRef.current = onDrag;
   }, [onDrag]);
 
   useEffect(() => {
-    const finishDrag = (target = lastDragPointRef.current) => {
-      // R3F 9.6 does not dispatch object-level pointercancel/lostpointercapture handlers.
-      // Every R3F and native exit path converges here; the guard makes the pose commit exact-once.
+    const finishDrag = (
+      target = lastDragPointRef.current,
+      phase: "end" | "cancel" = "end",
+    ) => {
+      // R3F 9.6 does not dispatch every object-level cancel/lost-capture path consistently.
+      // Every R3F and native exit path converges here; normal pointer-up commits, while ownership
+      // loss, blur, cancellation and unmount explicitly roll the preview back.
       if (!draggingRef.current) return;
       draggingRef.current = false;
       const pointerId = activePointerIdRef.current;
@@ -64,29 +70,34 @@ export function VrmPoseBoneMarker({
           // The browser may already have released capture before lostpointercapture/blur arrives.
         }
       }
-      onDragRef.current(boneName, [target.x, target.y, target.z], "end");
+      onDragRef.current(boneName, [target.x, target.y, target.z], phase);
     };
     finishDragRef.current = finishDrag;
 
     const finishMatchingPointer = (event: PointerEvent) => {
       const activePointerId = activePointerIdRef.current;
       if (activePointerId === null || event.pointerId !== activePointerId) return;
-      finishDrag();
+      finishDrag(lastDragPointRef.current, "end");
     };
-    const finishOnWindowBlur = () => finishDrag();
+    const cancelMatchingPointer = (event: PointerEvent) => {
+      const activePointerId = activePointerIdRef.current;
+      if (activePointerId === null || event.pointerId !== activePointerId) return;
+      finishDrag(lastDragPointRef.current, "cancel");
+    };
+    const cancelOnWindowBlur = () => finishDrag(lastDragPointRef.current, "cancel");
 
     // Bubble-stage window handlers run after the normal R3F pointerup path. If R3F already
     // finished the drag, finishDrag's guard makes these fallbacks harmless.
     window.addEventListener("pointerup", finishMatchingPointer);
-    window.addEventListener("pointercancel", finishMatchingPointer);
-    window.addEventListener("blur", finishOnWindowBlur);
-    gl.domElement.addEventListener("lostpointercapture", finishMatchingPointer);
+    window.addEventListener("pointercancel", cancelMatchingPointer);
+    window.addEventListener("blur", cancelOnWindowBlur);
+    gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer);
     return () => {
       window.removeEventListener("pointerup", finishMatchingPointer);
-      window.removeEventListener("pointercancel", finishMatchingPointer);
-      window.removeEventListener("blur", finishOnWindowBlur);
-      gl.domElement.removeEventListener("lostpointercapture", finishMatchingPointer);
-      finishDrag();
+      window.removeEventListener("pointercancel", cancelMatchingPointer);
+      window.removeEventListener("blur", cancelOnWindowBlur);
+      gl.domElement.removeEventListener("lostpointercapture", cancelMatchingPointer);
+      finishDrag(lastDragPointRef.current, "cancel");
       if (finishDragRef.current === finishDrag) {
         finishDragRef.current = () => undefined;
       }
@@ -166,12 +177,12 @@ export function VrmPoseBoneMarker({
       onPointerCancel={(event) => {
         if (!draggingRef.current) return;
         event.stopPropagation();
-        finishDragRef.current();
+        finishDragRef.current(lastDragPointRef.current, "cancel");
       }}
       onLostPointerCapture={(event) => {
         if (!draggingRef.current) return;
         event.stopPropagation();
-        finishDragRef.current();
+        finishDragRef.current(lastDragPointRef.current, "cancel");
       }}
     >
       <sphereGeometry args={[1, 16, 12]} />
@@ -203,7 +214,7 @@ export function VrmPoseBoneOverlay({
   readonly onDrag: (
     boneName: VRMHumanBoneName,
     target: readonly [number, number, number],
-    phase: "start" | "move" | "end",
+    phase: "start" | "move" | "end" | "cancel",
   ) => void;
 }) {
   return (

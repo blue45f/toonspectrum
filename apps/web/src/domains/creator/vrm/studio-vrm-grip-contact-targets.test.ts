@@ -112,3 +112,61 @@ describe("Studio VRM grip contact targets", () => {
     })).toBeNull();
   });
 });
+
+
+describe("Studio VRM thumb grip contact targets", () => {
+  it("adds a stable thumb slot without changing the four original finger ordinals", () => {
+    const source = points();
+    const result = createStudioVrmGripContactTargets({
+      center: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      fallbackRadial: new THREE.Vector3(1, 0, 0),
+      fingertipWorldPositions: [new THREE.Vector3(0.025, 0, -0.02), ...source],
+      fingerOrdinals: ["thumb", 0, 1, 2, 3],
+      gripRadius: 0.008,
+      handSize: 0.075,
+      side: "right",
+    });
+
+    expect(result).not.toBeNull();
+    const ys = result!.targets.map((target) => target.y);
+    expect(ys[1]).toBeGreaterThan(ys[0]!);
+    expect(ys[0]).toBeGreaterThan(ys[2]!);
+    expect(ys[2]).toBeGreaterThan(ys[3]!);
+    expect(ys[3]).toBeGreaterThan(ys[4]!);
+  });
+
+  it("uses an opposed fallback for an axial thumb and numeric finger", () => {
+    const result = createStudioVrmGripContactTargets({
+      center: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      fallbackRadial: new THREE.Vector3(1, 0, 0),
+      fingertipWorldPositions: [
+        new THREE.Vector3(0, 0.01, 0),
+        new THREE.Vector3(0, 0.02, 0),
+      ],
+      fingerOrdinals: ["thumb", 0],
+      gripRadius: 0.008,
+      handSize: 0.075,
+      side: "right",
+    });
+
+    expect(result?.targets[0]?.x).toBeLessThan(0);
+    expect(result?.targets[1]?.x).toBeGreaterThan(0);
+  });
+
+  it("preserves an authored circumferential side for the thumb", () => {
+    const result = createStudioVrmGripContactTargets({
+      center: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      fallbackRadial: new THREE.Vector3(1, 0, 0),
+      fingertipWorldPositions: [new THREE.Vector3(0.02, 0.01, 0)],
+      fingerOrdinals: ["thumb"],
+      gripRadius: 0.008,
+      handSize: 0.075,
+      side: "right",
+    });
+
+    expect(result?.targets[0]?.x).toBeGreaterThan(0);
+  });
+});

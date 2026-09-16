@@ -4,6 +4,10 @@ import {
   type BodySilhouette,
 } from "./studio-vrm-body-silhouette";
 import {
+  inspectStudioVrmGarmentPoseEnvelope,
+  studioVrmGarmentPoseAllowanceForRegions,
+} from "./studio-vrm-garment-pose-envelope";
+import {
   WARDROBE_FIT_MAX,
   WARDROBE_FIT_MIN,
   WARDROBE_SLOTS,
@@ -15,14 +19,17 @@ import {
   type WardrobeSlot,
   type WardrobeState,
 } from "./studio-vrm-wardrobe";
+import type { PoseBoneMap } from "./studio-vrm-poser-utils";
 
 export type StudioVrmGarmentFitStatus = "ready" | "warning" | "unavailable";
 
 export type StudioVrmGarmentFitIssueCode =
   | "metric-fallback"
   | "body-clearance"
+  | "pose-clearance"
   | "layer-clearance"
-  | "auto-adjusted";
+  | "auto-adjusted"
+  | "pose-auto-adjusted";
 
 export interface StudioVrmGarmentFitIssue {
   code: StudioVrmGarmentFitIssueCode;
@@ -42,6 +49,8 @@ export interface StudioVrmGarmentSlotFit {
   effectiveFit: number;
   referenceRadiusM: number;
   estimatedBodyClearanceM: number;
+  requiredMotionClearanceM: number;
+  poseAllowanceM: number;
   autoAdjustmentM: number;
 }
 
@@ -49,6 +58,8 @@ export interface StudioVrmGarmentFitReport {
   status: StudioVrmGarmentFitStatus;
   metricSource: WardrobeMetrics["source"] | "unavailable";
   signature: string;
+  poseSignature: string;
+  posePeakLoad: number;
   slots: Partial<Record<WardrobeSlot, StudioVrmGarmentSlotFit>>;
   issues: readonly StudioVrmGarmentFitIssue[];
   autoAdjusted: boolean;
@@ -57,8 +68,8 @@ export interface StudioVrmGarmentFitReport {
 
 export interface StudioVrmGarmentEvaluationReceipt {
   kind: "studio-vrm-garment-evaluation-receipt";
-  version: 1;
-  solver: "analytic-layer-fit-v1";
+  version: 2;
+  solver: "pose-aware-layer-fit-v2";
   modelId: string;
   poseSignature: string;
   inputSignature: string;
@@ -162,8 +173,10 @@ function hashSignature(value: string): string {
 export function buildStudioVrmGarmentFitInputSignature(
   wardrobe: WardrobeState,
   metricsRaw: WardrobeMetrics | null | undefined,
+  poseBones?: PoseBoneMap | null,
 ): string {
   const metrics = metricsRaw ? sanitizeWardrobeMetrics(metricsRaw) : null;
+  const poseEnvelope = inspectStudioVrmGarmentPoseEnvelope(poseBones);
   const slots = WARDROBE_SLOTS.flatMap((slot) => {
     const equip = wardrobe[slot];
     return equip
@@ -185,13 +198,14 @@ export function buildStudioVrmGarmentFitInputSignature(
         // every joint distance yet give a top a different reference radius, so a cached report
         // keyed on the skeleton alone would survive a measurement it no longer describes.
         torso: bodySilhouetteSignature(metrics.torso),
+        pose: poseEnvelope.signature,
         slots,
       }
-    : { source: "unavailable", slots };
-  // garfit2 (was garfit1): the payload gained the measurement, and on a measured body every
-  // penetration number a garfit1 receipt carries came from the skeleton radius instead. Those
-  // receipts have to be recomputed rather than matched, so the tag says so out loud.
-  return `garfit2:${hashSignature(JSON.stringify(payload))}`;
+    : { source: "unavailable", pose: poseEnvelope.signature, slots };
+  // garfit3 adds the authored pose envelope. A receipt computed for a neutral stance must never be
+  // reused after an arm raise, crouch or deep torso bend because the rendered shell now reserves
+  // region-specific motion room for the actual pose.
+  return `garfit3:${hashSignature(JSON.stringify(payload))}`;
 }
 
 /**
@@ -201,13 +215,17 @@ export function buildStudioVrmGarmentFitInputSignature(
 export function inspectStudioVrmGarmentFit(
   wardrobe: WardrobeState,
   metricsRaw: WardrobeMetrics | null | undefined,
+  options: { readonly bones?: PoseBoneMap | null } = {},
 ): StudioVrmGarmentFitReport {
-  const signature = buildStudioVrmGarmentFitInputSignature(wardrobe, metricsRaw);
+  const poseEnvelope = inspectStudioVrmGarmentPoseEnvelope(options.bones);
+  const signature = buildStudioVrmGarmentFitInputSignature(wardrobe, metricsRaw, options.bones);
   if (!metricsRaw) {
     return {
       status: "unavailable",
       metricSource: "unavailable",
       signature,
+      poseSignature: poseEnvelope.signature,
+      posePeakLoad: poseEnvelope.peakLoad,
       slots: {},
       issues: [],
       autoAdjusted: false,
@@ -232,7 +250,12 @@ export function inspectStudioVrmGarmentFit(
     const clearanceAt = measured === null
       ? (value: number) => item.fitProfile.baseBodyClearanceM + (value - 1) * radius
       : (value: number) => perFitStepM * value;
-    const bodyShortfall = Math.max(0, item.fitProfile.motionAllowanceM - clearanceAt(equip.fit));
+    const poseAllowanceM = studioVrmGarmentPoseAllowanceForRegions(
+      poseEnvelope,
+      item.fitProfile.regions,
+    );
+    const requiredMotionClearanceM = item.fitProfile.motionAllowanceM + poseAllowanceM;
+    const motionShortfall = Math.max(0, requiredMotionClearanceM - clearanceAt(equip.fit));
     return [{
       slot,
       equip,
@@ -240,7 +263,9 @@ export function inspectStudioVrmGarmentFit(
       radius,
       clearanceAt,
       perFitStepM,
-      suggestedFit: clampFit(equip.fit + bodyShortfall / perFitStepM),
+      poseAllowanceM,
+      requiredMotionClearanceM,
+      suggestedFit: clampFit(equip.fit + motionShortfall / perFitStepM),
     }];
   });
 
@@ -252,10 +277,18 @@ export function inspectStudioVrmGarmentFit(
   for (const outer of ordered) {
     for (const inner of ordered) {
       if (inner === outer || inner.item.fitProfile.layerRank >= outer.item.fitProfile.layerRank) continue;
-      if (intersectRegions(outer.item.fitProfile.regions, inner.item.fitProfile.regions).length === 0) continue;
+      const sharedRegions = intersectRegions(
+        outer.item.fitProfile.regions,
+        inner.item.fitProfile.regions,
+      );
+      if (sharedRegions.length === 0) continue;
+      const poseLayerAllowanceM = studioVrmGarmentPoseAllowanceForRegions(
+        poseEnvelope,
+        sharedRegions,
+      ) * 0.35;
       const shortfall = Math.max(
         0,
-        outer.item.fitProfile.layerClearanceM
+        outer.item.fitProfile.layerClearanceM + poseLayerAllowanceM
           - (outer.clearanceAt(outer.suggestedFit) - inner.clearanceAt(inner.suggestedFit)),
       );
       outer.suggestedFit = clampFit(outer.suggestedFit + shortfall / outer.perFitStepM);
@@ -276,6 +309,8 @@ export function inspectStudioVrmGarmentFit(
       effectiveFit: round(effectiveFit),
       referenceRadiusM: round(candidate.radius),
       estimatedBodyClearanceM: round(estimatedBodyClearanceM),
+      requiredMotionClearanceM: round(candidate.requiredMotionClearanceM),
+      poseAllowanceM: round(candidate.poseAllowanceM),
       // 자동 보정이 셸을 실제로 얼마나 밀어냈는지 — 같은 여유분 모델로 잰다.
       autoAdjustmentM: round(Math.max(
         0,
@@ -305,6 +340,10 @@ export function inspectStudioVrmGarmentFit(
       0,
       candidate.item.fitProfile.motionAllowanceM - resolved.estimatedBodyClearanceM,
     );
+    const totalMotionShortfall = Math.max(
+      0,
+      candidate.requiredMotionClearanceM - resolved.estimatedBodyClearanceM,
+    );
     if (bodyShortfall > EPSILON_M) {
       issues.push({
         code: "body-clearance",
@@ -316,13 +355,27 @@ export function inspectStudioVrmGarmentFit(
         suggestedFit: round(candidate.suggestedFit),
       });
     }
-    if (resolved.autoAdjustmentM > EPSILON_M) {
+    if (candidate.poseAllowanceM > EPSILON_M && totalMotionShortfall > EPSILON_M) {
       issues.push({
-        code: "auto-adjusted",
+        code: "pose-clearance",
+        severity: "warning",
+        slots: [candidate.slot],
+        regions: candidate.item.fitProfile.regions,
+        message: `${candidate.item.label}이 현재 포즈에서 ${formatMillimetres(totalMotionShortfall)}의 동작 여유가 부족합니다. 자동 맞춤 또는 권장 여유값을 적용해 주세요.`,
+        estimatedPenetrationM: round(totalMotionShortfall),
+        suggestedFit: round(candidate.suggestedFit),
+      });
+    }
+    if (resolved.autoAdjustmentM > EPSILON_M) {
+      const poseAdjusted = candidate.poseAllowanceM > EPSILON_M;
+      issues.push({
+        code: poseAdjusted ? "pose-auto-adjusted" : "auto-adjusted",
         severity: "info",
         slots: [candidate.slot],
         regions: candidate.item.fitProfile.regions,
-        message: `${candidate.item.label}에 ${formatMillimetres(resolved.autoAdjustmentM)}의 안전 여유를 자동 적용했습니다.`,
+        message: poseAdjusted
+          ? `${candidate.item.label}에 현재 포즈용 ${formatMillimetres(resolved.autoAdjustmentM)} 동작 여유를 자동 적용했습니다.`
+          : `${candidate.item.label}에 ${formatMillimetres(resolved.autoAdjustmentM)}의 안전 여유를 자동 적용했습니다.`,
         estimatedPenetrationM: 0,
         suggestedFit: resolved.suggestedFit,
       });
@@ -340,9 +393,13 @@ export function inspectStudioVrmGarmentFit(
       if (!innerResolved) continue;
       // 해결기(위)와 같은 여유분 모델을 쓴다. 여기만 옛 선형식을 남겨 두면 자동 맞춤이 해결했다고
       // 판단한 겹침을 경고가 계속 띄우거나 그 반대가 된다.
+      const poseLayerAllowanceM = studioVrmGarmentPoseAllowanceForRegions(
+        poseEnvelope,
+        regions,
+      ) * 0.35;
       const shortfall = Math.max(
         0,
-        outer.item.fitProfile.layerClearanceM
+        outer.item.fitProfile.layerClearanceM + poseLayerAllowanceM
           - (outer.clearanceAt(outerResolved.effectiveFit) - inner.clearanceAt(innerResolved.effectiveFit)),
       );
       if (shortfall <= EPSILON_M) continue;
@@ -351,7 +408,7 @@ export function inspectStudioVrmGarmentFit(
         severity: "warning",
         slots: [inner.slot, outer.slot],
         regions,
-        message: `${inner.item.label}과 ${outer.item.label} 사이 여유가 ${formatMillimetres(shortfall)} 부족합니다. 겉 의상을 자동 맞춤으로 바꿔 주세요.`,
+        message: `${inner.item.label}과 ${outer.item.label} 사이 여유가 ${formatMillimetres(shortfall)} 부족합니다.${poseLayerAllowanceM > EPSILON_M ? " 현재 포즈의 굽힘 여유를 포함한 값입니다." : ""} 겉 의상을 자동 맞춤으로 바꿔 주세요.`,
         estimatedPenetrationM: round(shortfall),
         suggestedFit: round(outer.suggestedFit),
       });
@@ -366,6 +423,8 @@ export function inspectStudioVrmGarmentFit(
     status: issues.some((issue) => issue.severity === "warning") ? "warning" : "ready",
     metricSource: metrics.source,
     signature,
+    poseSignature: poseEnvelope.signature,
+    posePeakLoad: poseEnvelope.peakLoad,
     slots,
     issues,
     autoAdjusted: Object.values(slots).some((slot) => (slot?.autoAdjustmentM ?? 0) > EPSILON_M),
@@ -381,8 +440,8 @@ export function createStudioVrmGarmentEvaluationReceipt(input: {
 }): StudioVrmGarmentEvaluationReceipt {
   return {
     kind: "studio-vrm-garment-evaluation-receipt",
-    version: 1,
-    solver: "analytic-layer-fit-v1",
+    version: 2,
+    solver: "pose-aware-layer-fit-v2",
     modelId: input.modelId,
     poseSignature: input.poseSignature,
     inputSignature: input.report.signature,

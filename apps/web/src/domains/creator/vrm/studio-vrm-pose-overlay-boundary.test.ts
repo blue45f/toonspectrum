@@ -71,9 +71,10 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("pointerCaptureTarget.releasePointerCapture(pointerId)");
     expect(source).toContain("onLostPointerCapture={(event) => {");
     expect(source).toContain('window.addEventListener("pointerup", finishMatchingPointer)');
-    expect(source).toContain('window.addEventListener("pointercancel", finishMatchingPointer)');
-    expect(source).toContain('window.addEventListener("blur", finishOnWindowBlur)');
-    expect(source).toContain('gl.domElement.addEventListener("lostpointercapture", finishMatchingPointer)');
+    expect(source).toContain('window.addEventListener("pointercancel", cancelMatchingPointer)');
+    expect(source).toContain('window.addEventListener("blur", cancelOnWindowBlur)');
+    expect(source).toContain('gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)');
+    expect(source).toContain('finishDrag(lastDragPointRef.current, "cancel")');
     expect(source).toContain("if (!draggingRef.current) return;");
     expect(source).toContain("finishDragRef.current(target)");
     expect(source).toContain("setIsViewportHandIkDragging(false)");
@@ -116,7 +117,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("onPolePreview={previewJointHandlePole}");
     expect(source).toContain("onPoleCommit={handleJointHandlePoleCommit}");
     expect(source).toContain('aria-label="IK 핸들 이동 방식"');
-    expect(source).toContain('aria-label="IK 핸들 축 제한"');
+    expect(source).toContain('aria-label="관절·IK 축 제한"');
     expect(source).toContain("min-h-11 min-w-11");
   });
 

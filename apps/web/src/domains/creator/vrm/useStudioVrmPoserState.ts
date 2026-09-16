@@ -459,7 +459,7 @@ export function useStudioVrmPoserState({
   const [propRigMetrics, setPropRigMetrics] = useState<VrmPropRigMetrics>(DEFAULT_VRM_PROP_RIG_METRICS);
   const effectivePropRigMetrics = scaleVrmPropRigMetrics(propRigMetrics, bodyScale);
   const [wardrobeAutoHide, setWardrobeAutoHide] = useState(true);
-  const wardrobeFitReport = inspectStudioVrmGarmentFit(wardrobeState, wardrobeMetrics);
+  const wardrobeFitReport = inspectStudioVrmGarmentFit(wardrobeState, wardrobeMetrics, { bones: customBones });
   const wardrobeAuthoredIdentity = JSON.stringify(
     serializeWardrobe(wardrobeState, { autoHideOriginal: wardrobeAutoHide }) ?? null,
   );
