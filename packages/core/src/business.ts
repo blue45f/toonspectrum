@@ -22,7 +22,7 @@ export const BUSINESS_INFO = {
   /** 호스팅 사업자. */
   hosting: "Cloudflare (Frontend) · Render (API)",
   /** 서비스 형태 한 줄 설명. */
-  serviceType: "웹툰·웹소설 통합 검색 및 분석 인덱스",
+  serviceType: "웹툰 기획·제작·협업·연재 및 작품 인사이트 플랫폼",
 } as const;
 
 /** 정책/약관 문서. */
