@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { STUDIO_WEBTOON_CANVAS_PRESETS } from "./studio-webtoon-canvas-presets";
 import {
   WEBTOON_WIDTH_STANDARDS,
   episodeLengthLabel,
@@ -8,6 +9,17 @@ import {
 } from "./studio-webtoon-guides";
 
 describe("webtoonWidthGuides", () => {
+  it("새 문서 플랫폼 프리셋과 같은 표준폭을 사용한다", () => {
+    const standards = new Map(WEBTOON_WIDTH_STANDARDS.map((standard) => [standard.id, standard]));
+    for (const preset of STUDIO_WEBTOON_CANVAS_PRESETS) {
+      expect(standards.get(preset.guideId)).toEqual({
+        id: preset.guideId,
+        label: preset.guideLabelKo,
+        width: preset.width,
+      });
+    }
+  });
+
   it("표준폭보다 좁은 캔버스는 가이드 없음", () => {
     const minWidth = Math.min(...WEBTOON_WIDTH_STANDARDS.map((s) => s.width));
     expect(webtoonWidthGuides(minWidth - 1)).toEqual([]);
