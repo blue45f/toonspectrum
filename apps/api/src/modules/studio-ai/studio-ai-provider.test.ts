@@ -154,6 +154,38 @@ describe("Studio AI provider resolution", () => {
     });
   });
 
+  it("기존 Z.AI/OpenRouter 비밀은 확인된 무료 모델 경계에서만 재사용한다", () => {
+    const confirmed = resolveStudioAiProviders("auto", {
+      NODE_ENV: "production",
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "zai,openrouter",
+      ZAI_API_KEY: "legacy-zai-key",
+      STUDIO_AI_FREE_ZAI_CONFIRMED: "true",
+      OPENROUTER_API_KEY: "legacy-openrouter-key",
+      STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
+    });
+    expect(confirmed.map(({ id, model }) => ({ id, model }))).toEqual([
+      { id: "zai", model: "glm-4.7-flash" },
+      { id: "openrouter", model: "openrouter/free" },
+    ]);
+    expect(resolveStudioAiProviders("auto", {
+      NODE_ENV: "production",
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      ZAI_API_KEY: "legacy-zai-key",
+      OPENROUTER_API_KEY: "legacy-openrouter-key",
+    })).toEqual([]);
+    expect(resolveStudioAiProviders("auto", {
+      NODE_ENV: "production",
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      ZAI_API_KEY: "legacy-zai-key",
+      STUDIO_AI_FREE_ZAI_CONFIRMED: "true",
+      STUDIO_AI_FREE_ZAI_MODEL: "glm-5.1",
+      OPENROUTER_API_KEY: "legacy-openrouter-key",
+      STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
+      STUDIO_AI_FREE_OPENROUTER_MODEL: "openai/gpt-5",
+    })).toEqual([]);
+  });
+
   it("공통 timeout을 우선하고 제공자 request ID를 제한해 추출한다", () => {
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000" })).toBe(6000);
     expect(resolveStudioAiTimeoutMs("sambanova", {

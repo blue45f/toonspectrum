@@ -245,10 +245,20 @@ export function inferLegacyUserAiCostPolicy(
 }
 
 const QWEN_FREE_MODELS = new Set([
+  "qwen3.8-max",
+  "qwen3.8-max-0902",
+  "qwen3.8-flash",
+  "qwen3.7-max",
+  "qwen3.7-max-2026-06-08",
+  "qwen3.7-max-2026-05-20",
+  "qwen3.7-max-preview",
   "qwen3.7-plus",
   "qwen3.7-plus-2026-05-26",
-  "qwen3.8-27b",
-  "qwen3.8-2.4t-a95b",
+  "qwen3.6-plus",
+  "qwen3.6-plus-2026-04-02",
+  "qwen3.7-flash",
+  "qwen3.7-flash-2026-07-15",
+  "qwen3.6-flash",
   "qwen3.6-flash-2026-04-16",
   "qwen-turbo",
 ]);
