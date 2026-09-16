@@ -20,7 +20,7 @@ test("failed refresh and recovery keep the same inline comment draft mounted", a
   });
   await page.goto("/e2e/feedback-community.html");
   await page.getByRole("button", { name: entry.title, exact: true }).click();
-  const draft = page.getByRole("textbox", { name: "공개 댓글" });
+  const draft = page.getByRole("textbox", { name: "공개 댓글", exact: true });
   await draft.fill("작성 중인 댓글입니다.");
   await page.getByRole("button", { name: "제보 목록 새로고침" }).click();
   await expect(page.getByRole("alert")).toContainText("새로고침 일시 실패");
@@ -88,9 +88,9 @@ test("invalid vote and reply acknowledgements preserve confirmed counts and draf
   await expect(vote).toHaveAttribute("aria-pressed", "false");
   await expect(vote).toContainText("0");
   await page.getByRole("button", { name: entry.title, exact: true }).click();
-  await page.getByRole("textbox", { name: "공개 댓글" }).fill("보존해야 할 댓글입니다.");
+  await page.getByRole("textbox", { name: "공개 댓글", exact: true }).fill("보존해야 할 댓글입니다.");
   await page.getByRole("button", { name: "댓글 등록", exact: true }).click();
   await expect(page.locator(".fb-thread").getByRole("alert")).toContainText("댓글 등록 결과를 확인하지 못했어요");
-  await expect(page.getByRole("textbox", { name: "공개 댓글" })).toHaveValue("보존해야 할 댓글입니다.");
+  await expect(page.getByRole("textbox", { name: "공개 댓글", exact: true })).toHaveValue("보존해야 할 댓글입니다.");
   await expect(page.getByText("댓글이 등록되었습니다.", { exact: true })).toHaveCount(0);
 });
