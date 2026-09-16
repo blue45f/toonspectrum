@@ -8,6 +8,7 @@ import {
   normalizeLocaleCode,
   getLocaleCandidates,
   detectDocumentPreferredLocale,
+  getLocaleDirection,
   resolveSelectableLocale,
 } from "./i18n-intl-utils";
 import {
@@ -35,7 +36,8 @@ export interface LanguageLocaleOption {
    */
   translatedRatio: number;
   /**
-   * false 면 이 로케일은 사실상 영어로 렌더된다. 언어 선택 UI 는 이 사실을 감추면 안 된다.
+   * false 면 사람이 검수한 완성 번역이 아니라 자동 번역과 영어 폴백을 함께 사용한다.
+   * 언어 선택 UI 는 이 품질 차이를 감추면 안 된다.
    */
   fullyTranslated: boolean;
 }
@@ -64,16 +66,26 @@ export function resolveTranslation(
   fallbackChain: readonly string[] = FALLBACK_CHAIN,
 ): string {
   const candidates = getLocaleCandidates(lang, fallbackChain);
+  const englishSource = DICT.en?.[key];
   for (const candidate of candidates) {
+    const authoredValue = DICT[candidate]?.[key];
+
+    // Human-authored values always win over cached machine translation. This also protects newly
+    // improved locale assets from being shadowed by an older automatic-translation cache.
+    if (
+      authoredValue !== undefined &&
+      (englishSource === undefined || authoredValue !== englishSource)
+    ) {
+      return authoredValue;
+    }
+
+    const runtimeValue = getRuntimeTranslationBundle(candidate)?.[key];
+    if (runtimeValue !== undefined) return runtimeValue;
+
     // A locale that defines a key answers for it — including with "". Several locales
     // deliberately render no unit suffix (`ageGate.yearSuffix`), and a truthiness test used to
     // skip past those empty strings and pull the Korean suffix into every other language.
-    const runtimeBundle = getRuntimeTranslationBundle(candidate);
-    const runtimeValue = runtimeBundle?.[key];
-    if (runtimeValue !== undefined) return runtimeValue;
-
-    const value = DICT[candidate]?.[key];
-    if (value !== undefined) return value;
+    if (authoredValue !== undefined) return authoredValue;
   }
 
   return DICT[FALLBACK_LANG][key] ?? key;
@@ -122,9 +134,11 @@ function getTranslationResolver(lang: string): TranslationResolver {
   return resolver;
 }
 
-function applyHtmlLang(lang: string) {
-  if (typeof document !== "undefined")
-    document.documentElement.lang = normalizeLocaleCode(lang) || FALLBACK_LANG;
+export function applyDocumentLocale(lang: string) {
+  if (typeof document === "undefined") return;
+  const normalized = normalizeLocaleCode(lang) || FALLBACK_LANG;
+  document.documentElement.lang = normalized;
+  document.documentElement.dir = getLocaleDirection(normalized);
 }
 
 export const useI18n = create<I18nState>()(
@@ -134,7 +148,7 @@ export const useI18n = create<I18nState>()(
       translationBundleRevision: 0,
       setLang: (lang) => {
         const normalized = resolveSelectableLocale(lang);
-        applyHtmlLang(normalized);
+        applyDocumentLocale(normalized);
         set({ lang: normalized });
         void loadRuntimeTranslationBundle(normalized);
       },
@@ -145,7 +159,7 @@ export const useI18n = create<I18nState>()(
         if (state) {
           const normalized = resolveSelectableLocale(state.lang || FALLBACK_LANG);
           state.lang = normalized;
-          applyHtmlLang(normalized);
+          applyDocumentLocale(normalized);
           void loadRuntimeTranslationBundle(normalized);
         }
       },

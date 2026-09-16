@@ -7,14 +7,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FALLBACK_CHAIN,
   GOOGLE_PLAY_LOCALE_LIST,
+  ISO_639_1_LANGUAGE_LOCALE_LIST,
+  NORMALIZED_LOCALE_OPTIONS,
+  WORLD_LANGUAGE_LOCALE_LIST,
+  ensureRuntimeLocaleBundle,
   getLanguageOptions,
   getLocaleCandidates,
-  resolveSelectableLocale,
+  getLocaleDirection,
   i18nDict,
-  ensureRuntimeLocaleBundle,
+  loadAppI18nLocale,
   resolveI18nValue,
+  resolveSelectableLocale,
 } from "@/shared/lib/i18n";
 import { APP_I18N_BUILT_IN_LOCALES } from "@/shared/lib/i18n-locale-catalog";
+import "@/domains/creator/studio-app-settings-center-i18n";
 
 function mockTranslationResponseForRequest(url: string): Response {
   const parsed = new URL(url);
@@ -33,9 +39,10 @@ function mockTranslationResponseForRequest(url: string): Response {
 
 function makeCachedLocalePayload(locale: string, dict: Record<string, string>) {
   return {
-    v: 1,
+    v: 2,
     locale,
     updatedAt: Date.now(),
+    complete: true,
     dict,
   };
 }
@@ -110,7 +117,8 @@ function collectSourceI18nKeys(): Set<string> {
 
       const text = readFileSync(full, "utf8");
       for (const match of text.matchAll(keyRe)) {
-        used.add(match[1]);
+        const key = match[1];
+        if (!key.includes("${")) used.add(key);
       }
     }
   };
@@ -149,26 +157,57 @@ describe("i18n locale candidates", () => {
     expect(candidates).toContain("ko");
   });
 
-  it("maps browser-only region variants to a locale exposed by the language control", () => {
+  it("maps known variants and preserves valid custom BCP 47 locales", () => {
     expect(resolveSelectableLocale("ko-KR")).toBe("ko");
     expect(resolveSelectableLocale("zh-Hant-TW")).toBe("zh-hant");
     expect(resolveSelectableLocale("en-US")).toBe("en-us");
+    expect(resolveSelectableLocale("und-Arab")).toBe("und-arab");
     expect(resolveSelectableLocale("not-a-published-locale")).toBe("ko");
+  });
+
+  it("resolves right-to-left direction from language and script subtags", () => {
+    for (const locale of ["ar", "fa", "he", "ur", "az-Arab"]) {
+      expect(getLocaleDirection(locale), locale).toBe("rtl");
+    }
+    for (const locale of ["en", "ko", "ja", "az-Latn"]) {
+      expect(getLocaleDirection(locale), locale).toBe("ltr");
+    }
   });
 });
 
 describe("getLanguageOptions", () => {
-  it("builds options from known and Google Play locales", () => {
+  it("builds options from the worldwide catalog while preserving every legacy locale", () => {
     const options = getLanguageOptions("en");
     const optionCodes = new Set(options.map((item) => item.code));
-    const normalizedGooglePlay = new Set(
-      GOOGLE_PLAY_LOCALE_LIST.map((code) => code.trim().replace(/_/g, "-").toLowerCase())
+    const normalizedWorldCatalog = new Set(
+      WORLD_LANGUAGE_LOCALE_LIST.map((code) =>
+        code.trim().replace(/_/gu, "-").toLowerCase(),
+      ),
     );
 
+    expect(ISO_639_1_LANGUAGE_LOCALE_LIST).toHaveLength(184);
     expect(options).toHaveLength(optionCodes.size);
-    expect(optionCodes.size).toBe(normalizedGooglePlay.size);
+    expect(optionCodes.size).toBe(normalizedWorldCatalog.size);
+    expect(optionCodes.size).toBe(NORMALIZED_LOCALE_OPTIONS.length);
+    expect(optionCodes.size).toBeGreaterThanOrEqual(290);
 
-    for (const requiredCode of ["en", "ko", "zh", "zh-hans", "zh-hant", "es-419"]) {
+    for (const locale of ISO_639_1_LANGUAGE_LOCALE_LIST) {
+      expect(optionCodes.has(locale), `missing ISO 639-1 locale ${locale}`).toBe(true);
+    }
+    for (const locale of GOOGLE_PLAY_LOCALE_LIST) {
+      const normalized = locale.trim().replace(/_/gu, "-").toLowerCase();
+      expect(optionCodes.has(normalized), `legacy locale ${locale} disappeared`).toBe(true);
+    }
+    for (const requiredCode of [
+      "en",
+      "ko",
+      "eo",
+      "tlh",
+      "yue",
+      "zh-hans",
+      "zh-hant",
+      "es-419",
+    ]) {
       expect(optionCodes.has(requiredCode)).toBe(true);
     }
   });
@@ -253,6 +292,22 @@ describe("runtime translation bundles", () => {
     fetchSpy.mockRestore();
   });
 
+  it("fills English placeholders without replacing authored locale strings", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((url) =>
+        Promise.resolve(mockTranslationResponseForRequest(url.toString())),
+      );
+
+    await ensureRuntimeLocaleBundle("es");
+
+    expect(resolveI18nValue("es", "common.close")).toBe("Cerrar");
+    expect(resolveI18nValue("es", "app.name")).toBe(
+      `${i18nDict.en["app.name"]}-translated`,
+    );
+    fetchSpy.mockRestore();
+  });
+
     it("falls back to language root when locale-specific translation variant is unavailable", async () => {
       const calls: string[] = [];
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
@@ -300,7 +355,7 @@ describe("runtime translation bundles", () => {
 
   it("uses cached runtime translation bundle without calling translator", async () => {
     return withLocalStorage(async () => {
-      const cacheKey = "toonspectrum-i18n-runtime:v1:ia";
+      const cacheKey = "toonspectrum-i18n-runtime:v2:ia";
       localStorage.setItem(
         cacheKey,
         JSON.stringify(
@@ -386,38 +441,31 @@ describe("translation dictionary completeness", () => {
     }
   });
 
-  it("resolves valid translations for every Google Play country/locale in the world", () => {
-    for (const rawLocale of GOOGLE_PLAY_LOCALE_LIST) {
-      const appName = resolveI18nValue(rawLocale, "app.name");
-      const commonClose = resolveI18nValue(rawLocale, "common.close");
-      const searchTitle = resolveI18nValue(rawLocale, "search.title");
+  it("keeps a safe synchronous fallback for every selectable world locale", () => {
+    for (const locale of NORMALIZED_LOCALE_OPTIONS) {
+      const appName = resolveI18nValue(locale, "app.name");
+      const commonClose = resolveI18nValue(locale, "common.close");
+      const searchTitle = resolveI18nValue(locale, "search.title");
 
-      expect(appName, `app.name for ${rawLocale}`).toBeTruthy();
-      expect(commonClose, `common.close for ${rawLocale}`).toBeTruthy();
-      expect(searchTitle, `search.title for ${rawLocale}`).toBeTruthy();
+      expect(appName, `app.name for ${locale}`).toBeTruthy();
+      expect(commonClose, `common.close for ${locale}`).toBeTruthy();
+      expect(searchTitle, `search.title for ${locale}`).toBeTruthy();
     }
   });
 
-  it("resolves authentic non-English Studio and App translations for Chinese, Japanese, Spanish, etc.", async () => {
-    await ensureRuntimeLocaleBundle("zh");
+  it("preserves authentic authored App and Studio translations", async () => {
+    for (const locale of ["zh", "zh-hant", "ja", "es", "fr", "de"]) {
+      await loadAppI18nLocale(locale);
+    }
+
     expect(resolveI18nValue("zh", "common.close")).toBe("关闭");
     expect(resolveI18nValue("zh", "studio.settings.title")).toBe("应用程序设置");
-
-    await ensureRuntimeLocaleBundle("zh-hant");
     expect(resolveI18nValue("zh-hant", "common.close")).toBe("關閉");
     expect(resolveI18nValue("zh-hant", "studio.settings.title")).toBe("應用程式設定");
-
-    await ensureRuntimeLocaleBundle("ja");
     expect(resolveI18nValue("ja", "common.close")).toBe("閉じる");
     expect(resolveI18nValue("ja", "studio.settings.title")).toBe("アプリケーション設定");
-
-    await ensureRuntimeLocaleBundle("es");
     expect(resolveI18nValue("es", "common.close")).toBe("Cerrar");
-
-    await ensureRuntimeLocaleBundle("fr");
     expect(resolveI18nValue("fr", "common.close")).toBe("Fermer");
-
-    await ensureRuntimeLocaleBundle("de");
     expect(resolveI18nValue("de", "common.close")).toBe("Schließen");
   });
 });

@@ -1,6 +1,6 @@
 import { useFx } from "@toonspectrum/core/fx";
 import { Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppearanceTrigger } from "./appearance/AppearanceTrigger";
 
@@ -77,14 +77,13 @@ export function FloatingControls({
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
-  // Floating chrome only lists locales with real translations. The full Google Play list stays on Settings.
-  // Keep the active value so a persisted region variant (en-us) does not visually snap to the first option.
-  // Region variants can inherit a translated ratio via fallback; only expose the curated roots here.
-  const langOptions = getLanguageOptions(lang).filter((option) => {
-    if (option.code === lang) return true;
-    if (!option.fullyTranslated) return false;
-    return option.code === "zh-hant" || !option.code.includes("-");
-  });
+  const languageGroups = useMemo(() => {
+    const options = getLanguageOptions(lang);
+    return {
+      translated: options.filter((option) => option.fullyTranslated),
+      automatic: options.filter((option) => !option.fullyTranslated),
+    };
+  }, [lang]);
   const fx = useFx();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
@@ -176,7 +175,7 @@ export function FloatingControls({
 
       {showTheme && <AppearanceTrigger className={cx(PILL, "border-line text-fg-2 hover:text-fg")} />}
 
-      {/* 언어 선택 — 다국어 옵션을 전체 Google Play locale 목록에서 제공합니다. */}
+      {/* 언어 선택 — 전 세계 언어 카탈로그와 안전한 영어 폴백을 제공합니다. */}
       {showLang && (
         <div
           className="inline-flex h-11 items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
@@ -187,11 +186,20 @@ export function FloatingControls({
             onChange={(event) => setLang(event.target.value)}
             className="max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
           >
-            {langOptions.map((o) => (
-              <option key={o.code} value={o.code}>
-                {o.label}
-              </option>
-            ))}
+            <optgroup label={t("control.language.group.translated")}>
+              {languageGroups.translated.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label={t("control.language.group.englishBase")}>
+              {languageGroups.automatic.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
       )}
