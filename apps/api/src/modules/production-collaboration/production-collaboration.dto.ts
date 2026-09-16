@@ -808,6 +808,13 @@ const UpsertSubmissionCommandSchema = z.object({ type: z.literal("upsert-submiss
 const UpsertReviewPolicyCommandSchema = z.object({ type: z.literal("upsert-review-policy"), policy: ReviewPolicySchema }).strict();
 const RecordReviewDecisionCommandSchema = z.object({ type: z.literal("record-review-decision"), policyId: IdentitySchema, decision: ReviewDecisionSchema }).strict();
 const UpsertTaskCommandSchema = z.object({ type: z.literal("upsert-task"), task: ProductionTaskSchema }).strict();
+const UpsertEpisodeOperationsCommandSchema = z.object({
+  type: z.literal("upsert-episode-operations"),
+  episodeId: IdentitySchema,
+  episode: EpisodeCollaborationSchema.optional(),
+  episodePlan: EpisodePlanSchema.optional(),
+  tasks: z.array(ProductionTaskSchema).max(64).default([]),
+}).strict();
 const UpsertChangeRequestCommandSchema = z.object({
   type: z.literal("upsert-change-request"),
   request: ChangeRequestSchema,
@@ -873,6 +880,7 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertReviewPolicyCommandSchema,
   RecordReviewDecisionCommandSchema,
   UpsertTaskCommandSchema,
+  UpsertEpisodeOperationsCommandSchema,
   UpsertChangeRequestCommandSchema,
   PublishScopePackageCommandSchema,
   AmendScopePackageCommandSchema,

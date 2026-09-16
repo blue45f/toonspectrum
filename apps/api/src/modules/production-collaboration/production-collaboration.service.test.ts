@@ -641,4 +641,111 @@ describe("ProductionCollaborationService", () => {
     });
   });
 
+  it("creates a new episode, plan and dependency-safe deadline pipeline atomically", async () => {
+    const current = aggregate();
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+    const episode = {
+      id: "episode-collaboration-14",
+      projectId: "project-1",
+      episodeId: "episode-14",
+      revision: 0,
+      state: "episode-planning" as const,
+      narrativeRevisionRef: null,
+      visualRevisionRef: null,
+      integratedRevisionRef: null,
+      activeHandoffId: null,
+      openBlockerCount: 0,
+      storyLockApproved: false,
+      thumbnailLockApproved: false,
+      jointProofApproved: false,
+      creditPreflightPassed: false,
+      publicationPreflightPassed: false,
+      updatedAt: at,
+    };
+    const episodePlan = {
+      id: "episode-plan-14",
+      projectId: "project-1",
+      seasonId: null,
+      episodeId: "episode-14",
+      episodeNumber: 14,
+      revision: 1,
+      status: "draft" as const,
+      title: "14화 새 출발",
+      logline: "새로운 사건이 시작된다.",
+      openingHook: "",
+      coreConflict: "",
+      turningPoints: [],
+      cliffhanger: "",
+      characterRefs: [],
+      locationRefs: [],
+      targetCutCount: 60,
+      targetScrollHeightPx: 80000,
+      dialogueDensity: "medium" as const,
+      difficulty: 3,
+      riskIds: [],
+      narrativeRevisionRef: null,
+      approvedByAssignmentIds: [],
+      createdAt: at,
+    };
+    const storyTask = {
+      id: "task-episode-14-story",
+      projectId: "project-1",
+      scope: episodeScope("project-1", "episode-14"),
+      processKey: "story",
+      title: "14화 대본 확정",
+      status: "draft" as const,
+      assignmentIds: [],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-10-01T09:00:00.000Z",
+      estimateHours: { optimistic: 6, likely: 10, pessimistic: 14 },
+      completionCriteria: ["대사 정본 고정"],
+      sourceAgreementMilestoneId: null,
+    };
+    const publicationTask = {
+      ...storyTask,
+      id: "task-episode-14-publication",
+      processKey: "publication",
+      title: "14화 게시 예약",
+      dependencyTaskIds: [storyTask.id],
+      dueAt: "2026-10-15T09:00:00.000Z",
+      estimateHours: { optimistic: 2, likely: 3, pessimistic: 5 },
+      completionCriteria: ["업로드 규격 검증"],
+    };
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "12121212-1212-4212-8212-121212121212",
+      command: {
+        type: "upsert-episode-operations",
+        episodeId: episode.episodeId,
+        episode,
+        episodePlan,
+        tasks: [storyTask, publicationTask],
+      },
+    });
+    expect(result.aggregate).toMatchObject({ revision: 1 });
+    expect(result.aggregate.episodes).toHaveLength(1);
+    expect(result.aggregate.episodePlans).toHaveLength(1);
+    expect(result.aggregate.tasks).toHaveLength(2);
+    expect(result.derived).toEqual({
+      episodeId: "episode-14",
+      taskCount: 2,
+      releaseAt: "2026-10-15T09:00:00.000Z",
+    });
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "upsert-episode-operations",
+      targetType: "episode-operations",
+      targetId: "episode-14",
+    });
+  });
+
 });
