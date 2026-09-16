@@ -21,10 +21,20 @@ import type {
   PromotionDetail,
 } from "../../../../../packages/core/src/promotion";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { promotionClient } from "@/infrastructure/promotion-client";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
+import { ShareDialog } from "@/shared/components/share-dialog";
+import {
+  canSharePromotionPost,
+  compactPublicShareDescription,
+  publicShareImageUrl,
+} from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 
 export function PromotionPostPage() {
@@ -45,7 +55,31 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
   const live = useRef(true);
   const actionBusy = useRef(false);
 
-  useDocumentTitle(data ? `${data.post.title} · 작가 홍보` : "작가 홍보 · ToonStudio");
+  const post = data?.post;
+  const shareable = post ? canSharePromotionPost(post) : false;
+  const sharePath = id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote";
+  const shareTitle = post ? `${post.title} · ${post.seriesTitle}` : "작가 홍보";
+  const shareDescription = compactPublicShareDescription(
+    post?.contentWarning
+      ? `${post.seriesTitle} · 콘텐츠 안내: ${post.contentWarning}`
+      : post?.description,
+    "웹툰 신작과 창작자의 작업 이야기를 확인해 보세요.",
+  );
+  const shareImage = publicShareImageUrl(shareable ? post?.cover : null);
+  const publicMetaTitle = shareable ? shareTitle : "작가 홍보";
+  const publicMetaDescription = shareable
+    ? shareDescription
+    : "웹툰 신작과 창작자의 작업 이야기를 소개하는 공간입니다.";
+
+  useDocumentTitle(post ? `${post.title} · 작가 홍보` : "작가 홍보 · ToonStudio");
+  useMetaDescription(post ? publicMetaDescription : null);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: publicMetaTitle,
+    description: publicMetaDescription,
+    type: "article",
+    image: shareImage,
+  });
 
   useEffect(() => {
     live.current = true;
@@ -103,16 +137,6 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
     }
   }
 
-  async function share() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      if (live.current) setNotice("게시물 링크를 복사했어요.");
-    } catch {
-      if (live.current) setNotice("주소창의 게시물 주소를 복사해 공유해 주세요.");
-    }
-  }
-
-  const post = data?.post;
   const readingUrl = post ? safePromotionUrl(post.readingUrl) : null;
 
   return (
@@ -202,10 +226,23 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 <Bookmark size={16} aria-hidden />
                 {post.saved ? "저장됨" : "작품 저장"}
               </button>
-              <button className="pc-button" type="button" onClick={() => void share()}>
-                <Share2 size={16} aria-hidden />
-                링크 복사
-              </button>
+              {shareable ? (
+                <ShareDialog
+                  payload={{
+                    title: shareTitle,
+                    text: shareDescription,
+                    url: sharePath,
+                    imageUrl: shareImage,
+                    buttonLabel: "소개 보기",
+                  }}
+                  trigger={
+                    <button className="pc-button" type="button">
+                      <Share2 size={16} aria-hidden />
+                      게시물 공유
+                    </button>
+                  }
+                />
+              ) : null}
             </div>
 
             {data.canManage ? (

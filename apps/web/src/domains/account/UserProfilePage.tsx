@@ -8,15 +8,17 @@ import type { SeedReview, Title } from "@/shared/lib/types";
 import Link from "@/compat/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
 import { useT } from "@/shared/lib/i18n";
+import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
 import { ErrorState } from "@/components/error-state";
 import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/creator-community-ui";
-import { useDocumentTitle, useMetaDescription } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import {
   getCreatorProfile,
   listSeries,
@@ -191,16 +193,29 @@ export function UserProfilePage() {
   const total = data?.stats.total ?? 0;
   const avg = data?.stats.avg ?? 0;
   const distinctTitles = data?.stats.distinctTitles ?? 0;
+  const profileMetaDescription = data
+    ? t("userProfile.metaTemplate")
+        .replace("{author}", author)
+        .replace("{reviews}", String(total))
+        .replace("{works}", String(distinctTitles))
+        .replace("{avg}", avg ? avg.toFixed(1) : "-")
+    : compactPublicShareDescription(
+        profile?.bio,
+        `${author} 창작자의 작품, 시리즈와 커뮤니티 활동을 확인해 보세요.`,
+      );
+  const sharePath = userId ? `/u/${encodeURIComponent(userId)}` : "/community";
+  const shareDescription = compactPublicShareDescription(profile?.bio, profileMetaDescription);
+  const shareImage = publicShareImageUrl(profile?.avatar);
+
   useDocumentTitle(loading && !profile ? t("userProfile.eyebrow") : `${author}`);
-  useMetaDescription(
-    data
-      ? t("userProfile.metaTemplate")
-          .replace("{author}", author)
-          .replace("{reviews}", String(total))
-          .replace("{works}", String(distinctTitles))
-          .replace("{avg}", avg ? avg.toFixed(1) : "-")
-      : null
-  );
+  useMetaDescription(profileMetaDescription);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: `${author} 창작자 프로필`,
+    description: shareDescription,
+    type: "website",
+    image: shareImage,
+  });
 
   async function onToggleFollow() {
     if (!profile || !viewerId || isSelf || followBusy) return;
@@ -250,42 +265,55 @@ export function UserProfilePage() {
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
             </div>
-            {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
-            {profile && !isSelf && (
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {viewerId && (
-                  <Link
-                    href={{
-                      pathname: "/messages/new",
-                      query: { to: profile.id, name: author },
-                    }}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {(profile || data) && (
+                <SharePageButton
+                  path={sharePath}
+                  text={`${author} 창작자 프로필`}
+                  description={shareDescription}
+                  imageUrl={shareImage}
+                  label="프로필 공유"
+                  actionLabel="프로필 보기"
+                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                />
+              )}
+              {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
+              {profile && !isSelf && (
+                <>
+                  {viewerId && (
+                    <Link
+                      href={{
+                        pathname: "/messages/new",
+                        query: { to: profile.id, name: author },
+                      }}
+                      className={buttonClass({
+                        size: "sm",
+                        variant: "outline",
+                        className: "gap-1.5",
+                      })}
+                    >
+                      <Mail size={14} aria-hidden="true" />
+                      메시지
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onToggleFollow}
+                    disabled={!viewerId || followBusy}
+                    aria-pressed={profile.isFollowing}
+                    title={viewerId ? undefined : t("userProfile.followHint")}
                     className={buttonClass({
                       size: "sm",
-                      variant: "outline",
+                      variant: profile.isFollowing ? "outline" : "solid",
                       className: "gap-1.5",
                     })}
                   >
-                    <Mail size={14} aria-hidden="true" />
-                    메시지
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={onToggleFollow}
-                  disabled={!viewerId || followBusy}
-                  aria-pressed={profile.isFollowing}
-                  title={viewerId ? undefined : t("userProfile.followHint")}
-                  className={buttonClass({
-                    size: "sm",
-                    variant: profile.isFollowing ? "outline" : "solid",
-                    className: "gap-1.5",
-                  })}
-                >
-                  {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
-                  {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
-                </button>
-              </div>
-            )}
+                    {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
+                    {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:flex sm:flex-wrap sm:items-end sm:gap-x-9">
