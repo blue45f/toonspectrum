@@ -87,7 +87,7 @@ describe("Studio rich-hint consumer mappings", () => {
       ["도형 채우기 끄기", "shape-fill"],
       ["세부 그리기 옵션 접기", "draw-settings"],
       ["캔버스 좌우 반전", "flip-view"],
-      ["브러시 스튜디오", "brush-studio"],
+      ["현재 브러시 편집", "brush-studio"],
       ["스마트 도형 끄기", "smart-shape"],
       ["브러시 슬롯 ${index + 1}", "brush-slot"],
     ]) {

@@ -176,7 +176,7 @@ export function studioInspectorActions(context: StudioInspectorActionContext): r
     contextual.push(action("drawing-properties", "그리기 도구 설정", "브러시, 지우개, 도형, 필압과 그리기 보조 설정을 엽니다.", ["draw", "brush", "pen", "그리기", "브러시", "지우개", "필압", "대칭"], { primary: "properties" }, "tool", "대상 › 그리기 도구"));
     if (context.drawingToolPropertiesAvailable !== false) {
       contextual.push(
-        action("brush-studio", "브러시 스튜디오", "브러시 팁, 간격, 압력과 질감의 고급 설정을 엽니다.", ["brush studio", "tip", "spacing", "pressure", "브러시", "간격", "필압", "질감"], { primary: "properties" }, "property", "대상 › 그리기 도구 › 브러시 스튜디오", "tool.brush-studio"),
+        action("brush-studio", "현재 브러시 편집", "현재 브러시의 팁, 간격, 압력과 질감 설정을 엽니다.", ["brush studio", "tip", "spacing", "pressure", "브러시", "간격", "필압", "질감"], { primary: "properties" }, "property", "대상 › 그리기 도구 › 현재 브러시 편집", "tool.brush-studio"),
         action("brush-engines", "브러시 엔진", "자연 매체와 고급 브러시 엔진을 선택하고 조절합니다.", ["brush engine", "natural media", "자연매체", "유화", "수채"], { primary: "properties" }, "property", "대상 › 그리기 도구 › 브러시 엔진", "tool.brush-engines"),
       );
     }

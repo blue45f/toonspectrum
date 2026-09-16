@@ -459,7 +459,7 @@ describe("StudioDrawingPaletteStack", () => {
       });
 
       const sectionHeader = await screen.findByRole("button", {
-        name: /브러시 스튜디오/u,
+        name: /현재 브러시 편집/u,
       });
       await waitFor(() => {
         expect(
