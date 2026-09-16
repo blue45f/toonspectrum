@@ -149,6 +149,12 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_work_report",
   "creator_work_review_feedback",
   "creator_work_review_link",
+  "member_message",
+  "member_message_block",
+  "member_message_participant",
+  "member_message_preference",
+  "member_message_report",
+  "member_message_thread",
   "personal_cloud_connection",
   "production_integration_connection",
   "production_integration_oauth_state",
@@ -302,7 +308,7 @@ export function buildCommunityCommentRuntimeAclViolationSql(runtimeDatabaseRole)
       FROM unnest(ARRAY[
         'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
       ]::text[]) AS public_privilege
-      WHERE pg_catalog.has_table_privilege('PUBLIC', relation_name, public_privilege)
+      WHERE pg_catalog.has_table_privilege(0::oid, relation_name, public_privilege)
     )
   )`;
 }
@@ -347,6 +353,67 @@ export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
       )
     )
   )`;
+}
+
+const MESSAGING_RUNTIME_RELATIONS = Object.freeze([
+  "member_message",
+  "member_message_block",
+  "member_message_participant",
+  "member_message_preference",
+  "member_message_report",
+  "member_message_thread",
+]);
+
+export function buildMessagingRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  const relations = MESSAGING_RUNTIME_RELATIONS
+    .map((relation) => `public.${relation}`)
+    .join(",\n  ");
+  return `
+REVOKE ALL ON TABLE
+  ${relations}
+FROM PUBLIC;
+REVOKE ALL ON TABLE
+  ${relations}
+FROM ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE ${relations}
+  TO ${quotedRole};
+`;
+}
+
+export function buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  const checks = MESSAGING_RUNTIME_RELATIONS.map((relation) => `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.${relation}',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.${relation}',
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        'public.${relation}',
+        public_privilege
+      )
+    )
+  )`).join("\n    OR ");
+  return `(${checks})`;
 }
 
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
@@ -2779,6 +2846,7 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildMessagingRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));

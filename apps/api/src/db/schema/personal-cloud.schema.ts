@@ -1,4 +1,12 @@
-import { index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 import { users } from "./auth.schema";
 
@@ -27,6 +35,10 @@ export const personalCloudConnections = pgTable(
   },
   (connection) => [
     primaryKey({ columns: [connection.userId, connection.provider] }),
+    check(
+      "personal_cloud_connection_provider_check",
+      sql`${connection.provider} in ('google-drive', 'dropbox', 'onedrive')`,
+    ),
     index("idx_personal_cloud_connection_updated").on(
       connection.userId,
       connection.updatedAt,

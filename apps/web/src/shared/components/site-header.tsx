@@ -71,6 +71,7 @@ const MY_PURPOSE_PREFIXES = [
   "/my",
   "/me",
   "/library",
+  "/messages",
   "/settings",
 ] as const;
 

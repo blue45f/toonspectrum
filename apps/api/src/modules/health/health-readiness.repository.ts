@@ -112,6 +112,12 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "feedback_post",
   "feedback_reply",
   "feedback_vote",
+  "member_message",
+  "member_message_block",
+  "member_message_participant",
+  "member_message_preference",
+  "member_message_report",
+  "member_message_thread",
   "monetization_plan",
   "personal_cloud_connection",
   "production_integration_connection",
@@ -164,6 +170,7 @@ export const REQUIRED_DATABASE_MIGRATIONS = [
   "0033_creator_marketplace_cloud_library",
   "0034_creator_marketplace_package_moderation",
   "0051_personal_cloud_connections",
+  "0059_member_messaging",
 ] as const;
 
 interface DatabasePingRow {

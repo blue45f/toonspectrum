@@ -40,9 +40,61 @@ export interface ContentReportItem {
   targetType: string;
   targetId: string;
   reason: string;
+  details?: string | null;
   status: ReportStatus;
   resolutionNote: string | null;
+  evidenceSnapshot?: unknown;
   createdAt: string;
+}
+
+interface MessageEvidenceItem {
+  id: string;
+  senderId: string | null;
+  type: string;
+  body: string;
+  createdAt: string;
+}
+
+interface MessageEvidenceView {
+  targetMessageId: string | null;
+  capturedAt: string | null;
+  messages: MessageEvidenceItem[];
+}
+
+function parseMessageEvidence(value: unknown): MessageEvidenceView | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const snapshot = value as Record<string, unknown>;
+  if (!Array.isArray(snapshot.messages)) return null;
+  const messages = snapshot.messages.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return [];
+    }
+    const item = candidate as Record<string, unknown>;
+    if (
+      typeof item.id !== "string" ||
+      typeof item.body !== "string" ||
+      typeof item.type !== "string" ||
+      typeof item.createdAt !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      id: item.id,
+      senderId: typeof item.senderId === "string" ? item.senderId : null,
+      type: item.type,
+      body: item.body,
+      createdAt: item.createdAt,
+    }];
+  });
+  return {
+    targetMessageId:
+      typeof snapshot.targetMessageId === "string"
+        ? snapshot.targetMessageId
+        : null,
+    capturedAt:
+      typeof snapshot.capturedAt === "string" ? snapshot.capturedAt : null,
+    messages,
+  };
 }
 
 interface AdminReportsProps {
@@ -418,6 +470,10 @@ export function AdminReports({ userId }: AdminReportsProps) {
         <div className="grid gap-4">
           {visibleReports.map((item) => {
             const selectable = item.status === "pending";
+            const messageEvidence =
+              item.targetType === "member_message"
+                ? parseMessageEvidence(item.evidenceSnapshot)
+                : null;
             return (
               <article
                 key={item.id}
@@ -465,12 +521,56 @@ export function AdminReports({ userId }: AdminReportsProps) {
                           item.reporterEmail ||
                           item.reporterId}
                       </p>
-                      <p className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-sm text-slate-300">
-                        <span className="font-semibold text-amber-400">
-                          {t("admin.reports.reasonPrefix")}
-                        </span>{" "}
-                        {item.reason}
-                      </p>
+                      <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-sm text-slate-300">
+                        <p>
+                          <span className="font-semibold text-amber-400">
+                            {t("admin.reports.reasonPrefix")}
+                          </span>{" "}
+                          {item.reason}
+                        </p>
+                        {item.details ? (
+                          <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-400">
+                            {item.details}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {messageEvidence ? (
+                        <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                          <summary className="cursor-pointer text-xs font-semibold text-slate-300">
+                            보존된 대화 증거 {messageEvidence.messages.length.toLocaleString()}건
+                          </summary>
+                          {messageEvidence.capturedAt ? (
+                            <p className="mt-2 text-[0.68rem] text-slate-500">
+                              캡처 시각: {formatDate(messageEvidence.capturedAt)}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
+                            {messageEvidence.messages.map((message) => (
+                              <div
+                                key={message.id}
+                                className={cn(
+                                  "rounded-lg border border-slate-800 bg-slate-950 p-3",
+                                  message.id === messageEvidence.targetMessageId &&
+                                    "border-amber-500/50 bg-amber-500/5",
+                                )}
+                              >
+                                <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-slate-500">
+                                  <span>{message.senderId ?? "탈퇴한 회원"}</span>
+                                  <span>{message.type}</span>
+                                  <span>{formatDate(message.createdAt)}</span>
+                                  {message.id === messageEvidence.targetMessageId ? (
+                                    <span className="font-semibold text-amber-400">신고 대상</span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-300">
+                                  {message.body}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
 
                       {item.resolutionNote ? (
                         <p className="text-xs italic text-slate-400">
@@ -484,15 +584,21 @@ export function AdminReports({ userId }: AdminReportsProps) {
                   </div>
 
                   <div className="flex flex-wrap gap-2 lg:justify-end">
-                    <Link
-                      href={`/admin/community?q=${encodeURIComponent(
-                        item.targetId,
-                      )}`}
-                      className={adminButtonClass("ghost")}
-                    >
-                      <ExternalLink size={13} />
-                      {copy.reports.viewTarget}
-                    </Link>
+                    {item.targetType === "member_message" ? (
+                      <span className="inline-flex min-h-10 items-center rounded-xl border border-line bg-panel px-3 text-xs text-fg-3">
+                        관리자 전용 증거
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/admin/community?q=${encodeURIComponent(
+                          item.targetId,
+                        )}`}
+                        className={adminButtonClass("ghost")}
+                      >
+                        <ExternalLink size={13} />
+                        {copy.reports.viewTarget}
+                      </Link>
+                    )}
                     {item.status === "pending" ? (
                       <>
                         <button
