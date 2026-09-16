@@ -113,7 +113,7 @@ describe("StudioProjectLibraryPage", () => {
     }
 
     render(
-      <MemoryRouter initialEntries={["/studio/view=trash"]}>
+      <MemoryRouter initialEntries={["/studio?view=trash"]}>
         <StudioProjectLibraryPage />
       </MemoryRouter>,
     );
