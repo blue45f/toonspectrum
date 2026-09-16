@@ -51,6 +51,15 @@ describe("StudioWorkspaceRegion", () => {
     await edit(); expect(screen.getByRole("button", { name: "테스트 도구 이동" })).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" }); expect(screen.queryByRole("button", { name: "테스트 도구 이동" })).toBeNull();
   });
+  it("closes the arrangement palette without changing the document or panel state", async () => {
+    render(<Harness />);
+    const child = screen.getByRole("button", { name: "도구 실행" });
+    await edit();
+    fireEvent.click(screen.getByRole("button", { name: "배치 도구 닫기" }));
+    expect(screen.getByRole("button", { name: "배치 편집" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "테스트 도구 이동" })).toBeNull();
+    expect(screen.getByRole("button", { name: "도구 실행" })).toBe(child);
+  });
   it("keeps local input and mounted child state while moving, attaching, and disabling", async () => {
     const mounted = vi.fn(); const unmounted = vi.fn();
     function Child() { const [value, setValue] = useState(""); useEffect(() => { mounted(); return unmounted; }, []); return <input aria-label="이름" value={value} onChange={(event) => setValue(event.target.value)} />; }
