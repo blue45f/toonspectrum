@@ -28,10 +28,22 @@ export const personalCloudConnections = pgTable(
     encryptedRefreshToken: text("encryptedRefreshToken").notNull(),
     tokenType: text("tokenType").notNull().default("Bearer"),
     scope: text("scope").notNull(),
-    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", { mode: "date" }).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
-    lastUsedAt: timestamp("lastUsedAt", { mode: "date" }),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("createdAt", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull().defaultNow(),
+    lastUsedAt: timestamp("lastUsedAt", {
+      mode: "date",
+      withTimezone: true,
+    }),
   },
   (connection) => [
     primaryKey({ columns: [connection.userId, connection.provider] }),
