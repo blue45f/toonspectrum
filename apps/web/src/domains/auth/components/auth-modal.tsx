@@ -1,5 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
+import {
+  Code2,
+  ImagePlus,
+  LogIn,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
@@ -50,7 +58,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 const authSchema = z.object({
   email: z.string().trim().min(1, "이메일을 입력해 주세요.").email("이메일 형식을 확인해 주세요."),
-  password: z.string().min(6, "비밀번호는 6자 이상이어야 해요."),
+  password: z.string().min(1, "비밀번호를 입력해 주세요.").max(128, "비밀번호가 너무 깁니다."),
   name: z.string(),
   avatar: z.string(),
   image: z.string().nullable(),
@@ -70,6 +78,8 @@ export function AuthModal({
   const [providerStatus, setProviderStatus] = useState<"loading" | "ready" | "error">("loading");
   const [providerAttempt, setProviderAttempt] = useState(0);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
+  const [emailAction, setEmailAction] = useState<"reset" | "resend" | null>(null);
   const [imageErr, setImageErr] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
@@ -168,21 +178,36 @@ export function AuthModal({
 
   const submit = handleSubmit(async ({ email, password, name, avatar, image }) => {
     setErr("");
+    setNotice("");
     try {
       if (mode === "signup") {
-        const r = await fetch(apiPath("/auth/signup"), withCsrfProtection({
+        if (Array.from(password).length < 15) {
+          setErr("비밀번호는 15자 이상이어야 해요.");
+          return;
+        }
+        const response = await fetch(apiPath("/auth/signup"), withCsrfProtection({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name, avatar, image }),
         }));
-        if (!r.ok) {
-          setErr((await r.json()).error ?? "가입 실패");
+        const payload = await response.json().catch(() => null) as {
+          error?: string;
+          message?: string;
+        } | null;
+        if (!response.ok) {
+          setErr(payload?.error ?? "가입을 완료하지 못했어요.");
           return;
         }
+        setMode("login");
+        setValue("password", "");
+        setNotice(payload?.message ?? "가입 확인 메일을 보냈어요. 이메일 인증 후 로그인해 주세요.");
+        return;
       }
-      const res = await signIn("credentials", { email, password, redirect: false });
-      if (res?.error) {
-        setErr("이메일 또는 비밀번호를 확인해 주세요.");
+      const result = await signIn("credentials", { email, password, redirect: false });
+      if (result?.error) {
+        setErr(result.error === "auth-failed"
+          ? "이메일 또는 비밀번호를 확인해 주세요."
+          : result.error);
         return;
       }
       onClose();
@@ -190,6 +215,43 @@ export function AuthModal({
       setErr("문제가 발생했어요. 다시 시도해 주세요.");
     }
   });
+
+  const requestEmailAction = async (
+    action: "reset" | "resend",
+  ) => {
+    const email = emailValue.trim();
+    setErr("");
+    setNotice("");
+    if (!email) {
+      setErr("이메일을 먼저 입력해 주세요.");
+      emailRef.current?.focus();
+      return;
+    }
+    setEmailAction(action);
+    try {
+      const endpoint = action === "reset"
+        ? "/auth/password/reset/request"
+        : "/auth/email/verification/resend";
+      const response = await fetch(apiPath(endpoint), withCsrfProtection({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }));
+      const payload = await response.json().catch(() => null) as {
+        error?: string;
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        setErr(payload?.error ?? "안내 메일을 보내지 못했어요.");
+        return;
+      }
+      setNotice(payload?.message ?? "처리 가능한 계정이 있다면 안내 메일을 보냈어요.");
+    } catch {
+      setErr("메일 요청 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setEmailAction(null);
+    }
+  };
 
   const avatarImage = resolveSignupAvatarImage(imageValue);
 
@@ -261,6 +323,7 @@ export function AuthModal({
                 onClick={() => {
                   setMode(m);
                   setErr("");
+                  setNotice("");
                 }}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -410,7 +473,8 @@ export function AuthModal({
             <input
               {...register("password")}
               type="password"
-              placeholder="비밀번호 (6자 이상)"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              placeholder={mode === "signup" ? "비밀번호 (15자 이상)" : "비밀번호"}
               aria-label="비밀번호"
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? "auth-password-error" : undefined}
@@ -419,6 +483,31 @@ export function AuthModal({
             {errors.password?.message && (
               <p id="auth-password-error" className="text-xs text-bad" role="alert">
                 {errors.password.message}
+              </p>
+            )}
+            {mode === "login" && (
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[0.72rem]">
+                <button
+                  type="button"
+                  disabled={emailAction !== null}
+                  onClick={() => { void requestEmailAction("resend"); }}
+                  className="font-medium text-fg-3 hover:text-accent disabled:opacity-50"
+                >
+                  {emailAction === "resend" ? "전송 중…" : "인증 메일 다시 보내기"}
+                </button>
+                <button
+                  type="button"
+                  disabled={emailAction !== null}
+                  onClick={() => { void requestEmailAction("reset"); }}
+                  className="font-medium text-fg-3 hover:text-accent disabled:opacity-50"
+                >
+                  {emailAction === "reset" ? "전송 중…" : "비밀번호를 잊으셨나요?"}
+                </button>
+              </div>
+            )}
+            {notice && (
+              <p className="rounded-lg border border-good/30 bg-good/5 px-3 py-2 text-xs leading-relaxed text-good" role="status">
+                {notice}
               </p>
             )}
             {err && (
@@ -436,7 +525,11 @@ export function AuthModal({
             </button>
           </form>
 
-          {(providerStatus !== "ready" || providers.kakao || providers.google || providers.naver) && (
+          {(providerStatus !== "ready"
+            || providers.kakao
+            || providers.google
+            || providers.naver
+            || providers.github) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
@@ -511,6 +604,16 @@ export function AuthModal({
                   >
                     네이버로 계속하기
                     {providers.naver.mode === "demo" && <DemoTag dark />}
+                  </button>
+                )}
+                {providers.github && (
+                  <button
+                    type="button"
+                    onClick={() => signIn("github")}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-[oklch(0.22_0.015_70)] text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  >
+                    <Code2 size={17} aria-hidden="true" />
+                    GitHub로 계속하기
                   </button>
                 )}
               </div>

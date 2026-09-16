@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parse as parseYaml } from "yaml";
 
 import { validateEnv } from "../apps/api/src/config/env";
-import { buildAuthorizeUrl, isAuthorizationCodeFlowConfigured, issueState, redirectUri, verifyState, webAppBaseUrl } from "../apps/api/src/server/oauth";
+import { buildAuthorizeUrl, createPkceCodeChallenge, isAuthorizationCodeFlowConfigured, issuePkceVerifier, issueState, redirectUri, verifyState, webAppBaseUrl } from "../apps/api/src/server/oauth";
 
 vi.mock("../apps/api/src/db", () => ({
   accounts: {}, db: {}, dbClient: {}, sessions: {}, users: {},
@@ -14,9 +14,12 @@ const SECRET = "fixture-signing-secret-with-at-least-32-bytes";
 const FAKE_DB = "postgresql://fixture:fixture@127.0.0.1:1/fixture";
 const fixtureKeys = [
   "DATABASE_URL", "AUTH_SESSION_SECRET", "AUTH_STATE_SECRET", "AUTH_SECRET", "BETTER_AUTH_SECRET",
+  "AUTH_EMAIL_PROVIDER", "AUTH_EMAIL_FROM", "AUTH_EMAIL_REPLY_TO", "RESEND_API_KEY",
   "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "KAKAO_REST_API_KEY", "KAKAO_CLIENT_SECRET",
   "NAVER_OAUTH_CLIENT_ID", "NAVER_OAUTH_CLIENT_SECRET", "WEB_APP_BASE_URL", "OAUTH_REDIRECT_BASE_URL",
   "KAKAO_OAUTH_CLIENT_ID", "KAKAO_OAUTH_CLIENT_SECRET", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
+  "GITHUB_OAUTH_CLIENT_ID", "GITHUB_OAUTH_CLIENT_SECRET", "KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED",
+  "KAKAO_APP_ID", "KAKAO_ADMIN_KEY", "AUTH_SOCIAL_DEMO_ENABLED",
   "PRIVATE_OBJECT_STORAGE_ENABLED",
   "PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER",
   "PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER",
@@ -240,11 +243,11 @@ describe("production reconciliation runtime authority", () => {
 
 describe("OAuth aliases use the same state-signing authority as the real API", () => {
   const cases = [
-    { provider: "kakao", credentials: { KAKAO_OAUTH_CLIENT_ID: "fixture-kakao-id" } },
     { provider: "kakao", credentials: { KAKAO_OAUTH_CLIENT_ID: "fixture-kakao-id", KAKAO_OAUTH_CLIENT_SECRET: "fixture-kakao-secret" } },
     { provider: "naver", credentials: { NAVER_CLIENT_ID: "fixture-naver-id", NAVER_CLIENT_SECRET: "fixture-naver-secret" } },
     { provider: "naver", credentials: { NAVER_OAUTH_CLIENT_ID: "fixture-naver-id", NAVER_CLIENT_SECRET: "fixture-naver-secret" } },
     { provider: "naver", credentials: { NAVER_CLIENT_ID: "fixture-naver-id", NAVER_OAUTH_CLIENT_SECRET: "fixture-naver-secret" } },
+    { provider: "github", credentials: { GITHUB_OAUTH_CLIENT_ID: "fixture-github-id", GITHUB_OAUTH_CLIENT_SECRET: "fixture-github-secret" } },
   ];
   it.each(cases)("refuses the configured $provider alias flow before any Vercel write without state authority: $credentials", async ({ provider, credentials }) => {
     existing.push({ key: "AUTH_SESSION_SECRET", type: "sensitive", target: ["production"] });
@@ -270,7 +273,10 @@ describe("OAuth aliases use the same state-signing authority as the real API", (
     expect(isAuthorizationCodeFlowConfigured(provider)).toBe(true);
     const state = issueState(provider);
     expect(verifyState(provider, state)).toBe(true);
-    const url = new URL(buildAuthorizeUrl(provider, state));
+    const authorizeOptions = provider === "github"
+      ? { pkceCodeChallenge: createPkceCodeChallenge(issuePkceVerifier()) }
+      : undefined;
+    const url = new URL(buildAuthorizeUrl(provider, state, authorizeOptions));
     expect(url.searchParams.get("client_id")).toBe(Object.entries(credentials).find(([key]) => key.endsWith("CLIENT_ID"))[1]);
     expect(url.searchParams.get("state")).toBe(state);
   });

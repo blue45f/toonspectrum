@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (/\/auth\/session$/u.test(pathname)) {
-      await route.fulfill({ status: 200, json: { user: null, expires: null } });
+      await route.fulfill({ status: 200, json: { authenticated: false, user: null } });
     } else {
       await route.fulfill({ status: 503, json: { message: "Browser regression: service temporarily unavailable", error: "Service Unavailable" } });
     }
@@ -123,22 +123,41 @@ test("account pages never receive promotional onward cards", async ({ page }) =>
   }
 });
 
-test("artwork contrast controls, theme surfaces and reduced motion remain functional", async ({ page }, testInfo) => {
+test("theme artwork, contrast surfaces and reduced motion remain functional", async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("toonspectrum-theme", JSON.stringify({
+      state: { preference: "light", studioPreference: "inherit", theme: "light" },
+      version: 0,
+    }));
+  });
   await page.setViewportSize({ width: 320, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const slider = page.locator(".cf-art-study").getByRole("slider");
-  await slider.focus();
-  await page.keyboard.press("Home");
-  await expect(slider).toHaveValue("0");
-  await page.keyboard.press("End");
-  await expect(slider).toHaveValue("100");
-  expect(await page.locator(".cf-study-art img").first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  const home = page.locator('[data-creator-experience="clarity-v1"]');
+  const artwork = home.locator(".cf-home-preview img");
+  await expect(home).toHaveAttribute("data-theme-art", "light");
+  await expect(artwork).toHaveAttribute("data-art-asset", "process");
+  await expect(artwork).toHaveAttribute("srcset", /640w/u);
+  expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
-  for (const theme of ["light", "dark"]) {
-    await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
-    await capturePageEvidence(page, testInfo, `home-320-${theme}`);
-  }
+  await capturePageEvidence(page, testInfo, "home-320-light");
+
+  const dark = JSON.stringify({
+    state: { preference: "dark", studioPreference: "inherit", theme: "dark" },
+    version: 0,
+  });
+  await page.evaluate((value) => {
+    localStorage.setItem("toonspectrum-theme", value);
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: "toonspectrum-theme",
+      newValue: value,
+      storageArea: localStorage,
+    }));
+  }, dark);
+  await expect(home).toHaveAttribute("data-theme-art", "dark");
+  await expect(artwork).toHaveAttribute("data-art-asset", "world");
+  expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  await capturePageEvidence(page, testInfo, "home-320-dark");
 });
 
 test("directory search supports real navigation, a shared query, Back and recovery", async ({ page }) => {

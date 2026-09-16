@@ -18,6 +18,8 @@ const PUBLIC_ROUTE_SOURCE_FILES = [
 
 const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
   "/auth/callback",
+  "/auth/reset-password",
+  "/auth/verify-email",
   "/collaborate/moderation",
   "/community/promote/moderation",
   "/challenges",
@@ -72,7 +74,9 @@ const directorySource = `${sitemapSource}\n${navigationSource}`;
 function staticUserFacingRoutes(): string[] {
   const routes = PUBLIC_ROUTE_SOURCE_FILES.flatMap((sourcePath) => {
     const source = readFileSync(sourcePath, "utf8");
-    return [...source.matchAll(/\bpath:\s*"([^"]+)"/gu)].map((match) => match[1]);
+    const fromPathField = [...source.matchAll(/\bpath:\s*"([^"]+)"/gu)].map((match) => match[1]);
+    const fromRouteHelper = [...source.matchAll(/\broute\(\s*"[^"]+"\s*,\s*"([^"]+)"/gu)].map((match) => match[1]);
+    return [...fromPathField, ...fromRouteHelper];
   });
 
   return [...new Set(routes)]
@@ -125,6 +129,8 @@ describe("site directory experience contracts", () => {
     for (const href of [
       "/admin",
       "/auth/callback",
+      "/auth/reset-password",
+      "/auth/verify-email",
       "/collaborate/moderation",
       "/creator-hub",
       "/showcase",

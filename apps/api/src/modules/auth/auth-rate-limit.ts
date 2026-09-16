@@ -7,6 +7,12 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   "oauth-demo": { limit: 20 },
   signup: { limit: 5 },
   login: { limit: 10 },
+  "email-verify": { limit: 10 },
+  "email-verification-resend": { limit: 3 },
+  "password-reset-request": { limit: 5 },
+  "password-reset-confirm": { limit: 10 },
+  "account-link": { limit: 10 },
+  "account-unlink": { limit: 10 },
 } as const;
 
 export type AuthRateLimitAction = keyof typeof AUTH_RATE_LIMIT_POLICIES;
@@ -123,13 +129,21 @@ export class LocalAuthRateLimiter {
  * digest so one endpoint cannot consume another endpoint's policy bucket. The complete 256-bit
  * digest is retained; the Upstash client HMACs it again before creating the Redis key.
  */
+export type AuthRateLimitSubjectKind = "ip" | "account" | "token";
+
 export function createAuthRateLimitSubjectFingerprint(
   action: AuthRateLimitAction,
-  sourceIp: string,
+  subject: string,
+  kind: AuthRateLimitSubjectKind = "ip",
 ): `sha256:${string}` {
   const digest = createHash("sha256")
     .update(
-      JSON.stringify(["toonspectrum-auth-rate-limit-v1", action, sourceIp]),
+      JSON.stringify([
+        "toonspectrum-auth-rate-limit-v2",
+        action,
+        kind,
+        subject,
+      ]),
       "utf8",
     )
     .digest("hex");

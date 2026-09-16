@@ -38,10 +38,30 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(61);
+  expect(manifest).toHaveLength(62);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0061_member_messaging_cutover_marker");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(61);
+  expect(manifest.at(-1).id).toBe("0062_auth_identity_hardening");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(62);
+});
+
+test("auth identity hardening migration preserves legacy access and enforces normalized ownership", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0062_auth_identity_hardening",
+  );
+  expect(migration?.id).toBe("0062_auth_identity_hardening");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'SET "emailVerified" = COALESCE("createdAt", now())',
+    'idx_user_email_normalized_unique',
+    'idx_account_user_provider_unique',
+    'idx_verification_token_token',
+    'account_provider_account_id_length_check',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {

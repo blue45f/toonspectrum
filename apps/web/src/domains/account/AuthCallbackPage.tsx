@@ -24,6 +24,10 @@ const ERROR_LABEL_KEYS: Record<string, string> = {
   oauth_unavailable: "auth.callback.error.oauthFailed",
   unsupported: "auth.callback.error.unsupported",
   access_denied: "auth.callback.error.accessDenied",
+  account_link_required: "auth.callback.error.oauthFailed",
+  account_blocked: "auth.callback.error.oauthFailed",
+  identity_already_linked: "auth.callback.error.oauthFailed",
+  provider_already_linked: "auth.callback.error.oauthFailed",
 };
 
 function parseHash(): Record<string, string> {
@@ -46,7 +50,8 @@ export function AuthCallbackPage() {
 
     const finish = (
       user: { id?: string } | null | undefined,
-      isDemo: boolean
+      isDemo: boolean,
+      destination = "/",
     ) => {
       if (!user?.id) {
         setPhase("error");
@@ -57,7 +62,10 @@ export function AuthCallbackPage() {
       setDemo(isDemo);
       setPhase("done");
       setMessageKey(isDemo ? "auth.callback.message.doneDemo" : "auth.callback.message.done");
-      globalThis.setTimeout(() => navigate("/", { replace: true }), isDemo ? 1400 : 700);
+      globalThis.setTimeout(
+        () => navigate(destination, { replace: true }),
+        isDemo ? 1400 : 700,
+      );
     };
 
     async function run() {
@@ -67,7 +75,7 @@ export function AuthCallbackPage() {
         return;
       }
       try {
-        if (params.session === "1") {
+        if (params.session === "1" || params.linked) {
           const res = await api.raw(apiPath("/auth/session"), {
             method: "GET",
             cache: "no-store",
@@ -77,7 +85,11 @@ export function AuthCallbackPage() {
           if (!res.ok || data?.authenticated !== true || !data.user) {
             throw new Error(data?.error ?? "session-failed");
           }
-          finish(data.user, false);
+          finish(
+            data.user,
+            false,
+            params.linked ? "/settings#account-security" : "/",
+          );
           return;
         }
         if (params.t) {

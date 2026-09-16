@@ -40,6 +40,7 @@ WEBDEX_SITE_URL=https://www.toonstudio.cloud # 기존 알림 스크립트 호환
 https://www.toonstudio.cloud/api/auth/oauth/google/callback
 https://www.toonstudio.cloud/api/auth/oauth/kakao/callback
 https://www.toonstudio.cloud/api/auth/oauth/naver/callback
+https://www.toonstudio.cloud/api/auth/oauth/github/callback
 ```
 
 Google Identity Services의 승인된 JavaScript origin에는

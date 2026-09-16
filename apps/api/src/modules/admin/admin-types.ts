@@ -12,11 +12,6 @@ import {
   users,
 } from "../../db";
 import {
-  getAdminEmailWhitelist,
-  normalizeAdminEmail,
-} from "../../server/admin-emails";
-import { invalidateSessionUser } from "../../server/session";
-import {
   ensureUserLifecycleSchema,
   normalizeUserAccountStatus,
   type UserAccountStatus,
@@ -481,15 +476,7 @@ export async function requireAdminUser(userId: string): Promise<{ id: string; na
     throw new ForbiddenException("비활성 계정은 관리자 권한을 사용할 수 없습니다.");
   }
 
-  const dbRole = normalizeRole(row.role);
-  const email = normalizeAdminEmail(row.email);
-  const whitelist = getAdminEmailWhitelist();
-  const finalRole: AdminRole = ADMIN_ROLES.has(dbRole) ? dbRole : whitelist.has(email) ? "admin" : dbRole;
-
-  if (whitelist.has(email) && finalRole === "admin" && dbRole !== "admin") {
-    await db.update(users).set({ role: "admin" }).where(eq(users.id, row.id));
-    invalidateSessionUser(row.id); // 화이트리스트 승격도 권한 변경 — 캐시 즉시 무효화.
-  }
+  const finalRole = normalizeRole(row.role);
 
   if (!ADMIN_ROLES.has(finalRole)) {
     throw new ForbiddenException("관리자 전용 페이지입니다.");

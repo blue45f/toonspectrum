@@ -73,4 +73,40 @@ describe("auth provider discovery", () => {
       },
     });
   });
+
+  it("accepts GitHub only when the server confirms the redirect flow", () => {
+    expect(
+      parseAuthProviderDiscovery({
+        github: {
+          label: "GitHub",
+          mode: "oauth",
+          redirectAvailable: true,
+        },
+      }),
+    ).toEqual({
+      github: {
+        label: "GitHub",
+        mode: "oauth",
+        redirectAvailable: true,
+      },
+    });
+  });
+
+  it("hides GitHub until the server confirms a complete redirect flow", () => {
+    expect(
+      parseAuthProviderDiscovery({
+        github: {
+          mode: "disabled",
+          reason: "missing-credentials",
+          redirectAvailable: false,
+        },
+      }),
+    ).toEqual({});
+
+    expect(
+      parseAuthProviderDiscovery({
+        github: { mode: "oauth", redirectAvailable: false },
+      }),
+    ).toEqual({});
+  });
 });

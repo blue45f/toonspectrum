@@ -10,6 +10,8 @@ import {
   type AuthRateLimitConfig,
 } from "./auth-rate-limit.config";
 import { AuthController } from "./auth.controller";
+import { KakaoUnlinkWebhookController } from "./kakao-unlink-webhook.controller";
+import { NaverUnlinkWebhookController } from "./naver-unlink-webhook.controller";
 import {
   AUTH_CLIENT_IP_POLICY,
   AUTH_RATE_LIMIT_CONFIG,
@@ -42,6 +44,10 @@ const upstashCoordinationModule = authRateLimitConfig.distributed
       useFactory: () => resolveAuthClientIpPolicy(process.env),
     },
   ],
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+    KakaoUnlinkWebhookController,
+    NaverUnlinkWebhookController,
+  ],
 })
 export class AuthModule {}

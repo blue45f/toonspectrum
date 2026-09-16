@@ -417,6 +417,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0059_member_messaging",
       "0060_studio_ai_free_provider_expansion",
       "0061_member_messaging_cutover_marker",
+      "0062_auth_identity_hardening",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });
