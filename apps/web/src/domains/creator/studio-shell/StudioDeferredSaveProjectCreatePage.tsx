@@ -17,6 +17,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
@@ -90,6 +91,7 @@ export function StudioDeferredSaveProjectCreatePage() {
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
     [showMoreKinds],
   );
+  const titleReady = title.trim().length > 0;
 
   const selectKind = (option: StudioProjectCreateKindOption) => {
     setKind(option.id);
@@ -99,7 +101,7 @@ export function StudioDeferredSaveProjectCreatePage() {
   };
 
   const create = () => {
-    if (typeof window === "undefined" || creating || !title.trim()) return;
+    if (typeof window === "undefined" || creating || !titleReady) return;
     setCreating(true);
     setError(null);
     try {
@@ -144,12 +146,12 @@ export function StudioDeferredSaveProjectCreatePage() {
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
                 {locale === "ko"
-                  ? "작업 종류와 시작 형식만 고르면 됩니다. 처음에는 이 기기에 임시 자동저장하고, 다 그린 뒤 저장을 누를 때 파일이나 개인 드라이브를 선택합니다."
-                  : "Choose only the work type and starting format. ToonStudio keeps a temporary local autosave first, then asks for a file or personal drive when you explicitly save."}
+                  ? "작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 프로젝트 저장 후에는 ToonStudio 클라우드에서 다른 기기와 팀 작업으로 이어갈 수 있습니다. 기존 파일과 외부 드라이브는 가져오기·백업 옵션입니다."
+                  : "Choose only the work type and starting format. Recovery storage begins on this device immediately, and a saved project can continue through ToonStudio Cloud across devices and teams. Existing files and external drives remain optional import and backup paths."}
               </p>
             </div>
             <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
-              {locale === "ko" ? "파일 가져오기" : "Import files"}
+              {locale === "ko" ? "기존 파일 가져오기" : "Import existing files"}
             </Link>
           </header>
 
@@ -210,23 +212,30 @@ export function StudioDeferredSaveProjectCreatePage() {
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-fg-3">
                   {locale === "ko"
-                    ? "공개 제목·소개·장르·저장 위치는 지금 정하지 않아도 됩니다."
-                    : "A public title, synopsis, genre and save destination are not required now."}
+                    ? "공개 제목·소개·장르·연재 위치는 지금 정하지 않아도 됩니다."
+                    : "A public title, synopsis, genre and publishing destination are not required now."}
                 </p>
               </div>
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <label className="text-xs font-bold text-fg-2">
+              <label className="text-xs font-bold text-fg-2" htmlFor="studio-project-title">
                 {locale === "ko" ? "프로젝트 이름" : "Project name"}
                 <input
+                  id="studio-project-title"
                   value={title}
                   maxLength={120}
+                  aria-describedby="studio-project-title-help"
                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     setTitle(event.target.value);
                     setTitleEdited(true);
                   }}
                   className="mt-2 min-h-12 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
+                <span id="studio-project-title-help" className={cn("mt-2 block text-[0.6875rem] leading-5", titleReady ? "text-fg-3" : "text-danger")}>
+                  {titleReady
+                    ? (locale === "ko" ? "작업용 이름이며 공개 전 언제든 바꿀 수 있습니다." : "This is a working name and can change before publishing.")
+                    : (locale === "ko" ? "프로젝트 이름을 입력하면 시작할 수 있습니다." : "Enter a project name to continue.")}
+                </span>
               </label>
               <label className="text-xs font-bold text-fg-2">
                 {locale === "ko" ? "시작 템플릿" : "Starting template"}
@@ -245,18 +254,19 @@ export function StudioDeferredSaveProjectCreatePage() {
             </div>
           </section>
 
-          <section className="mt-5 flex items-start gap-3 rounded-2xl border border-success/30 bg-success-soft/15 p-4" aria-label={locale === "ko" ? "임시 자동저장 안내" : "Temporary autosave notice"}>
+          <section className="mt-5 flex min-w-0 items-start gap-3 rounded-2xl border border-success/30 bg-success-soft/15 p-4" aria-label={locale === "ko" ? "자동 저장 안내" : "Autosave notice"}>
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-success">
               <ShieldCheck size={18} aria-hidden="true" />
             </span>
-            <div>
-              <h2 className="text-sm font-black text-fg">
-                {locale === "ko" ? "그리는 동안은 자동으로 임시 저장됩니다" : "Your work is temporarily autosaved while you draw"}
+            <div className="min-w-0">
+              <WorkflowTrustBadge state="device-saved" locale={locale} className="mb-2 w-fit" />
+              <h2 className="break-words text-sm font-black text-fg">
+                {locale === "ko" ? "그리는 동안 이 기기에 자동 저장됩니다" : "Your work is autosaved on this device while you draw"}
               </h2>
-              <p className="mt-1 text-xs leading-5 text-fg-2">
+              <p className="mt-1 break-words text-xs leading-5 text-fg-2">
                 {locale === "ko"
-                  ? "내 작업의 ‘임시 작업’에서 언제든 이어갈 수 있습니다. 저장 버튼을 처음 누르면 파일·Google Drive·Dropbox·OneDrive 중에서 고릅니다."
-                  : "Resume it from Temporary work at any time. The first explicit Save lets you choose a file, Google Drive, Dropbox or OneDrive."}
+                  ? "‘임시 작업’에서 언제든 이어갈 수 있습니다. 프로젝트로 저장하면 ToonStudio 클라우드 동기화와 버전 복구를 사용할 수 있으며, Google Drive·Dropbox·OneDrive는 가져오기와 추가 백업에 선택적으로 사용할 수 있습니다."
+                  : "Resume it from Temporary work at any time. Saving as a project enables ToonStudio Cloud sync and version recovery; Google Drive, Dropbox and OneDrive remain optional import and extra-backup choices."}
               </p>
             </div>
           </section>
@@ -273,7 +283,8 @@ export function StudioDeferredSaveProjectCreatePage() {
             </Link>
             <button
               type="button"
-              disabled={creating || !title.trim()}
+              disabled={creating || !titleReady}
+              aria-describedby={!titleReady ? "studio-project-title-help" : undefined}
               onClick={create}
               className={buttonClass({ className: "min-w-44" })}
             >
