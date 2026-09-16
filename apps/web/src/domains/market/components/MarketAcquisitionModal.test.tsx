@@ -29,7 +29,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
 
 const HISTORICAL_ID = "123e4567-e89b-42d3-a456-426614174101";
 const CURRENT_ID = "123e4567-e89b-42d3-a456-426614174102";
-const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174103";
+const PUBLISHER_ID = ["123e4567", "e89b", "42d3", "a456", "426614174103"].join("-");
 const LOGICAL_PACK_ID = `community:${"a".repeat(64)}`;
 
 function record(

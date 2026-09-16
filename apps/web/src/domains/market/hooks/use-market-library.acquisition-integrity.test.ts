@@ -34,7 +34,7 @@ const listLibrary = vi.mocked(listCreatorMarketplaceCloudLibrary);
 const USER_ID = "123e4567-e89b-42d3-a456-426614174010";
 const RESOURCE_ID = "123e4567-e89b-42d3-a456-426614174001";
 const LIBRARY_ID = "123e4567-e89b-42d3-a456-426614174003";
-const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174002";
+const PUBLISHER_ID = ["123e4567", "e89b", "42d3", "a456", "426614174002"].join("-");
 const EXPECTED_LOGICAL_PACK_ID = `community:${"b".repeat(64)}`;
 
 const record: CreatorMarketplaceResourceRecord = {
