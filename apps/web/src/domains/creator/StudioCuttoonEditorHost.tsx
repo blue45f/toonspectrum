@@ -1879,7 +1879,6 @@ export function StudioCuttoonEditor({
     setCurrentPageIdState(nextPageId);
     return true;
   }, []);
-
   const {
     aiProvenance,
     animaticWorkspace,
@@ -2065,7 +2064,6 @@ export function StudioCuttoonEditor({
     !persistLeadershipAllowsDraw;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
-
   useLayoutEffect(() => {
     const observeSceneElements = (
       sceneElements: ReturnType<StudioCrdtDocument["getSceneElements"]>
