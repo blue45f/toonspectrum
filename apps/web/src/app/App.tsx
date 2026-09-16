@@ -274,7 +274,6 @@ function AppRuntime() {
         showSkipLink={!studioImmersive}
         showCommandPalette={!adminChrome}
         showGlobalOverlays={!adminChrome}
-        trackVisit={!adminChrome}
         mainClassName={
           studioImmersive
             ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"

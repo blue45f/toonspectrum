@@ -15,7 +15,6 @@ import { z } from "zod";
 const ClientIpHeaderSchema = z.enum([
   "x-forwarded-for",
   "x-real-ip",
-  "x-vercel-forwarded-for",
   "cf-connecting-ip",
 ]);
 

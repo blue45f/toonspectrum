@@ -30,7 +30,7 @@ function sanitizeMethod(value: unknown): string | undefined {
 
 /**
  * Pino HTTP's default request serializer includes the complete header bag and
- * network address. Vercel injects bearer credentials and signed proxy metadata
+ * network address. Some fallback platforms inject bearer credentials and signed proxy metadata
  * into those headers, so request logging is deliberately an allowlist boundary.
  */
 export function serializeSafeHttpRequest(value: unknown): SafeRequestLog {

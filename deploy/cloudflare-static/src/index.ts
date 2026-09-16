@@ -1,4 +1,9 @@
 import {
+  getStaticPolicyDocument,
+  isPolicySlug,
+} from "../../../packages/core/src/legal-policy";
+
+import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
   cloudflareLargeAssetDescriptor,
   cloudflareLargeAssetKey,
@@ -76,7 +81,7 @@ export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com; script-src 'self' 'sha256-OmHwrCLVdhu+S3kh6CjljJPz6ndGTuXZGMTrN96KuAg=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://desk-platform.vercel.app https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
+  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com; script-src 'self' 'sha256-OmHwrCLVdhu+S3kh6CjljJPz6ndGTuXZGMTrN96KuAg=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
   "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 } as const);
@@ -112,6 +117,31 @@ function edgeLivenessResponse(request: Request): Response {
       ...COMMON_SECURITY_HEADERS,
     },
   });
+}
+
+function edgePolicyResponse(request: Request, requestUrl: URL): Response | null {
+  const prefix = "/api/legal/policies/";
+  if (!requestUrl.pathname.startsWith(prefix)) return null;
+  const method = request.method.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    return withSecurityHeaders(new Response(null, {
+      status: 405,
+      headers: { allow: "GET, HEAD" },
+    }));
+  }
+  const slug = requestUrl.pathname.slice(prefix.length);
+  if (!isPolicySlug(slug) || slug.includes("/")) {
+    return jsonError(404, "policy_not_found");
+  }
+  const body = JSON.stringify(getStaticPolicyDocument(slug));
+  return withSecurityHeaders(new Response(method === "HEAD" ? null : body, {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=300, s-maxage=86400",
+      "x-toonspectrum-policy-source": "first-party-release",
+    },
+  }));
 }
 
 function validatedCoreOriginSecret(raw: string | undefined): string | null {
@@ -700,6 +730,9 @@ export function createCloudflareStaticGateway(
     if (!isDynamicPath(requestUrl.pathname)) {
       return env.ASSETS.fetch(request);
     }
+
+    const policyResponse = edgePolicyResponse(request, requestUrl);
+    if (policyResponse) return policyResponse;
 
     const route = classifyDynamicRoute(request, requestUrl);
     if (route === "large-asset") {

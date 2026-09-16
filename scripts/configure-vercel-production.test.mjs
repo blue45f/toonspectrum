@@ -1,7 +1,4 @@
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parse as parseYaml } from "yaml";
@@ -94,7 +91,7 @@ afterEach(() => {
 });
 async function reconcile() {
   const module = await import("./configure-vercel-production.mjs");
-  return module.reconcileProductionEnvironment();
+  return module.reconcileProductionEnvironment({ referencedKeys: fixtureKeys });
 }
 function posted(key) { return requests.find((request) => request.body?.key === key)?.body; }
 function runtimeEnvironment() {
@@ -294,61 +291,20 @@ describe("OAuth aliases use the same state-signing authority as the real API", (
 });
 
 describe("production readiness workflow", () => {
-  it("is always audit-only and requires the project/org pair before reading configuration", () => {
+  it("audits Cloudflare and Render without requiring Vercel credentials", () => {
     const workflow = parseYaml(readFileSync(new URL("../.github/workflows/production-readiness.yml", import.meta.url), "utf8"));
     expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
     expect(workflow.on.workflow_dispatch?.inputs).toBeUndefined();
-    const steps = workflow.jobs["reconcile-and-deploy"].steps;
-    const validation = steps.find((step) => step.name === "Validate deployment credentials");
-    expect(validation.run).toContain("VERCEL_PROJECT_ID");
-    expect(validation.run).toContain("VERCEL_ORG_ID");
-    const reconciliation = steps.find((step) => step.name?.startsWith("Reconcile production variables"));
-    expect(reconciliation.run).toContain("--audit-only");
-    expect(reconciliation.env?.DEPLOY).toBeUndefined();
-    expect(steps.some((step) => /vercel\s+(?:deploy|build)/u.test(step.run ?? ""))).toBe(false);
-    expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_SESSION_SECRET_VALUE).toBe("${{ secrets.AUTH_SESSION_SECRET }}");
-    expect(workflow.jobs["reconcile-and-deploy"].env.AUTH_STATE_SECRET_VALUE).toBe("${{ secrets.AUTH_STATE_SECRET }}");
-    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE).toBe(
-      "${{ secrets.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT }}",
-    );
-    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED_VALUE).toBe(
-      "${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED }}",
-    );
-    expect(workflow.jobs["reconcile-and-deploy"].env.PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON_VALUE).toBe(
-      "${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON }}",
-    );
-    expect(workflow.jobs["reconcile-and-deploy"].env.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE).toBe(
-      "${{ secrets.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY }}",
-    );
-    expect(steps.findIndex((step) => step === validation)).toBeLessThan(steps.findIndex((step) => step === reconciliation));
+    const job = workflow.jobs.audit;
+    const steps = job.steps;
+    expect(job.env.RENDER_CORE_API_ORIGIN).toBe("https://toonspectrum-core-api.onrender.com");
+    expect(job.env.PUBLIC_APP_ORIGIN).toBe("https://www.toonstudio.cloud");
+    expect(Object.keys(job.env).some((name) => name.startsWith("VERCEL_"))).toBe(false);
+    expect(steps.some((step) => step.run === "pnpm run verify:render-core-origin")).toBe(true);
+    expect(steps.some((step) => step.run === "pnpm run verify:free-infrastructure")).toBe(true);
+    const edge = steps.find((step) => step.name === "Verify production edge does not traverse Vercel");
+    expect(edge.run).toContain("x-vercel-id");
+    expect(edge.run).toContain("x-render-origin-server: Render");
+    expect(steps.some((step) => /configure-vercel-production|vercel\s+(?:deploy|build|pull)/u.test(step.run ?? ""))).toBe(false);
   });
-  it("rejects a missing CLI org/project pair before any remote command", () => {
-    const workflow = parseYaml(readFileSync(new URL("../.github/workflows/production-readiness.yml", import.meta.url), "utf8"));
-    const script = workflow.jobs["reconcile-and-deploy"].steps.find((step) => step.name === "Validate deployment credentials").run;
-    for (const ids of [{ VERCEL_PROJECT_ID: "fixture-project" }, { VERCEL_ORG_ID: "fixture-team" }, {}]) {
-      const result = spawnSync("bash", ["-c", script], { env: { PATH: process.env.PATH, VERCEL_TOKEN: "fixture-token", ...ids }, encoding: "utf8" });
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain("both required");
-      expect(result.stdout).not.toContain("fixture-token");
-    }
-    expect(spawnSync("bash", ["-c", script], { env: { PATH: process.env.PATH, VERCEL_TOKEN: "fixture-token", VERCEL_PROJECT_ID: "fixture-project", VERCEL_ORG_ID: "fixture-team" } }).status).toBe(0);
-  });
-
-  it("uses read-only mode even when the retired DEPLOY variable is true", () => {
-    const workflow = parseYaml(readFileSync(new URL("../.github/workflows/production-readiness.yml", import.meta.url), "utf8"));
-    const script = workflow.jobs["reconcile-and-deploy"].steps.find((step) => step.name?.startsWith("Reconcile production variables")).run;
-    const fixture = mkdtempSync(join(tmpdir(), "toonspectrum-env-mode-"));
-    const args = join(fixture, "args.txt");
-    try {
-      writeFileSync(join(fixture, "node"), '#!/bin/sh\nprintf "%s\n" "$@" > "$FIXTURE_ARGS"\n', { mode: 0o700 });
-      for (const deploy of ["false", "true"]) {
-        const result = spawnSync("bash", ["-c", script], { env: { PATH: `${fixture}:${process.env.PATH}`, DEPLOY: deploy, FIXTURE_ARGS: args }, encoding: "utf8" });
-        expect(result.status).toBe(0);
-        expect(readFileSync(args, "utf8").includes("--audit-only")).toBe(true);
-      }
-    } finally {
-      rmSync(fixture, { recursive: true, force: true });
-    }
-  });
-
 });

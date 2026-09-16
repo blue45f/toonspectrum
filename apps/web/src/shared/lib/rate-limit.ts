@@ -37,7 +37,7 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
 
 // 요청에서 클라이언트 IP 추정.
 // 주의: x-forwarded-for 맨 왼쪽은 클라이언트가 위조할 수 있다(베이스라인 한계). 신뢰 가능한
-// 보호가 필요하면 배포 플랫폼이 보장하는 IP(예: Vercel) 또는 신뢰 프록시 hop 기반으로 교체할 것.
+// 보호가 필요하면 신뢰할 수 있는 엣지가 보장하는 IP 또는 신뢰 프록시 hop 기반으로 교체할 것.
 export function clientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0].trim();

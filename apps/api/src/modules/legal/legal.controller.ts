@@ -9,7 +9,7 @@ const resolvePolicy = createPolicyResolver();
 @Controller()
 export class LegalController {
   @Get("/legal/policies/:slug")
-  @Header("Cache-Control", "no-store, max-age=0")
+  @Header("Cache-Control", "public, max-age=300, s-maxage=86400")
   async getPolicy(@Param("slug") slug: string) {
     if (!isPolicySlug(slug)) {
       throw new HttpException({ error: "policy_not_found" }, HttpStatus.NOT_FOUND);

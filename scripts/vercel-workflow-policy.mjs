@@ -108,8 +108,8 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   }
 
   const steps = Array.isArray(deployJob.steps) ? deployJob.steps : [];
-  if (steps.length !== 10) {
-    issues.push(`Vercel prebuilt fallback workflow must keep exactly 10 auditable steps (found ${steps.length})`);
+  if (steps.length !== 11) {
+    issues.push(`Vercel prebuilt fallback workflow must keep exactly 11 auditable steps (found ${steps.length})`);
   }
   const [
     preflightRaw,
@@ -117,6 +117,7 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
     sourceGuardRaw,
     pnpmSetupRaw,
     setupNodeRaw,
+    fallbackConfigRaw,
     installRaw,
     pullRaw,
     buildRaw,
@@ -129,6 +130,11 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   const sourceGuard = requireUnconditionalStep(sourceGuardRaw, "main ancestry guard", issues);
   const pnpmSetup = requireUnconditionalStep(pnpmSetupRaw, "pnpm setup", issues);
   const setupNode = requireUnconditionalStep(setupNodeRaw, "Node setup", issues);
+  const fallbackConfig = requireUnconditionalStep(
+    fallbackConfigRaw,
+    "cold fallback configuration verification",
+    issues,
+  );
   const install = requireUnconditionalStep(installRaw, "CLI install", issues);
   const pull = requireUnconditionalStep(pullRaw, "production settings pull", issues);
   const build = requireUnconditionalStep(buildRaw, "prebuilt production build", issues);
@@ -220,6 +226,13 @@ export function validateVercelFallbackWorkflow(source) { // NOSONAR javascript:S
   }
   if (String(setupWith.cache ?? "") !== "pnpm") {
     issues.push("Vercel fallback workflow must reuse the pnpm dependency cache");
+  }
+
+  if (
+    fallbackConfig?.name !== "Verify cold fallback configuration"
+    || stepRun(fallbackConfig) !== "node scripts/cloudflare-static-rules.mjs --check-vercel-fallback"
+  ) {
+    issues.push("Vercel fallback workflow must verify the cold fallback header contract before installing the CLI");
   }
 
   const installRun = stepRun(install);

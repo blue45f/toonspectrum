@@ -11,113 +11,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  reconcile-and-deploy:
+  audit:
     environment: production
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_PROJECT_NAME: toonspectrum
-      VERCEL_CLI_VERSION: "58.9.4"
-      VERCEL_TELEMETRY_DISABLED: "1"
+      RENDER_CORE_API_ORIGIN: https://toonspectrum-core-api.onrender.com
       PUBLIC_APP_ORIGIN: https://www.toonstudio.cloud
-      DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
-      AUTH_SESSION_SECRET_VALUE: ${{ secrets.AUTH_SESSION_SECRET }}
-      AUTH_STATE_SECRET_VALUE: ${{ secrets.AUTH_STATE_SECRET }}
-      GOOGLE_OAUTH_CLIENT_ID_VALUE: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      KAKAO_REST_API_KEY_VALUE: ${{ secrets.KAKAO_REST_API_KEY }}
-      KAKAO_OAUTH_CLIENT_ID_VALUE: ${{ secrets.KAKAO_OAUTH_CLIENT_ID }}
-      KAKAO_CLIENT_SECRET_VALUE: ${{ secrets.KAKAO_CLIENT_SECRET }}
-      KAKAO_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.KAKAO_OAUTH_CLIENT_SECRET }}
-      NAVER_OAUTH_CLIENT_ID_VALUE: ${{ secrets.NAVER_OAUTH_CLIENT_ID }}
-      NAVER_CLIENT_ID_VALUE: ${{ secrets.NAVER_CLIENT_ID }}
-      NAVER_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.NAVER_OAUTH_CLIENT_SECRET }}
-      NAVER_CLIENT_SECRET_VALUE: ${{ secrets.NAVER_CLIENT_SECRET }}
-      OPENAI_API_KEY_VALUE: ${{ secrets.OPENAI_API_KEY }}
-      OPENROUTER_API_KEY_VALUE: ${{ secrets.OPENROUTER_API_KEY }}
-      BLOB_READ_WRITE_TOKEN_VALUE: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-      R2_ACCOUNT_ID_VALUE: ${{ secrets.R2_ACCOUNT_ID }}
-      R2_ACCESS_KEY_ID_VALUE: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY_VALUE: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_BUCKET_VALUE: ${{ secrets.R2_BUCKET }}
-      S3_ENDPOINT_VALUE: ${{ secrets.S3_ENDPOINT }}
-      S3_REGION_VALUE: ${{ secrets.S3_REGION }}
-      S3_ACCESS_KEY_ID_VALUE: ${{ secrets.S3_ACCESS_KEY_ID }}
-      S3_SECRET_ACCESS_KEY_VALUE: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-      S3_BUCKET_VALUE: ${{ secrets.S3_BUCKET }}
-      CREATOR_ASSET_OBJECT_STORAGE_ENDPOINT_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_ENDPOINT }}
-      CREATOR_ASSET_OBJECT_STORAGE_BUCKET_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_BUCKET }}
-      CREATOR_ASSET_OBJECT_STORAGE_ACCESS_KEY_ID_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_ACCESS_KEY_ID }}
-      CREATOR_ASSET_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_SECRET_ACCESS_KEY }}
-      PRIVATE_OBJECT_STORAGE_ENABLED_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_ENABLED }}
-      PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_SOURCE_PROVIDER }}
-      PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_DERIVED_PROVIDER }}
-      PRIVATE_OBJECT_STORAGE_EXPORT_PROVIDER_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_EXPORT_PROVIDER }}
-      PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_ROUTING_FINGERPRINT }}
-      PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED }}
-      PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON_VALUE: ${{ secrets.PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON }}
-      SUPABASE_OBJECT_STORAGE_ENABLED_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_ENABLED }}
-      SUPABASE_OBJECT_STORAGE_URL_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_URL }}
-      SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY }}
-      SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET }}
-      SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET }}
-      SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET }}
-      SUPABASE_OBJECT_STORAGE_TIMEOUT_MS_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_TIMEOUT_MS }}
-      SUPABASE_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES }}
-      SUPABASE_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES }}
-      SUPABASE_OBJECT_STORAGE_MAXIMUM_RESPONSE_BYTES_VALUE: ${{ secrets.SUPABASE_OBJECT_STORAGE_MAXIMUM_RESPONSE_BYTES }}
-      R2_OBJECT_STORAGE_ENABLED_VALUE: ${{ secrets.R2_OBJECT_STORAGE_ENABLED }}
-      R2_OBJECT_STORAGE_ENDPOINT_VALUE: ${{ secrets.R2_OBJECT_STORAGE_ENDPOINT }}
-      R2_OBJECT_STORAGE_REGION_VALUE: ${{ secrets.R2_OBJECT_STORAGE_REGION }}
-      R2_OBJECT_STORAGE_ACCESS_KEY_ID_VALUE: ${{ secrets.R2_OBJECT_STORAGE_ACCESS_KEY_ID }}
-      R2_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE: ${{ secrets.R2_OBJECT_STORAGE_SECRET_ACCESS_KEY }}
-      R2_OBJECT_STORAGE_SOURCE_BUCKET_VALUE: ${{ secrets.R2_OBJECT_STORAGE_SOURCE_BUCKET }}
-      R2_OBJECT_STORAGE_DERIVED_BUCKET_VALUE: ${{ secrets.R2_OBJECT_STORAGE_DERIVED_BUCKET }}
-      R2_OBJECT_STORAGE_EXPORT_BUCKET_VALUE: ${{ secrets.R2_OBJECT_STORAGE_EXPORT_BUCKET }}
-      R2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED_VALUE: ${{ secrets.R2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED }}
-      R2_OBJECT_STORAGE_TIMEOUT_MS_VALUE: ${{ secrets.R2_OBJECT_STORAGE_TIMEOUT_MS }}
-      R2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES_VALUE: ${{ secrets.R2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES }}
-      R2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES_VALUE: ${{ secrets.R2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES }}
-      B2_OBJECT_STORAGE_ENABLED_VALUE: ${{ secrets.B2_OBJECT_STORAGE_ENABLED }}
-      B2_OBJECT_STORAGE_ENDPOINT_VALUE: ${{ secrets.B2_OBJECT_STORAGE_ENDPOINT }}
-      B2_OBJECT_STORAGE_REGION_VALUE: ${{ secrets.B2_OBJECT_STORAGE_REGION }}
-      B2_OBJECT_STORAGE_ACCESS_KEY_ID_VALUE: ${{ secrets.B2_OBJECT_STORAGE_ACCESS_KEY_ID }}
-      B2_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE: ${{ secrets.B2_OBJECT_STORAGE_SECRET_ACCESS_KEY }}
-      B2_OBJECT_STORAGE_SOURCE_BUCKET_VALUE: ${{ secrets.B2_OBJECT_STORAGE_SOURCE_BUCKET }}
-      B2_OBJECT_STORAGE_DERIVED_BUCKET_VALUE: ${{ secrets.B2_OBJECT_STORAGE_DERIVED_BUCKET }}
-      B2_OBJECT_STORAGE_EXPORT_BUCKET_VALUE: ${{ secrets.B2_OBJECT_STORAGE_EXPORT_BUCKET }}
-      B2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED_VALUE: ${{ secrets.B2_OBJECT_STORAGE_PRIVATE_BUCKETS_CONFIRMED }}
-      B2_OBJECT_STORAGE_TIMEOUT_MS_VALUE: ${{ secrets.B2_OBJECT_STORAGE_TIMEOUT_MS }}
-      B2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES_VALUE: ${{ secrets.B2_OBJECT_STORAGE_MAXIMUM_ASSET_BYTES }}
-      B2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES_VALUE: ${{ secrets.B2_OBJECT_STORAGE_MAXIMUM_CONTROL_METADATA_BYTES }}
-
     steps:
       - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          cache: pnpm
 
-      - name: Validate deployment credentials
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify free-infrastructure boundaries
+        run: pnpm run verify:free-infrastructure
+
+      - name: Verify Render Core API authority
+        run: pnpm run verify:render-core-origin
+
+      - name: Verify production edge does not traverse Vercel
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
-            echo "::error::GitHub production environment secret VERCEL_TOKEN is missing."
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          trap 'rm -f "$headers" "$body"' EXIT
+          curl --fail --silent --show-error --max-time 120 \
+            --dump-header "$headers" \
+            --output "$body" \
+            "${PUBLIC_APP_ORIGIN}/api/auth/providers"
+          if grep -Eiq '^(x-vercel-id|x-vercel-cache):' "$headers"; then
+            echo "::error::Production API still traverses Vercel."
             exit 1
           fi
-          if [[ -z "${VERCEL_PROJECT_ID:-}" || -z "${VERCEL_ORG_ID:-}" ]]; then
-            echo "::error::VERCEL_PROJECT_ID and VERCEL_ORG_ID are both required for the pinned Vercel CLI."
-            exit 1
-          fi
-          echo "Vercel deployment credentials are available."
-
-      # Environment mutation and source-build deployment were retired by owner policy 2026-09-14.
-      - name: Reconcile production variables without exposing values
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/configure-vercel-production.mjs --audit-only
+          grep -Eiq '^x-render-origin-server: Render' "$headers"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$body"
+          echo "Cloudflare edge and Render Core API authority verified."

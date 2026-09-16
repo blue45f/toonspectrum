@@ -57,7 +57,7 @@ export function validateUserAiBaseUrl(value: string): string {
     || url.password
     || url.search
     || url.hash
-    || /(?:^|\.)(?:toonstudio\.cloud|toonspectrum\.vercel\.app)$/u.test(url.hostname)
+    || /(?:^|\.)toonstudio\.cloud$/u.test(url.hostname)
     || (typeof location !== "undefined" && url.origin === location.origin)
   ) {
     throw new Error("AI 제공자 또는 직접 운영하는 HTTPS 주소를 입력하세요. 사이트 자체 주소·인증정보가 포함된 URL은 사용할 수 없습니다.");

@@ -29,9 +29,7 @@ function requestContext(request: Request): TrafficRequestContext {
     userAgent: singleHeader(request.headers["user-agent"]),
     host: singleHeader(request.headers.host),
     referer: singleHeader(request.headers.referer),
-    countryCode:
-      singleHeader(request.headers["x-vercel-ip-country"])
-      ?? singleHeader(request.headers["cf-ipcountry"]),
+    countryCode: singleHeader(request.headers["cf-ipcountry"]),
     privacyOptOut:
       singleHeader(request.headers.dnt) === "1"
       || singleHeader(request.headers["sec-gpc"]) === "1",

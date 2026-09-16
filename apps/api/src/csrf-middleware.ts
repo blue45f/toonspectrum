@@ -52,7 +52,7 @@ function queryPath(req: Request): string | null {
  * before a cookie exists. They therefore need login-CSRF protection as well as
  * the ordinary cookie-authenticated mutation boundary.
  *
- * `queryPath` mirrors the Vercel `/api/index?path=...` adapter shape because this
+ * `queryPath` mirrors the optional `/api/index?path=...` compatibility adapter shape because this
  * middleware deliberately runs before the adapter rewrites the request URL.
  */
 export function isAuthMutationRequest(req: Request): boolean {

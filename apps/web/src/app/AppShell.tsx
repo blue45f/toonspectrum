@@ -13,7 +13,6 @@ import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteCo
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
-import { pingVisit } from "@/shared/lib/visits-api";
 
 import "@toonspectrum/core/fx/fx.css";
 
@@ -71,10 +70,6 @@ function useDeferredByInput(timeoutMs = 4500) {
   return ready;
 }
 
-function useVisitPing(enabled: boolean) {
-  useEffect(() => { if (enabled) void pingVisit(); }, [enabled]);
-}
-
 function DeferredGlobalOverlays() {
   const ready = useDeferredByInput();
   if (!ready) return null;
@@ -89,7 +84,6 @@ export interface AppShellProps {
   showSkipLink?: boolean;
   showCommandPalette?: boolean;
   showGlobalOverlays?: boolean;
-  trackVisit?: boolean;
   mainClassName?: string;
   publicExperience?: boolean;
 }
@@ -102,13 +96,11 @@ export function AppShell({
   showSkipLink = true,
   showCommandPalette = true,
   showGlobalOverlays = true,
-  trackVisit = true,
   publicExperience = false,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname } = useLocation();
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
-  useVisitPing(trackVisit);
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname);
   return (
     <AuthSessionProvider>
