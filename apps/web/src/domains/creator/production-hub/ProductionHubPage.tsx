@@ -53,6 +53,7 @@ import {
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
+import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
 import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWorkspace";
 import { createProductionDemoProject } from "./production-demo";
@@ -794,44 +795,26 @@ function EpisodesSurface({ aggregate }: { readonly aggregate: ProductionProjectA
   );
 }
 
-function ProductionSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
-  const groups = [
-    { id: "needs-input", label: "입력 필요", statuses: ["draft", "needs-input", "ready"] },
-    { id: "working", label: "진행 중", statuses: ["in-progress", "blocked", "paused"] },
-    { id: "review", label: "검수", statuses: ["internal-review", "external-review", "changes-requested", "conditionally-approved"] },
-    { id: "done", label: "승인·완료", statuses: ["approved", "done"] },
-  ] as const;
+function ProductionSurface({
+  aggregate,
+  execute,
+  canEdit,
+  roleLens,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+  readonly roleLens: RoleLens;
+}) {
   return (
-    <div className="grid gap-3 xl:grid-cols-4">
-      {groups.map((group) => {
-        const tasks = aggregate.tasks.filter((task) => (group.statuses as readonly string[]).includes(task.status));
-        return (
-          <section key={group.id} className="rounded-2xl border border-line bg-card p-3">
-            <header className="mb-3 flex items-center justify-between gap-2 px-1">
-              <h2 className="text-sm font-bold text-fg">{group.label}</h2><Pill>{tasks.length}</Pill>
-            </header>
-            <div className="space-y-2">
-              {tasks.map((task) => (
-                <article key={task.id} className="rounded-xl border border-line bg-panel p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <Pill tone={task.status === "blocked" ? "danger" : task.status === "in-progress" ? "accent" : task.status === "done" ? "success" : "neutral"}>{task.processKey}</Pill>
-                    <span className="text-[0.6875rem] text-fg-3">{formatDay(task.dueAt)}</span>
-                  </div>
-                  <h3 className="mt-3 text-sm font-semibold leading-5 text-fg">{task.title}</h3>
-                  <p className="mt-2 text-xs text-fg-2">{task.assignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "담당자 미정"}</p>
-                  {task.estimateHours ? <p className="mt-1 text-[0.6875rem] text-fg-3">공수 {task.estimateHours.optimistic}–{task.estimateHours.pessimistic}h · 기준 {task.estimateHours.likely}h</p> : null}
-                  {task.dependencyTaskIds.length > 0 ? <p className="mt-2 flex items-center gap-1 text-[0.6875rem] text-fg-3"><GitBranch className="size-3" aria-hidden="true" /> 선행 {task.dependencyTaskIds.length}개</p> : null}
-                </article>
-              ))}
-              {tasks.length === 0 ? <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-fg-3">작업 없음</div> : null}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+    <ProductionRoleWorkspace
+      aggregate={aggregate}
+      execute={execute}
+      canEdit={canEdit}
+      roleLens={roleLens}
+    />
   );
 }
-
 function ScheduleSurface({
   aggregate,
   execute,
@@ -1134,6 +1117,7 @@ function SettingsSurface({ aggregate }: { readonly aggregate: ProductionProjectA
         </ul>
       </SectionCard>
       </div>
+      <ProductionCrewCoverage aggregate={aggregate} />
       <ProductionIntegrationsPanel aggregate={aggregate} />
     </div>
   );
@@ -1156,7 +1140,7 @@ function SurfaceContent({
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <EpisodesSurface aggregate={aggregate} />;
-    case "production": return <ProductionSurface aggregate={aggregate} />;
+    case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
