@@ -38,12 +38,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(60);
+  expect(manifest).toHaveLength(61);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe(
-    "0060_studio_ai_free_provider_expansion",
-  );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(60);
+  expect(manifest.at(-1).id).toBe("0061_member_messaging_cutover_marker");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(61);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
@@ -261,6 +259,27 @@ test("member messaging migration provisions request-gated conversations", () => 
     'member messaging relations are incomplete',
     'INSERT INTO public."toonspectrum_schema_migration"',
     "VALUES ('0059_member_messaging', statement_timestamp())",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("member messaging cutover marker verifies and publishes readiness evidence", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0061_member_messaging_cutover_marker",
+  );
+  expect(migration?.id).toBe("0061_member_messaging_cutover_marker");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "LOCK TABLE",
+    'public."member_message_thread"',
+    "member_message_thread_actor_check",
+    "idx_member_message_report_status_created",
+    "member messaging foreign keys are incomplete",
+    "VALUES ('0059_member_messaging', statement_timestamp())",
+    'ON CONFLICT ("id") DO NOTHING',
   ]) {
     expect(sql).toContain(requiredFragment);
   }

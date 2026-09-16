@@ -33,63 +33,125 @@ try {
 
     // The URL exists before the lazy homepage. The mounted route must resolve it.
     await page.goto(`${origin}/#creator-faq-title`, { waitUntil: "domcontentloaded" });
-    const faq = page.locator("#creator-faq-title");
-    await expect(faq).toBeFocused({ timeout: 30000 });
-    await expect(page.locator(".cf-jump-nav a")).toHaveCount(5);
-    const position = await faq.boundingBox();
-    const header = await page.locator('header').first().boundingBox();
-    assert(position && position.y >= (header ? header.y + header.height : 0) - 1, "Fragment heading must not be hidden by the site header");
-    assert(position.y < height, "Fragment heading must land inside the viewport");
+    const home = page.locator('[data-creator-home="studio-first"]');
+    await expect(home).toBeVisible({ timeout: 30000 });
+    const experience = await home.getAttribute("data-creator-experience");
 
-    // The hero film link is still a genuine URL fragment, not a media-play command.
-    await page.locator('.cf-film-link[href="#creator-film"]').click();
-    await expect(page.locator("#creator-film-title")).toBeFocused();
-    await expect(page).toHaveURL(/#creator-film$/);
-    await page.goBack();
-    await expect(faq).toBeFocused();
-    await expect(page).toHaveURL(/#creator-faq-title$/);
-    await page.goForward();
-    await expect(page.locator("#creator-film-title")).toBeFocused();
+    if (experience === "clarity-v1") {
+      const faq = page.locator("#creator-faq-title");
+      await expect(page).toHaveURL(/#creator-faq-title$/);
+      await expect(faq).toBeVisible();
+      await expect.poll(async () => {
+        const target = await faq.boundingBox();
+        const stickyHeader = await page.locator("header").first().boundingBox();
+        return Boolean(target
+          && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1
+          && target.y < height);
+      }, { message: "The FAQ fragment must remain visible below the public header" }).toBe(true);
 
-    // Same-fragment activation should focus the heading even without hashchange.
-    const filmLink = page.locator('.cf-film-link[href="#creator-film"]');
-    await filmLink.focus();
-    await page.keyboard.press("Enter");
-    await expect(page.locator("#creator-film-title")).toBeFocused();
+      await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/studio/new");
+      await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/studio/projects");
+      await expect(page.locator(".cf-start-card")).toHaveCount(4);
+      await expect(page.locator(".cf-flow li a")).toHaveCount(3);
+      await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
+      await expect(page.locator(".cf-faq details")).toHaveCount(3);
+      await expect(page.locator(".cf-jump-nav,.cf-film-link,.cf-stage-switcher,.cf-study-controls")).toHaveCount(0);
 
-    await page.locator('.cf-jump-nav a[href="#creator-process-title"]').click();
-    await expect(page.locator("#creator-process-title")).toBeFocused();
-    await expect.poll(async () => {
-      const target = await page.locator("#creator-process-title").boundingBox();
-      const stickyHeader = await page.locator("header").first().boundingBox();
-      return Boolean(target && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1);
-    }, { message: "Clicked fragment heading must remain below the public journey header" }).toBe(true);
-    const localPicker = page.locator(".cf-stage-switcher button");
-    await localPicker.nth(1).click();
-    await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "comic");
-    await expect(page.locator('.cf-stage-switcher button[data-creator-stage="comic"]')).toHaveAttribute("aria-pressed", "true");
-    await page.keyboard.press("End");
-    await expect(localPicker.nth(2)).toBeFocused();
-    await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "scene");
-    await page.keyboard.press("ArrowRight");
-    await expect(localPicker.nth(0)).toBeFocused();
-    await page.keyboard.press("ArrowLeft");
-    await expect(localPicker.nth(2)).toBeFocused();
-    await page.keyboard.press("Home");
-    await expect(localPicker.nth(0)).toBeFocused();
-    await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "draw");
+      await page.evaluate(() => { window.location.hash = "creator-process-title"; });
+      const processTitle = page.locator("#creator-process-title");
+      await expect(page).toHaveURL(/#creator-process-title$/);
+      await expect.poll(async () => {
+        const target = await processTitle.boundingBox();
+        const stickyHeader = await page.locator("header").first().boundingBox();
+        return Boolean(target
+          && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1
+          && target.y < height);
+      }, { message: "The workflow fragment must remain visible below the public header" }).toBe(true);
+      await page.goBack();
+      await expect(page).toHaveURL(/#creator-faq-title$/);
+      await expect(faq).toBeInViewport();
+      await page.goForward();
+      await expect(page).toHaveURL(/#creator-process-title$/);
+      await expect(processTitle).toBeInViewport();
 
-    assert.equal(await page.locator("video").count(), 0);
-    assert.deepEqual(mediaRequests, [], "Navigation must not mount or download a video");
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    for (const control of await page.locator(".cf-jump-nav a,.cf-stage-switcher button,.cf-study-controls input").all()) {
-      const box = await control.boundingBox();
-      assert(box && box.height >= 44, "Navigation and workflow controls must keep the 44px touch target");
+      const firstDetails = page.locator(".cf-faq details").first();
+      const firstSummary = firstDetails.locator("summary");
+      await firstSummary.focus();
+      await page.keyboard.press("Enter");
+      await expect(firstDetails).toHaveJSProperty("open", true);
+      await page.keyboard.press("Enter");
+      await expect(firstDetails).toHaveJSProperty("open", false);
+
+      assert.equal(await page.locator("video").count(), 0);
+      assert.deepEqual(mediaRequests, [], "The clarity homepage must not mount or download a video");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+      for (const control of await page.locator(".cf-actions a,.cf-start-card,.cf-flow li a,.cf-support-grid a,.cf-faq summary").all()) {
+        const box = await control.boundingBox();
+        assert(box && box.height >= 44, "Homepage links and FAQ controls must keep the 44px touch target");
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
+      assert.deepEqual(errors, []);
+      results.push({ name, viewport: [width, height], experience, directFragment: true, nativeBackForward: true, faqKeyboard: true, noMediaRequests: true, minimumControlHeight: 44 });
+    } else {
+      const faq = page.locator("#creator-faq-title");
+      await expect(faq).toBeFocused({ timeout: 30000 });
+      await expect(page.locator(".cf-jump-nav a")).toHaveCount(5);
+      const position = await faq.boundingBox();
+      const header = await page.locator("header").first().boundingBox();
+      assert(position && position.y >= (header ? header.y + header.height : 0) - 1, "Fragment heading must not be hidden by the site header");
+      assert(position.y < height, "Fragment heading must land inside the viewport");
+
+      // The hero film link is still a genuine URL fragment, not a media-play command.
+      await page.locator('.cf-film-link[href="#creator-film"]').click();
+      await expect(page.locator("#creator-film-title")).toBeFocused();
+      await expect(page).toHaveURL(/#creator-film$/);
+      await page.goBack();
+      await expect(faq).toBeFocused();
+      await expect(page).toHaveURL(/#creator-faq-title$/);
+      await page.goForward();
+      await expect(page.locator("#creator-film-title")).toBeFocused();
+
+      // Same-fragment activation should focus the heading even without hashchange.
+      const filmLink = page.locator('.cf-film-link[href="#creator-film"]');
+      await filmLink.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator("#creator-film-title")).toBeFocused();
+
+      await page.locator('.cf-jump-nav a[href="#creator-process-title"]').click();
+      await expect(page.locator("#creator-process-title")).toBeFocused();
+      await expect.poll(async () => {
+        const target = await page.locator("#creator-process-title").boundingBox();
+        const stickyHeader = await page.locator("header").first().boundingBox();
+        return Boolean(target && target.y >= (stickyHeader ? stickyHeader.y + stickyHeader.height : 0) - 1);
+      }, { message: "Clicked fragment heading must remain below the public journey header" }).toBe(true);
+      const localPicker = page.locator(".cf-stage-switcher button");
+      await localPicker.nth(1).click();
+      await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "comic");
+      await expect(page.locator('.cf-stage-switcher button[data-creator-stage="comic"]')).toHaveAttribute("aria-pressed", "true");
+      await page.keyboard.press("End");
+      await expect(localPicker.nth(2)).toBeFocused();
+      await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "scene");
+      await page.keyboard.press("ArrowRight");
+      await expect(localPicker.nth(0)).toBeFocused();
+      await page.keyboard.press("ArrowLeft");
+      await expect(localPicker.nth(2)).toBeFocused();
+      await page.keyboard.press("Home");
+      await expect(localPicker.nth(0)).toBeFocused();
+      await expect(page.locator("#creator-stage-description")).toHaveAttribute("data-creator-stage", "draw");
+
+      assert.equal(await page.locator("video").count(), 0);
+      assert.deepEqual(mediaRequests, [], "Navigation must not mount or download a video");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+      for (const control of await page.locator(".cf-jump-nav a,.cf-stage-switcher button,.cf-study-controls input").all()) {
+        const box = await control.boundingBox();
+        assert(box && box.height >= 44, "Navigation and workflow controls must keep the 44px touch target");
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
+      assert.deepEqual(errors, []);
+      results.push({ name, viewport: [width, height], experience: experience ?? "legacy", directFragment: true, nativeBackForward: true, sameFragmentFocus: true, workflowPicker: true, keyboard: true, noMediaRequests: true, minimumControlHeight: 44 });
     }
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
-    assert.deepEqual(errors, []);
-    results.push({ name, viewport: [width, height], directFragment: true, nativeBackForward: true, sameFragmentFocus: true, workflowPicker: true, keyboard: true, noMediaRequests: true, minimumControlHeight: 44 });
     await context.close();
     currentPage = undefined;
   }
