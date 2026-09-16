@@ -24,7 +24,7 @@ jobs:
       - name: Export payload diagnostics
         shell: bash
         env:
-          PAYLOAD_DIR: artifacts/studio-gpt25-background-atlas
+          PAYLOAD_DIR: docs/operations/studio-gpt25-background-atlas
         run: |
           set -euo pipefail
 
