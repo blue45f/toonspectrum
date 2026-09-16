@@ -1,6 +1,44 @@
 /** Network-first navigation with a bounded, validated offline fallback. */
 export const STUDIO_NAVIGATION_TIMEOUT_MS = 4_000;
 
+const MODULE_PRELOAD_LINK =
+  /<link\b(?=[^>]*\srel\s*=\s*(?:"modulepreload"|'modulepreload'|modulepreload\b))[^>]*>\s*/giu;
+
+/**
+ * A controlled reload receives its document through the Service Worker while
+ * its hashed modules are fulfilled from Cache Storage. Chromium cannot reuse
+ * document-level modulepreload responses across that boundary and emits one
+ * warning plus a duplicate fetch for every hint. The first, uncontrolled visit
+ * keeps Vite's hints; controlled documents omit only modulepreload links.
+ */
+export function stripModulePreloadLinks(html: string): string {
+  return html.replace(MODULE_PRELOAD_LINK, "");
+}
+
+export async function prepareControlledNavigationDocument(response: Response): Promise<Response> {
+  if (
+    response.status !== 200
+    || !response.headers.get("content-type")?.toLowerCase().includes("text/html")
+  ) {
+    return response;
+  }
+  const source = await response.clone().text();
+  const body = stripModulePreloadLinks(source);
+  if (body === source) return response;
+
+  const headers = new Headers(response.headers);
+  // Fetch exposes a decoded body. Representation headers from the upstream
+  // bytes are no longer valid after rewriting the HTML.
+  for (const name of ["content-encoding", "content-length", "etag", "last-modified"]) {
+    headers.delete(name);
+  }
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export function isUsableStudioShell(response: Response, isolated: boolean): boolean {
   if (response.status !== 200 || response.redirected
     || !response.headers.get("content-type")?.toLowerCase().includes("text/html")) return false;

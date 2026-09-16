@@ -4,7 +4,10 @@
  * only GET assets are cached. Manuscripts and writes remain owned by the app.
  */
 import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
-import { resolveStudioNavigation } from "./studio-service-worker-navigation";
+import {
+  prepareControlledNavigationDocument,
+  resolveStudioNavigation,
+} from "./studio-service-worker-navigation";
 import { hasPreparedStudioDrawingResources, prepareStudioOfflineResources } from "./studio-service-worker-offline";
 import {
   STUDIO_SERVICE_WORKER_MESSAGE,
@@ -175,7 +178,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
     const cache = await caches.open(cacheNames.precache);
     return cache.match(shellRequest(studioServiceWorkerOfflineShellUrl(pathname)), { ignoreVary: true });
   };
-  return resolveStudioNavigation({
+  const response = await resolveStudioNavigation({
     request: event.request, preloadResponse: event.preloadResponse,
     isolated: routeClass === "studio-navigation", shellUrls: manifest.shellUrls,
     readPreparedShell: routeClass === "studio-navigation" ? async () => {
@@ -201,6 +204,7 @@ async function handleNavigation(event: FetchEvent, routeClass: StudioServiceWork
     refreshShell: (response) => persist("precache", shellRequest(pathname), response),
     waitUntil: (promise) => event.waitUntil(promise),
   });
+  return prepareControlledNavigationDocument(response);
 }
 
 scope.addEventListener("install", (event) => {
