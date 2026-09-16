@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_BRUSH_QUARANTINED_PRESET_IDS } from "./studio-brush-quarantine";
+import { STUDIO_V6_BRUSH_CATALOG_ITEMS } from "./studio-brush-v6-catalog";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 const traySource = readFileSync(
@@ -91,6 +92,27 @@ describe("StudioBrushTray", () => {
     });
   });
 
+  it("restores a persisted V6 favorite through the artist-facing deferred catalogue", async () => {
+    const v6 = STUDIO_V6_BRUSH_CATALOG_ITEMS[0]!;
+    const onSelect = vi.fn();
+    render(
+      <StudioBrushTray
+        activeBrushId={v6.id}
+        favoriteBrushIds={[v6.id]}
+        onSelect={onSelect}
+        onOpenLibrary={vi.fn()}
+      />
+    );
+
+    const option = await screen.findByRole("option", {
+      name: new RegExp(`즐겨찾기 브러시 ${v6.name}`),
+    });
+    expect(option.getAttribute("data-studio-brush-chip")).toBe(v6.id);
+    expect(option.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(option);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: v6.id }));
+  });
+
   it("keeps quarantined favorites off both the core and deferred listing lanes", async () => {
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS.length).toBeGreaterThan(0);
     const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
@@ -127,7 +149,7 @@ describe("StudioBrushTray", () => {
     expect(
       document.querySelector(`[data-studio-brush-chip="${quarantinedId}"]`)
     ).toBeNull();
-    expect(traySource).toContain("loadStudioListedBrushCatalogItems");
+    expect(traySource).toContain("loadStudioLibraryBrushCatalogItems");
     expect(traySource).not.toContain("loadStudioFullBrushCatalogItems");
   });
 

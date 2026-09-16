@@ -3,6 +3,7 @@ import type { StudioBrushCatalogItem } from "./studio-brush-catalog-core";
 interface StudioFullBrushCatalogModule {
   readonly STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[];
   readonly STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[];
+  readonly STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[];
   studioBrushCatalogItemById(brushId: unknown): StudioBrushCatalogItem | null;
 }
 
@@ -42,6 +43,14 @@ export async function loadStudioListedBrushCatalogItems(): Promise<
   readonly StudioBrushCatalogItem[]
 > {
   return (await loadStudioFullBrushCatalog()).STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
+}
+
+
+/** Artist-facing listing lane, including exact V6 material recipes. */
+export async function loadStudioLibraryBrushCatalogItems(): Promise<
+  readonly StudioBrushCatalogItem[]
+> {
+  return (await loadStudioFullBrushCatalog()).STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS;
 }
 
 export async function loadStudioBrushCatalogItemById(

@@ -4,9 +4,11 @@ import {
   loadStudioBrushCatalogItemById,
   loadStudioFullBrushCatalogItems,
   loadStudioListedBrushCatalogItems,
+  loadStudioLibraryBrushCatalogItems,
 } from "./studio-brush-catalog-loader";
 import { STUDIO_BRUSH_QUALITY_PORTFOLIO } from "./studio-brush-quality-portfolio";
 import { STUDIO_BRUSH_QUARANTINED_PRESET_IDS } from "./studio-brush-quarantine";
+import { STUDIO_V6_BRUSH_CATALOG_COUNT } from "./studio-brush-v6-catalog";
 
 describe("studio brush catalog loader lanes", () => {
   it("keeps quarantined ids out of the deferred LISTING lane", async () => {
@@ -17,6 +19,17 @@ describe("studio brush catalog loader lanes", () => {
     const quarantined = new Set(STUDIO_BRUSH_QUARANTINED_PRESET_IDS);
     expect(listed.length).toBeGreaterThan(0);
     expect(listed.some((item) => quarantined.has(item.id))).toBe(false);
+  });
+
+  it("adds V6 recipes only to the artist-facing library lane", async () => {
+    const [classic, library] = await Promise.all([
+      loadStudioListedBrushCatalogItems(),
+      loadStudioLibraryBrushCatalogItems(),
+    ]);
+    expect(classic.some(({ id }) => id.startsWith("v6:"))).toBe(false);
+    expect(library.filter(({ id }) => id.startsWith("v6:"))).toHaveLength(
+      STUDIO_V6_BRUSH_CATALOG_COUNT,
+    );
   });
 
   it("keeps saved-document metadata RESOLUTION unfiltered", async () => {

@@ -150,6 +150,7 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
 export type StudioBrushTrayCategory =
   | "beginner"
   | "expressive"
+  | "nextgen"
   | StudioBrushMediaGroup
   | "all";
 
@@ -416,6 +417,8 @@ export function listStudioBrushTrayItems(
   const all = [...beginner, ...expressiveUnique, ...extras];
 
   if (category === "beginner") return beginner;
+  // V6 rows are injected by the lazy product catalogue, never the core-only fallback.
+  if (category === "nextgen") return [];
   // Expressive kit still surfaces wash/air for discovery even when they are beginner-primary.
   if (category === "expressive") return [...expressive, ...extras];
   if (isStudioBrushMaterialGroup(category)) {

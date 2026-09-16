@@ -26,7 +26,9 @@ export function studioBrushCatalogSelectionSnapshot(
     sourcePresetName: extendedSource ? selection.catalogName : undefined,
     stampTuning: defaultStampTuningForBrushId(applied.brushId),
     brushDynamics: normalizeStudioBrushDynamicsSettings(selection.brushDynamics),
-    enginePrograms: withoutMaterial(current.enginePrograms),
+    enginePrograms: selection.enginePrograms === undefined
+      ? withoutMaterial(current.enginePrograms)
+      : normalizeStudioBrushEngineProgramSet(selection.enginePrograms),
   };
 }
 
