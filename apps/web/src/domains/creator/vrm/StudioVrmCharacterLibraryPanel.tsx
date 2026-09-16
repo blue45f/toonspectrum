@@ -13,8 +13,11 @@ import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
 import { presentStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
 import { filterStudioVrmProductionLibraryEntries } from "./studio-vrm-production-catalog";
+import { resolveVrmLibraryEntryDisplayName } from "./studio-vrm-display-name";
 import { StudioVrmCharacterPreviewImage } from "./StudioVrmCharacterPreviewImage";
 import { buildFallbackVrmLibraryThumbnail, type VrmLibraryEntry } from "./vrm-library";
+
+import { useI18n } from "@/shared/lib/i18n";
 
 const LIBRARY_BATCH_SIZE = 12;
 /** Prefetch margin so the next batch starts before the user hits the list end. */
@@ -68,6 +71,10 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function normalizeCharacterSearchText(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase();
+}
+
 export function StudioVrmCharacterLibraryPanel({
   hidden,
   entries,
@@ -88,6 +95,7 @@ export function StudioVrmCharacterLibraryPanel({
   onLoadMore,
   onVisibleWindowChange,
 }: StudioVrmCharacterLibraryPanelProps) {
+  const locale = useI18n((state) => state.lang);
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(LIBRARY_BATCH_SIZE);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,15 +104,19 @@ export function StudioVrmCharacterLibraryPanel({
   const loadMoreActionRef = useRef<() => void>(() => undefined);
 
   const catalogEntries = filterStudioVrmProductionLibraryEntries(entries, [activeModelId]);
+  const displayNameOf = (entry: VrmLibraryEntry) =>
+    resolveVrmLibraryEntryDisplayName(entry, locale);
   const entryById = new Map(catalogEntries.map((entry) => [entry.id, entry] as const));
   const recentEntries = recentCharacterIds
     .map((id) => entryById.get(id))
     .filter((entry): entry is VrmLibraryEntry => entry !== undefined)
     .slice(0, 6);
-  const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
-  const filteredEntries = catalogEntries.filter((entry) =>
-    entry.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
-  );
+  const normalizedQuery = normalizeCharacterSearchText(query);
+  const filteredEntries = catalogEntries.filter((entry) => {
+    const localizedName = displayNameOf(entry);
+    return normalizeCharacterSearchText(localizedName).includes(normalizedQuery)
+      || normalizeCharacterSearchText(entry.name).includes(normalizedQuery);
+  });
   const visibleEntries = filteredEntries.slice(0, visibleCount);
   const visibleWindowEntries = visibleEntries.slice(-LIBRARY_BATCH_SIZE);
   const visibleWindowKey = visibleWindowEntries.map((entry) => entry.id).join("\u0000");
@@ -118,7 +130,7 @@ export function StudioVrmCharacterLibraryPanel({
   useEffect(() => {
     setVisibleCount(LIBRARY_BATCH_SIZE);
     loadMorePendingRef.current = false;
-  }, [normalizedQuery]);
+  }, [locale, normalizedQuery]);
 
   useEffect(() => {
     if (!hidden) onVisibleWindowChange?.(visibleWindowEntries);
@@ -346,6 +358,7 @@ export function StudioVrmCharacterLibraryPanel({
           <div className="flex flex-wrap gap-1.5">
             {recentEntries.map((entry) => {
               const isActive = entry.id === activeModelId;
+              const displayName = displayNameOf(entry);
               return (
                 <button
                   key={`recent-${entry.id}`}
@@ -360,7 +373,7 @@ export function StudioVrmCharacterLibraryPanel({
                   )}
                   onClick={() => onSelect(entry)}
                 >
-                  {entry.name}
+                  {displayName}
                 </button>
               );
             })}
@@ -384,6 +397,7 @@ export function StudioVrmCharacterLibraryPanel({
         {visibleEntries.map((entry) => {
           const isActive = entry.id === activeModelId;
           const isDeleting = deletingModelId === entry.id;
+          const displayName = displayNameOf(entry);
           const licensePresentation = entry.source === "sample"
             ? null
             : presentStudioVrmLicenseAuthority(entry.licenseAuthority);
@@ -398,7 +412,7 @@ export function StudioVrmCharacterLibraryPanel({
             >
               <button
                 type="button"
-                aria-label={`${entry.name} 선택`}
+                aria-label={`${displayName} 선택`}
                 aria-pressed={isActive}
                 className="grid min-h-[6.25rem] w-full grid-rows-[4.5rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                 disabled={modelStatus === "loading" && isActive}
@@ -408,12 +422,12 @@ export function StudioVrmCharacterLibraryPanel({
                   <StudioVrmCharacterPreviewImage
                     alt=""
                     className="object-contain"
-                    fallbackSrc={buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}
+                    fallbackSrc={buildFallbackVrmLibraryThumbnail(displayName, entry.id)}
                     src={entry.thumbnail}
                   />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
+                  <span className="block truncate text-xs font-bold text-fg">{displayName}</span>
                   <span
                     className={cx(
                       "mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.68rem] font-bold",
@@ -476,7 +490,7 @@ export function StudioVrmCharacterLibraryPanel({
               {entry.source !== "sample" ? (
                 <button
                   type="button"
-                  aria-label={`${entry.name} 삭제`}
+                  aria-label={`${displayName} 삭제`}
                   className="absolute right-1.5 top-1.5 grid size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors pointer-coarse:size-11 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
                   disabled={isDeleting}
                   onClick={(event) => {
