@@ -25,3 +25,7 @@ export * from "./command/bus";
 export * from "./testing/fault-injection";
 export * from "./graph/index";
 export * from "./command/transaction";
+export * from "./ir/layer-graph-v3";
+export * from "./ir/sparse-tile-v3";
+export * from "./ir/vector-stroke-v3";
+export * from "./ir/scene-3d-v3";
