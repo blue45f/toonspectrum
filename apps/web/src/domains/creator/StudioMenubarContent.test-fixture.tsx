@@ -90,6 +90,7 @@ export function createProps(
     masterEditMode: false,
     menu: null,
     mobileImmersive: false,
+    onNavigateBack: vi.fn(),
     historyPanelOpen: false,
     openStudioCommentCount: 0,
     pageCount: 2,

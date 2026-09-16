@@ -21,6 +21,7 @@ import {
   studioChromeIconClass,
 } from "../studio-chrome-ui";
 import { StudioBrushCatalogPortal, StudioPublishContextBanner } from "../studio-page-lazy-ui";
+import { returnFromStudioEditorInBrowser } from "../studio-editor-return-navigation";
 import { LazyStudioMenubarContent } from "../studio-page-modal-lazy-boundaries";
 import { StudioOptionsBars } from "../StudioOptionsBars";
 import { StudioToolBeltContent } from "../StudioToolBeltContent";
@@ -405,6 +406,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           masterEditMode={masterEditMode}
           menu={menu}
           mobileImmersive={mobileImmersive}
+          onNavigateBack={returnFromStudioEditorInBrowser}
           historyPanelOpen={historyPanelOpen}
           openStudioCommentCount={openStudioCommentCount}
           pageCount={studioMenubarPageLabels.length}

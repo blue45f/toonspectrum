@@ -72,6 +72,7 @@ import {
   updateStudioWorkspaceLiveLayout,
 } from "./studio-workspaces";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
+import { StudioEditorReturnButton } from "./StudioEditorReturnButton";
 import { StudioProjectCenterSearch, StudioProjectCenterSection } from "./StudioProjectCenterSearch";
 import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -940,6 +941,7 @@ export interface StudioMenubarContentProps {
   masterEditMode: boolean;
   menu: StudioMenu | null;
   mobileImmersive: boolean;
+  onNavigateBack: () => void;
   historyPanelOpen: boolean;
   /** 미해결 문서 댓글 수 — 프로젝트 시트의 댓글 진입점 배지. */
   openStudioCommentCount: number;
@@ -1023,6 +1025,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   masterEditMode,
   menu,
   mobileImmersive,
+  onNavigateBack,
   historyPanelOpen,
   openStudioCommentCount,
   pageCount,
@@ -1393,8 +1396,15 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             mobileImmersive && "hidden"
           )}
         >
+          {!mobileImmersive ? (
+            <StudioEditorReturnButton
+              variant="lane"
+              onReturn={onNavigateBack}
+            />
+          ) : null}
           {/* Keep document/workspace context intact; the primary lane scrolls when commands exceed width. */}
           <div
+            data-studio-document-context="true"
             className={cn(
               // This lane contains the workspace dialog trigger. Let the primary menubar scroll
               // instead of shrinking this wrapper beneath the adjacent history cluster; after a
@@ -1527,6 +1537,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             mobileImmersive && "min-w-0 gap-1"
           )}
         >
+          {mobileImmersive ? (
+            <StudioEditorReturnButton
+              variant="immersive"
+              onReturn={onNavigateBack}
+            />
+          ) : null}
           {!isMobile && actionStudioMainMenuGroups.length > 0 ? (
             <Suspense fallback={null}>
               <StudioMainMenu
@@ -1566,7 +1582,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   !mobileImmersive &&
                     "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",
                   mobileImmersive &&
-                    "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
+                    "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0"
                 )}
               >
                 {mobileImmersive ? (
@@ -1574,7 +1590,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 ) : (
                   <Maximize2 size={15} aria-hidden />
                 )}
-                <span className={!mobileImmersive ? "max-[429px]:sr-only" : undefined}>
+                <span className="max-[429px]:sr-only">
                   {mobileImmersive ? "종료" : "전체화면"}
                 </span>
               </button>

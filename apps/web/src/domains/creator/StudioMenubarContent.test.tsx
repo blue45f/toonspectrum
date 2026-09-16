@@ -233,6 +233,28 @@ describe("StudioMenubarContent menu presentation", () => {
   });
 });
 describe("StudioMenubarContent", () => {
+  it("keeps the previous-screen path reachable in regular and immersive drawing modes", () => {
+    const onNavigateBack = vi.fn();
+    const { rerender } = render(
+      <StudioMenubarContent {...createProps({ onNavigateBack })} />
+    );
+
+    let back = screen.getByRole("button", { name: "이전 화면으로 돌아가기" });
+    expect(back.getAttribute("data-studio-editor-return")).toBe("lane");
+    fireEvent.click(back);
+    expect(onNavigateBack).toHaveBeenCalledOnce();
+
+    rerender(
+      <StudioMenubarContent
+        {...createProps({ isMobile: true, mobileImmersive: true, onNavigateBack })}
+      />
+    );
+    back = screen.getByRole("button", { name: "이전 화면으로 돌아가기" });
+    expect(back.getAttribute("data-studio-editor-return")).toBe("immersive");
+    fireEvent.click(back);
+    expect(onNavigateBack).toHaveBeenCalledTimes(2);
+  });
+
   it("waits for watermark readiness before toggling export controls", async () => {
     const stableHandlers = createHandlers();
     const setExportMenuOpen = vi.fn();
@@ -596,10 +618,13 @@ describe("StudioMenubarContent", () => {
     const context = screen.getByText("테스트 원고 · 첫 장면");
     expect(context.className).toContain("sr-only");
     expect(context.className).not.toContain("flex-1");
+    const back = screen.getByRole("button", { name: "이전 화면으로 돌아가기" });
     const exit = screen.getByRole("button", { name: "전체 화면 드로잉 종료" });
     const draft = screen.getByRole("button", { name: "초안 저장" });
     const publish = screen.getByRole("button", { name: "게시하기" });
-    expect(exit).toBeTruthy();
+    expect(back.className).toContain("max-[429px]:size-11");
+    expect(exit.className).toContain("max-[429px]:size-11");
+    expect(exit.querySelector("span")?.className).toContain("max-[429px]:sr-only");
     expect(draft).toBeTruthy();
     expect(publish).toBeTruthy();
     // Sticky canvas ring was painting over the draft button in the compact pill.
@@ -769,7 +794,9 @@ describe("StudioMenubarContent", () => {
     const { container } = render(<StudioMenubarContent {...createProps()} />);
 
     const lane = container.querySelector<HTMLElement>('[data-studio-menubar-primary="true"]');
-    const contextLane = lane?.firstElementChild as HTMLElement | null;
+    const contextLane = lane?.querySelector<HTMLElement>(
+      '[data-studio-document-context="true"]'
+    ) ?? null;
     expect(contextLane?.querySelector("h1")).not.toBeNull();
     expect(contextLane?.className).not.toContain("min-w-0");
     // 제목만 줄어들며 압력을 흡수한다.
