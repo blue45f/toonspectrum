@@ -59,11 +59,20 @@ type InitialLibraryView = "active" | "archived" | "trash";
 
 const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
   active: { ko: "내 작업", en: "My work" },
-  storage: { ko: "저장소", en: "Storage" },
-  exports: { ko: "내보내기·제출", en: "Export and submit" },
-  publications: { ko: "게시 관리", en: "Publishing" },
-  archived: { ko: "보관됨", en: "Archived" },
+  storage: { ko: "저장·백업", en: "Save and backup" },
+  exports: { ko: "내보내기", en: "Export" },
+  publications: { ko: "게시", en: "Publishing" },
+  archived: { ko: "보관함", en: "Archive" },
   trash: { ko: "휴지통", en: "Trash" },
+};
+
+const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
+  active: { ko: "최근 작업을 이어가거나 새 작품을 시작하세요. 작업은 이 기기에 자동 저장됩니다.", en: "Continue recent work or start something new. Work is saved automatically on this device." },
+  storage: { ko: "프로젝트 파일과 연결한 개인 드라이브 백업을 관리합니다.", en: "Manage project files and backups in your connected personal drives." },
+  exports: { ko: "플랫폼 제출용 파일과 최근 내보내기를 확인합니다.", en: "Review files prepared for platforms and your recent exports." },
+  publications: { ko: "게시한 작품과 공개 상태를 관리합니다.", en: "Manage published work and its visibility." },
+  archived: { ko: "잠시 보관한 작업을 다시 내 작업으로 옮길 수 있습니다.", en: "Move archived work back into My work whenever you need it." },
+  trash: { ko: "삭제한 작업을 복원하거나 완전히 삭제합니다.", en: "Restore deleted work or remove it permanently." },
 };
 
 function localeFromLanguage(language: string): Locale {
@@ -364,51 +373,60 @@ export function StudioSaveFirstProjectLibraryPage({
       : `Created a new private copy of “${project.title}”.`);
   };
 
-  const navigation: readonly LibraryView[] = [
-    "active",
-    "storage",
-    "exports",
-    "publications",
-    "archived",
-    "trash",
-  ];
+  const primaryNavigation: readonly LibraryView[] = ["active", "archived", "trash"];
+  const secondaryNavigation: readonly LibraryView[] = ["storage", "exports", "publications"];
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO SAVE-FIRST</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">{VIEW_LABELS[view][locale]}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
-              {locale === "ko"
-                ? "작품을 먼저 안전하게 저장하고 원하는 곳에 보관하세요. 내보내기와 공개는 필요할 때만 선택합니다."
-                : "Save work safely first and keep it where you choose. Exporting and publishing remain optional."}
+              {VIEW_DESCRIPTIONS[view][locale]}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>{locale === "ko" ? "작품 가져오기" : "Import work"}</Link>
-            <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}><Plus size={16} aria-hidden="true" />{locale === "ko" ? "새 비공개 작업" : "New private project"}</Link>
+            <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>{locale === "ko" ? "파일 가져오기" : "Import files"}</Link>
+            <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}><Plus size={16} aria-hidden="true" />{locale === "ko" ? "새 작품 만들기" : "Create new work"}</Link>
           </div>
         </header>
 
-        <nav className="mt-7 overflow-x-auto" aria-label={locale === "ko" ? "스튜디오 작업 관리" : "Studio work management"}>
-          <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
-            {navigation.map((candidate) => (
+        <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <nav className="overflow-x-auto" aria-label={locale === "ko" ? "내 작업 보기" : "My work views"}>
+            <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
+              {primaryNavigation.map((candidate) => (
+                <Link
+                  key={candidate}
+                  href={viewHref(candidate)}
+                  aria-current={candidate === view ? "page" : undefined}
+                  className={cn(
+                    "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
+                    candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
+                  )}
+                >
+                  {VIEW_LABELS[candidate][locale]}
+                </Link>
+              ))}
+            </div>
+          </nav>
+          <nav className="flex flex-wrap items-center gap-1" aria-label={locale === "ko" ? "저장과 배포" : "Storage and distribution"}>
+            {secondaryNavigation.map((candidate) => (
               <Link
                 key={candidate}
                 href={viewHref(candidate)}
                 aria-current={candidate === view ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
-                  candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
+                  "inline-flex min-h-10 items-center rounded-xl px-3 text-xs font-semibold",
+                  candidate === view ? "bg-raised text-accent" : "text-fg-3 hover:bg-card hover:text-fg",
                 )}
               >
                 {VIEW_LABELS[candidate][locale]}
               </Link>
             ))}
-          </div>
-        </nav>
+          </nav>
+        </div>
 
         {message ? (
           <div role="status" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft/20 px-3 py-2 text-sm font-semibold text-fg">
@@ -430,6 +448,12 @@ export function StudioSaveFirstProjectLibraryPage({
               <div className="mt-5 rounded-3xl border border-dashed border-line bg-card/60 px-5 py-14 text-center">
                 <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
                 <h2 className="mt-3 text-xl font-black text-fg">{locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}</h2>
+                {view === "active" ? (
+                  <Link href="/studio/new" className={buttonClass({ className: "mt-5 gap-2" })}>
+                    <Plus size={16} aria-hidden="true" />
+                    {locale === "ko" ? "새 작품 만들기" : "Create new work"}
+                  </Link>
+                ) : null}
               </div>
             ) : view === "active" ? (
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

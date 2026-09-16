@@ -80,12 +80,6 @@ const ContactPage = lazyRetry(
   })),
   "ContactPage",
 );
-const SupportPage = lazyRetry(
-  () => import("@/domains/legal/SupportPage").then((module) => ({
-    default: module.SupportPage,
-  })),
-  "SupportPage",
-);
 const FeedbackPage = lazyRetry(
   () => import("@/domains/legal/FeedbackPage").then((module) => ({
     default: module.FeedbackPage,
@@ -95,8 +89,16 @@ const FeedbackPage = lazyRetry(
 
 export const legalRoutes = defineAppRoutes([
   { id: "legal-about", path: "/about", element: <AboutPage /> },
-  { id: "legal-about-workflow", path: "/about/workflow", element: <WebtoonWorkflowPage /> },
-  { id: "legal-about-technology", path: "/about/technology", element: <TechnologyPage /> },
+  {
+    id: "legal-about-workflow",
+    path: "/about/workflow",
+    element: <WebtoonWorkflowPage />,
+  },
+  {
+    id: "legal-about-technology",
+    path: "/about/technology",
+    element: <TechnologyPage />,
+  },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-accessibility", path: "/accessibility", element: <AccessibilityPage /> },
   { id: "legal-data-sources", path: "/about/data", element: <DataSourcesPage /> },
@@ -107,6 +109,6 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-privacy", path: "/privacy", element: <PrivacyPage /> },
   { id: "legal-copyright", path: "/copyright", element: <CopyrightPage /> },
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
-  { id: "legal-support", path: "/support", element: <SupportPage /> },
+  { id: "legal-support", path: "/support", element: <FeedbackPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);
