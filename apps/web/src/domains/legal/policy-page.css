@@ -1,0 +1,16 @@
+.policy-page__article :is(p, li) { overflow-wrap: anywhere; }
+.policy-page__article section:target { border-radius: 0.75rem; background: color-mix(in oklch, var(--color-accent) 7%, transparent); box-shadow: 0 0 0 0.75rem color-mix(in oklch, var(--color-accent) 7%, transparent); }
+@media (width < 1024px) {
+  .policy-page__layout { max-width: 48rem; }
+  .policy-page__toc nav { max-height: 17rem; }
+}
+@media print {
+  .policy-page { max-width: none !important; padding: 0 !important; }
+  .policy-page__summary,
+  .policy-page__toc { break-inside: avoid; }
+  .policy-page__print { display: none !important; }
+  .policy-page__layout { display: block !important; }
+  .policy-page__toc { margin-bottom: 2rem; }
+  .policy-page__toc nav { max-height: none !important; overflow: visible !important; }
+  .policy-page__article section { break-inside: avoid-page; }
+}

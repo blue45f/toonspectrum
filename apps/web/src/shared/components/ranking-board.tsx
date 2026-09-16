@@ -236,6 +236,8 @@ export function RankingBoard({
             return (
               <button
                 key={a.key}
+                type="button"
+                aria-pressed={active}
                 onClick={() => setAxis(a.key)}
                 className={cn(
                   "group flex min-w-36 shrink-0 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-sm font-medium transition-[background,border-color,color,transform,box-shadow] duration-150 ease-out-expo sm:min-w-0",
@@ -250,7 +252,7 @@ export function RankingBoard({
                     active ? "border-accent/45 bg-canvas/45" : "border-line bg-raised/60"
                   )}
                 >
-                  <Icon size={17} />
+                  <Icon size={17} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 leading-tight">
                   <span>{a.label}</span>
@@ -387,6 +389,7 @@ export function RankingBoard({
           </label>
           <button
             type="button"
+            aria-pressed={risingOnly}
             onClick={() => setRisingOnly((current) => !current)}
             className={cn(
               "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors",
@@ -429,7 +432,7 @@ export function RankingBoard({
           >
             <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
           </button>
-          <span className="inline-flex h-10 items-center rounded-xl border border-line bg-card px-3 text-sm text-fg-3">
+          <span className="inline-flex h-10 items-center rounded-xl border border-line bg-card px-3 text-sm text-fg-3" aria-live="polite">
             <span className="mr-1 text-fg">다음 갱신:</span>
             <span className="numeral mr-1 text-fg">{refreshLabel}</span>
             <span>·</span>
@@ -440,6 +443,7 @@ export function RankingBoard({
             type="button"
             onClick={() => setShowFilters((current) => !current)}
             aria-expanded={showFilters}
+            aria-controls="ranking-client-filters"
             className={cn(
               "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-medium transition-colors",
               showFilters || clientFilterCount > 0
@@ -470,14 +474,16 @@ export function RankingBoard({
 
       {/* 보조 클라이언트 필터(내 찜·장르·이용가) — 서버 순위는 유지하고 비매칭 행만 숨김 */}
       {showFilters && (
-        <TitleFilterPanel
-          value={clientFilters}
-          onChange={setClientFilters}
-          facets={["saved", "genre", "age"]}
-          savedCount={savedIds.size}
-          remember={rememberFilters}
-          onToggleRemember={toggleRememberFilters}
-        />
+        <div id="ranking-client-filters">
+          <TitleFilterPanel
+            value={clientFilters}
+            onChange={setClientFilters}
+            facets={["saved", "genre", "age"]}
+            savedCount={savedIds.size}
+            remember={rememberFilters}
+            onToggleRemember={toggleRememberFilters}
+          />
+        </div>
       )}
 
       {/* 랭킹 — 3가지 표시 방식 */}
