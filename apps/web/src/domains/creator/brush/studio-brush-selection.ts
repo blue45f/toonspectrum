@@ -10,6 +10,9 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import { isStudioV6BrushCatalogId } from "./studio-brush-v6-id";
+
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 /**
  * Catalogue identity is deliberately separate from the renderer identity.
@@ -30,6 +33,8 @@ export interface StudioBrushCatalogSelection {
   defaultOpacity: number;
   defaultColor?: string;
   brushDynamics: NormalizedStudioBrushDynamicsSettings | null;
+  /** Versioned physical/material program receipt for exact replay; absent on classic selections. */
+  enginePrograms?: StudioBrushEngineProgramSet | null;
 }
 
 const STUDIO_CORE_BRUSH_PRESET_BY_ID: ReadonlyMap<string, BrushPreset> = new Map(
@@ -46,6 +51,19 @@ function loadStudioBrushPackRuntime() {
     throw error;
   });
   return studioBrushPackRuntimePromise;
+}
+
+let studioV6BrushCatalogRuntimePromise:
+  | Promise<typeof import("./studio-brush-v6-catalog-runtime")>
+  | null = null;
+
+function loadStudioV6BrushCatalogRuntime() {
+  studioV6BrushCatalogRuntimePromise ??= import("./studio-brush-v6-catalog-runtime")
+    .catch((error) => {
+      studioV6BrushCatalogRuntimePromise = null;
+      throw error;
+    });
+  return studioV6BrushCatalogRuntimePromise;
 }
 
 export function studioCoreBrushCatalogSelection(
@@ -80,7 +98,7 @@ export function studioCoreBrushCatalogSelection(
 }
 
 /**
- * One fail-closed selector for the complete 234-tool catalogue.
+ * One fail-closed selector for the complete product brush catalogue.
  *
  * Core presets resolve synchronously from the canonical table. Procedural profiles keep their
  * physics chunk lazy, but both the desktop catalogue and mobile sheet receive the same durable
@@ -92,14 +110,21 @@ export async function materializeStudioBrushCatalogSelection(
   if (typeof catalogId !== "string" || !catalogId) return null;
   const corePreset = STUDIO_CORE_BRUSH_PRESET_BY_ID.get(catalogId);
   if (corePreset) return studioCoreBrushCatalogSelection(corePreset);
+  if (isStudioV6BrushCatalogId(catalogId)) {
+    return (await loadStudioV6BrushCatalogRuntime())
+      .materializeStudioV6BrushCatalogSelection(catalogId);
+  }
   if (!isStudioBrushPackCatalogId(catalogId)) return null;
   return (await loadStudioBrushPackRuntime()).materializeStudioBrushPackSelection(catalogId);
 }
 
-/** Warm only the optional procedural chunk when pointer/focus intent makes selection likely. */
+/** Warm only the optional engine chunk when pointer/focus intent makes selection likely. */
 export async function preloadStudioBrushCatalogSelection(catalogId: unknown): Promise<void> {
-  if (!isStudioBrushPackCatalogId(catalogId)) return;
-  await loadStudioBrushPackRuntime();
+  if (isStudioV6BrushCatalogId(catalogId)) {
+    await loadStudioV6BrushCatalogRuntime();
+    return;
+  }
+  if (isStudioBrushPackCatalogId(catalogId)) await loadStudioBrushPackRuntime();
 }
 
 export function isStudioBrushCatalogSelection(
@@ -123,5 +148,10 @@ export function isStudioBrushCatalogSelection(
     && Number.isFinite(candidate.defaultWidth)
     && typeof candidate.defaultOpacity === "number"
     && Number.isFinite(candidate.defaultOpacity)
-    && (candidate.brushDynamics === null || typeof candidate.brushDynamics === "object");
+    && (candidate.brushDynamics === null || typeof candidate.brushDynamics === "object")
+    && (
+      candidate.enginePrograms === undefined
+      || candidate.enginePrograms === null
+      || (typeof candidate.enginePrograms === "object" && !Array.isArray(candidate.enginePrograms))
+    );
 }

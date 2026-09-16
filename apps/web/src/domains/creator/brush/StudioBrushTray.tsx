@@ -13,12 +13,13 @@ import {
   STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog-core";
-import { loadStudioListedBrushCatalogItems } from "./studio-brush-catalog-loader";
+import { loadStudioLibraryBrushCatalogItems } from "./studio-brush-catalog-loader";
 import {
   resolveStudioBrushEngineLaneLabelKo,
   studioBrushEngineLaneRowById,
 } from "./studio-brush-engine-lane-catalog";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import { isStudioV6BrushCatalogId } from "./studio-brush-v6-id";
 import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
@@ -198,7 +199,7 @@ export function StudioBrushTray({
   const proMetadataRequestKey = brushCatalogItems
     ? ""
     : [activeBrushId, ...favoriteBrushIds, ...recentBrushIds]
-        .filter(isStudioBrushPackCatalogId)
+        .filter((id) => isStudioBrushPackCatalogId(id) || isStudioV6BrushCatalogId(id))
         .join("\u0000");
   const needsProMetadata = proMetadataRequestKey.length > 0;
 
@@ -208,7 +209,7 @@ export function StudioBrushTray({
     // The tray is a LISTING lane: the listed (quarantine-filtered) inventory keeps a quarantined
     // favorite/MRU id from re-surfacing as a chip. Current-brush metadata resolution stays on the
     // unfiltered lane (`loadStudioBrushCatalogItemById` in StudioActiveBrushSummary).
-    void loadStudioListedBrushCatalogItems()
+    void loadStudioLibraryBrushCatalogItems()
       .then((items) => {
         if (live) setDeferredCatalogItems(items);
       })

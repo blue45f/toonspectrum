@@ -14,7 +14,8 @@ import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
-  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_LIBRARY_COUNTS,
+  STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
@@ -41,7 +42,8 @@ const beginnerCatalogItems = filterStudioBrushCatalogItems({
 const beginnerCatalogCount = beginnerCatalogItems.length;
 // The drawer's own header counts what it can OFFER, not what is registered — quarantined ids are
 // registered but unreachable, so the listed paint inventory is the honest number.
-const paintCatalogCount = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
+const paintCatalogCount = STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS.length;
+const nextGenCatalogCount = STUDIO_BRUSH_LIBRARY_COUNTS.v6;
 const qualityPaintCatalogCount = STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS.length;
 
 // 재질 탭은 티어 탭을 대체한다. 개수를 하드코딩하면 재질이 늘 때마다 테스트가 거짓말을 하므로
@@ -57,18 +59,25 @@ const exhaustiveCatalogItems = filterStudioBrushCatalogItems({
   operation: "paint",
   category: "all",
   query: "",
+  includeV6: true,
 });
 const exhaustiveCatalogCount = exhaustiveCatalogItems.length;
 const exhaustiveFirstBatchProCount = exhaustiveCatalogItems
   .slice(0, 48)
-  .filter((item) => item.source === "pro").length;
+  .filter((item) => item.source === "pro" && !item.id.startsWith("v6:")).length;
 const exhaustiveProCount = exhaustiveCatalogItems
-  .filter((item) => item.source === "pro").length;
+  .filter((item) => item.source === "pro" && !item.id.startsWith("v6:")).length;
+const exhaustiveFirstBatchNextGenCount = exhaustiveCatalogItems
+  .slice(0, 48)
+  .filter((item) => item.id.startsWith("v6:")).length;
+const exhaustiveNextGenCount = exhaustiveCatalogItems
+  .filter((item) => item.id.startsWith("v6:")).length;
 // Synthetic inventories exercise pagination independently of the shipped selectable inventory.
 const LARGE_CATALOG_FIXTURE_COUNT = 123;
 function installLargeCatalogFixture(): void {
   const items = Array.from({ length: LARGE_CATALOG_FIXTURE_COUNT }, (_, index) => ({
     ...exhaustiveCatalogItems[index % exhaustiveCatalogItems.length]!,
+    source: "core" as const,
     id: `synthetic-brush-${index}`,
     name: `synthetic brush ${index}`,
   }));
@@ -181,7 +190,8 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain('data-studio-brush-surface-role="full-catalog-management"');
     expect(html).toContain("브러시 전체 라이브러리");
     expect(html).toContain(
-      `브러시 ${paintCatalogCount}종 · 품질 검증 ${qualityPaintCatalogCount}종 우선 · `
+      `브러시 ${paintCatalogCount}종 · 차세대 ${nextGenCatalogCount}종 · `
+        + `품질 검증 ${qualityPaintCatalogCount}종 우선 · `
         + `재질 ${materialTabCount}갈래`,
     );
     expect(html).toContain('aria-label="브러시 전체 라이브러리 닫기"');
@@ -502,8 +512,16 @@ describe("StudioBrushLibrarySheet", () => {
       container.querySelectorAll('[data-studio-brush-quality-tier="verified"]'),
     ).toHaveLength(Math.min(48, qualityPaintCatalogCount));
     expect(
+      container.querySelectorAll('[data-studio-brush-quality-tier="nextgen"]'),
+    ).toHaveLength(exhaustiveFirstBatchNextGenCount);
+    expect(
       container.querySelectorAll('[data-studio-brush-quality-tier="extended"]'),
-    ).toHaveLength(Math.max(0, Math.min(48, exhaustiveCatalogCount) - qualityPaintCatalogCount));
+    ).toHaveLength(Math.max(
+      0,
+      Math.min(48, exhaustiveCatalogCount)
+        - qualityPaintCatalogCount
+        - exhaustiveFirstBatchNextGenCount,
+    ));
     expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
       exhaustiveFirstBatchProCount,
     );
@@ -529,8 +547,14 @@ describe("StudioBrushLibrarySheet", () => {
       container.querySelectorAll('[data-studio-brush-quality-tier="verified"]'),
     ).toHaveLength(qualityPaintCatalogCount);
     expect(
+      container.querySelectorAll('[data-studio-brush-quality-tier="nextgen"]'),
+    ).toHaveLength(exhaustiveNextGenCount);
+    expect(
       container.querySelectorAll('[data-studio-brush-quality-tier="extended"]'),
-    ).toHaveLength(exhaustiveCatalogCount - qualityPaintCatalogCount);
+    ).toHaveLength(
+      exhaustiveCatalogCount - qualityPaintCatalogCount - exhaustiveNextGenCount,
+    );
+    expect(screen.getAllByText("V6")).toHaveLength(exhaustiveNextGenCount);
     expect(screen.getAllByText("PRO")).toHaveLength(exhaustiveProCount);
 
     fireEvent.click(screen.getByRole("button", { name: "고사리 깃잎 선택" }));

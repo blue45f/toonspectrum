@@ -95,6 +95,7 @@ function brushSnapshotFingerprint(s: StudioBrushSnapshot): string {
     s.tipRoundness,
     JSON.stringify(s.brushDynamics ?? null),
     JSON.stringify(s.stampTuning ?? null),
+    JSON.stringify(s.enginePrograms ?? null),
   ].join("|");
 }
 
