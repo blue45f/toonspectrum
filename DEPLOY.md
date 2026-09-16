@@ -32,10 +32,10 @@ rollback일 뿐 Git 자동 배포나 정상 트래픽 권위가 아닙니다.
 폴백입니다. 정적 gateway의 `CORE_API_ORIGIN`은 readiness를 통과한 Core 서비스만 가리켜야 하며,
 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
 
-### 운영 검증 스냅샷 (2026-08-02)
+### 운영 검증 스냅샷 (2026-09-16)
 
-- production DB `0001`~`0025` exact ledger와 runtime capability 검증 완료
-- Cloudflare realtime `workers.dev` 활성; `realtime.toonstudio.cloud` custom hostname/DNS/TLS는 대기
+- production DB `0001`~`0058` exact ledger와 runtime capability 검증 완료
+- Cloudflare realtime `realtime.toonstudio.cloud` custom hostname/DNS/TLS 활성; `workers.dev`는 독립 canary·rollback으로 유지
 - Upstash coordination과 Supabase private buckets 활성
 - Google OAuth production callback 수정·검증 완료
 - AI provider production secret·budget/failover 값은 다음 승인 배포 반영 대기
@@ -132,9 +132,10 @@ Google Identity Services의 승인된 JavaScript origin에는
 
 ## 6. Studio 실시간 권위와 선택형 Socket.IO 폴백
 
-현재 ephemeral realtime production 권위는 Cloudflare Durable Objects `workers.dev`
-origin입니다. `realtime.toonstudio.cloud`는 DNS zone·custom hostname·TLS가 완료되기 전에
-사용하지 않습니다. Cloudflare는 presence, comment invalidation, screen-share signaling을
+현재 ephemeral realtime production 정본은 Cloudflare Durable Objects의
+`realtime.toonstudio.cloud` custom domain입니다. `workers.dev` origin은 독립 canary와
+rollback 확인용으로 계속 활성화하며, 둘 중 어느 경로도 영구 작품 원장으로 사용하지 않습니다.
+Cloudflare는 presence, comment invalidation, screen-share signaling을
 역할별 ticket으로 처리하며 raster pixel, 작품 ACL, 음성 media 권위가 아닙니다.
 
 로그인한 사용자가 저장된 작품을 다시 편집하고 서버에 저장하려면 CRDT 변경을 영속 저장하는

@@ -2,6 +2,14 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "toonspectrum-realtime",
   "main": "src/index.ts",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "realtime.toonstudio.cloud",
+      "custom_domain": true
+    }
+  ],
   "compatibility_date": "2026-07-30",
 
   "durable_objects": {
