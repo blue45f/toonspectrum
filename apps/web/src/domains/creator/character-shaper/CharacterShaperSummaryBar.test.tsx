@@ -16,6 +16,8 @@ import type {
 import type { CharacterShaperBinding } from "./character-shaper-ui-contract";
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 
+import { useI18n } from "@/shared/lib/i18n";
+
 vi.mock("./character-shaper-recipe", () => ({
   describeCharacterRecipe: () => ({ style: "7두신 · 보브 · 교복", lines: ["7두신"], changedSlots: [] }),
   diffCharacterRecipes: (left: CharacterRecipe, right: CharacterRecipe) =>
@@ -126,6 +128,7 @@ function baseHost(): Record<string, unknown> {
 }
 
 beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
   installMatchMedia(1440);
 });
 
@@ -199,6 +202,40 @@ describe("CharacterShaperSummaryBar", () => {
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalledWith("교복 버전");
     expect(screen.getByRole("status").textContent).toContain("저장됨 · 교복 버전");
+  });
+
+  it("shows bundled model names in the active application language", () => {
+    useI18n.setState({ lang: "ja" });
+    const host = {
+      ...baseHost(),
+      libraryEntries: [
+        {
+          id: "quaternius-modular-female-witch",
+          name: "Quaternius Witch (Female)",
+          source: "sample",
+          thumbnail: null,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+        {
+          id: "uploaded",
+          name: "My OC",
+          source: "sqlite-opfs",
+          thumbnail: null,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      activeModelId: "quaternius-modular-female-witch",
+    };
+
+    render(<Harness binding={makeBinding()} host={host} onSaved={vi.fn()} />);
+
+    const modelPicker = screen.getByLabelText("모델") as HTMLSelectElement;
+    expect(Array.from(modelPicker.options, (option) => option.textContent)).toEqual([
+      "クォータニアス 魔女（女性）",
+      "My OC",
+    ]);
   });
 
   it("switches models through the picker", () => {
