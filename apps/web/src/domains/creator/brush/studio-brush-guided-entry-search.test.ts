@@ -8,9 +8,10 @@ function ids(query: string): string[] {
   );
 }
 
-describe("guided Brush Studio command search", () => {
-  it("finds the dedicated authoring workspace with user-facing names", () => {
+describe("unified Brush Studio command search", () => {
+  it("finds full brush creation by its visible name and former lab aliases", () => {
     for (const query of [
+      "새 브러시 만들기",
       "목적별 브러시 제작실",
       "브러시 연구실",
       "브러시 제작실",
@@ -20,11 +21,14 @@ describe("guided Brush Studio command search", () => {
     }
   });
 
-  it("finds current-brush editing with the label shown in the Studio menu", () => {
-    expect(ids("현재 브러시 세부 설정")).toContain("brush.studio");
-  });
-
-  it("keeps the former Brush Studio wording as a searchable alias", () => {
-    expect(ids("브러시 스튜디오")).toContain("brush.studio");
+  it("finds compact current-brush editing by current and former wording", () => {
+    for (const query of [
+      "현재 브러시 편집",
+      "현재 브러시 세부 설정",
+      "브러시 상세 설정",
+      "브러시 스튜디오",
+    ]) {
+      expect(ids(query), query).toContain("brush.studio");
+    }
   });
 });

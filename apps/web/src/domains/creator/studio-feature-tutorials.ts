@@ -238,8 +238,8 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
     tryLabel: "브러시 열기",
     steps: [
       {
-        title: "브러시 스튜디오 열기",
-        body: "그리기 옵션의 브러시 목록에서 브러시 스튜디오로 들어가요.",
+        title: "현재 브러시 편집 열기",
+        body: "그리기 옵션에서 현재 브러시 편집을 열어 펜촉과 반응을 조절해요.",
       },
       {
         title: "듀얼 브러시 켜기",

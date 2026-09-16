@@ -38,7 +38,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
   pen: {
     id: "pen",
     title: "펜",
-    description: "자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요.",
+    description: "자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 현재 브러시 편집에서 조절해요.",
     shortcut: "B",
     preview: "ink",
     tip: "[ 와 ] 키로 그리는 흐름을 끊지 않고 크기를 바꿔보세요.",

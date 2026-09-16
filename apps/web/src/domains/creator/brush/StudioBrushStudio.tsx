@@ -113,6 +113,7 @@ import {
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushGoalStart } from "./StudioBrushGoalStart";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
+import { STUDIO_BRUSH_LABELS, studioBrushEditorHref } from "./studio-brush-product-model";
 
 import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type {
@@ -851,6 +852,9 @@ export function StudioBrushStudio({
   const mappingCount = studioBrushDynamicsActiveMappingCount(settings);
   const brushLabel = BRUSH_PRESETS.find((preset) => preset.id === brushId)?.name ?? "브러시";
   const touch = density === "touch";
+  const fullEditorHref = studioBrushEditorHref(
+    typeof window === "undefined" ? "/studio/canvas" : window.location.pathname,
+  );
 
   function closeStudio() {
     restoreRequestRef.current += 1;
@@ -1567,11 +1571,22 @@ export function StudioBrushStudio({
             <SlidersHorizontal size={17} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate text-sm font-bold text-fg">브러시 스튜디오</h2>
+            <h2 id={titleId} className="truncate text-sm font-bold text-fg">{STUDIO_BRUSH_LABELS.editCurrent}</h2>
             <p id={descriptionId} className="truncate text-[0.65rem] text-fg-3">
               {brushLabel} · {dynamicsActive ? `${mappingCount}개 입력 연결` : "전역 입력과 입자 브러시 설정"}
             </p>
           </div>
+          <a
+            href={fullEditorHref}
+            aria-label={STUDIO_BRUSH_LABELS.create}
+            title="브러시 스튜디오 전체 편집에서 새 브러시 만들기"
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:border-accent/55 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              STUDIO_FOCUS_RING,
+            )}
+          >
+            <Sparkles size={17} aria-hidden />
+          </a>
           <button
             type="button"
             onClick={() => setCategory("engines")}
@@ -1588,7 +1603,7 @@ export function StudioBrushStudio({
             ref={closeRef}
             type="button"
             onClick={closeStudio}
-            aria-label="브러시 스튜디오 닫기"
+            aria-label="현재 브러시 편집 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={17} aria-hidden />
@@ -1616,7 +1631,7 @@ export function StudioBrushStudio({
         <div className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[10rem_minmax(0,1fr)_14rem]">
           <div
             role="tablist"
-            aria-label="브러시 스튜디오 설정 분류"
+            aria-label="현재 브러시 편집 설정 분류"
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-2 [scrollbar-width:none] sm:flex-col sm:overflow-x-visible sm:border-b-0 sm:border-r sm:p-3"
           >
             {CATEGORY_ITEMS.map(({ id, label, description, Icon }) => {
@@ -1695,7 +1710,7 @@ export function StudioBrushStudio({
           <SlidersHorizontal size={16} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-semibold text-fg-2">브러시 스튜디오</span>
+          <span className="block text-xs font-semibold text-fg-2">{STUDIO_BRUSH_LABELS.editCurrent}</span>
           <span className="block truncate text-[0.65rem] text-fg-3">{launcherSummary}</span>
         </span>
         <ChevronRight size={16} className="shrink-0 text-fg-3" aria-hidden />

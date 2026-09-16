@@ -733,7 +733,7 @@ function StudioLeftToolRailConnected() {
               data-studio-primary-action="draw"
               icon={Pencil}
               label="펜 (B)"
-              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
+              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 현재 브러시 편집에서 조절해요."
               active={tool === "draw" && drawMode === "pen" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}

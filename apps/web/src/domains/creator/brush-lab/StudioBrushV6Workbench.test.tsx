@@ -38,11 +38,22 @@ afterEach(cleanup);
 const stored = (): BrushStudioV6Program => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
+  it("starts with result-focused controls and reveals engine internals only on request", () => {
+    render(<StudioBrushV6Workbench scope="test" />);
+    expect(screen.getByRole("button", { name: "재료·질감" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "엔진 조합" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    expect(screen.getByRole("button", { name: "엔진 조합" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "호환성·성능" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "기본 편집" }));
+    expect(screen.queryByRole("button", { name: "엔진 조합" })).toBeNull();
+  });
   it("offers one truthful output authority and explains preserved imported alternatives", () => {
     const original = createBrushStudioV6Program("oil-hair-mixer");
     localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({ ...original, slots: { ...original.slots, output: "output-raster-tiles" } }));
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
     const select = screen.getByLabelText("출력 권위") as HTMLSelectElement;
     expect(select.value).toBe("output-raster-tiles");
     expect([...select.options].filter((option) => !option.disabled).map((option) => option.value)).toEqual(["output-contact-canvas-svg"]);
@@ -58,13 +69,14 @@ describe("V6 brush experiments in the workbench", () => {
     const original = createBrushStudioV6Program(recipe);
     localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(original));
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
     const pickup = screen.getByLabelText("픽업") as HTMLSelectElement;
     expect(pickup.value).toBe("pickup-pigment-reservoir");
     const card = pickup.closest("div.rounded-xl") as HTMLElement;
     expect(within(card).getByText(status)).toBeTruthy();
     expect(within(card).getByText(/강모 조합에서만 CPU 안료 저장량 보충/u)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     expect((screen.getByRole("slider", { name: /안료 보충·혼합/u }) as HTMLInputElement).disabled).toBe(inactive);
     expect(stored().slots.pickup).toBe(original.slots.pickup);
     expect(stored().tuning.pickup).toBe(original.tuning.pickup);
@@ -73,9 +85,10 @@ describe("V6 brush experiments in the workbench", () => {
   it("disables pickup and secondary pigment for a no-pickup bristle graph", () => {
     localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Engine Graph" }));
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
     fireEvent.change(screen.getByLabelText("픽업"), { target: { value: "pickup-none" } });
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     expect((screen.getByRole("slider", { name: /안료 보충·혼합/u }) as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByLabelText("혼합·패턴 색", { exact: false }) as HTMLInputElement).disabled).toBe(true);
     expect(stored().tuning.pickup).toBe(0.62);
@@ -83,7 +96,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it("disables the secondary color when the contact engine uses only primary pigment", () => {
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     const input = screen.getByLabelText("혼합·패턴 색", { exact: false }) as HTMLInputElement;
     expect(input.disabled).toBe(true);
     expect(input.getAttribute("aria-describedby")).toBe("brush-v6-secondary-inactive");
@@ -96,7 +109,7 @@ describe("V6 brush experiments in the workbench", () => {
       ...program, input: { ...program.input, touchPolicy: "pen-ink-finger-water" },
     }));
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Input·Device" }));
+    fireEvent.click(screen.getByRole("button", { name: "입력·필압" }));
     const unsupported = screen.getByRole("option", { name: "손가락 물붓 · 미지원" }) as HTMLOptionElement;
     expect(unsupported.disabled).toBe(true);
     expect(screen.getByText(/손가락 물붓은 현재 미지원/u)).toBeTruthy();
@@ -124,7 +137,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it("groups continuous slider events but keeps the next gesture separately undoable", () => {
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     const slider = screen.getByRole("slider", { name: /도포 유량/u });
     const initial = stored().tuning.flow;
     fireEvent.change(slider, { target: { value: "0.2" } });
@@ -153,7 +166,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it("allows clearing and typing a precise number without resetting the brush mid-entry", () => {
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     const numeric = screen.getByRole("spinbutton", { name: "도포 유량 직접 입력" });
     const before = stored().tuning.flow;
     fireEvent.change(numeric, { target: { value: "" } });
@@ -184,12 +197,12 @@ describe("V6 brush experiments in the workbench", () => {
     save.mockRejectedValueOnce(new Error("저장소 연결 실패"));
     render(<StudioBrushV6Workbench scope="test" />);
     const before = stored();
-    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "브러시로 저장" }));
     expect(await screen.findByText("브러시 저장 실패: 저장소 연결 실패")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "원고에서 사용하기" })).toBeNull();
     expect(stored()).toEqual(before);
     save.mockResolvedValueOnce({ id: "saved-physical-brush", name: "테스트 브러시" });
-    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "브러시로 저장" }));
     expect((await screen.findByRole("link", { name: "원고에서 사용하기" })).getAttribute("href"))
       .toBe("/studio?materialBrush=saved-physical-brush");
     expect(save).toHaveBeenLastCalledWith(before);
@@ -200,20 +213,20 @@ describe("V6 brush experiments in the workbench", () => {
     save.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
     render(<StudioBrushV6Workbench scope="test" />);
     const captured = stored();
-    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "브러시로 저장" }));
     fireEvent.change(screen.getByRole("textbox", { name: "브러시 이름" }), {
       target: { value: "저장 중 새 브러시" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Material" }));
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
     fireEvent.change(screen.getByRole("slider", { name: /도포 유량/u }), { target: { value: "0.23" } });
     await act(async () => { resolveSave({ id: "old-recipe", name: captured.name }); });
     expect(save).toHaveBeenCalledWith(captured);
     expect(screen.queryByRole("link", { name: "원고에서 사용하기" })).toBeNull();
     expect(screen.queryByText(/라이브러리에 저장하고 다시 읽어 확인했습니다/u)).toBeNull();
     expect(stored()).toMatchObject({ name: "저장 중 새 브러시", tuning: { flow: 0.23 } });
-    expect((screen.getByRole("button", { name: "스튜디오에 브러시 저장" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "브러시로 저장" }) as HTMLButtonElement).disabled).toBe(false);
     save.mockResolvedValueOnce({ id: "current-recipe", name: "저장 중 새 브러시" });
-    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "브러시로 저장" }));
     expect((await screen.findByRole("link", { name: "원고에서 사용하기" })).getAttribute("href"))
       .toBe("/studio?materialBrush=current-recipe");
   });
@@ -224,7 +237,7 @@ describe("V6 brush experiments in the workbench", () => {
     render(<StudioBrushV6Workbench scope="test" />);
     const initial = stored();
     fireEvent.change(screen.getByRole("textbox", { name: "브러시 이름" }), { target: { value: "저장 대상" } });
-    fireEvent.click(screen.getByRole("button", { name: "스튜디오에 브러시 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "브러시로 저장" }));
     const undo = screen.getByRole("button", { name: "실행 취소" });
     if (source === "button") fireEvent.click(undo);
     else fireEvent.keyDown(undo, { key: "z", metaKey: true });
@@ -236,11 +249,13 @@ describe("V6 brush experiments in the workbench", () => {
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: /^중력 분사/u }));
     expect(stored().slots.carrier).toBe("carrier-cpu-ballistic-spray-v1");
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
     fireEvent.change(screen.getByRole("slider", { name: /중력 방향·강도/u }), { target: { value: "-0.5" } });
     expect(stored().tuning.gravity).toBe(-0.5);
     const pattern = screen.getByLabelText("패턴") as HTMLSelectElement;
     expect([...pattern.options].filter((option) => !option.disabled).map((option) => option.value)).toEqual(["pattern-none"]);
-    fireEvent.click(screen.getByRole("button", { name: "Physics" }));
+    fireEvent.click(screen.getByRole("button", { name: "물리" }));
     const bristle = screen.getByRole("button", { name: /Bristle Dynamics/u }) as HTMLButtonElement;
     expect(bristle.disabled).toBe(true);
   });
@@ -251,7 +266,8 @@ describe("V6 brush experiments in the workbench", () => {
       JSON.stringify(createBrushStudioV6Program("mixbox-oil-bristle")),
     );
     render(<StudioBrushV6Workbench scope="test" />);
-    fireEvent.click(screen.getByRole("button", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "호환성·성능" }));
     const plan = screen.getByRole("region", { name: "무폴백 브러시 엔진 바인딩" });
     expect(within(plan).getByText(/fallback none/u)).toBeTruthy();
     expect(within(plan).getByText("Mixbox")).toBeTruthy();
@@ -266,11 +282,12 @@ describe("V6 brush experiments in the workbench", () => {
       JSON.stringify({ ...base, slots: { ...base.slots, pigment: "pigment-painter-lut" } }),
     );
     render(<StudioBrushV6Workbench scope="test" />);
-    const button = screen.getByRole("button", { name: "스튜디오에 브러시 저장" }) as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "브러시로 저장" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(save).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "호환성·성능" }));
     expect(screen.getByRole("alert").textContent).toContain("Pigment Painter LUT");
   });
 
