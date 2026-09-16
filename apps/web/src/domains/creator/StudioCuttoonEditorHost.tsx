@@ -24095,6 +24095,7 @@ No text, logo, watermark, or copyrighted character.`;
       collaborationOperationSyncRequired,
       collaborationLockMessage,
       studioCrdtAuthoritativeSaveBarrierRef,
+      studioCrdtSceneRuntimeRef,
       studioCrdtDocumentRef,
       sharedDocumentSaveAbortRef,
       ownerDetailAbortRef,

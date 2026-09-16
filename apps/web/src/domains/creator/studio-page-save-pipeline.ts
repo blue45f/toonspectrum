@@ -30,7 +30,10 @@ import { validateStudioPublishPreflight } from "./studio-publish-preflight";
 import { validateStudioWorkMetadata } from "./studio-work-metadata";
 
 import type { StudioCrdtDocument } from "./live/studio-crdt-document";
-import type { StudioCrdtAuthoritativeSaveBarrier } from "./live/StudioLiveCollaborationProvider";
+import type {
+  StudioCrdtAuthoritativeSaveBarrier,
+  StudioCrdtSceneGraphRuntime,
+} from "./live/StudioLiveCollaborationProvider";
 import type { StudioDraftCollaborationReadiness } from "./studio-draft-collaboration";
 import type { El } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";
@@ -102,6 +105,9 @@ export interface StudioPageSavePipelineDeps {
   readonly collaborationLockMessage: () => string;
   readonly studioCrdtAuthoritativeSaveBarrierRef: {
     readonly current: StudioCrdtAuthoritativeSaveBarrier | null;
+  };
+  readonly studioCrdtSceneRuntimeRef: {
+    readonly current: StudioCrdtSceneGraphRuntime | null;
   };
   readonly studioCrdtDocumentRef: { readonly current: StudioCrdtDocument | null };
   readonly sharedDocumentSaveAbortRef: { current: AbortController | null };
@@ -218,6 +224,7 @@ export async function runStudioPageSavePipeline(
     collaborationOperationSyncRequired,
     collaborationLockMessage,
     studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtSceneRuntimeRef,
     studioCrdtDocumentRef,
     sharedDocumentSaveAbortRef,
     ownerDetailAbortRef,
@@ -384,6 +391,10 @@ export async function runStudioPageSavePipeline(
   hideStrokeGuide();
   setIsExporting(true);
   let authoritativeCrdtServerSequence: string | null = null;
+  let draftProtectionReceipt: {
+    readonly runtime: StudioCrdtSceneGraphRuntime;
+    readonly protectedUpdateIds: readonly string[];
+  } | null = null;
   let linkedCloudUploadWorkId: string | null = null;
   let linkedCloudUploadReceipts: Awaited<ReturnType<
     typeof import("./studio-linked-3d-pass-cloud-project").ensureStudioLinked3dPassCloudProject
@@ -399,19 +410,48 @@ export async function runStudioPageSavePipeline(
     }
     if (!saveScopeStillCurrent()) return;
     if (collaborationOperationSyncRequired) {
-      const authoritativeSaveBarrier = studioCrdtAuthoritativeSaveBarrierRef.current;
-      if (!authoritativeSaveBarrier) {
-        throw new Error(
-          "팀 원고의 서버 승인 경계가 준비되지 않아 저장을 시작하지 않았습니다. 연결을 확인해 주세요."
-        );
+      // Publishing and shared-document PATCHes still require an authoritative server sequence.
+      // A normal direct draft can instead establish a device-first boundary: the exact CRDT batch
+      // stays in the durable outbox and replays after reconnect while the REST draft save proceeds.
+      const requiresAuthoritativeBoundary = status === "published" || sharedDocument !== null;
+      if (requiresAuthoritativeBoundary) {
+        const authoritativeSaveBarrier = studioCrdtAuthoritativeSaveBarrierRef.current;
+        if (!authoritativeSaveBarrier) {
+          throw new Error(
+            "팀 원고의 서버 승인 경계가 준비되지 않아 저장을 시작하지 않았습니다. 연결을 확인해 주세요."
+          );
+        }
+        setSharedDocumentNotice("대기 중인 공동 편집 변경을 서버에 승인받은 뒤 저장합니다.");
+        const barrierResult = await authoritativeSaveBarrier(10_000);
+        authoritativeCrdtServerSequence = barrierResult.serverSequence;
+      } else {
+        const draftProtectionRuntime = studioCrdtSceneRuntimeRef.current;
+        if (draftProtectionRuntime) {
+          setSharedDocumentNotice(
+            "최근 변경을 이 기기에 먼저 보호한 뒤 서버 초안과 자동으로 맞춥니다."
+          );
+          const protection = await draftProtectionRuntime.flushAndWaitForDraftProtection(10_000);
+          if (protection.protectedUpdateIds.length > 0) {
+            draftProtectionReceipt = {
+              runtime: draftProtectionRuntime,
+              protectedUpdateIds: protection.protectedUpdateIds,
+            };
+          }
+        } else {
+          // The owner may save before the optional live runtime finishes warming up. React history
+          // and the OPFS/SQLite autosave remain canonical, so realtime readiness must not block the
+          // first private draft creation.
+          setSharedDocumentNotice(
+            "실시간 연결 준비를 기다리지 않고 이 기기의 최신 원고로 초안을 저장합니다."
+          );
+        }
       }
-      setSharedDocumentNotice("대기 중인 공동 편집 변경을 서버에 승인받은 뒤 저장합니다.");
-      const barrierResult = await authoritativeSaveBarrier(10_000);
-      authoritativeCrdtServerSequence = barrierResult.serverSequence;
       if (!saveScopeStillCurrent()) return;
       if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) {
         throw new Error(
-          "서버 승인 중 원고가 변경되어 저장을 중단했습니다. 최신 원고를 확인한 뒤 다시 저장해 주세요."
+          requiresAuthoritativeBoundary
+            ? "서버 승인 중 원고가 변경되어 저장을 중단했습니다. 최신 원고를 확인한 뒤 다시 저장해 주세요."
+            : "초안 보호 중 원고가 변경되어 최신 상태로 다시 저장합니다."
         );
       }
       setSharedDocumentNotice(null);
@@ -785,6 +825,23 @@ export async function runStudioPageSavePipeline(
         ),
       });
       return;
+    }
+
+    // The exact REST snapshot now supersedes only the local CRDT batches captured by the draft
+    // protection fence. Never clear newer edits or a recovered-existing promotion without proof.
+    if (draftProtectionReceipt) {
+      try {
+        await draftProtectionReceipt.runtime.acknowledgeDraftProtection(
+          draftProtectionReceipt.protectedUpdateIds
+        );
+      } catch (cause) {
+        setSharedDocumentNotice(
+          "서버 초안 저장은 완료했지만 이 기기의 동기화 대기 기록을 정리하지 못했습니다. 다음 연결에서 안전하게 다시 확인합니다."
+        );
+        if (import.meta.env.DEV) {
+          console.warn("Studio draft protection cleanup failed after server save.", cause);
+        }
+      }
     }
 
     // This is the exact acknowledged-save path: never metadata, permission failure, a stale

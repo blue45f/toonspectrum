@@ -53,6 +53,7 @@ describe("studio save payload ownership boundary", () => {
     expect(save).toContain("publishComplianceResult.readyForDestinationReview");
     expect(save).toContain("new AbortController()");
     expect(save).toContain("await authoritativeSaveBarrier(10_000)");
+    expect(save).toContain("await draftProtectionRuntime.flushAndWaitForDraftProtection(10_000)");
     expect(save).toContain("await captureReadyStageForPage(page)");
     expect(save).toContain("await downscaleStudioCanvasDataUrl(pageImages[0] || \"\", 480)");
     expect(save).toContain("await updateStudioSharedDocument(");
@@ -93,6 +94,17 @@ describe("studio save payload ownership boundary", () => {
       'if (directSavePlan.kind === "update")',
       "assertStudioApiJsonPayloadSize(directSavePlan.payload)",
       "await updateWork(",
+    ]);
+
+    const exactSaveCleanup = save.slice(
+      save.indexOf('if (stagedLinkedNewWork?.outcome === "recovered-existing")'),
+    );
+    expectTokenOrder(exactSaveCleanup, [
+      'if (stagedLinkedNewWork?.outcome === "recovered-existing")',
+      "if (draftProtectionReceipt)",
+      "await draftProtectionReceipt.runtime.acknowledgeDraftProtection(",
+      "await acknowledgeStudioDurableSaveIntent(durableIntentScope, capturedDurableIntent)",
+      "localStorage.removeItem(autosaveKey)",
     ]);
 
     expectTokenOrder(save, [
