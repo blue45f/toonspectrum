@@ -52,7 +52,7 @@ export function PersonalInferencePage() {
   const [jobs, setJobs] = useState<PersonalInferenceJob[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [notice, setNotice] = useState("통합 AI 설정의 개인 서버만 사용합니다. 운영측 GPU·모델·키로 전환하지 않습니다.");
+  const [notice, setNotice] = useState("통합 AI 설정의 관리형 클라우드 런타임만 사용합니다. 다른 GPU·모델·키로 자동 전환하지 않습니다.");
   const [error, setError] = useState("");
   const operation = useRef<AbortController | null>(null);
 
@@ -76,7 +76,7 @@ export function PersonalInferencePage() {
     const controller = new AbortController();
     setError("");
     void refresh(controller.signal).catch((cause: unknown) => {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "개인 추론 서버 상태를 확인하지 못했습니다.");
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "클라우드 추론 런타임 상태를 확인하지 못했습니다.");
     });
     const timer = globalThis.setInterval(() => {
       if (!document.hidden && configured) void refresh(controller.signal).catch(() => undefined);
@@ -96,7 +96,7 @@ export function PersonalInferencePage() {
     setProgress(0);
     setError("");
     try {
-      setNotice("원본을 개인 서버로 분할 업로드하고 SHA-256으로 확인하는 중입니다.");
+      setNotice("원본을 관리형 클라우드 런타임으로 분할 업로드하고 SHA-256으로 확인하는 중입니다.");
       const assetId = await uploadPersonalInferenceAsset(file, controller.signal, setProgress);
       const job = await submitPersonalInferenceJob({
         mode,
@@ -111,9 +111,9 @@ export function PersonalInferencePage() {
         yaw,
       }, crypto.randomUUID(), controller.signal);
       setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]);
-      setNotice("개인 서버가 작업을 접수했습니다. 같은 요청을 자동 재전송하지 않습니다.");
+      setNotice("클라우드 런타임이 작업을 접수했습니다. 같은 요청을 자동 재전송하지 않습니다.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "개인 추론 작업을 시작하지 못했습니다.");
+      setError(cause instanceof Error ? cause.message : "클라우드 추론 작업을 시작하지 못했습니다.");
     } finally {
       operation.current = null;
       setBusy(false);
@@ -152,9 +152,9 @@ export function PersonalInferencePage() {
       <header className="rounded-3xl border border-line bg-panel/60 p-6 sm:p-8">
         <p className="eyebrow text-accent">PERSONAL CREATOR RUNTIME</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">내 GPU·내 모델로 만드는 변환실</h1>
-        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 통합 설정에 등록한 개인 Creator Runtime으로 브라우저가 직접 요청합니다. 운영측 AI 비용·자동 유료 폴백·숨은 재시도는 없습니다.</p>
+        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 통합 설정에 등록한 관리형 클라우드 Creator Runtime으로 브라우저가 직접 요청합니다. 운영측 AI 비용·자동 유료 폴백·숨은 재시도는 없습니다.</p>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link to="/settings/ai" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 개인 서버 설정</Link>
+          <Link to="/settings/ai" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 클라우드 런타임 설정</Link>
           <Link to="/studio/ecosystem" className={BUTTON}>창작 생태계 작업대</Link>
           <Link to="/studio" className={BUTTON}>Studio</Link>
         </div>
@@ -164,7 +164,7 @@ export function PersonalInferencePage() {
       {error ? <p className="mb-5 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad" role="alert">{error}</p> : null}
       {!configured ? (
         <section className="rounded-2xl border border-warn/40 bg-warn/10 p-5">
-          <h2 className="font-black text-fg">개인 서버 연결이 필요합니다.</h2>
+          <h2 className="font-black text-fg">클라우드 런타임 연결이 필요합니다.</h2>
           <p className="mt-2 text-sm leading-6 text-fg-2">Creator Runtime 주소와 32자 이상의 토큰을 통합 AI 설정에 등록하세요. CORS는 ToonStudio origin만 명시적으로 허용하세요.</p>
         </section>
       ) : null}
@@ -178,7 +178,7 @@ export function PersonalInferencePage() {
               <Icon size={20} className="text-accent" />
               <strong className="mt-3 block text-fg">{item.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-fg-3">{item.description}</span>
-              <small className={ready ? "mt-3 block text-good" : "mt-3 block text-warn"}>{ready ? capabilities?.engines[item.id]?.model : "개인 서버 모델 준비 필요"}</small>
+              <small className={ready ? "mt-3 block text-good" : "mt-3 block text-warn"}>{ready ? capabilities?.engines[item.id]?.model : "클라우드 모델 준비 필요"}</small>
             </button>
           );
         })}
@@ -216,7 +216,7 @@ export function PersonalInferencePage() {
 
         <section className="rounded-2xl border border-line bg-card p-5">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-black text-fg">개인 서버 작업</h2>
+            <h2 className="text-lg font-black text-fg">클라우드 런타임 작업</h2>
             <button type="button" className={BUTTON} onClick={() => void refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "새로고침 실패"))}><RefreshCw size={15} /> 새로고침</button>
           </div>
           {!jobs.length ? <p className="mt-4 text-sm text-fg-3">아직 작업이 없습니다.</p> : (

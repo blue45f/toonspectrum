@@ -1,127 +1,113 @@
-# Free-only AI runtime
+# Cloud-only free-first AI runtime
 
-ToonSpectrum may provide text AI without requiring every user to paste a key, but the service must never create a silent paid-AI path. The runtime therefore combines a billing-disabled shared free pool with policy-validated personal free connections and fails closed when all free capacity is unavailable.
+ToonSpectrum can provide text AI without requiring every user to paste a key. The runtime combines a billing-disabled shared free pool with user-configured cloud API routes and fails closed when no permitted cloud route is available. Local LLMs, localhost gateways, private-network endpoints, browser model downloads, and self-hosted GPU inference are not supported AI execution paths.
 
-## End-to-end routing
+## Default shared free pool
 
-For text requests the default automatic order is:
+The default quality order is:
 
-1. shared Gemini free tier;
-2. shared Qwen China (Beijing) Free Quota Only;
-3. shared Groq free tier;
-4. shared SambaNova Free Tier;
-5. shared Z.AI free Flash;
-6. shared Mistral Free mode;
-7. shared Cloudflare Workers AI on Workers Free;
-8. shared OpenRouter free router;
-9. shared SiliconFlow free text model;
-10. the user's reviewed external personal free connections in the same quality order.
+1. Gemini free tier;
+2. Qwen China (Beijing) Free Quota Only;
+3. Groq free tier;
+4. SambaNova Free Tier;
+5. Z.AI free Flash;
+6. Mistral Free mode;
+7. Cloudflare Workers AI on Workers Free;
+8. OpenRouter free router;
+9. SiliconFlow free text model.
 
-Local LLM, self-hosted runtime, and batch APIs are deliberately excluded from automatic routing. Existing manual connections remain available only when the user explicitly invokes a feature assigned to them.
+`STUDIO_AI_FREE_PROVIDER_ORDER` defines the deployment default. An authenticated request may send a validated, duplicate-free subset/order from the unified settings UI. The user order is applied before the deployment default and missing entries are appended, so the pool remains complete.
 
-A route advances only after a definitive pre-inference free-capacity or request-limit rejection (`402`, `429`, Qwen `403/AllocationQuota.FreeTierOnly`, or Cloudflare `403/5035`) or the application's own browser safety-budget exhaustion. Network errors, timeouts, `5xx` responses, malformed responses, and authentication errors are surfaced immediately and are not sent to another provider. This avoids duplicate inference after an ambiguous failure.
+A shared provider is eligible only when:
 
-When every external free route is exhausted or currently rate-limited, the UI explains that the user may add a reviewed personal free API key, retry after the provider limit clears, or leave the feature unavailable. It does not automatically invoke local AI or a batch job. The runtime never substitutes a paid model or silently enables billing.
+- `STUDIO_AI_FREE_POOL_ENABLED=true`;
+- its server-side key exists;
+- its `STUDIO_AI_FREE_*_CONFIRMED=true` approval exists;
+- its endpoint and model satisfy the hardcoded free-only policy.
 
-## Shared free pool invariants
+Shared keys never appear in `VITE_` variables, browser responses, logs, or artwork files.
 
-1. `STUDIO_AI_FREE_POOL_ENABLED=true` is required.
-2. Every provider needs a server-side key and a matching `STUDIO_AI_FREE_*_CONFIRMED=true` operational approval.
-3. Approval means the account was checked to have billing disabled or an enforced free-only boundary. Qwen must use China (Beijing) with Free Quota Only; SambaNova must have no linked payment method; Mistral must remain in cardless Free mode with Pay-as-you-go disabled; Cloudflare must remain on Workers Free without prepaid AI Gateway billing.
-4. Qwen, Z.AI, Cloudflare, OpenRouter, and SiliconFlow are limited to exact hardcoded free-model allowlists and official endpoints.
-5. OpenRouter is limited to `openrouter/free` or a model ending in `:free`.
-6. Shared credentials are never exposed through `VITE_` variables or API responses.
-7. Existing user-level and service-wide UTC daily request/token admissions remain authoritative and fail closed when their storage is unavailable.
-8. Shared providers are text-only. Image, video, 3D, local LLM, self-hosted and batch execution are outside the automatic pool.
+## Personal cloud routing
 
-The application cannot independently inspect every provider's billing configuration. The `CONFIRMED` flags are therefore deliberate deployment approvals, not automatic billing guarantees. Use accounts with no payment method or provider-side hard spending limits wherever possible.
+One connection can store multiple key profiles and multiple model profiles. Each connection, key, and model has an enabled flag and numeric priority. Models are assigned to `text`, `image`, `inference`, or `three-d`.
 
-## Personal connection policies
+Three modes are available:
+
+- **Automatic:** shared free pool first, then policy-validated personal free routes in quality order.
+- **Priority:** numeric connection/model/key priority is used; the shared free pool has its own priority value.
+- **Manual:** one exact connection/key/model route is selected for each capability.
+
+Paid `user-funded-byok` routes are excluded from automatic and priority fallback until the user explicitly enables paid fallback. Manual selection is treated as explicit consent to use that route.
+
+## Cloud-only endpoint policy
+
+Personal endpoints must be public HTTPS URLs. The validator rejects URL credentials, query strings, fragments, redirects, site-self origins, localhost, loopback, `.local`/`.lan`/`.internal`, RFC1918, carrier-grade NAT, link-local, and private IPv6 ranges.
+
+Supported connection policies:
 
 | Policy | Enforcement |
 | --- | --- |
-| `local-zero-cost` | Only `localhost`, `127.0.0.1`, or `::1`; API key optional. |
-| `self-hosted-zero-cost` | Authenticated HTTPS endpoint explicitly operated by the user. Known public AI provider hosts are rejected. |
-| `openrouter-free` | Exact OpenRouter API base URL and `openrouter/free` or a model ending in `:free`; text only. |
-| `provider-free-tier` | Exact reviewed Gemini, Qwen Beijing, Groq, SambaNova, Z.AI, Mistral, or SiliconFlow OpenAI-compatible endpoint with an allowlisted free model; text only. The user confirms the account is free-only and has no paid fallback. |
-| `unverified` | Always blocked until the user reviews the migrated or changed connection. |
+| `openrouter-free` | Exact OpenRouter API base URL and `openrouter/free` or a `:free` model; text only. |
+| `provider-free-tier` | Exact reviewed cloud endpoint and a reviewed free text model. The user confirms provider billing/fallback is disabled. |
+| `user-funded-byok` | Any validated public HTTPS cloud API. Charges may be applied by the user’s provider account. |
+| `unverified` | Blocked until the migrated or modified connection is reviewed. |
 
-Personal API keys stay in memory by default. Optional persistence uses the existing encrypted local vault. Browser requests omit cookies, reject redirects, and do not automatically retry.
+## Safe fallback
 
-## Unified settings surface
+The runtime advances only after a definitive pre-inference rejection:
 
-`/settings/ai`, the Studio settings page, Studio popovers, and account settings all render the same `UnifiedAiSettings` owner. It contains:
+- `401`/`403` for a personal key, allowing the next configured key;
+- `402`/`429` for payment/free-quota/request-quota rejection;
+- Qwen `403/AllocationQuota.FreeTierOnly` and Cloudflare `403/5035` in the shared pool;
+- the app’s own per-route browser safety-budget exhaustion.
 
-- shared free-pool status and provider order;
-- personal external free API keys plus separately managed manual local/self-hosted connections;
-- per-connection local request/token budget and blocker state;
-- external personal text assignments used after the shared pool is exhausted or currently limited; manual local/self-hosted assignments are never auto-selected;
-- Hyper3D/Rodin personal key;
-- personal Creator Runtime URL, token, and owner ID;
-- optional encrypted local persistence.
+Network errors, timeouts, `5xx`, malformed success responses, and parse failures are surfaced immediately. The same request is not sent to another provider because the first provider may already have accepted it.
 
-No other Studio component owns an independent token-entry form.
+## Browser safety budget
 
-## Managed personal free safety budget
+`provider-free-tier` and `openrouter-free` routes use conservative per-route browser limits:
 
-The browser applies a conservative application cap to `provider-free-tier` and `openrouter-free` connections. These are local safety limits, not claims about current provider quotas:
-
-- 25 network attempts per connection and UTC day;
-- 64,000 conservatively reserved input/output tokens per connection and UTC day;
-- 1,024 output tokens per managed request;
+- 25 network attempts per UTC day;
+- 64,000 conservatively reserved input/output tokens per UTC day;
+- 1,024 output tokens per request;
 - 256 KiB maximum JSON request body and 2 MiB maximum response body;
-- one completion only (`n = 1`, `best_of = 1`) with log-probability expansion disabled;
-- no managed-provider streaming;
+- `n = 1`, `best_of = 1`, no log-probability expansion, no streaming;
 - only `GET /models` and `POST /chat/completions`.
 
-The runtime overwrites a managed request's model with the reviewed connection model before network I/O. Its budget ledger stores only counters, timestamps, connection ID, and provider host; prompts, responses, keys, and model output are never stored.
+The budget key includes connection, model, and key profile IDs. It stores counters and timestamps only, never prompts, outputs, or secrets.
 
-The ledger is serialized in `localStorage` so separate tabs share the daily cap. Browsers supporting Web Locks serialize reservations across tabs. If persistent storage is unavailable, the runtime keeps a fail-safe in-memory ledger for the current document.
+## Managed cloud media inference
 
-Provider responses operate a local circuit breaker:
-
-- `429`: at least 15 minutes of cooldown; a second quota failure on the same UTC day blocks until the next UTC day;
-- `401` or `403`: 10-minute authentication cooldown and no fallback;
-- `402`: locked until the connection is explicitly removed/reviewed and its local budget is reset;
-- successful responses clear transient rate/authentication breaker state.
-
-Requests are reserved before network I/O and are not refunded after a timeout or network failure because the provider may already have accepted them.
-
-Provider billing must remain disabled and no payment method should be attached when the provider permits that setup. Browser-local limits can be cleared by the browser owner and provider terms can change, so these guards are an additional safety boundary—not a provider-side billing guarantee.
-
-## Local Apple Silicon setup
-
-The local preset points to `http://localhost:8082/v1`, matching an OpenAI-compatible proxy such as LiteLLM:
+Image/video/2D↔3D server media jobs use:
 
 ```text
-ToonSpectrum browser
-  -> http://localhost:8082/v1
-  -> LiteLLM (loopback only)
-  -> MLX-LM or Rapid-MLX
+STUDIO_MEDIA_CLOUD_API_URL=https://managed-runtime.example.com
+STUDIO_MEDIA_CLOUD_API_TOKEN=server-side-secret
 ```
 
-Example:
+Only a public HTTPS origin is accepted. HTTP, loopback, private networks, URL credentials, paths, query strings, and fragments are rejected. The API remains user-funded/fail-closed and does not substitute an operator-paid provider.
 
-```bash
-python3 -m mlx_lm server \
-  --model mlx-community/Qwen3.6-35B-A3B-4bit \
-  --port 8080
+## Unified settings and secret storage
 
-litellm --config ~/litellm_config.yaml --port 8082
-```
+All AI entry points render `UnifiedAiSettings`. It owns:
 
-The local gateway must permit the ToonSpectrum origin through CORS and should listen on loopback unless the user deliberately secures a remote endpoint. Ollama users can select the `http://localhost:11434/v1` preset and enter an installed model name.
+- shared free-pool status and order;
+- automatic/priority/manual routing mode;
+- multiple keys and models per cloud connection;
+- exact capability route assignments;
+- paid-fallback consent;
+- Hyper3D/Rodin and managed Creator Runtime tokens;
+- optional encrypted browser vault.
+
+Personal keys remain in memory by default. The encrypted vault stores the normalized configuration but never stores the vault password. Browser requests omit cookies, reject redirects, and do not automatically retry ambiguous failures.
 
 ## Review checklist
 
-- [ ] Shared accounts have billing disabled or an equivalent hard free-only boundary.
-- [ ] Every enabled provider has a matching explicit `CONFIRMED=true` flag.
-- [ ] Shared and personal managed providers remain text-only.
-- [ ] OpenRouter non-free model IDs remain rejected.
-- [ ] `402`/`429` are the only remote conditions that advance the free chain.
-- [ ] Network, timeout, `5xx`, authentication, and parse failures do not resend a prompt.
-- [ ] All-free exhaustion or request limiting returns the personal-key/local-AI/feature-unavailable message.
-- [ ] Legacy connections remain `unverified` until explicitly reviewed.
-- [ ] Browser requests omit cookies, redirects, and retries.
-- [ ] No secret, prompt, or response is stored in quota ledgers or logs.
-- [ ] All token-entry surfaces render the shared unified settings owner.
+- [ ] Every shared account has billing disabled or a provider-side hard free-only boundary.
+- [ ] Every enabled shared provider has `CONFIRMED=true`.
+- [ ] No preset or environment variable points to localhost/private AI infrastructure.
+- [ ] Paid BYOK fallback is disabled by default.
+- [ ] Multiple key/model route order is deterministic.
+- [ ] `401`/`403`/`402`/`429` are the only personal-route automatic advance conditions.
+- [ ] Network, timeout, `5xx`, parse, and malformed-success failures do not replay.
+- [ ] No secret, prompt, or response is stored in quota ledgers or application logs.

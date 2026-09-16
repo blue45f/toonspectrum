@@ -55,13 +55,13 @@ const managedConnection: UserAiConnection = {
   costPolicy: "openrouter-free",
 };
 
-const localConnection: UserAiConnection = {
+const paidCloudConnection: UserAiConnection = {
   ...managedConnection,
-  id: "local",
-  baseUrl: "http://localhost:8082/v1",
-  apiKey: "",
-  textModel: "qwen",
-  costPolicy: "local-zero-cost",
+  id: "paid-cloud",
+  baseUrl: "https://api.openai.com/v1",
+  apiKey: "user-paid-key",
+  textModel: "gpt-4.1-mini",
+  costPolicy: "user-funded-byok",
 };
 
 beforeEach(() => {
@@ -75,10 +75,10 @@ afterEach(() => {
 });
 
 describe("free AI runtime budget guard", () => {
-  it("does not limit or rewrite a local zero-cost request", async () => {
+  it("does not apply free-tier caps to an explicitly user-funded cloud request", async () => {
     const body = { model: "qwen", max_tokens: 4096, n: 2 };
     const result = await guardFreeAiRuntimeRequest(
-      localConnection,
+      paidCloudConnection,
       "text",
       "/chat/completions",
       "POST",
@@ -88,7 +88,7 @@ describe("free AI runtime budget guard", () => {
 
     expect(result.guarded).toBe(false);
     expect(result.body).toBe(body);
-    expect(getFreeAiRuntimeBudgetSnapshot(localConnection, NOW).requestLimit).toBeNull();
+    expect(getFreeAiRuntimeBudgetSnapshot(paidCloudConnection, NOW).requestLimit).toBeNull();
   });
 
   it("forces the configured free model and clamps costly fan-out and output", async () => {

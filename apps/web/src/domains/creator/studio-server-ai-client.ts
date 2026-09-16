@@ -1,5 +1,10 @@
 import { HTTPError, api, getApiErrorMessage } from "@/infrastructure/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
+import {
+  getUserAiSnapshot,
+  userAiAutomaticExternalConnectionsForCapability,
+} from "@/shared/ai/user-ai-store";
+import { userAiRoutingSettings } from "@/shared/ai/user-ai-types";
 
 export type StudioServerAiTask = "assistant" | "composition" | "scenario" | "translation" | "dialogue" | "palette";
 export type StudioFreePoolProvider = "gemini" | "qwen" | "groq" | "sambanova" | "zai" | "mistral" | "cloudflare" | "openrouter" | "siliconflow" | "deepseek";
@@ -18,7 +23,7 @@ const LABELS: Record<StudioServerAiProvider, string> = {
   openrouter: "OpenRouter 무료",
   siliconflow: "SiliconFlow 무료 텍스트",
   deepseek: "DeepSeek",
-  user: "내 무료 AI",
+  user: "내 클라우드 AI",
 };
 
 export function studioServerAiProviderLabel(provider: StudioServerAiProvider): string {
@@ -219,7 +224,7 @@ const PERSONAL_FALLBACK_CODES = new Set([
 ]);
 
 function exhaustedMessage(): string {
-  return "자동 무료 AI와 등록된 개인 무료 AI가 모두 무료 한도 또는 요청 제한 상태입니다. 통합 AI 설정에서 개인 무료 API 키나 로컬 AI를 연결하거나 제한 해제 후 다시 시도하세요. 그 전까지 이 기능은 사용할 수 없습니다.";
+  return "자동 무료 AI와 등록된 클라우드 BYOK 경로가 모두 무료 한도 또는 요청 제한 상태입니다. 통합 AI 설정에서 다른 클라우드 키·모델을 추가하거나 제한 해제 후 다시 시도하세요. 현재 이 AI 기능은 사용할 수 없습니다.";
 }
 
 async function completeWithPersonalFreeAi(
@@ -268,7 +273,28 @@ export async function completeStudioServerText(
   if (!operationId) {
     return { ok: false, code: "invalid_input", error: "AI 요청 식별자가 올바르지 않아요." };
   }
-  const { operationId: _operationId, ...request } = input;
+  const { operationId: _operationId, ...requestInput } = input;
+  const configuration = getUserAiSnapshot().configuration;
+  const routing = userAiRoutingSettings(configuration);
+  const personalRoutes = userAiAutomaticExternalConnectionsForCapability("text");
+  const explicitServerProvider = input.provider && input.provider !== "auto";
+  const personalFirst = !explicitServerProvider && personalRoutes.length > 0 && (
+    routing.mode === "manual"
+    || (routing.mode === "priority"
+      && (personalRoutes[0]?.priority ?? 100) < routing.managedPoolPriority)
+  );
+  let personalAttempted = false;
+  if (personalFirst) {
+    personalAttempted = true;
+    const personalResult = await completeWithPersonalFreeAi(input, operationId, signal);
+    if (routing.mode === "manual" || personalResult.ok || personalResult.code !== "free_exhausted") {
+      return personalResult;
+    }
+  }
+  const request = {
+    ...requestInput,
+    ...(!explicitServerProvider ? { providerOrder: routing.serverProviderOrder } : {}),
+  };
   try {
     const raw = await api.post<unknown>("/studio-ai/chat", request, {
       signal,
@@ -281,7 +307,9 @@ export async function completeStudioServerText(
   } catch (error) {
     const code = httpErrorCode(error);
     if (code && PERSONAL_FALLBACK_CODES.has(code)) {
-      return completeWithPersonalFreeAi(input, operationId, signal);
+      return personalAttempted
+        ? { ok: false, code: "free_exhausted", error: exhaustedMessage() }
+        : completeWithPersonalFreeAi(input, operationId, signal);
     }
     if (signal?.aborted) {
       return {

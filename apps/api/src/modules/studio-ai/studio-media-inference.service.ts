@@ -14,10 +14,41 @@ export function validateInferencePng(data: string): Buffer {
   if (width < 64 || height < 64 || width > 2048 || height > 2048 || width * height > 2_097_152) throw new BadRequestException("이미지 해상도는 64~2048, 최대 209만 화소여야 해요.");
   return bytes;
 }
+function privateMediaRuntimeHost(value: string): boolean {
+  const hostname = value.toLowerCase().replace(/^\[|\]$/gu, "");
+  if (
+    hostname === "localhost"
+    || hostname === "0.0.0.0"
+    || hostname.endsWith(".localhost")
+    || hostname.endsWith(".local")
+    || hostname.endsWith(".lan")
+    || hostname.endsWith(".internal")
+    || hostname === "::1"
+    || hostname === "::"
+    || hostname.startsWith("fc")
+    || hostname.startsWith("fd")
+    || /^fe[89ab]/u.test(hostname)
+  ) return true;
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/u.test(hostname)) return false;
+  const [a, b] = hostname.split(".").map(Number);
+  return a === 0 || a === 10 || a === 127
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || a >= 224;
+}
 export function allowedInferenceOrigin(value: string): string {
   const url = new URL(value);
-  if (url.username || url.password || url.search || url.hash || url.pathname !== "/") throw new Error("Use an operator-configured origin only");
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))) throw new Error("HTTPS or loopback is required");
+  if (
+    url.protocol !== "https:"
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+    || url.pathname !== "/"
+    || privateMediaRuntimeHost(url.hostname)
+  ) throw new Error("Use a public managed-cloud HTTPS origin only");
   return url.origin;
 }
 export async function boundedInferenceBytes(response: Response, max: number): Promise<Uint8Array> {
@@ -49,10 +80,10 @@ export class StudioMediaInferenceService {
   private store: MediaInferenceStore | undefined;
   private configuration() {
     rejectOperatorFundedAi();
-    const value = process.env.STUDIO_COMFYUI_URL?.trim();
-    if (!value || !process.env.DATABASE_URL) throw new ServiceUnavailableException("자체 GPU 추론 서버와 작업 저장소가 아직 설정되지 않았어요.");
+    const value = process.env.STUDIO_MEDIA_CLOUD_API_URL?.trim();
+    if (!value || !process.env.DATABASE_URL) throw new ServiceUnavailableException("관리형 클라우드 미디어 런타임과 작업 저장소가 아직 설정되지 않았어요.");
     let origin: string;
-    try { origin = allowedInferenceOrigin(value); } catch { throw new ServiceUnavailableException("추론 서버 보안 설정을 확인해 주세요."); }
+    try { origin = allowedInferenceOrigin(value); } catch { throw new ServiceUnavailableException("클라우드 미디어 런타임 보안 설정을 확인해 주세요."); }
     this.store ??= new MediaInferenceStore(process.env.DATABASE_URL);
     return { origin, store: this.store, models: {
       wan: process.env.STUDIO_WAN_MODEL || DEFAULT_MEDIA_MODELS.wan, text: process.env.STUDIO_WAN_TEXT_ENCODER || DEFAULT_MEDIA_MODELS.text,
@@ -63,7 +94,7 @@ export class StudioMediaInferenceService {
   private async request(path: string, init: RequestInit = {}, max = 16 * 1024 * 1024): Promise<Uint8Array> {
     const { origin } = this.configuration();
     const headers = new Headers(init.headers);
-    const token = process.env.STUDIO_COMFYUI_TOKEN; if (token) headers.set("Authorization", `Bearer ${token}`);
+    const token = process.env.STUDIO_MEDIA_CLOUD_API_TOKEN; if (token) headers.set("Authorization", `Bearer ${token}`);
     const response = await fetch(`${origin}${path}`, { ...init, headers, redirect: "error", signal: AbortSignal.timeout(30000) });
     if (!response.ok) { await response.body?.cancel(); throw new Error(`provider-http-${response.status}`); }
     return boundedInferenceBytes(response, max);
@@ -86,8 +117,8 @@ export class StudioMediaInferenceService {
       const info = await this.json("/object_info");
       const sample = { image: "", prompt: "", negative: "", seed: 42, frames: 81 as const, aspect: "landscape" as const, strength: .45 };
       const capabilities = KINDS.map(kind => { const missing = mediaGraphAvailability(buildMediaInferenceGraph({ ...sample, kind }, "00000000-0000-4000-8000-000000000000.png", "00000000-0000-4000-8000-000000000000", config.models), info); return { kind, ready: missing.length === 0, missing }; });
-      return { configured: true, provider: "self-hosted-comfyui", capabilities, requiresAuth: true, limits: { activePerUser: 1, dailyPerUser: 12 }, externalPaidFallback: false };
-    } catch { return { configured: false, provider: "self-hosted-comfyui", capabilities: KINDS.map(kind => ({ kind, ready: false, missing: ["GPU 서버·모델·작업 저장소 연결을 확인해 주세요."] })), requiresAuth: true, externalPaidFallback: false }; }
+      return { configured: true, provider: "managed-cloud-comfyui", capabilities, requiresAuth: true, limits: { activePerUser: 1, dailyPerUser: 12 }, externalPaidFallback: false };
+    } catch { return { configured: false, provider: "managed-cloud-comfyui", capabilities: KINDS.map(kind => ({ kind, ready: false, missing: ["관리형 클라우드 런타임·모델·작업 저장소 연결을 확인해 주세요."] })), requiresAuth: true, externalPaidFallback: false }; }
   }
   async list(owner: string) { return (await this.configuration().store.list(owner)).map(publicJob); }
   private async owned(owner: string, id: string): Promise<MediaJob> {
@@ -154,7 +185,7 @@ export class StudioMediaInferenceService {
         if (job.state === "cancel-requested") return publicJob(await store.patch(owner, id, "cancelled", null));
       }
       return publicJob(job);
-    } catch { throw new ServiceUnavailableException("추론 서버 상태를 확인하지 못했어요. 작업 ID를 유지한 채 다시 확인해 주세요."); }
+    } catch { throw new ServiceUnavailableException("클라우드 런타임 상태를 확인하지 못했어요. 작업 ID를 유지한 채 다시 확인해 주세요."); }
   }
   async cancel(owner: string, id: string) {
     const job = await this.owned(owner,id); if (TERMINAL.has(job.state)) return publicJob(job);

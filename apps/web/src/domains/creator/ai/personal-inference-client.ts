@@ -38,12 +38,12 @@ const STATES = new Set(["queued", "running", "succeeded", "failed", "cancelled",
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value && typeof value === "object" && !Array.isArray(value)); }
 function connection() {
   const settings = getUnifiedAiAuxSettings();
-  if (!settings.creatorRuntimeBaseUrl || !settings.creatorRuntimeToken) throw new Error("통합 AI 설정에서 개인 Creator Runtime 주소와 토큰을 등록하세요.");
+  if (!settings.creatorRuntimeBaseUrl || !settings.creatorRuntimeToken) throw new Error("통합 AI 설정에서 관리형 클라우드 Creator Runtime 주소와 토큰을 등록하세요.");
   return { base: validateUserAiBaseUrl(settings.creatorRuntimeBaseUrl, false), token: settings.creatorRuntimeToken, owner: settings.creatorRuntimeOwner };
 }
 async function boundedBytes(response: Response, maximum: number): Promise<Uint8Array> {
   const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > maximum || !response.body) { await response.body?.cancel(); throw new Error("개인 추론 서버 응답 크기를 확인할 수 없습니다."); }
+  if (declared > maximum || !response.body) { await response.body?.cancel(); throw new Error("클라우드 추론 런타임 응답 크기를 확인할 수 없습니다."); }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -52,7 +52,7 @@ async function boundedBytes(response: Response, maximum: number): Promise<Uint8A
       const next = await reader.read();
       if (next.done) break;
       total += next.value.byteLength;
-      if (total > maximum) { await reader.cancel(); throw new Error("개인 추론 서버 응답이 허용 크기를 초과했습니다."); }
+      if (total > maximum) { await reader.cancel(); throw new Error("클라우드 추론 런타임 응답이 허용 크기를 초과했습니다."); }
       chunks.push(next.value);
     }
   } finally { reader.releaseLock(); }
@@ -78,20 +78,20 @@ export function isPersonalInferenceRequestPath(path: string): boolean {
 }
 
 async function request(path: string, init: RequestInit = {}, maximum = 1536 * 1024): Promise<Response> {
-  if (!isPersonalInferenceRequestPath(path)) throw new Error("개인 추론 서버 경로가 올바르지 않습니다.");
+  if (!isPersonalInferenceRequestPath(path)) throw new Error("클라우드 추론 런타임 경로가 올바르지 않습니다.");
   const current = connection();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${current.token}`);
   headers.set("X-Creator-Owner", current.owner);
   const response = await fetch(`${current.base}${path}`, { ...init, headers, credentials: "omit", redirect: "error", referrerPolicy: "no-referrer", cache: "no-store" });
   const bytes = await boundedBytes(response, maximum);
-  if (!response.ok) throw new Error(`개인 추론 서버 요청 실패 (HTTP ${response.status}). 자동 재시도하지 않았습니다.`);
+  if (!response.ok) throw new Error(`클라우드 추론 런타임 요청 실패 (HTTP ${response.status}). 자동 재시도하지 않았습니다.`);
   return new Response(Uint8Array.from(bytes).buffer, { status: response.status, headers: response.headers });
 }
 async function json<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await request(path, init);
   try { return await response.json() as T; }
-  catch (error) { throw new Error("개인 추론 서버 JSON 응답을 확인하지 못했습니다.", { cause: error }); }
+  catch (error) { throw new Error("클라우드 추론 런타임 JSON 응답을 확인하지 못했습니다.", { cause: error }); }
 }
 function base64(bytes: Uint8Array): string {
   let value = "";
@@ -107,11 +107,11 @@ export function validatePersonalInferenceJob(value: unknown): PersonalInferenceJ
     || typeof value.mode !== "string" || !["image-to-video", "image-to-3d", "model-to-2d"].includes(value.mode)
     || typeof value.state !== "string" || !STATES.has(value.state)
     || typeof value.progress !== "number" || value.progress < 0 || value.progress > 100
-    || typeof value.stage !== "string" || !Array.isArray(value.artifacts) || value.artifacts.length > 16) throw new Error("개인 추론 작업 응답이 올바르지 않습니다.");
+    || typeof value.stage !== "string" || !Array.isArray(value.artifacts) || value.artifacts.length > 16) throw new Error("클라우드 추론 작업 응답이 올바르지 않습니다.");
   const artifacts = value.artifacts.map((entry) => {
     if (!object(entry) || typeof entry.name !== "string" || !/^[a-z0-9_-]+\.(?:mp4|glb|png|json|srt)$/u.test(entry.name)
       || typeof entry.bytes !== "number" || !Number.isSafeInteger(entry.bytes) || entry.bytes <= 0 || entry.bytes > 256 * CHUNK
-      || typeof entry.mime !== "string" || typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(entry.sha256)) throw new Error("개인 추론 결과 파일 정보가 올바르지 않습니다.");
+      || typeof entry.mime !== "string" || typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(entry.sha256)) throw new Error("클라우드 추론 결과 파일 정보가 올바르지 않습니다.");
     return { name: entry.name, bytes: entry.bytes, mime: entry.mime, sha256: entry.sha256 };
   });
   return { id: value.id, mode: value.mode as PersonalInferenceMode, state: value.state as PersonalInferenceJob["state"], progress: value.progress, stage: value.stage.slice(0, 160), error: typeof value.error === "string" ? value.error.slice(0, 500) : null, artifacts };
@@ -119,7 +119,7 @@ export function validatePersonalInferenceJob(value: unknown): PersonalInferenceJ
 
 export async function personalInferenceCapabilities(signal?: AbortSignal): Promise<PersonalInferenceCapabilities> {
   const value = await json<unknown>("/capabilities", { signal });
-  if (!object(value) || typeof value.enabled !== "boolean" || !object(value.engines)) throw new Error("개인 추론 서버 기능 정보를 확인하지 못했습니다.");
+  if (!object(value) || typeof value.enabled !== "boolean" || !object(value.engines)) throw new Error("클라우드 추론 런타임 기능 정보를 확인하지 못했습니다.");
   const engines: PersonalInferenceCapabilities["engines"] = {};
   for (const mode of ["image-to-video", "image-to-3d", "model-to-2d"] as const) {
     const raw = value.engines[mode];
@@ -135,7 +135,7 @@ export async function uploadPersonalInferenceAsset(file: File, signal: AbortSign
   const checksum = await sha256(await file.arrayBuffer());
   signal.throwIfAborted();
   const upload = await json<{ id: string; chunkBytes: number; chunks: number }>("/uploads", { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mime, bytes: file.size, sha256: checksum }) });
-  if (!ID.test(upload.id) || upload.chunkBytes !== CHUNK || upload.chunks !== Math.ceil(file.size / CHUNK)) throw new Error("개인 추론 서버 업로드 응답이 올바르지 않습니다.");
+  if (!ID.test(upload.id) || upload.chunkBytes !== CHUNK || upload.chunks !== Math.ceil(file.size / CHUNK)) throw new Error("클라우드 추론 런타임 업로드 응답이 올바르지 않습니다.");
   try {
     for (let index = 0; index < upload.chunks; index += 1) {
       signal.throwIfAborted();
@@ -153,7 +153,7 @@ export async function uploadPersonalInferenceAsset(file: File, signal: AbortSign
 
 export async function listPersonalInferenceJobs(signal?: AbortSignal): Promise<PersonalInferenceJob[]> {
   const value = await json<{ jobs?: unknown[] }>("/jobs", { signal });
-  if (!Array.isArray(value.jobs) || value.jobs.length > 40) throw new Error("개인 추론 작업 목록을 확인하지 못했습니다.");
+  if (!Array.isArray(value.jobs) || value.jobs.length > 40) throw new Error("클라우드 추론 작업 목록을 확인하지 못했습니다.");
   return value.jobs.map(validatePersonalInferenceJob);
 }
 export async function submitPersonalInferenceJob(input: PersonalInferenceRequest, key: string, signal: AbortSignal): Promise<PersonalInferenceJob> {

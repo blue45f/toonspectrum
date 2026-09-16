@@ -41,7 +41,7 @@ afterEach(() => {
   resetFreeAiRuntimeBudget();
 });
 
-describe("managed free AI transport response limits", () => {
+describe("managed cloud AI transport", () => {
   it.each([200, 500])(
     "rejects an oversized %i response without retrying",
     async (status) => {
@@ -61,7 +61,7 @@ describe("managed free AI transport response limits", () => {
     },
   );
 
-  it("sends the guarded model and output limit to the provider", async () => {
+  it("sends the guarded free model and output limit to the provider", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(
       JSON.stringify({ choices: [] }),
       { status: 200, headers: { "content-type": "application/json" } },
@@ -90,7 +90,7 @@ describe("managed free AI transport response limits", () => {
     expect(init.redirect).toBe("error");
   });
 
-  it("reports a missing personal free connection without sending a request", async () => {
+  it("reports a missing cloud route without sending a request", async () => {
     setUserAiConfiguration({
       version: 1,
       connections: [],
@@ -105,24 +105,16 @@ describe("managed free AI transport response limits", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("excludes local and self-hosted connections from automatic fallback", async () => {
-    const local: UserAiConnection = {
+  it("keeps user-funded BYOK out of automatic fallback until explicitly enabled", async () => {
+    const paid: UserAiConnection = {
       ...managedConnection,
-      id: "local-user",
-      label: "Local LLM",
-      baseUrl: "http://localhost:8082/v1",
-      apiKey: "",
-      textModel: "local-model",
-      costPolicy: "local-zero-cost",
-    };
-    const selfHosted: UserAiConnection = {
-      ...managedConnection,
-      id: "self-hosted-user",
-      label: "Self hosted",
-      baseUrl: "https://my-private-runtime.example/v1",
-      apiKey: "private-runtime-key",
-      textModel: "private-model",
-      costPolicy: "self-hosted-zero-cost",
+      id: "paid-user",
+      label: "Paid cloud",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "paid-key",
+      textModel: "gpt-4.1-mini",
+      costPolicy: "user-funded-byok",
+      priority: 1,
     };
     const groq: UserAiConnection = {
       ...managedConnection,
@@ -132,19 +124,26 @@ describe("managed free AI transport response limits", () => {
       apiKey: "groq-user-key",
       textModel: "groq-free-model",
       costPolicy: "provider-free-tier",
+      priority: 100,
     };
     setUserAiConfiguration({
       version: 1,
-      connections: [local, selfHosted, groq],
-      assignments: { text: local.id, image: null, inference: null, "three-d": null },
+      connections: [paid, groq],
+      assignments: { text: paid.id, image: null, inference: null, "three-d": null },
+      routing: {
+        mode: "automatic",
+        allowPaidFallback: false,
+        managedPoolPriority: 50,
+        serverProviderOrder: ["gemini", "groq"],
+      },
     });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: "External only" } }],
+      choices: [{ message: { content: "Free route" } }],
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(completeUserAiTextDetailed("system", "user")).resolves.toMatchObject({
-      content: "External only",
+      content: "Free route",
       connection: { id: "groq-user" },
       attemptedConnectionIds: ["groq-user"],
     });
@@ -152,18 +151,24 @@ describe("managed free AI transport response limits", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("api.groq.com");
   });
 
-  it("does not invoke the network when only local or self-hosted connections exist", async () => {
+  it("does not invoke a paid-only route when paid fallback is disabled", async () => {
     setUserAiConfiguration({
       version: 1,
       connections: [{
         ...managedConnection,
-        id: "local-only",
-        baseUrl: "http://localhost:8082/v1",
-        apiKey: "",
-        textModel: "local-model",
-        costPolicy: "local-zero-cost",
+        id: "paid-only",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "paid-key",
+        textModel: "gpt-4.1-mini",
+        costPolicy: "user-funded-byok",
       }],
-      assignments: { text: "local-only", image: null, inference: null, "three-d": null },
+      assignments: { text: "paid-only", image: null, inference: null, "three-d": null },
+      routing: {
+        mode: "automatic",
+        allowPaidFallback: false,
+        managedPoolPriority: 50,
+        serverProviderOrder: ["gemini", "groq"],
+      },
     });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -174,7 +179,62 @@ describe("managed free AI transport response limits", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("falls through personal free connections by quality only after quota exhaustion", async () => {
+  it("uses multiple keys and models in explicit priority order after safe authentication failure", async () => {
+    setUserAiConfiguration({
+      version: 1,
+      connections: [{
+        ...managedConnection,
+        id: "groq-multi",
+        label: "Groq multi route",
+        baseUrl: "https://api.groq.com/openai/v1",
+        apiKey: "legacy-key",
+        textModel: "legacy-model",
+        costPolicy: "provider-free-tier",
+        priority: 10,
+        apiKeys: [
+          { id: "backup", label: "Backup", apiKey: "key-b", enabled: true, priority: 20 },
+          { id: "primary", label: "Primary", apiKey: "key-a", enabled: true, priority: 10 },
+        ],
+        models: [
+          { id: "quality", label: "Quality", model: "model-quality", capability: "text", enabled: true, priority: 20 },
+          { id: "fast", label: "Fast", model: "model-fast", capability: "text", enabled: true, priority: 10 },
+        ],
+      }],
+      assignments: { text: "groq-multi", image: null, inference: null, "three-d": null },
+      routing: {
+        mode: "priority",
+        allowPaidFallback: false,
+        managedPoolPriority: 100,
+        serverProviderOrder: ["groq", "gemini"],
+      },
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const authorization = new Headers(init?.headers).get("authorization");
+      if (authorization === "Bearer key-a") {
+        return new Response(JSON.stringify({ error: "invalid key" }), { status: 401 });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "Backup key result" } }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).resolves.toMatchObject({
+      content: "Backup key result",
+      connection: {
+        id: "groq-multi",
+        apiKeyProfileId: "backup",
+        modelProfileId: "fast",
+      },
+      attemptedRouteIds: [
+        "groq-multi:fast:primary",
+        "groq-multi:fast:backup",
+      ],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls through free providers by quality only after quota exhaustion", async () => {
     const gemini: UserAiConnection = {
       ...managedConnection,
       id: "gemini-user",
@@ -218,5 +278,33 @@ describe("managed free AI transport response limits", () => {
       attemptedConnectionIds: ["gemini-user", "groq-user"],
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry an ambiguous provider failure on another key or model", async () => {
+    setUserAiConfiguration({
+      version: 1,
+      connections: [{
+        ...managedConnection,
+        apiKeys: [
+          { id: "primary", label: "Primary", apiKey: "key-a", enabled: true, priority: 10 },
+          { id: "backup", label: "Backup", apiKey: "key-b", enabled: true, priority: 20 },
+        ],
+        models: [
+          { id: "fast", label: "Fast", model: "openrouter/free", capability: "text", enabled: true, priority: 10 },
+        ],
+      }],
+      assignments: { text: managedConnection.id, image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ error: "provider unavailable" }),
+      { status: 500, headers: { "content-type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).rejects.toMatchObject({
+      code: "http-error",
+      status: 500,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

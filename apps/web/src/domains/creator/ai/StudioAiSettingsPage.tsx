@@ -20,7 +20,7 @@ export function StudioAiSettingsPage() {
           자동 무료 AI와 내 연결
         </h1>
         <p className="mt-3 text-sm leading-7 text-fg-2">
-          사이트 전체 AI 기능의 자동 무료 풀, 개인 무료 API 키, 로컬 AI,
+          사이트 전체 AI 기능의 자동 무료 풀, 여러 클라우드 API 키와 모델 우선순위,
           3D 및 개인 런타임 토큰을 한곳에서 관리합니다.
         </p>
       </header>

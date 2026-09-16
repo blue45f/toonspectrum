@@ -8,7 +8,7 @@
 import { STUDIO_AI_ASSIST_TOOLS, type StudioAiAssistToolId } from "./studio-ai-assist-ux";
 
 export const STUDIO_AI_EXECUTION_COST_CATEGORIES = [
-  "로컬 0원",
+  "클라우드 무료",
   "제공자 과금 가능",
   "공용 무료 쿼터",
 ] as const;
@@ -120,7 +120,7 @@ const IMAGE_UNAVAILABLE_REASON =
   "이미지 API가 연결되지 않아 실행할 수 없습니다. AI 어시스트 설정에서 키를 등록해 주세요.";
 
 const TEXT_UNAVAILABLE_REASON =
-  "텍스트 AI가 연결되지 않아 실행할 수 없습니다. 로그인하면 자동 무료 AI를 먼저 사용하며, 무료 경로를 사용할 수 없으면 통합 AI 설정에서 개인 무료 키 또는 로컬 AI를 연결하세요.";
+  "텍스트 AI가 연결되지 않아 실행할 수 없습니다. 로그인하면 자동 무료 AI를 먼저 사용하며, 무료 경로를 사용할 수 없으면 통합 AI 설정에서 개인 클라우드 API 키와 모델을 연결하세요.";
 
 function normalizeConnectionLabel(connectionLabel: string): string {
   const normalized = connectionLabel.replace(/\s+/g, " ").trim().slice(0, 120);
