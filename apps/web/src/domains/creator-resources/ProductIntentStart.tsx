@@ -8,17 +8,17 @@ import { useUi } from "@/shared/lib/ui-store";
 
 const COPY = {
   ko: {
-    title: "오늘 하려던 일, 이어서.", search: "작품·도구·소재·도움말 검색", recent: "최근 작업 이어하기",
-    fallback: "프로젝트 센터에서 작업 이어가기", fallbackBody: "최근 프로젝트, 로컬 초안, 공유받은 작업과 복구 항목을 확인하세요.",
-    all: "프로젝트 센터", destinations: ["만들기 시작", "작품 찾기", "리서치 열기", "커뮤니티 열기", "에셋 마켓", "내 서재", "도움말"],
+    title: "지금 필요한 작업으로 바로 가세요.", search: "프로젝트·회차·도구·작품 재료 검색", recent: "최근 작업 이어하기",
+    fallback: "내 프로젝트에서 이어가기", fallbackBody: "최근 작품, 공유 작업과 복구할 초안을 한곳에서 확인하세요.",
+    all: "모든 프로젝트", destinations: ["제작 관리", "내 프로젝트", "새 작품", "작품 재료", "검수·내보내기", "팀원·외주", "도움말"],
   },
   en: {
-    title: "Pick up your next step.", search: "Search stories, tools, materials and help", recent: "Continue where you left off",
-    fallback: "Continue from Project Center", fallbackBody: "Find recent projects, local drafts, shared work and recovery items.",
-    all: "Project Center", destinations: ["Start creating", "Find stories", "Open research", "Open community", "Asset market", "My library", "Help"],
+    title: "Go straight to the work you need.", search: "Search projects, episodes, tools and assets", recent: "Continue recent work",
+    fallback: "Continue from My projects", fallbackBody: "Find recent work, shared projects and recoverable drafts in one place.",
+    all: "All projects", destinations: ["Production", "My projects", "New work", "Assets", "Review & export", "Collaborators", "Help"],
   },
 } as const;
-const DESTINATIONS = ["/make", "/discover", "/research", "/community", "/market", "/library", "/help"] as const;
+const DESTINATIONS = ["/production", "/studio/projects", "/studio/new", "/studio/assets", "/studio/publish", "/collaborate", "/help"] as const;
 
 export function ProductIntentStart() {
   const language = useI18n((state) => state.lang);

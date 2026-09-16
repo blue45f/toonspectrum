@@ -103,7 +103,7 @@ export function MobileHeaderNavigation({
   const navigationGroups = siteNavigationGroupsForPath(pathname);
   const mobileTabs = mobileSiteTabsForPath(pathname);
   const menuDescription = navigationContext === "studio"
-    ? (locale === "ko" ? "작업 단계와 결과에서 바로 시작하세요" : "Start from your work or the result you need")
+    ? (locale === "ko" ? "기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요" : "Jump straight to planning, production, review or export")
     : (locale === "ko" ? "영감을 찾고, 그리고, 함께 나누는 작업실" : "Discover inspiration, draw and share your work");
 
   useEffect(() => {

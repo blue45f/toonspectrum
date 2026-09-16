@@ -24,16 +24,18 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('id="creator-flow"');
     expect(source).toContain('id="creator-toolkit-title"');
     expect(source).toContain('id="creator-process-title"');
-    expect(source).toContain('data-creator-home="studio-first"');
+    expect(source).toContain('data-creator-home="production-first"');
     expect(source).toContain("<ProductIntentStart />");
     expect(source).toContain('href="/studio/new"');
     expect(source).toContain('href="/studio/projects"');
     expect(source).toContain('href: "/discover"');
     expect(source).toContain('href: "/learn"');
-    expect(source).toContain('href: "/community"');
-    expect(source).toContain("getCreatorThemeArt(resolvedTheme)");
-    expect(source).toContain("data-theme-art={resolvedTheme}");
-    expect(source).toContain("srcSet={artDirection.hero.srcSet}");
+    expect(source).toContain('href: "/collaborate"');
+    expect(source).toContain('href="/production"');
+    expect(source).toContain('data-creator-experience="production-os-v2"');
+    expect(source).toContain('/brand/production-os-hero.svg');
+    expect(source).toContain('/brand/production-os-workspace.svg');
+    expect(source).toContain('/brand/production-os-journey.svg');
   });
 
   it("does not make heavyweight demos, readiness diagnostics, or film playback part of first load", () => {
@@ -47,7 +49,7 @@ describe("creator home experience contracts", () => {
     ]) {
       expect(source).not.toContain(heavyweight);
     }
-    expect(source.match(/<img\b/gu)).toHaveLength(1);
+    expect(source.match(/<img\b/gu)).toHaveLength(3);
     expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/u);
   });
 
@@ -82,6 +84,8 @@ describe("creator home experience contracts", () => {
     expect(flagship).toContain("@media (max-width: 720px)");
     expect(flagship).toContain("@media (prefers-reduced-motion: reduce)");
     expect(flagship).toContain(".cf-start-grid");
+    expect(flagship).toContain(".cf-bridge");
+    expect(flagship).toContain(".cf-flow-grid");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(themeArt).toContain('data-theme-art="aurora"');
     expect(themeArt).toContain('data-theme-art="blossom"');

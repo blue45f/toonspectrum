@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+  <title id="title">ToonStudio production workspace</title>
+  <desc id="desc">A vivid webtoon production desk connecting idea, planning, drawing, review and publishing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#080a18"/><stop offset=".55" stop-color="#171334"/><stop offset="1" stop-color="#071d2e"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24213e"/><stop offset="1" stop-color="#121527"/></linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9d7cff"/><stop offset="1" stop-color="#6ee7ff"/></linearGradient>
+    <linearGradient id="pink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff77c8"/><stop offset="1" stop-color="#a17cff"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#000" flood-opacity=".48"/></filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="24"/></filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#95a4ff" stroke-opacity=".07"/></pattern>
+  </defs>
+  <rect width="1600" height="1120" fill="url(#bg)"/>
+  <rect width="1600" height="1120" fill="url(#grid)"/>
+  <circle cx="1280" cy="190" r="250" fill="#8f6cff" opacity=".2" filter="url(#glow)"/>
+  <circle cx="220" cy="920" r="260" fill="#3ed8ff" opacity=".12" filter="url(#glow)"/>
+  <g opacity=".92"><circle cx="114" cy="116" r="8" fill="#ff7ac8"/><circle cx="142" cy="116" r="8" fill="#ffd76e"/><circle cx="170" cy="116" r="8" fill="#67e8bd"/></g>
+  <text x="210" y="132" fill="#f7f2ff" font-family="Inter, Pretendard, sans-serif" font-size="30" font-weight="800" letter-spacing="3">TOONSTUDIO</text>
+  <text x="210" y="167" fill="#a9a9c6" font-family="Inter, Pretendard, sans-serif" font-size="17" letter-spacing="2">PLAN · DRAW · REVIEW · DELIVER</text>
+
+  <g filter="url(#shadow)">
+    <rect x="110" y="220" width="900" height="710" rx="38" fill="url(#panel)" stroke="#9c86ff" stroke-opacity=".28" stroke-width="2"/>
+    <rect x="146" y="258" width="828" height="62" rx="18" fill="#121426" stroke="#ffffff" stroke-opacity=".08"/>
+    <circle cx="180" cy="289" r="15" fill="url(#violet)"/>
+    <rect x="210" y="276" width="170" height="13" rx="6.5" fill="#f3efff" fill-opacity=".88"/>
+    <rect x="210" y="298" width="112" height="8" rx="4" fill="#aaa9c4" fill-opacity=".55"/>
+    <rect x="764" y="275" width="174" height="30" rx="15" fill="#8f71ff" fill-opacity=".18" stroke="#9d85ff" stroke-opacity=".36"/>
+    <text x="851" y="296" text-anchor="middle" fill="#d8ceff" font-family="Inter, sans-serif" font-size="13" font-weight="700">EPISODE 08</text>
+
+    <rect x="146" y="344" width="530" height="430" rx="24" fill="#0c1021" stroke="#ffffff" stroke-opacity=".09"/>
+    <text x="178" y="382" fill="#e8e3ff" font-family="Inter, Pretendard, sans-serif" font-size="16" font-weight="700">STORYBOARD</text>
+    <g transform="translate(178 408)">
+      <rect width="214" height="146" rx="14" fill="#29304c"/><path d="M18 118C64 70 105 89 134 44c24-37 51-10 62 7v77H18z" fill="#7c6cff" fill-opacity=".34"/><circle cx="154" cy="49" r="21" fill="#ffd4dc"/><path d="M142 42c13-18 33-10 35 7-13-7-22-5-35 3z" fill="#181a2d"/><rect x="24" y="18" width="78" height="9" rx="4.5" fill="#fff" fill-opacity=".72"/></g>
+      <g transform="translate(414 408)"><rect width="230" height="146" rx="14" fill="#1f2942"/><circle cx="60" cy="64" r="30" fill="#76dfff" fill-opacity=".28"/><path d="M22 122c54-28 93-52 190-34v40H22z" fill="#ff78c8" fill-opacity=".24"/><rect x="132" y="22" width="72" height="42" rx="12" fill="#f8f5ff"/><path d="M146 43h43M146 51h30" stroke="#70668f" stroke-width="5" stroke-linecap="round"/></g>
+      <g transform="translate(178 574)"><rect width="302" height="166" rx="14" fill="#202641"/><path d="M20 139c54-64 93-47 134-89 43-45 85-2 129 24v72H20z" fill="url(#pink)" fill-opacity=".28"/><circle cx="226" cy="62" r="28" fill="#ffd8d2"/><path d="M203 56c15-26 49-24 57 2-21-7-34-5-57 6z" fill="#111529"/><path d="M45 32h90" stroke="#fff" stroke-opacity=".72" stroke-width="10" stroke-linecap="round"/></g>
+      <g transform="translate(500 574)"><rect width="144" height="166" rx="14" fill="#28234a"/><path d="M30 136V68m42 68V42m42 94V86" stroke="#8f79ff" stroke-width="15" stroke-linecap="round"/><circle cx="30" cy="56" r="9" fill="#69e5ff"/><circle cx="72" cy="30" r="9" fill="#ff7bc8"/><circle cx="114" cy="74" r="9" fill="#ffd76a"/></g>
+
+    <rect x="704" y="344" width="270" height="430" rx="24" fill="#101428" stroke="#ffffff" stroke-opacity=".09"/>
+    <text x="736" y="382" fill="#e8e3ff" font-family="Inter, Pretendard, sans-serif" font-size="16" font-weight="700">REVIEW</text>
+    <g transform="translate(736 410)">
+      <rect width="206" height="92" rx="16" fill="#262441"/><circle cx="28" cy="28" r="15" fill="#8b77ff"/><rect x="54" y="17" width="92" height="9" rx="4.5" fill="#fff" fill-opacity=".78"/><rect x="54" y="36" width="126" height="7" rx="3.5" fill="#aaa9c4" fill-opacity=".48"/><rect x="16" y="62" width="174" height="12" rx="6" fill="#ff77c8" fill-opacity=".18"/>
+      <rect y="112" width="206" height="92" rx="16" fill="#202b42"/><circle cx="28" cy="140" r="15" fill="#61dff8"/><rect x="54" y="129" width="105" height="9" rx="4.5" fill="#fff" fill-opacity=".78"/><rect x="54" y="148" width="135" height="7" rx="3.5" fill="#aaa9c4" fill-opacity=".48"/><rect x="16" y="174" width="174" height="12" rx="6" fill="#67e8bd" fill-opacity=".18"/>
+      <rect y="224" width="206" height="126" rx="16" fill="#1a1e35"/><path d="M28 272l18 18 42-48" fill="none" stroke="#70e5b5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><text x="112" y="270" fill="#f6f2ff" font-family="Inter, sans-serif" font-size="14" font-weight="800">READY</text><text x="112" y="294" fill="#9fa0bc" font-family="Inter, sans-serif" font-size="12">FOR EXPORT</text>
+    </g>
+
+    <rect x="146" y="802" width="828" height="88" rx="20" fill="#0d1122" stroke="#ffffff" stroke-opacity=".08"/>
+    <line x1="202" y1="846" x2="918" y2="846" stroke="#4a4968" stroke-width="6" stroke-linecap="round"/>
+    <line x1="202" y1="846" x2="734" y2="846" stroke="url(#violet)" stroke-width="7" stroke-linecap="round"/>
+    <g fill="#17162a" stroke="#ad96ff" stroke-width="4"><circle cx="202" cy="846" r="15"/><circle cx="378" cy="846" r="15"/><circle cx="556" cy="846" r="15"/><circle cx="734" cy="846" r="15"/></g><circle cx="918" cy="846" r="15" fill="#17162a" stroke="#4a4968" stroke-width="4"/>
+  </g>
+
+  <g filter="url(#shadow)" font-family="Inter, Pretendard, sans-serif">
+    <path d="M1016 270c44 0 44-78 88-78" fill="none" stroke="#9d83ff" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 14"/>
+    <g transform="translate(1070 130)"><rect width="410" height="142" rx="28" fill="#282044" stroke="#a58cff" stroke-opacity=".58"/><circle cx="62" cy="71" r="35" fill="#8f71ff" fill-opacity=".22"/><path d="M53 71h18M62 62v18" stroke="#cfc3ff" stroke-width="6" stroke-linecap="round"/><text x="120" y="61" fill="#aaa9c8" font-size="13" font-weight="700" letter-spacing="2">01 · IDEA</text><text x="120" y="92" fill="#fff" font-size="22" font-weight="800">아이디어 모으기</text></g>
+    <g transform="translate(1070 292)"><rect width="410" height="142" rx="28" fill="#182a42" stroke="#6de2ff" stroke-opacity=".48"/><circle cx="62" cy="71" r="35" fill="#62def8" fill-opacity=".18"/><path d="M46 54h32v34H46zM52 64h20M52 73h16" fill="none" stroke="#9eefff" stroke-width="5" stroke-linecap="round"/><text x="120" y="61" fill="#aaa9c8" font-size="13" font-weight="700" letter-spacing="2">02 · PLAN</text><text x="120" y="92" fill="#fff" font-size="22" font-weight="800">회차와 일정 정리</text></g>
+    <g transform="translate(1070 454)"><rect width="410" height="142" rx="28" fill="#35213e" stroke="#ff7ac8" stroke-opacity=".48"/><circle cx="62" cy="71" r="35" fill="#ff73c3" fill-opacity=".17"/><path d="M47 84l30-30 8 8-30 30-12 4z" fill="none" stroke="#ffb7df" stroke-width="5" stroke-linejoin="round"/><text x="120" y="61" fill="#aaa9c8" font-size="13" font-weight="700" letter-spacing="2">03 · DRAW</text><text x="120" y="92" fill="#fff" font-size="22" font-weight="800">익숙한 도구로 작화</text></g>
+    <g transform="translate(1070 616)"><rect width="410" height="142" rx="28" fill="#25263f" stroke="#ffd16e" stroke-opacity=".5"/><circle cx="62" cy="71" r="35" fill="#ffd16e" fill-opacity=".16"/><path d="M44 72l12 13 27-31" fill="none" stroke="#ffe0a0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><text x="120" y="61" fill="#aaa9c8" font-size="13" font-weight="700" letter-spacing="2">04 · REVIEW</text><text x="120" y="92" fill="#fff" font-size="22" font-weight="800">검수와 수정 확인</text></g>
+    <g transform="translate(1070 778)"><rect width="410" height="142" rx="28" fill="#163637" stroke="#69e5ba" stroke-opacity=".48"/><circle cx="62" cy="71" r="35" fill="#68e1b7" fill-opacity=".16"/><path d="M62 48v42m-16-16 16 16 16-16M45 98h34" fill="none" stroke="#a7f2d6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><text x="120" y="61" fill="#aaa9c8" font-size="13" font-weight="700" letter-spacing="2">05 · DELIVER</text><text x="120" y="92" fill="#fff" font-size="22" font-weight="800">규격 확인 후 내보내기</text></g>
+  </g>
+  <g opacity=".75"><path d="M1046 226v738" stroke="url(#violet)" stroke-width="3" stroke-dasharray="3 14"/><circle cx="1046" cy="230" r="9" fill="#a188ff"/><circle cx="1046" cy="956" r="9" fill="#6be4be"/></g>
+</svg>

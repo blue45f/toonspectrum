@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect } from "react";
 
-import { CREATOR_HOME_SECTIONS, bindCreatorSectionNavigation, focusCreatorSection, isPlainCreatorJump } from "./creator-home-navigation";
+import { CREATOR_HOME_SECTIONS, bindCreatorSectionNavigation, focusCreatorSection, isPlainCreatorJump, type CreatorHomeSectionId } from "./creator-home-navigation";
 import "./creator-home-navigation.css";
 
 export function CreatorSectionLink({ sectionId, className, children }: {
-  sectionId: (typeof CREATOR_HOME_SECTIONS)[number]["id"];
+  sectionId: CreatorHomeSectionId;
   className?: string;
   children: ReactNode;
 }) {
@@ -36,7 +36,7 @@ export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
   const label = locale === "ko" ? "툰스튜디오 소개 바로가기" : "Explore the ToonStudio introduction";
   return (
     <nav className="ch-jump-nav" aria-label={label}>
-      <span className="ch-jump-label">{locale === "ko" ? "어떤 창작을 시작해 볼까요?" : "Find your way to create."}</span>
+      <span className="ch-jump-label">{locale === "ko" ? "필요한 곳으로 바로 이동하세요." : "Jump to the part you need."}</span>
       <div className="ch-jump-links">
         {CREATOR_HOME_SECTIONS.map((section) => (
           <CreatorSectionLink key={section.id} sectionId={section.id}>

@@ -32,6 +32,7 @@ const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
 );
 
+const STUDIO_PRODUCTION_PREFIXES = ["/production"] as const;
 const STUDIO_ASSET_PREFIXES = [
   "/studio/assets",
   "/studio/brushes",
@@ -53,10 +54,15 @@ const STUDIO_LEARN_PREFIXES = [
   "/help",
   "/studio/manual",
 ] as const;
+const STUDIO_PUBLISH_PREFIXES = [
+  "/studio/publish",
+  "/publishing",
+] as const;
 const STUDIO_WORK_EXCLUDED_PREFIXES = [
   ...STUDIO_CREATE_PREFIXES,
   ...STUDIO_ASSET_PREFIXES,
   ...STUDIO_LEARN_PREFIXES,
+  ...STUDIO_PUBLISH_PREFIXES,
   "/studio/templates",
 ] as const;
 const COMMUNITY_PURPOSE_PREFIXES = [
@@ -101,9 +107,11 @@ function useDestinationActive() {
 
 /** Broader state used only by the top-level purpose choices. */
 function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
+  if (href === "/production") return pathMatchesAny(pathname, STUDIO_PRODUCTION_PREFIXES);
   if (href === "/studio") return isStudioWorkPurpose(pathname);
   if (href === "/studio/new") return pathMatchesAny(pathname, STUDIO_CREATE_PREFIXES);
   if (href === "/studio/assets") return pathMatchesAny(pathname, STUDIO_ASSET_PREFIXES);
+  if (href === "/studio/publish") return pathMatchesAny(pathname, STUDIO_PUBLISH_PREFIXES);
   if (href === "/learn") return pathMatchesAny(pathname, STUDIO_LEARN_PREFIXES);
   if (exact || href === "/") return pathname === href;
   if (href === "/discover") return isDiscoverPurposeRoute(pathname);
@@ -166,16 +174,14 @@ export function SiteHeader() {
   useSiteHeaderHeight(headerRef);
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
-  const brandHref = navigationContext === "studio" ? "/studio" : "/";
+  const brandHref = "/";
   const brandName = navigationContext === "studio" ? "ToonStudio" : t("app.name");
   const brandDescription = navigationContext === "studio"
-    ? SITE_NAVIGATION_ITEMS.studio.description
+    ? SITE_NAVIGATION_ITEMS.production.description
     : SITE_NAVIGATION_ITEMS.home.description;
-  const brandTagline = isPublicPage
-    ? "Webtoon drawing atelier"
-    : navigationContext === "studio"
-    ? (locale === "ko" ? "만들기 · 검토 · 내보내기" : "Create · Review · Publish")
-    : "Discover · Read · Share";
+  const brandTagline = navigationContext === "studio"
+    ? (locale === "ko" ? "기획 · 제작 · 검수 · 내보내기" : "Plan · Produce · Review · Deliver")
+    : (locale === "ko" ? "찾기 · 읽기 · 나누기" : "Discover · Read · Share");
   const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
   const closeMenu = useCallback(() => {
