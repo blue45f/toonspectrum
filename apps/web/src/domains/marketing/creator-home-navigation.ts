@@ -1,16 +1,16 @@
 /** Existing fragment IDs stay public; never interpret a URL fragment as a selector. */
 export const CREATOR_HOME_SECTIONS = [
   { id: "creator-toolkit-title", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
-  { id: "creator-process-title", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
-  { id: "creator-support-title", headingId: "creator-support-title", ko: "협업·도움", en: "People & help" },
-  { id: "creator-closing-title", headingId: "creator-closing-title", ko: "제작 시작", en: "Start production" },
+  { id: "creator-process-title", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
+  { id: "creator-support-title", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },
+  { id: "creator-closing-title", headingId: "creator-closing-title", ko: "작품 시작", en: "Start creating" },
 ] as const;
 
 const LEGACY_SECTIONS = [
-  { id: "creator-film", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
-  { id: "creator-faq-title", headingId: "creator-support-title", ko: "협업·도움", en: "People & help" },
+  { id: "creator-film", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
+  { id: "creator-faq-title", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },
   { id: "creator-desk-title", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
-  { id: "creator-offline-title", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
+  { id: "creator-offline-title", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
 ] as const;
 
 export type CreatorHomeSectionId =
@@ -23,7 +23,9 @@ export function creatorSectionFromHash(hash: string) {
     const id = decodeURIComponent(hash.slice(1));
     return CREATOR_HOME_SECTIONS.find((section) => section.id === id)
       ?? LEGACY_SECTIONS.find((section) => section.id === id);
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 export function creatorWorkflowIndex(key: string, current: number, count: number): number | null {
@@ -39,13 +41,17 @@ export function creatorWorkflowIndex(key: string, current: number, count: number
 }
 
 export type CreatorJumpActivation = {
-  button: number; defaultPrevented: boolean; altKey: boolean;
-  ctrlKey: boolean; metaKey: boolean; shiftKey: boolean;
+  button: number;
+  defaultPrevented: boolean;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
 };
 
 export function isPlainCreatorJump(event: CreatorJumpActivation): boolean {
-  return event.button === 0 && !event.defaultPrevented &&
-    !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+  return event.button === 0 && !event.defaultPrevented
+    && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
 }
 
 type CreatorSectionTarget = Pick<HTMLElement, "focus" | "scrollIntoView">;
@@ -62,7 +68,8 @@ export function focusCreatorSection(hash: string, findTarget: FindCreatorTarget,
 }
 
 export type CreatorNavigationHost = {
-  getHash: () => string; findTarget: FindCreatorTarget;
+  getHash: () => string;
+  findTarget: FindCreatorTarget;
   requestFrame: (callback: () => void) => number;
   cancelFrame: (handle: number) => void;
   subscribe: (callback: () => void) => () => void;
@@ -73,6 +80,7 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
   let frame: number | undefined;
   let revision = 0;
   let disposed = false;
+
   const schedule = () => {
     if (disposed) return;
     const request = ++revision;
@@ -86,11 +94,14 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
       focusCreatorSection(hash, host.findTarget, true);
     });
   };
+
   const unsubscribe = host.subscribe(schedule);
   schedule();
+
   return () => {
     if (disposed) return;
-    disposed = true; revision += 1;
+    disposed = true;
+    revision += 1;
     if (frame !== undefined) host.cancelFrame(frame);
     unsubscribe();
   };

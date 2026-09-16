@@ -37,7 +37,7 @@ try {
 
       const playButton = page.getByTestId("creator-film-play");
       if (await playButton.count() === 0) {
-        await expect(page.locator('[data-creator-experience="production-os-v2"]')).toHaveCount(1);
+        await expect(page.locator('[data-creator-experience="all-in-one-studio-v3"]')).toHaveCount(1);
         const manifestResponse = await context.request.get(`${origin}/brand/film-manifest.json`);
         assert.equal(manifestResponse.ok(), true);
         const manifest = await manifestResponse.json();

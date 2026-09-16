@@ -64,29 +64,28 @@ try {
     assert.equal(await page.locator("video").count(), 0, "Video must not mount before a user gesture");
     assert.equal(videoRequests.length, 0, "Video must not download before a user gesture");
     const brand = locale === "ko" ? "툰스튜디오" : "ToonStudio";
-    await page.waitForFunction((name) => document.title.includes(name), brand);
+    await page.waitForFunction((brandName) => document.title.includes(brandName), brand);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
     const headlineBounds = await page.locator("#creator-hero-title").boundingBox();
     assert(
       headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1,
       `Clipped headline: ${name}`,
     );
-    await expect(page.locator('.cf-hero .cf-primary[href="/production"]')).toBeVisible();
-    await expect(page.locator('.cf-hero .cf-secondary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-primary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-secondary[href="/production"]')).toBeVisible();
     await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toBeVisible();
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
+    await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
     await expect(page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]')).toHaveCount(1);
     await expect(page.locator('.cf-bridge-visual img[src="/brand/production-os-workspace.svg"]')).toHaveCount(1);
     await expect(page.locator('.cf-production-journey img[src="/brand/production-os-journey.svg"]')).toHaveCount(1);
     const heroImage = page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]');
     await expect.poll(() => heroImage.evaluate((image) => image.complete && image.naturalWidth > 0), {
-      message: "The above-the-fold production preview must load",
+      message: "The above-the-fold all-in-one preview must load",
     }).toBe(true);
 
-    // The existing shell intentionally defers its footer. Exercise scroll, wait for its
-    // real lazy-loaded content, and only then capture the complete document.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const footer = page.locator('footer[data-site-chrome="footer"]');
     await footer.waitFor({ state: "visible", timeout: 30000 });

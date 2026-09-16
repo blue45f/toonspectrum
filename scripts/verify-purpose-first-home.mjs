@@ -10,13 +10,14 @@ const viewports = [
   ["english-mobile", 390, 844, "en-US"],
 ];
 const requiredDestinations = [
-  "/production",
+  "/story-lab",
   "/studio/new",
+  "/studio/bg3d",
   "/studio/projects",
   "/studio/assets",
+  "/production",
   "/studio/publish",
   "/collaborate",
-  "/discover",
   "/learn",
 ];
 
@@ -40,7 +41,6 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
 
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    // Purpose-first intent is always visible on the simplified creator home (no details accordion).
     await page.locator("#product-intent-title").waitFor({ timeout: 60_000 });
     await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);
