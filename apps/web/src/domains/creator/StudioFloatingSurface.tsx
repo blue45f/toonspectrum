@@ -581,6 +581,11 @@ export const StudioFloatingSurface = forwardRef<
     commitLayout(setStudioFloatingSurfaceLock(committedLayout, kind, !locked));
   };
 
+  const viewportInsetTop = viewport.insetTop ?? 0;
+  const viewportInsetRight = viewport.insetRight ?? 0;
+  const viewportInsetBottom = viewport.insetBottom ?? 0;
+  const viewportInsetLeft = viewport.insetLeft ?? 0;
+
   const arrangementControllerRef = useRef({
     arrange: (_mode: "edges" | "cascade", _index: number, _count: number) => undefined,
     setMinimized: (_value: boolean) => undefined,
@@ -590,11 +595,11 @@ export const StudioFloatingSurface = forwardRef<
       arrange(mode, index, count) {
         const availableWidth = Math.max(
           minWidth,
-          viewport.width - viewport.insetLeft - viewport.insetRight,
+          viewport.width - viewportInsetLeft - viewportInsetRight,
         );
         const availableHeight = Math.max(
           minHeight,
-          viewport.height - viewport.insetTop - viewport.insetBottom,
+          viewport.height - viewportInsetTop - viewportInsetBottom,
         );
         setMinimized(false);
         if (mode === "edges") {
@@ -614,9 +619,9 @@ export const StudioFloatingSurface = forwardRef<
           const right = index % columns === 1;
           commitRect({
             x: right
-              ? viewport.width - viewport.insetRight - width
-              : viewport.insetLeft,
-            y: viewport.insetTop + row * slotHeight,
+              ? viewport.width - viewportInsetRight - width
+              : viewportInsetLeft,
+            y: viewportInsetTop + row * slotHeight,
             width,
             height,
           }, "free");
@@ -632,8 +637,8 @@ export const StudioFloatingSurface = forwardRef<
         const yRoom = Math.max(0, availableHeight - height);
         const offset = count <= 1 ? 0 : index / (count - 1);
         commitRect({
-          x: viewport.insetLeft + xRoom * offset,
-          y: viewport.insetTop + yRoom * offset,
+          x: viewportInsetLeft + xRoom * offset,
+          y: viewportInsetTop + yRoom * offset,
           width,
           height,
         }, "free");
@@ -655,7 +660,7 @@ export const StudioFloatingSurface = forwardRef<
     ? {
         ...committedRect,
         y: committedLayout.dock === "bottom"
-          ? viewport.height - viewport.insetBottom - 40
+          ? viewport.height - viewportInsetBottom - 40
           : committedRect.y,
         height: 40,
       }
