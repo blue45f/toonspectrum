@@ -31,7 +31,7 @@ const STUDIO_REALTIME_PROVIDER_ID =
 /**
  * Bounded retries still cover a free container's cold start. Production never constructs this
  * socket without an explicit long-running origin, so the larger window cannot revive the old
- * Vercel-serverless reconnect loop.
+ * static-origin reconnect loop.
  */
 export const STUDIO_LIVE_SOCKET_RETRY_POLICY = Object.freeze({
   reconnection: true,

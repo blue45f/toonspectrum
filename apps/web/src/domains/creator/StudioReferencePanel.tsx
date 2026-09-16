@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Check,
+  ExternalLink,
   ChevronLeft,
   ChevronRight,
   FlipHorizontal2,
@@ -10,9 +11,12 @@ import {
   Images,
   Link2,
   Loader2,
+  LayoutGrid,
   Palette,
   Pipette,
   RefreshCw,
+  RotateCw,
+  Scaling,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -34,9 +38,12 @@ import {
 import {
   addStudioReferenceBoardItem,
   createStudioReferenceBoardItem,
+  normalizeStudioReferenceBoardRotation,
   removeStudioReferenceBoardItem,
   reorderStudioReferenceBoardItem,
   STUDIO_REFERENCE_BOARD_MAX_ITEMS,
+  STUDIO_REFERENCE_BOARD_MAX_ZOOM,
+  STUDIO_REFERENCE_BOARD_MIN_ZOOM,
   updateStudioReferenceBoardItem,
   type StudioReferenceBoardDocument,
   type StudioReferenceBoardItem,
@@ -51,6 +58,7 @@ import {
   type StudioReferenceImageRaster,
   type StudioReferencePoint,
 } from "./studio-reference-color-sampler";
+import { arrangeStudioReferenceCanvas } from "./studio-reference-canvas-layout";
 import {
   assertStudioReferenceGifSignature,
   assertStudioReferenceImportBatch,
@@ -90,6 +98,8 @@ export interface StudioReferencePanelProps {
   onChange: (next: StudioReferenceBoardDocument) => boolean | void;
   /** Optional Studio primary-color sink. Color inspection never mutates the reference document. */
   onPickColor?: (hex: string) => void;
+  /** Opens the synchronized project-owned canvas in a dedicated browser window. */
+  onOpenDetached?: () => void;
   /** Test/runtime injection seam; product defaults to the shared SQLite/OPFS authority. */
   acquirePreferences?: () => Promise<StudioReferencePanelPreferencesRepository>;
 }
@@ -106,6 +116,16 @@ type ItemDragSession = {
   startPointer: { x: number; y: number };
   startView: StudioReferenceBoardItemView;
   boardRect: DOMRect;
+};
+type ItemTransformKind = "scale" | "rotate";
+type ItemTransformSession = {
+  kind: ItemTransformKind;
+  itemId: string;
+  pointerId: number;
+  startView: StudioReferenceBoardItemView;
+  center: { x: number; y: number };
+  startDistance: number;
+  startAngleDeg: number;
 };
 type LibraryStatus = "idle" | "loading" | "ready" | "error";
 type ColorAnalysisStatus = "idle" | "loading" | "ready" | "error";
@@ -299,6 +319,7 @@ export function StudioReferencePanel({
   document,
   onChange,
   onPickColor,
+  onOpenDetached,
   acquirePreferences = acquireProductStudioReferencePanelPreferencesRepository,
 }: StudioReferencePanelProps): ReactElement | null {
   const [settings, setSettings] = useState<ReferencePanelSettings>(() =>
@@ -336,6 +357,8 @@ export function StudioReferencePanel({
   const panelDragListenersRef = useRef<{ onMove: (event: PointerEvent) => void; onEnd: () => void } | null>(null);
   const itemDragSessionRef = useRef<ItemDragSession | null>(null);
   const dragPreviewRef = useRef<{ itemId: string; view: StudioReferenceBoardItemView } | null>(null);
+  const itemTransformSessionRef = useRef<ItemTransformSession | null>(null);
+  const itemTransformPreviewRef = useRef<{ itemId: string; view: StudioReferenceBoardItemView } | null>(null);
   const settingsRef = useRef(settings);
   const settingsRevisionRef = useRef(0);
   const lastEnqueuedSettingsRevisionRef = useRef(0);
@@ -770,7 +793,7 @@ export function StudioReferencePanel({
       }
     } catch {
       if (!isReferenceImportActive(ticket)) return;
-      setLibraryError("이미지를 보드에 추가할 수 없습니다. 콘텐츠 해시 지원을 확인해 주세요.");
+      setLibraryError("이미지를 레퍼런스 캔버스에 추가할 수 없습니다. 콘텐츠 해시 지원을 확인해 주세요.");
     } finally {
       if (importGenerationRef.current === ticket.generation && mountedRef.current) {
         assetAddInFlightRef.current = false;
@@ -782,7 +805,7 @@ export function StudioReferencePanel({
   async function importRemoteReference(): Promise<void> {
     if (importInFlightRef.current || assetAddInFlightRef.current) return;
     if (latestDocumentRef.current.items.length >= STUDIO_REFERENCE_BOARD_MAX_ITEMS) {
-      setImportStatus(`참고 보드는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
+      setImportStatus(`레퍼런스 캔버스에는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
       return;
     }
     const sourceUrl = remoteUrl.trim();
@@ -825,9 +848,9 @@ export function StudioReferencePanel({
       const item = buildReferenceItem(asset, current.items.length);
       if (!item) throw new Error("원격 참고 이미지의 콘텐츠 식별자를 만들지 못했습니다.");
       const next = addStudioReferenceBoardItem(current, item);
-      if (next === current) throw new Error("참고 보드에 이미지를 추가할 수 없습니다.");
+      if (next === current) throw new Error("레퍼런스 캔버스에 이미지를 추가할 수 없습니다.");
       if (!emitDocumentChange(next)) {
-        setImportStatus("현재 문서가 잠겨 있어 보드에는 추가하지 못했습니다. 이미지는 개인 에셋에 저장했습니다.");
+        setImportStatus("현재 문서가 잠겨 있어 레퍼런스 캔버스에는 추가하지 못했습니다. 이미지는 개인 에셋에 저장했습니다.");
         return;
       }
       setSelectedItemId(item.id);
@@ -859,7 +882,7 @@ export function StudioReferencePanel({
     const plan = planStudioReferenceImports(sourceFiles, remainingSlots);
     if (plan.files.length === 0) {
       if (plan.overflow.length > 0 || remainingSlots <= 0) {
-        setImportStatus(`참고 보드는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
+        setImportStatus(`레퍼런스 캔버스에는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
       } else if (sourceFiles.length > 0) {
         setImportStatus("PNG, JPG, WebP 또는 GIF 이미지 파일만 가져올 수 있습니다.");
       }
@@ -938,7 +961,7 @@ export function StudioReferencePanel({
         + plan.overflow.length
         + Math.max(0, savedAssets.length - addedItems.length);
       if (!accepted) {
-        setImportStatus("현재 문서가 잠겨 있어 보드에는 추가하지 못했습니다. 파일은 개인 에셋에 저장했습니다.");
+        setImportStatus("현재 문서가 잠겨 있어 레퍼런스 캔버스에는 추가하지 못했습니다. 파일은 개인 에셋에 저장했습니다.");
       } else if (addedItems.length === 0) {
         setImportStatus(failures[0] ?? "가져올 수 있는 참고 이미지가 없습니다.");
       } else {
@@ -1015,7 +1038,7 @@ export function StudioReferencePanel({
     }
     const boardRect = board.getBoundingClientRect();
     if (boardRect.width <= 0 || boardRect.height <= 0) {
-      setColorInteractionStatus("참고 보드 크기를 확인하지 못했습니다.");
+      setColorInteractionStatus("레퍼런스 캔버스 크기를 확인하지 못했습니다.");
       return;
     }
     const displayWidth = item.asset.width ?? asset.width ?? cache.raster.width;
@@ -1168,6 +1191,117 @@ export function StudioReferencePanel({
     setDragPreview(null);
   }
 
+  function beginItemTransform(
+    kind: ItemTransformKind,
+    item: StudioReferenceBoardItem,
+    view: StudioReferenceBoardItemView,
+    event: ReactPointerEvent<HTMLSpanElement>,
+  ): void {
+    if (event.button !== 0 || eyedropperActive) return;
+    const board = event.currentTarget.closest<HTMLElement>("[data-reference-board-canvas]");
+    if (!board) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const boardRect = board.getBoundingClientRect();
+    const center = {
+      x: boardRect.left + view.centerX * boardRect.width,
+      y: boardRect.top + view.centerY * boardRect.height,
+    };
+    const deltaX = event.clientX - center.x;
+    const deltaY = event.clientY - center.y;
+    itemTransformSessionRef.current = {
+      kind,
+      itemId: item.id,
+      pointerId: event.pointerId,
+      startView: view,
+      center,
+      startDistance: Math.max(8, Math.hypot(deltaX, deltaY)),
+      startAngleDeg: Math.atan2(deltaY, deltaX) * 180 / Math.PI,
+    };
+    itemTransformPreviewRef.current = null;
+    setSelectedItemId(item.id);
+    setTransformPreview({ itemId: item.id, view });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function previewItemTransform(event: ReactPointerEvent<HTMLSpanElement>): void {
+    const session = itemTransformSessionRef.current;
+    if (!session || event.pointerId !== session.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = event.clientX - session.center.x;
+    const deltaY = event.clientY - session.center.y;
+    let nextView: StudioReferenceBoardItemView;
+    if (session.kind === "scale") {
+      const ratio = Math.hypot(deltaX, deltaY) / session.startDistance;
+      const zoom = Math.min(
+        STUDIO_REFERENCE_BOARD_MAX_ZOOM,
+        Math.max(STUDIO_REFERENCE_BOARD_MIN_ZOOM, session.startView.zoom * ratio),
+      );
+      nextView = { ...session.startView, zoom };
+    } else {
+      const angleDeg = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+      let rotationDeg = normalizeStudioReferenceBoardRotation(
+        session.startView.rotationDeg + angleDeg - session.startAngleDeg,
+      );
+      if (event.shiftKey) {
+        rotationDeg = normalizeStudioReferenceBoardRotation(Math.round(rotationDeg / 15) * 15);
+      }
+      nextView = { ...session.startView, rotationDeg };
+    }
+    const preview = { itemId: session.itemId, view: nextView };
+    itemTransformPreviewRef.current = preview;
+    setTransformPreview(preview);
+  }
+
+  function finishItemTransform(event: ReactPointerEvent<HTMLSpanElement>): void {
+    const session = itemTransformSessionRef.current;
+    if (!session || event.pointerId !== session.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const finalView = itemTransformPreviewRef.current?.itemId === session.itemId
+      ? itemTransformPreviewRef.current.view
+      : session.startView;
+    itemTransformSessionRef.current = null;
+    itemTransformPreviewRef.current = null;
+    setTransformPreview(null);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+    const unchanged = session.kind === "scale"
+      ? finalView.zoom === session.startView.zoom
+      : finalView.rotationDeg === session.startView.rotationDeg;
+    if (unchanged) return;
+    const view = session.kind === "scale"
+      ? { zoom: finalView.zoom }
+      : { rotationDeg: finalView.rotationDeg };
+    emitDocumentChange(updateStudioReferenceBoardItem(
+      latestDocumentRef.current,
+      session.itemId,
+      { view },
+    ));
+  }
+
+  function cancelItemTransform(event?: ReactPointerEvent<HTMLSpanElement>): void {
+    const session = itemTransformSessionRef.current;
+    if (!session || (event && event.pointerId !== session.pointerId)) return;
+    event?.preventDefault();
+    event?.stopPropagation();
+    itemTransformSessionRef.current = null;
+    itemTransformPreviewRef.current = null;
+    setTransformPreview(null);
+  }
+
+  function arrangeReferenceCanvas(): void {
+    const next = arrangeStudioReferenceCanvas(latestDocumentRef.current);
+    if (!emitDocumentChange(next)) return;
+    itemTransformSessionRef.current = null;
+    itemTransformPreviewRef.current = null;
+    setDragPreview(null);
+    setTransformPreview(null);
+    setImportStatus("레퍼런스를 한눈에 비교할 수 있도록 정돈했습니다.");
+  }
+
   function patchSelectedView(patch: Partial<StudioReferenceBoardItemView>): void {
     const itemId = effectiveSelectedItem?.id;
     if (!itemId) return;
@@ -1203,9 +1337,11 @@ export function StudioReferencePanel({
   return (
     <div
       role="region"
-      aria-label="포즈 참고 보드"
+      aria-label="레퍼런스 캔버스"
       data-studio-reference-preferences-authority={preferencesAuthority}
-      className="fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
+      data-studio-reference-canvas="true"
+      tabIndex={-1}
+      className="fixed z-[70] flex flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_18px_56px_oklch(0.05_0.01_70/0.48)] outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       style={{ left: settings.x, top: settings.y, width: settings.width, height: settings.height }}
     >
       <input
@@ -1223,18 +1359,35 @@ export function StudioReferencePanel({
         }}
       />
       <header
-        className="flex shrink-0 cursor-grab items-center justify-between gap-1 border-b border-line bg-card px-2 py-1.5 active:cursor-grabbing"
+        className="relative flex shrink-0 cursor-grab items-center justify-between gap-2 overflow-hidden border-b border-line bg-[linear-gradient(110deg,oklch(0.22_0.025_48/0.96),oklch(0.18_0.018_290/0.96))] px-2.5 py-2 active:cursor-grabbing"
         style={{ touchAction: "none" }}
         onPointerDown={(event) => beginPanelDrag("move", event)}
       >
-        <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-fg">
-          <Images size={13} className="shrink-0 text-accent" aria-hidden />
-          <span className="truncate">포즈 참고 보드</span>
-          <span className="rounded-full border border-line bg-raised px-1.5 py-0.5 text-[0.6rem] font-semibold tabular-nums text-fg-3">
+        <span className="pointer-events-none absolute -left-8 -top-10 size-24 rounded-full bg-accent/10 blur-2xl" aria-hidden />
+        <span className="relative flex min-w-0 items-center gap-2 text-xs text-fg">
+          <span className="grid size-8 shrink-0 place-items-center rounded-xl border border-accent/25 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.08)]">
+            <Images size={15} aria-hidden />
+          </span>
+          <span className="min-w-0">
+            <strong className="block truncate text-[0.72rem]">레퍼런스 캔버스</strong>
+            <span className="block truncate text-[0.54rem] font-medium text-fg-3">자유 배치 · 겹침 비교 · 색상 추출</span>
+          </span>
+          <span className="rounded-full border border-line bg-panel/70 px-1.5 py-0.5 text-[0.56rem] font-semibold tabular-nums text-fg-3 backdrop-blur-sm">
             {document.items.length}/{STUDIO_REFERENCE_BOARD_MAX_ITEMS}
           </span>
         </span>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="relative flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            aria-label="레퍼런스 이미지 자동 정돈"
+            title="겹친 이미지를 한눈에 보이도록 정돈"
+            disabled={document.items.length < 2}
+            className={cx(ICON_BUTTON, "size-8")}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={arrangeReferenceCanvas}
+          >
+            <LayoutGrid size={13} aria-hidden />
+          </button>
           <button
             type="button"
             aria-label="선택 이미지 속성"
@@ -1266,9 +1419,21 @@ export function StudioReferencePanel({
           >
             <ImagePlus size={13} aria-hidden />
           </button>
+          {onOpenDetached ? (
+            <button
+              type="button"
+              aria-label="레퍼런스 캔버스를 별도 창으로 열기"
+              title="동기화된 전용 창으로 열기"
+              className={cx(ICON_BUTTON, "size-8")}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={onOpenDetached}
+            >
+              <ExternalLink size={13} aria-hidden />
+            </button>
+          ) : null}
           <button
             type="button"
-            aria-label="포즈 참고 보드 닫기"
+            aria-label="레퍼런스 캔버스 닫기"
             title="닫기"
             className={cx(ICON_BUTTON, "size-8")}
             onPointerDown={(event) => event.stopPropagation()}
@@ -1285,7 +1450,7 @@ export function StudioReferencePanel({
           aria-live="polite"
           className="shrink-0 border-b border-warning/30 bg-warning/10 px-2 py-1 text-[0.61rem] leading-relaxed text-warning"
         >
-          참고 보드 배치 설정은 현재 세션 메모리에서만 유지됩니다.
+          레퍼런스 캔버스 배치는 현재 세션 메모리에서만 유지됩니다.
         </p>
       ) : null}
 
@@ -1302,7 +1467,7 @@ export function StudioReferencePanel({
             role="status"
             className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-xl border-2 border-dashed border-accent bg-panel/90 p-4 text-center text-xs font-bold text-accent"
           >
-            PNG · JPG · WebP · GIF를 놓아 참고 보드에 추가
+            PNG · JPG · WebP · GIF를 놓아 레퍼런스 캔버스에 추가
           </div>
         ) : null}
         {importStatus && !dropActive ? (
@@ -1320,8 +1485,8 @@ export function StudioReferencePanel({
           className="absolute inset-0 bottom-12 overflow-hidden"
           style={{
             backgroundImage:
-              "linear-gradient(oklch(0.35 0.012 68 / 0.16) 1px, transparent 1px), linear-gradient(90deg, oklch(0.35 0.012 68 / 0.16) 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
+              "radial-gradient(circle at center, oklch(0.72 0.03 70 / 0.2) 1px, transparent 1px), radial-gradient(circle at 18% 4%, oklch(0.72 0.16 42 / 0.12), transparent 38%), radial-gradient(circle at 88% 92%, oklch(0.6 0.14 285 / 0.1), transparent 42%)",
+            backgroundSize: "18px 18px, 100% 100%, 100% 100%",
           }}
           onPointerDown={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -1333,9 +1498,9 @@ export function StudioReferencePanel({
             <div className="grid h-full place-items-center p-4 text-center">
               <div>
                 <ImageIcon className="mx-auto text-fg-3" size={23} aria-hidden />
-                <p className="mt-2 text-[0.72rem] font-semibold text-fg">함께 볼 참고 이미지를 모아보세요</p>
+                <p className="mt-2 text-[0.72rem] font-semibold text-fg">레퍼런스를 캔버스에 펼쳐보세요</p>
                 <p className="mx-auto mt-1 max-w-[28ch] text-[0.65rem] leading-relaxed text-fg-3">
-                  여러 이미지를 겹쳐 배치하고 크기·각도·투명도를 비교할 수 있어요.
+                  여러 이미지를 직접 옮기고 겹치며 크기·각도·투명도를 눈으로 맞출 수 있어요.
                 </p>
                 <button
                   type="button"
@@ -1372,20 +1537,18 @@ export function StudioReferencePanel({
                     : `${label} — 드래그해서 이동`
                   : `${label} — 원본 에셋을 찾을 수 없음`}
                 className={cx(
-                  "absolute grid touch-none select-none place-items-center border bg-card/20 p-0 outline-none",
+                  "group absolute grid touch-none select-none place-items-center border bg-card/20 p-0 outline-none",
                   eyedropperActive && isSelected && "cursor-crosshair",
                   isSelected
-                    ? "border-accent shadow-[0_0_0_1px_oklch(0.72_0.185_42/0.35)]"
+                    ? "border-accent shadow-[0_0_0_1px_oklch(0.72_0.185_42/0.35),0_12px_30px_oklch(0.05_0.01_70/0.34)]"
                     : "border-transparent hover:border-line-strong focus-visible:border-accent"
                 )}
                 style={{
                   left: `${view.centerX * 100}%`,
                   top: `${view.centerY * 100}%`,
-                  width: `${framePercent.width}%`,
-                  height: `${framePercent.height}%`,
-                  opacity: view.opacity,
-                  filter: view.grayscale ? "grayscale(1)" : undefined,
-                  transform: `translate(-50%, -50%) rotate(${view.rotationDeg}deg) scale(${view.zoom * (view.flipX ? -1 : 1)}, ${view.zoom * (view.flipY ? -1 : 1)})`,
+                  width: `${framePercent.width * view.zoom}%`,
+                  height: `${framePercent.height * view.zoom}%`,
+                  transform: `translate(-50%, -50%) rotate(${view.rotationDeg}deg)`,
                   transformOrigin: "center",
                 }}
                 onPointerDown={(event) => beginItemDrag(item, view, event)}
@@ -1393,6 +1556,12 @@ export function StudioReferencePanel({
                 onPointerUp={finishItemDrag}
                 onPointerCancel={cancelItemDrag}
                 onLostPointerCapture={cancelItemDrag}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedItemId(item.id);
+                  setInspectorOpen(true);
+                  setPickerOpen(false);
+                }}
                 onKeyDown={(event) => sampleReferenceItemFromKeyboard(item, view, event)}
               >
                 {asset ? (
@@ -1401,9 +1570,18 @@ export function StudioReferencePanel({
                     alt=""
                     draggable={false}
                     className="pointer-events-none h-full w-full object-contain"
+                    style={{
+                      opacity: view.opacity,
+                      filter: view.grayscale ? "grayscale(1)" : undefined,
+                      transform: `scale(${view.flipX ? -1 : 1}, ${view.flipY ? -1 : 1})`,
+                      transformOrigin: "center",
+                    }}
                   />
                 ) : (
-                  <span className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-line bg-card/90 p-2 text-center text-[0.55rem] leading-tight text-fg-3">
+                  <span
+                    className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-line bg-card/90 p-2 text-center text-[0.55rem] leading-tight text-fg-3"
+                    style={{ opacity: view.opacity }}
+                  >
                     <AlertTriangle size={14} className="text-warn" aria-hidden />
                     원본 없음
                   </span>
@@ -1412,6 +1590,36 @@ export function StudioReferencePanel({
                   <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-accent px-1 py-0.5 text-[0.48rem] font-bold text-on-accent">
                     <Sparkles size={7} aria-hidden /> AI
                   </span>
+                ) : null}
+                {isSelected && !eyedropperActive ? (
+                  <>
+                    <span
+                      aria-hidden
+                      data-reference-transform-handle="rotate"
+                      title="드래그해서 회전 · Shift로 15° 맞춤"
+                      className="absolute left-1/2 -top-9 z-30 grid size-7 -translate-x-1/2 cursor-grab place-items-center rounded-full border border-accent/80 bg-panel text-accent shadow-lg before:absolute before:top-full before:h-2 before:w-px before:bg-accent/70 active:cursor-grabbing"
+                      onPointerDown={(event) => beginItemTransform("rotate", item, view, event)}
+                      onPointerMove={previewItemTransform}
+                      onPointerUp={finishItemTransform}
+                      onPointerCancel={cancelItemTransform}
+                      onLostPointerCapture={cancelItemTransform}
+                    >
+                      <RotateCw size={13} />
+                    </span>
+                    <span
+                      aria-hidden
+                      data-reference-transform-handle="scale"
+                      title="드래그해서 크기 조절"
+                      className="absolute -bottom-3 -right-3 z-30 grid size-7 cursor-nwse-resize place-items-center rounded-lg border border-accent/80 bg-panel text-accent shadow-lg"
+                      onPointerDown={(event) => beginItemTransform("scale", item, view, event)}
+                      onPointerMove={previewItemTransform}
+                      onPointerUp={finishItemTransform}
+                      onPointerCancel={cancelItemTransform}
+                      onLostPointerCapture={cancelItemTransform}
+                    >
+                      <Scaling size={13} />
+                    </span>
+                  </>
                 ) : null}
               </button>
             );
@@ -1460,13 +1668,13 @@ export function StudioReferencePanel({
         {pickerOpen ? (
           <div className="absolute inset-0 z-20 flex flex-col overflow-hidden bg-panel p-2">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[0.72rem] font-bold text-fg">보드에 이미지 추가</p>
+              <p className="text-[0.72rem] font-bold text-fg">레퍼런스 추가</p>
               <button
                 type="button"
                 className="text-[0.68rem] font-semibold text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => setPickerOpen(false)}
               >
-                보드로 돌아가기
+                캔버스로 돌아가기
               </button>
             </div>
             <button
@@ -1484,7 +1692,7 @@ export function StudioReferencePanel({
               내 기기에서 가져오기
             </button>
             <p className="mb-2 text-center text-[0.56rem] text-fg-3">
-              여러 파일 선택 · 보드로 드롭 · 이미지 붙여넣기 지원
+              여러 파일 선택 · 캔버스로 드롭 · 이미지 붙여넣기 지원
             </p>
             <form
               className="mb-2 rounded-lg border border-line bg-card/70 p-2"
@@ -1564,7 +1772,7 @@ export function StudioReferencePanel({
                 </div>
               ) : assets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                  저장된 에셋이 없어요. 위 버튼에서 바로 가져오거나 보드에 파일을 놓아 주세요.
+                  저장된 에셋이 없어요. 위 버튼에서 바로 가져오거나 캔버스에 파일을 놓아 주세요.
                 </p>
               ) : filteredAssets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] text-fg-3">
@@ -1576,8 +1784,8 @@ export function StudioReferencePanel({
                     <button
                       key={asset.id}
                       type="button"
-                      aria-label={`${asset.name} 보드에 추가`}
-                      title={`${asset.name} 보드에 추가`}
+                      aria-label={`${asset.name} 캔버스에 추가`}
+                      title={`${asset.name} 캔버스에 추가`}
                       disabled={
                         atItemLimit ||
                         addingAssetId !== null ||

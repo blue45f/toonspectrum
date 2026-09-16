@@ -48,7 +48,7 @@ were introduced to conceal deterministic failures.
 A minimal local preflight is:
 
 ```sh
-node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/verify-api-serverless-build.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
+node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
 python3 scripts/verify-pr-workflow-fanout.py
 ```
 

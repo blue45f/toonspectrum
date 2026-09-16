@@ -88,7 +88,7 @@ describe("StudioMainMenu viewport integration", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("applies above-trigger transform and the actual available height", async () => {
+  it("opens above the trigger as a viewport-safe movable surface", async () => {
     const viewport = Object.assign(new EventTarget(), { offsetLeft: 0, offsetTop: 0, width: 320, height: 300 });
     vi.stubGlobal("visualViewport", viewport);
     const trigger = await mountMenu();
@@ -97,10 +97,12 @@ describe("StudioMainMenu viewport integration", () => {
     });
     const menu = await open(trigger);
     expect(menu.dataset.studioMainMenuSide).toBe("top");
-    expect(menu.style.transform).toBe("translateY(-100%)");
-    expect(menu.style.maxHeight).toBe("232px");
-    expect(menu.style.minWidth).toBe("248px");
-    expect(menu.style.maxWidth).toBe("248px");
+    expect(menu.dataset.studioMainMenuFloating).toBe("true");
+    expect(menu.style.transform).toBe("translate3d(0, 0, 0)");
+    expect(Number.parseFloat(menu.style.top)).toBeGreaterThanOrEqual(52);
+    expect(Number.parseFloat(menu.style.left)).toBeGreaterThanOrEqual(8);
+    expect(Number.parseFloat(menu.style.width)).toBe(248);
+    expect(Number.parseFloat(menu.style.height)).toBeLessThanOrEqual(232);
   });
 
   it("subscribes to visual viewport changes, coalesces frames and removes listeners", async () => {
@@ -114,12 +116,15 @@ describe("StudioMainMenu viewport integration", () => {
       pending = callback;
       return 123;
     });
-    viewport.height = 160;
-    viewport.dispatchEvent(new Event("resize"));
-    viewport.dispatchEvent(new Event("scroll"));
+    await act(async () => {
+      viewport.height = 160;
+      viewport.dispatchEvent(new Event("resize"));
+      viewport.dispatchEvent(new Event("scroll"));
+    });
     expect(request).toHaveBeenCalledTimes(1);
     await act(async () => { (pending as FrameRequestCallback | null)?.(0); });
-    expect(menu.style.maxHeight).toBe("136px");
+    expect(Number.parseFloat(menu.style.top)).toBeGreaterThanOrEqual(52);
+    expect(Number.parseFloat(menu.style.height)).toBeLessThanOrEqual(100);
     await act(async () => root?.unmount());
     root = null;
     expect(remove).toHaveBeenCalledWith("resize", expect.any(Function));

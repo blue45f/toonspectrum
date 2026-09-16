@@ -46,6 +46,6 @@ fallback.
 Tracks are registered at boot from `public/audio/playlist.json`
 (schema `{ tracks: [{ src, title, artist, license, creditUrl }] }`) by the web `AppShell`.
 It loads both the manifest and the mp3 files from the deployed origin via
-`resolveAssetUrl` (`/audio/*` response headers are configured in `vercel.json`). If the manifest
+`resolveAssetUrl` (`/audio/*` response headers are generated from `config/http-response-headers.json`). If the manifest
 fails to load, a built-in fallback registers the vocal opening; if a track fails to play, the
 procedural Web Audio soundtrack remains the final fallback.

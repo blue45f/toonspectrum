@@ -243,7 +243,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     ? undefined
     : parseStudioReferenceBoardDocument(project.referenceBoard);
   if (project.referenceBoard !== undefined && !referenceBoard) {
-    throw new Error("포즈 참고 보드 데이터가 손상되었거나 지원하지 않는 버전입니다.");
+    throw new Error("레퍼런스 캔버스 데이터가 손상되었거나 지원하지 않는 버전입니다.");
   }
   return {
     ...project,

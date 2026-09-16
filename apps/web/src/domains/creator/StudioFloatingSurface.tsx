@@ -1,6 +1,8 @@
 import {
   Check,
   GripHorizontal,
+  Maximize2,
+  Minimize2,
   MoreHorizontal,
   Move,
   PanelLeft,
@@ -53,6 +55,7 @@ import {
 import {
   bringStudioFloatingSurfaceToFront,
   registerStudioFloatingSurface,
+  registerStudioFloatingSurfaceArrangementController,
   requestStudioFloatingSurfaceLayoutReset,
   subscribeStudioFloatingSurfaceLayoutReset,
   studioFloatingSurfaceStackSnapshot,
@@ -170,6 +173,12 @@ export interface StudioFloatingSurfaceProps {
   readonly insetLeft?: number;
   readonly className?: string;
   readonly contentClassName?: string;
+  /** Keeps high-priority transient surfaces above the regular floating-window stack. */
+  readonly zIndexFloor?: number;
+  /** Allows the window to collapse without unmounting its working state. */
+  readonly minimizable?: boolean;
+  /** Excludes transient dropdowns from global workspace arrangement commands. */
+  readonly participatesInWorkspaceArrangement?: boolean;
   /**
    * Edges this surface may dock to. Omit to offer all of them. A surface that only makes sense
    * along one axis — the animatic timeline is a bottom strip — would otherwise advertise a dock
@@ -269,6 +278,9 @@ export const StudioFloatingSurface = forwardRef<
   insetLeft = 12,
   className,
   contentClassName,
+  zIndexFloor,
+  minimizable = true,
+  participatesInWorkspaceArrangement = true,
   allowedDockEdges,
   rootDataAttributes,
 }, forwardedRef) {
@@ -288,6 +300,7 @@ export const StudioFloatingSurface = forwardRef<
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const normalizedDefault = useMemo(
     () => normalizeStudioFloatingSurfaceLayout(defaultLayout),
     [defaultLayout],
@@ -320,6 +333,9 @@ export const StudioFloatingSurface = forwardRef<
   );
   void stackRevision;
   const zIndex = studioFloatingSurfaceZIndex(stackSurfaceId);
+  const resolvedZIndex = typeof zIndexFloor === "number" && Number.isFinite(zIndexFloor)
+    ? Math.max(zIndex, Math.round(zIndexFloor))
+    : zIndex;
 
   useLayoutEffect(
     () => registerStudioFloatingSurface(stackSurfaceId),
@@ -392,6 +408,7 @@ export const StudioFloatingSurface = forwardRef<
 
   const resetLayout = (): void => {
     setMenuOpen(false);
+    setMinimized(false);
     commitLayout(normalizeStudioFloatingSurfaceLayout(normalizedDefault));
   };
 
@@ -564,12 +581,97 @@ export const StudioFloatingSurface = forwardRef<
     commitLayout(setStudioFloatingSurfaceLock(committedLayout, kind, !locked));
   };
 
+  const viewportInsetTop = viewport.insetTop ?? 0;
+  const viewportInsetRight = viewport.insetRight ?? 0;
+  const viewportInsetBottom = viewport.insetBottom ?? 0;
+  const viewportInsetLeft = viewport.insetLeft ?? 0;
+
+  const arrangementControllerRef = useRef({
+    arrange: (_mode: "edges" | "cascade", _index: number, _count: number) => undefined,
+    setMinimized: (_value: boolean) => undefined,
+  });
+  useLayoutEffect(() => {
+    arrangementControllerRef.current = {
+      arrange(mode, index, count) {
+        const availableWidth = Math.max(
+          minWidth,
+          viewport.width - viewportInsetLeft - viewportInsetRight,
+        );
+        const availableHeight = Math.max(
+          minHeight,
+          viewport.height - viewportInsetTop - viewportInsetBottom,
+        );
+        setMinimized(false);
+        if (mode === "edges") {
+          const columns = count > 1 ? 2 : 1;
+          const rows = Math.max(1, Math.ceil(count / columns));
+          const row = Math.floor(index / columns);
+          const slotHeight = availableHeight / rows;
+          const width = Math.min(
+            availableWidth,
+            maxWidth,
+            Math.max(minWidth, Math.min(420, availableWidth * 0.3)),
+          );
+          const height = Math.min(
+            maxHeight ?? availableHeight,
+            Math.max(minHeight, slotHeight - 10),
+          );
+          const right = index % columns === 1;
+          commitRect({
+            x: right
+              ? viewport.width - viewportInsetRight - width
+              : viewportInsetLeft,
+            y: viewportInsetTop + row * slotHeight,
+            width,
+            height,
+          }, "free");
+          return;
+        }
+        const width = Math.min(availableWidth, maxWidth, Math.max(minWidth, 620));
+        const height = Math.min(
+          availableHeight,
+          maxHeight ?? availableHeight,
+          Math.max(minHeight, 560),
+        );
+        const xRoom = Math.max(0, availableWidth - width);
+        const yRoom = Math.max(0, availableHeight - height);
+        const offset = count <= 1 ? 0 : index / (count - 1);
+        commitRect({
+          x: viewportInsetLeft + xRoom * offset,
+          y: viewportInsetTop + yRoom * offset,
+          width,
+          height,
+        }, "free");
+      },
+      setMinimized(value) {
+        setMinimized(value);
+      },
+    };
+  });
+  useLayoutEffect(() => {
+    if (!participatesInWorkspaceArrangement) return undefined;
+    return registerStudioFloatingSurfaceArrangementController(stackSurfaceId, {
+      arrange: (...args) => arrangementControllerRef.current.arrange(...args),
+      setMinimized: (value) => arrangementControllerRef.current.setMinimized(value),
+    });
+  }, [participatesInWorkspaceArrangement, stackSurfaceId]);
+
+  const displayedRect = minimized
+    ? {
+        ...committedRect,
+        y: committedLayout.dock === "bottom"
+          ? viewport.height - viewportInsetBottom - 40
+          : committedRect.y,
+        height: 40,
+      }
+    : committedRect;
+
   const style = {
-    left: committedRect.x,
-    top: committedRect.y,
-    width: committedRect.width,
-    height: committedRect.height,
-    zIndex,
+    left: displayedRect.x,
+    top: displayedRect.y,
+    width: displayedRect.width,
+    height: displayedRect.height,
+    zIndex: resolvedZIndex,
     transform: "translate3d(0, 0, 0)",
     willChange: dragging
       ? "transform"
@@ -594,6 +696,7 @@ export const StudioFloatingSurface = forwardRef<
       data-dock={committedLayout.dock}
       data-position-locked={committedLayout.positionLocked ? "true" : "false"}
       data-size-locked={committedLayout.sizeLocked ? "true" : "false"}
+      data-minimized={minimized ? "true" : "false"}
       data-dragging={dragging ? "true" : "false"}
       data-resizing={resizing ? "true" : "false"}
       className={cn(
@@ -632,6 +735,25 @@ export const StudioFloatingSurface = forwardRef<
         </button>
         {headerActions ? (
           <div className="flex shrink-0 items-stretch">{headerActions}</div>
+        ) : null}
+        {minimizable ? (
+          <button
+            type="button"
+            aria-label={`${label} ${minimized ? "펼치기" : "접기"}`}
+            title={minimized ? "내용 펼치기" : "제목줄만 남기기"}
+            aria-expanded={!minimized}
+            className={cn(
+              "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg",
+              STUDIO_TOUCH_TARGET,
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING,
+            )}
+            onClick={() => setMinimized((value) => !value)}
+          >
+            {minimized
+              ? <Maximize2 size={15} aria-hidden />
+              : <Minimize2 size={15} aria-hidden />}
+          </button>
         ) : null}
         <button
           ref={menuButtonRef}
@@ -779,11 +901,15 @@ export const StudioFloatingSurface = forwardRef<
         </div>
       ) : null}
 
-      <div className={cn("min-h-0 flex-1", contentClassName)}>
+      <div
+        hidden={minimized}
+        inert={minimized ? true : undefined}
+        className={cn("min-h-0 flex-1", contentClassName)}
+      >
         {children}
       </div>
 
-      {RESIZE_HANDLES.map((handle) => (
+      {!minimized ? RESIZE_HANDLES.map((handle) => (
         <button
           key={handle.edge}
           type="button"
@@ -805,7 +931,7 @@ export const StudioFloatingSurface = forwardRef<
           onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) =>
             beginPointerSession(event, "resize", handle.edge, handle.cursor)}
         />
-      ))}
+      )) : null}
     </div>
   );
 });

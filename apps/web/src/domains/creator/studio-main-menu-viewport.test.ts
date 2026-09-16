@@ -9,6 +9,7 @@ import {
   studioMainMenuCoordsEqual,
 } from "./studio-main-menu-viewport";
 import mainMenuSource from "./StudioMainMenu.tsx?raw";
+import floatingMenuSource from "./StudioMainMenuFloatingPanel.tsx?raw";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -156,12 +157,17 @@ describe("Studio menu-local focus reveal", () => {
     expect(menu.scrollTop).toBe(0);
   });
 
-  it("wires viewport sizing, keyboard reveal and IME boundaries into the actual menu", () => {
+  it("wires viewport sizing, movable window geometry, keyboard reveal and IME boundaries into the actual menu", () => {
     expect(mainMenuSource).toContain('from "./studio-main-menu-viewport"');
     expect(mainMenuSource).toContain('visualViewport?.addEventListener("resize", onReposition)');
     expect(mainMenuSource).toContain('visualViewport?.removeEventListener("scroll", onReposition)');
-    expect(mainMenuSource).toContain("maxWidth: coords.maxWidth");
-    expect(mainMenuSource).toContain('coords.side === "top" ? "translateY(-100%)"');
+    expect(mainMenuSource).toContain("StudioMainMenuFloatingPanel");
+    expect(floatingMenuSource).toContain("createStudioMainMenuFloatingLayout(coords, viewport, itemCount)");
+    expect(floatingMenuSource).toContain("Math.min(336, coords.maxWidth)");
+    expect(floatingMenuSource).toContain('coords.side === "top"');
+    expect(floatingMenuSource).toContain("<StudioFloatingSurface");
+    expect(floatingMenuSource).toContain("maxWidth={constraints.maxWidth}");
+    expect(floatingMenuSource).toContain('data-studio-main-menu-floating');
     expect(mainMenuSource).toContain("revealStudioMainMenuItem(itemRefs.current[nextIndex]");
     expect(mainMenuSource).toContain("event.nativeEvent.isComposing");
     expect(mainMenuSource).toContain('event.key === "ArrowUp" ? "last" : "first"');

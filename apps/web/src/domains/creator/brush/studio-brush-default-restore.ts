@@ -166,8 +166,8 @@ export function createStudioBuiltInBrushDefaultRestoreProfile(
         selection.brushDynamics ?? neutral.brushDynamics,
       ),
       stampTuning: defaultStampTuning(selection.runtimeBrushId),
-      // 기본값 복원은 브러시 id 의 조합으로 되돌린다 = 세트를 벗는다.
-      enginePrograms: null,
+      // V6 selections own an exact physical-program receipt; classic brushes own no override.
+      enginePrograms: selection.enginePrograms ?? null,
       stabilizer: neutral.stabilizer,
       stabilizerMode: neutral.stabilizerMode,
       postCorrection: neutral.postCorrection,

@@ -76,7 +76,7 @@ export function createCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOpt
   };
 }
 
-/** 장기 실행 API와 비상 serverless fallback이 같은 CORS 정책을 쓰게 하는 단일 진입점. */
+/** 모든 장기 실행 API runtime이 같은 CORS 정책을 쓰게 하는 단일 진입점. */
 export function configureCors(app: INestApplication, env: NodeJS.ProcessEnv = process.env): void {
   app.enableCors(createCorsOptions(env));
 }

@@ -8,6 +8,18 @@ const registrations = new Map<string, number>();
 const listeners = new Set<() => void>();
 let revision = 0;
 
+export type StudioFloatingSurfaceArrangement = "edges" | "cascade";
+
+export interface StudioFloatingSurfaceArrangementController {
+  readonly arrange: (
+    mode: StudioFloatingSurfaceArrangement,
+    index: number,
+    count: number,
+  ) => void;
+  readonly setMinimized: (minimized: boolean) => void;
+}
+const arrangementControllers = new Map<string, StudioFloatingSurfaceArrangementController>();
+
 function normalizeSurfaceId(surfaceId: string): string {
   const normalized = surfaceId.trim();
   return normalized.length > 0 && normalized.length <= 160
@@ -111,10 +123,43 @@ export function subscribeStudioFloatingSurfaceLayoutReset(
   return () => resetListeners.delete(listener);
 }
 
+export function registerStudioFloatingSurfaceArrangementController(
+  surfaceId: string,
+  controller: StudioFloatingSurfaceArrangementController,
+): () => void {
+  const id = normalizeSurfaceId(surfaceId);
+  const previous = arrangementControllers.get(id);
+  arrangementControllers.set(id, controller);
+  if (previous !== controller) publish();
+  return () => {
+    if (arrangementControllers.get(id) !== controller) return;
+    arrangementControllers.delete(id);
+    publish();
+  };
+}
+
+export function arrangeStudioFloatingSurfaces(
+  mode: StudioFloatingSurfaceArrangement,
+): void {
+  const entries = [...arrangementControllers.values()];
+  entries.forEach((controller, index) => controller.arrange(mode, index, entries.length));
+}
+
+export function setStudioFloatingSurfacesMinimized(minimized: boolean): void {
+  for (const controller of arrangementControllers.values()) {
+    controller.setMinimized(minimized);
+  }
+}
+
+export function studioFloatingSurfaceArrangementCount(): number {
+  return arrangementControllers.size;
+}
+
 /** Test-only reset; product code never needs to globally erase the visible window stack. */
 export function resetStudioFloatingSurfaceStackForTest(): void {
   order.length = 0;
   registrations.clear();
   resetListeners.clear();
+  arrangementControllers.clear();
   publish();
 }

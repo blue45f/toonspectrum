@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  arrangeStudioFloatingSurfaces,
   bringStudioFloatingSurfaceToFront,
   registerStudioFloatingSurface,
+  registerStudioFloatingSurfaceArrangementController,
   resetStudioFloatingSurfaceStackForTest,
+  setStudioFloatingSurfacesMinimized,
+  studioFloatingSurfaceArrangementCount,
   studioFloatingSurfaceZIndex,
   studioFloatingSurfaceStackSnapshot,
   subscribeStudioFloatingSurfaceStack,
@@ -61,6 +65,37 @@ describe("studio floating surface stack", () => {
     expect(studioFloatingSurfaceZIndex("surface-5")).toBe(50);
 
     for (const release of releases) release();
+  });
+});
+
+
+describe("floating surface arrangement controllers", () => {
+  it("arranges and minimizes registered windows in stable registration order", () => {
+    const calls: string[] = [];
+    const releaseA = registerStudioFloatingSurfaceArrangementController("a", {
+      arrange: (mode, index, count) => calls.push(`a:${mode}:${index}/${count}`),
+      setMinimized: (value) => calls.push(`a:min:${value}`),
+    });
+    const releaseB = registerStudioFloatingSurfaceArrangementController("b", {
+      arrange: (mode, index, count) => calls.push(`b:${mode}:${index}/${count}`),
+      setMinimized: (value) => calls.push(`b:min:${value}`),
+    });
+
+    expect(studioFloatingSurfaceArrangementCount()).toBe(2);
+    arrangeStudioFloatingSurfaces("edges");
+    setStudioFloatingSurfacesMinimized(true);
+    expect(calls).toEqual([
+      "a:edges:0/2",
+      "b:edges:1/2",
+      "a:min:true",
+      "b:min:true",
+    ]);
+
+    releaseA();
+    arrangeStudioFloatingSurfaces("cascade");
+    expect(calls.at(-1)).toBe("b:cascade:0/1");
+    expect(studioFloatingSurfaceArrangementCount()).toBe(1);
+    releaseB();
   });
 });
 

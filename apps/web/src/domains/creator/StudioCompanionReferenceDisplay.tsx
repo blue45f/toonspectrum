@@ -285,7 +285,7 @@ function stateCopy(state: ReferenceDisplayState): { title: string; detail: strin
     case "empty":
       return {
         title: "레퍼런스가 아직 없습니다",
-        detail: "기본 스튜디오의 레퍼런스 보드에 이미지를 추가하면 여기에 표시됩니다.",
+        detail: "기본 스튜디오의 레퍼런스 캔버스에 이미지를 추가하면 여기에 표시됩니다.",
       };
     case "unavailable":
       return {
@@ -304,7 +304,7 @@ function stateCopy(state: ReferenceDisplayState): { title: string; detail: strin
       };
     case "ready":
       return {
-        title: "레퍼런스 보드가 최신 상태입니다",
+        title: "레퍼런스 캔버스가 최신 상태입니다",
         detail: "스포이드로 합성본의 색을 기본 스튜디오에 보낼 수 있습니다.",
       };
   }
@@ -365,7 +365,7 @@ export function StudioCompanionReferenceDisplay({
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [pickerActive, setPickerActive] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
-  const [feedback, setFeedback] = useState("레퍼런스 전용 화면이 열렸습니다.");
+  const [feedback, setFeedback] = useState("분리 레퍼런스 캔버스가 열렸습니다.");
   const sendDemandControl = useEffectEvent(onControl);
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
@@ -525,7 +525,7 @@ export function StudioCompanionReferenceDisplay({
     setZoom(1);
     setZoomLabel("맞춤");
     setPan({ x: 0, y: 0 });
-    setFeedback("새 레퍼런스 화면을 맞춤 보기로 열었습니다.");
+    setFeedback("새 레퍼런스 캔버스를 맞춤 보기로 열었습니다.");
   }, [projection?.generation]);
 
   useEffect(() => {
@@ -1178,7 +1178,7 @@ export function StudioCompanionReferenceDisplay({
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 id={titleId} className="truncate text-sm font-semibold text-fg">
-            레퍼런스 전용 화면
+            분리 레퍼런스 캔버스
           </h2>
           <p id={helpId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
             <span className="[@media(pointer:coarse)]:hidden">
@@ -1282,7 +1282,7 @@ export function StudioCompanionReferenceDisplay({
       <button
         type="button"
         ref={viewportRef}
-        aria-label="합성된 레퍼런스 보드"
+        aria-label="합성된 레퍼런스 캔버스"
         aria-describedby={`${helpId} ${statusId}`}
         aria-keyshortcuts="0 + - I Escape Enter Space"
         onClick={handleClick}
@@ -1321,7 +1321,7 @@ export function StudioCompanionReferenceDisplay({
         {visiblePreview ? (
           <img
             src={visiblePreview.url}
-            alt="합성된 레퍼런스 보드 미리보기"
+            alt="합성된 레퍼런스 캔버스 미리보기"
             draggable={false}
             className={cn(
               "pointer-events-none absolute inset-0 size-full select-none object-contain",

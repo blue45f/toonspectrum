@@ -1,7 +1,6 @@
 # Render Blueprint — ToonSpectrum platform-neutral NestJS runtimes.
 # The production web authority is Cloudflare Static Assets + Worker. The full Core API
-# runs as an independent HTTPS origin; Vercel is retained only as a manually approved
-# emergency rollback and is not the normal HTTP, static, file, or realtime authority.
+# runs as an independent HTTPS origin. Retired Vercel runtimes are not part of the release path.
 services:
   - type: web
     name: toonspectrum-core-api
@@ -29,8 +28,6 @@ services:
         value: Asia/Seoul
       - key: CATALOG_INGEST_MODE
         value: "off"
-      - key: CATALOG_EAGER_INIT
-        value: "0"
       - key: API_CORS_ALLOWED_ORIGINS
         value: https://www.toonstudio.cloud,https://toonstudio.cloud
       - key: CANONICAL_HOST

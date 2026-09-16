@@ -45,7 +45,6 @@ export class CatalogPublicCacheInterceptor implements NestInterceptor {
       if (res.headersSent) return;
       res.setHeader("Cache-Control", NO_STORE);
       res.removeHeader("CDN-Cache-Control");
-      res.removeHeader("Vercel-CDN-Cache-Control");
     };
     noStore();
 

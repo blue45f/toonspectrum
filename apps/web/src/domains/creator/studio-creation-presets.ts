@@ -1,4 +1,5 @@
 import type { StudioProjectKind } from "./studio-project-library-store";
+import { STUDIO_WEBTOON_CANVAS_PRESETS } from "./studio-webtoon-canvas-presets";
 
 export interface StudioCreationPreset {
   readonly id: string;
@@ -7,9 +8,18 @@ export interface StudioCreationPreset {
   readonly height: number;
 }
 
+const WEBTOON_PLATFORM_CREATION_PRESETS = STUDIO_WEBTOON_CANVAS_PRESETS.map(
+  (preset): StudioCreationPreset => ({
+    id: preset.id,
+    kind: "webtoon",
+    width: preset.width,
+    height: preset.height,
+  }),
+);
+
 /** Creation-only dimensions. Existing documents are never resized by a workspace change. */
 export const STUDIO_CREATION_PRESETS: readonly StudioCreationPreset[] = [
-  { id: "webtoon-vertical", kind: "webtoon", width: 1080, height: 8000 },
+  ...WEBTOON_PLATFORM_CREATION_PRESETS,
   { id: "webtoon-four-cut", kind: "webtoon", width: 1080, height: 4320 },
   { id: "webtoon-page", kind: "webtoon", width: 1600, height: 2400 },
   { id: "illustration-portrait", kind: "illustration", width: 2048, height: 2560 },

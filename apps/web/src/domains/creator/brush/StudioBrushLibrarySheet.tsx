@@ -16,6 +16,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -39,8 +40,9 @@ import {
   isStudioDefaultQualityBrushCatalogId,
   STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
-  STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
-  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_LIBRARY_COUNTS,
+  STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -63,8 +65,10 @@ import {
   studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
+import { isStudioV6BrushCatalogId } from "./studio-brush-v6-id";
 import { STUDIO_BRUSH_LIBRARY_TABS } from "./studio-draw-ux";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
+import { StudioNextGenBrushPreview } from "./StudioNextGenBrushPreview";
 
 
 import type { StudioToolOperation } from "../studio-brush";
@@ -829,8 +833,8 @@ export function StudioBrushLibrarySheet({
   // SSOT totals — never hardcode historical counts. The drawer advertises the complete
   // non-quarantined inventory; replay-only quarantined identities remain resolvable but invisible.
   const operationCatalogCount = operation === "erase"
-    ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length
-    : STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
+    ? STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS.length
+    : STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS.length;
   const qualityFirstCatalogCount = operation === "erase"
     ? STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS.length
     : STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS.length;
@@ -917,13 +921,15 @@ export function StudioBrushLibrarySheet({
 
   const normalizedQuery = query.trim();
   const personalSearch = tab === "favorites" || tab === "recent";
-  const items = filterStudioBrushCatalogItems({
+  const favoriteIdSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+  const items = useMemo(() => filterStudioBrushCatalogItems({
     operation,
     category: tab,
     query: normalizedQuery,
     favoriteIds,
     recentIds,
-  });
+    includeV6: true,
+  }), [favoriteIds, normalizedQuery, operation, recentIds, tab]);
   const progressiveFilterKey = [
     operation,
     tab,
@@ -1171,7 +1177,7 @@ export function StudioBrushLibrarySheet({
           >
             {operation === "erase"
               ? `지우개 ${operationCatalogCount}종 · ${visibleItems.length}/${items.length}개 표시`
-              : `브러시 ${operationCatalogCount}종 · 품질 검증 ${qualityFirstCatalogCount}종 우선 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
+              : `브러시 ${operationCatalogCount}종 · 차세대 ${STUDIO_BRUSH_LIBRARY_COUNTS.v6}종 · 품질 검증 ${qualityFirstCatalogCount}종 우선 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1403,18 +1409,23 @@ export function StudioBrushLibrarySheet({
           >
             {visibleItems.map((item, itemIndex) => {
               const active = item.id === activeBrushId;
-              const fav = favoriteIds.includes(item.id);
+              const fav = favoriteIdSet.has(item.id);
               const kindLabel = studioBrushCatalogKindLabel(item);
               const qualityRepresentative = isStudioDefaultQualityBrushCatalogId(item.id);
-              const engineLaneLabel = resolveStudioBrushEngineLaneLabelKo(item.id);
-              const engineLane = studioBrushEngineLaneRowById(item.id);
+              const nextGen = isStudioV6BrushCatalogId(item.id);
+              const engineLaneLabel = nextGen
+                ? "V6 재질 엔진"
+                : resolveStudioBrushEngineLaneLabelKo(item.id);
+              const engineLane = nextGen ? null : studioBrushEngineLaneRowById(item.id);
               return (
                 <div
                   key={item.id}
-                  data-studio-brush-source={item.source}
-                  data-studio-brush-quality-tier={qualityRepresentative ? "verified" : "extended"}
+                  data-studio-brush-source={nextGen ? "v6" : item.source}
+                  data-studio-brush-quality-tier={nextGen
+                    ? "nextgen"
+                    : qualityRepresentative ? "verified" : "extended"}
                   data-studio-brush-kind={item.mediaGroup}
-                  data-studio-brush-engine-lane={engineLane?.lane}
+                  data-studio-brush-engine-lane={nextGen ? "v6-material" : engineLane?.lane}
                   className={cn(
                     "group relative flex border [content-visibility:auto]",
                     STUDIO_EASE,
@@ -1460,7 +1471,14 @@ export function StudioBrushLibrarySheet({
                       STUDIO_FOCUS_RING
                     )}
                   >
-                    {viewMode === "text" ? null : (
+                    {viewMode === "text" ? null : nextGen ? (
+                      <StudioNextGenBrushPreview
+                        catalogId={item.id}
+                        active={active}
+                        compact={compact}
+                        density={viewMode}
+                      />
+                    ) : (
                       <LargeBrushPreview
                         item={item}
                         active={active}
@@ -1507,6 +1525,10 @@ export function StudioBrushLibrarySheet({
                       </span>
                       {pendingSelectionId === item.id ? (
                         <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : nextGen ? (
+                        <span className="ml-auto shrink-0 rounded-full bg-accent/20 px-1.5 py-0.5 text-[0.58rem] font-black text-accent" title="V6 재질 엔진">
+                          V6
+                        </span>
                       ) : item.source === "pro" ? (
                         <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.58rem] font-black text-accent">
                           PRO

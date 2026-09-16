@@ -32,8 +32,8 @@ export function brushLabDocumentFromSelection(selection: StudioBrushCatalogSelec
   const { snapshot } = sanitizeBrushSnapshot({
     ...previous, ...profile.values, brushId: selection.runtimeBrushId,
     color: previous.color, sourcePresetId: selection.catalogId, sourcePresetName: selection.catalogName,
-    // A new carrier must never inherit a different carrier's override programs.
-    enginePrograms: null,
+    // A new carrier never inherits another carrier, but V6 selections retain their own receipt.
+    enginePrograms: selection.enginePrograms ?? null,
   });
   return { carrierId: selection.catalogId, name: selection.catalogName, snapshot };
 }

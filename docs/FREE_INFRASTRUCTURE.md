@@ -31,7 +31,7 @@
 | 원본·DB 백업 | Backblaze B2 + 암호화 로컬 사본 | 주 공급자와 실패 도메인을 분리한다. |
 | 개인 프로젝트 | OPFS/로컬 파일/BYOS | 운영자 중앙 저장소를 무제한 개인 드라이브로 사용하지 않는다. |
 | 이메일 | Resend | 인증·보안·거래 메일을 우선하고 알림은 digest한다. |
-| Core NestJS API | Render `toonspectrum-core-api` | scale-to-zero full authority이며 Vercel은 비상 rollback만 남긴다. |
+| Core NestJS API | Render `toonspectrum-core-api` | scale-to-zero full authority이며 수동 release만 허용한다. |
 | AI | 사용자 키 또는 로컬 모델 | 운영자 AI key를 기본 경로로 사용하지 않는다. |
 
 ## 현재 구현된 전환 경계
@@ -45,14 +45,13 @@
 
 ### 보안·캐시 헤더 보존
 
-`apps/web/public/_headers`와 Worker 동적 응답은 같은 보안·캐시 계약을 사용한다. 정적 호스트를
-바꾼다는 이유로 CSP, COOP/COEP, HSTS, immutable cache 계약을 제거하지 않는다. `vercel.json`은
-이 계약의 권위가 아니라 비상 rollback 호환 구성이다.
+`apps/web/public/_headers`와 Worker 동적 응답은 `config/http-response-headers.json`의 같은 보안·캐시
+계약을 사용한다. 정적 호스트를 바꾼다는 이유로 CSP, COOP/COEP, HSTS, immutable cache 계약을
+제거하지 않는다.
 
 ### 자동 배포 차단
 
-- `vercel.json`은 모든 Git branch 배포를 비활성화하고 Vercel은 비상 prebuilt rollback으로만 유지한다.
-- 기존 `vercel:deploy`, `vercel:preview` 명령은 실패한다.
+- Vercel 런타임·설정·배포 workflow는 제거되었고 아키텍처 검증이 재도입을 거부한다.
 - Render Core API와 Cloudflare 운영 배포는 모두 수동이며 검토된 `main` SHA를 사용한다.
 - Cloudflare 운영 배포는 clean worktree와 명시적 approval 문자열이 모두 있어야 한다.
 - PR과 `main` 병합 자체는 어느 공급자에도 배포를 만들지 않는다.

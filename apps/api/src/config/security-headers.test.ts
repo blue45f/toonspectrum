@@ -51,7 +51,7 @@ describe("API security headers", () => {
     );
   });
 
-  it("also exposes an explicit helper for serverless response tests", () => {
+  it("also exposes an explicit helper for direct response tests", () => {
     const setHeader = vi.fn();
     applyApiSecurityHeaders({ setHeader } as never, { NODE_ENV: "test" });
     expect(setHeader).toHaveBeenCalledWith(

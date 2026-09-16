@@ -1,7 +1,7 @@
 {
   "control.language.label": "Language",
-  "control.language.group.translated": "Translated languages",
-  "control.language.group.englishBase": "Shown in English (translation pending)",
+  "control.language.group.translated": "High-coverage translations",
+  "control.language.group.englishBase": "Automatic translation · English fallback",
   "control.sound.enable": "Enable sound effects",
   "control.sound.disable": "Disable sound effects",
   "control.theme.dark": "Switch to light mode",

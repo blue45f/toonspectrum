@@ -186,7 +186,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     fireEvent.click(viewport, { button: 0, clientX: 150, clientY: 75 });
     expect(onControl).toHaveBeenNthCalledWith(2, {
@@ -300,7 +300,7 @@ describe("StudioCompanionReferenceDisplay", () => {
   it("rejects clicks in the letterbox and never floods controls during local panning", () => {
     const { onControl } = renderDisplay();
     fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
 
     // A 1:2 image in a 1:1 viewport occupies x=75..225; x=30 is letterbox.
@@ -317,7 +317,7 @@ describe("StudioCompanionReferenceDisplay", () => {
 
   it("lets touch users pan with one finger when the picker is off", () => {
     const { container } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     fireEvent.pointerDown(viewport, {
       button: 0,
       pointerId: 21,
@@ -347,7 +347,7 @@ describe("StudioCompanionReferenceDisplay", () => {
   it("pinch-zooms around the moving centroid and transitions to one-finger pan", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const { container } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     const setPointerCapture = vi.fn();
     const releasePointerCapture = vi.fn();
@@ -421,7 +421,7 @@ describe("StudioCompanionReferenceDisplay", () => {
   it("blocks picker sampling during pinch and safely ignores a third or zero-distance pointer", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const { container, onControl } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
 
@@ -518,7 +518,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     const cancelAnimationFrame = vi.fn();
     vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
     const view = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     const releasePointerCapture = vi.fn();
     Object.assign(viewport, {
@@ -568,7 +568,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     expect(view.container.querySelector("img")?.style.transform)
       .toBe("translate3d(0px, 0px, 0) scale(1)");
 
-    const replacementViewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const replacementViewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(replacementViewport);
     fireEvent.pointerDown(replacementViewport, {
       button: 0,
@@ -639,7 +639,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const onControl = vi.fn();
     const { container } = renderDisplay({ onControl });
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     const wheel = new WheelEvent("wheel", {
       bubbles: true,
@@ -669,7 +669,7 @@ describe("StudioCompanionReferenceDisplay", () => {
 
   it("allows page scrolling while the reference surface is empty or disconnected", () => {
     const view = renderDisplay({ connectionStatus: "disconnected" });
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
 
     expect((viewport as HTMLButtonElement).style.touchAction).toBe("pan-y");
@@ -708,7 +708,7 @@ describe("StudioCompanionReferenceDisplay", () => {
       />
     );
     expect((screen.getByRole("button", {
-      name: "합성된 레퍼런스 보드",
+      name: "합성된 레퍼런스 캔버스",
     }) as HTMLButtonElement).style.touchAction).toBe("pan-y");
   });
 
@@ -721,7 +721,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
     const { container } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
 
     fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -20 });
@@ -738,7 +738,7 @@ describe("StudioCompanionReferenceDisplay", () => {
   it("handles Ctrl/Cmd wheel locally and keeps zoom inside the 25%–800% limits", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const { container } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     const ctrlWheel = new WheelEvent("wheel", {
       bubbles: true,
@@ -781,7 +781,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     vi.useFakeTimers();
     vi.stubGlobal("requestAnimationFrame", undefined);
     renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
 
     fireEvent.wheel(viewport, { clientX: 150, clientY: 150, deltaY: -40 });
@@ -797,7 +797,7 @@ describe("StudioCompanionReferenceDisplay", () => {
   it("toggles fit and original 100% on double click without stealing picker or touch gestures", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const { container, onControl } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport, 400, 400);
 
     fireEvent.doubleClick(viewport, { button: 0, clientX: 200, clientY: 200 });
@@ -841,7 +841,7 @@ describe("StudioCompanionReferenceDisplay", () => {
     vi.stubGlobal("requestAnimationFrame", undefined);
     const { onControl } = renderDisplay();
     fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -100 });
     fireEvent.click(viewport, { button: 0, clientX: 10, clientY: 150 });
@@ -878,7 +878,7 @@ describe("StudioCompanionReferenceDisplay", () => {
 
   it("supports fit, zoom, eyedropper, Escape, Space-pan, and center-pick shortcuts", () => {
     const { onControl } = renderDisplay();
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport, 400, 400);
 
     fireEvent.keyDown(viewport, { key: "i", code: "KeyI" });
@@ -917,7 +917,7 @@ describe("StudioCompanionReferenceDisplay", () => {
 
     expect(screen.queryByLabelText(/최근 선택 색상/u)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     setViewportBounds(viewport);
     fireEvent.click(viewport, { button: 0, clientX: 150, clientY: 150 });
     view.rerender(
@@ -938,12 +938,12 @@ describe("StudioCompanionReferenceDisplay", () => {
 
     const toolbar = screen.getByRole("toolbar", { name: "레퍼런스 보기 도구" });
     expect(toolbar).toBeTruthy();
-    expect(screen.getByRole("button", { name: "합성된 레퍼런스 보드" }).getAttribute("aria-keyshortcuts"))
+    expect(screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" }).getAttribute("aria-keyshortcuts"))
       .toBe("0 + - I Escape Enter Space");
     expect(screen.getByText(/두 손가락 확대 · 한 손가락 이동/u).className)
       .toContain("pointer:coarse");
     expect((screen.getByRole("button", {
-      name: "합성된 레퍼런스 보드",
+      name: "합성된 레퍼런스 캔버스",
     }) as HTMLButtonElement).style.touchAction).toBe("none");
     for (const button of within(toolbar).getAllByRole("button")) {
       expect(button.className).toContain("min-h-11");
@@ -958,6 +958,6 @@ describe("StudioCompanionReferenceDisplay", () => {
     expect(screen.getByLabelText("최근 선택 색상 #32A6D8")).toBeTruthy();
     expect(container.textContent).not.toMatch(/item[-_ ]?id|filename|source url|asset[-_ ]?id/iu);
     expect(container.textContent).not.toContain("blob:reference-composite");
-    expect(container.querySelector("img")?.getAttribute("alt")).toBe("합성된 레퍼런스 보드 미리보기");
+    expect(container.querySelector("img")?.getAttribute("alt")).toBe("합성된 레퍼런스 캔버스 미리보기");
   });
 });

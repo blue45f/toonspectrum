@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { searchSiteDirectory, type SiteDirectoryEntry } from "./site-directory-search";
+import { filterSiteDirectory, searchSiteDirectory, type SiteDirectoryEntry } from "./site-directory-search";
 
 const entries: SiteDirectoryEntry[] = [
   { href: "/learn/records", label: { ko: "학습 기록", en: "Learning records" }, description: { ko: "학습 진행 백업 복원", en: "Back up progress" } },
@@ -21,5 +21,26 @@ describe("local directory search", () => {
   });
   it.each(["", "  ", "unknown-menu-xyz"])("handles empty or unmatched input %s", (query) => {
     expect(searchSiteDirectory(entries, query)).toEqual([]);
+  });
+});
+
+
+describe("directory metadata filters", () => {
+  it("filters by product, maturity and access without a text query", () => {
+    const richerEntries: SiteDirectoryEntry[] = [
+      ...entries,
+      { href: "/studio/bg3d", label: { ko: "3D 배경", en: "3D backgrounds" }, description: { ko: "장면", en: "Scenes" } },
+      { href: "/privacy", label: { ko: "개인정보", en: "Privacy" }, description: { ko: "정책", en: "Policy" } },
+    ];
+    expect(filterSiteDirectory(richerEntries, "", { product: "studio", maturity: "beta" }).map((item) => item.href)).toEqual(["/studio/bg3d"]);
+    expect(filterSiteDirectory(richerEntries, "", { product: "docs" }).map((item) => item.href)).toEqual(["/support", "/privacy"]);
+  });
+
+  it("normalizes aliases and supports a favorites-only view", () => {
+    const aliased: SiteDirectoryEntry[] = [
+      { href: "/publishing", label: { ko: "출판", en: "Publishing" }, description: { ko: "게시", en: "Publish" } },
+      { href: "/ranking", label: { ko: "랭킹", en: "Ranking" }, description: { ko: "순위", en: "Ranks" } },
+    ];
+    expect(filterSiteDirectory(aliased, "", { favoritesOnly: true, favorites: ["/studio/publish"] }).map((item) => item.href)).toEqual(["/studio/publish"]);
   });
 });

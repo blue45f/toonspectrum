@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Ink creative motifs</title>
+  <desc id="desc">Expressive brush stroke, ink bottle and hatched comic panel.</desc>
+  <defs>
+    <linearGradient id="i-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#160f0d"/><stop offset="1" stop-color="#2b1a15"/></linearGradient>
+    <linearGradient id="i-accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9b67"/><stop offset="1" stop-color="#ef5d3e"/></linearGradient>
+    <filter id="i-shadow" x="-35%" y="-35%" width="170%" height="190%"><feDropShadow dy="18" stdDeviation="13" flood-color="#050302" flood-opacity=".55"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="36" fill="url(#i-bg)"/>
+    <path d="M43 222c72-105 144-128 216-77 59 42 83 16 108-47-8 97-62 160-155 154-86-6-111 30-150 92 8-51 7-85-19-122Z" fill="#050505" filter="url(#i-shadow)"/>
+    <path d="M64 249c69-85 136-92 195-52" fill="none" stroke="url(#i-accent)" stroke-width="18" stroke-linecap="round"/>
+    <g fill="#050505"><ellipse cx="79" cy="127" rx="19" ry="45" transform="rotate(-26 79 127)"/><ellipse cx="315" cy="300" rx="16" ry="37" transform="rotate(24 315 300)"/><circle cx="345" cy="210" r="11"/></g>
+    <path d="m296 68 44 39-39 51-47-16 10-45Z" fill="#f7eadc"/><path d="m264 139 50-46" stroke="#1b1110" stroke-width="7"/><circle cx="315" cy="94" r="7" fill="#1b1110"/>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="36" fill="#1a1210"/>
+    <ellipse cx="201" cy="335" rx="137" ry="29" fill="#080504"/>
+    <g filter="url(#i-shadow)"><path d="M111 140h178l29 168c4 25-14 45-39 45H121c-25 0-43-20-39-45Z" fill="#080808" stroke="#5e3a2d" stroke-width="8"/><rect x="127" y="89" width="146" height="70" rx="17" fill="#3b211a"/><rect x="153" y="61" width="94" height="45" rx="12" fill="#1b1110"/></g>
+    <path d="M108 256c59-32 124-36 185-10" fill="none" stroke="#ed6e48" stroke-width="13" stroke-linecap="round" opacity=".8"/>
+    <g transform="rotate(25 306 161)"><rect x="294" y="55" width="25" height="223" rx="12" fill="#f2d8bd"/><path d="m294 55 13-38 12 38Z" fill="#13100f"/><rect x="294" y="178" width="25" height="100" rx="12" fill="#b84d34"/></g>
+    <circle cx="74" cy="74" r="9" fill="#f28b62"/><circle cx="329" cy="316" r="6" fill="#f28b62"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="36" fill="#efe4d8"/>
+    <g transform="translate(42 44) rotate(-3 158 154)" filter="url(#i-shadow)"><rect width="316" height="308" rx="18" fill="#fffaf3" stroke="#211816" stroke-width="8"/><rect x="22" y="22" width="126" height="116" fill="#211816"/><rect x="168" y="22" width="126" height="116" fill="#d76a49"/><rect x="22" y="158" width="272" height="128" fill="#f5eadf" stroke="#211816" stroke-width="6"/>
+      <path d="m35 125 102-90M46 139 148 49m35 75 96-86m-94 101 96-86" stroke="#fff8ee" stroke-width="5" opacity=".52"/>
+      <path d="M56 249c42-56 86-65 132-30 31 24 55 22 83-2" fill="none" stroke="#211816" stroke-width="15" stroke-linecap="round"/>
+      <path d="M205 59h57c11 0 20 9 20 20v8c0 11-9 20-20 20h-19l-14 13 2-13h-26c-11 0-20-9-20-20v-8c0-11 9-20 20-20Z" fill="#fff6e7"/>
+    </g>
+  </g>
+</svg>

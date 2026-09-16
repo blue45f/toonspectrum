@@ -252,6 +252,25 @@ afterEach(() => {
 });
 
 describe("StudioReferencePanel controlled reference board", () => {
+  it("opens the synchronized reference canvas in a dedicated window", () => {
+    const onOpenDetached = vi.fn();
+    render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={vi.fn()}
+        onOpenDetached={onOpenDetached}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "레퍼런스 캔버스를 별도 창으로 열기",
+    }));
+
+    expect(onOpenDetached).toHaveBeenCalledOnce();
+  });
+
   it("hydrates its layout from SQLite and persists keyboard layout changes", async () => {
     const preferences = createReferencePreferencesHarness(serializeReferencePanelSettings({
       x: 144,
@@ -271,7 +290,7 @@ describe("StudioReferencePanel controlled reference board", () => {
       />
     );
 
-    const panel = await screen.findByRole("region", { name: "포즈 참고 보드" });
+    const panel = await screen.findByRole("region", { name: "레퍼런스 캔버스" });
     await waitFor(() => {
       expect(panel.style.left).toBe("144px");
       expect(panel.style.width).toBe("420px");
@@ -303,7 +322,7 @@ describe("StudioReferencePanel controlled reference board", () => {
       />
     );
 
-    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    const panel = screen.getByRole("region", { name: "레퍼런스 캔버스" });
     fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
       key: "ArrowLeft",
     });
@@ -342,7 +361,7 @@ describe("StudioReferencePanel controlled reference board", () => {
         acquirePreferences={preferences.acquire}
       />
     );
-    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    const panel = screen.getByRole("region", { name: "레퍼런스 캔버스" });
     await waitFor(() => {
       expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
     });
@@ -371,7 +390,7 @@ describe("StudioReferencePanel controlled reference board", () => {
         acquirePreferences={preferences.acquire}
       />
     );
-    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    const panel = screen.getByRole("region", { name: "레퍼런스 캔버스" });
     await waitFor(() => {
       expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
     });
@@ -409,7 +428,7 @@ describe("StudioReferencePanel controlled reference board", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByRole("region", { name: "포즈 참고 보드" })
+        expect(screen.getByRole("region", { name: "레퍼런스 캔버스" })
           .getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
       });
       await new Promise((resolve) => window.setTimeout(resolve, 220));
@@ -434,7 +453,7 @@ describe("StudioReferencePanel controlled reference board", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
-    const addAsset = await screen.findByRole("button", { name: "동작 A 보드에 추가" });
+    const addAsset = await screen.findByRole("button", { name: "동작 A 캔버스에 추가" });
     fireEvent.click(addAsset);
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1));
     await waitFor(() => expect((addAsset as HTMLButtonElement).disabled).toBe(false));
@@ -465,7 +484,7 @@ describe("StudioReferencePanel controlled reference board", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
-    fireEvent.click(await screen.findByRole("button", { name: "동작 A 보드에 추가" }));
+    fireEvent.click(await screen.findByRole("button", { name: "동작 A 캔버스에 추가" }));
     await waitFor(() => expect(assetLibraryMock.ensureStudioAssetContentHash).toHaveBeenCalledOnce());
 
     view.rerender(
@@ -844,6 +863,77 @@ describe("StudioReferencePanel controlled reference board", () => {
     fireEvent.pointerUp(item, { pointerId: 7, clientX: 90, clientY: 60 });
     expect(onCommit).toHaveBeenCalledOnce();
     expect(onCommit.mock.calls[0]?.[0].items[0]?.view).toMatchObject({ centerX: 0.7, centerY: 0.6 });
+  });
+
+  it("previews direct scale and rotation handles and commits each gesture once", async () => {
+    const onCommit = vi.fn();
+    const { container } = render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([makeItem("ref-handles")])}
+        onCommit={onCommit}
+      />
+    );
+    const item = await screen.findByRole("button", { name: "동작 A 이동 및 선택" });
+    const canvas = screen.getByTestId("reference-board-canvas");
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 100,
+      width: 200,
+      height: 100,
+      toJSON: () => ({}),
+    });
+
+    const scale = container.querySelector<HTMLElement>('[data-reference-transform-handle="scale"]');
+    expect(scale).toBeTruthy();
+    const initialWidth = Number.parseFloat(item.style.width);
+    fireEvent.pointerDown(scale!, { pointerId: 31, button: 0, clientX: 150, clientY: 50 });
+    fireEvent.pointerMove(scale!, { pointerId: 31, clientX: 200, clientY: 50 });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(Number.parseFloat(item.style.width)).toBeCloseTo(initialWidth * 2, 5);
+    fireEvent.pointerUp(scale!, { pointerId: 31, clientX: 200, clientY: 50 });
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(onCommit.mock.calls[0]?.[0].items[0]?.view.zoom).toBeCloseTo(2, 5);
+
+    const rotate = container.querySelector<HTMLElement>('[data-reference-transform-handle="rotate"]');
+    expect(rotate).toBeTruthy();
+    fireEvent.pointerDown(rotate!, { pointerId: 32, button: 0, clientX: 150, clientY: 50 });
+    fireEvent.pointerMove(rotate!, { pointerId: 32, clientX: 100, clientY: 100, shiftKey: true });
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(item.style.transform).toContain("rotate(90deg)");
+    fireEvent.pointerUp(rotate!, { pointerId: 32, clientX: 100, clientY: 100, shiftKey: true });
+    expect(onCommit).toHaveBeenCalledTimes(2);
+    expect(onCommit.mock.calls[1]?.[0].items[0]?.view.rotationDeg).toBe(90);
+  });
+
+  it("auto-arranges overlapping references into a centered comparison layout", async () => {
+    const onCommit = vi.fn();
+    const first = makeItem("ref-arrange-a");
+    const second = {
+      ...makeItem("ref-arrange-b", HASH_B, ASSET_B.id, ASSET_B.name),
+      view: {
+        ...makeItem("ref-arrange-b", HASH_B, ASSET_B.id, ASSET_B.name).view,
+        rotationDeg: 37,
+      },
+    };
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([first, second])}
+        onCommit={onCommit}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "레퍼런스 이미지 자동 정돈" }));
+
+    expect(onCommit).toHaveBeenCalledOnce();
+    const arranged = onCommit.mock.calls[0]?.[0] as StudioReferenceBoardDocument;
+    expect(arranged.items[0]?.view.centerX).not.toBe(arranged.items[1]?.view.centerX);
+    expect(arranged.items.every((candidate) => candidate.view.rotationDeg === 0)).toBe(true);
+    expect(arranged.items.every((candidate) => candidate.view.zoom <= 1)).toBe(true);
+    expect(screen.getByText("레퍼런스를 한눈에 비교할 수 있도록 정돈했습니다.")).toBeTruthy();
   });
 
   it("rolls a cancelled item drag back without creating a document commit", async () => {

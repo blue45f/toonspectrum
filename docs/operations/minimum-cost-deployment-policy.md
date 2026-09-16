@@ -13,7 +13,6 @@
 | Core API | Render `toonspectrum-core-api` | `API_RUNTIME_ROLE=full`, 수동 release, scale-to-zero. |
 | 임시 실시간 조정 | Cloudflare Durable Objects | presence·cursor·comment·signaling. |
 | PostgreSQL 원장 | Neon/호환 PostgreSQL | migration은 별도 승인형 single writer. |
-| Vercel | 비상 prebuilt rollback | 정상 배포·정적 제공·Core API 권위가 아니다. |
 
 ## 변하지 않는 기본 원칙
 
@@ -74,17 +73,12 @@ pnpm run cloudflare:static:deploy
   `LARGE_ASSET_ORIGIN`이 비어 있으면 Core API를 파일 서버처럼 깨우지 않는다.
 - 운영 배포는 검토된 `main`, clean worktree, 명시적 approval 문자열이 모두 필요하다.
 
-## Vercel 비상 롤백
+## Vercel 제거 상태
 
-`.github/workflows/deploy-vercel.yml`은 정상 릴리스 경로가 아니다. Cloudflare 또는 Render 전환에서
-복구할 수 없는 운영 장애가 있고 사용자가 별도로 승인한 경우에만 current-main ancestor의 검증된
-prebuilt 산출물을 올린다.
-
-- Vercel Git 연결과 모든 branch 자동 배포는 계속 비활성이다.
-- `pnpm vercel:deploy`, `pnpm vercel:preview`는 실패한다.
-- Preview, Deploy Hook, dashboard source rebuild, 자동 재시도는 금지한다.
-- `origin.toonstudio.cloud`는 필요 시 롤백 확인에 사용할 수 있지만 정상 Worker origin으로 사용하지 않는다.
-- 안정화 후 Vercel project·DNS fallback 삭제는 별도 운영 변경으로 수행한다.
+저장소의 Vercel 런타임, 서버리스 진입점, `vercel.json`, GitHub 배포 workflow와 관련 검증 코드는
+제거되어 정상 배포나 비상 롤백에 사용되지 않는다. Cloudflare Static Assets/Worker와 Render의
+직전 검증 version이 각각의 롤백 단위다. Vercel 프로젝트, custom domain 연결, 팀 플랜과 잔여
+배포 삭제는 코드 변경과 분리한 운영 작업으로 수행한다.
 
 ## 실패·롤백
 

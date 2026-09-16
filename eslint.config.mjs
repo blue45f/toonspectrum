@@ -15,7 +15,6 @@ export default defineConfig(
     '**/build/**',
     '**/coverage/**',
     '**/node_modules/**',
-    '**/.vercel/**',
     '**/*.d.ts',
     '**/*.tsbuildinfo',
     '**/*.config.{js,mjs,cjs,ts}',
@@ -183,12 +182,6 @@ export default defineConfig(
   {
     files: ['scripts/**/*.{ts,tsx,mts,cts}'],
     languageOptions: { globals: globals.node },
-  },
-
-  {
-    files: ['apps/api/og-title-files.cjs', 'scripts/build-og-title-shards.cjs'],
-    ...js.configs.recommended,
-    languageOptions: { sourceType: 'commonjs', globals: globals.node },
   },
 
   // JS/MJS(스크립트·SW 등) — TS 파서 밖이라 js.recommended + Node globals 로 별도 처리.

@@ -32,7 +32,6 @@ const FORBIDDEN_PATH_RULES = Object.freeze([
   /^deploy\//u,
   /^scripts\//u,
   /^tools\//u,
-  /^vercel\.json$/u,
   /^(?:vite|vitest|playwright|eslint|postcss|tailwind|commitlint|turbo|tsconfig)(?:\.|$)/u,
   /^apps\/api\/src\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
   /^lib\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,

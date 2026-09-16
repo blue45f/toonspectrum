@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Starlight creative motifs</title>
+  <desc id="desc">Moon window, constellation map and glowing night canvas.</desc>
+  <defs>
+    <linearGradient id="s-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#121634"/><stop offset=".55" stop-color="#23204e"/><stop offset="1" stop-color="#382b65"/></linearGradient>
+    <linearGradient id="s-glow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#77e7ff"/><stop offset=".5" stop-color="#9f9cff"/><stop offset="1" stop-color="#f0a7ff"/></linearGradient>
+    <radialGradient id="s-moon"><stop stop-color="#fffbd9"/><stop offset="1" stop-color="#d8e8ff"/></radialGradient>
+    <filter id="s-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dy="0" stdDeviation="16" flood-color="#7abfff" flood-opacity=".48"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="48" fill="url(#s-bg)"/>
+    <rect x="63" y="47" width="274" height="289" rx="137" fill="#0b1028" stroke="#7b80bd" stroke-width="7"/>
+    <circle cx="200" cy="170" r="88" fill="url(#s-moon)" filter="url(#s-shadow)"/>
+    <circle cx="231" cy="140" r="88" fill="#111633"/>
+    <path d="M82 254c77-37 162-31 236 16v66H82Z" fill="#26305c"/>
+    <path d="M81 252h238M200 48v288" stroke="#7b80bd" stroke-width="6" opacity=".7"/>
+    <g fill="#f8f1a8"><circle cx="103" cy="91" r="4"/><circle cx="302" cy="87" r="5"/><circle cx="95" cy="193" r="3"/><circle cx="313" cy="222" r="4"/></g>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="48" fill="#11152f"/>
+    <circle cx="200" cy="200" r="145" fill="#1b2146" stroke="#59639a" stroke-width="3"/>
+    <g fill="none" stroke="#727eb8" stroke-width="2" opacity=".55"><circle cx="200" cy="200" r="112"/><circle cx="200" cy="200" r="72"/><path d="M55 200h290M200 55v290M98 98l204 204M302 98 98 302"/></g>
+    <path d="m89 250 65-121 68 58 70-93 35 137" fill="none" stroke="url(#s-glow)" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 10"/>
+    <g fill="#c9d7ff" filter="url(#s-shadow)"><circle cx="89" cy="250" r="7"/><circle cx="154" cy="129" r="8"/><circle cx="222" cy="187" r="6"/><circle cx="292" cy="94" r="9"/><circle cx="327" cy="231" r="7"/></g>
+    <path d="m193 181 8 20 20 8-20 8-8 20-8-20-20-8 20-8Z" fill="#fff5af"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="48" fill="url(#s-bg)"/>
+    <ellipse cx="203" cy="340" rx="146" ry="26" fill="#080b20"/>
+    <g filter="url(#s-shadow)"><rect x="49" y="64" width="302" height="230" rx="28" fill="#111832" stroke="#7584d5" stroke-width="6"/><rect x="70" y="84" width="260" height="188" rx="18" fill="#1b2853"/></g>
+    <path d="M78 236c52-50 99-44 136-93 34-44 67-43 108-25v154H78Z" fill="url(#s-glow)" opacity=".8"/>
+    <path d="M90 225c43-32 83-28 118-64 38-40 74-48 111-28" fill="none" stroke="#fff2c4" stroke-width="8" stroke-linecap="round"/>
+    <rect x="181" y="294" width="42" height="34" rx="8" fill="#6976b6"/><rect x="132" y="326" width="140" height="16" rx="8" fill="#49558f"/>
+    <g fill="#eef2ff"><circle cx="99" cy="106" r="4"/><circle cx="288" cy="112" r="3"/><circle cx="309" cy="216" r="5"/></g>
+  </g>
+</svg>

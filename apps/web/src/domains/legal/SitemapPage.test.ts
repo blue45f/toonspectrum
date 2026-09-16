@@ -31,11 +31,19 @@ const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
 ]);
 
 // Legacy URLs render the same public pages; the directory must link to canonical URLs.
-const LEGACY_PUBLIC_ALIASES = new Map([
+const LEGACY_SHARED_PAGE_ALIASES = new Map([
   ["/create", "/showcase"],
   ["/create/challenges", "/showcase/challenges"],
   ["/create/promo", "/showcase/promo"],
 ]);
+
+const LEGACY_REDIRECT_ALIASES = new Map([
+  ["/brush-lab", "/studio/assets/brushes/new"],
+  ["/music", "/studio/assets/audio"],
+  ["/publishing", "/studio/publish"],
+]);
+
+const canonicalDirectoryPath = (href: string) => LEGACY_SHARED_PAGE_ALIASES.get(href) ?? LEGACY_REDIRECT_ALIASES.get(href) ?? href;
 
 const NESTED_USER_FACING_DESTINATIONS = [
   "/learn",
@@ -93,13 +101,14 @@ describe("site directory experience contracts", () => {
   it("uses the same purpose-based navigation model as the global site chrome", () => {
     expect(sitemapSource).toContain("SITE_NAVIGATION_GROUPS");
     expect(sitemapSource).toContain("SITE_UTILITY_NAVIGATION");
-    expect(sitemapSource).toContain("SITE_NAVIGATION_ITEMS.me");
+    expect(navigationSource).toContain("SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me]");
+    expect(sitemapSource).not.toContain("SITE_NAVIGATION_ITEMS.me");
     expect(sitemapSource).toContain("siteNavigationText");
   });
 
   it("keeps every standalone user-facing route reachable from the directory", () => {
     const expectedDestinations = new Set([
-      ...staticUserFacingRoutes().map((href) => LEGACY_PUBLIC_ALIASES.get(href) ?? href),
+      ...staticUserFacingRoutes().map(canonicalDirectoryPath),
       ...NESTED_USER_FACING_DESTINATIONS,
     ]);
 
@@ -112,9 +121,18 @@ describe("site directory experience contracts", () => {
     const routes = readFileSync("apps/web/src/app/routes/groups/creator.routes.tsx", "utf8");
     const pageByPath = new Map([...routes.matchAll(/path: "([^"]+)", element: <(\w+) \/>/gu)]
       .map((match) => [match[1], match[2]]));
-    for (const [legacy, canonical] of LEGACY_PUBLIC_ALIASES) {
+    for (const [legacy, canonical] of LEGACY_SHARED_PAGE_ALIASES) {
       expect(pageByPath.get(legacy)).toBeTruthy();
       expect(pageByPath.get(legacy)).toBe(pageByPath.get(canonical));
+      expect(directorySource).toContain(`"${canonical}"`);
+      expect(extendedDestinationHrefs()).not.toContain(legacy);
+    }
+  });
+
+  it("keeps redirect aliases out of the directory while preserving their canonical targets", () => {
+    const routes = PUBLIC_ROUTE_SOURCE_FILES.map((sourcePath) => readFileSync(sourcePath, "utf8")).join("\n");
+    for (const [legacy, canonical] of LEGACY_REDIRECT_ALIASES) {
+      expect(routes).toContain(`path: "${legacy}"`);
       expect(directorySource).toContain(`"${canonical}"`);
       expect(extendedDestinationHrefs()).not.toContain(legacy);
     }

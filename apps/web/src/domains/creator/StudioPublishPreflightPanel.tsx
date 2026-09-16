@@ -2,6 +2,8 @@ import { AlertTriangle, CheckCircle2, Download, ShieldCheck, X, XCircle } from "
 import { useRef } from "react";
 import { createPortal } from "react-dom";
 
+import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
+import { STUDIO_DESKTOP_FLOATING_QUERY, StudioDesktopFloatingSurface } from "./StudioDesktopFloatingSurface";
 import type {
   StudioPublishComplianceChecklist,
   StudioPublishComplianceResult,
@@ -13,6 +15,19 @@ import type {
   StudioPublishProfile,
 } from "./studio-publish-preflight";
 import { useStudioModalSheet } from "./useStudioModalSheet";
+
+import { useMediaQuery } from "@/hooks/use-media-query";
+
+const PREFLIGHT_DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = {
+  version: 2,
+  xRatio: 1,
+  yRatio: 0.04,
+  width: 680,
+  height: 760,
+  dock: "right",
+  positionLocked: false,
+  sizeLocked: false,
+};
 
 const PROFILE_LABELS: Record<StudioPublishProfile, string> = {
   generic: "일반 / ToonSpectrum",
@@ -65,12 +80,13 @@ export function StudioPublishPreflightPanel({
   result,
   onDownloadReport,
 }: StudioPublishPreflightPanelProps) {
+  const isDesktop = useMediaQuery(STUDIO_DESKTOP_FLOATING_QUERY);
   const dialogRef = useRef<HTMLDivElement>(null);
   const portalRootRef = useRef<HTMLElement | null>(
     typeof document === "undefined" ? null : document.body,
   );
   useStudioModalSheet({
-    activeKey: open ? "publish-preflight" : null,
+    activeKey: open && !isDesktop ? "publish-preflight" : null,
     dialogRef,
     onDismiss: onClose,
     resolveReturnFocus: () => {
@@ -96,15 +112,19 @@ export function StudioPublishPreflightPanel({
 
   const modal = (
     <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Publish Pack 사전검사"
-      tabIndex={-1}
-      className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
+      ref={isDesktop ? undefined : dialogRef}
+      role={isDesktop ? undefined : "dialog"}
+      aria-modal={isDesktop ? undefined : true}
+      aria-label={isDesktop ? undefined : "Publish Pack 사전검사"}
+      tabIndex={isDesktop ? undefined : -1}
+      className={isDesktop
+        ? "contents"
+        : "fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"}
     >
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
-        <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
+      <div className={isDesktop
+        ? "flex h-full min-h-0 w-full flex-col overflow-hidden"
+        : "mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl"}>
+        <header className={isDesktop ? "hidden" : "flex shrink-0 items-start gap-3 border-b border-line px-4 py-3"}>
           <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <ShieldCheck size={18} aria-hidden />
           </span>
@@ -425,5 +445,22 @@ export function StudioPublishPreflightPanel({
     </div>
   );
 
-  return createPortal(modal, document.body);
+  return createPortal(
+    isDesktop ? (
+      <StudioDesktopFloatingSurface
+        surfaceId="publish-preflight"
+        label="Publish Pack 사전검사"
+        defaultLayout={PREFLIGHT_DEFAULT_LAYOUT}
+        onClose={onClose}
+        minWidth={480}
+        minHeight={420}
+        maxWidth={960}
+        maxHeight={1100}
+        contentClassName="min-h-0 overflow-hidden"
+      >
+        {modal}
+      </StudioDesktopFloatingSurface>
+    ) : modal,
+    document.body,
+  );
 }

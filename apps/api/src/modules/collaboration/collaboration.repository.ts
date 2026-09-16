@@ -90,7 +90,7 @@ export class CollaborationRepository {
   async create(userId: string, input: CollaborationInput): Promise<{ id: string }> {
     const id = randomUUID();
     await this.transaction(async (client) => {
-      // Shared across serverless instances; deletions cannot reset the daily quota.
+      // Shared across process instances; deletions cannot reset the daily quota.
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`collaboration:${userId}`]);
       const counts = await client.query<{ daily: number; active: number }>(`SELECT
         count(*) FILTER (WHERE "createdAt" >= now() - interval '24 hours')::int AS daily,

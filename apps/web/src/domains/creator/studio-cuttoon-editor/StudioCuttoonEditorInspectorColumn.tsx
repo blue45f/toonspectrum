@@ -211,6 +211,9 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     quickShapeActive,
     onCorrectCurrentStroke,
     recentColors,
+    referenceBoard,
+    referencePanelOpen,
+    openReferenceCompanionWindow,
     refreshQuickMaskTint,
     resetPixelSelectionHistoryState,
     rightResize,
@@ -320,6 +323,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     setQuickMaskTintOpacity,
     setQuickShapeActive,
     setQuickStartOpen,
+    setReferencePanelOpen,
     setRightPanelOpenWithOverride,
     setSelectedId,
     setShapeFill,
@@ -416,6 +420,15 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
   const commandSearch = useStudioDeferredCommandSearch(
     isMobile, mobileSheet === "props", () => setMobileSheet("props"),
   );
+  const openReferenceCanvas = setReferencePanelOpen
+    ? () => {
+        setReferencePanelOpen(true);
+        globalThis.requestAnimationFrame?.(() => {
+          document.querySelector<HTMLElement>("[data-studio-reference-canvas]")
+            ?.focus({ preventScroll: true });
+        });
+      }
+    : undefined;
   return (
     <>
         {/* 캔버스 ↔ 작업 패널 너비 스플리터(데스크톱) */}
@@ -624,6 +637,10 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           quickShapeActive={quickShapeActive}
           onCorrectCurrentStroke={onCorrectCurrentStroke}
           recentColors={recentColors}
+          referenceBoardItemCount={referenceBoard?.items?.length ?? 0}
+          referencePanelOpen={Boolean(referencePanelOpen)}
+          onOpenReferenceCanvas={openReferenceCanvas}
+          onOpenReferenceWindow={openReferenceCompanionWindow}
           rightResize={rightResize}
           savedBrushes={savedBrushes}
           openBrushLibraryRepository={productBrushRepository}

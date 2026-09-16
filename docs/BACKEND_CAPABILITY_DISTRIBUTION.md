@@ -13,11 +13,11 @@ The following always stay on the NestJS API and authoritative PostgreSQL:
 - CRDT document metadata, operation ordering and acknowledgement
 - authorization and marketplace ownership
 
-Vercel can serve the bounded HTTP portion of that API. Socket.IO CRDT fanout and authoritative
-locks additionally require the same Nest application on a long-running host. The checked-in
-`render.yaml` is that purpose-specific deployment boundary: it uses the same session signing key
-as Vercel and a direct PostgreSQL endpoint for the Socket.IO cluster adapter. It is not used as an
-object store, media relay, thumbnail worker or generic fallback.
+Render serves the authoritative HTTP API. Socket.IO CRDT fanout and authoritative locks use the
+same Nest application on a separate long-running Render role. The checked-in `render.yaml` defines
+both purpose-specific deployment boundaries and a direct PostgreSQL endpoint for the Socket.IO
+cluster adapter. Neither role is used as an object store, media relay, thumbnail worker or generic
+fallback.
 
 The capability router intentionally has no IDs for those operations. Feature code cannot route
 them to a free provider by mistake.
@@ -32,7 +32,7 @@ not move unrelated features between hosts.
 | Placement role | Workloads | Normal primary owner | Same-role continuity only | Never substituted with |
 | --- | --- | --- | --- |
 | `container-worker` | high-quality thumbnail rendering and conversion | Cloud Run | Fly, Railway, Cloudtype, Render, Koyeb | short edge functions |
-| `edge-short` | webhook validation and short event work | Cloudflare Workers | AWS Lambda, Azure Functions, Vercel, Netlify, Deno Deploy, Supabase/Firebase functions | long conversion workers |
+| `edge-short` | webhook validation and short event work | Cloudflare Workers | AWS Lambda, Azure Functions, Netlify, Deno Deploy, Supabase/Firebase functions | long conversion workers |
 | `durable-queue` | cleanup and notification dispatch | Upstash QStash | Cloudflare Queues | process-local timers |
 | `object-store` | source images, 3D assets, thumbnails and exports | Supabase Storage | Cloudflare R2, Firebase Storage | container local filesystems |
 | `realtime-relay` | presence, comment invalidation and screen-share signaling | Cloudflare Durable Objects with channel-isolated state | Supabase/Firebase or a full-contract container relay after its ACL bridge is verified | raster pixels, voice media, comment authority or CRDT ordering |
@@ -81,9 +81,9 @@ because it accepts HTTP.
 Render free web services currently spin down after idle time and have ephemeral local files, so they
 are never first choice for latency-sensitive or durable work. Fly autostop is useful for bursty
 workers, but background work must have an explicit lifecycle because an HTTP machine can stop after
-the request closes. Vercel and similar function platforms are treated as bounded request executors,
-not durable queues. Supabase Edge Functions have runtime limits and cannot run Node libraries that
-need native multithreading, so image conversion belongs on a container worker.
+the request closes. Function platforms are treated as bounded request executors, not durable queues.
+Supabase Edge Functions have runtime limits and cannot run Node libraries that need native
+multithreading, so image conversion belongs on a container worker.
 
 Cloud Run services support HTTPS and WebSockets, while Cloud Run jobs run finite container tasks.
 Koyeb can scale to zero and its free instance sleeps, so it is an exact-contract auxiliary
@@ -98,7 +98,6 @@ Official references:
 - [Fly Machines background-work lifecycle](https://fly.io/docs/machines/guides-examples/managing-machines-with-the-api/)
 - [Railway cost controls](https://docs.railway.com/pricing/cost-control)
 - [Railway cron, worker and queue guidance](https://docs.railway.com/guides/cron-workers-queues)
-- [Vercel function limits](https://vercel.com/docs/functions/limitations)
 - [Netlify background functions](https://docs.netlify.com/build/functions/background-functions/)
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 - [Supabase Edge Function limits](https://supabase.com/docs/guides/functions/limits)

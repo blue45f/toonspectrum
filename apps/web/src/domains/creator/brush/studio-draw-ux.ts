@@ -16,6 +16,7 @@ import {
   studioBrushEngineLaneRowById,
 } from "./studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
+import { isStudioV6BrushCatalogId } from "./studio-brush-v6-id";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
 export const STUDIO_BRUSH_OPACITY_RANGE = { min: 0.05, max: 1 } as const;
@@ -77,6 +78,8 @@ export function filterStudioBrushLibraryItems(options: {
       : allItems.filter((item) => item.category === "expressive");
   } else if (category === "beginner") {
     items = allItems.filter((item) => item.category === "beginner");
+  } else if (category === "nextgen") {
+    items = allItems.filter((item) => isStudioV6BrushCatalogId(item.id));
   } else {
     items = allItems.filter((item) => item.mediaGroup === category);
   }
@@ -122,6 +125,8 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
 }[] = [
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
   { id: "recent", label: "최근 사용", title: "최근 사용한 브러시" },
+  { id: "all", label: "전체", title: "모든 브러시" },
+  { id: "nextgen", label: "차세대", title: "V6 재질 엔진 · 무폴백 브러시" },
   { id: "beginner", label: "시작 도구", title: "자주 쓰는 기본 표현부터 선택" },
   { id: "ink", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.ink, title: "펜·G펜·붓펜 — 균일 선부터 필압 테이퍼까지" },
   { id: "pencil", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.pencil, title: "연필·흑연 — 종이결 그레인" },
@@ -133,5 +138,4 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   { id: "texture", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.texture, title: "천·암석·나뭇잎·털 — 재질 스탬프" },
   { id: "tone", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.tone, title: "스크린톤·망점·해칭" },
   { id: "fx", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.fx, title: "네온·글로우·글리터·비·눈·불꽃" },
-  { id: "all", label: "전체", title: "모든 브러시" },
 ];

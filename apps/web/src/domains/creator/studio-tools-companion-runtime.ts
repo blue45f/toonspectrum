@@ -1,6 +1,9 @@
 import { studioCompanionPopupGuidance } from "./studio-companion-popup-guidance";
 
-import type { StudioCompanionPrimaryRuntime } from "./studio-tools-companion";
+import type {
+  StudioCompanionPrimaryRuntime,
+  StudioCompanionSurface,
+} from "./studio-tools-companion";
 
 export type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
 export type StudioToolsCompanionReviewProjectionInput = Parameters<
@@ -25,8 +28,12 @@ let studioToolsCompanionProtocolPromise: Promise<StudioToolsCompanionProtocolMod
 let studioCompanionReferenceCaptureRuntimePromise:
   Promise<StudioCompanionReferenceCaptureRuntimeModule> | null = null;
 
-const STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES =
-  "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no";
+const STUDIO_COMPANION_RESERVATION_FEATURES: Readonly<Record<StudioCompanionSurface, string>> = {
+  workspace: "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no",
+  navigator: "popup=yes,width=390,height=860,menubar=no,toolbar=no,location=no,status=no",
+  review: "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no",
+  reference: "popup=yes,width=520,height=860,menubar=no,toolbar=no,location=no,status=no",
+};
 
 function loadStudioToolsCompanionProtocol():
 Promise<StudioToolsCompanionProtocolModule> {
@@ -60,6 +67,7 @@ Promise<StudioCompanionReferenceCaptureRuntimeModule> {
 }
 
 export function openStudioToolsCompanionForMenu(input: {
+  surface?: StudioCompanionSurface;
   ensureRuntime: () => Promise<StudioToolsCompanionPrimaryRuntime | null>;
   runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
   windowRef: { current: Window | null };
@@ -71,10 +79,12 @@ export function openStudioToolsCompanionForMenu(input: {
     const translated = input.t(key);
     return translated === key ? fallback : translated;
   };
+  const surface = input.surface ?? "workspace";
   const ready = input.runtimeRef.current;
   if (ready) {
     ready.protocol.openReadyStudioToolsCompanionForMenu({
       sessionId: ready.sessionId,
+      surface,
       binding: ready.binding,
       windowRef: input.windowRef,
       announce: input.announce,
@@ -102,7 +112,7 @@ export function openStudioToolsCompanionForMenu(input: {
 
   let reservation: Window | null = null;
   try {
-    reservation = window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES);
+    reservation = window.open("", "_blank", STUDIO_COMPANION_RESERVATION_FEATURES[surface]);
   } catch {
     reservation = null;
   }
@@ -156,6 +166,7 @@ export function openStudioToolsCompanionForMenu(input: {
     }
     runtime.protocol.completeReservedStudioToolsCompanionWindow({
       sessionId: runtime.sessionId,
+      surface,
       reservation,
       windowRef: input.windowRef,
       announce: input.announce,

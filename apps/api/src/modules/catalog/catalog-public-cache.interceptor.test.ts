@@ -67,12 +67,12 @@ afterEach(() => vi.unstubAllEnvs());
   });
   it("removes higher-priority cache headers on exceptions", async () => {
     const h = harness();
-    h.res.setHeader("Vercel-CDN-Cache-Control", "s-maxage=999");
+    h.res.setHeader("CDN-Cache-Control", "s-maxage=999");
     await expect(lastValueFrom(new CatalogPublicCacheInterceptor().intercept(h.context, {
       handle: () => throwError(() => new Error("read failed")),
     }))).rejects.toThrow("read failed");
     expect(h.responseHeaders.get("cache-control")).toContain("no-store");
-    expect(h.responseHeaders.has("vercel-cdn-cache-control")).toBe(false);
+    expect(h.responseHeaders.has("cdn-cache-control")).toBe(false);
   });
   it("bounds the TTL and supports disabling live enrichment or caching", () => {
     expect(catalogPublicCacheSeconds({})).toBe(30);

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { FeedbackComposer } from "./feedback/FeedbackComposer";
 import { FeedbackPostCard } from "./feedback/FeedbackPostCard";
 import { useFeedbackFeed } from "./feedback/use-feedback-feed";
+import { feedbackRouteState } from "./feedback/feedback-route-state";
 import "./feedback/feedback-community.css";
 
 import type { FeedbackFilters } from "./feedback/use-feedback-feed";
@@ -11,7 +12,7 @@ import type { FeedbackEntry, FeedbackKind } from "@toonspectrum/core/feedback";
 
 import { Container } from "@/shared/components/container";
 import { useApp, useHydrated } from "@/shared/lib/store";
-import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS, isFeedbackKind } from "@toonspectrum/core/feedback";
+import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS } from "@toonspectrum/core/feedback";
 
 const EMPTY_FILTERS: FeedbackFilters = { category: "all", progress: "all", query: "", mine: false, tag: "" };
 const INTAKES = [
@@ -19,18 +20,17 @@ const INTAKES = [
   { kind: "idea", icon: Lightbulb, title: "이런 아이디어는 어때요?", description: "더 즐겁게 창작할 수 있는 생각을 나눠요.", action: "아이디어 제안" },
   { kind: "request", icon: Sparkles, title: "이 기능이 필요해요", description: "작업에 꼭 필요한 도구와 개선을 요청해요.", action: "기능 요청" },
 ] as const;
-function initialKind(): FeedbackKind {
-  if (typeof window === "undefined") return "bug";
-  const kind = new URLSearchParams(window.location.search).get("type");
-  return isFeedbackKind(kind) ? kind : "bug";
-}
 export function FeedbackPage() {
   const userId = useApp((state) => state.userId);
   const hydrated = useHydrated();
-  const [kind, setKind] = useState<FeedbackKind>(initialKind);
-  const [filters, setFilters] = useState<FeedbackFilters>(EMPTY_FILTERS);
+  const [initialRoute] = useState(() => feedbackRouteState(
+    typeof window === "undefined" ? "" : window.location.search,
+    typeof window !== "undefined" && window.matchMedia("(min-width: 761px)").matches,
+  ));
+  const [kind, setKind] = useState<FeedbackKind>(initialRoute.kind);
+  const [filters, setFilters] = useState<FeedbackFilters>(initialRoute.filters);
   const [search, setSearch] = useState("");
-  const [composerOpen, setComposerOpen] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 761px)").matches);
+  const [composerOpen, setComposerOpen] = useState(initialRoute.composerOpen);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const composer = useRef<HTMLDetailsElement | null>(null);
