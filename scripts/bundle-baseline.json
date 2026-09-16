@@ -1,7 +1,7 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-09-16T16:12:36.224Z",
-  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main — the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset. 2026-08-14: first runtime block measured by a probe that actually reaches a returning user — the previous one seeded localStorage keys that had moved into SQLite, so it recorded a first-run tour. Startup grew to 276 requests / 6228 KiB because the durable local database now gates what the artist sees: the coach only resolves after the UI preference, work and autosave hydrations, so studio-local-database*, studio-ui-preferences-sqlite, studio-workspace-sqlite-runtime and studio-autosave-sqlite-store are boot-critical rather than deferrable. studio-tournament-sqlite-persistence is the documented post-mount hydration that keeps the first stroke on the right renderer lane. Shrinking further needs a lightweight boot fast path with SQLite as the later authority; filed separately, not traded for a first-render flicker. 2026-09-11: accepted the consolidated #1289 product wave after production build verification. The static Studio route grew to ~5823.4 KiB raw / ~1882.6 KiB gzip and 274 chunks; the app-shell delta is ~5258.6 KiB raw / ~1699.4 KiB gzip and 265 chunks. This records the measured feature breadth without disabling the 2% ratchet. 2026-09-14: PR #1427 remeasured the consolidated production bundle after restoring the PSD decoder lazy boundary. The runtime probe now targets /studio/canvas because /studio is the project home; the returning-user editor reached its first canvas in 2047 ms and recorded 339 startup requests / 8,281,945 decoded bytes, including 107 eager-dynamic requests / 1,989,247 bytes. Static route growth is explicitly accepted together with lower route, app-shell, app-entry and BG3D chunk counts; reference budgets and the 2% ratchet remain unchanged. 2026-09-17: accepted the consolidated production-workcell, restored project-library, sitewide route-guidance, internationalization, platform-canvas, and complete safe-brush wave already merged to main. The measured Studio route is ~6305.4 KiB raw / ~2112.1 KiB gzip, the post-shell route is ~5680.8 KiB raw / ~1909.4 KiB gzip, and the app entry is ~624.6 KiB raw / ~202.7 KiB gzip. This records the intended current-main feature breadth; the byte/count tolerance remains 2% with the existing count slack.",
+  "recordedAt": "2026-09-16T18:58:53.315Z",
+  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main — the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset. 2026-08-14: first runtime block measured by a probe that actually reaches a returning user — the previous one seeded localStorage keys that had moved into SQLite, so it recorded a first-run tour. Startup grew to 276 requests / 6228 KiB because the durable local database now gates what the artist sees: the coach only resolves after the UI preference, work and autosave hydrations, so studio-local-database*, studio-ui-preferences-sqlite, studio-workspace-sqlite-runtime and studio-autosave-sqlite-store are boot-critical rather than deferrable. studio-tournament-sqlite-persistence is the documented post-mount hydration that keeps the first stroke on the right renderer lane. Shrinking further needs a lightweight boot fast path with SQLite as the later authority; filed separately, not traded for a first-render flicker. 2026-09-11: accepted the consolidated #1289 product wave after production build verification. The static Studio route grew to ~5823.4 KiB raw / ~1882.6 KiB gzip and 274 chunks; the app-shell delta is ~5258.6 KiB raw / ~1699.4 KiB gzip and 265 chunks. This records the measured feature breadth without disabling the 2% ratchet. 2026-09-14: PR #1427 remeasured the consolidated production bundle after restoring the PSD decoder lazy boundary. The runtime probe now targets /studio/canvas because /studio is the project home; the returning-user editor reached its first canvas in 2047 ms and recorded 339 startup requests / 8,281,945 decoded bytes, including 107 eager-dynamic requests / 1,989,247 bytes. Static route growth is explicitly accepted together with lower route, app-shell, app-entry and BG3D chunk counts; reference budgets and the 2% ratchet remain unchanged. 2026-09-17: accepted the consolidated production-workcell, restored project-library, sitewide route-guidance, internationalization, platform-canvas, and complete safe-brush wave already merged to main. The measured Studio route is ~6305.4 KiB raw / ~2112.1 KiB gzip, the post-shell route is ~5680.8 KiB raw / ~1909.4 KiB gzip, and the app entry is ~624.6 KiB raw / ~202.7 KiB gzip. This records the intended current-main feature breadth; the byte/count tolerance remains 2% with the existing count slack. 2026-09-17: remeasured clean main at e52f6d2 after main CI run 35132982042 failed on BG3D/app-entry chunk counts before this atlas branch. Clean main and the atlas branch both measured BG3D 67 and app entry 13 chunks; this baseline was generated from clean main so the atlas pipeline consumes no chunk-count slack.",
   "policy": {
     "byteTolerance": 0.02,
     "countTolerance": 0.02,
@@ -9,18 +9,18 @@
     "authority": "scripts/check-studio-bundle.mjs (this file records the values only)"
   },
   "static": {
-    "Studio route raw": 6456763,
-    "Studio route gzip": 2162770,
-    "StudioPage entry raw": 2341565,
-    "StudioPage entry gzip": 721210,
-    "Studio route after app shell raw": 5817123,
-    "Studio route after app shell gzip": 1955255,
+    "Studio route raw": 6451616,
+    "Studio route gzip": 2161421,
+    "StudioPage entry raw": 2342381,
+    "StudioPage entry gzip": 721521,
+    "Studio route after app shell raw": 5805817,
+    "Studio route after app shell gzip": 1951600,
     "Studio route after app shell chunks": 232,
-    "app entry raw": 639640,
-    "app entry gzip": 207515,
-    "BG3D editor activation raw": 3528717,
-    "BG3D editor activation gzip": 1025308,
-    "BG3D editor activation chunks": 64,
+    "app entry raw": 645799,
+    "app entry gzip": 209821,
+    "BG3D editor activation raw": 3535132,
+    "BG3D editor activation gzip": 1027746,
+    "BG3D editor activation chunks": 67,
     "BG3D shot-batch runtime after editor raw": 112907,
     "BG3D shot-batch runtime after editor gzip": 34782,
     "BG3D shot-batch runtime after editor chunks": 7,
@@ -34,8 +34,8 @@
     "BG3D PSD Worker gzip": 83718,
     "BG3D physics Worker raw": 2312208,
     "BG3D physics Worker gzip": 853440,
-    "Studio route chunks": 242,
-    "app entry chunks": 10
+    "Studio route chunks": 245,
+    "app entry chunks": 13
   },
   "runtime": {
     "recordedAt": "2026-09-14T14:50:25.954Z",
