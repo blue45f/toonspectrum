@@ -94,8 +94,8 @@ describe("VRM asset SQLite/OPFS product boundary", () => {
     const hydrate = poser.slice(hydrateStart, hydrateEnd);
 
     expect(hydrate).toContain('entry.source === "sample"');
-    expect(hydrate).toContain('entry.thumbnail?.startsWith("/vrm/thumbnails/")');
-    expect(hydrate).toContain("isBundledStaticThumbnail");
+    expect(hydrate).toContain('entry.source === "memory"');
+    expect(hydrate).not.toContain('startsWith("/vrm/thumbnails/")');
     expect(hydrate).toContain("return { ...entry, thumbnail: null }");
   });
 

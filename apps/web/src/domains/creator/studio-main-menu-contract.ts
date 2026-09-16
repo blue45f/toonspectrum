@@ -175,6 +175,7 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   openBrushPresetBrowser: () => unknown;
   /** §15.3 Brush ▸ Brush Studio — the dynamics editor inside the inspector. */
   openBrushStudio: () => unknown;
+  openBrushLab: () => unknown;
   /** The saved "내 브러시" library, whose import control accepts ABR/MYB/KPP. */
   openBrushLibrary: () => unknown;
   /** §15.3 Brush ▸ Import — opens the ABR/MYB/KPP/JSON picker with no detour. */

@@ -160,6 +160,7 @@ function buildLiveMenuGroups() {
     openLayerMask: vi.fn(),
     openBrushPresetBrowser: vi.fn(),
     openBrushStudio: vi.fn(),
+    openBrushLab: vi.fn(),
     openBrushLibrary: vi.fn(),
     requestBrushPackImport: vi.fn(),
     openNaturalMediaBrushes: vi.fn(),

@@ -12,11 +12,14 @@ import {
 } from "lucide-react";
 
 import { ProductIntentStart } from "../creator-resources/ProductIntentStart";
+import { getCreatorThemeArt } from "./creator-theme-art";
 import "./creator-home-experience.css";
 import "./creator-flagship.css";
+import "./creator-theme-gallery.css";
 
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
+import { useTheme } from "@/shared/lib/theme";
 
 type Locale = "ko" | "en";
 
@@ -177,6 +180,8 @@ export function CreatorHomeExperience() {
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const copy = COPY[locale];
+  const resolvedTheme = useTheme((state) => state.resolvedTheme);
+  const artDirection = getCreatorThemeArt(resolvedTheme);
 
   return (
     <div
@@ -184,6 +189,7 @@ export function CreatorHomeExperience() {
       lang={locale}
       data-creator-home="studio-first"
       data-creator-experience="clarity-v1"
+      data-theme-art={resolvedTheme}
     >
       <div className="cf-shell">
         <section className="cf-hero" aria-labelledby="creator-home-title">
@@ -203,12 +209,15 @@ export function CreatorHomeExperience() {
           </div>
           <figure className="cf-home-preview">
             <img
-              src="/brand/atelier-process.webp"
+              src={artDirection.hero.src}
+              srcSet={artDirection.hero.srcSet}
+              sizes="(max-width: 720px) 92vw, 48vw"
               width={1536}
               height={1024}
               decoding="async"
               fetchPriority="high"
               alt={copy.previewAlt}
+              data-art-asset={artDirection.hero.id}
             />
             <figcaption>{copy.previewCaption}</figcaption>
           </figure>

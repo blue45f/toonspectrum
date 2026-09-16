@@ -63,7 +63,7 @@ function readRgba(pixels) {
 
 describe("ndarray-pixels with the security-patched sharp runtime", () => {
   it("resolves the reviewed sharp version through the real glTF dependency path", () => {
-    expect(sharpPackage.version).toBe("0.35.2");
+    expect(sharpPackage.version).toBe("0.35.4");
   });
 
   it("round-trips odd-width RGBA pixels through lossless PNG", async () => {

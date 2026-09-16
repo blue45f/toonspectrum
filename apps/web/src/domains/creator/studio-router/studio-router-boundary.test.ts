@@ -15,6 +15,10 @@ const creatorRoutesSource = readFileSync(
   resolve(process.cwd(), "apps/web/src/app/routes/groups/creator.routes.tsx"),
   "utf8",
 );
+const creatorRoutePagesSource = readFileSync(
+  resolve(process.cwd(), "apps/web/src/app/routes/groups/creator-route-pages.ts"),
+  "utf8",
+);
 const editorRouteSource = readFileSync(
   resolve(process.cwd(), "apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx"),
   "utf8",
@@ -54,18 +58,18 @@ const dccWorkbenchRouteSource =
 
 describe("Studio router bundle boundaries", () => {
   it("loads editor and publish surfaces through independent route modules", () => {
-    expect(publishRouteSource).toContain('import("../../StudioUploadPublish")');
+    expect(publishRouteSource).toContain('import("../../StudioPublishingCommandCenter")');
     expect(editorRouteSource).toContain('import("../../studio-legacy-editor-adapter")');
-    expect(routerSource).not.toContain("StudioUploadPublish");
+    expect(routerSource).not.toContain("StudioPublishingCommandCenter");
     expect(routerSource).not.toContain("studio-legacy-editor-adapter");
     expect(routerSource).not.toMatch(/from\s+["']\.\.\/StudioPage["']/u);
-    expect(legacyEditorSource).not.toContain("StudioUploadPublish,");
+    expect(legacyEditorSource).not.toContain("StudioPublishingCommandCenter,");
   });
 
   it("gives AppRouter one domain-owned lazy Studio entry instead of competing flat routes", () => {
     expect(appRouterSource).toContain('import { appRoutes } from "./groups/app-routes"');
     expect(appRouterSource).toContain("appRoutes.map");
-    expect(creatorRoutesSource).toContain(
+    expect(creatorRoutePagesSource).toContain(
       'import("@/domains/creator/studio-router/StudioRouter")',
     );
     expect(creatorRoutesSource).toContain(

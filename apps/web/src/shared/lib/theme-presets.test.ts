@@ -20,6 +20,11 @@ function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocke
 }
 
 describe("appearance preferences and first paint", () => {
+  it("ships three signature themes alongside the classic and accessibility palettes", () => {
+    expect(THEME_IDS).toHaveLength(9);
+    expect(THEME_PRESETS.filter((preset) => preset.group === "signature").map((preset) => preset.id)).toEqual(["aurora", "blossom", "starlight"]);
+    expect(THEME_PRESETS.filter((preset) => preset.group === "accessibility").map((preset) => preset.id)).toEqual(["contrast"]);
+  });
   it.each([null, undefined, false, 7, "sepia", [], {}])("normalizes untrusted values %s", (value) => {
     expect(normalizeAppearance(value)).toEqual(DEFAULT_APPEARANCE);
   });

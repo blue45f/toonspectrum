@@ -30,6 +30,13 @@ function frame(path = "/calendar") {
 }
 
 describe("non-studio experience controls", () => {
+  it("mounts decorative theme artwork outside the accessibility tree", () => {
+    const result = frame();
+    const ambient = result.container.querySelector(".site-experience-ambient");
+    expect(ambient?.getAttribute("aria-hidden")).toBe("true");
+    expect(ambient?.querySelectorAll(".site-theme-art")).toHaveLength(6);
+    expect(ambient?.querySelector(".site-theme-art--constellation")).not.toBeNull();
+  });
   it("toggles the actual context, persists it, and restores it on remount", () => {
     const first = frame();
     const buttons = screen.getAllByRole("button", { name: "차분한 화면" });

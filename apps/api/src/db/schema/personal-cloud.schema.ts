@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   pgTable,
   primaryKey,
@@ -18,9 +19,7 @@ import { users } from "./auth.schema";
 export const personalCloudConnections = pgTable(
   "personal_cloud_connection",
   {
-    userId: text("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull(),
     provider: text("provider").notNull(),
     providerAccountId: text("providerAccountId").notNull(),
     accountLabel: text("accountLabel").notNull(),
@@ -35,25 +34,63 @@ export const personalCloudConnections = pgTable(
     createdAt: timestamp("createdAt", {
       mode: "date",
       withTimezone: true,
-    }).notNull().defaultNow(),
+    })
+      .notNull()
+      .defaultNow(),
     updatedAt: timestamp("updatedAt", {
       mode: "date",
       withTimezone: true,
-    }).notNull().defaultNow(),
+    })
+      .notNull()
+      .defaultNow(),
     lastUsedAt: timestamp("lastUsedAt", {
       mode: "date",
       withTimezone: true,
     }),
   },
   (connection) => [
-    primaryKey({ columns: [connection.userId, connection.provider] }),
+    primaryKey({
+      name: "personal_cloud_connection_pkey",
+      columns: [connection.userId, connection.provider],
+    }),
+    foreignKey({
+      name: "personal_cloud_connection_user_fkey",
+      columns: [connection.userId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
     check(
       "personal_cloud_connection_provider_check",
       sql`${connection.provider} in ('google-drive', 'dropbox', 'onedrive')`,
     ),
+    check(
+      "personal_cloud_connection_provider_account_check",
+      sql`length(${connection.providerAccountId}) between 1 and 512`,
+    ),
+    check(
+      "personal_cloud_connection_account_label_check",
+      sql`length(${connection.accountLabel}) between 1 and 512`,
+    ),
+    check(
+      "personal_cloud_connection_token_ciphertext_check",
+      sql`length(${connection.encryptedAccessToken}) between 32 and 32768
+        and length(${connection.encryptedRefreshToken}) between 32 and 32768`,
+    ),
+    check(
+      "personal_cloud_connection_token_type_check",
+      sql`length(${connection.tokenType}) between 1 and 64`,
+    ),
+    check(
+      "personal_cloud_connection_scope_check",
+      sql`length(${connection.scope}) between 1 and 4096`,
+    ),
+    check(
+      "personal_cloud_connection_timestamp_check",
+      sql`${connection.updatedAt} >= ${connection.createdAt}
+        and (${connection.lastUsedAt} is null or ${connection.lastUsedAt} >= ${connection.createdAt})`,
+    ),
     index("idx_personal_cloud_connection_updated").on(
       connection.userId,
-      connection.updatedAt,
+      connection.updatedAt.desc(),
     ),
     index("idx_personal_cloud_connection_provider_account").on(
       connection.provider,
