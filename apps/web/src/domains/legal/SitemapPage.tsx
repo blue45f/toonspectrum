@@ -3,6 +3,7 @@ import {
   BookOpen,
   CircleHelp,
   Database,
+  MessageCircle,
   Search,
   ShieldCheck,
   Sparkles,
@@ -62,6 +63,26 @@ const PERSONAL_DESTINATIONS = [
     description: {
       ko: "프로필과 계정 정보, 내 활동 관리",
       en: "Manage your profile, account details and activity",
+    },
+  },
+  {
+    id: "messages",
+    href: "/messages",
+    icon: MessageCircle,
+    label: { ko: "쪽지", en: "Messages" },
+    description: {
+      ko: "회원 간 쪽지와 받은 요청 확인",
+      en: "Review member messages and incoming requests",
+    },
+  },
+  {
+    id: "messages-new",
+    href: "/messages/new",
+    icon: MessageCircle,
+    label: { ko: "새 쪽지", en: "New message" },
+    description: {
+      ko: "회원에게 새 쪽지 또는 대화 요청 보내기",
+      en: "Send a new message or conversation request",
     },
   },
   ...SITE_UTILITY_NAVIGATION,
