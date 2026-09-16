@@ -18,7 +18,7 @@ export interface FreeAiConnectionLike {
 }
 
 export interface FreeAiPreset {
-  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "mistral-free";
+  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "sambanova-free" | "mistral-free";
   label: string;
   description: string;
   baseUrl: string;
@@ -35,6 +35,7 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 const PROVIDER_FREE_TIER_ENDPOINTS: Readonly<Record<string, string>> = Object.freeze({
   "api.groq.com": "/openai/v1",
   "generativelanguage.googleapis.com": "/v1beta/openai",
+  "api.sambanova.ai": "/v1",
   "api.mistral.ai": "/v1",
 });
 
@@ -113,9 +114,20 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     docsUrl: "https://ai.google.dev/gemini-api/docs/openai",
   },
   {
+    id: "sambanova-free",
+    label: "SambaNova 무카드 Free Tier",
+    description: "결제수단이 연결되지 않은 Free Tier 계정의 본인 키만 사용합니다. 모델별 무료 일일 한도에서 중단됩니다.",
+    baseUrl: "https://api.sambanova.ai/v1",
+    textModel: "DeepSeek-V3.1",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://docs.sambanova.ai/docs/en/models/rate-limits",
+  },
+  {
     id: "mistral-free",
     label: "Mistral 무료 모드",
-    description: "카드 없는 무료 모드에서 만든 본인 키만 사용합니다. 비공개 원고 전송 여부를 먼저 검토하세요.",
+    description: "카드 없는 Free mode 조직에서 만든 본인 키만 사용합니다. Pay-as-you-go가 비활성화됐는지 확인하세요.",
     baseUrl: "https://api.mistral.ai/v1",
     textModel: "",
     imageModel: "",
@@ -261,7 +273,7 @@ export function freeAiConnectionPolicyIssue(
     || requiredPath === undefined
     || normalizedApiPath(url) !== requiredPath
   ) {
-    return "무료 티어 정책은 현재 등록된 Groq·Gemini·Mistral 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
+    return "무료 티어 정책은 현재 등록된 Gemini·Groq·SambaNova·Mistral 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
   }
   if (!connection.apiKey.trim()) {
     return "원격 무료 티어 연결에는 본인 API 키가 필요합니다.";

@@ -8,9 +8,11 @@ For text requests the default order is:
 
 1. shared Gemini free tier;
 2. shared Groq free tier;
-3. shared OpenRouter free router;
-4. the user's explicitly selected personal free connection;
-5. remaining valid personal free connections in quality order: Gemini, Groq, OpenRouter, Mistral, then local/self-hosted connections.
+3. shared SambaNova Free Tier;
+4. shared Mistral Free mode;
+5. shared OpenRouter free router;
+6. the user's explicitly selected personal free connection;
+7. remaining valid personal free connections in quality order: Gemini, Groq, SambaNova, Mistral, OpenRouter, then local/self-hosted connections.
 
 A route advances only after a definitive pre-inference free-capacity or request-limit rejection (`402` or `429`) or the application's own local free-budget exhaustion. Network errors, timeouts, `5xx` responses, malformed responses, and authentication errors are surfaced immediately and are not sent to another provider. This avoids duplicate inference after an ambiguous failure.
 
@@ -20,7 +22,7 @@ When every free route is exhausted or currently rate-limited, the UI explains th
 
 1. `STUDIO_AI_FREE_POOL_ENABLED=true` is required.
 2. Every provider needs a server-side key and a matching `STUDIO_AI_FREE_*_CONFIRMED=true` operational approval.
-3. Approval means the account was checked to have billing disabled or an enforced free-only boundary.
+3. Approval means the account was checked to have billing disabled or an enforced free-only boundary. SambaNova must have no linked payment method; Mistral must remain in cardless Free mode with Pay-as-you-go disabled.
 4. OpenRouter is limited to `openrouter/free` or a model ending in `:free`.
 5. Shared credentials are never exposed through `VITE_` variables or API responses.
 6. Existing user-level and service-wide UTC daily request/token admissions remain authoritative and fail closed when their storage is unavailable.
@@ -35,7 +37,7 @@ The application cannot independently inspect every provider's billing configurat
 | `local-zero-cost` | Only `localhost`, `127.0.0.1`, or `::1`; API key optional. |
 | `self-hosted-zero-cost` | Authenticated HTTPS endpoint explicitly operated by the user. Known public AI provider hosts are rejected. |
 | `openrouter-free` | Exact OpenRouter API base URL and `openrouter/free` or a model ending in `:free`; text only. |
-| `provider-free-tier` | Exact official Groq, Gemini, or Mistral OpenAI-compatible endpoint with the user's key; text only. The user confirms billing is disabled. |
+| `provider-free-tier` | Exact official Gemini, Groq, SambaNova, or Mistral OpenAI-compatible endpoint with the user's key; text only. The user confirms the account is free-only and has no paid fallback. |
 | `unverified` | Always blocked until the user reviews the migrated or changed connection. |
 
 Personal API keys stay in memory by default. Optional persistence uses the existing encrypted local vault. Browser requests omit cookies, reject redirects, and do not automatically retry.

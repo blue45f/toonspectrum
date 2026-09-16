@@ -70,6 +70,16 @@ describe("free-only AI connection policy", () => {
     expect(() => assertFreeAiConnection(groq, "text")).not.toThrow();
     expect(() => assertFreeAiConnection({
       ...groq,
+      baseUrl: "https://api.sambanova.ai/v1",
+      textModel: "DeepSeek-V3.1",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.mistral.ai/v1",
+      textModel: "mistral-small-latest",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
       baseUrl: "https://api.example.com/v1",
     }, "text")).toThrow(/공식 OpenAI 호환 API/u);
     expect(() => assertFreeAiConnection({
@@ -108,8 +118,10 @@ describe("free-only AI connection policy", () => {
   });
 
   it("ships only free-policy presets", () => {
-    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(5);
+    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(7);
     expect(FREE_AI_PRESETS.map((preset) => String(preset.costPolicy))).not.toContain("unverified");
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "sambanova-free")).toBe(true);
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "mistral-free")).toBe(true);
     expect(FREE_AI_PRESETS.some((preset) => preset.textModel === "openrouter/free")).toBe(true);
     expect(FREE_AI_PRESETS.every((preset) => preset.imageModel === "")).toBe(true);
   });

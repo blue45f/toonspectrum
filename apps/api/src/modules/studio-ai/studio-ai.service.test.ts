@@ -185,6 +185,12 @@ describe("StudioAiService", () => {
     delete process.env.STUDIO_AI_FREE_GROQ_API_KEY;
     delete process.env.STUDIO_AI_FREE_GROQ_MODEL;
     delete process.env.STUDIO_AI_FREE_GROQ_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_MODEL;
+    delete process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_API_KEY;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_MODEL;
+    delete process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_MODEL;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED;
@@ -958,13 +964,17 @@ describe("StudioAiService", () => {
     expect(JSON.stringify(error.getResponse())).not.toContain("postgres release connection detail");
   });
 
-  it("공유 무료 풀은 Gemini와 Groq 한도 소진 뒤 세 번째 OpenRouter까지 전환한다", async () => {
+  it("공유 무료 풀은 다섯 제공자의 무료 한도를 품질 순서대로 전환한다", async () => {
     process.env.STUDIO_AI_FREE_POOL_ENABLED = "true";
-    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,openrouter";
+    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,sambanova,mistral,openrouter";
     process.env.STUDIO_AI_FREE_GEMINI_API_KEY = "gemini-free-test-key";
     process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_GROQ_API_KEY = "groq-free-test-key";
     process.env.STUDIO_AI_FREE_GROQ_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY = "sambanova-free-test-key";
+    process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_MISTRAL_API_KEY = "mistral-free-test-key";
+    process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY = "openrouter-free-test-key";
     process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED = "true";
     const fetchMock = vi
@@ -976,9 +986,15 @@ describe("StudioAiService", () => {
         new Response('{"error":{"message":"groq-private-quota-detail"}}', { status: 429 })
       )
       .mockResolvedValueOnce(
+        new Response('{"error":{"message":"sambanova-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"mistral-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "openrouter-free-request-3",
+            id: "openrouter-free-request-5",
             model: "openrouter/free-selected-model",
             choices: [{ finish_reason: "stop", message: { content: "무료 풀 전환 완료" } }],
             usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
@@ -989,7 +1005,7 @@ describe("StudioAiService", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { service, finalize, markSent, markSucceeded } = createService();
 
-    const result = await complete(service, "studio-user-three-free-providers", {
+    const result = await complete(service, "studio-user-five-free-providers", {
       ...compositionInput,
       task: "assistant",
     });
@@ -998,10 +1014,10 @@ describe("StudioAiService", () => {
       content: "무료 풀 전환 완료",
       provider: "openrouter",
       model: "openrouter/free-selected-model",
-      requestId: "openrouter-free-request-3",
+      requestId: "openrouter-free-request-5",
       failover: {
-        attemptedProvider: "groq",
-        attemptedModel: "openai/gpt-oss-120b",
+        attemptedProvider: "mistral",
+        attemptedModel: "mistral-small-latest",
         actualProvider: "openrouter",
         actualModel: "openrouter/free-selected-model",
         reason: "free_quota_exhausted",
@@ -1011,15 +1027,17 @@ describe("StudioAiService", () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       "https://api.groq.com/openai/v1/chat/completions",
+      "https://api.sambanova.ai/v1/chat/completions",
+      "https://api.mistral.ai/v1/chat/completions",
       "https://openrouter.ai/api/v1/chat/completions",
     ]);
-    expect(markSent).toHaveBeenCalledTimes(3);
+    expect(markSent).toHaveBeenCalledTimes(5);
     expect(markSucceeded).toHaveBeenCalledOnce();
     expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
       task: "assistant",
       provider: "openrouter",
       model: "openrouter/free",
-      attemptCount: 3,
+      attemptCount: 5,
       status: "success",
     }));
   });
