@@ -10,6 +10,8 @@ import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel
 import type { VrmLibraryEntry } from "./vrm-library";
 import type { ComponentProps } from "react";
 
+import { useI18n } from "@/shared/lib/i18n";
+
 type PanelProps = ComponentProps<typeof StudioVrmCharacterLibraryPanel>;
 
 class CharacterLibraryIntersectionObserver implements IntersectionObserver {
@@ -98,6 +100,7 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
 }
 
 beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
   CharacterLibraryIntersectionObserver.instances.length = 0;
   vi.stubGlobal("IntersectionObserver", CharacterLibraryIntersectionObserver);
 });
@@ -131,7 +134,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     view.rerender(
       <StudioVrmCharacterLibraryPanel
         {...view.props}
-        entries={[createEntry("lumi", "루미")]}
+        entries={[createEntry("sample-vrm", "루미")]}
         libraryStatus="ready"
       />,
     );
@@ -144,7 +147,11 @@ describe("StudioVrmCharacterLibraryPanel", () => {
 
   it("filters entries, resets the visible batch, and expands or collapses pagination", () => {
     const entries = Array.from({ length: 14 }, (_, index) =>
-      createEntry(`character-${index + 1}`, `캐릭터 ${String(index + 1).padStart(2, "0")}`),
+      createEntry(
+        `character-${index + 1}`,
+        `캐릭터 ${String(index + 1).padStart(2, "0")}`,
+        "sqlite-opfs",
+      ),
     );
     const onCollapse = vi.fn();
     renderPanel({ entries, onCollapse });
@@ -177,7 +184,11 @@ describe("StudioVrmCharacterLibraryPanel", () => {
 
   it("expands the local window when the infinite-scroll sentinel intersects", () => {
     const entries = Array.from({ length: 14 }, (_, index) =>
-      createEntry(`character-${index + 1}`, `캐릭터 ${String(index + 1).padStart(2, "0")}`),
+      createEntry(
+        `character-${index + 1}`,
+        `캐릭터 ${String(index + 1).padStart(2, "0")}`,
+        "sqlite-opfs",
+      ),
     );
     renderPanel({ entries });
 
@@ -239,11 +250,43 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     expect(onLoadMore).toHaveBeenCalledOnce();
   });
 
+  it("localizes bundled names reactively while preserving canonical and uploaded-name search", () => {
+    const bundled = createEntry(
+      "quaternius-modular-male-adventurer",
+      "Quaternius Adventurer (Male)",
+    );
+    const uploaded = createEntry("uploaded", "My OC 캐릭터", "sqlite-opfs");
+    renderPanel({
+      entries: [bundled, uploaded],
+      recentCharacterIds: [bundled.id, uploaded.id],
+      activeModelId: bundled.id,
+    });
+
+    expect(screen.getAllByText("쿼터니어스 모험가 (남성)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("My OC 캐릭터").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("캐릭터 라이브러리 검색"), {
+      target: { value: "Adventurer" },
+    });
+    expect(screen.getByText("표시 1/1명")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "쿼터니어스 모험가 (남성) 선택" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("캐릭터 라이브러리 검색"), {
+      target: { value: "" },
+    });
+    act(() => {
+      useI18n.setState({ lang: "ja" });
+    });
+
+    expect(screen.getAllByText("クォータニアス 冒険者（男性）").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("My OC 캐릭터").length).toBeGreaterThan(0);
+  });
+
   it("preserves recent character order and selects a recent entry once", () => {
     const entries = [
-      createEntry("one", "하나"),
-      createEntry("two", "둘"),
-      createEntry("three", "셋"),
+      createEntry("one", "하나", "sqlite-opfs"),
+      createEntry("two", "둘", "sqlite-opfs"),
+      createEntry("three", "셋", "sqlite-opfs"),
     ];
     const onSelect = vi.fn();
     renderPanel({

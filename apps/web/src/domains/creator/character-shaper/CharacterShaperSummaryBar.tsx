@@ -7,6 +7,7 @@ import { ChevronDown, Ellipsis, Eye, Redo2, RotateCcw, Save, SlidersHorizontal, 
 import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { resolveVrmLibraryEntryDisplayName } from "../vrm/studio-vrm-display-name";
 
 import { describeCharacterRecipe, diffCharacterRecipes } from "./character-shaper-recipe";
 import { CHARACTER_SHAPER_TABLET_QUERY, pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
@@ -16,6 +17,7 @@ import type { CharacterShaperSummaryBarProps } from "./character-shaper-ui-contr
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 
+import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
@@ -82,6 +84,7 @@ export function CharacterShaperSummaryBar({
   titleId,
   descriptionId,
 }: CharacterShaperSummaryBarProps) {
+  const locale = useI18n((state) => state.lang);
   const wide = useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
   const compact = !wide;
   const selectId = useId();
@@ -96,7 +99,8 @@ export function CharacterShaperSummaryBar({
 
   const entries: readonly VrmLibraryEntry[] = Array.isArray(h.libraryEntries) ? h.libraryEntries : [];
   const activeModelId: string | null = typeof h.activeModelId === "string" ? h.activeModelId : null;
-  const modelName = entries.find((entry) => entry.id === activeModelId)?.name ?? null;
+  const activeEntry = entries.find((entry) => entry.id === activeModelId) ?? null;
+  const modelName = activeEntry ? resolveVrmLibraryEntryDisplayName(activeEntry, locale) : null;
   const loading = h.status === "loading";
   const capturing = Boolean(h.isCapturing);
   const summary = describeCharacterRecipe(binding.recipe, binding.catalog);
@@ -239,7 +243,7 @@ export function CharacterShaperSummaryBar({
         ) : null}
         {entries.map((entry) => (
           <option key={entry.id} value={entry.id}>
-            {entry.name}
+            {resolveVrmLibraryEntryDisplayName(entry, locale)}
           </option>
         ))}
       </select>
