@@ -259,6 +259,8 @@ test("member messaging migration provisions request-gated conversations", () => 
     'member_message_report_reporter_message_unique',
     'REVOKE ALL ON TABLE public."member_message_thread" FROM PUBLIC',
     'member messaging relations are incomplete',
+    'INSERT INTO public."toonspectrum_schema_migration"',
+    "VALUES ('0059_member_messaging', statement_timestamp())",
   ]) {
     expect(sql).toContain(requiredFragment);
   }
