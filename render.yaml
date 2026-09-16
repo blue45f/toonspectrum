@@ -65,6 +65,26 @@ services:
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_SECRET
         sync: false
+      # User sign-in OAuth credentials. Keep the key inventory in the Blueprint so
+      # infrastructure migrations cannot silently hide configured login providers.
+      - key: KAKAO_REST_API_KEY
+        sync: false
+      - key: KAKAO_CLIENT_SECRET
+        sync: false
+      - key: KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED
+        value: "false"
+      - key: KAKAO_APP_ID
+        sync: false
+      - key: KAKAO_ADMIN_KEY
+        sync: false
+      - key: NAVER_OAUTH_CLIENT_ID
+        sync: false
+      - key: NAVER_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
       - key: PERSONAL_CLOUD_OAUTH_STATE_SECRET
         sync: false
       - key: PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY

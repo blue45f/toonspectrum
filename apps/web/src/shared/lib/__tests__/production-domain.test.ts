@@ -65,6 +65,17 @@ describe("toonstudio.cloud production domain", () => {
       { key: "WEB_APP_BASE_URL", value: "https://www.toonstudio.cloud" },
       { key: "CANONICAL_HOST", value: "www.toonstudio.cloud" },
       { key: "DATABASE_URL", sync: false },
+      { key: "GOOGLE_OAUTH_CLIENT_ID", sync: false },
+      { key: "GOOGLE_OAUTH_CLIENT_SECRET", sync: false },
+      { key: "KAKAO_REST_API_KEY", sync: false },
+      { key: "KAKAO_CLIENT_SECRET", sync: false },
+      { key: "KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED", value: "false" },
+      { key: "KAKAO_APP_ID", sync: false },
+      { key: "KAKAO_ADMIN_KEY", sync: false },
+      { key: "NAVER_OAUTH_CLIENT_ID", sync: false },
+      { key: "NAVER_OAUTH_CLIENT_SECRET", sync: false },
+      { key: "GITHUB_OAUTH_CLIENT_ID", sync: false },
+      { key: "GITHUB_OAUTH_CLIENT_SECRET", sync: false },
     ]));
 
     const realtime = render.services?.find(({ name }) => name === "toonspectrum-studio-live");
