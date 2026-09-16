@@ -11,6 +11,8 @@ import {
   STUDIO_MENU_ITEM_INVENTORY as BASE_MENU_INVENTORY,
 } from "./studio-command-catalog-base";
 
+import { STUDIO_BRUSH_LABELS } from "./brush/studio-brush-product-model";
+
 import type { StudioCommandCatalogEntry, StudioCommandSource } from "./studio-command-catalog-base";
 import type { CommandId } from "@toonspectrum/studio-command-registry";
 
@@ -62,22 +64,23 @@ const NORMALIZED_BASE_CATALOG: readonly StudioCommandCatalogEntry[] = Object.fre
         labels: Object.freeze([
           {
             locale: "ko",
-            label: "현재 브러시 세부 설정",
-            description: "현재 선택한 브러시의 펜촉·필압·도장·입력·엔진 조합을 편집합니다.",
+            label: STUDIO_BRUSH_LABELS.editCurrent,
+            description: "캔버스를 떠나지 않고 현재 브러시의 펜촉·필압·도장·입력·엔진 조합을 빠르게 편집합니다.",
           },
           {
             locale: "en",
-            label: "Current brush settings",
-            description: "Edit the selected brush tip, pressure, stamp, input, and engine settings.",
+            label: "Edit current brush",
+            description: "Quickly edit the selected brush tip, pressure, stamp, input, and engine settings without leaving the canvas.",
           },
         ]),
         aliases: Object.freeze([
           ...entry.aliases,
           { vendor: "toonstudio", locale: "ko", term: "브러시 스튜디오" } as const,
           { vendor: "toonstudio", locale: "ko", term: "브러시 상세 설정" } as const,
+          { vendor: "toonstudio", locale: "ko", term: "현재 브러시 세부 설정" } as const,
           { vendor: "toonstudio", locale: "en", term: "Brush Studio" } as const,
         ]),
-        note: "The in-editor Brush Studio edits the current brush; the dedicated brush.lab command owns guided brush authoring.",
+        note: "Compact and full editing are two depths of one Brush Studio product, not separate products.",
       });
     }
 
@@ -105,17 +108,18 @@ const BRUSH_LAB_COMMAND: StudioCommandCatalogEntry = {
   id: "brush.lab",
   category: "brush",
   labels: [
-    { locale: "ko", label: "목적별 브러시 제작실", description: "원하는 획을 먼저 고르고 실제로 시험한 뒤 재질·물리·패턴·전문 엔진까지 조정합니다." },
-    { locale: "en", label: "Guided Brush Studio", description: "Start from the desired stroke, test it live, then refine material, physics, pattern, and expert engines." },
+    { locale: "ko", label: STUDIO_BRUSH_LABELS.create, description: "시작 브러시를 고르고 실제로 시험한 뒤 재질·물리·패턴·전문 엔진까지 전체 편집합니다." },
+    { locale: "en", label: "Create a new brush", description: "Choose a starting brush, test it live, then refine material, physics, pattern, and expert engines in the full Brush Studio." },
   ],
   aliases: [
+    { vendor: "toonstudio", locale: "ko", term: "목적별 브러시 제작실" },
     { vendor: "toonstudio", locale: "ko", term: "브러시 연구실" },
     { vendor: "toonstudio", locale: "ko", term: "브러시 제작실" },
     { vendor: "toonstudio", locale: "en", term: "Brush Studio V6" },
   ],
   helpNodeId: "help/brush/lab",
   origins: [{ source: "menu", nativeId: BRUSH_LAB_MENU_ID, status: "wired" }],
-  note: "Navigation command to the dedicated Brush Studio V6 workspace while preserving work/remix context.",
+  note: "Navigation command to the canonical full Brush Studio while preserving manuscript context; former lab names remain search aliases only.",
 };
 
 export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =

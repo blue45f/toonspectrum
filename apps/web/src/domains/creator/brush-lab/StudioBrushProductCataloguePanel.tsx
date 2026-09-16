@@ -56,12 +56,12 @@ export function StudioBrushProductCataloguePanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Library size={15} aria-hidden="true" /> PRODUCT CATALOGUE
+            <Library size={15} aria-hidden="true" /> STARTING BRUSHES
           </p>
-          <h2 className="mt-1 text-sm font-black text-fg">제품 브러시 48종</h2>
+          <h2 className="mt-1 text-sm font-black text-fg">시작 브러시 48종</h2>
           <p className="mt-1 max-w-4xl text-xs leading-5 text-fg-3">
             실제 렌더 결과·손맛·재질이 구분되는 대표만 남겼습니다. 비슷한 구현 변형과 이전
-            설계명은 별도 브러시로 노출하지 않으며, 일반 선택 창과 이 편집기가 같은 목록을
+            설계명은 별도 브러시로 노출하지 않으며, 브러시 선택과 전체 편집이 같은 목록·엔진 설명·특성 정보를
             사용합니다.
           </p>
         </div>
@@ -71,7 +71,7 @@ export function StudioBrushProductCataloguePanel({
           onClick={() => setOpen((current) => !current)}
           className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-fg hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         >
-          {open ? "카탈로그 닫기" : "48종 보기"}
+          {open ? "시작 브러시 숨기기" : "48종 보기"}
         </button>
       </div>
 
@@ -126,7 +126,7 @@ export function StudioBrushProductCataloguePanel({
                   </span>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
                     {recipeId
-                      ? `${recipeNames.get(recipeId) ?? recipeId}로 편집하기`
+                      ? `${recipeNames.get(recipeId) ?? recipeId} 기반으로 시작`
                       : "브러시 선택에서 사용하기"}
                     <ArrowRight
                       size={13}

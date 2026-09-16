@@ -569,7 +569,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
   {
     id: "workflow.brush-studio",
     category: "workflow",
-    title: "브러시 스튜디오에서 질감 만들기",
+    title: "현재 브러시 편집에서 질감 다듬기",
     eyebrow: "개인화 작업 흐름",
     summary: "팁, 간격, 산포, 질감, 필압, 혼색과 엔진 조합을 시험해 목적별 브러시를 만듭니다.",
     outcome: "미리보기로 비교한 설정을 재사용 가능한 브러시 프리셋으로 저장합니다.",

@@ -24,17 +24,13 @@ import {
   Wind,
 } from "lucide-react";
 
+import { STUDIO_BRUSH_LABELS, studioBrushEditorHref } from "./brush/studio-brush-product-model";
+
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
-/** Keep the current document/remix context when moving into the full Brush Editor workspace. */
-export function studioBrushLabHref(pathname: string): string {
-  const work = /^\/studio\/work\/([^/]+)/u.exec(pathname);
-  if (work?.[1]) return `/studio/work/${work[1]}/brush-lab`;
-  const remix = /^\/studio\/remix\/([^/]+)/u.exec(pathname);
-  if (remix?.[1]) return `/studio/remix/${remix[1]}/brush-lab`;
-  return "/studio/brush-lab";
-}
+/** @deprecated Use the canonical full-editor helper; retained for existing host imports. */
+export const studioBrushLabHref = studioBrushEditorHref;
 
 /** Build brush menu commands for the active Studio document and UI capabilities. */
 export function buildStudioBrushMenuItems({
@@ -103,7 +99,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "preset-browser",
       commandId: "brush.preset-browser",
-      label: "브러시 선택…",
+      label: `${STUDIO_BRUSH_LABELS.choose}…`,
       icon: LibraryBig,
       onSelect: () => {
         ui.openBrushPresetBrowser();
@@ -112,7 +108,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "brush-studio",
       commandId: "brush.studio",
-      label: "현재 브러시 세부 설정…",
+      label: `${STUDIO_BRUSH_LABELS.editCurrent}…`,
       icon: SlidersHorizontal,
       onSelect: () => {
         ui.openBrushStudio();
@@ -122,7 +118,7 @@ export function buildStudioBrushMenuItems({
       id: "brush-lab",
       commandId: "brush.lab",
       searchActivation: "execute",
-      label: "목적별 브러시 제작실…",
+      label: `${STUDIO_BRUSH_LABELS.create}…`,
       icon: Sparkles,
       onSelect: () => {
         ui.openBrushLab();
@@ -131,7 +127,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "natural-media",
       commandId: "brush.natural-media",
-      label: "자연 매체 설정…",
+      label: `${STUDIO_BRUSH_LABELS.editCurrent} · 자연 매체…`,
       icon: Droplets,
       onSelect: () => {
         ui.openNaturalMediaBrushes();
@@ -140,7 +136,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "my-brushes",
       commandId: "brush.saved-library",
-      label: "브러시 관리…",
+      label: `${STUDIO_BRUSH_LABELS.manage}…`,
       icon: BookMarked,
       onSelect: () => {
         ui.openBrushLibrary();

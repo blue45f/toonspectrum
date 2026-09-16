@@ -1060,8 +1060,8 @@ export function StudioDrawOptionsBar({
           {drawMode === "pen" && onOpenBrushStudio ? (
             <StudioToolHintTarget
               hint={studioToolHintFromLabel(
-                "브러시 스튜디오",
-                "현재 브러시의 필압 곡선·도장 간격·촉 회전·질감을 세밀하게 편집하고 재사용 프리셋으로 저장합니다.",
+                "현재 브러시 편집",
+                "캔버스를 떠나지 않고 현재 브러시의 필압 곡선·도장 간격·촉 회전·질감을 빠르게 편집합니다.",
                 undefined,
                 "brush-studio"
               )}
@@ -1069,7 +1069,7 @@ export function StudioDrawOptionsBar({
               <button
                 type="button"
                 onClick={onOpenBrushStudio}
-                aria-label="브러시 고급 설정"
+                aria-label="현재 브러시 편집"
                 className={cn(iconBtn, "size-11 border-line bg-card text-fg-2 hover:bg-raised")}
               >
                 <Wand2 size={13} strokeWidth={1.75} aria-hidden />

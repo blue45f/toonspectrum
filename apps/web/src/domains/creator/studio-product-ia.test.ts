@@ -55,11 +55,18 @@ describe("ToonStudio final product IA", () => {
       "내 브러시",
     ]));
 
+    expect(editor?.label).toBe("브러시 스튜디오");
     expect(editor?.surfaces).toContainEqual({ id: "brush-editor", role: "primary" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-current-settings", role: "projection" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-studio", role: "projection" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-lab-v6", role: "legacy" });
     expect(editor?.surfaces).toContainEqual({ id: "brush-v5-diagnostic", role: "diagnostic" });
     expect(editor?.aliases).toEqual(expect.arrayContaining([
-      "브러시 스튜디오",
+      "현재 브러시 편집",
+      "새 브러시 만들기",
+      "브러시 설정",
       "브러시 연구실",
+      "브러시 제작실",
     ]));
   });
 
