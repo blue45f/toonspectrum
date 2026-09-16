@@ -5,3 +5,6 @@ export * from "./revision";
 export * from "./project-graph";
 export * from "./legacy-project-state-adapter";
 export * from "./capability-ledger";
+export * from "./review";
+export * from "./external-file-binding";
+export * from "./sync";
