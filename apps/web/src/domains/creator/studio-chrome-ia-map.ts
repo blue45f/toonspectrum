@@ -181,7 +181,7 @@ export const STUDIO_CHROME_SELECT_CORE_ACTION_IDS = [
 
 /**
  * File menu item order for CSP/PPT-like document flow:
- * save & publish → import → project tools → export/share → project surfaces.
+ * save → import → project tools → export/share → project surfaces → optional publication.
  *
  * Wave E appended the five surfaces whose only door was the desktop-only
  * 프로젝트 센터 sheet. They sit after the export loop on purpose: the export loop
@@ -189,7 +189,6 @@ export const STUDIO_CHROME_SELECT_CORE_ACTION_IDS = [
  */
 export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [
   "save-draft",
-  "publish",
   "import-json",
   "import-psd",
   "import-ora-cbz",
@@ -203,6 +202,7 @@ export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [
   "publish-preflight",
   "publish-package",
   "rights-manifest",
+  "publish",
 ] as const;
 
 /** CSP-style left rail tool groups (divider boundaries). */
