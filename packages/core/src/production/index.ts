@@ -11,3 +11,4 @@ export * from "./aggregate";
 export * from "./versioning";
 export * from "./planning";
 export * from "./commercial";
+export * from "./role-workflow";
