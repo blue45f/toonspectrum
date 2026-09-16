@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -48,6 +49,7 @@ import {
 import type { StudioProjectLibraryEntry, StudioProjectStatus } from "../studio-project-library-store";
 import { PersonalCloudConnectionPanel } from "./PersonalCloudConnectionPanel";
 import { PersonalCloudUploadActions } from "./PersonalCloudUploadActions";
+import { StudioProjectCardThumbnail } from "./StudioProjectCardThumbnail";
 import { StudioQuickStart } from "./StudioQuickStart";
 import { usePersonalCloudConnections } from "./usePersonalCloudConnections";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
@@ -150,8 +152,10 @@ export function StudioSaveFirstProjectLibraryPage({
   readonly initialView?: InitialLibraryView;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data: session } = useSession();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
+  const authUserId = session?.user?.id ?? null;
   const view = resolveView(searchParams.get("view"), initialView);
   const status: StudioProjectStatus | undefined = view === "archived"
     ? "archived"
@@ -460,7 +464,12 @@ export function StudioSaveFirstProjectLibraryPage({
                 {filteredProjects.map((project) => {
                   const profile = profiles.profileFor(project.id);
                   return (
-                    <article key={project.id} className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+                    <article key={project.id} className="overflow-hidden rounded-2xl border border-line bg-card p-4 shadow-sm">
+                      <StudioProjectCardThumbnail
+                        authUserId={authUserId}
+                        locale={locale}
+                        project={project}
+                      />
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent-soft px-2.5 text-[0.68rem] font-black text-accent"><ShieldCheck size={13} aria-hidden="true" />{locale === "ko" ? "나만 보기" : "Owner only"}</span>
                         <SaveBadge profile={profile} locale={locale} />

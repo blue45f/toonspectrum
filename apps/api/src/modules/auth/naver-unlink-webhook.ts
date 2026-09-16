@@ -65,6 +65,7 @@ function constantTimeEqual(value: string, expected: string): boolean {
 // Naver's published disconnect protocol explicitly derives both AES and HMAC
 // keys from MD5(client secret). This is protocol compatibility, not password hashing.
 function naverProtocolKey(clientSecret: string): Buffer {
+  // codeql[js/weak-cryptographic-algorithm,js/insufficient-password-hash]
   return createHash("md5").update(clientSecret, "utf8").digest().subarray(
     0,
     NAVER_PROTOCOL_BLOCK_BYTES,

@@ -384,3 +384,36 @@
 @media (prefers-reduced-motion: reduce) {
   .appearance-preview-art i { animation: none !important; }
 }
+
+/* Real scene thumbnails make each theme's atmosphere visible before selection. */
+.appearance-preview > .appearance-preview-scene {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .28;
+  filter: saturate(.86) contrast(1.04);
+  transform: scale(1.06);
+  transition: opacity .2s ease, transform .4s cubic-bezier(.16,1,.3,1);
+}
+.appearance-preview > :not(.appearance-preview-art):not(.appearance-preview-scene) {
+  position: relative;
+  z-index: 1;
+}
+.appearance-card:hover .appearance-preview-scene,
+.appearance-card[data-selected="true"] .appearance-preview-scene {
+  opacity: .54;
+  transform: scale(1);
+}
+.appearance-card[data-featured="true"] .appearance-preview-scene { opacity: .38; }
+.appearance-card[data-featured="true"]:hover .appearance-preview-scene,
+.appearance-card[data-featured="true"][data-selected="true"] .appearance-preview-scene { opacity: .62; }
+@media (prefers-reduced-motion: reduce) {
+  .appearance-preview-scene { transition: none; }
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  .appearance-preview-scene { display: none; }
+}

@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
+import { getThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
 import { THEME_PRESETS, type AppearanceScope, type ThemeGroup } from "@/shared/lib/theme-presets";
 
 const GROUPS: readonly ThemeGroup[] = ["signature", "classic", "accessibility"];
@@ -79,11 +80,21 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
                 <div className="appearance-grid">
                   {presets.map((preset) => {
                     const label = korean ? preset.ko : preset.en;
+                    const scene = getThemeSceneAsset(preset.id);
                     return (
                       <label className="appearance-card" key={preset.id} data-selected={selected === preset.id} data-featured={preset.group === "signature" || undefined}>
                         <input className="sr-only" type="radio" name={`${id}-theme`} aria-label={label}
                           checked={selected === preset.id} onChange={() => choose(preset.id)} />
                         <span className="appearance-preview" data-appearance-preview={preset.id} aria-hidden="true">
+                          <img
+                            className="appearance-preview-scene"
+                            src={scene.src}
+                            width={1200}
+                            height={800}
+                            loading="lazy"
+                            decoding="async"
+                            alt=""
+                          />
                           <span className="appearance-preview-toolbar"><i /><i /><i /></span>
                           <span className="appearance-preview-rail"><i /><i /><i /></span>
                           <span className="appearance-preview-paper"><i /><i /><i /></span>

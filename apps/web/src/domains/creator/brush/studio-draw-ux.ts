@@ -11,6 +11,10 @@ import {
 } from "../studio-creative-ux";
 import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
 
+import {
+  resolveStudioBrushEngineLaneLabelKo,
+  studioBrushEngineLaneRowById,
+} from "./studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
@@ -57,15 +61,16 @@ export function filterStudioBrushLibraryItems(options: {
   const recentIds = options.recentIds ?? [];
   const category = options.category ?? "all";
 
-  const allItems = options.catalogItems
-    ? [...options.catalogItems]
-    : listStudioBrushTrayItems("all");
-  const byId = new Map(allItems.map((item) => [item.id, item]));
-  let items: StudioBrushTrayItem[];
-  if (category === "favorites") {
-    items = [...new Set(favoriteIds)].map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
-  } else if (category === "recent") {
-    items = [...new Set(recentIds)].map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
+  const allItems = options.catalogItems ?? listStudioBrushTrayItems("all");
+  let items: readonly StudioBrushTrayItem[];
+  if (category === "favorites" || category === "recent") {
+    // Most catalogue views never need id lookup. Build the map only for personal ordering lanes,
+    // keeping every ordinary search/material filter allocation-linear as the library grows.
+    const byId = new Map(allItems.map((item) => [item.id, item]));
+    const ids = category === "favorites" ? favoriteIds : recentIds;
+    items = [...new Set(ids)]
+      .map((id) => byId.get(id))
+      .filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "all" || category === "expressive") {
     items = category === "all"
       ? allItems
@@ -76,8 +81,10 @@ export function filterStudioBrushLibraryItems(options: {
     items = allItems.filter((item) => item.mediaGroup === category);
   }
 
-  if (!terms.length) return items;
+  if (!terms.length) return [...items];
   return items.filter((item) => {
+    const engineLane = studioBrushEngineLaneRowById(item.id);
+    const engineLaneLabel = resolveStudioBrushEngineLaneLabelKo(item.id);
     return matchesStudioToolSearch(terms, [
       item.name,
       item.shortName,
@@ -85,6 +92,11 @@ export function filterStudioBrushLibraryItems(options: {
       item.id,
       item.mediaGroup,
       STUDIO_BRUSH_MATERIAL_GROUP_LABELS[item.mediaGroup],
+      engineLane?.lane ?? "",
+      engineLane?.engine ?? "",
+      engineLane?.engineVariant ?? "",
+      engineLane?.family ?? "",
+      engineLaneLabel ?? "",
       ...(item.searchAliases ?? []),
     ]);
   });
@@ -99,7 +111,7 @@ export function studioBrushPresetById(id: unknown): BrushPreset | null {
  * 브러시 라이브러리 탭 — 재질 축 하나로 정리했다.
  *
  * "프로"와 "엔진" 탭은 삭제했다. 둘 다 브러시가 어떤 재료를 남기는지 말해주지 않는 구현 티어라,
- * 유화 리본과 수채 과립이 "엔진" 한 칸에 뒤섞여 있었고 프로 160종은 재질과 무관하게 한 덩어리였다.
+ * 유화 리본과 수채 과립이 "엔진" 한 칸에 뒤섞여 있었고 프로시저럴 브러시는 재질과 무관하게 한 덩어리였다.
  * 지금은 잉크·연필·마커·수채·유화·에어·파스텔·질감·톤·효과 열 갈래이며, 각 항목의 소속은
  * 렌더 계약에서 파생되므로 새 브러시가 추가돼도 손으로 표를 고칠 일이 없다.
  */

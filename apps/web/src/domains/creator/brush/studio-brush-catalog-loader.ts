@@ -33,10 +33,10 @@ export async function loadStudioFullBrushCatalogItems(): Promise<
 }
 
 /**
- * LISTING lane: the curated quality portfolio in its explicit product order. Quick shelves and
- * pickers expose only those distinct entries; both quarantined and other excluded registry ids
- * remain hidden even when favorited. `loadStudioBrushCatalogItemById` stays unfiltered so saved
- * documents retain their original brush identities.
+ * LISTING lane: the complete non-quarantined product inventory in quality-first order. The audited
+ * representatives stay at the front, while safe engine/procedural variants remain discoverable by
+ * material, search, favorites, and recents. `loadStudioBrushCatalogItemById` stays unfiltered so
+ * saved documents can still resolve replay-only quarantined identities.
  */
 export async function loadStudioListedBrushCatalogItems(): Promise<
   readonly StudioBrushCatalogItem[]

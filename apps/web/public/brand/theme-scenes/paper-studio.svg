@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Paper storyboard desk</title>
+  <desc id="desc">A bright overhead desk with taped storyboard sheets, pencils, rulers and daylight shadows.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="bg" x1="70" y1="30" x2="1130" y2="770" gradientUnits="userSpaceOnUse"><stop stop-color="#fbfaf5"/><stop offset="1" stop-color="#ece8df"/></linearGradient>
+    <linearGradient id="paper" x1="300" y1="120" x2="830" y2="680" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#f5f2e9"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="url(#bg)"/><path d="M0 104h1200M0 690h1200" stroke="#d8d3c7" stroke-width="3"/><path d="M116 0v800M1078 0v800" stroke="#ded9cf" stroke-width="2"/>
+  <g filter="url(#shadow)"><rect x="222" y="92" width="672" height="616" rx="14" fill="url(#paper)" transform="rotate(-2 222 92)"/><rect x="268" y="144" width="254" height="196" rx="5" fill="#e4eef5" stroke="#403d38" stroke-width="4"/><rect x="548" y="144" width="294" height="196" rx="5" fill="#f4dfd4" stroke="#403d38" stroke-width="4"/><rect x="268" y="369" width="574" height="281" rx="5" fill="#ece7dc" stroke="#403d38" stroke-width="4"/>
+    <path d="M305 296c54-83 129-95 181-20" fill="none" stroke="#526778" stroke-width="10" stroke-linecap="round"/><path d="M594 291c64-75 145-84 207-12" fill="none" stroke="#a4553d" stroke-width="10" stroke-linecap="round"/><path d="M326 588c122-127 279-136 457-24" fill="none" stroke="#55514b" stroke-width="12" stroke-linecap="round"/>
+    <path d="M250 118h80v22h-80Zm544 545h80v22h-80Z" fill="#f0c778" opacity=".75"/></g>
+  <g transform="translate(82 486) rotate(-18)" filter="url(#shadow)"><rect width="410" height="42" rx="10" fill="#e8ba54"/><path d="M42 0v42m44-42v42m44-42v42m44-42v42m44-42v42m44-42v42m44-42v42m44-42v42" stroke="#80611f" stroke-width="3" opacity=".7"/></g>
+  <g transform="translate(895 174) rotate(12)" filter="url(#shadow)"><rect width="34" height="406" rx="17" fill="#e7614c"/><path d="M0 344h34l-17 62Z" fill="#d8b485"/><path d="m10 382 7 24 7-24Z" fill="#2e2a27"/><rect y="25" width="34" height="30" fill="#f3cf6d"/></g>
+  <circle cx="1012" cy="632" r="83" fill="#fff" stroke="#d4cec2" stroke-width="8" filter="url(#shadow)"/><circle cx="1012" cy="632" r="54" fill="#8b5a3e"/><path d="M1080 602c58 0 68 83 3 92" fill="none" stroke="#d4cec2" stroke-width="18"/>
+  <path d="M36 188c111-73 195-86 294-53" fill="none" stroke="#7899a8" stroke-width="18" stroke-linecap="round" opacity=".35"/>
+</svg>

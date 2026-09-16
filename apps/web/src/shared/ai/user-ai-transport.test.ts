@@ -199,8 +199,11 @@ describe("managed free AI transport response limits", () => {
       assignments: { text: groq.id, image: null, inference: null, "three-d": null },
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("generativelanguage.googleapis.com")) {
+      const requestUrl = new URL(String(input));
+      if (
+        requestUrl.protocol === "https:"
+        && requestUrl.hostname === "generativelanguage.googleapis.com"
+      ) {
         return new Response(JSON.stringify({ error: "quota" }), { status: 429 });
       }
       return new Response(JSON.stringify({

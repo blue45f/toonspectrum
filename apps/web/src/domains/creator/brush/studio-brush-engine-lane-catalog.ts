@@ -245,6 +245,33 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
 
 const LANE_ID_RE = /^([a-z0-9-]+)--([a-z0-9-]+)$/u;
 
+const STUDIO_BRUSH_ENGINE_LANE_BY_ID: ReadonlyMap<
+  string,
+  StudioBrushEngineLaneCatalogRow
+> = new Map(STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => [row.id, row]));
+
+const STUDIO_BRUSH_ENGINE_LANE_IDS: readonly string[] = Object.freeze(
+  STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => row.id),
+);
+
+const STUDIO_BRUSH_ENGINE_LANE_PRESETS: readonly {
+  id: string;
+  name: string;
+  defaultWidth: number;
+  defaultOpacity: number;
+  searchAliases: readonly string[];
+}[] = Object.freeze(
+  STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) =>
+    Object.freeze({
+      id: row.id,
+      name: row.name,
+      defaultWidth: row.defaultWidth,
+      defaultOpacity: row.defaultOpacity,
+      searchAliases: row.searchAliases,
+    }),
+  ),
+);
+
 export function isStudioBrushEngineLaneId(brushId: string): boolean {
   return LANE_ID_RE.test(brushId);
 }
@@ -257,14 +284,14 @@ export function resolveStudioBrushEngineLaneBaseId(
 }
 
 export function listStudioBrushEngineLaneIds(): readonly string[] {
-  return Object.freeze(STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => row.id));
+  return STUDIO_BRUSH_ENGINE_LANE_IDS;
 }
 
 export function studioBrushEngineLaneRowById(
   brushId: string | null | undefined,
 ): StudioBrushEngineLaneCatalogRow | null {
   if (!brushId) return null;
-  return STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.find((row) => row.id === brushId) ?? null;
+  return STUDIO_BRUSH_ENGINE_LANE_BY_ID.get(brushId) ?? null;
 }
 
 export function listStudioBrushEngineLanePresets(): readonly {
@@ -274,17 +301,7 @@ export function listStudioBrushEngineLanePresets(): readonly {
   defaultOpacity: number;
   searchAliases: readonly string[];
 }[] {
-  return Object.freeze(
-    STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) =>
-      Object.freeze({
-        id: row.id,
-        name: row.name,
-        defaultWidth: row.defaultWidth,
-        defaultOpacity: row.defaultOpacity,
-        searchAliases: row.searchAliases,
-      }),
-    ),
-  );
+  return STUDIO_BRUSH_ENGINE_LANE_PRESETS;
 }
 
 export function studioBrushEngineLaneDiameterScale(

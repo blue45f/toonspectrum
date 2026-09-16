@@ -36,6 +36,10 @@ describe("non-studio experience controls", () => {
     expect(ambient?.getAttribute("aria-hidden")).toBe("true");
     expect(ambient?.querySelectorAll(".site-theme-art")).toHaveLength(6);
     expect(ambient?.querySelector(".site-theme-art--constellation")).not.toBeNull();
+    const scene = ambient?.querySelector<HTMLImageElement>(".site-theme-scene");
+    expect(scene?.getAttribute("src")).toMatch(/^\/brand\/theme-scenes\/.+\.svg$/u);
+    expect(scene?.getAttribute("alt")).toBe("");
+    expect(scene?.getAttribute("data-theme-scene")).toBeTruthy();
   });
   it("toggles the actual context, persists it, and restores it on remount", () => {
     const first = frame();

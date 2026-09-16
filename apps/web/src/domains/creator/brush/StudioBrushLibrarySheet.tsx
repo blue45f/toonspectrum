@@ -36,6 +36,9 @@ import { useStudioFloatingSurfaceLayout } from "../use-studio-floating-surface-l
 
 import {
   filterStudioBrushCatalogItems,
+  isStudioDefaultQualityBrushCatalogId,
+  STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
@@ -823,13 +826,14 @@ export function StudioBrushLibrarySheet({
   const catalogTabs = operation === "erase"
     ? STUDIO_ERASER_LIBRARY_TABS
     : STUDIO_BRUSH_LIBRARY_TABS;
-  // SSOT totals — never hardcode (legacy copy said "229 paint" from core 71 era). The number must
-  // come from the LISTED inventory, not the registered one: registered counts include quarantined
-  // ids that this sheet can never show, so `STUDIO_BRUSH_CATALOG_COUNTS.paint` would advertise
-  // The drawer count is the curated product inventory, not the internal renderer registry.
+  // SSOT totals — never hardcode historical counts. The drawer advertises the complete
+  // non-quarantined inventory; replay-only quarantined identities remain resolvable but invisible.
   const operationCatalogCount = operation === "erase"
     ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length
     : STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
+  const qualityFirstCatalogCount = operation === "erase"
+    ? STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS.length
+    : STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS.length;
   // 코어/프로시저럴은 구현 티어라 서랍에서 말하지 않는다. 대신 지금 고를 수 있는 재질 갈래 수를
   // 보여준다 — 탭이 곧 재질이므로 이 숫자는 탭 목록에서 파생된다.
   const materialTabCount = catalogTabs.filter(
@@ -1167,7 +1171,7 @@ export function StudioBrushLibrarySheet({
           >
             {operation === "erase"
               ? `지우개 ${operationCatalogCount}종 · ${visibleItems.length}/${items.length}개 표시`
-              : `브러시 ${operationCatalogCount}종 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
+              : `브러시 ${operationCatalogCount}종 · 품질 검증 ${qualityFirstCatalogCount}종 우선 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1401,12 +1405,14 @@ export function StudioBrushLibrarySheet({
               const active = item.id === activeBrushId;
               const fav = favoriteIds.includes(item.id);
               const kindLabel = studioBrushCatalogKindLabel(item);
+              const qualityRepresentative = isStudioDefaultQualityBrushCatalogId(item.id);
               const engineLaneLabel = resolveStudioBrushEngineLaneLabelKo(item.id);
               const engineLane = studioBrushEngineLaneRowById(item.id);
               return (
                 <div
                   key={item.id}
                   data-studio-brush-source={item.source}
+                  data-studio-brush-quality-tier={qualityRepresentative ? "verified" : "extended"}
                   data-studio-brush-kind={item.mediaGroup}
                   data-studio-brush-engine-lane={engineLane?.lane}
                   className={cn(

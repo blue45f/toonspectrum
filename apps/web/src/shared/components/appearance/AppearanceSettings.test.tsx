@@ -20,12 +20,16 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("appearance controls", () => {
   it("exposes grouped signature, classic and accessibility presets with independent Studio preferences", () => {
-    render(<AppearanceSettings />);
+    const result = render(<AppearanceSettings />);
     expect(screen.getAllByRole("radio")).toHaveLength(10);
     expect(screen.getByRole("heading", { name: "시그니처 테마" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "클래식 작업실" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "접근성" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "오로라" })).toBeTruthy();
+    const scenes = Array.from(result.container.querySelectorAll<HTMLImageElement>(".appearance-preview-scene"));
+    expect(scenes).toHaveLength(9);
+    expect(new Set(scenes.map((scene) => scene.getAttribute("src"))).size).toBe(9);
+    expect(scenes.every((scene) => /^\/brand\/theme-scenes\/.+\.svg$/u.test(scene.getAttribute("src") ?? ""))).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: "미드나이트" }));
     expect(useTheme.getState().preference).toBe("midnight");
     fireEvent.click(screen.getByRole("button", { name: "스튜디오" }));
