@@ -337,10 +337,14 @@ export function issueState(
 
 export function readOAuthStateContext(
   id: OAuthProviderId,
-  state: string | undefined,
+  state: unknown,
   maxAgeMs = 10 * 60_000,
 ): OAuthStateContext | null {
-  if (!state || state.length > OAUTH_STATE_MAX_LENGTH) return null;
+  if (
+    typeof state !== "string"
+    || state.length === 0
+    || state.length > OAUTH_STATE_MAX_LENGTH
+  ) return null;
   const dot = state.lastIndexOf(".");
   if (dot < 0) return null;
   const payloadB64 = state.slice(0, dot);
@@ -395,7 +399,7 @@ export function readOAuthStateContext(
 
 export function verifyState(
   id: OAuthProviderId,
-  state: string | undefined,
+  state: unknown,
   maxAgeMs = 10 * 60_000,
 ): boolean {
   return readOAuthStateContext(id, state, maxAgeMs) !== null;
@@ -403,11 +407,16 @@ export function verifyState(
 
 export function verifyBrowserBoundState(
   id: OAuthProviderId,
-  state: string | undefined,
-  cookieState: string | null,
+  state: unknown,
+  cookieState: unknown,
   maxAgeMs = 10 * 60_000,
 ): boolean {
-  if (!state || !cookieState || !verifyState(id, state, maxAgeMs)) return false;
+  if (
+    typeof state !== "string"
+    || typeof cookieState !== "string"
+    || cookieState.length !== state.length
+    || !verifyState(id, state, maxAgeMs)
+  ) return false;
   const stateBytes = Buffer.from(state, "utf8");
   const cookieBytes = Buffer.from(cookieState, "utf8");
   return (

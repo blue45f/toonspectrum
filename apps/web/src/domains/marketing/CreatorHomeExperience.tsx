@@ -207,20 +207,42 @@ export function CreatorHomeExperience() {
               {copy.trust.map((item) => <span key={item}><Check size={13} aria-hidden="true" />{item}</span>)}
             </div>
           </div>
-          <figure className="cf-home-preview">
-            <img
-              src={artDirection.hero.src}
-              srcSet={artDirection.hero.srcSet}
-              sizes="(max-width: 720px) 92vw, 48vw"
-              width={1536}
-              height={1024}
-              decoding="async"
-              fetchPriority="high"
-              alt={copy.previewAlt}
-              data-art-asset={artDirection.hero.id}
-            />
-            <figcaption>{copy.previewCaption}</figcaption>
-          </figure>
+          <div className="cf-hero-visual" data-theme-layout={artDirection.scene.id}>
+            <div className="cf-theme-collage" aria-hidden="true">
+              {[artDirection.hero, artDirection.companions[0]].map((asset, index) => (
+                <span className={`cf-theme-collage-card cf-theme-collage-card--${index + 1}`} key={asset.id}>
+                  <img
+                    src={asset.src}
+                    srcSet={asset.srcSet}
+                    sizes="(max-width: 720px) 22vw, 10rem"
+                    width={640}
+                    height={427}
+                    decoding="async"
+                    loading="lazy"
+                    alt=""
+                    data-art-asset={asset.id}
+                  />
+                </span>
+              ))}
+            </div>
+            <span className="cf-theme-ribbon" aria-hidden="true"><i /><i /><i /></span>
+            <figure className="cf-home-preview">
+              <img
+                className="cf-theme-scene-image"
+                src={artDirection.scene.src}
+                width={1200}
+                height={800}
+                decoding="async"
+                fetchPriority="high"
+                alt={locale === "ko" ? artDirection.scene.altKo : artDirection.scene.altEn}
+                data-art-asset={artDirection.scene.id}
+              />
+              <figcaption>
+                <span>{copy.previewCaption}</span>
+                <small>{locale === "ko" ? "테마 전용 장면" : "Theme-specific scene"}</small>
+              </figcaption>
+            </figure>
+          </div>
         </section>
 
         <ProductIntentStart />

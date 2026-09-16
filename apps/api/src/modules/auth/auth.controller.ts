@@ -151,6 +151,7 @@ export function isValidSignupEmail(email: string): boolean {
   return dot > 0 && dot < domain.length - 1;
 }
 const AUTH_RATE_LIMIT_LOCAL_LIMITER = new LocalAuthRateLimiter();
+const OAUTH_AUTHORIZATION_CODE_MAX_LENGTH = 8_192;
 
 @Controller("auth")
 export class AuthController {
@@ -334,9 +335,9 @@ export class AuthController {
   @Get("oauth/:provider/callback")
   async oauthCallback(
     @Param("provider") provider: string,
-    @Query("code") code: string | undefined,
-    @Query("state") state: string | undefined,
-    @Query("error") error: string | undefined,
+    @Query("code") code: unknown,
+    @Query("state") state: unknown,
+    @Query("error") error: unknown,
     @Req() request: Request,
     @Res() res: Response,
   ) {
@@ -357,8 +358,12 @@ export class AuthController {
     if (!isAuthorizationCodeFlowConfigured(provider)) {
       return res.redirect(`${web}/auth/callback#error=oauth_unavailable`);
     }
-    if (!state || !verifyBrowserBoundState(provider, state, browserState))
+    if (
+      typeof state !== "string"
+      || !verifyBrowserBoundState(provider, state, browserState)
+    ) {
       return res.redirect(`${web}/auth/callback#error=bad_state`);
+    }
     const stateContext = readOAuthStateContext(provider, state);
     if (!stateContext) {
       return res.redirect(`${web}/auth/callback#error=bad_state`);
@@ -393,15 +398,22 @@ export class AuthController {
     if (provider === "github" && !isValidPkceVerifier(browserPkceVerifier)) {
       return res.redirect(`${web}/auth/callback#error=bad_state`);
     }
-    if (error) {
-      const errorCode = /^[A-Za-z0-9._-]{1,80}$/u.test(error)
+    if (error !== undefined) {
+      const errorCode = typeof error === "string"
+        && /^[A-Za-z0-9._-]{1,80}$/u.test(error)
         ? error
         : "provider_error";
       return res.redirect(
         `${web}/auth/callback#error=${encodeURIComponent(errorCode)}`,
       );
     }
-    if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
+    if (
+      typeof code !== "string"
+      || code.length === 0
+      || code.length > OAUTH_AUTHORIZATION_CODE_MAX_LENGTH
+    ) {
+      return res.redirect(`${web}/auth/callback#error=no_code`);
+    }
     try {
       const user = linkToUserId
         ? await handleOAuthCallback(

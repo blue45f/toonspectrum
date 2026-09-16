@@ -33,19 +33,33 @@ mkdirSync(outputDirectory, { recursive: true });
 const failures: string[] = [];
 const productIds = STUDIO_BRUSH_QUALITY_PORTFOLIO.map((entry) => entry.id);
 const productIdSet = new Set(productIds);
+const listedIds = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+const listedIdSet = new Set(listedIds);
+const expectedListedIds = STUDIO_ALL_BRUSH_CATALOG_ITEMS
+  .filter((item) => !isStudioBrushQuarantinedPresetId(item.id))
+  .map((item) => item.id);
+const expectedListedIdSet = new Set(expectedListedIds);
 
 if (productIds.length !== 88) failures.push(`product total is ${productIds.length}, expected 88`);
 if (new Set(productIds).size !== productIds.length) failures.push("duplicate product ids");
 if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint !== 86) failures.push("paint total is not 86");
 if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.erase !== 2) failures.push("eraser total is not 2");
 
-for (const [label, inventory] of [
-  ["default", STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS],
-  ["listed", STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS],
-] as const) {
-  if (inventory.map((item) => item.id).join("\0") !== productIds.join("\0")) {
-    failures.push(`${label} catalogue differs from the product portfolio`);
-  }
+if (
+  STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => item.id).join("\0")
+  !== productIds.join("\0")
+) {
+  failures.push("default quality catalogue differs from the audited portfolio");
+}
+if (listedIds.slice(0, productIds.length).join("\0") !== productIds.join("\0")) {
+  failures.push("complete catalogue does not keep the quality portfolio first");
+}
+if (listedIdSet.size !== listedIds.length) failures.push("duplicate complete catalogue ids");
+if (
+  listedIdSet.size !== expectedListedIdSet.size
+  || [...expectedListedIdSet].some((id) => !listedIdSet.has(id))
+) {
+  failures.push("complete catalogue differs from the non-quarantined registry");
 }
 
 const rows = STUDIO_BRUSH_QUALITY_PORTFOLIO.map((entry) => {
@@ -95,12 +109,16 @@ for (const [absorbedId, ownerId] of Object.entries(
   if (!productIdSet.has(ownerId)) {
     failures.push(`${absorbedId}: missing owner ${ownerId}`);
   }
-  if (
-    filterStudioBrushCatalogItems({ query: absorbedId }).some(
-      (item) => item.id === absorbedId,
-    )
-  ) {
-    failures.push(`${absorbedId}: excluded implementation remains directly searchable`);
+  const registered = studioBrushCatalogItemById(absorbedId);
+  const directlySearchable = filterStudioBrushCatalogItems({ query: absorbedId }).some(
+    (item) => item.id === absorbedId,
+  );
+  if (registered && !isStudioBrushQuarantinedPresetId(absorbedId)) {
+    if (!directlySearchable) {
+      failures.push(`${absorbedId}: safe advanced identity is not directly searchable`);
+    }
+  } else if (directlySearchable) {
+    failures.push(`${absorbedId}: quarantined or unknown identity became searchable`);
   }
 }
 
@@ -116,13 +134,15 @@ if (Math.abs(qualityWeight - 0.85) > 1e-9) failures.push("quality weight is not 
 if (Math.abs(performanceWeight - 0.15) > 1e-9) failures.push("performance weight is not 15%");
 
 const report = {
-  kind: "toonspectrum-studio-brush-product-catalogue-audit-v2",
+  kind: "toonspectrum-studio-brush-product-catalogue-audit-v3",
   generatedAt: new Date().toISOString(),
   counts: {
     internalRegistry: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length,
-    productCatalogue: rows.length,
-    hiddenImplementationRows: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length - rows.length,
-    excludedImplementationIds: Object.keys(STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER).length,
+    qualityPortfolio: rows.length,
+    listedCatalogue: listedIds.length,
+    advancedListedRows: listedIds.length - rows.length,
+    quarantinedReplayOnlyRows: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length - listedIds.length,
+    absorbedQualityEvidenceIds: Object.keys(STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER).length,
   },
   weights: STUDIO_BRUSH_QUALITY_SCORE_WEIGHTS,
   rows,
@@ -146,9 +166,11 @@ const markdown =
     "# Studio brush product catalogue audit",
     "",
     `- Internal renderer rows: ${report.counts.internalRegistry}`,
-    `- Product brushes: ${report.counts.productCatalogue}`,
-    `- Hidden implementation rows: ${report.counts.hiddenImplementationRows}`,
-    `- Excluded implementation ids: ${report.counts.excludedImplementationIds}`,
+    `- Quality-first brushes: ${report.counts.qualityPortfolio}`,
+    `- Complete selectable brushes: ${report.counts.listedCatalogue}`,
+    `- Advanced selectable rows: ${report.counts.advancedListedRows}`,
+    `- Quarantined replay-only rows: ${report.counts.quarantinedReplayOnlyRows}`,
+    `- Absorbed quality-evidence ids: ${report.counts.absorbedQualityEvidenceIds}`,
     `- Failures: ${failures.length}`,
     "",
     "| Brush | Medium | Live → commit | Distinctness |",

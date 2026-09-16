@@ -58,7 +58,7 @@ describe("StudioProjectCreatePage", () => {
     });
   });
 
-  it("routes personal Drive creation through storage connection and first sync", async () => {
+  it("starts with browser autosave and defers destination choice until explicit Save", async () => {
     render(
       <MemoryRouter initialEntries={["/studio/new"]}>
         <StudioProjectCreatePage />
@@ -66,26 +66,18 @@ describe("StudioProjectCreatePage", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText(/3\. 저장 위치|3\. Save location/u));
-    fireEvent.click(screen.getByRole("button", { name: /다른 원격 저장소 보기|Show more remote storage/u }));
-    fireEvent.click(screen.getByRole("radio", { name: /Google Drive/u }));
+    expect(screen.queryByText(/3\. 저장 위치|3\. Save location/u)).toBeNull();
+    expect(screen.getByText(/그리는 동안은 자동으로 임시 저장됩니다|temporarily autosaved while you draw/u)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /웹툰 시작|Start Webtoon/u }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("location").textContent).toMatch(
-        /^\/studio\?view=storage&project=[^&]+&sync=google-drive$/u,
-      );
+      expect(screen.getByLabelText("location").textContent).toMatch(/^\/studio\/p\//u);
     });
-
     const project = readStudioProjectLibrary(window.localStorage).projects[0]!;
     const profile = readStudioSaveProfiles(window.localStorage).profiles[project.id]!;
-    expect(profile.accessMode).toBe("owner-only");
-    expect(profile.distributionState).toBe("none");
-    expect(profile.bindings).toContainEqual(expect.objectContaining({
-      provider: "google-drive",
-      syncState: "pending",
-      connectionRequired: true,
-    }));
+    expect(profile.lastManualSaveAt).toBeNull();
+    expect(profile.bindings).toHaveLength(1);
+    expect(profile.bindings[0]).toMatchObject({ provider: "browser", syncState: "local-only" });
   });
 
   it("honors a homepage deep link for project kind and starting template", () => {

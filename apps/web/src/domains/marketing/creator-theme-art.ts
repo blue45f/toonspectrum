@@ -1,3 +1,4 @@
+import { getThemeSceneAsset, type ThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
 import type { DesignTheme } from "@/shared/lib/theme-presets";
 
 export type CreatorArtAssetId = "world" | "process" | "materials";
@@ -9,6 +10,7 @@ export interface CreatorArtAsset {
 }
 
 export interface CreatorThemeArtDirection {
+  scene: ThemeSceneAsset;
   hero: CreatorArtAsset;
   companions: readonly [CreatorArtAsset, CreatorArtAsset];
   process: CreatorArtAsset;
@@ -35,12 +37,14 @@ export const CREATOR_ART_ASSETS: Readonly<Record<CreatorArtAssetId, CreatorArtAs
 };
 
 const direction = (
+  theme: DesignTheme,
   hero: CreatorArtAssetId,
   companions: readonly [CreatorArtAssetId, CreatorArtAssetId],
   process: CreatorArtAssetId,
   closing: CreatorArtAssetId,
   tools: readonly [CreatorArtAssetId, CreatorArtAssetId, CreatorArtAssetId],
 ): CreatorThemeArtDirection => ({
+  scene: getThemeSceneAsset(theme),
   hero: CREATOR_ART_ASSETS[hero],
   companions: [CREATOR_ART_ASSETS[companions[0]], CREATOR_ART_ASSETS[companions[1]]],
   process: CREATOR_ART_ASSETS[process],
@@ -48,17 +52,17 @@ const direction = (
   tools,
 });
 
-/** The same licensed brand studies are recomposed per theme; no remote image request is introduced. */
+/** Every theme receives a unique scene plus local licensed studies for supporting collage depth. */
 export const CREATOR_THEME_ART: Readonly<Record<DesignTheme, CreatorThemeArtDirection>> = {
-  aurora: direction("world", ["process", "materials"], "process", "world", ["materials", "world", "process"]),
-  blossom: direction("process", ["world", "materials"], "world", "process", ["process", "materials", "world"]),
-  starlight: direction("world", ["materials", "process"], "materials", "world", ["world", "materials", "process"]),
-  dark: direction("world", ["process", "materials"], "process", "world", ["world", "process", "materials"]),
-  light: direction("process", ["materials", "world"], "world", "materials", ["process", "world", "materials"]),
-  graphite: direction("materials", ["process", "world"], "process", "materials", ["materials", "process", "world"]),
-  midnight: direction("world", ["materials", "process"], "materials", "world", ["world", "materials", "process"]),
-  sepia: direction("process", ["world", "materials"], "world", "process", ["process", "world", "materials"]),
-  contrast: direction("materials", ["world", "process"], "process", "world", ["materials", "world", "process"]),
+  aurora: direction("aurora", "world", ["process", "materials"], "process", "world", ["materials", "world", "process"]),
+  blossom: direction("blossom", "process", ["world", "materials"], "world", "process", ["process", "materials", "world"]),
+  starlight: direction("starlight", "world", ["materials", "process"], "materials", "world", ["world", "materials", "process"]),
+  dark: direction("dark", "world", ["process", "materials"], "process", "world", ["world", "process", "materials"]),
+  light: direction("light", "process", ["materials", "world"], "world", "materials", ["process", "world", "materials"]),
+  graphite: direction("graphite", "materials", ["process", "world"], "process", "materials", ["materials", "process", "world"]),
+  midnight: direction("midnight", "world", ["materials", "process"], "materials", "world", ["world", "materials", "process"]),
+  sepia: direction("sepia", "process", ["world", "materials"], "world", "process", ["process", "world", "materials"]),
+  contrast: direction("contrast", "materials", ["world", "process"], "process", "world", ["materials", "world", "process"]),
 };
 
 export function getCreatorThemeArt(theme: DesignTheme): CreatorThemeArtDirection {

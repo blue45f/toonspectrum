@@ -6,7 +6,7 @@ import { inflateSync } from "node:zlib";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const publicRoot = resolve(root, "apps/web/public");
-const revision = "ink-panel-v1";
+const brandRoot = "brand/spectrum-ribbon-v2";
 const pngSizes = new Map([
   ["favicon-32.png", 32], ["favicon-96.png", 96],
   ["apple-touch-icon.png", 180], ["icon-192.png", 192],
@@ -14,6 +14,7 @@ const pngSizes = new Map([
   ["icon-maskable-512.png", 512],
 ]);
 const read = (name) => readFileSync(resolve(publicRoot, name));
+const readVersioned = (name) => readFileSync(resolve(publicRoot, brandRoot, name));
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -85,13 +86,16 @@ for (const [name, size] of pngSizes) {
     const bytes = read(name);
     assert.ok(bytes.length < 12_000, "Oversized brand PNG");
     const rgba = decodeBrandPng(bytes, size);
-    let paper = 0, accent = 0;
+    let light = 0, chromatic = 0, navy = 0;
     for (let i = 0; i < rgba.length; i += 4) {
-      if (rgba[i] > 220 && rgba[i + 1] > 210 && rgba[i + 2] > 195 && rgba[i + 3] === 255) paper += 1;
-      if (rgba[i] > 220 && rgba[i + 1] > 90 && rgba[i + 1] < 150 && rgba[i + 2] < 100) accent += 1;
+      const [red, green, blue, alpha] = rgba.subarray(i, i + 4);
+      if (red > 220 && green > 210 && blue > 190 && alpha >= 250) light += 1;
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) > 38 && alpha >= 250) chromatic += 1;
+      if (red < 38 && green < 48 && blue > 35 && blue < 72 && alpha >= 250) navy += 1;
     }
-    assert.ok(paper > size * size * 0.025, "Missing paper nib");
-    assert.ok(accent > size * size * 0.1, "Missing persimmon panel");
+    assert.ok(light > size * size * 0.01, "Missing bright nib and sparkle details");
+    assert.ok(chromatic > size * size * 0.12, "Missing Spectrum Ribbon colour range");
+    assert.ok(navy > size * size * 0.18, "Missing stable navy silhouette background");
   }]);
 }
 for (const [name, size] of pngSizes) {
@@ -102,7 +106,7 @@ for (const [name, size] of pngSizes) {
       const i = (y * size + x) * 4;
       assert.equal(rgba[i + 3], 255, "Install icon must be opaque");
       if (Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) > size * 0.4) {
-        assert.ok(Math.abs(rgba[i] - 26) <= 2 && Math.abs(rgba[i + 1] - 20) <= 2 && Math.abs(rgba[i + 2] - 16) <= 2, "Artwork outside the safe circle");
+        assert.ok(Math.abs(rgba[i] - 16) <= 2 && Math.abs(rgba[i + 1] - 24) <= 2 && Math.abs(rgba[i + 2] - 45) <= 2, "Artwork outside the safe circle");
       }
     }
   }]);
@@ -110,12 +114,12 @@ for (const [name, size] of pngSizes) {
 for (const name of ["favicon.svg", "icon-maskable.svg", "safari-pinned-tab.svg"]) {
   brandIconChecks.push([`${name}: small, self-contained, static vector`, () => {
     const svg = read(name).toString("utf8");
-    assert.ok(Buffer.byteLength(svg) < 2048);
+    assert.ok(Buffer.byteLength(svg) < 4096);
     assert.match(svg, /viewBox="0 0 64 64"/u);
     assert.doesNotMatch(svg, /<(?:image|script|style|filter|animate|foreignObject)\b|(?:href|onload)=|data:|ToonSpectrum/iu);
     assert.match(svg, /<path\b/u);
     if (name !== "safari-pinned-tab.svg") assert.match(svg, /ToonStudio/u);
-    else assert.doesNotMatch(svg, /<rect\b|#fa7946|#f3eee5/u);
+    else assert.doesNotMatch(svg, /<rect\b|linearGradient|#66e7ef|#d879f2/iu);
   }]);
 }
 brandIconChecks.push(["ICO: 16/32/48 frames with independently decoded image data", () => {
@@ -138,7 +142,13 @@ brandIconChecks.push(["ICO: 16/32/48 frames with independently decoded image dat
   }
   assert.equal(expectedOffset, ico.length);
 }]);
-brandIconChecks.push(["HTML: versioned static icon links and SVG after fallbacks", () => {
+brandIconChecks.push(["Versioned assets: byte-identical copies at a cache-rotated path", () => {
+  for (const name of [...pngSizes.keys(), "favicon.svg", "favicon.ico", "icon-maskable.svg", "safari-pinned-tab.svg"]) {
+    assert.deepEqual(readVersioned(name), read(name), name);
+  }
+  assert.deepEqual(readVersioned("manifest.webmanifest"), read("manifest.webmanifest"));
+}]);
+brandIconChecks.push(["HTML: cache-rotated static icon paths and SVG after fallbacks", () => {
   const html = readFileSync(resolve(root, "apps/web/index.html"), "utf8");
   const links = [...html.matchAll(/<link\b[^>]*>/gu)].map(([tag]) => Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/gu)].map(([, key, value]) => [key, value])));
   const icons = links.filter((link) => ["icon", "mask-icon", "apple-touch-icon"].includes(link.rel));
@@ -146,29 +156,33 @@ brandIconChecks.push(["HTML: versioned static icon links and SVG after fallbacks
   for (const icon of icons) {
     const url = new URL(icon.href, "https://www.toonstudio.cloud");
     assert.equal(url.origin, "https://www.toonstudio.cloud");
-    assert.equal(url.searchParams.get("v"), revision);
+    assert.equal(url.search, "");
+    assert.ok(url.pathname.startsWith(`/${brandRoot}/`));
     assert.ok(read(url.pathname.slice(1)).length > 0);
   }
   assert.equal(icons.filter((icon) => icon.rel === "icon").at(-1)?.type, "image/svg+xml");
   assert.equal(icons.find((icon) => icon.rel === "apple-touch-icon")?.sizes, "180x180");
-  assert.equal(links.find((link) => link.rel === "manifest")?.href, `/manifest.webmanifest?v=${revision}`);
+  assert.equal(links.find((link) => link.rel === "manifest")?.href, `/${brandRoot}/manifest.webmanifest`);
 }]);
-brandIconChecks.push(["Manifest: matching revision, real dimensions, separate any/maskable roles", () => {
+brandIconChecks.push(["Manifest: cache-rotated paths, real dimensions and separate roles", () => {
   const manifest = JSON.parse(read("manifest.webmanifest").toString("utf8"));
   assert.equal(manifest.id, "/");
   assert.equal(manifest.start_url, "/studio");
+  assert.equal(manifest.theme_color, "#10182d");
+  assert.equal(manifest.background_color, "#10182d");
   assert.equal(manifest.icons.length, 5);
   for (const icon of manifest.icons) {
     const url = new URL(icon.src, "https://www.toonstudio.cloud");
-    const name = url.pathname.slice(1);
+    const name = url.pathname.split("/").at(-1);
     assert.equal(url.origin, "https://www.toonstudio.cloud");
-    assert.equal(url.searchParams.get("v"), revision);
+    assert.equal(url.search, "");
+    assert.ok(url.pathname.startsWith(`/${brandRoot}/`));
     assert.equal(icon.purpose, name.includes("maskable") ? "maskable" : "any");
     if (icon.type === "image/png") {
       const size = pngSizes.get(name);
       assert.ok(size);
       assert.equal(icon.sizes, `${size}x${size}`);
-      decodeBrandPng(read(name), size);
+      decodeBrandPng(read(url.pathname.slice(1)), size);
     } else {
       assert.equal(name, "favicon.svg");
       assert.equal(icon.sizes, "any");

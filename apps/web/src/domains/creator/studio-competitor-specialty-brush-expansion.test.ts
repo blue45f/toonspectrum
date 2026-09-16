@@ -134,20 +134,34 @@ describe("competitor specialty brush expansion", () => {
     }
   });
 
-  it("never resurrects absorbed runtime profiles through search or favorites", () => {
-  for (const [id, query, owner] of [
-    ["erodible-pencil", "마모 촉", "pencil--side-shade"],
-    ["paint-tube", "3d tube brush", "oil--impasto-ribbon"],
-  ] as const) {
-    expect(STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER[id]).toBe(owner);
-    expect(studioBrushCatalogItemById(id)?.id).toBe(id);
-    expect(filterStudioBrushCatalogItems({ category: "all" }).some((item) => item.id === owner)).toBe(true);
-    for (const candidate of [query, id]) {
-      expect(filterStudioBrushCatalogItems({ category: "marker", query: candidate }).some((item) => item.id === id)).toBe(false);
+  it("keeps absorbed quality ownership without hiding safe specialist identities", () => {
+    for (const [id, query, owner] of [
+      ["erodible-pencil", "마모 촉", "pencil--side-shade"],
+      ["paint-tube", "3d tube brush", "oil--impasto-ribbon"],
+    ] as const) {
+      expect(STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER[id]).toBe(owner);
+      expect(studioBrushCatalogItemById(id)?.id).toBe(id);
+      expect(
+        filterStudioBrushCatalogItems({ category: "all" }).some(
+          (item) => item.id === owner,
+        ),
+      ).toBe(true);
+      for (const candidate of [query, id]) {
+        expect(
+          filterStudioBrushCatalogItems({
+            category: "marker",
+            query: candidate,
+          }).some((item) => item.id === id),
+        ).toBe(true);
+      }
+      expect(
+        filterStudioBrushCatalogItems({
+          category: "favorites",
+          favoriteIds: [id],
+        }).some((item) => item.id === id),
+      ).toBe(true);
     }
-    expect(filterStudioBrushCatalogItems({ category: "favorites", favoriteIds: [id] }).some((item) => item.id === id)).toBe(false);
-  }
-});
+  });
 
 it("keeps the catalogue exhaustive and assigns unique runtime variants", () => {
     expect(STUDIO_BRUSH_CATALOG_COUNTS.pro).toBe(200);

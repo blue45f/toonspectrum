@@ -1,3 +1,3 @@
 export {
-  StudioSaveFirstProjectCreatePage as StudioNewIntegratedPage,
-} from "./StudioSaveFirstProjectCreatePage";
+  StudioDeferredSaveProjectCreatePage as StudioNewIntegratedPage,
+} from "./StudioDeferredSaveProjectCreatePage";

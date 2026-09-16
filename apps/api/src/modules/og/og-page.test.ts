@@ -6,8 +6,13 @@ const RESOURCE_ID = "123e4567-e89b-42d3-a456-426614174000";
 const crawler = "Googlebot/2.1";
 
 function lastJsonLd(html: string): Record<string, unknown> {
-  const values = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gu)];
-  return JSON.parse(values.at(-1)?.[1] ?? "null") as Record<string, unknown>;
+  const openingTag = '<script type="application/ld+json">';
+  const start = html.lastIndexOf(openingTag);
+  if (start < 0) throw new Error("rendered page has no JSON-LD script");
+  const contentStart = start + openingTag.length;
+  const end = html.indexOf("</script>", contentStart);
+  if (end < 0) throw new Error("rendered JSON-LD script is not closed");
+  return JSON.parse(html.slice(contentStart, end)) as Record<string, unknown>;
 }
 
 afterEach(() => {
