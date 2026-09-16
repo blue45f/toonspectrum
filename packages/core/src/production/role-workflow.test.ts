@@ -123,10 +123,63 @@ describe("production role workcells", () => {
       expect.stringContaining("입력 revision"),
     ]));
     expect(gate.warnings).toEqual(expect.arrayContaining([
-      expect.stringContaining("검수 담당자"),
+      expect.stringContaining("검수 가능한 담당자"),
       expect.stringContaining("산출물"),
     ]));
   });
+
+  it("keeps future crew out of current assignment and approval gates", () => {
+    const futureLineArtist = {
+      ...assignment("future-line", "line-artist", true),
+      startsAt: "2026-10-01T00:00:00.000Z",
+    };
+    const editor = assignment("editor", "editor", true);
+    const lineArt = task({
+      id: "line-art-review-12",
+      processKey: "line-art",
+      status: "internal-review",
+      assignmentIds: [futureLineArtist.id],
+      reviewerAssignmentIds: [editor.id],
+      inputRevisionRefs: [],
+    });
+    const gate = evaluateProductionTaskGate({
+      task: lineArt,
+      tasks: [lineArt],
+      assignments: [futureLineArtist, editor],
+      at: AT,
+    });
+    expect(gate.missingAssignee).toBe(true);
+    expect(gate.blockers).toEqual(expect.arrayContaining([
+      expect.stringContaining("현재 작업 가능한 주 담당자"),
+      expect.stringContaining("입력 revision"),
+    ]));
+    expect(gate.canApprove).toBe(false);
+  });
+
+  it("shows scheduled crew coverage without using it for automatic assignment", () => {
+    const futureColorist = {
+      ...assignment("future-color", "colorist", true),
+      startsAt: "2026-10-01T00:00:00.000Z",
+    };
+    const color = task({ id: "color-12", processKey: "color" });
+    expect(eligibleAssignmentsForTask({
+      task: color,
+      assignments: [futureColorist],
+      kind: "owner",
+      at: AT,
+    })).toEqual([]);
+
+    const board = buildProductionRoleWorkcellBoard({
+      aggregate: aggregate([futureColorist], [color]),
+      at: AT,
+    });
+    const colorCell = board.workcells.find((entry) => entry.department.key === "color");
+    expect(colorCell?.coverage).toBe("scheduled");
+    expect(colorCell?.assignmentIds).toEqual([]);
+    expect(colorCell?.scheduledAssignmentIds).toEqual([futureColorist.id]);
+    expect(board.coverageGapDepartmentKeys).toContain("color");
+  });
+
   it("builds coverage, review and bottleneck metrics by department", () => {
     const storyboardArtist = assignment("storyboard", "storyboard-artist", true);
     const editor = assignment("editor", "editor", true);

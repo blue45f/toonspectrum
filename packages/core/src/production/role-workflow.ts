@@ -270,7 +270,9 @@ export function productionDepartment(
   const definition = DEPARTMENT_BY_KEY.get(key);
   if (!definition) throw new Error(`Unknown production department: ${key}`);
   return definition;
-}export function departmentForRole(roleType: ProductionRoleType): ProductionDepartmentKey {
+}
+
+export function departmentForRole(roleType: ProductionRoleType): ProductionDepartmentKey {
   return ROLE_DEPARTMENT[roleType];
 }
 
@@ -300,11 +302,28 @@ export function inferProductionTaskDepartment(
       right[1] - left[1]
       || productionDepartment(left[0]).order - productionDepartment(right[0]).order)[0]?.[0]
     ?? null;
-}function assignmentAvailable(assignment: RoleAssignment, at: string): boolean {
+}
+
+function assignmentAvailable(assignment: RoleAssignment, at: string): boolean {
   if (assignment.status !== "active" && assignment.status !== "onboarding") return false;
   const instant = Date.parse(at);
+  const start = Date.parse(assignment.startsAt);
   const end = assignment.endsAt ? Date.parse(assignment.endsAt) : Number.POSITIVE_INFINITY;
-  return Number.isFinite(instant) && instant <= end;
+  return Number.isFinite(instant)
+    && Number.isFinite(start)
+    && start <= instant
+    && instant <= end;
+}
+
+function assignmentScheduled(assignment: RoleAssignment, at: string): boolean {
+  if (assignment.status !== "active" && assignment.status !== "onboarding") return false;
+  const instant = Date.parse(at);
+  const start = Date.parse(assignment.startsAt);
+  const end = assignment.endsAt ? Date.parse(assignment.endsAt) : Number.POSITIVE_INFINITY;
+  return Number.isFinite(instant)
+    && Number.isFinite(start)
+    && instant < start
+    && instant <= end;
 }
 
 export function eligibleAssignmentsForTask(input: {
@@ -329,7 +348,9 @@ export function eligibleAssignmentsForTask(input: {
     .sort((left, right) =>
       Number(right.lead) - Number(left.lead)
       || left.startsAt.localeCompare(right.startsAt)));
-}export interface ProductionTaskGate {
+}
+
+export interface ProductionTaskGate {
   readonly taskId: string;
   readonly departmentKey: ProductionDepartmentKey | null;
   readonly missingDependencyTaskIds: readonly string[];
@@ -354,16 +375,35 @@ export function evaluateProductionTaskGate(input: {
   readonly dueSoonHours?: number;
 }): ProductionTaskGate {
   const taskById = new Map(input.tasks.map((task) => [task.id, task]));
+  const departmentKey = inferProductionTaskDepartment(input.task, input.assignments);
+  const eligibleOwnerIds = new Set(eligibleAssignmentsForTask({
+    task: input.task,
+    assignments: input.assignments,
+    departmentKey,
+    kind: "owner",
+    at: input.at,
+  }).map((assignment) => assignment.id));
+  const eligibleReviewerIds = new Set(eligibleAssignmentsForTask({
+    task: input.task,
+    assignments: input.assignments,
+    departmentKey,
+    kind: "reviewer",
+    at: input.at,
+  }).map((assignment) => assignment.id));
   const missingDependencyTaskIds = input.task.dependencyTaskIds.filter((taskId) => {
     const dependency = taskById.get(taskId);
     return !dependency || !DEPENDENCY_COMPLETE_STATUSES.has(dependency.status);
-  });  const missingInputRevision = input.task.inputRevisionRefs.length === 0;
-  const missingAssignee = input.task.assignmentIds.length === 0;
-  const missingReviewer = input.task.reviewerAssignmentIds.length === 0;
+  });
+  const missingInputRevision = input.task.inputRevisionRefs.length === 0;
+  const missingAssignee = !input.task.assignmentIds.some((assignmentId) =>
+    eligibleOwnerIds.has(assignmentId));
+  const missingReviewer = !input.task.reviewerAssignmentIds.some((assignmentId) =>
+    eligibleReviewerIds.has(assignmentId));
   const missingDeliverable = input.task.outputDeliverableIds.length === 0;
   const now = Date.parse(input.at);
   const due = input.task.dueAt ? Date.parse(input.task.dueAt) : Number.NaN;
-  const dueSoonWindow = (input.dueSoonHours ?? 72) * 60 * 60 * 1_000;
+  const dueSoonHours = input.dueSoonHours ?? 72;
+  const dueSoonWindow = dueSoonHours * 60 * 60 * 1_000;
   const active = !CLOSED_TASK_STATUSES.has(input.task.status);
   const overdue = active && Number.isFinite(now) && Number.isFinite(due) && due < now;
   const dueSoon = active
@@ -377,12 +417,12 @@ export function evaluateProductionTaskGate(input: {
     blockers.push(`선행 작업 ${missingDependencyTaskIds.length}개가 완료되지 않았습니다.`);
   }
   if (missingInputRevision) blockers.push("시작 입력 revision이 고정되지 않았습니다.");
-  if (missingAssignee) blockers.push("주 담당자가 배정되지 않았습니다.");
-  if (missingReviewer) warnings.push("검수 담당자가 배정되지 않았습니다.");
+  if (missingAssignee) blockers.push("현재 작업 가능한 주 담당자가 배정되지 않았습니다.");
+  if (missingReviewer) warnings.push("현재 검수 가능한 담당자가 배정되지 않았습니다.");
   if (missingDeliverable) warnings.push("완료 산출물이 연결되지 않았습니다.");
   if (overdue) warnings.push("마감 기한이 지났습니다.");
-  else if (dueSoon) warnings.push("72시간 안에 마감됩니다.");
-  const departmentKey = inferProductionTaskDepartment(input.task, input.assignments);  return Object.freeze({
+  else if (dueSoon) warnings.push(`${dueSoonHours}시간 안에 마감됩니다.`);
+  return Object.freeze({
     taskId: input.task.id,
     departmentKey,
     missingDependencyTaskIds: Object.freeze(missingDependencyTaskIds),
@@ -401,18 +441,20 @@ export function evaluateProductionTaskGate(input: {
       && !missingReviewer
       && !missingDeliverable,
     canApprove:
-      REVIEW_TASK_STATUSES.has(input.task.status)
+      blockers.length === 0
+      && REVIEW_TASK_STATUSES.has(input.task.status)
       && !missingReviewer
       && !missingDeliverable,
   });
 }
 
 export type ProductionWorkcellHealth = "healthy" | "attention" | "blocked" | "unfilled";
-export type ProductionWorkcellCoverage = "covered" | "lead-missing" | "unfilled";
+export type ProductionWorkcellCoverage = "covered" | "lead-missing" | "scheduled" | "unfilled";
 
 export interface ProductionRoleWorkcell {
   readonly department: ProductionDepartmentDefinition;
   readonly assignmentIds: readonly string[];
+  readonly scheduledAssignmentIds: readonly string[];
   readonly leadAssignmentIds: readonly string[];
   readonly taskIds: readonly string[];
   readonly openTaskCount: number;
@@ -447,14 +489,19 @@ export function buildProductionRoleWorkcellBoard(input: {
       assignments: input.aggregate.assignments,
       at: input.at,
     }),
-  ]));  const availableAssignments = input.aggregate.assignments.filter((assignment) =>
+  ]));
+  const availableAssignments = input.aggregate.assignments.filter((assignment) =>
     assignmentAvailable(assignment, input.at));
+  const scheduledAssignments = input.aggregate.assignments.filter((assignment) =>
+    assignmentScheduled(assignment, input.at));
   const taskDepartment = new Map(input.aggregate.tasks.map((task) => [
     task.id,
     inferProductionTaskDepartment(task, input.aggregate.assignments),
   ]));
   const workcells = PRODUCTION_DEPARTMENTS.map((department): ProductionRoleWorkcell => {
     const assignments = availableAssignments.filter((assignment) =>
+      department.primaryRoleTypes.includes(assignment.roleType));
+    const scheduled = scheduledAssignments.filter((assignment) =>
       department.primaryRoleTypes.includes(assignment.roleType));
     const tasks = input.aggregate.tasks.filter((task) =>
       taskDepartment.get(task.id) === department.key);
@@ -466,7 +513,9 @@ export function buildProductionRoleWorkcellBoard(input: {
     const overdueTaskCount = openTasks.filter((task) => gates[task.id]?.overdue).length;
     const dueSoonTaskCount = openTasks.filter((task) => gates[task.id]?.dueSoon).length;
     const coverage: ProductionWorkcellCoverage = assignments.length === 0
-      ? "unfilled"
+      ? scheduled.length > 0
+        ? "scheduled"
+        : "unfilled"
       : assignments.some((assignment) => assignment.lead)
         ? "covered"
         : "lead-missing";
@@ -474,11 +523,16 @@ export function buildProductionRoleWorkcellBoard(input: {
       ? "unfilled"
       : blockedTaskCount > 0 || overdueTaskCount > 0
         ? "blocked"
-        : reviewTaskCount > 0 || dueSoonTaskCount > 0 || coverage === "lead-missing"
+        : reviewTaskCount > 0
+          || dueSoonTaskCount > 0
+          || coverage === "lead-missing"
+          || coverage === "scheduled"
           ? "attention"
-          : "healthy";    return Object.freeze({
+          : "healthy";
+    return Object.freeze({
       department,
       assignmentIds: Object.freeze(assignments.map((assignment) => assignment.id)),
+      scheduledAssignmentIds: Object.freeze(scheduled.map((assignment) => assignment.id)),
       leadAssignmentIds: Object.freeze(assignments
         .filter((assignment) => assignment.lead)
         .map((assignment) => assignment.id)),
@@ -506,7 +560,8 @@ export function buildProductionRoleWorkcellBoard(input: {
       right.blockedTaskCount - left.blockedTaskCount
       || right.overdueTaskCount - left.overdueTaskCount
       || right.reviewTaskCount - left.reviewTaskCount
-      || right.likelyHours - left.likelyHours)    .slice(0, 3)
+      || right.likelyHours - left.likelyHours)
+    .slice(0, 3)
     .map((workcell) => workcell.department.key);
   return Object.freeze({
     workcells: Object.freeze(workcells),

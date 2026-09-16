@@ -137,6 +137,13 @@ function healthTone(health: ProductionRoleWorkcell["health"]): Tone {
   return "warning";
 }
 
+function coverageLabel(coverage: ProductionRoleWorkcell["coverage"]): string {
+  if (coverage === "covered") return "담당 있음";
+  if (coverage === "lead-missing") return "리드 필요";
+  if (coverage === "scheduled") return "충원 예정";
+  return "미충원";
+}
+
 function toneClass(tone: Tone): string {
   return {
     neutral: "border-line bg-raised text-fg-2",
@@ -271,7 +278,8 @@ function TaskCard({
         <div className="flex min-w-0 items-center gap-2">
           <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg border", toneClass(statusTone(task.status)))}>
             <Icon className="size-3.5" aria-hidden="true" />
-          </span>          <div className="min-w-0">
+          </span>
+          <div className="min-w-0">
             <p className="truncate text-[0.6875rem] font-bold text-accent">
               {department?.shortLabel ?? task.processKey} · {scopeLabel(task)}
             </p>
@@ -371,7 +379,8 @@ function TaskInspector({
   useEffect(() => setActionError(null), [task.id]);
   const departmentKey = gate.departmentKey;
   const department = departmentKey ? productionDepartment(departmentKey) : null;
-  const primaryAction = primaryTaskAction(task);  const ownerOptions = uniqueAssignmentOptions(
+  const primaryAction = primaryTaskAction(task);
+  const ownerOptions = uniqueAssignmentOptions(
     eligibleAssignmentsForTask({
       task,
       assignments: aggregate.assignments,
@@ -439,7 +448,8 @@ function TaskInspector({
   const canRequestChanges = REVIEW_STATUSES.has(task.status);
 
   return (
-    <aside className="rounded-2xl border border-line bg-card p-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">      <div className="flex flex-wrap items-start justify-between gap-3">
+    <aside className="rounded-2xl border border-line bg-card p-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-accent">
             {department?.label ?? task.processKey} · {scopeLabel(task)}
@@ -499,7 +509,8 @@ function TaskInspector({
             onChange={(event) => void changePrimaryAssignment("owner", event.target.value)}
             disabled={!canEdit}
             className="mt-1.5 min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg outline-none focus:border-accent"
-          >            <option value="">담당자 미정</option>
+          >
+            <option value="">담당자 미정</option>
             {ownerOptions.map((assignment) => (
               <option key={assignment.id} value={assignment.id}>
                 {assignmentLabel(aggregate, assignment.id)} · {PRODUCTION_ROLE_LABELS[assignment.roleType]}
@@ -528,7 +539,8 @@ function TaskInspector({
 
       {dependencyTasks.length > 0 ? (
         <section className="mt-5">
-          <h3 className="text-xs font-black text-fg">선행 인수인계</h3>          <div className="mt-2 space-y-2">
+          <h3 className="text-xs font-black text-fg">선행 인수인계</h3>
+          <div className="mt-2 space-y-2">
             {dependencyTasks.map((dependency, index) => (
               <div key={task.dependencyTaskIds[index]} className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2.5">
                 {dependency && COMPLETED_DEPENDENCY_STATUSES.has(dependency.status)
@@ -607,6 +619,7 @@ export function ProductionCrewCoverage({
 }) {
   const board = useMemo(() => buildProductionRoleWorkcellBoard({ aggregate, at }), [aggregate, at]);
   const covered = board.workcells.filter((entry) => entry.coverage === "covered").length;
+  const scheduled = board.workcells.filter((entry) => entry.coverage === "scheduled").length;
   const activeCells = board.workcells.filter((entry) => entry.openTaskCount > 0).length;
   return (
     <section className="rounded-2xl border border-line bg-card p-4">
@@ -623,14 +636,19 @@ export function ProductionCrewCoverage({
         </div>
         <div className="flex flex-wrap gap-2">
           <Pill tone={covered === PRODUCTION_DEPARTMENTS.length ? "success" : "warning"}>
-            {covered}/{PRODUCTION_DEPARTMENTS.length} 직군 커버
+            {covered}/{PRODUCTION_DEPARTMENTS.length} 현재 커버
           </Pill>
+          {scheduled > 0 ? <Pill tone="accent">충원 예정 {scheduled}</Pill> : null}
           <Pill tone="accent">활성 셀 {activeCells}</Pill>
         </div>
-      </header>      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      </header>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {board.workcells.map((workcell) => {
           const Icon = DEPARTMENT_ICONS[workcell.department.key];
-          const assignments = workcell.assignmentIds
+          const assignments = [
+            ...workcell.assignmentIds,
+            ...workcell.scheduledAssignmentIds,
+          ]
             .map((assignmentId) => aggregate.assignments.find((entry) => entry.id === assignmentId))
             .filter((entry): entry is RoleAssignment => Boolean(entry));
           return (
@@ -647,12 +665,17 @@ export function ProductionCrewCoverage({
                 <span className={cn("flex size-9 items-center justify-center rounded-xl border", toneClass(healthTone(workcell.health)))}>
                   <Icon className="size-4" aria-hidden="true" />
                 </span>
-                <Pill tone={workcell.coverage === "covered" ? "success" : "warning"}>
-                  {workcell.coverage === "covered" ? "담당 있음" : workcell.coverage === "lead-missing" ? "리드 필요" : "미충원"}
+                <Pill tone={workcell.coverage === "covered"
+                  ? "success"
+                  : workcell.coverage === "scheduled"
+                    ? "accent"
+                    : "warning"}>
+                  {coverageLabel(workcell.coverage)}
                 </Pill>
               </div>
               <h3 className="mt-3 text-sm font-black text-fg">{workcell.department.label}</h3>
-              <p className="mt-1 line-clamp-2 text-[0.6875rem] leading-5 text-fg-3">{workcell.department.description}</p>              <div className="mt-3 space-y-2">
+              <p className="mt-1 line-clamp-2 text-[0.6875rem] leading-5 text-fg-3">{workcell.department.description}</p>
+              <div className="mt-3 space-y-2">
                 {assignments.slice(0, 3).map((assignment) => {
                   const person = assignmentLabel(aggregate, assignment.id);
                   const scheduled = Date.parse(assignment.startsAt) > Date.parse(at);
@@ -725,7 +748,8 @@ function DepartmentSidebar({
         <Workflow className="size-4" aria-hidden="true" />
         <span className="min-w-0 flex-1">전체 직군</span>
         <span>{board.workcells.reduce((sum, entry) => sum + entry.openTaskCount, 0)}</span>
-      </button>      <div className="my-2 h-px bg-line" />
+      </button>
+      <div className="my-2 h-px bg-line" />
       <div className="space-y-1">
         {board.workcells.map((workcell) => {
           const Icon = DEPARTMENT_ICONS[workcell.department.key];
@@ -892,7 +916,8 @@ export function ProductionRoleWorkspace({
   const [query, setQuery] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(aggregate.tasks[0]?.id ?? null);
   const [at] = useState(() => new Date().toISOString());
-  const board = useMemo(() => buildProductionRoleWorkcellBoard({ aggregate, at }), [aggregate, at]);  const lensDepartmentKeys = LENS_DEPARTMENTS[roleLens];
+  const board = useMemo(() => buildProductionRoleWorkcellBoard({ aggregate, at }), [aggregate, at]);
+  const lensDepartmentKeys = LENS_DEPARTMENTS[roleLens];
   const queryKey = query.trim().toLocaleLowerCase("ko-KR");
   const episodeIds = useMemo(() => {
     const values = new Set<string>();
@@ -925,7 +950,8 @@ export function ProductionRoleWorkspace({
   useEffect(() => {
     if (selectedTaskId && visibleTasks.some((task) => task.id === selectedTaskId)) return;
     setSelectedTaskId(visibleTasks[0]?.id ?? null);
-  }, [selectedTaskId, visibleTasks]);  const selectedTask = selectedTaskId
+  }, [selectedTaskId, visibleTasks]);
+  const selectedTask = selectedTaskId
     ? aggregate.tasks.find((task) => task.id === selectedTaskId) ?? null
     : null;
   const selectedGate = selectedTask ? board.taskGates[selectedTask.id] : null;
@@ -960,7 +986,8 @@ export function ProductionRoleWorkspace({
       <section className="overflow-hidden rounded-3xl border border-line bg-card">
         <div className="relative p-5 sm:p-6">
           <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-accent/10 blur-3xl" />
-          <div className="relative flex flex-wrap items-start justify-between gap-4">            <div className="max-w-3xl">
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
               <div className="flex items-center gap-2 text-accent">
                 <Workflow className="size-4" aria-hidden="true" />
                 <p className="text-[0.6875rem] font-black uppercase tracking-[0.14em]">Role-based production</p>
@@ -992,7 +1019,8 @@ export function ProductionRoleWorkspace({
             </div>
           </div>
         </div>
-        <div className="border-t border-line bg-panel/70 p-3 sm:px-5">          <div className="flex flex-wrap items-center gap-2">
+        <div className="border-t border-line bg-panel/70 p-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label="제작 보기 방식">
               {([
                 ["workcells", "직군 보드", ListFilter],
@@ -1023,9 +1051,12 @@ export function ProductionRoleWorkspace({
                 className="bg-transparent font-semibold text-fg outline-none"
               >
                 <option value="all">전체 회차</option>
-                {episodeIds.map((episodeId) => <option key={episodeId} value={episodeId}>{episodeId}</option>)}
+                {episodeIds.map((episodeId) => (
+                  <option key={episodeId} value={episodeId}>{episodeId}</option>
+                ))}
               </select>
-            </label>            <label className="relative ml-auto min-w-[13rem] flex-1 sm:max-w-sm">
+            </label>
+            <label className="relative ml-auto min-w-[13rem] flex-1 sm:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" aria-hidden="true" />
               <span className="sr-only">제작 작업 검색</span>
               <input
@@ -1083,7 +1114,8 @@ export function ProductionRoleWorkspace({
             filter={departmentFilter}
             roleLens={roleLens}
             onChange={setDepartmentFilter}
-          />          <section className="min-w-0 rounded-2xl border border-line bg-card p-3">
+          />
+          <section className="min-w-0 rounded-2xl border border-line bg-card p-3">
             <header className="flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
               <div>
                 <h2 className="text-sm font-black text-fg">
