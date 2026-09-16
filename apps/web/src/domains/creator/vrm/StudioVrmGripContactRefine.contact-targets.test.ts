@@ -9,6 +9,9 @@ describe("Studio VRM grip contact runtime boundary", () => {
     expect(source).toContain("createStudioVrmGripContactTargets({");
     expect(source).toContain("fingertipWorldPositions: endpointWorldPositions");
     expect(source).toContain("fingerOrdinals");
+    expect(source).toContain("name: \"Thumb\"");
+    expect(source).toContain("createStudioVrmVirtualFingertipProbe({");
+    expect(source).toContain("sampleStudioVrmVirtualFingertip(");
     expect(source).toContain("goal: contactPlan.tolerance");
     expect(source).toContain("distanceTo(contactPlan.targets[index]!)");
     expect(source).not.toContain("goal: radius * 2.2 + handSize * 0.4");

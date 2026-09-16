@@ -1,5 +1,5 @@
 import { createPortal } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import {
@@ -17,6 +17,7 @@ import {
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
+import { planStudioVrmHairTransition } from "./studio-vrm-hair-transition";
 import { applyStudioVrmSemanticFaceMorphs } from "./studio-vrm-semantic-face-morph";
 
 import type { StudioVrmAvatarForgeFaceController } from "./studio-vrm-avatar-forge-face-controller";
@@ -24,6 +25,7 @@ import type { VRM } from "@pixiv/three-vrm";
 
 const AVATAR_FORGE_MARKER = "toonSpectrumAvatarForge";
 const AVATAR_FORGE_OWNED_TEXTURES = "toonSpectrumAvatarForgeOwnedTextures";
+const AVATAR_FORGE_HAIR_IDENTITY = "toonSpectrumAvatarForgeHairIdentity";
 const HAIR_VISIBILITY_LEASES = new WeakMap<THREE.Object3D, { count: number; visible: boolean }>();
 
 type HeadFit = {
@@ -419,6 +421,14 @@ function disposeAvatarForgeObject(object: THREE.Object3D) {
   }
 }
 
+function useStudioVrmStableSnapshot<T>(value: T, identity: string): T {
+  const snapshotRef = useRef({ identity, value });
+  if (snapshotRef.current.identity !== identity) {
+    snapshotRef.current = { identity, value };
+  }
+  return snapshotRef.current.value;
+}
+
 export type StudioVrmAvatarForgeProps = {
   vrm: VRM;
   state: AvatarForgeState;
@@ -447,12 +457,43 @@ export function StudioVrmAvatarForge({
     },
     [normalizedHead, rigRevision, vrm]
   );
-  const object = useMemo(
-    () => (fit ? buildAvatarForgeObject(safeState, fit) : null),
-    [fit, safeState]
-  );
 
-  useEffect(() => {
+  // Generated surface ownership is independent from the original-hair visibility lease. A pure
+  // visibility toggle keeps the current buffers, while any style/shape/material change gets a fresh
+  // object so stale clumps, textures and future dynamic state cannot survive the transition.
+  const committedHairRef = useRef<AvatarForgeHairParams | null>(null);
+  const hairTransition = planStudioVrmHairTransition(
+    committedHairRef.current,
+    safeState.hair,
+  );
+  const hairGeometryIdentity = hairTransition.identity;
+  useLayoutEffect(() => {
+    committedHairRef.current = { ...safeState.hair };
+  }, [safeState.hair]);
+  const faceDecorationIdentity = JSON.stringify({
+    face: safeState.face,
+    faceAccents: safeState.faceAccents ?? [],
+  });
+  const objectIdentity = `${hairGeometryIdentity}:${faceDecorationIdentity}`;
+  const stableObjectState = useStudioVrmStableSnapshot(safeState, objectIdentity);
+  const stableFace = useStudioVrmStableSnapshot(
+    safeState.face,
+    JSON.stringify(safeState.face),
+  );
+  const stableSemanticFaceMorphs = useStudioVrmStableSnapshot(
+    safeState.semanticFaceMorphs,
+    JSON.stringify(safeState.semanticFaceMorphs ?? {}),
+  );
+  const object = useMemo(() => {
+    if (!fit) return null;
+    const next = buildAvatarForgeObject(stableObjectState, fit);
+    next.userData[AVATAR_FORGE_HAIR_IDENTITY] = hairGeometryIdentity;
+    return next;
+  }, [fit, hairGeometryIdentity, stableObjectState]);
+
+  // Dispose in the same layout phase that swaps the primitive. The old and new hairstyles are never
+  // painted together, and every geometry/material/owned texture is released exactly once.
+  useLayoutEffect(() => {
     if (!object) return;
     return () => disposeAvatarForgeObject(object);
   }, [object]);
@@ -462,24 +503,27 @@ export function StudioVrmAvatarForge({
       normalizedHead,
       rawHead,
       rigRevision,
-      face: safeState.face,
+      face: stableFace,
     });
     return () => {
       faceController.release();
     };
-  }, [faceController, normalizedHead, rawHead, rigRevision, safeState.face]);
+  }, [faceController, normalizedHead, rawHead, rigRevision, stableFace]);
 
   useLayoutEffect(
-    () => applyStudioVrmSemanticFaceMorphs(vrm, safeState.semanticFaceMorphs),
-    [safeState.semanticFaceMorphs, vrm],
+    () => applyStudioVrmSemanticFaceMorphs(vrm, stableSemanticFaceMorphs),
+    [stableSemanticFaceMorphs, vrm],
   );
 
   const hideAuthoredHair = shouldHideAuthoredVrmHair(safeState.hair);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hideAuthoredHair) return;
     return acquireHiddenHair(detectReplaceableHairMeshes(vrm));
-  }, [hideAuthoredHair, vrm]);
+  }, [hideAuthoredHair, rigRevision, vrm]);
 
   if (!normalizedHead || !object) return null;
-  return createPortal(<primitive object={object} />, normalizedHead);
+  return createPortal(
+    <primitive key={objectIdentity} object={object} />,
+    normalizedHead,
+  );
 }

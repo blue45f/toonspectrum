@@ -122,6 +122,8 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
     handleResetActivePose,
     handleMirrorPose,
     handleStraightenUpperBody,
+    handleNaturalizePose,
+    handleGroundAndBalancePose,
     togglePoseBoneLock,
     handleBoneRotationChange,
     handleYOffsetChange,
@@ -706,7 +708,27 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                       파랑은 선택, 초록 손목은 IK 드래그, 주황은 잠금, 강조색은 현재 선택입니다. 관절 점은 최종 PNG에 포함되지 않습니다.
                     </p>
                   ) : null}
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!vrm || webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
+                      onClick={handleNaturalizePose}
+                      title="현재 보이는 자세를 유지하면서 척추·어깨·손목의 과도한 꺾임만 완화합니다."
+                      className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-md border border-accent/50 bg-accent-soft px-2 py-1.5 text-[0.68rem] font-bold text-accent hover:bg-accent/15 disabled:opacity-45"
+                    >
+                      <Sparkles className="size-3.5" aria-hidden />
+                      포즈 자연스럽게
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!vrm || webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
+                      onClick={handleGroundAndBalancePose}
+                      title="양발 바닥 높이를 맞추고 상체 무게중심을 두 발의 지지 영역 안쪽으로 보정합니다."
+                      className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-card px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                    >
+                      <PersonStanding className="size-3.5" aria-hidden />
+                      발 접지·균형 맞춤
+                    </button>
                     <button
                       type="button"
                       disabled={!vrm}
@@ -727,7 +749,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                       type="button"
                       disabled={!vrm}
                       onClick={handleStraightenUpperBody}
-                      className="rounded-md border border-line bg-card px-2 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                      className="col-span-2 rounded-md border border-line bg-card px-2 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
                     >
                       상체·목 펴기
                     </button>

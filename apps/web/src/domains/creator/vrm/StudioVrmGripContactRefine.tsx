@@ -11,10 +11,15 @@ import {
 } from "./studio-vrm-contact-refinement";
 import {
   createStudioVrmGripContactTargets,
-  type StudioVrmGripFingerOrdinal,
+  type StudioVrmGripDigitOrdinal,
 } from "./studio-vrm-grip-contact-targets";
 import { createAutoGripFingerOverrides, resolvePropAttachment, resolveSecondaryPropTarget } from "./studio-vrm-prop-rig";
 import { propDefById } from "./studio-vrm-props";
+import {
+  createStudioVrmVirtualFingertipProbe,
+  sampleStudioVrmVirtualFingertip,
+  type StudioVrmVirtualFingertipProbe,
+} from "./studio-vrm-virtual-fingertip";
 
 import type { VrmPropRigMetrics, ResolvedPropAttachment } from "./studio-vrm-prop-rig";
 import type { PropInstance, PropAnchorDef } from "./studio-vrm-props";
@@ -22,9 +27,13 @@ import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 // Base pose (-3), prop IK (-2), contact (-1.5), then raw-skeleton commit (-1).
 const STUDIO_VRM_GRIP_CONTACT_PRIORITY = -1.5;
-const FINGERS = ["Index", "Middle", "Ring", "Little"] as const;
-const SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
-const LIMITS = [80, 100, 65].map(THREE.MathUtils.degToRad);
+const DIGITS = [
+  { name: "Thumb", segments: ["Metacarpal", "Proximal", "Distal"], ordinal: "thumb", limits: [55, 75, 85], tipRatio: 0.82 },
+  { name: "Index", segments: ["Proximal", "Intermediate", "Distal"], ordinal: 0, limits: [80, 100, 65], tipRatio: 0.72 },
+  { name: "Middle", segments: ["Proximal", "Intermediate", "Distal"], ordinal: 1, limits: [80, 100, 65], tipRatio: 0.68 },
+  { name: "Ring", segments: ["Proximal", "Intermediate", "Distal"], ordinal: 2, limits: [80, 100, 65], tipRatio: 0.72 },
+  { name: "Little", segments: ["Proximal", "Intermediate", "Distal"], ordinal: 3, limits: [80, 100, 65], tipRatio: 0.78 },
+] as const;
 
 export type StudioVrmGripContactPass = { run(): void; release(): boolean };
 
@@ -61,25 +70,40 @@ export function createStudioVrmGripContactPasses(
       if (!authority[`${side}IndexProximal`]) continue;
       const hand = vrm.humanoid?.getNormalizedBoneNode(`${side}Hand`);
       if (!hand) continue;
-      const chains: THREE.Object3D[][] = [];
-      const fingerOrdinals: StudioVrmGripFingerOrdinal[] = [];
-      for (const [fingerIndex, finger] of FINGERS.entries()) {
-        const names = SEGMENTS.map((segment) => `${side}${finger}${segment}` as VRMHumanBoneName);
-        // A locked joint protects its entire finger, not unrelated unlocked fingers.
-        if (names.some((name) => locked.includes(name))) continue;
-        const nodes = names.map((name) => vrm.humanoid?.getNormalizedBoneNode(name));
-        if (nodes.some((node) => !node)) continue;
-        chains.push(nodes as THREE.Object3D[]);
-        fingerOrdinals.push(fingerIndex as StudioVrmGripFingerOrdinal);
-      }
-      if (chains.length === 0) continue;
-      const bones = chains.flat();
-      const endpoints = chains.map((chain) => chain[2]);
-      const endpointWorldPositions = endpoints.map(() => new THREE.Vector3());
-      const groups = chains.map((_, index) => [index * 3, index * 3 + 1, index * 3 + 2]);
       const radius = (anchor.gripRadius ?? def.grip.radius) * resolved.scale;
       const handSize = side === "left" ? metrics.leftHand : metrics.rightHand;
       if (![radius, handSize].every((value) => Number.isFinite(value) && value > 0)) continue;
+
+      hand.updateWorldMatrix(true, true);
+      const chains: THREE.Object3D[][] = [];
+      const fingerOrdinals: StudioVrmGripDigitOrdinal[] = [];
+      const probes: StudioVrmVirtualFingertipProbe[] = [];
+      const jointLimits: number[] = [];
+      for (const digit of DIGITS) {
+        const names = digit.segments.map((segment) => (
+          `${side}${digit.name}${segment}` as VRMHumanBoneName
+        ));
+        // A locked joint protects its entire digit, not unrelated unlocked digits.
+        if (names.some((name) => locked.includes(name))) continue;
+        const nodes = names.map((name) => vrm.humanoid?.getNormalizedBoneNode(name));
+        if (nodes.some((node) => !node)) continue;
+        const chain = nodes as THREE.Object3D[];
+        const probe = createStudioVrmVirtualFingertipProbe({
+          distal: chain[2]!,
+          previousJoint: chain[1]!,
+          handSize,
+          lengthRatio: digit.tipRatio,
+        });
+        if (!probe) continue;
+        chains.push(chain);
+        fingerOrdinals.push(digit.ordinal);
+        probes.push(probe);
+        jointLimits.push(...digit.limits.map(THREE.MathUtils.degToRad));
+      }
+      if (chains.length === 0) continue;
+      const bones = chains.flat();
+      const endpointWorldPositions = probes.map(() => new THREE.Vector3());
+      const groups = chains.map((_, index) => [index * 3, index * 3 + 1, index * 3 + 2]);
       const gripCenter = new THREE.Vector3();
       const localCenter = new THREE.Vector3();
       const gripAxis = new THREE.Vector3();
@@ -157,7 +181,13 @@ export function createStudioVrmGripContactPasses(
               localCenter.x, localCenter.y, localCenter.z,
               localAxis.x, localAxis.y, localAxis.z,
               localRadial.x, localRadial.y, localRadial.z,
-              radius, handSize, ...fingerOrdinals,
+              radius, handSize,
+              ...fingerOrdinals.map((ordinal) => ordinal === "thumb" ? -1 : ordinal),
+              ...probes.flatMap((probe) => [
+                ...probe.localTip,
+                probe.estimatedWorldLength,
+                probe.sourceSegmentWorldLength,
+              ]),
             ];
             // Scale/shear Gram matrix is invariant under common rigid movement.
             for (let a = 0; a < 3; a += 1) {
@@ -172,7 +202,16 @@ export function createStudioVrmGripContactPasses(
             const initial = [...plan.angles];
             if (!sameStudioVrmContactValues(initial, current)) apply(initial);
 
-            endpoints.forEach((node, index) => node.getWorldPosition(endpointWorldPositions[index]!));
+            let sampledAllTips = true;
+            probes.forEach((probe, index) => {
+              sampledAllTips = Boolean(
+                sampleStudioVrmVirtualFingertip(probe, endpointWorldPositions[index]!),
+              ) && sampledAllTips;
+            });
+            if (!sampledAllTips) {
+              release();
+              return;
+            }
             const contactPlan = createStudioVrmGripContactTargets({
               center: gripCenter,
               axis: gripAxis,
@@ -188,21 +227,32 @@ export function createStudioVrmGripContactPasses(
               return;
             }
 
+            const measureContacts = (): number[] | null => {
+              const distances: number[] = [];
+              for (let index = 0; index < probes.length; index += 1) {
+                const tip = sampleStudioVrmVirtualFingertip(
+                  probes[index]!,
+                  endpointWorldPositions[index]!,
+                );
+                if (!tip) return null;
+                distances.push(tip.distanceTo(contactPlan.targets[index]!));
+              }
+              return distances.every(Number.isFinite) ? distances : null;
+            };
             const result = refineStudioVrmContact({
               initial, groups,
-              limits: bones.map((_, index) => LIMITS[index % 3]),
+              limits: jointLimits,
               goal: contactPlan.tolerance,
               minImprovement: Math.max(5e-6, handSize * 0.004),
               allowRelaxation: true,
               maxAngularChange: THREE.MathUtils.degToRad(24),
               maxEvaluations: 80,
               apply,
-              measure: () => Math.max(...endpoints.map((node, index) => (
-                node.getWorldPosition(scratch).distanceTo(contactPlan.targets[index]!)
-              ))),
-              measureContacts: () => endpoints.map((node, index) => (
-                node.getWorldPosition(scratch).distanceTo(contactPlan.targets[index]!)
-              )),
+              measure: () => {
+                const distances = measureContacts();
+                return distances ? Math.max(...distances) : null;
+              },
+              measureContacts,
             });
             if (result.reason === "invalid" || !result.restored) {
               cache = null;

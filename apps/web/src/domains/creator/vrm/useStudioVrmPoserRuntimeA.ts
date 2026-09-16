@@ -662,7 +662,7 @@ export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
       modelId: activeModelId,
       poseSignature: currentPersistentIkSignature(),
       generation: garmentEvaluationGenerationRef.current,
-      report: inspectStudioVrmGarmentFit(wardrobeState, wardrobeMetrics),
+      report: inspectStudioVrmGarmentFit(wardrobeState, wardrobeMetrics, { bones: customBones }),
     });
   }, [
     activeModelId,

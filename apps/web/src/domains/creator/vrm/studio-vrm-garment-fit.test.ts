@@ -167,8 +167,8 @@ describe("Studio VRM garment fit runtime", () => {
 
     expect(receipt).toEqual(expect.objectContaining({
       kind: "studio-vrm-garment-evaluation-receipt",
-      version: 1,
-      solver: "analytic-layer-fit-v1",
+      version: 2,
+      solver: "pose-aware-layer-fit-v2",
       modelId: "sample-vrm",
       poseSignature: "pose:abc",
       generation: 4,
@@ -353,3 +353,58 @@ describe("실측 몸에서의 여유분 모델", () => {
 function referenceRadiusForBroadChest(): number {
   return 0.21;
 }
+
+
+describe("포즈 연동 의상 여유", () => {
+  const raisedArmPose = {
+    rightShoulder: { rotation: [0.2, 0.1, -0.85] as const },
+    rightUpperArm: { direction: { sideX: 0.3, y: 0.94, z: 0.16 } },
+    rightLowerArm: { direction: { sideX: 0.12, y: 0.92, z: 0.38 } },
+  };
+
+  it("같은 의상도 팔을 들면 자동 셸이 더 큰 동작 여유를 확보한다", () => {
+    const wardrobe: WardrobeState = {
+      top: equip("shirt", { fit: 0.9, fitMode: "auto" }),
+    };
+    const neutral = inspectStudioVrmGarmentFit(wardrobe, MEASURED_METRICS);
+    const raised = inspectStudioVrmGarmentFit(wardrobe, MEASURED_METRICS, {
+      bones: raisedArmPose,
+    });
+
+    expect(raised.slots.top?.poseAllowanceM).toBeGreaterThan(0);
+    expect(raised.slots.top?.requiredMotionClearanceM ?? 0)
+      .toBeGreaterThan(neutral.slots.top?.requiredMotionClearanceM ?? 0);
+    expect(raised.slots.top?.effectiveFit ?? 0).toBeGreaterThan(neutral.slots.top?.effectiveFit ?? 0);
+    expect(raised.issues).toContainEqual(expect.objectContaining({
+      code: "pose-auto-adjusted",
+      severity: "info",
+      slots: ["top"],
+    }));
+  });
+
+  it("수동 셸은 현재 포즈에 부족한 동작 여유를 숨기지 않는다", () => {
+    const report = inspectStudioVrmGarmentFit({
+      top: equip("shirt", { fit: 0.9, fitMode: "manual" }),
+    }, MEASURED_METRICS, { bones: raisedArmPose });
+
+    expect(report.status).toBe("warning");
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: "pose-clearance",
+      severity: "warning",
+      slots: ["top"],
+    }));
+    expect(report.maxEstimatedPenetrationM).toBeGreaterThan(0);
+  });
+
+  it("포즈가 바뀌면 fit 입력 서명과 영수증 캐시 경계도 바뀐다", () => {
+    const wardrobe: WardrobeState = { top: equip("shirt") };
+    const neutral = buildStudioVrmGarmentFitInputSignature(wardrobe, MEASURED_METRICS);
+    const raised = buildStudioVrmGarmentFitInputSignature(
+      wardrobe,
+      MEASURED_METRICS,
+      raisedArmPose,
+    );
+    expect(raised).not.toBe(neutral);
+    expect(raised.startsWith("garfit3:")).toBe(true);
+  });
+});
