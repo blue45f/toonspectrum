@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Starlight observatory studio</title>
+  <desc id="desc">A quiet night studio with a moon window, constellation lines and a glowing comic canvas.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="bg" x1="110" y1="40" x2="1060" y2="780" gradientUnits="userSpaceOnUse"><stop stop-color="#111734"/><stop offset=".58" stop-color="#1c2250"/><stop offset="1" stop-color="#321d51"/></linearGradient>
+    <radialGradient id="moon"><stop stop-color="#fff9d5"/><stop offset="1" stop-color="#b8d9ff"/></radialGradient>
+    <linearGradient id="screen" x1="300" y1="260" x2="820" y2="600" gradientUnits="userSpaceOnUse"><stop stop-color="#3c60a6"/><stop offset=".5" stop-color="#624fba"/><stop offset="1" stop-color="#c469bb"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="url(#bg)"/><circle cx="970" cy="206" r="176" fill="url(#moon)" opacity=".95"/><circle cx="1019" cy="164" r="34" fill="#a9c9ee" opacity=".35"/><circle cx="911" cy="248" r="24" fill="#a9c9ee" opacity=".3"/>
+  <g fill="#dff4ff"><circle cx="105" cy="100" r="4"/><circle cx="220" cy="184" r="3"/><circle cx="358" cy="84" r="5"/><circle cx="478" cy="180" r="3"/><circle cx="614" cy="92" r="4"/><circle cx="738" cy="156" r="3"/><circle cx="1100" cy="370" r="4"/></g>
+  <g fill="none" stroke="#7bdcff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="7 9"><path d="m105 100 115 84 138-100 120 96 136-88 124 64"/><path d="m220 184 40 94 218-98 72 121 188-145"/></g>
+  <path d="M0 640c188-70 363-32 517 4 237 55 442-35 683-11v167H0Z" fill="#0b1028"/>
+  <g filter="url(#shadow)"><rect x="190" y="235" width="640" height="390" rx="30" fill="#222a58" stroke="#7a82df" stroke-width="3"/><rect x="224" y="270" width="572" height="303" rx="18" fill="url(#screen)"/><path d="M224 500c111-96 191-57 284-135 90-76 183-57 288 16v192H224Z" fill="#14213f" opacity=".72"/><circle cx="623" cy="354" r="55" fill="#ffe9c9" opacity=".86"/><path d="M520 573c18-116 62-180 129-180 67 0 105 67 112 180Z" fill="#171631"/>
+    <rect x="396" y="607" width="226" height="18" rx="9" fill="#4c568f"/></g>
+  <g filter="url(#shadow)"><path d="M858 626h188l-24 42H884Z" fill="#29325c"/><rect x="908" y="436" width="72" height="190" rx="32" fill="#2a3158"/><path d="M944 443V326" stroke="#7f8ef3" stroke-width="18" stroke-linecap="round"/><path d="M944 335c-68 0-116 45-116 103h232c0-58-48-103-116-103Z" fill="#7f8ef3"/><ellipse cx="944" cy="440" rx="116" ry="34" fill="#8bdcff" opacity=".18"/></g>
+  <path d="M85 630c68-92 143-110 219-28" fill="none" stroke="#ca88ef" stroke-width="18" stroke-linecap="round" opacity=".55"/><path d="m1070 462 8 21 22 8-22 8-8 21-8-21-21-8 21-8Z" fill="#f4d6ff"/>
+</svg>

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -6,6 +6,7 @@ const EXPERIENCE_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.
 const EXPERIENCE_STYLES = "apps/web/src/domains/marketing/creator-home-experience.css";
 const FLAGSHIP_STYLES = "apps/web/src/domains/marketing/creator-flagship.css";
 const THEME_ART_SOURCE = "apps/web/src/domains/marketing/creator-theme-art.ts";
+const THEME_SCENES_SOURCE = "apps/web/src/shared/lib/theme-scene-assets.ts";
 const THEME_ART_STYLES = "apps/web/src/domains/marketing/creator-theme-gallery.css";
 const ROOT_HOME_SOURCE = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
 const APP_SHELL_SOURCE = "apps/web/src/app/AppShell.tsx";
@@ -33,7 +34,8 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('href: "/community"');
     expect(source).toContain("getCreatorThemeArt(resolvedTheme)");
     expect(source).toContain("data-theme-art={resolvedTheme}");
-    expect(source).toContain("srcSet={artDirection.hero.srcSet}");
+    expect(source).toContain("srcSet={asset.srcSet}");
+    expect(source).toContain("src={artDirection.scene.src}");
   });
 
   it("does not make heavyweight demos, readiness diagnostics, or film playback part of first load", () => {
@@ -47,19 +49,27 @@ describe("creator home experience contracts", () => {
     ]) {
       expect(source).not.toContain(heavyweight);
     }
-    expect(source.match(/<img\b/gu)).toHaveLength(1);
+    expect(source.match(/<img\b/gu)).toHaveLength(2);
+    expect(source).toContain('className="cf-theme-scene-image"');
+    expect(source).toContain('className="cf-theme-collage"');
+    expect(source).toContain('loading="lazy"');
     expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/u);
   });
 
-  it("recomposes the single local hero study for every design theme without remote artwork", () => {
+  it("assigns every design theme a distinct local scene instead of recolouring one hero", () => {
     const source = readFileSync(THEME_ART_SOURCE, "utf8");
+    const scenes = readFileSync(THEME_SCENES_SOURCE, "utf8");
     for (const theme of ["aurora", "blossom", "starlight", "dark", "light", "graphite", "midnight", "sepia", "contrast"]) {
-      expect(source).toContain(`${theme}: direction(`);
+      expect(source).toContain(`${theme}: direction("${theme}"`);
     }
+    const scenePaths = [...scenes.matchAll(/src: "(\/brand\/theme-scenes\/[^"]+\.svg)"/gu)].map((match) => match[1]);
+    expect(scenePaths).toHaveLength(9);
+    expect(new Set(scenePaths).size).toBe(9);
+    for (const path of scenePaths) expect(existsSync(`apps/web/public${path}`)).toBe(true);
     expect(source).toContain("/brand/atelier-world.webp");
     expect(source).toContain("/brand/atelier-process.webp");
     expect(source).toContain("/brand/atelier-materials.webp");
-    expect(source).not.toMatch(/https?:\/\//u);
+    expect(`${source}\n${scenes}`).not.toMatch(/https?:\/\//u);
   });
 
   it("tracks allow-listed destinations and captures installability before render", () => {
@@ -86,7 +96,8 @@ describe("creator home experience contracts", () => {
     expect(themeArt).toContain('data-theme-art="aurora"');
     expect(themeArt).toContain('data-theme-art="blossom"');
     expect(themeArt).toContain('data-theme-art="starlight"');
-    expect(themeArt).toContain(".cf-home-preview img");
+    expect(themeArt).toContain(".cf-theme-scene-image");
+    expect(themeArt).toContain("data-theme-layout=\"blossom\"");
     expect(themeArt).toContain("@media (prefers-reduced-motion: reduce)");
     expect(themeArt).toContain("@media (prefers-contrast: more), (forced-colors: active)");
   });

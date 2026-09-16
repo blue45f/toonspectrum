@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Ink panel studio</title>
+  <desc id="desc">An expressive dark drawing surface with bold brush marks, speech panels and a pen nib.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="bg" x1="100" y1="40" x2="1100" y2="760" gradientUnits="userSpaceOnUse"><stop stop-color="#130f0d"/><stop offset="1" stop-color="#241813"/></linearGradient>
+    <linearGradient id="ink" x1="20" y1="180" x2="1120" y2="660" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb26d"/><stop offset=".45" stop-color="#f27143"/><stop offset="1" stop-color="#c34638"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="url(#bg)"/><path d="M-70 240c226-190 403-12 522 56 122 69 227 38 316-54 104-108 230-91 502 61" fill="none" stroke="url(#ink)" stroke-width="88" stroke-linecap="round" opacity=".86"/><path d="M-20 655c180-109 360-48 515 2 202 65 352-73 682-22" fill="none" stroke="#f5e7d5" stroke-width="28" stroke-linecap="round" opacity=".28"/>
+  <g filter="url(#shadow)"><rect x="138" y="152" width="680" height="506" rx="18" fill="#f5efe6"/><rect x="174" y="190" width="282" height="190" rx="8" fill="#261b17"/><rect x="480" y="190" width="302" height="190" rx="8" fill="#e6794b"/><rect x="174" y="404" width="608" height="214" rx="8" fill="#31211a"/>
+    <path d="M208 322c77-103 153-105 214-15" fill="none" stroke="#f6e4cf" stroke-width="16" stroke-linecap="round"/><path d="M529 325c52-72 142-88 206-24" fill="none" stroke="#2b1a15" stroke-width="17" stroke-linecap="round"/><path d="M220 558c133-122 322-125 514-18" fill="none" stroke="#f6e4cf" stroke-width="19" stroke-linecap="round"/>
+    <ellipse cx="266" cy="230" rx="63" ry="32" fill="#fff"/><path d="m302 244 23 32-45-22Z" fill="#fff"/><ellipse cx="687" cy="242" rx="58" ry="30" fill="#fff4df"/><path d="m650 257-23 28 43-19Z" fill="#fff4df"/></g>
+  <g transform="translate(820 348) rotate(12)" filter="url(#shadow)"><path d="m73 0 174 173-171 171-137-52 34-153Z" fill="#fff3df"/><path d="M-20 269 116 126" stroke="#1a1210" stroke-width="22" stroke-linecap="round"/><circle cx="118" cy="126" r="24" fill="#1a1210"/><path d="m76 344-94 33 43-86Z" fill="#f27143"/></g>
+  <g fill="#fff0c6"><path d="m1050 122 10 27 28 10-28 10-10 27-10-27-27-10 27-10Z"/><circle cx="92" cy="90" r="8"/><circle cx="1100" cy="670" r="7"/></g>
+</svg>

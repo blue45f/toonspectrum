@@ -4,14 +4,27 @@ import { SiteExperienceContext } from "./site-experience-context";
 import { EXPERIENCE_MODE_KEY, parseExperienceMode, type ExperienceMode } from "./site-experience-policy";
 
 import { readBrowserPreference, writeBrowserPreference } from "@/shared/lib/browser-preferences";
+import { useTheme } from "@/shared/lib/theme";
+import { getThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
 
 import "./site-experience.css";
 import "./site-art-direction.css";
 
 
 function SiteThemeAmbientArt() {
+  const resolvedTheme = useTheme((state) => state.resolvedTheme);
+  const scene = getThemeSceneAsset(resolvedTheme);
   return (
     <div className="site-experience-ambient" aria-hidden="true">
+      <img
+        className="site-theme-scene"
+        src={scene.src}
+        width={1200}
+        height={800}
+        decoding="async"
+        alt=""
+        data-theme-scene={scene.id}
+      />
       <span className="site-theme-art site-theme-art--ribbon"><i /><i /><i /></span>
       <span className="site-theme-art site-theme-art--petals"><i /><i /><i /><i /><i /><i /></span>
       <span className="site-theme-art site-theme-art--orbit"><i /><i /><i /></span>
