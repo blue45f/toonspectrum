@@ -201,7 +201,10 @@ export function useMarketLibrary() {
   );
 
   const acquireResource = useCallback(
-    async (record: CreatorMarketplaceResourceRecord): Promise<boolean> => {
+    async (
+      record: CreatorMarketplaceResourceRecord,
+      expectedLogicalPackId?: string,
+    ): Promise<boolean> => {
       const activeUserId = userIdRef.current;
       const generation = generationRef.current;
       if (!activeUserId) return false;
@@ -215,6 +218,11 @@ export function useMarketLibrary() {
       if (
         userIdRef.current !== activeUserId
         || generationRef.current !== generation
+        || receipt.membership !== "active"
+        || (
+          expectedLogicalPackId !== undefined
+          && receipt.logicalPackId !== expectedLogicalPackId
+        )
       ) return false;
 
       setReleaseIds((current) => new Set([...current, record.id]));
