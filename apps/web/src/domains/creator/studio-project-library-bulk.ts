@@ -98,8 +98,9 @@ function mutateStudioProjectsBulk(
   }
 
   const affected = new Set(affectedIds);
+  const orderedAffectedIds = ids.filter((projectId) => affected.has(projectId));
   const skippedIds = ids.filter((projectId) => !foundIds.has(projectId) || !affected.has(projectId));
-  if (affectedIds.length === 0) {
+  if (orderedAffectedIds.length === 0) {
     return Object.freeze({
       state: current,
       affectedIds: Object.freeze([]),
@@ -114,7 +115,7 @@ function mutateStudioProjectsBulk(
   }), options.target);
   return Object.freeze({
     state,
-    affectedIds: Object.freeze(affectedIds),
+    affectedIds: Object.freeze(orderedAffectedIds),
     skippedIds: Object.freeze(skippedIds),
   });
 }

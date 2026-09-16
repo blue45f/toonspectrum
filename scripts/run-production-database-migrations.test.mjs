@@ -44,6 +44,16 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
   expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(62);
 });
 
+test("applied studio media inference migration remains checksum-immutable", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0045_studio_media_inference_jobs",
+  );
+
+  expect(migration?.checksum).toBe(
+    "319baddddcd1f478477ea1175c27b773b0f29cf3baf920816b7263e6a3d3fd38",
+  );
+});
+
 test("auth identity hardening migration preserves legacy access and enforces normalized ownership", () => {
   const migration = loadMigrationManifest().find(
     ({ id }) => id === "0062_auth_identity_hardening",
