@@ -36,7 +36,12 @@ import {
   type PersonalCloudUploadProgress,
 } from "../save-first/personal-cloud-upload";
 import { STUDIO_EXPORT_PRESETS } from "../save-first/studio-export-presets";
-import { buildStudioProjectPackage, saveStudioProjectPackage } from "../save-first/studio-project-package";
+import {
+  chooseStudioProjectPackageSaveTarget,
+  studioProjectPackageFileName,
+  writeStudioProjectPackageToTarget,
+} from "../save-first/studio-project-package";
+import { buildStudioProjectPackageWithWorkspace } from "../save-first/studio-project-package-with-workspace";
 import {
   studioSaveSafetySummary,
   type StudioSaveProfile,
@@ -211,22 +216,31 @@ export function StudioSaveFirstProjectLibraryPage({
     ? []
     : readStudioSubmissions(window.localStorage).submissions;
 
-  const createPackage = (
+  const createPackage = async (
     project: StudioProjectLibraryEntry,
     profile: StudioSaveProfile,
-  ) => buildStudioProjectPackage({
-    project,
-    documents: readStudioProjectDocuments(window.localStorage, project.id).documents,
-    profile,
-    submissions: submissions.filter((submission) => submission.projectId === project.id),
-  });
+  ) => {
+    const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
+    return (await buildStudioProjectPackageWithWorkspace({
+      storage: window.localStorage,
+      project,
+      documents,
+      profile,
+      submissions: submissions.filter((submission) => submission.projectId === project.id),
+      authUserId,
+    })).packageResult;
+  };
   const savePackage = async (project: StudioProjectLibraryEntry) => {
     if (typeof window === "undefined" || busyProjectId) return;
     setBusyProjectId(project.id);
     try {
+      const target = await chooseStudioProjectPackageSaveTarget(
+        studioProjectPackageFileName(project.title),
+        window,
+      );
       const profile = profiles.ensure(project.id) ?? profiles.profileFor(project.id);
-      const result = createPackage(project, profile);
-      const method = await saveStudioProjectPackage(result, window);
+      const result = await createPackage(project, profile);
+      const method = await writeStudioProjectPackageToTarget(result, target);
       profiles.addProvider(project.id, "local-file");
       const saved = profiles.recordSave(project.id) ?? profile;
       profiles.markSynced(project.id, "local-file:backup", {
@@ -289,7 +303,7 @@ export function StudioSaveFirstProjectLibraryPage({
         error: null,
       }) ?? prepared;
       const binding = syncing.bindings.find((entry) => entry.id === bindingId) ?? null;
-      const packageResult = createPackage(project, syncing);
+      const packageResult = await createPackage(project, syncing);
       const credential = await getPersonalCloudAccessToken(provider);
       const uploaded = await uploadPersonalCloudProjectPackage(provider, {
         projectId: project.id,

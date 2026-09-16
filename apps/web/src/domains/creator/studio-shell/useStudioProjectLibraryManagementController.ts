@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useSession } from "@/compat/auth-session-store";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { removeStudioSaveProfilesBulk } from "../save-first/studio-save-profile-bulk";
 import type { StudioSaveProfile } from "../save-first/studio-save-profile";
 import {
-  buildStudioProjectPackage,
-  saveStudioProjectPackage,
+  chooseStudioProjectPackageSaveTarget,
+  studioProjectPackageFileName,
+  writeStudioProjectPackageToTarget,
 } from "../save-first/studio-project-package";
+import { buildStudioProjectPackageWithWorkspace } from "../save-first/studio-project-package-with-workspace";
 import { readStudioSubmissions } from "../save-first/studio-submission-store";
 import {
   ensureInitialStudioProjectDocument,
@@ -49,7 +52,9 @@ export interface StudioProjectLibraryDeleteRequest {
 
 export function useStudioProjectLibraryManagementController() {
   const [searchParams] = useSearchParams();
+  const { data: session } = useSession();
   const language = useI18n((state) => state.lang);
+  const authUserId = session?.user?.id ?? null;
   const locale = studioProjectLibraryLocale(language);
   const view = resolveStudioProjectLibraryManagementView(searchParams.get("view"));
   const status = view === "archived" ? "archived" : view === "trash" ? "trashed" : "active";
@@ -247,25 +252,32 @@ export function useStudioProjectLibraryManagementController() {
     });
   };
 
-  const createPackage = (project: StudioProjectLibraryEntry, profile: StudioSaveProfile) => {
+  const createPackage = async (project: StudioProjectLibraryEntry, profile: StudioSaveProfile) => {
     const submissions = typeof window === "undefined"
       ? []
       : readStudioSubmissions(window.localStorage).submissions;
-    return buildStudioProjectPackage({
+    const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
+    return (await buildStudioProjectPackageWithWorkspace({
+      storage: window.localStorage,
       project,
-      documents: readStudioProjectDocuments(window.localStorage, project.id).documents,
+      documents,
       profile,
       submissions: submissions.filter((submission) => submission.projectId === project.id),
-    });
+      authUserId,
+    })).packageResult;
   };
 
   const savePackage = async (project: StudioProjectLibraryEntry) => {
     if (typeof window === "undefined" || busyProjectId) return;
     setBusyProjectId(project.id);
     try {
+      const target = await chooseStudioProjectPackageSaveTarget(
+        studioProjectPackageFileName(project.title),
+        window,
+      );
       const profile = profiles.ensure(project.id) ?? profiles.profileFor(project.id);
-      const result = createPackage(project, profile);
-      const method = await saveStudioProjectPackage(result, window);
+      const result = await createPackage(project, profile);
+      const method = await writeStudioProjectPackageToTarget(result, target);
       profiles.addProvider(project.id, "local-file");
       const saved = profiles.recordSave(project.id) ?? profile;
       profiles.markSynced(project.id, "local-file:backup", {
@@ -315,6 +327,7 @@ export function useStudioProjectLibraryManagementController() {
   };
   return {
     locale,
+    authUserId,
     view,
     library,
     profiles,

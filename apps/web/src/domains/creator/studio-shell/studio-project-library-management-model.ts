@@ -1,4 +1,7 @@
-import type { StudioSaveProfile } from "../save-first/studio-save-profile";
+import {
+  studioSaveProfileNeedsDestination,
+  type StudioSaveProfile,
+} from "../save-first/studio-save-profile";
 import type {
   StudioProjectKind,
   StudioProjectLibraryEntry,
@@ -79,8 +82,7 @@ export function studioProjectLibraryDateLabel(
 }
 
 export function studioProjectIsTemporaryWork(profile: StudioSaveProfile): boolean {
-  return profile.lastManualSaveAt === null
-    && profile.bindings.every((binding) => binding.provider === "browser");
+  return studioSaveProfileNeedsDestination(profile);
 }
 
 export function studioProjectLibrarySearchText(

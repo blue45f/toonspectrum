@@ -257,6 +257,26 @@ import {
 import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
+import { StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialog";
+import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
+import {
+  chooseStudioProjectPackageSaveTarget,
+  studioProjectPackageFileName,
+  writeStudioProjectPackageToTarget,
+  type StudioProjectPackageSaveTarget,
+} from "./save-first/studio-project-package";
+import { buildStudioProjectPackageWithWorkspace } from "./save-first/studio-project-package-with-workspace";
+import {
+  ensureStudioSaveProfile,
+  markStudioStorageBindingSynced,
+  recordStudioManualSave,
+  studioSaveProfileForProject,
+  studioSaveProfileNeedsDestination,
+  upsertStudioStorageBinding,
+} from "./save-first/studio-save-profile";
+import { readStudioSubmissions } from "./save-first/studio-submission-store";
+import { readStudioProjectDocuments } from "./studio-project-document-reader";
+import { readStudioProjectLibrary } from "./studio-project-library-reader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
@@ -1434,7 +1454,7 @@ import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useResizable } from "@/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
@@ -1452,6 +1472,8 @@ export function StudioCuttoonEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
+  const studioLanguage = useI18n((state) => state.lang);
+  const studioSaveLocale = studioLanguage.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const [params] = useSearchParams();
   const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
@@ -1469,6 +1491,13 @@ export function StudioCuttoonEditor({
   );
   const linked3dCloudSaveRecoveryNoticeRef = useRef(linked3dCloudSaveRecoveryNotice);
   const [error, setError] = useState<string | null>(linked3dCloudSaveRecoveryNotice);
+  const [formalSaveOpen, setFormalSaveOpen] = useState(false);
+  const [formalSaveBusy, setFormalSaveBusy] = useState(false);
+  const [formalSaveError, setFormalSaveError] = useState<string | null>(null);
+  const [formalSaveFirstSave, setFormalSaveFirstSave] = useState(true);
+  const [formalSaveProjectTitle, setFormalSaveProjectTitle] = useState("");
+  const formalSaveInFlightRef = useRef(false);
+  const formalSaveTargetRef = useRef<StudioProjectPackageSaveTarget | null>(null);
   const announceDrawingShortcutRef = useRef<(message: string) => void>(() => undefined);
   const creationLinks = studioCreationLinkParams({
     workId,
@@ -1481,6 +1510,9 @@ export function StudioCuttoonEditor({
   const linkedChallengeId = creationLinks.challengeId;
   const studioAuthUserId = session?.user?.id ?? null;
   const studioHasAuthenticatedSession = Boolean(studioAuthUserId);
+  useEffect(() => {
+    formalSaveTargetRef.current = null;
+  }, [studioRoute.projectId]);
   const studioLiveTransportFactory = useStudioLiveTransportAuth({
     authReady: studioAuthReady,
     userId: studioAuthUserId,
@@ -24070,11 +24102,157 @@ No text, logo, watermark, or copyrighted character.`;
     });
   }
 
+  function localStudioProjectForSave() {
+    if (typeof window === "undefined" || !studioRoute.projectId || !studioRoute.documentId) {
+      return null;
+    }
+    const project = readStudioProjectLibrary(window.localStorage).projects.find(
+      (candidate) => candidate.id === studioRoute.projectId,
+    ) ?? null;
+    return project ? { project, documentId: studioRoute.documentId } : null;
+  }
+
+  function openLocalStudioFormalSave(): boolean {
+    const context = localStudioProjectForSave();
+    if (!context) {
+      setError(studioSaveLocale === "ko"
+        ? "이 원고가 속한 프로젝트를 찾지 못했습니다. 내 작업에서 다시 열어 주세요."
+        : "The project for this document could not be found. Reopen it from My work.");
+      return false;
+    }
+    const profile = studioSaveProfileForProject(window.localStorage, context.project.id);
+    setFormalSaveProjectTitle(context.project.title);
+    setFormalSaveFirstSave(studioSaveProfileNeedsDestination(profile));
+    setFormalSaveError(null);
+    setFormalSaveOpen(true);
+    return true;
+  }
+
+  async function saveLocalStudioProjectFile(): Promise<void> {
+    if (formalSaveInFlightRef.current || typeof window === "undefined") return;
+    const context = localStudioProjectForSave();
+    if (!context) {
+      setFormalSaveError(studioSaveLocale === "ko"
+        ? "프로젝트 정보를 읽지 못했습니다. 내 작업에서 다시 열어 주세요."
+        : "Project information could not be read. Reopen it from My work.");
+      return;
+    }
+    formalSaveInFlightRef.current = true;
+    setFormalSaveBusy(true);
+    setFormalSaveError(null);
+    try {
+      // The picker must be opened before any OPFS/SQLite await so the original click or shortcut
+      // remains a valid browser user activation.
+      const target = formalSaveTargetRef.current
+        ?? await chooseStudioProjectPackageSaveTarget(
+          studioProjectPackageFileName(context.project.title),
+          window,
+        );
+      formalSaveTargetRef.current = target;
+      if (pendingStrokeCommitsRef.current) {
+        flushSync(() => flushPendingStrokeCommitsRef.current());
+      }
+      const documents = readStudioProjectDocuments(
+        window.localStorage,
+        context.project.id,
+      ).documents;
+      const profile = ensureStudioSaveProfile(window.localStorage, context.project.id, {
+        provider: "browser",
+        autoSave: true,
+        createVersions: true,
+        target: window,
+      });
+      const submissions = readStudioSubmissions(window.localStorage).submissions.filter(
+        (submission) => submission.projectId === context.project.id,
+      );
+      const currentSnapshot = currentStudioProjectSnapshot();
+      const { packageResult } = await buildStudioProjectPackageWithWorkspace({
+        storage: window.localStorage,
+        project: context.project,
+        documents,
+        profile,
+        submissions,
+        authUserId: studioAuthUserId,
+        currentSnapshots: { [context.documentId]: currentSnapshot },
+      });
+      const method = await writeStudioProjectPackageToTarget(packageResult, target);
+      upsertStudioStorageBinding(window.localStorage, context.project.id, {
+        id: "local-file:canonical",
+        provider: "local-file",
+        role: "canonical",
+        syncState: "pending",
+      }, { target: window });
+      const saved = recordStudioManualSave(window.localStorage, context.project.id, {
+        target: window,
+      });
+      markStudioStorageBindingSynced(
+        window.localStorage,
+        context.project.id,
+        "local-file:canonical",
+        {
+          remotePath: packageResult.fileName,
+          byteLength: packageResult.blob.size,
+          revision: saved.revision,
+        },
+        { target: window },
+      );
+      setFormalSaveFirstSave(false);
+      setFormalSaveOpen(false);
+      announceDrawingShortcut(method === "file-picker"
+        ? studioSaveLocale === "ko"
+          ? "편집 가능한 프로젝트 원본을 저장했습니다."
+          : "Saved the editable project original."
+        : studioSaveLocale === "ko"
+          ? "편집 가능한 프로젝트 원본을 다운로드했습니다."
+          : "Downloaded the editable project original.");
+    } catch (cause) {
+      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+        formalSaveTargetRef.current = null;
+        setFormalSaveError(cause instanceof Error && cause.message.trim()
+          ? cause.message.trim().slice(0, 500)
+          : studioSaveLocale === "ko"
+            ? "프로젝트 원본을 저장하지 못했습니다. 임시 자동저장본은 유지됩니다."
+            : "The project original could not be saved. The temporary autosave remains available.");
+        setFormalSaveOpen(true);
+      }
+    } finally {
+      formalSaveInFlightRef.current = false;
+      setFormalSaveBusy(false);
+    }
+  }
+
+  function openLocalStudioPersonalDrive(): void {
+    const context = localStudioProjectForSave();
+    if (!context) return;
+    persistPendingStrokeEmergencyAutosaveRef.current("route-change");
+    setFormalSaveOpen(false);
+    navigate(`/studio?view=storage&project=${encodeURIComponent(context.project.id)}`);
+  }
+
   // 저장 파이프라인 본체는 studio-page-save-pipeline.ts 로 추출(2026-08, B-09). scoped-async
   // 가드(saveScopeStillCurrent·mutation ticket)·CRDT 승인 장벽·revision fencing 은 전부 함께
   // 이관됐고, 이 선언은 호출 시점 렌더 바인딩을 deps 로 흘리는 얇은 지점만 유지한다
   // (함수 선언 hoisting 으로 상단 handleSaveRef 배선이 그대로 동작한다).
   async function handleSave(status: "published" | "draft") {
+    const localProjectContext = localStudioProjectForSave();
+    const explicitSaveAction = resolveStudioEditorExplicitSaveAction({
+      status,
+      projectId: studioRoute.projectId,
+      documentId: studioRoute.documentId,
+      workId,
+      remixId,
+      profile: localProjectContext
+        ? studioSaveProfileForProject(window.localStorage, localProjectContext.project.id)
+        : null,
+    });
+    if (explicitSaveAction === "save-local-file") {
+      await saveLocalStudioProjectFile();
+      return;
+    }
+    if (explicitSaveAction === "choose-destination") {
+      openLocalStudioFormalSave();
+      return;
+    }
     await runStudioPageSavePipeline(status, {
       studioAuthUserId,
       workId,
@@ -29469,6 +29647,21 @@ function clearSelectionForEdit() {
       >
         {editorSurface}
         {smartShapeDialog}
+        <StudioFormalSaveDialog
+          open={formalSaveOpen}
+          locale={studioSaveLocale}
+          projectTitle={formalSaveProjectTitle || title || (studioSaveLocale === "ko" ? "제목 없는 프로젝트" : "Untitled project")}
+          firstSave={formalSaveFirstSave}
+          busy={formalSaveBusy}
+          error={formalSaveError}
+          onClose={() => {
+            if (formalSaveBusy) return;
+            setFormalSaveOpen(false);
+            setFormalSaveError(null);
+          }}
+          onSaveFile={() => { void saveLocalStudioProjectFile(); }}
+          onOpenPersonalDrive={openLocalStudioPersonalDrive}
+        />
         <StudioWebtoonAssistantModal
           open={webtoonAssistantOpen}
           onClose={() => setWebtoonAssistantOpen(false)}

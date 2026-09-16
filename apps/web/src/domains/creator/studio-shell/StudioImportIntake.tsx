@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, FileUp, ShieldCheck } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useSession } from "@/compat/auth-session-store";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -9,6 +10,7 @@ import {
   planStudioImport,
   type StudioImportPlanItem,
 } from "../studio-import-compatibility";
+import { importStudioProjectPackage } from "../save-first/studio-project-package-import";
 import {
   STUDIO_IMPORT_HANDOFF_ACCEPT,
   registerStudioImportHandoff,
@@ -45,8 +47,10 @@ function listLabel(values: readonly string[], fallback: string): string {
  */
 export function StudioImportIntake({ locale }: { readonly locale: StudioImportIntakeLocale }) {
   const navigate = useNavigate();
+  const { data: session } = useSession();
   const [selection, setSelection] = useState<Selection | null>(null);
   const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
 
   const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0] ?? null;
@@ -66,8 +70,28 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
     }
   };
 
-  const continueImport = () => {
-    if (!selection || selection.item.status === "blocked") return;
+  const continueImport = async () => {
+    if (!selection || selection.item.status === "blocked" || importing) return;
+    if (selection.item.format === "toonstudio") {
+      setImporting(true);
+      setMessage("");
+      try {
+        const restored = await importStudioProjectPackage(selection.file, {
+          storage: window.localStorage,
+          target: window,
+          authUserId: session?.user?.id ?? null,
+        });
+        navigate(restored.href, { replace: true });
+      } catch (error) {
+        setMessage(error instanceof Error
+          ? error.message
+          : locale === "ko"
+            ? "ToonStudio 프로젝트 파일을 복원하지 못했습니다."
+            : "The ToonStudio project file could not be restored.");
+        setImporting(false);
+      }
+      return;
+    }
     if (!studioImportHandoffTargetForFormat(selection.item.format)) {
       setMessage(locale === "ko"
         ? "이 형식은 아래 전용 작업공간에서 가져와야 합니다. 파일은 전송하거나 저장하지 않았습니다."
@@ -83,7 +107,8 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
   };
 
   const operational = selection
-    ? studioImportHandoffTargetForFormat(selection.item.format) !== null
+    ? selection.item.format === "toonstudio"
+      || studioImportHandoffTargetForFormat(selection.item.format) !== null
     : false;
   const Icon = selection?.item.status === "accepted"
     ? CheckCircle2
@@ -106,8 +131,8 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
           </h2>
           <p className="mt-2 text-sm leading-6 text-fg-3">
             {locale === "ko"
-              ? "JSON·PSD·ORA·CBZ·브러시 팩과 이미지 파일은 보존 항목과 변환 손실을 확인한 뒤 기존 검증된 가져오기 경로로 전달합니다. 파일 자체는 URL이나 저장소에 기록하지 않습니다."
-              : "JSON, PSD, ORA, CBZ, brush packs and images are previewed for preservation and loss, then passed to the established import owner. File bytes are never written to URL or storage."}
+              ? "ToonStudio 프로젝트·JSON·PSD·ORA·CBZ·브러시 팩과 이미지 파일은 보존 항목과 변환 손실을 확인한 뒤 검증된 가져오기 경로로 전달합니다. 프로젝트 파일은 원고 스냅샷까지 새 로컬 프로젝트로 복원합니다."
+              : "ToonStudio projects, JSON, PSD, ORA, CBZ, brush packs and images are previewed for preservation and loss, then sent through verified import paths. Project packages restore canvas snapshots into a new local project."}
           </p>
         </div>
         <label className={buttonClass({ size: "lg", className: "shrink-0 cursor-pointer gap-2" })}>
@@ -116,6 +141,7 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
           <input
             type="file"
             accept={STUDIO_IMPORT_HANDOFF_ACCEPT}
+            disabled={importing}
             className="sr-only"
             onChange={selectFile}
           />
@@ -159,11 +185,15 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
             </div>
             <button
               type="button"
-              disabled={selection.item.status === "blocked" || !operational}
-              onClick={continueImport}
+              disabled={selection.item.status === "blocked" || !operational || importing}
+              onClick={() => { void continueImport(); }}
               className={buttonClass({ className: "shrink-0 gap-2" })}
             >
-              {locale === "ko" ? "편집기에서 가져오기" : "Import in editor"}
+              {importing
+                ? locale === "ko" ? "프로젝트 복원 중…" : "Restoring project…"
+                : selection.item.format === "toonstudio"
+                  ? locale === "ko" ? "프로젝트 복원" : "Restore project"
+                  : locale === "ko" ? "편집기에서 가져오기" : "Import in editor"}
               <FileUp size={15} aria-hidden="true" />
             </button>
           </div>
