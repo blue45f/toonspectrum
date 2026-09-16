@@ -1,5 +1,6 @@
 import legacyManifest from "./studio-2d-asset-manifest.json";
 import cc0Manifest from "./studio-2d-cc0-scene-manifest.json";
+import { GENERATED_GPT25_ASSET_METADATA } from "./studio-2d-generated-backgrounds";
 
 export interface Studio2dScene {
   readonly id: string;
@@ -32,20 +33,24 @@ export interface Studio2dAssetMetadata {
     readonly notes: readonly string[];
   };
   readonly provenance: {
-    readonly kind: "legacy-catalog" | "poly-haven-cc0";
-    readonly licenseStatus: "unverified" | "cc0-verified";
+    readonly kind: "legacy-catalog" | "poly-haven-cc0" | "gpt-image-2.5";
+    readonly licenseStatus: "unverified" | "cc0-verified" | "first-party-generated";
     readonly aiLabelInCatalog?: boolean;
     readonly licenseId?: string;
     readonly provider?: string;
     readonly sourceUrl?: string;
     readonly checkedOn?: string;
+    readonly model?: string;
+    readonly promptHash?: string;
+    readonly recipeId?: string;
+    readonly generatedAt?: string;
   };
   readonly mediaType: "image/jpeg" | "image/png" | "image/webp";
   readonly legacySrc: string | null;
   readonly label?: string;
   readonly genre?: string;
   readonly sourceManifest?: string;
-  readonly style?: "photographic-reference";
+  readonly style?: "photographic-reference" | "webtoon-illustration";
 }
 export type Studio2dOrientation = "all" | "landscape" | "portrait" | "square";
 export type Studio2dQualityFilter = "all" | "recommended" | "large" | "raster" | "vector";
@@ -68,6 +73,7 @@ export interface Studio2dFilters {
 export const STUDIO_2D_ASSET_METADATA: readonly Studio2dAssetMetadata[] = Object.freeze([
   ...legacyManifest.assets,
   ...cc0Manifest.assets,
+  ...GENERATED_GPT25_ASSET_METADATA,
 ] as unknown as Studio2dAssetMetadata[]);
 const byId = new Map(STUDIO_2D_ASSET_METADATA.map((asset) => [asset.id, asset]));
 
