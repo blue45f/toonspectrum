@@ -1,87 +1,56 @@
-import { defineAppRoutes } from "../app-route-definition";
+import { createElement, type ComponentType } from "react";
+
+import { defineAppRoutes, type AppRouteDefinition } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
-const MySpaceHubPage = lazyRetry(
-  () => import("@/domains/account/MySpaceHubPage").then((module) => ({
-    default: module.MySpaceHubPage,
-  })),
+type LazyPageModule = Record<string, ComponentType>;
+
+function lazyPage(load: () => Promise<unknown>, name: string) {
+  return lazyRetry(
+    () => load().then((module) => ({
+      default: (module as LazyPageModule)[name]!,
+    })),
+    name,
+  );
+}
+
+function route(id: string, path: string, Page: ComponentType): AppRouteDefinition {
+  return { id, path, element: createElement(Page) };
+}
+
+const MySpaceHubPage = lazyPage(
+  () => import("@/domains/account/MySpaceHubPage"),
   "MySpaceHubPage",
 );
-const AccountPage = lazyRetry(
-  () => import("@/domains/account/AccountPage").then((module) => ({
-    default: module.AccountPage,
-  })),
-  "AccountPage",
-);
-const UserProfilePage = lazyRetry(
-  () => import("@/domains/account/UserProfilePage").then((module) => ({
-    default: module.UserProfilePage,
-  })),
+const AccountPage = lazyPage(() => import("@/domains/account/AccountPage"), "AccountPage");
+const UserProfilePage = lazyPage(
+  () => import("@/domains/account/UserProfilePage"),
   "UserProfilePage",
 );
-const SettingsPage = lazyRetry(
-  () => import("@/domains/account/SettingsPage").then((module) => ({
-    default: module.SettingsPage,
-  })),
-  "SettingsPage",
+const SettingsPage = lazyPage(() => import("@/domains/account/SettingsPage"), "SettingsPage");
+const AuthActionPage = lazyPage(
+  () => import("@/domains/account/AuthActionPage"),
+  "AuthActionPage",
 );
-const AuthCallbackPage = lazyRetry(
-  () => import("@/domains/account/AuthCallbackPage").then((module) => ({
-    default: module.AuthCallbackPage,
-  })),
-  "AuthCallbackPage",
+const AiSettingsPage = lazyPage(
+  () => import("@/domains/account/AiSettingsPage"),
+  "AiSettingsPage",
 );
-const VerifyEmailPage = lazyRetry(
-  () => import("@/domains/account/VerifyEmailPage").then((module) => ({
-    default: module.VerifyEmailPage,
-  })),
-  "VerifyEmailPage",
-);
-const ResetPasswordPage = lazyRetry(
-  () => import("@/domains/account/ResetPasswordPage").then((module) => ({
-    default: module.ResetPasswordPage,
-  })),
-  "ResetPasswordPage",
-);
-
-const AiSettingsPage = lazyRetry(() => import("@/domains/account/AiSettingsPage").then(module => ({ default: module.AiSettingsPage })), "AiSettingsPage");
-
-const MessagesPage = lazyRetry(
-  () => import("@/domains/messages/MessagesPage").then((module) => ({
-    default: module.MessagesPage,
-  })),
-  "MessagesPage",
-);
-const MessageRequestPage = lazyRetry(
-  () => import("@/domains/messages/MessageRequestPage").then((module) => ({
-    default: module.MessageRequestPage,
-  })),
+const MessagesPage = lazyPage(() => import("@/domains/messages/MessagesPage"), "MessagesPage");
+const MessageRequestPage = lazyPage(
+  () => import("@/domains/messages/MessageRequestPage"),
   "MessageRequestPage",
 );
 
 export const accountRoutes = defineAppRoutes([
-  { id: "account-ai-settings", path: "/settings/ai", element: <AiSettingsPage /> },
-  { id: "account-my-space", path: "/my", element: <MySpaceHubPage /> },
-  { id: "account-me", path: "/me", element: <AccountPage /> },
-  { id: "account-profile", path: "/u/:userId", element: <UserProfilePage /> },
-  { id: "account-messages-new", path: "/messages/new", element: <MessageRequestPage /> },
-  { id: "account-messages-thread", path: "/messages/:threadId", element: <MessagesPage /> },
-  { id: "account-messages", path: "/messages", element: <MessagesPage /> },
-  { id: "account-settings", path: "/settings", element: <SettingsPage /> },
-  {
-    id: "account-auth-callback",
-    path: "/auth/callback",
-    element: <AuthCallbackPage />,
-  },
-  {
-    id: "account-verify-email",
-    path: "/auth/verify-email",
-    element: <VerifyEmailPage />,
-  },
-  {
-    id: "account-reset-password",
-    path: "/auth/reset-password",
-    element: <ResetPasswordPage />,
-  },
+  route("account-ai-settings", "/settings/ai", AiSettingsPage),
+  route("account-my-space", "/my", MySpaceHubPage),
+  route("account-me", "/me", AccountPage),
+  route("account-profile", "/u/:userId", UserProfilePage),
+  route("account-messages-new", "/messages/new", MessageRequestPage),
+  route("account-messages-thread", "/messages/:threadId", MessagesPage),
+  route("account-messages", "/messages", MessagesPage),
+  route("account-settings", "/settings", SettingsPage),
+  route("account-auth-action", "/auth/:action", AuthActionPage),
 ]);

@@ -74,7 +74,9 @@ const directorySource = `${sitemapSource}\n${navigationSource}`;
 function staticUserFacingRoutes(): string[] {
   const routes = PUBLIC_ROUTE_SOURCE_FILES.flatMap((sourcePath) => {
     const source = readFileSync(sourcePath, "utf8");
-    return [...source.matchAll(/\bpath:\s*"([^"]+)"/gu)].map((match) => match[1]);
+    const fromPathField = [...source.matchAll(/\bpath:\s*"([^"]+)"/gu)].map((match) => match[1]);
+    const fromRouteHelper = [...source.matchAll(/\broute\(\s*"[^"]+"\s*,\s*"([^"]+)"/gu)].map((match) => match[1]);
+    return [...fromPathField, ...fromRouteHelper];
   });
 
   return [...new Set(routes)]

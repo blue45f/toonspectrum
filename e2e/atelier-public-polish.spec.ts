@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/api/**", async (route) => {
     const session = new URL(route.request().url()).pathname.endsWith("/auth/session");
-    await route.fulfill({ status: session ? 200 : 503, json: session ? { user: null, expires: null } : { message: "Deliberate offline fixture" } });
+    await route.fulfill({ status: session ? 200 : 503, json: session ? { authenticated: false, user: null } : { message: "Deliberate offline fixture" } });
   });
 });
 
@@ -17,7 +17,7 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.goto("/");
+    await page.goto("/community");
     const demo = page.getByTestId("atelier-workbench");
     await demo.scrollIntoViewIfNeeded();
     await expect(demo).toHaveCount(1);

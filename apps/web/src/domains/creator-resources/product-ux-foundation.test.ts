@@ -59,8 +59,8 @@ describe("purpose-first product UX foundation", () => {
   it("routes My Space as the global account destination while preserving detailed account pages", () => {
     const routes = readFileSync(ACCOUNT_ROUTES, "utf8");
     const navigation = readFileSync(SITE_NAVIGATION, "utf8");
-    expect(routes).toContain('path: "/my"');
-    expect(routes).toContain('path: "/me"');
+    expect(routes).toMatch(/route\(\s*"account-my-space"\s*,\s*"\/my"/u);
+    expect(routes).toMatch(/route\(\s*"account-me"\s*,\s*"\/me"/u);
     expect(navigation).toMatch(/me:\s*item\(\s*"me",\s*"\/my"/u);
   });
 

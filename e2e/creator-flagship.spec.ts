@@ -2,79 +2,114 @@ import { expect, test } from "@playwright/test";
 
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
-// Exercise the actual application route; do not replace the component under test.
+const THEME_STORAGE_KEY = "toonspectrum-theme";
+
+function themeEnvelope(preference: "dark" | "light") {
+  return JSON.stringify({
+    state: { preference, studioPreference: "inherit", theme: preference },
+    version: 0,
+  });
+}
+
+async function applyTheme(page: import("@playwright/test").Page, preference: "dark" | "light") {
+  const serialized = themeEnvelope(preference);
+  await page.evaluate(({ key, value }) => {
+    localStorage.setItem(key, value);
+    window.dispatchEvent(new StorageEvent("storage", {
+      key,
+      newValue: value,
+      storageArea: localStorage,
+    }));
+  }, { key: THEME_STORAGE_KEY, value: serialized });
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(({ language, themeKey, theme }) => {
+    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: language }, version: 0 }));
+    localStorage.setItem(themeKey, theme);
+    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+  }, { language: "ko", themeKey: THEME_STORAGE_KEY, theme: themeEnvelope("light") });
+  await page.route("**/api/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (/\/auth\/session$/u.test(pathname)) {
+      await route.fulfill({ status: 200, json: { authenticated: false, user: null } });
+      return;
+    }
+    await route.fulfill({ status: 503, json: { message: "Deliberate offline fixture" } });
+  });
+});
+
 for (const width of [320, 390, 820, 1440]) {
-  test(`flagship route layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
+  test(`clarity home layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
-    // Separate behavior coverage below still exercises running and user-paused motion.
     await page.emulateMedia({ reducedMotion: "reduce" });
-    const media: string[] = [];
     const pageErrors: string[] = [];
-    page.on("request", (request) => { if (/\/brand\/.*\.mp4(?:\?|$)/u.test(request.url())) media.push(request.url()); });
     page.on("pageerror", (error) => pageErrors.push(error.message));
+
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    const home = page.locator('[data-creator-experience="v4"]');
+    const home = page.locator('[data-creator-experience="clarity-v1"]');
+    const heroArt = home.locator(".cf-home-preview img");
+    const startCards = home.locator(".cf-start-card");
+
     await expect(home).toBeVisible();
+    await expect(home).toHaveAttribute("data-theme-art", "light");
     await expect(page.locator("h1")).toHaveCount(1);
+    await expect(heroArt).toBeVisible();
+    await expect(heroArt).toHaveAttribute("data-art-asset", "process");
+    await expect(heroArt).toHaveAttribute("srcset", /640w/u);
+    await expect(startCards).toHaveCount(4);
+    await startCards.first().focus();
+    await expect(startCards.first()).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    const comparison = home.getByRole("slider", { name: "일러스트의 명암과 컬러 비교" });
-    // Read native layout dimensions; offscreen CDP quads round a 44px box to 43.999px.
-    const comparisonBounds = await comparison.evaluate((element) => ({ width: element.clientWidth, height: element.clientHeight }));
-    expect(comparisonBounds.height).toBeGreaterThanOrEqual(44);
-    expect(comparisonBounds.width).toBeGreaterThanOrEqual(44);
-    await comparison.click({ position: { x: comparisonBounds.width * 0.25, y: 22 } });
-    expect(Number(await comparison.inputValue())).toBeLessThan(40);
-    const modes = home.locator(".cf-stage-switcher button");
-    await modes.first().focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(modes.nth(1)).toBeFocused();
-    await expect(modes.nth(1)).toHaveAttribute("aria-pressed", "true");
-    await home.locator('a[href="#creator-desk-title"]').click();
-    await expect(page.locator("#creator-desk-title")).toBeFocused();
-    await home.locator('a[href="#creator-offline-title"]').click();
-    await expect(page.locator("#creator-offline-title")).toBeFocused();
-    expect(media).toHaveLength(0);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await capturePageEvidence(page, testInfo, `flagship-${width}`);
-    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+    expect(await heroArt.evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
+
+    const faq = home.locator(".cf-faq details").first();
+    const summary = faq.locator("summary");
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(faq).toHaveAttribute("open", "");
+
+    await capturePageEvidence(page, testInfo, `clarity-${width}`);
+    await applyTheme(page, "dark");
+    await expect(home).toHaveAttribute("data-theme-art", "dark");
+    await expect(heroArt).toHaveAttribute("data-art-asset", "world");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await capturePageEvidence(page, testInfo, `flagship-dark-${width}`);
+    await capturePageEvidence(page, testInfo, `clarity-dark-${width}`);
     expect(pageErrors).toEqual([]);
   });
 }
 
-test("Korean query reaches the real reference screen without losing its original", async ({ page }) => {
-  await page.route("**/api/creator-resources/**", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "fixture provider outage" }) }));
+test("Korean home search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".cf-search-field input").fill("중세 갑옷");
-  await expect(page.locator(".cf-query-preview")).toContainText("medieval armor");
-  await page.locator(".cf-search-field button").click();
-  await expect(page).toHaveURL(/\/research\/assets\?/u);
-  expect(new URL(page.url()).searchParams.get("q")).toBe("중세 갑옷");
-  await expect(page.locator('aside').filter({ hasText: "medieval armor" })).toBeVisible();
+  await page.getByRole("button", { name: "작품·도구·소재·도움말 검색" }).click();
+  const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
+  await expect(search).toBeVisible();
+  await search.fill("중세 갑옷");
+  await expect(search).toHaveValue("중세 갑옷");
 });
 
-test("professional webtoon entry leads with quick draw and projects available", async ({ page }) => {
+test("professional webtoon entry leads with creation and project continuity", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator('.cf-hero a.cf-primary[href="/studio"]')).toBeVisible();
-  await expect(page.locator('.cf-hero a[href="/studio/new#quick-draw"]')).toBeVisible();
-  await expect(page.locator('.cf-hero a[href="/studio/projects"]')).toBeVisible();
-  await expect(page.locator('.creator-flagship form')).toHaveCount(1);
+  const home = page.locator('[data-creator-experience="clarity-v1"]');
+  await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a.cf-secondary[href="/studio/projects"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/new?kind=webtoon&template=webtoon-vertical"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/new?kind=webtoon&template=webtoon-four-cut"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/new?kind=illustration&template=illustration-portrait"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/assets/characters/new"]')).toBeVisible();
+  await expect(home.locator('.cf-intent nav a')).toHaveCount(7);
 });
 
-test("artwork values can be compared by keyboard and reduced motion stops the artwork", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
-  const study = page.locator(".cf-art-study");
-  const comparison = study.getByRole("slider");
-  await comparison.focus();
-  await page.keyboard.press("Home");
-  await expect(comparison).toHaveValue("0");
-  await page.keyboard.press("End");
-  await expect(comparison).toHaveValue("100");
-  await study.locator(".cf-motion-control").click();
-  await expect(study).toHaveAttribute("data-motion", "paused");
+test("theme artwork follows stored appearance and reduced motion remains static", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(study.locator(".cf-motion-control")).toBeHidden();
-  expect(await study.locator(".cf-study-art img").first().evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
+  await page.goto("/");
+  const home = page.locator('[data-creator-experience="clarity-v1"]');
+  const art = home.locator(".cf-home-preview img");
+  await expect(home).toHaveAttribute("data-theme-art", "light");
+  await expect(art).toHaveAttribute("data-art-asset", "process");
+  expect(await art.evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
+  await applyTheme(page, "dark");
+  await expect(home).toHaveAttribute("data-theme-art", "dark");
+  await expect(art).toHaveAttribute("data-art-asset", "world");
+  expect(await art.evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
 });
