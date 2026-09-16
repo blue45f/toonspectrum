@@ -18,6 +18,10 @@ function directive(csp, name) {
     .find((part) => part === name || part.startsWith(`${name} `)) ?? "";
 }
 
+function hasExactToken(tokens, expected) {
+  return tokens.some((token) => token === expected);
+}
+
 function rootCsp(responsePolicy) {
   const root = responsePolicy.headers?.find((entry) => entry.source === "/(.*)");
   return root?.headers?.find((header) => header.key === "Content-Security-Policy")?.value;
@@ -271,7 +275,7 @@ export function verifyStaticCspContract({ html, responsePolicy, bootstrapCompatS
     throw new Error("script-src must not contain unsafe-eval.");
   }
 
-  if (!scriptTokens.includes(cloudflareAnalyticsScriptOrigin)) {
+  if (!hasExactToken(scriptTokens, cloudflareAnalyticsScriptOrigin)) {
     throw new Error(
       "script-src must contain the exact Cloudflare Web Analytics script origin.",
     );
@@ -336,7 +340,7 @@ export function verifyStaticCspContract({ html, responsePolicy, bootstrapCompatS
     || !connections.some((source) => source === "wss://realtime.toonstudio.cloud")) {
     throw new Error("The exact production realtime origins are missing from connect-src.");
   }
-  if (!connections.includes(cloudflareAnalyticsConnectionOrigin)) {
+  if (!hasExactToken(connections, cloudflareAnalyticsConnectionOrigin)) {
     throw new Error(
       "connect-src must contain the exact Cloudflare Web Analytics beacon origin.",
     );

@@ -15,6 +15,8 @@ import {
   createPkceCodeChallenge,
   issuePkceVerifier,
   issueState,
+  readOAuthStateContext,
+  verifyBrowserBoundState,
 } from "../../server/oauth";
 import { verifySessionToken } from "../../server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
@@ -316,6 +318,69 @@ describe("AuthController Google GIS/code-flow boundary", () => {
     expect(res.redirect).toHaveBeenCalledWith(
       "https://www.toonstudio.cloud/auth/callback#error=oauth_unavailable",
     );
+  });
+
+  it("rejects polluted or oversized OAuth callback query parameters", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "123-client.apps.googleusercontent.com");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "configured-code-flow-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const state = issueState("google");
+
+    expect(readOAuthStateContext("google", [state])).toBeNull();
+    expect(readOAuthStateContext("google", { state })).toBeNull();
+    expect(verifyBrowserBoundState("google", state, [state])).toBe(false);
+    expect(verifyBrowserBoundState("google", state, `${state}x`)).toBe(false);
+
+    const cases: ReadonlyArray<{
+      readonly code: unknown;
+      readonly callbackState: unknown;
+      readonly error: unknown;
+      readonly expected: string;
+    }> = [
+      {
+        code: "authorization-code",
+        callbackState: [state],
+        error: undefined,
+        expected: "https://www.toonstudio.cloud/auth/callback#error=bad_state",
+      },
+      {
+        code: ["authorization-code"],
+        callbackState: state,
+        error: undefined,
+        expected: "https://www.toonstudio.cloud/auth/callback#error=no_code",
+      },
+      {
+        code: "x".repeat(8_193),
+        callbackState: state,
+        error: undefined,
+        expected: "https://www.toonstudio.cloud/auth/callback#error=no_code",
+      },
+      {
+        code: "authorization-code",
+        callbackState: state,
+        error: ["access_denied"],
+        expected: "https://www.toonstudio.cloud/auth/callback#error=provider_error",
+      },
+    ];
+
+    for (const current of cases) {
+      const res = response();
+      await controller().oauthCallback(
+        "google",
+        current.code,
+        current.callbackState,
+        current.error,
+        requestWithOAuthState("google", state),
+        res,
+      );
+      expect(res.redirect).toHaveBeenCalledWith(current.expected);
+    }
+    expect(handleOAuthCallback).not.toHaveBeenCalled();
   });
 
   it("rejects a valid signed state that was not initiated by the callback browser", async () => {

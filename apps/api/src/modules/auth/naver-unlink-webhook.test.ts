@@ -1,9 +1,3 @@
-import {
-  createCipheriv,
-  createHash,
-  createHmac,
-} from "node:crypto";
-
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -17,52 +11,33 @@ import {
 } from "./naver-unlink-webhook";
 
 const NOW = 1_800_000_000;
+const CLIENT_ID = "fixture-naver-client-id";
+const CLIENT_SECRET = "fixture-naver-client-secret";
 const ENV = {
-  NAVER_OAUTH_CLIENT_ID: "fixture-naver-client-id",
-  NAVER_OAUTH_CLIENT_SECRET: "fixture-naver-client-secret",
+  NAVER_OAUTH_CLIENT_ID: CLIENT_ID,
+  NAVER_OAUTH_CLIENT_SECRET: CLIENT_SECRET,
 } as NodeJS.ProcessEnv;
 const USER_ID = "fixture_naver_user_1";
-function protocolKey(secret = ENV.NAVER_OAUTH_CLIENT_SECRET!): Buffer {
-  return createHash("md5").update(secret, "utf8").digest().subarray(0, 16);
-}
 
-function encryptedUserId(
-  userId = USER_ID,
-  secret = ENV.NAVER_OAUTH_CLIENT_SECRET!,
-): string {
-  const key = protocolKey(secret);
-  const iv = Buffer.from("00112233445566778899aabbccddeeff", "hex");
-  const cipher = createCipheriv("aes-128-cbc", key, iv);
-  return Buffer.concat([
-    iv,
-    cipher.update(userId, "utf8"),
-    cipher.final(),
-  ]).toString("base64url");
-}
+// Fixed vectors generated from Naver's documented disconnect-callback protocol:
+// AES-128-CBC/PKCS padding with the first 16 bytes of MD5(client secret), then
+// HMAC-SHA256 over the exact callback fields. Keeping the vectors static avoids
+// reimplementing a provider-mandated legacy derivation inside application tests.
+const ENCRYPTED_USER_ID =
+  "ABEiM0RVZneImaq7zN3u__pmwdJA8cLTEl9FJQvleGYR7v_NscYy21jlUgTwEFCZ";
+const VALID_SIGNATURE =
+  "vYP5vI2_kLV1ucQV-HoS3oBpQzz8VLOLVdrNyzMI78Y";
+const INVALID_ENCRYPTED_USER_ID =
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const INVALID_CIPHERTEXT_SIGNATURE =
+  "MBnskZzfFhmdSRis0E5iKWY-7yNCJIQI3hm0Ck5F4-Q";
 
-function signature(
-  clientId: string,
-  encrypted: string,
-  timestamp: string,
-  secret = ENV.NAVER_OAUTH_CLIENT_SECRET!,
-): string {
-  const base = `clientId=${clientId}&encryptUniqueId=${encrypted}&timestamp=${timestamp}`;
-  return createHmac("sha256", protocolKey(secret))
-    .update(base, "utf8")
-    .digest("base64url");
-}
 function payload(overrides: Record<string, unknown> = {}) {
-  const clientId = String(overrides.clientId ?? ENV.NAVER_OAUTH_CLIENT_ID);
-  const encryptUniqueId = String(
-    overrides.encryptUniqueId ?? encryptedUserId(),
-  );
-  const timestamp = String(overrides.timestamp ?? NOW);
   return {
-    clientId,
-    encryptUniqueId,
-    timestamp,
-    signature: overrides.signature
-      ?? signature(clientId, encryptUniqueId, timestamp),
+    clientId: CLIENT_ID,
+    encryptUniqueId: ENCRYPTED_USER_ID,
+    timestamp: String(NOW),
+    signature: VALID_SIGNATURE,
     ...overrides,
   };
 }
@@ -125,10 +100,12 @@ describe("Naver unlink webhook authentication", () => {
       )
     ).toThrow(NaverWebhookPayloadError);
 
-    const invalidEncrypted = Buffer.alloc(32).toString("base64url");
     expect(() =>
       parseNaverUnlinkWebhook(
-        payload({ encryptUniqueId: invalidEncrypted }),
+        payload({
+          encryptUniqueId: INVALID_ENCRYPTED_USER_ID,
+          signature: INVALID_CIPHERTEXT_SIGNATURE,
+        }),
         ENV,
         NOW,
       )
