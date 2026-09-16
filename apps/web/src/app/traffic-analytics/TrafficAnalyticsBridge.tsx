@@ -126,7 +126,10 @@ function postTrafficEvent(
     },
     body: JSON.stringify(body),
   });
-  if (trafficEndpointUnavailable) return;
+  if (
+    trafficEndpointUnavailable
+    || (typeof navigator !== "undefined" && navigator.onLine === false)
+  ) return;
   void fetch(apiPath(`/api/analytics/traffic/${endpoint}`), init)
     .then((response) => {
       // A 5xx means the collector is not there; it will not be there on the next navigation

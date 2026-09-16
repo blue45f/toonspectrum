@@ -90,6 +90,27 @@ export const STUDIO_PRECACHE_BUDGET: StudioPrecacheBudget = Object.freeze({
   warmBytes: 512 * 1024,
 });
 
+/** Stable same-origin files used by the HTML shell and emergency recovery. */
+export const STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS = Object.freeze([
+  "/bootstrap-compat.js", "/bootstrap-theme.js",
+  "/offline-draw/index.html", "/offline-draw/portable.html",
+  "/offline-draw/styles.css", "/offline-draw/model.js",
+  "/offline-draw/storage.js", "/offline-draw/editor.js",
+  "/offline-draw/cache.js", "/offline-draw/bootstrap.js",
+  "/brand/spectrum-ribbon-v2/manifest.webmanifest",
+  "/brand/spectrum-ribbon-v2/favicon.ico",
+  "/brand/spectrum-ribbon-v2/favicon-32.png",
+  "/brand/spectrum-ribbon-v2/favicon-96.png",
+  "/brand/spectrum-ribbon-v2/favicon.svg",
+  "/brand/spectrum-ribbon-v2/safari-pinned-tab.svg",
+  "/brand/spectrum-ribbon-v2/apple-touch-icon.png",
+  "/icon-192.png", "/favicon-96.png",
+  "/brand/theme-scenes/ink-studio.svg",
+  "/brand/theme-scenes/motifs/ink-motifs.svg",
+  "/brand/production-os-hero.svg",
+  "/brand/production-os-workspace.svg",
+] as const);
+
 export interface StudioPrecachePlanInput {
   readonly manifest: StudioViteManifest;
   readonly appEntryKey: string;
@@ -104,8 +125,12 @@ export interface StudioPrecachePlanInput {
    * visit is enough to make the editor work offline afterwards.
    */
   readonly warmUrls?: readonly string[];
+  /** Stable shell/recovery assets outside Vite's hashed module graph. */
+  readonly staticCriticalUrls?: readonly string[];
   /** Byte size of a public URL, or `null` when the file is not in the build. */
   readonly sizeOf: (url: string) => number | null;
+  /** Content fingerprint used to rotate the worker for stable public URLs. */
+  readonly fingerprintOf?: (url: string) => string | null;
   readonly budget?: StudioPrecacheBudget;
 }
 
@@ -114,6 +139,7 @@ export interface StudioPrecachePlan {
    * attaches COOP/COEP and the replayed offline document stays isolated. */
   readonly shellUrls: readonly string[];
   readonly criticalUrls: readonly string[];
+  readonly criticalFingerprints: readonly string[];
   readonly warmUrls: readonly string[];
   readonly criticalBytes: number;
   readonly warmBytes: number;
@@ -149,17 +175,33 @@ export function planStudioServiceWorkerPrecache(
   const warnings: string[] = [];
   const violations: string[] = [];
 
-  const criticalUrls = collectStudioManifestClosure(
+  const manifestCriticalUrls = collectStudioManifestClosure(
     input.manifest,
     input.appEntryKey,
   );
-  if (criticalUrls.length === 0) {
+  if (manifestCriticalUrls.length === 0) {
     violations.push(
       `app entry ${JSON.stringify(input.appEntryKey)} is missing from the Vite manifest`,
     );
   }
 
+  const criticalUrls = [...manifestCriticalUrls];
   const criticalSet = new Set(criticalUrls);
+  for (const url of input.staticCriticalUrls ?? []) {
+    if (!url.startsWith("/") || url.startsWith("//")) {
+      violations.push(`critical precache URL must be same-origin rooted: ${url}`);
+      continue;
+    }
+    if (criticalSet.has(url)) continue;
+    criticalSet.add(url);
+    criticalUrls.push(url);
+    if (input.sizeOf(url) === null) {
+      violations.push(`critical precache target has no file on disk: ${url}`);
+    }
+  }
+  const criticalFingerprints = criticalUrls.map((url) =>
+    `${url}:${input.fingerprintOf?.(url) ?? "url-only"}`,
+  );
   const warmUrls: string[] = [];
   const warmSeen = new Set<string>();
   for (const url of input.warmUrls ?? []) {
@@ -186,6 +228,7 @@ export function planStudioServiceWorkerPrecache(
   return {
     shellUrls: SHELL_URLS,
     criticalUrls,
+    criticalFingerprints,
     warmUrls,
     criticalBytes,
     warmBytes,
@@ -200,10 +243,17 @@ export function planStudioServiceWorkerPrecache(
  * not told to install a byte-identical worker.
  */
 export function studioServiceWorkerBuildId(
-  plan: Pick<StudioPrecachePlan, "criticalUrls" | "warmUrls">,
+  plan: Pick<StudioPrecachePlan, "criticalUrls" | "warmUrls">
+    & Partial<Pick<StudioPrecachePlan, "criticalFingerprints">>,
   digest: (value: string) => string,
 ): string {
-  const fingerprint = [...plan.criticalUrls, "--", ...plan.warmUrls].join("\n");
+  const fingerprint = [
+    ...plan.criticalUrls,
+    "--critical-content--",
+    ...(plan.criticalFingerprints ?? []),
+    "--warm--",
+    ...plan.warmUrls,
+  ].join("\n");
   return digest(fingerprint).slice(0, 12);
 }
 
