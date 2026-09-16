@@ -17,6 +17,33 @@ const DEFAULT_COLLATOR_LOCALE = "en";
 const displayNameCache = new Map<string, Intl.DisplayNames>();
 const collatorCache = new Map<string, Intl.Collator>();
 
+const RTL_SCRIPT_SUBTAGS = new Set([
+  "adlm",
+  "arab",
+  "hebr",
+  "mand",
+  "nkoo",
+  "rohg",
+  "syrc",
+  "thaa",
+]);
+const RTL_LANGUAGE_ROOTS = new Set([
+  "ar",
+  "arc",
+  "ckb",
+  "dv",
+  "fa",
+  "he",
+  "ks",
+  "nqo",
+  "ps",
+  "sd",
+  "syr",
+  "ug",
+  "ur",
+  "yi",
+]);
+
 export function getLocaleCandidateChain(
   raw: string,
   fallbackChain: readonly string[],
@@ -131,12 +158,47 @@ export function detectDocumentPreferredLocale(): string {
  * `<select>` makes the browser visually fall back to its first option while the
  * page continues rendering another language.
  */
+export function isWellFormedLocaleCode(raw?: string | null): boolean {
+  const normalized = normalizeLocaleCode(raw);
+  if (!normalized) return false;
+  try {
+    return Intl.getCanonicalLocales(normalized).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveSelectableLocale(raw?: string | null): string {
+  const normalized = normalizeLocaleCode(raw);
   const supported = new Set(NORMALIZED_LOCALE_OPTIONS);
-  const match = getLocaleCandidateChain(raw ?? "", []).find((candidate) =>
+  const match = getLocaleCandidateChain(normalized, []).find((candidate) =>
     supported.has(candidate)
   );
-  return match ?? FALLBACK_LANG;
+  if (match) return match;
+
+  // Integrations and persisted profiles may carry a valid BCP 47 locale that is not part of the
+  // curated picker yet. Preserve it instead of silently switching the user back to Korean.
+  return isWellFormedLocaleCode(normalized) ? normalized : FALLBACK_LANG;
+}
+
+export function getLocaleDirection(raw?: string | null): "ltr" | "rtl" {
+  const normalized = normalizeLocaleCode(raw);
+  if (!normalized) return "ltr";
+
+  try {
+    const script = new Intl.Locale(normalized).maximize().script?.toLowerCase();
+    if (script) return RTL_SCRIPT_SUBTAGS.has(script) ? "rtl" : "ltr";
+  } catch {
+    // Fall through to the language-root table for older runtimes or unusual valid tags.
+  }
+
+  const explicitScript = normalized
+    .split("-")
+    .find((part) => /^[a-z]{4}$/u.test(part));
+  if (explicitScript) {
+    return RTL_SCRIPT_SUBTAGS.has(explicitScript) ? "rtl" : "ltr";
+  }
+  return RTL_LANGUAGE_ROOTS.has(normalized.split("-")[0] ?? "") ? "rtl" : "ltr";
 }
 
 export function getLanguageDisplayName(
@@ -163,7 +225,10 @@ export function getLanguageOptions(
 ): LanguageLocaleOption[] {
   const inLocale = normalizeLocaleCode(displayLocale || FALLBACK_LANG);
   const collator = getCollator(inLocale);
-  return NORMALIZED_LOCALE_OPTIONS.map((code: string): LanguageLocaleOption => {
+  const localeCodes = new Set(NORMALIZED_LOCALE_OPTIONS);
+  if (isWellFormedLocaleCode(inLocale)) localeCodes.add(inLocale);
+
+  return [...localeCodes].map((code: string): LanguageLocaleOption => {
     const nativeLabel = getLanguageDisplayName(code, code);
     const englishLabel = getLanguageDisplayName(code, "en");
     const label =
