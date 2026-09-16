@@ -20,7 +20,7 @@ interface KakaoLink {
 interface KakaoShareRuntime {
   init(javaScriptKey: string): void;
   isInitialized(): boolean;
-  Share: {
+  Share?: {
     sendDefault(options: KakaoDefaultShareOptions): void;
   };
 }
@@ -56,8 +56,12 @@ export function isKakaoShareConfigured(): boolean {
 }
 
 function currentRuntime(): KakaoShareRuntime | null {
-  return typeof window !== "undefined" && window.Kakao?.Share
-    ? window.Kakao
+  if (typeof window === "undefined") return null;
+  const runtime = window.Kakao;
+  return runtime
+    && typeof runtime.init === "function"
+    && typeof runtime.isInitialized === "function"
+    ? runtime
     : null;
 }
 
@@ -128,10 +132,14 @@ export async function shareWithKakao(payload: SharePayload): Promise<void> {
 
   const kakao = await loadKakaoSdk();
   if (!kakao.isInitialized()) kakao.init(key);
+  const share = kakao.Share;
+  if (!share || typeof share.sendDefault !== "function") {
+    throw new Error("Kakao Share API was not exposed after initialization.");
+  }
 
   const url = withShareAttribution(payload.url, "kakao");
   const link = { mobileWebUrl: url, webUrl: url };
-  kakao.Share.sendDefault({
+  share.sendDefault({
     objectType: "feed",
     content: {
       title: payload.title.trim().slice(0, 120),
