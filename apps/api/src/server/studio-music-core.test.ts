@@ -48,7 +48,7 @@ describe("studio music paid request boundary", () => {
     const body = JSON.parse(init?.body as string);
     expect(body.force_instrumental).toBe(true);
     expect(body.music_length_ms).toBe(30000);
-    expect(body.model_id).toBe("music_v1");
+    expect(body.model_id).toBe("music_v2_5");
     expect(body).not.toHaveProperty("seed");
     expect(body).not.toHaveProperty("composition_plan");
     expect(body.prompt).not.toContain("test-only");

@@ -21,7 +21,7 @@ function metadata(value: unknown): MusicTrackMetadata {
   if (!value || typeof value !== "object") throw new Error("음원 제작 정보가 올바르지 않습니다.");
   const m = value as MusicTrackMetadata;
   if (typeof m.id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(m.id)
-    || m.provider !== "elevenlabs" || m.model !== "music_v1" || m.format !== "mp3_44100_128"
+    || m.provider !== "elevenlabs" || !["music_v1", "music_v2_5"].includes(m.model) || m.format !== "mp3_44100_128"
     || typeof m.createdAt !== "string" || m.createdAt.length > 40 || !Number.isFinite(Date.parse(m.createdAt))) {
     throw new Error("음원 제작 정보가 올바르지 않습니다.");
   }
