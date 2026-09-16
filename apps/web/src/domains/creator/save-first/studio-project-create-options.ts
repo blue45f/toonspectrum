@@ -67,7 +67,7 @@ export const STUDIO_PROJECT_CREATE_KINDS: readonly StudioProjectCreateKindOption
     descriptionEn: "Start slides for pitching and production sharing.",
     defaultTitleKo: "새 발표 자료",
     defaultTitleEn: "New presentation",
-    featured: true,
+    featured: false,
   },
   {
     id: "storyboard",
@@ -87,7 +87,7 @@ export const STUDIO_PROJECT_CREATE_KINDS: readonly StudioProjectCreateKindOption
     descriptionEn: "Start retouching, compositing and non-destructive editing.",
     defaultTitleKo: "새 이미지 작업",
     defaultTitleEn: "New image project",
-    featured: true,
+    featured: false,
   },
   {
     id: "three-d",

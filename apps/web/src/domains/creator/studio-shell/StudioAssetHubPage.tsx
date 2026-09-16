@@ -25,12 +25,12 @@ type Locale = "ko" | "en";
 
 const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>>>> = {
   essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
-  overview: { ko: "에셋 홈", en: "Asset home" },
+  overview: { ko: "소재 홈", en: "Materials home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
-  library: { ko: "내 에셋", en: "My assets" },
+  library: { ko: "내 소재", en: "My materials" },
   market: { ko: "마켓에서 찾기", en: "Browse market" },
   safety: { ko: "사용 권리·안전", en: "Rights & safety" },
-  seller: { ko: "판매자 센터", en: "Seller center" },
+  seller: { ko: "배포 관리", en: "Distribution" },
 };
 
 const VIEW_ICONS = {
@@ -80,7 +80,7 @@ function MissingProjectView({
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
           {seriesKit
             ? (locale === "ko"
-              ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 에셋의 Series Kit를 열면 됩니다."
+              ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 소재의 Series Kit를 열면 됩니다."
               : "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit.")
             : (locale === "ko"
               ? "사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다."
@@ -118,7 +118,7 @@ export function StudioAssetHubPage() {
                 <CurrentViewIcon size={18} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO ASSETS</p>
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO MATERIALS</p>
                 <p className="text-sm font-bold text-fg">{currentLabel}</p>
                 {projectId ? (
                   <p className="mt-0.5 text-xs text-fg-3">
@@ -128,7 +128,7 @@ export function StudioAssetHubPage() {
               </div>
             </div>
 
-            <nav aria-label={locale === "ko" ? "에셋 화면" : "Asset views"} className="overflow-x-auto">
+            <nav aria-label={locale === "ko" ? "소재 화면" : "Material views"} className="overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
                 {visibleViews.map((candidate) => {
                   const active = candidate === view;

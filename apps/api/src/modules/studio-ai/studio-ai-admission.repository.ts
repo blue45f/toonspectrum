@@ -7,6 +7,7 @@ import {
   isStudioAiSha256Digest,
   STUDIO_AI_IDEMPOTENCY_RECEIPT_RETENTION_MS,
 } from "./studio-ai-idempotency";
+import { STUDIO_AI_MAX_PROVIDER_ATTEMPTS } from "./studio-ai-provider";
 
 import type {
   StudioAiAdmissionAcquireInput,
@@ -173,7 +174,7 @@ WHERE "userId" = $1
   AND "requestHash" = $3::bytea
   AND "leaseFence" = $4::bigint
   AND "status" IN ('admitted', 'sent')
-  AND "attemptCount" < 3
+  AND "attemptCount" < ${STUDIO_AI_MAX_PROVIDER_ATTEMPTS}
 RETURNING "userKeyHash"
 `;
 

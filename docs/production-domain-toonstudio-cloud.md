@@ -4,11 +4,18 @@
 
 - 정본(canonical): `https://www.toonstudio.cloud`
 - apex: `https://toonstudio.cloud` → 정본으로 영구 `308`
-- 이전 Vercel URL: `https://toonspectrum.vercel.app` → 정본으로 영구 `308`
+- 비상 원본: `https://origin.toonstudio.cloud` → DNS-only Vercel fallback, canonical 아님
 
-Vercel 프로젝트의 Domains 설정에서 `www.toonstudio.cloud`를 Primary Domain으로 유지합니다.
-`vercel.json`에도 apex와 이전 Vercel 호스트를 정본으로 보내는 host 조건부 리다이렉트를
-두어, 도메인 설정이 재연결되더라도 중복 콘텐츠가 노출되지 않게 합니다.
+Cloudflare의 `toonstudio-apex-redirect` Worker가 `toonstudio.cloud/*`만 담당하고, 경로와
+query를 그대로 유지한 `308`을 반환합니다. `www.toonstudio.cloud/*`는 Static Assets Worker
+`toonspectrum-web`가 담당합니다. 두 역할을 분리해 정적 파일을 모두 Worker 코드로 통과시키지
+않으면서도 apex 정본화를 보장합니다.
+
+`origin.toonstudio.cloud`는 Cloudflare API/R2 장애 시 확인할 DNS-only Vercel 원본이며
+페이지의 canonical/OG/JSON-LD는 항상 `www`를 가리켜야 합니다. 역사적으로 사용한
+`toonspectrum.vercel.app`은 현재 운영 계정이 관리하는 도메인이 아니므로 배포·스모크 계약에
+포함하지 않습니다. `vercel.json`의 해당 host redirect는 도메인이 다시 연결될 경우를 위한
+방어적 규칙으로만 유지합니다.
 
 ## Vercel Production 환경 변수
 
@@ -83,11 +90,13 @@ credentialed wildcard CORS는 사용하지 않습니다.
 
 ```bash
 curl -I https://toonstudio.cloud/studio
-curl -I https://toonspectrum.vercel.app/studio
 curl -I https://www.toonstudio.cloud/studio
+curl -I https://origin.toonstudio.cloud/studio
 curl -s https://www.toonstudio.cloud/robots.txt
 curl -s https://www.toonstudio.cloud/ | grep -E 'canonical|og:url'
 ```
 
-첫 두 요청은 `https://www.toonstudio.cloud/studio`로 영구 리다이렉트되어야 하고, 정본
-페이지의 canonical/OG/JSON-LD 및 `robots.txt`의 sitemap도 모두 `www`를 가리켜야 합니다.
+첫 요청은 `https://www.toonstudio.cloud/studio`로 `308` 리다이렉트되어야 합니다. `www`와
+비상 원본은 모두 `200`이어야 하지만, 양쪽 HTML의 canonical/OG/JSON-LD 및 `robots.txt`의
+sitemap은 모두 `www`를 가리켜야 합니다. `origin`은 검색·OAuth·사용자 공유 URL로 쓰지
+않습니다.

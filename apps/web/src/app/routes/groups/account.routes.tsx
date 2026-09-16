@@ -47,11 +47,27 @@ const ResetPasswordPage = lazyRetry(
 
 const AiSettingsPage = lazyRetry(() => import("@/domains/account/AiSettingsPage").then(module => ({ default: module.AiSettingsPage })), "AiSettingsPage");
 
+const MessagesPage = lazyRetry(
+  () => import("@/domains/messages/MessagesPage").then((module) => ({
+    default: module.MessagesPage,
+  })),
+  "MessagesPage",
+);
+const MessageRequestPage = lazyRetry(
+  () => import("@/domains/messages/MessageRequestPage").then((module) => ({
+    default: module.MessageRequestPage,
+  })),
+  "MessageRequestPage",
+);
+
 export const accountRoutes = defineAppRoutes([
   { id: "account-ai-settings", path: "/settings/ai", element: <AiSettingsPage /> },
   { id: "account-my-space", path: "/my", element: <MySpaceHubPage /> },
   { id: "account-me", path: "/me", element: <AccountPage /> },
   { id: "account-profile", path: "/u/:userId", element: <UserProfilePage /> },
+  { id: "account-messages-new", path: "/messages/new", element: <MessageRequestPage /> },
+  { id: "account-messages-thread", path: "/messages/:threadId", element: <MessagesPage /> },
+  { id: "account-messages", path: "/messages", element: <MessagesPage /> },
   { id: "account-settings", path: "/settings", element: <SettingsPage /> },
   {
     id: "account-auth-callback",

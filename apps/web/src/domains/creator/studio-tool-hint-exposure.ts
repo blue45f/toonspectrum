@@ -2,6 +2,7 @@ export type StudioToolHintRevealIntent = "focus" | "hover" | "touch";
 
 export const STUDIO_TOOL_HINT_HOVER_COOLDOWN_MS = 90_000;
 export const STUDIO_TOOL_HINT_ACTIVATION_COOLDOWN_MS = 5 * 60_000;
+export const STUDIO_TOOL_HINT_COMPACT_ACTIVATION_GUARD_MS = 1_200;
 export const STUDIO_TOOL_HINT_AUTOMATIC_RESET_MS = 15 * 60_000;
 export const STUDIO_TOOL_HINT_GLOBAL_REVEAL_WINDOW_MS = 20_000;
 export const STUDIO_TOOL_HINT_GLOBAL_MAX_AUTOMATIC_REVEALS = 6;
@@ -20,6 +21,7 @@ export type StudioToolHintExposureManager = {
   canReveal: (hintId: string, intent: StudioToolHintRevealIntent, now?: number) => boolean;
   markRevealed: (hintId: string, intent: StudioToolHintRevealIntent, now?: number) => void;
   markActivated: (hintId: string, now?: number) => void;
+  isCompactRevealGuarded: (hintId: string, now?: number) => boolean;
 };
 
 const EMPTY_EXPOSURE: StudioToolHintExposure = {
@@ -128,6 +130,13 @@ export function createStudioToolHintExposureManager(): StudioToolHintExposureMan
         ...read(hintId, now),
         lastActivationAt: now,
       });
+    },
+    isCompactRevealGuarded(hintId, now = Date.now()) {
+      const lastActivationAt = read(hintId, now).lastActivationAt;
+      return (
+        lastActivationAt !== null &&
+        now - lastActivationAt < STUDIO_TOOL_HINT_COMPACT_ACTIVATION_GUARD_MS
+      );
     },
   };
 }

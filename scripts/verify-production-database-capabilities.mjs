@@ -12,6 +12,7 @@ import {
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
+  buildMessagingRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
@@ -424,6 +425,11 @@ BEGIN
   IF ${buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact personal cloud connection privileges';
+  END IF;
+
+  IF ${buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact member messaging privileges';
   END IF;
 
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN

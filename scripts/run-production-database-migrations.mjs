@@ -9,6 +9,10 @@ import { spawnSync } from "node:child_process";
 import { buildAdminCapabilitySql, buildAdminRuntimeAclSql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
+  buildCommunityCafeCapabilitySql,
+  buildCommunityCafeRuntimeAclSql,
+} from "./community-cafe-database-contract.mjs";
+import {
   createPsqlEnvironment,
   validateProductionDatabaseUrl,
 } from "./validate-production-database-url.mjs";
@@ -95,6 +99,10 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "admin_content_reports",
   "admin_promos",
   "admin_security_policies",
+  "community_cafe_ban",
+  "community_cafe_invite",
+  "community_cafe_join_request",
+  "community_cafe_moderation_log",
   "creator_asset_artifact",
   "creator_asset_artifact_set",
   "creator_asset_license_snapshot",
@@ -141,7 +149,20 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_work_report",
   "creator_work_review_feedback",
   "creator_work_review_link",
+  "member_message",
+  "member_message_block",
+  "member_message_participant",
+  "member_message_preference",
+  "member_message_report",
+  "member_message_thread",
   "personal_cloud_connection",
+  "production_integration_connection",
+  "production_integration_oauth_state",
+  "production_integration_receipt",
+  "production_project",
+  "production_project_event",
+  "production_project_mutation_receipt",
+  "production_push_subscription",
   "studio_ai_comic_director_approval",
   "studio_ai_comic_director_artifact",
   "studio_ai_comic_director_job",
@@ -287,7 +308,7 @@ export function buildCommunityCommentRuntimeAclViolationSql(runtimeDatabaseRole)
       FROM unnest(ARRAY[
         'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
       ]::text[]) AS public_privilege
-      WHERE pg_catalog.has_table_privilege('PUBLIC', relation_name, public_privilege)
+      WHERE pg_catalog.has_table_privilege(0::oid, relation_name, public_privilege)
     )
   )`;
 }
@@ -332,6 +353,67 @@ export function buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole) {
       )
     )
   )`;
+}
+
+const MESSAGING_RUNTIME_RELATIONS = Object.freeze([
+  "member_message",
+  "member_message_block",
+  "member_message_participant",
+  "member_message_preference",
+  "member_message_report",
+  "member_message_thread",
+]);
+
+export function buildMessagingRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  const relations = MESSAGING_RUNTIME_RELATIONS
+    .map((relation) => `public.${relation}`)
+    .join(",\n  ");
+  return `
+REVOKE ALL ON TABLE
+  ${relations}
+FROM PUBLIC;
+REVOKE ALL ON TABLE
+  ${relations}
+FROM ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE ${relations}
+  TO ${quotedRole};
+`;
+}
+
+export function buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  const checks = MESSAGING_RUNTIME_RELATIONS.map((relation) => `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.${relation}',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.${relation}',
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        'public.${relation}',
+        public_privilege
+      )
+    )
+  )`).join("\n    OR ");
+  return `(${checks})`;
 }
 
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
@@ -2764,10 +2846,13 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildMessagingRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCommunityCafeRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCommunityCafeCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
     psql(

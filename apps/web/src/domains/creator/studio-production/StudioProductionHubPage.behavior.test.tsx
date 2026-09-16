@@ -51,7 +51,7 @@ function mount(surface: StudioProductionSurface = "projects", search = `?scope=$
   const view = render(<MemoryRouter initialEntries={[`/studio/${surface}${search}`]}><Mount onOpen={onOpen} /></MemoryRouter>);
   return { ...view, onOpen };
 }
-async function saved() { await screen.findByText("SQLite/OPFS 저장됨"); }
+async function saved() { await screen.findByText("이 기기에 저장됨"); }
 async function go(name: string) { fireEvent.click(screen.getByRole("link", { name })); await saved(); }
 
 beforeEach(() => {
@@ -100,15 +100,15 @@ describe("production hub durable user operations", () => {
     fireEvent.click(within(screen.getByRole("heading", { name: "원고 확인" }).closest("article")!).getByRole("button", { name: "완료" }));
     await waitFor(() => expect(row().tasks[0]!.status).toBe("done"));
     expect(row().tasks[1]!.status).toBe("blocked");
-    expect(screen.getByText("차단 작업 1 · 중요 검수 2")).toBeTruthy();
-    await go("리뷰");
+    expect(screen.getByText("먼저 해결할 항목 1 · 확인할 의견 2")).toBeTruthy();
+    await go("검토");
     const issue = screen.getByRole("heading", { name: "대사 검수" }).closest("article")!;
     fireEvent.click(within(issue).getByRole("button", { name: "해결" }));
     await waitFor(() => expect(row().reviews[0]!.status).toBe("resolved"));
     expect(row().reviews[1]!.status).toBe("open");
     fireEvent.click(within(issue).getByRole("button", { name: "다시 열기" }));
     await waitFor(() => expect(row().reviews[0]!.status).toBe("open"));
-    fireEvent.click(screen.getByRole("button", { name: "검수 항목 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "의견 추가" }));
     await screen.findByRole("heading", { name: "새 로컬 검수 항목" });
     expect(row().reviews).toHaveLength(4);
   });
@@ -119,12 +119,12 @@ describe("production hub durable user operations", () => {
     expect(screen.getByText("로컬 체크포인트가 없습니다")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "체크포인트 만들기" }));
     await screen.findByRole("heading", { name: "로컬 체크포인트 1" });
-    await go("프로젝트");
+    await go("홈");
     fireEvent.click(screen.getByRole("button", { name: "완료" }));
     await waitFor(() => expect(row().tasks[0]!.status).toBe("done"));
     fireEvent.blur(screen.getByRole("textbox", { name: "프로젝트 제목" }), { target: { value: "보존할 새 제목" } });
     await waitFor(() => expect(row().title).toBe("보존할 새 제목"));
-    await go("버전");
+    await go("변경 기록");
     fireEvent.click(screen.getByRole("button", { name: "로컬 복원" }));
     await waitFor(() => expect(row().tasks[0]!.status).toBe("doing"));
     expect(row()).toMatchObject({ title: "보존할 새 제목", reviews: [review], slides: [{ body: "보존할 본문" }] });
@@ -221,8 +221,8 @@ describe("production hub durable user operations", () => {
 
   it("allows demo edits without persisting them and ignores modified keyboard shortcuts", async () => {
     mount("review", "?demo=1");
-    await screen.findByText("데모 · 저장 안 함");
-    fireEvent.click(screen.getByRole("button", { name: "검수 항목 추가" }));
+    await screen.findByText("샘플 · 저장 안 함");
+    fireEvent.click(screen.getByRole("button", { name: "의견 추가" }));
     await screen.findByRole("heading", { name: "새 로컬 검수 항목" });
     expect(screen.getByText(/데모 변경은 저장되지 않습니다/)).toBeTruthy();
     expect(storage.kvSet).not.toHaveBeenCalled();
