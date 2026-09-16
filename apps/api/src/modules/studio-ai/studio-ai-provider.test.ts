@@ -154,6 +154,24 @@ describe("Studio AI provider resolution", () => {
     });
   });
 
+  it("사용자가 지정한 무료 공급자 순서를 운영 기본값보다 우선한다", () => {
+    const freeEnv = {
+      NODE_ENV: "production",
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_GEMINI_API_KEY: "gemini-free-key",
+      STUDIO_AI_FREE_GEMINI_CONFIRMED: "true",
+      STUDIO_AI_FREE_GROQ_API_KEY: "groq-free-key",
+      STUDIO_AI_FREE_GROQ_CONFIRMED: "true",
+      STUDIO_AI_FREE_OPENROUTER_API_KEY: "openrouter-free-key",
+      STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
+      STUDIO_AI_FREE_OPENROUTER_MODEL: "openrouter/free",
+    };
+    expect(resolveStudioAiProviders("auto", freeEnv, ["openrouter", "groq"])
+      .map(({ id }) => id)).toEqual(["openrouter", "groq", "gemini"]);
+    expect(resolveStudioAiProviderCandidates("auto", freeEnv, ["groq", "openrouter", "groq"])
+      .map(({ id }) => id)).toEqual(["groq", "openrouter", "gemini"]);
+  });
+
   it("기존 Z.AI/OpenRouter 비밀은 확인된 무료 모델 경계에서만 재사용한다", () => {
     const confirmed = resolveStudioAiProviders("auto", {
       NODE_ENV: "production",

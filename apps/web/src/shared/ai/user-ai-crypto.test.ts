@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { decryptUserAiVault, encryptUserAiVault } from "./user-ai-crypto";
+import { normalizeUserAiConfiguration } from "./user-ai-types";
 
 const configuration = {
   version: 1 as const,
@@ -35,7 +36,7 @@ describe("encrypted user AI vault", () => {
     await expect(decryptUserAiVault(
       encrypted,
       "correct horse battery staple",
-    )).resolves.toEqual(configuration);
+    )).resolves.toEqual(normalizeUserAiConfiguration(configuration));
   });
 
   it("fails closed for a wrong password", async () => {

@@ -381,26 +381,35 @@ function providerUniverse(env: EnvLike): readonly StudioAiProviderId[] {
       : STUDIO_AI_FREE_PROVIDER_IDS;
 }
 
-export function resolveStudioAiProviderOrder(env: EnvLike = process.env): StudioAiProviderId[] {
+export function resolveStudioAiProviderOrder(
+  env: EnvLike = process.env,
+  userOrder: readonly StudioAiFreeProviderId[] = [],
+): StudioAiProviderId[] {
   const freeMode = studioAiFreePoolEnabled(env);
   const universe = providerUniverse(env);
-  const requested = (freeMode
+  const configuredOrder = (freeMode
     ? env.STUDIO_AI_FREE_PROVIDER_ORDER
     : env.STUDIO_AI_PROVIDER_ORDER)?.split(",")
     .map((value) => value.trim().toLowerCase())
     .filter((value): value is StudioAiProviderId =>
       universe.includes(value as StudioAiProviderId)
-    );
+    ) ?? [];
+  const requested = freeMode
+    ? userOrder.filter((id) => universe.includes(id))
+    : [];
   const defaults = freeMode ? DEFAULT_FREE_PROVIDER_ORDER : DEFAULT_LEGACY_PROVIDER_ORDER;
-  const source = requested?.length ? [...requested, ...defaults] : defaults;
-  return [...new Set(source)].filter((id) => universe.includes(id));
+  return [...new Set([...requested, ...configuredOrder, ...defaults])]
+    .filter((id) => universe.includes(id));
 }
 
 export function resolveStudioAiProviders(
   preference: StudioAiProviderPreference = "auto",
   env: EnvLike = process.env,
+  userOrder: readonly StudioAiFreeProviderId[] = [],
 ): StudioAiProviderConfig[] {
-  const ids = preference === "auto" ? resolveStudioAiProviderOrder(env) : [preference];
+  const ids = preference === "auto"
+    ? resolveStudioAiProviderOrder(env, userOrder)
+    : [preference];
   return ids.map((id) => providerConfig(id, env)).filter((provider) => provider.configured);
 }
 
@@ -408,11 +417,12 @@ export function resolveStudioAiProviders(
 export function resolveStudioAiProviderCandidates(
   preference: StudioAiProviderPreference = "auto",
   env: EnvLike = process.env,
+  userOrder: readonly StudioAiFreeProviderId[] = [],
 ): StudioAiProviderConfig[] {
-  if (preference === "auto") return resolveStudioAiProviders("auto", env);
+  if (preference === "auto") return resolveStudioAiProviders("auto", env, userOrder);
   const preferred = providerConfig(preference, env);
   if (!preferred.configured) return [];
-  const remaining = resolveStudioAiProviderOrder(env)
+  const remaining = resolveStudioAiProviderOrder(env, userOrder)
     .filter((id) => id !== preference)
     .map((id) => providerConfig(id, env))
     .filter((provider) => provider.configured);

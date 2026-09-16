@@ -509,7 +509,11 @@ export class StudioAiService {
       requestHash: studioAiCanonicalRequestHash(input),
     };
     const providerPreference = input.provider ?? "auto";
-    const providers = resolveStudioAiProviderCandidates(providerPreference);
+    const providers = resolveStudioAiProviderCandidates(
+      providerPreference,
+      process.env,
+      input.providerOrder ?? [],
+    );
     if (providers.length === 0) {
       throw new ServiceUnavailableException({
         code: "FREE_AI_POOL_UNAVAILABLE",
