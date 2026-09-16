@@ -1,6 +1,10 @@
 import {
   StudioLiveGuestCredentialSchema,
 } from "../../../shared/lib/studio-live-auth-ticket";
+import {
+  readStudioLivePageNavigationType,
+  type StudioLivePageNavigationType,
+} from "./studio-live-page-lifecycle";
 
 export const STUDIO_LIVE_GUEST_CREDENTIAL_STORAGE_KEY =
   "toonspectrum-studio-live-guest-credential-v1";
@@ -72,37 +76,64 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
+const runtimeClientInstanceIds = new WeakMap<
+  StudioLiveIdentityStorage,
+  Map<string, string>
+>();
+const storageLessRuntimeClientInstanceIds = new Map<string, string>();
+
+function runtimeClientInstances(
+  storage: StudioLiveIdentityStorage | null,
+): Map<string, string> {
+  if (!storage) return storageLessRuntimeClientInstanceIds;
+  const current = runtimeClientInstanceIds.get(storage);
+  if (current) return current;
+  const created = new Map<string, string>();
+  runtimeClientInstanceIds.set(storage, created);
+  return created;
+}
+
 /**
- * Tab-scoped client instance id. Refresh reuses it so the live server can replace the old
- * socket. A new tab gets a new id, so two windows are two peers instead of kicking each other.
+ * Page-instance id for one collaborative work.
+ *
+ * Reloads reuse the stored id so the server can replace a stale socket. A duplicated tab starts
+ * with a cloned sessionStorage snapshot, so every non-reload page lifecycle deliberately mints a
+ * new id instead of letting two live pages filter each other's CRDT messages as self-authored.
  */
 export function readOrCreateStudioLiveClientInstanceId(
   workId: string,
   storage: StudioLiveIdentityStorage | null = defaultSessionStorage(),
   randomUUID: () => string = () => globalThis.crypto.randomUUID(),
+  navigationType: StudioLivePageNavigationType = readStudioLivePageNavigationType(),
 ): string {
   if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
     throw new Error("안전한 공동작업 세션 식별자를 만들 수 없습니다.");
   }
+  const runtime = runtimeClientInstances(storage);
+  const current = runtime.get(workId);
+  if (current) return current;
+
   const key = `${STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX}${workId}`;
+  let stored: string | null = null;
   if (storage) {
     try {
-      const stored = storage.getItem(key);
-      if (stored && isUuid(stored)) return stored;
+      const candidate = storage.getItem(key);
+      if (candidate && isUuid(candidate)) stored = candidate;
     } catch {
       // Fall through and mint a fresh id.
     }
   }
-  const created = randomUUID();
-  if (!isUuid(created)) {
+  const selected = stored && navigationType === "reload" ? stored : randomUUID();
+  if (!isUuid(selected)) {
     throw new Error("안전한 공동작업 세션 식별자를 만들 수 없습니다.");
   }
+  runtime.set(workId, selected);
   if (storage) {
     try {
-      storage.setItem(key, created);
+      storage.setItem(key, selected);
     } catch {
-      // Same as guest credential: keep the minted id for this generation.
+      // Same as guest credential: keep the minted id for this page generation.
     }
   }
-  return created;
+  return selected;
 }

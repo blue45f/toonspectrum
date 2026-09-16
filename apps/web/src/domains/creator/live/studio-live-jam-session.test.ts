@@ -13,16 +13,27 @@ import {
   shouldRequireStudioLiveServer,
   shouldSeedStudioLiveSharedBootstrapPage,
   studioLiveSharedBootstrapPageId,
+  STUDIO_LIVE_OWNER_ROOM_SESSION_KEY,
   withStudioLiveJamRoom,
   type StudioLiveOwnerRoomSessionStorage,
 } from "./studio-live-jam-session";
 
-function sessionStorageFixture(): StudioLiveOwnerRoomSessionStorage {
-  const values = new Map<string, string>();
+function sessionStorageFixture(
+  initial: Record<string, string> = {},
+): StudioLiveOwnerRoomSessionStorage & { values: Map<string, string> } {
+  const values = new Map(Object.entries(initial));
   return {
+    values,
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => { values.set(key, value); },
+    removeItem: (key) => { values.delete(key); },
   };
+}
+
+function cloneSessionStorage(
+  source: ReturnType<typeof sessionStorageFixture>,
+): ReturnType<typeof sessionStorageFixture> {
+  return sessionStorageFixture(Object.fromEntries(source.values));
 }
 
 describe("studio live jam session", () => {
@@ -75,7 +86,7 @@ describe("studio live jam session", () => {
     })).toBe(true);
   });
 
-  it("keeps an owner room editable after reload while a fresh companion tab remains a joiner", () => {
+  it("keeps an owner room editable across remount and reload while a fresh companion remains a joiner", () => {
     const ownerStorage = sessionStorageFixture();
     const ownerRoom = resolveStudioLiveInstantWorkIdForTab({
       workId: null,
@@ -84,15 +95,28 @@ describe("studio live jam session", () => {
       storage: ownerStorage,
       now: () => 1,
       random: () => 0.5,
+      navigationType: "navigate",
     });
 
-    const reloadedOwnerId = resolveStudioLiveInstantWorkIdForTab({
+    const remountedOwnerId = resolveStudioLiveInstantWorkIdForTab({
       workId: null,
       remixId: null,
       roomId: ownerRoom,
       storage: ownerStorage,
       now: () => 2,
       random: () => 0.25,
+      navigationType: "navigate",
+    });
+    expect(remountedOwnerId).toBe(ownerRoom);
+
+    const reloadedOwnerId = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: ownerRoom,
+      storage: cloneSessionStorage(ownerStorage),
+      now: () => 2,
+      random: () => 0.25,
+      navigationType: "reload",
     });
     expect(reloadedOwnerId).toBe(ownerRoom);
     expect(isStudioJoinedLiveJamRoom({ roomId: ownerRoom, instantWorkId: reloadedOwnerId })).toBe(false);
@@ -104,9 +128,38 @@ describe("studio live jam session", () => {
       storage: sessionStorageFixture(),
       now: () => 2,
       random: () => 0.25,
+      navigationType: "navigate",
     });
     expect(companionId).not.toBe(ownerRoom);
     expect(isStudioJoinedLiveJamRoom({ roomId: ownerRoom, instantWorkId: companionId })).toBe(true);
+  });
+
+  it("demotes a duplicated owner tab whose session storage was cloned", () => {
+    const ownerStorage = sessionStorageFixture();
+    const ownerRoom = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: null,
+      storage: ownerStorage,
+      now: () => 1,
+      random: () => 0.5,
+      navigationType: "navigate",
+    });
+    const duplicateStorage = cloneSessionStorage(ownerStorage);
+
+    const duplicateId = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: ownerRoom,
+      storage: duplicateStorage,
+      now: () => 2,
+      random: () => 0.25,
+      navigationType: "navigate",
+    });
+
+    expect(duplicateId).not.toBe(ownerRoom);
+    expect(isStudioJoinedLiveJamRoom({ roomId: ownerRoom, instantWorkId: duplicateId })).toBe(true);
+    expect(duplicateStorage.getItem(STUDIO_LIVE_OWNER_ROOM_SESSION_KEY)).toBeNull();
   });
 
   it("fails open for the local mount when tab storage is unavailable", () => {
