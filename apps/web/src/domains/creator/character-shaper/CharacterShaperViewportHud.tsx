@@ -10,6 +10,7 @@ import { Eye, EyeOff, LoaderCircle, Maximize2, RotateCw, SunMedium, ZoomIn, Zoom
 
 import { StudioHudPill } from "../studio-chrome-ui";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { resolveVrmLibraryEntryDisplayName } from "../vrm/studio-vrm-display-name";
 import { CAMERA_PRESETS } from "../vrm/studio-vrm-poser-catalogs";
 
 import {
@@ -23,6 +24,7 @@ import type { CharacterShaperViewportHudProps } from "./character-shaper-ui-cont
 import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 
+import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 const HUD_BUTTON = cn(
@@ -53,6 +55,7 @@ function statusText(input: {
 }
 
 export function CharacterShaperViewportHud({ h, binding, compact }: CharacterShaperViewportHudProps) {
+  const locale = useI18n((state) => state.lang);
   const status: LoadStatus = h.status ?? "empty";
   const activeCameraId: string = typeof h.activeCameraId === "string" ? h.activeCameraId : "front";
   const turntable = Boolean(h.turntable);
@@ -63,7 +66,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
   const modelReady = status === "ready";
   const activePresetLabel = CAMERA_PRESETS.find((preset) => preset.id === activeCameraId)?.label ?? "정면";
   const entries: readonly VrmLibraryEntry[] = Array.isArray(h.libraryEntries) ? h.libraryEntries : [];
-  const modelName = entries.find((entry) => entry.id === h.activeModelId)?.name ?? null;
+  const activeEntry = entries.find((entry) => entry.id === h.activeModelId) ?? null;
+  const modelName = activeEntry ? resolveVrmLibraryEntryDisplayName(activeEntry, locale) : null;
   const pill = statusText({
     status,
     compareActive: binding.compareActive,
