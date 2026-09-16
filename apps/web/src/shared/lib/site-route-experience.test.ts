@@ -13,6 +13,12 @@ describe("site route experience", () => {
     expect(experience.terminologyScope).toBe("production");
   });
 
+  it("keeps project entry routes in user-facing project language", () => {
+    const experience = resolveSiteRouteExperience("/studio/projects");
+    expect(experience.emptyStateId).toBe("projects");
+    expect(experience.terminologyScope).toBe("projects");
+  });
+
   it("keeps public discovery routes lightweight", () => {
     const experience = resolveSiteRouteExperience("/explore");
     expect(experience.requiresProjectContextBar).toBe(false);
