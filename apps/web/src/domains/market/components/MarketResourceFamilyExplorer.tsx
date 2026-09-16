@@ -16,7 +16,7 @@ interface MarketResourceFamilyExplorerProps {
 
 const FAMILY_STUDIES = {
   template: { image: "/brand/atelier-process.webp", position: "12% 45%", label: "컷의 시작 · 구도와 이야기" },
-  "2d": { image: "/assets/studio/backgrounds/webtoon_classroom.jpg", position: "50% 50%", label: "장면의 재료 · 배경과 소품" },
+  "2d": { image: "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/background.webp", position: "50% 50%", label: "장면의 재료 · 배경과 소품" },
   "3d": { image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png", position: "50% 55%", label: "공간의 기준 · 구도와 투시" },
   brush: { image: "/brand/atelier-materials.webp", position: "5% 40%", label: "선의 표정 · 필치와 질감" },
   look: { image: "/brand/atelier-world.webp", position: "20% 20%", label: "장면의 온도 · 색과 빛" },

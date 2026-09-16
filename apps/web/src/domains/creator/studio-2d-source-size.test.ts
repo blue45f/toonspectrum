@@ -4,13 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { STUDIO_2D_ASSET_METADATA } from "./studio-2d-asset-quality";
 import { createStudio2dCanvasImage, studio2dSourceSize } from "./studio-2d-source-size";
-import { BG_SCENES } from "./studio-bg-scenes";
+import { ALL_BG_SCENES, BG_SCENES } from "./studio-bg-scenes";
 import { createCanvasImageElement } from "./studio-image-placement";
 
 describe("2D original aspect ratio through canvas placement", () => {
-  it("carries all 29 original dimensions through the real catalog", () => {
+  it("carries every reviewed original dimension through the active and compatibility catalogs", () => {
     for (const asset of STUDIO_2D_ASSET_METADATA) {
-      const scene = BG_SCENES.find((entry) => entry.id === asset.id)!;
+      const scene = ALL_BG_SCENES.find((entry) => entry.id === asset.id)!;
       expect(studio2dSourceSize(scene)).toEqual({ width: asset.width, height: asset.height });
       const image = createCanvasImageElement({ id: scene.id, src: scene.imgSrc!, canvasWidth: 720,
         canvasHeight: 1080, sourceWidth: scene.width!, sourceHeight: scene.height!, horizontalInset: 0, minY: 0 });

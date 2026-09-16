@@ -86,7 +86,7 @@ describe("2D resilient image insertion", () => {
     fireEvent.click(screen.getByLabelText("문자 형태 없는 이미지 배경만"));
     const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
     expect(ids.length).toBeGreaterThan(0);
-    expect(ids.sort()).toEqual(STUDIO_2D_ASSET_METADATA.filter((asset) => !asset.containsText).map((asset) => asset.id).sort());
+    expect(ids.sort()).toEqual(STUDIO_2D_ASSET_METADATA.filter((asset) => asset.recommended && !asset.containsText).map((asset) => asset.id).sort());
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect((screen.getByLabelText("문자 형태 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);
   });

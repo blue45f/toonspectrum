@@ -26,7 +26,7 @@ export function SiteCreationCompass() {
           <ChevronDown size={16} aria-hidden="true" />
         </summary>
         <div id={id} className="site-creation-compass__brief">
-          <div className="site-creation-compass__image"><SiteArtwork image={direction.image} alt="" sizes="180px" /></div>
+          <div className="site-creation-compass__image"><SiteArtwork image={direction.image} alt="" sizes="(max-width: 767px) calc(100vw - 58px), 150px" /></div>
           <div><h2>{title}</h2><p>{description}</p><small>{locale === "ko" ? "브러시 · 레이어 · 컷 · 말풍선 — 웹툰을 직접 그리는 전문 작업실" : "Brushes · layers · panels · dialogue — a professional drawing workspace"}</small></div>
         </div>
       </details>

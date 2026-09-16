@@ -76,6 +76,8 @@ describe("contextual creation compass", () => {
     const result = render(<MemoryRouter initialEntries={["/learn"]}><SiteCreationCompass /></MemoryRouter>);
     expect(result.container.querySelector("details")?.hasAttribute("open")).toBe(false);
     expect(screen.getByRole("link", { name: "캔버스에서 연습하기" }).getAttribute("href")).toBe("/studio?uiMode=simple");
+    expect(result.container.querySelector(".site-creation-compass__image img")?.getAttribute("sizes"))
+      .toBe("(max-width: 767px) calc(100vw - 58px), 150px");
     expect(result.container.querySelector("video")).toBeNull();
   });
   it("renders nothing on a studio route", () => {

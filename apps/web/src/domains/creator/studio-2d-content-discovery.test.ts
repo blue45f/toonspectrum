@@ -16,7 +16,8 @@ describe("2D reviewed content filters", () => {
       for (const timeOfDay of ["all", "낮", "노을", "밤"] as const) {
         for (const textFreeOnly of [false, true]) {
           const actual = filterStudio2dScenes(groups, { quality: "raster", environment, timeOfDay, textFreeOnly });
-          const expected = STUDIO_2D_ASSET_METADATA.filter((item) => (environment === "all" || item.environment === environment)
+          const expected = STUDIO_2D_ASSET_METADATA.filter((item) => item.recommended
+            && (environment === "all" || item.environment === environment)
             && (timeOfDay === "all" || item.timeOfDay === timeOfDay) && (!textFreeOnly || item.containsText === false));
           expect(actual.map((item) => item.id).sort()).toEqual(expected.map((item) => item.id).sort());
         }

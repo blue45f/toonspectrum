@@ -226,6 +226,7 @@ function backgroundItem(
   const recommended = isRecommendedStudio2dScene(background);
   const vector = !background.imgSrc && Boolean(background.svg);
   const rightsUnverified = metadata?.provenance.licenseStatus === "unverified";
+  const cc0Verified = metadata?.provenance.licenseStatus === "cc0-verified";
   const preview: StudioUnifiedAssetPreview = background.imgSrc
     ? { kind: "image", src: background.imgSrc }
     : background.svg
@@ -234,7 +235,7 @@ function backgroundItem(
   const badges = [
     recommended ? "검수 추천" : vector ? "벡터" : "Studio 내장",
     metadata ? studio2dResolutionLabel(background) : vector ? "크기 조절" : "원본 확인 필요",
-    rightsUnverified ? "권리 미확인" : null,
+    cc0Verified ? "CC0" : rightsUnverified ? "권리 미확인" : null,
   ].filter((value): value is string => Boolean(value));
   const discoverability: StudioUnifiedAssetDiscoverability = rightsUnverified
     ? "caution"
@@ -246,7 +247,7 @@ function backgroundItem(
     category: "scene",
     scope: "studio",
     title: metadata?.title ?? background.label,
-    description: `${background.genre} 배경 · ${metadata ? studio2dResolutionLabel(background) : vector ? "벡터" : "원본 정보 미확인"}`,
+    description: `${background.genre} 배경 · ${metadata?.style === "photographic-reference" ? "포토 레퍼런스 · " : ""}${metadata ? studio2dResolutionLabel(background) : vector ? "벡터" : "원본 정보 미확인"}`,
     categoryLabel: "2D 배경",
     keywords: Object.freeze([
       background.id,
