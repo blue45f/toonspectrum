@@ -547,7 +547,7 @@ export function StudioToolsCompanionPage({
           ? "캔버스 내비게이터"
           : effectiveSurface === "review"
             ? "검수 콘솔"
-            : "레퍼런스 화면",
+            : "레퍼런스 캔버스",
       effectiveSurface === "workspace"
         ? "studio.toolsCompanion.surface.workspace"
         : effectiveSurface === "navigator"
@@ -1341,7 +1341,7 @@ export function StudioToolsCompanionPage({
       ? localizeText(t, "캔버스 내비게이터", "studio.toolsCompanion.surface.navigator")
       : effectiveSurface === "review"
         ? localizeText(t, "검수 콘솔", "studio.toolsCompanion.surface.review")
-        : localizeText(t, "레퍼런스 화면", "studio.toolsCompanion.surface.reference");
+        : localizeText(t, "레퍼런스 캔버스", "studio.toolsCompanion.surface.reference");
   const referenceConnectionStatus = connected
     ? "connected"
     : targetPrimaryInstanceId

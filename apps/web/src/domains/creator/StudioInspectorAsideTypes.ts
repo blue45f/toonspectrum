@@ -109,7 +109,7 @@ export interface StudioInspectorAsideHandlers {
     direction: StudioBrushDefaultRestoreDirection,
   ) => void;
   /**
-   * CSP식 서브 도구 팔레트가 코어 카탈로그 프리셋을 원자적으로 적용할 때 쓴다.
+   * 브러시 서브 도구 팔레트가 코어 카탈로그 프리셋을 원자적으로 적용할 때 쓴다.
    * StudioPage의 `applyBuiltInBrushPreset`(카탈로그 선택 → 도구 전환까지 한 트랜잭션)을
    * 그대로 배선한다 — 미배선 시 팔레트는 렌더되지 않는다(반쪽 동작 금지).
    */
@@ -372,6 +372,11 @@ export interface StudioInspectorAsideProps {
   quickShapeActive: boolean;
   onCorrectCurrentStroke?: () => void;
   recentColors: string[];
+  /** Project-owned WYSIWYG reference canvas summary and entry actions. */
+  referenceBoardItemCount?: number;
+  referencePanelOpen?: boolean;
+  onOpenReferenceCanvas?: () => void;
+  onOpenReferenceWindow?: () => void;
   rightResize: Resizable;
   savedBrushes: StudioSavedBrush[];
   /** Page-owned product authority shared with imports and the mobile projection. */

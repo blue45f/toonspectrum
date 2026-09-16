@@ -12807,6 +12807,7 @@ export function StudioCuttoonEditor({
   const {
     companionRuntimeRef,
     companionWindowRef,
+    companionReferenceWindowRef,
     companionPendingTextTimerRef,
     companionUiRef,
     companionReviewProjectionInputRef,
@@ -28884,6 +28885,15 @@ function clearSelectionForEdit() {
       redo={redo}
       referenceBoard={referenceBoard}
       referencePanelOpen={referencePanelOpen}
+      openReferenceCompanionWindow={() => openStudioToolsCompanionForMenu({
+        surface: "reference",
+        ensureRuntime: ensureStudioToolsCompanionRuntime,
+        runtimeRef: companionRuntimeRef,
+        windowRef: companionReferenceWindowRef,
+        announce: studioMainMenuActions.announceDrawingShortcut,
+        workId,
+        t,
+      })}
       refreshQuickMaskTint={refreshQuickMaskTint}
       releaseSchedule={releaseSchedule}
       removeSelected={removeSelected}

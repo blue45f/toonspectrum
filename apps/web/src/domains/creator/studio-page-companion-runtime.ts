@@ -61,6 +61,7 @@ export interface StudioCompanionRuntimeParams {
 export interface StudioCompanionRuntimeHandle {
   readonly companionRuntimeRef: MutableRefObject<StudioToolsCompanionPrimaryRuntime | null>;
   readonly companionWindowRef: MutableRefObject<Window | null>;
+  readonly companionReferenceWindowRef: MutableRefObject<Window | null>;
   readonly companionPendingTextTimerRef: MutableRefObject<
     ReturnType<typeof globalThis.setTimeout> | null
   >;
@@ -101,6 +102,7 @@ export function useStudioCompanionRuntime(
   const companionRuntimePromiseRef = useRef<Promise<StudioToolsCompanionPrimaryRuntime | null> | null>(null);
   const companionRuntimeGenerationRef = useRef(0);
   const companionWindowRef = useRef<Window | null>(null);
+  const companionReferenceWindowRef = useRef<Window | null>(null);
   const companionPendingTextTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const companionReferenceCaptureRuntimeRef =
     useRef<StudioCompanionReferenceCaptureRuntime | null>(null);
@@ -262,6 +264,8 @@ export function useStudioCompanionRuntime(
       companionReferenceCaptureRuntimeRef.current = null;
       companionReferenceCaptureRuntimePromiseRef.current = null;
       referenceRuntime?.release();
+      companionWindowRef.current = null;
+      companionReferenceWindowRef.current = null;
       if (companionPendingTextTimerRef.current !== null) {
         globalThis.clearTimeout(companionPendingTextTimerRef.current);
         companionPendingTextTimerRef.current = null;
@@ -280,6 +284,7 @@ export function useStudioCompanionRuntime(
   return {
     companionRuntimeRef,
     companionWindowRef,
+    companionReferenceWindowRef,
     companionPendingTextTimerRef,
     companionUiRef,
     companionReviewProjectionInputRef,

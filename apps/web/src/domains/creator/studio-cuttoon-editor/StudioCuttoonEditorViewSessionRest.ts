@@ -22,6 +22,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   redo: any;
   referenceBoard: any;
   referencePanelOpen: any;
+  openReferenceCompanionWindow?: () => void;
   refreshQuickMaskTint: any;
   releaseSchedule: any;
   removeSelected: any;

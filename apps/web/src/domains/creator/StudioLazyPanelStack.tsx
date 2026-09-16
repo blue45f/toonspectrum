@@ -319,6 +319,7 @@ export interface StudioLazyPanelStackProps {
   recentColors: string[];
   referencePanelOpen: boolean;
   referenceBoard: StudioReferenceBoardDocument;
+  onOpenReferenceWindow?: () => void;
   releaseSchedule: StudioReleaseSchedule;
   scenarioApplyTarget: "current-page" | "new-page";
   scenarioBusy: boolean;
@@ -414,7 +415,7 @@ function StudioReferencePanelLoadingFallback() {
   return (
     <div
       role="status"
-      aria-label="참고 이미지 창 불러오는 중"
+      aria-label="레퍼런스 캔버스 불러오는 중"
       aria-live="polite"
       data-studio-reference-panel-loading="true"
       className="fixed right-3 top-20 z-[70] flex min-h-24 w-[min(300px,calc(100vw-1.5rem))] items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
@@ -426,9 +427,9 @@ function StudioReferencePanelLoadingFallback() {
         <span className="size-2 rounded-full bg-accent motion-safe:animate-pulse" />
       </span>
       <span className="min-w-0">
-        <span className="block text-xs font-bold text-fg">참고 이미지 창</span>
+        <span className="block text-xs font-bold text-fg">레퍼런스 캔버스</span>
         <span className="mt-0.5 block text-[0.7rem] leading-relaxed text-fg-3">
-          보드와 저장된 배치를 준비하고 있어요…
+          자유 보드와 저장된 배치를 준비하고 있어요…
         </span>
       </span>
     </div>
@@ -530,6 +531,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   recentColors,
   referencePanelOpen,
   referenceBoard,
+  onOpenReferenceWindow,
   releaseSchedule,
   scenarioApplyTarget,
   scenarioBusy,
@@ -1145,6 +1147,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             document={referenceBoard}
             onChange={setReferenceBoard}
+            onOpenDetached={onOpenReferenceWindow}
             onPickColor={(nextColor) => {
               setColor(nextColor);
               rememberColor(nextColor);
