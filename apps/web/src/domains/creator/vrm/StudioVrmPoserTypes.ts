@@ -19,7 +19,11 @@ import type {
 import type { StudioVrmTexturePaintEnvironmentSignals } from "./studio-vrm-texture-paint-device-tier";
 import type { StudioVrmTrackingCalibrationRepository } from "./studio-vrm-tracking-calibration-sqlite-repository";
 import type { StudioVrmUserIkResult } from "./studio-vrm-user-ik";
-import type { StudioVrmIkEffectorBone, StudioVrmIkHandleControl } from "./StudioVrmJointHandles";
+import type {
+  StudioVrmIkEffectorBone,
+  StudioVrmIkHandleControl,
+  StudioVrmJointHandleBone,
+} from "./StudioVrmJointHandles";
 import type { StudioVrmTexturePaintPanelSettings } from "./StudioVrmTexturePaintPanel";
 import type { SharedAssetCatalogPage } from "@/infrastructure/creator-client";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -201,12 +205,24 @@ export function readStudioVrmTexturePaintEnvironmentSignals(): StudioVrmTextureP
 }
 
 export const VIEWPORT_POSE_BONES: readonly VRMHumanBoneName[] = Object.freeze([
-  "hips", "spine", "chest", "neck", "head",
-  "leftUpperArm", "leftLowerArm", "leftHand",
-  "rightUpperArm", "rightLowerArm", "rightHand",
-  "leftUpperLeg", "leftLowerLeg", "leftFoot",
-  "rightUpperLeg", "rightLowerLeg", "rightFoot",
+  "hips", "spine", "chest", "upperChest", "neck", "head",
+  "leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand",
+  "rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand",
+  "leftUpperLeg", "leftLowerLeg", "leftFoot", "leftToes",
+  "rightUpperLeg", "rightLowerLeg", "rightFoot", "rightToes",
 ]);
+
+export type StudioVrmDirectJointRotationTransaction = {
+  vrm: VRM;
+  bone: StudioVrmJointHandleBone;
+  before: FullVrmState;
+  originalPoseId: string;
+  baselineBones: PoseBoneMap;
+  baselineRotation: readonly [number, number, number];
+  latestBones: PoseBoneMap;
+  latestRotation: readonly [number, number, number];
+  didPreview: boolean;
+};
 
 export type StudioVrmIkTransaction = {
   vrm: VRM;

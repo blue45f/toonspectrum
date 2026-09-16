@@ -170,6 +170,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
     handleViewReset,
     handleJointHandleSelect,
     handleJointHandlePoleSelect,
+    togglePoseBoneLock,
+    handleViewportJointRotationGesture,
     previewJointHandleIk,
     handleJointHandleIkCommit,
     previewJointHandlePole,
@@ -234,7 +236,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                 <p id={viewportInstructionsId} className="sr-only">
                   {texturePaintModeSelected
                     ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. B로 직접 그리기, F로 ColorDrop, I로 스포이드를 선택합니다. 직접 그리기는 검증된 round 촉으로 UV 경계를 안전하게 나누고, 한 번의 제스처를 하나의 실행 취소 단계로 저장합니다."
-                    : "3D 캐릭터 편집 뷰포트입니다. 포인터로 끌어 캐릭터를 회전하고, 휠·핀치 또는 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."}
+                    : "3D 캐릭터 편집 뷰포트입니다. 관절 원을 끌면 해당 부위를 직접 회전하고 손·발 마름모를 끌면 IK 목표를 이동합니다. 우클릭 또는 터치 길게 누르기로 관절을 잠그며, 빈 공간 드래그와 휠·핀치로 시점을 조절하세요."}
                 </p>
                 <Canvas
                   role="group"
@@ -315,6 +317,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                     tone={lightingTone}
                     lighting={lighting}
                     env={envVariant}
+                    formStudy={mannequinMode}
                     envRootRef={envRootRef}
                   />
                   {vrm ? (
@@ -388,11 +391,14 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       poleSceneTargets={enabledStudioVrmIkPolesSceneLocal(ikConstraints)}
                       selectedBone={selectedJointHandle}
                       selectedPole={selectedIkPole}
+                      lockedBones={lockedPoseBones}
                       dragMode={ikHandleDragMode}
                       axisLock={ikHandleAxisLock}
                       disabled={webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
                       onSelectBone={handleJointHandleSelect}
                       onSelectPole={handleJointHandlePoleSelect}
+                      onToggleBoneLock={togglePoseBoneLock}
+                      onBoneRotationGesture={handleViewportJointRotationGesture}
                       onEffectorPreview={previewJointHandleIk}
                       onEffectorCommit={handleJointHandleIkCommit}
                       onEffectorRollback={handleJointHandleIkRollback}
@@ -622,7 +628,9 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                         >
                           {texturePaintModeSelected
                             ? "표면 칠하기 · 회전 잠김 · 휠·핀치 또는 우측 줌 버튼"
-                            : "끌어서 회전 · 휠·핀치로 확대/축소"}
+                            : activePanelTab === "pose" && jointHandlesVisible
+                              ? "관절 원 드래그: 회전 · 손발 마름모: IK · 우클릭/길게: 잠금"
+                              : "빈 공간 드래그: 시점 회전 · 휠·핀치: 확대/축소"}
                         </span>
                       </div>
                     ) : null}

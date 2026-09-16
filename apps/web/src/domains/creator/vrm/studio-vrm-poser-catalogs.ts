@@ -447,10 +447,10 @@ export const STUDIO_VRM_IK_AXIS_LOCKS: readonly {
   label: string;
   description: string;
 }[] = Object.freeze([
-  { id: "free", label: "자유", description: "축 제한 없이 이동" },
-  { id: "x", label: "X", description: "장면 X축으로만 이동" },
-  { id: "y", label: "Y", description: "장면 Y축으로만 이동" },
-  { id: "z", label: "Z", description: "장면 Z축으로만 이동" },
+  { id: "free", label: "자유", description: "축 제한 없이 조작" },
+  { id: "x", label: "X", description: "X축으로만 조작" },
+  { id: "y", label: "Y", description: "Y축으로만 조작" },
+  { id: "z", label: "Z", description: "Z축으로만 조작" },
 ]);
 
 export const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };

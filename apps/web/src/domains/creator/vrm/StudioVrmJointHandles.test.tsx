@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ import {
   projectStudioVrmJointPointerToPlane,
   resolveStudioVrmJointDragOutcome,
   resolveStudioVrmJointNodeBindings,
+  resolveStudioVrmJointRotationDelta,
   STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
   StudioVrmJointHandles,
 } from "./StudioVrmJointHandles";
@@ -91,6 +92,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   fiberMock.frameCallbacks.length = 0;
   vi.restoreAllMocks();
   vi.clearAllMocks();
@@ -102,17 +104,27 @@ describe("StudioVrmJointHandles helpers", () => {
     const bones = STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.map((item) => item.bone);
     expect(bones).toEqual([
       "hips",
+      "spine",
+      "chest",
+      "upperChest",
+      "neck",
       "head",
       "leftShoulder",
       "rightShoulder",
+      "leftUpperArm",
+      "rightUpperArm",
       "leftLowerArm",
       "rightLowerArm",
       "leftHand",
       "rightHand",
+      "leftUpperLeg",
+      "rightUpperLeg",
       "leftLowerLeg",
       "rightLowerLeg",
       "leftFoot",
       "rightFoot",
+      "leftToes",
+      "rightToes",
     ]);
     expect(new Set(bones).size).toBe(bones.length);
     expect(STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.filter((item) => item.effector).map((item) => item.bone))
@@ -253,6 +265,79 @@ describe("StudioVrmJointHandles helpers", () => {
     )?.toArray()).toEqual([1, 2, 5]);
   });
 
+  it("maps pointer motion through anatomy-aware rotation profiles and local axis locks", () => {
+    const torso = resolveStudioVrmJointRotationDelta(
+      100,
+      100,
+      140,
+      70,
+      "torso",
+      "free",
+    );
+    expect(torso?.[0]).toBeGreaterThan(0);
+    expect(torso?.[1]).toBeGreaterThan(0);
+    expect(torso?.[2]).toBeCloseTo(0);
+
+    const ball = resolveStudioVrmJointRotationDelta(
+      100,
+      100,
+      140,
+      70,
+      "ball",
+      "free",
+    );
+    expect(ball?.[0]).toBeGreaterThan(0);
+    expect(ball?.[1]).toBeCloseTo(0);
+    expect(ball?.[2]).toBeGreaterThan(0);
+
+    const lockedY = resolveStudioVrmJointRotationDelta(
+      100,
+      100,
+      150,
+      70,
+      "hinge",
+      "y",
+    );
+    expect(lockedY?.[0]).toBeCloseTo(0);
+    expect(lockedY?.[1]).toBeGreaterThan(0);
+    expect(lockedY?.[2]).toBeCloseTo(0);
+
+    const touch = resolveStudioVrmJointRotationDelta(
+      100,
+      100,
+      140,
+      70,
+      "ball",
+      "free",
+      { pointerType: "touch" },
+    );
+    expect(Math.abs(touch?.[0] ?? 0)).toBeLessThan(Math.abs(ball?.[0] ?? 0));
+    expect(resolveStudioVrmJointRotationDelta(0, 0, Number.NaN, 0, "torso", "free"))
+      .toBeNull();
+  });
+
+  it("supports Shift precision for direct joint rotation", () => {
+    const normal = resolveStudioVrmJointRotationDelta(
+      0,
+      0,
+      100,
+      -100,
+      "torso",
+      "free",
+    );
+    const precise = resolveStudioVrmJointRotationDelta(
+      0,
+      0,
+      100,
+      -100,
+      "torso",
+      "free",
+      { precision: true },
+    );
+    expect(precise?.[0]).toBeCloseTo((normal?.[0] ?? 0) * 0.25);
+    expect(precise?.[1]).toBeCloseTo((normal?.[1] ?? 0) * 0.25);
+  });
+
   it("commits only a previewed pointerup and rolls pointer cancellation back to its start", () => {
     const snapshot = {
       bone: "leftHand" as const,
@@ -287,8 +372,8 @@ describe("StudioVrmJointHandles interaction boundary", () => {
 
     render(<StudioVrmJointHandles vrm={vrm} selectedBone="leftHand" screenSize={24} />);
 
-    const hips = screen.getByRole("button", { name: "골반 관절 선택" });
-    const leftHand = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
+    const hips = screen.getByRole("button", { name: "골반 관절 직접 회전" });
+    const leftHand = screen.getByRole("button", { name: "왼손목 관절 IK 목표 이동" });
     expect(hips.getAttribute("aria-pressed")).toBe("false");
     expect(leftHand.getAttribute("aria-pressed")).toBe("true");
     expect(leftHand.getAttribute("aria-keyshortcuts")).toContain("ArrowLeft");
@@ -296,7 +381,188 @@ describe("StudioVrmJointHandles interaction boundary", () => {
     expect(
       (leftHand.querySelector('[data-handle-visual="target"]') as HTMLElement).style.width,
     ).toBe("24px");
-    expect(screen.queryByRole("button", { name: "오른손 관절 IK 목표 이동" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "오른손목 관절 IK 목표 이동" })).toBeNull();
+  });
+
+  it("previews and commits a direct joint rotation as one gesture transaction", () => {
+    const onBoneRotationGesture = vi.fn();
+    const onInteractionActiveChange = vi.fn();
+    const vrm = makeVrm({ chest: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onBoneRotationGesture={onBoneRotationGesture}
+        onInteractionActiveChange={onInteractionActiveChange}
+      />,
+    );
+    const handle = screen.getByRole("button", { name: "가슴 관절 직접 회전" });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 31,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 31,
+      pointerType: "mouse",
+      clientX: 140,
+      clientY: 70,
+    });
+    fireEvent.pointerUp(handle, {
+      pointerId: 31,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 140,
+      clientY: 70,
+    });
+
+    expect(onBoneRotationGesture.mock.calls.map((call) => call[2])).toEqual([
+      "start",
+      "move",
+      "end",
+    ]);
+    expect(onBoneRotationGesture.mock.calls[1][0]).toBe("chest");
+    expect(onBoneRotationGesture.mock.calls[1][1][0]).toBeGreaterThan(0);
+    expect(onBoneRotationGesture.mock.calls[1][1][1]).toBeGreaterThan(0);
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("uses a larger threshold for touch before direct rotation starts", () => {
+    const onBoneRotationGesture = vi.fn();
+    const vrm = makeVrm({ leftLowerArm: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onBoneRotationGesture={onBoneRotationGesture}
+      />,
+    );
+    const handle = screen.getByRole("button", { name: "왼쪽 팔꿈치 관절 직접 회전" });
+    fireEvent.pointerDown(handle, {
+      pointerId: 32,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 32,
+      pointerType: "touch",
+      clientX: 105,
+      clientY: 100,
+    });
+    expect(onBoneRotationGesture).not.toHaveBeenCalled();
+
+    fireEvent.pointerMove(handle, {
+      pointerId: 32,
+      pointerType: "touch",
+      clientX: 112,
+      clientY: 100,
+    });
+    fireEvent.pointerUp(handle, {
+      pointerId: 32,
+      pointerType: "touch",
+      button: 0,
+      clientX: 112,
+      clientY: 100,
+    });
+    expect(onBoneRotationGesture.mock.calls.map((call) => call[2])).toEqual([
+      "start",
+      "move",
+      "end",
+    ]);
+  });
+
+  it("toggles joint locking with context menu and touch long press", () => {
+    const onToggleBoneLock = vi.fn();
+    const onBoneRotationGesture = vi.fn();
+    const vrm = makeVrm({ neck: new THREE.Object3D() });
+    const { rerender } = render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onToggleBoneLock={onToggleBoneLock}
+        onBoneRotationGesture={onBoneRotationGesture}
+      />,
+    );
+    const unlocked = screen.getByRole("button", { name: "목 관절 직접 회전" });
+    fireEvent.contextMenu(unlocked);
+    expect(onToggleBoneLock).toHaveBeenLastCalledWith("neck");
+
+    rerender(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        lockedBones={["neck"]}
+        onToggleBoneLock={onToggleBoneLock}
+        onBoneRotationGesture={onBoneRotationGesture}
+      />,
+    );
+    const locked = screen.getByRole("button", { name: "목 관절 잠금됨" });
+    expect(locked.getAttribute("data-locked")).toBe("true");
+    fireEvent.pointerDown(locked, {
+      pointerId: 33,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(locked, {
+      pointerId: 33,
+      pointerType: "mouse",
+      clientX: 150,
+      clientY: 70,
+    });
+    fireEvent.pointerUp(locked, {
+      pointerId: 33,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 150,
+      clientY: 70,
+    });
+    expect(onBoneRotationGesture).not.toHaveBeenCalled();
+
+    vi.useFakeTimers();
+    fireEvent.pointerDown(locked, {
+      pointerId: 34,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    act(() => vi.advanceTimersByTime(520));
+    expect(onToggleBoneLock).toHaveBeenLastCalledWith("neck");
+    expect(onToggleBoneLock).toHaveBeenCalledTimes(2);
+  });
+
+  it("locks an IK effector with the same touch long-press gesture as body joints", () => {
+    vi.useFakeTimers();
+    const onToggleBoneLock = vi.fn();
+    const onEffectorPreview = vi.fn();
+    const onEffectorCommit = vi.fn();
+    const vrm = makeVrm({ leftHand: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onToggleBoneLock={onToggleBoneLock}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorCommit={onEffectorCommit}
+      />,
+    );
+    const handle = screen.getByRole("button", { name: "왼손목 관절 IK 목표 이동" });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 35,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    act(() => vi.advanceTimersByTime(520));
+
+    expect(onToggleBoneLock).toHaveBeenCalledOnce();
+    expect(onToggleBoneLock).toHaveBeenCalledWith("leftHand");
+    expect(onEffectorPreview).not.toHaveBeenCalled();
+    expect(onEffectorCommit).not.toHaveBeenCalled();
   });
 
   it("renders an accessible 44px pole handle for each supplied active constraint", () => {
@@ -310,8 +576,8 @@ describe("StudioVrmJointHandles interaction boundary", () => {
       />,
     );
 
-    const target = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
-    const pole = screen.getByRole("button", { name: "왼손 IK 폴 방향 이동" });
+    const target = screen.getByRole("button", { name: "왼손목 관절 IK 목표 이동" });
+    const pole = screen.getByRole("button", { name: "왼손목 IK 폴 방향 이동" });
     expect(target.getAttribute("aria-pressed")).toBe("false");
     expect(pole.getAttribute("aria-pressed")).toBe("true");
     expect(pole.getAttribute("data-ik-control")).toBe("pole");
@@ -335,7 +601,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         />
       </div>
     );
-    const handle = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
+    const handle = screen.getByRole("button", { name: "왼손목 관절 IK 목표 이동" });
 
     fireEvent.pointerDown(handle, { pointerId: 7, button: 0, clientX: 100, clientY: 100 });
     fireEvent.pointerUp(handle, { pointerId: 7, button: 0, clientX: 100, clientY: 100 });
@@ -358,7 +624,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         onEffectorCommit={onEffectorCommit}
       />
     );
-    const handle = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
+    const handle = screen.getByRole("button", { name: "왼손목 관절 IK 목표 이동" });
 
     fireEvent.pointerDown(handle, { pointerId: 7, button: 0, clientX: 100, clientY: 100 });
     fireEvent.pointerMove(handle, { pointerId: 7, clientX: 120, clientY: 120 });
@@ -402,7 +668,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
       />,
     );
     const handle = screen.getByRole("button", {
-      name: "왼손 관절 IK 목표 이동",
+      name: "왼손목 관절 IK 목표 이동",
     }) as HTMLButtonElement;
     const pointerCapture = rejectPointerCapture(handle);
     const addEventListener = vi.spyOn(window, "addEventListener");
@@ -465,7 +731,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
       />,
     );
     const handle = screen.getByRole("button", {
-      name: "오른손 관절 IK 목표 이동",
+      name: "오른손목 관절 IK 목표 이동",
     }) as HTMLButtonElement;
     rejectPointerCapture(handle);
 
@@ -514,7 +780,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
       />,
     );
     const pole = screen.getByRole("button", {
-      name: "왼발 IK 폴 방향 이동",
+      name: "왼발목 IK 폴 방향 이동",
     }) as HTMLButtonElement;
     rejectPointerCapture(pole);
 
@@ -559,7 +825,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         onEffectorRollback={onEffectorRollback}
       />
     );
-    const handle = screen.getByRole("button", { name: "오른손 관절 IK 목표 이동" });
+    const handle = screen.getByRole("button", { name: "오른손목 관절 IK 목표 이동" });
     fireEvent.pointerDown(handle, { pointerId: 3, button: 0, clientX: 80, clientY: 90 });
     fireEvent.pointerMove(handle, { pointerId: 3, clientX: 130, clientY: 120 });
 
@@ -591,7 +857,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         onInteractionActiveChange={onInteractionActiveChange}
       />
     );
-    const handle = screen.getByRole("button", { name: "오른손 관절 IK 목표 이동" });
+    const handle = screen.getByRole("button", { name: "오른손목 관절 IK 목표 이동" });
     const removeEventListener = vi.spyOn(window, "removeEventListener");
 
     fireEvent.pointerDown(handle, { pointerId: 3, button: 0, clientX: 80, clientY: 90 });
@@ -623,7 +889,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         onPoleRollback={onPoleRollback}
       />,
     );
-    const pole = screen.getByRole("button", { name: "왼발 IK 폴 방향 이동" });
+    const pole = screen.getByRole("button", { name: "왼발목 IK 폴 방향 이동" });
 
     fireEvent.pointerDown(pole, { pointerId: 12, button: 0, clientX: 100, clientY: 100 });
     fireEvent.pointerMove(pole, { pointerId: 12, clientX: 145, clientY: 120 });
@@ -648,7 +914,7 @@ describe("StudioVrmJointHandles interaction boundary", () => {
         onPoleRollback={onPoleRollback}
       />,
     );
-    const pole = screen.getByRole("button", { name: "오른발 IK 폴 방향 이동" });
+    const pole = screen.getByRole("button", { name: "오른발목 IK 폴 방향 이동" });
 
     fireEvent.pointerDown(pole, { pointerId: 13, button: 0, clientX: 100, clientY: 100 });
     fireEvent.pointerMove(pole, { pointerId: 13, clientX: 140, clientY: 130 });
