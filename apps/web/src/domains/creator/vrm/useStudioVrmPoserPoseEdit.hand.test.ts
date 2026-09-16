@@ -10,7 +10,11 @@ import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
 // are intentionally not mounted. Preserve React's other exports for dependencies.
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
-  return { ...actual, useEffect: vi.fn() };
+  return {
+    ...actual,
+    useEffect: vi.fn(),
+    useRef: vi.fn((initialValue: unknown) => ({ current: initialValue })),
+  };
 });
 
 function hostFixture({
