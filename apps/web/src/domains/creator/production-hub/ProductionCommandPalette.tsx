@@ -44,16 +44,16 @@ const SURFACE_ITEMS: readonly {
   readonly description: string;
   readonly icon: LucideIcon;
 }[] = [
-  { id: "overview", label: "프로젝트 개요", description: "우선 작업과 제작 상태", icon: LayoutDashboard },
-  { id: "planning", label: "시각 기획", description: "회차·장면·컷 WYSIWYG 기획", icon: BookOpenText },
-  { id: "episodes", label: "회차 매트릭스", description: "회차별 공정과 정본 상태", icon: PanelTopOpen },
-  { id: "production", label: "제작 보드", description: "공정별 칸반 작업", icon: Workflow },
-  { id: "schedule", label: "일정·용량", description: "타임라인과 워크로드", icon: CalendarClock },
-  { id: "handoff", label: "인수인계", description: "Story → Art 입력 정본", icon: Handshake },
-  { id: "review", label: "시각 검수", description: "비교·주석·lane 승인", icon: ClipboardCheck },
-  { id: "procurement", label: "발주·계약", description: "범위·제안·마일스톤", icon: BriefcaseBusiness },
-  { id: "rights", label: "권리·정산", description: "크레딧·권리·보상", icon: Scale },
-  { id: "settings", label: "협업 설정", description: "참여자·역할·운영 경계", icon: Users },
+  { id: "overview", label: "프로젝트 홈", description: "오늘 할 일과 막힌 작업", icon: LayoutDashboard },
+  { id: "planning", label: "기획", description: "작품·시즌·장면 기준", icon: BookOpenText },
+  { id: "episodes", label: "회차", description: "회차별 상태와 원고", icon: PanelTopOpen },
+  { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
+  { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
+  { id: "handoff", label: "작업 넘기기", description: "꼭 지킬 내용과 질문", icon: Handshake },
+  { id: "review", label: "검수·수정", description: "수정 요청과 승인", icon: ClipboardCheck },
+  { id: "procurement", label: "외주·발주", description: "의뢰 범위와 납품", icon: BriefcaseBusiness },
+  { id: "rights", label: "계약·정산", description: "권리·크레딧·보상", icon: Scale },
+  { id: "settings", label: "팀 설정", description: "참여자와 역할", icon: Users },
 ];
 
 export function ProductionCommandPalette({
@@ -80,7 +80,7 @@ export function ProductionCommandPalette({
     const episodes = aggregate.episodes.map((episode) => ({
       id: `episode:${episode.episodeId}`,
       label: `${episode.episodeId} 공동 작업실`,
-      description: `${episode.state} · blocker ${episode.openBlockerCount}`,
+      description: `${episode.state} · 막힘 ${episode.openBlockerCount}`,
       href: `${base}/episodes/${encodeURIComponent(episode.episodeId)}`,
       group: "회차" as const,
       icon: PanelTopOpen,
@@ -160,7 +160,7 @@ export function ProductionCommandPalette({
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="프로덕션 빠른 이동"
+            aria-label="제작 관리 빠른 이동"
             className="w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
           >
             <div className="flex items-center gap-3 border-b border-line px-4">
@@ -187,7 +187,7 @@ export function ProductionCommandPalette({
                     setOpen(false);
                   }
                 }}
-                aria-label="프로덕션 메뉴, 회차, 작업 검색"
+                aria-label="제작 관리 메뉴, 회차, 작업 검색"
                 aria-controls="production-command-results"
                 aria-activedescendant={filtered[activeIndex] ? `production-command-${filtered[activeIndex].id}` : undefined}
                 placeholder="화면, 회차, 작업을 검색하세요"

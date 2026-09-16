@@ -12,6 +12,7 @@ import {
   MessageCircle,
   MessageSquareQuote,
   Moon,
+  PackageCheck,
   Palette,
   Settings,
   Sparkles,
@@ -19,6 +20,7 @@ import {
   TrendingUp,
   UserRound,
   UserRoundPen,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,34 +73,53 @@ export const SITE_NAVIGATION_ITEMS = {
     "Discover stories and explore the service",
     true,
   ),
+  production: item(
+    "production",
+    "/production",
+    Workflow,
+    "제작 관리",
+    "Production",
+    "기획·회차·일정·검수·계약을 한 흐름으로 관리",
+    "Manage planning, episodes, schedules, review and agreements in one flow",
+    true,
+  ),
   make: item(
     "make",
     "/studio/new",
     Palette,
-    "새로 만들기",
-    "Create",
-    "만들 결과를 고르면 알맞은 작업공간을 준비",
-    "Choose an outcome and open the right workspace",
+    "새 작품",
+    "New work",
+    "웹툰·컷툰·일러스트를 알맞은 작업공간에서 시작",
+    "Start a webtoon, short comic or illustration in the right workspace",
     true,
   ),
   studio: item(
     "studio",
     "/studio",
     Palette,
-    "내 작업",
-    "My work",
-    "프로젝트·공유 작업·복구 항목을 한곳에서",
-    "Projects, shared work and recovery in one place",
+    "프로젝트",
+    "Projects",
+    "최근 작품·공유 작업·복구 항목을 한곳에서",
+    "Recent projects, shared work and recovery in one place",
     true,
   ),
   studioAssets: item(
     "studio-assets",
     "/studio/assets",
     Store,
-    "소재",
-    "Materials",
-    "브러시·캐릭터·배경·오디오를 제작에 연결",
-    "Connect brushes, characters, backgrounds and audio to production",
+    "작품 재료",
+    "Assets",
+    "캐릭터·배경·브러시·오디오와 사용 권리를 함께 정리",
+    "Organize characters, backgrounds, brushes, audio and usage rights",
+  ),
+  publish: item(
+    "publish",
+    "/studio/publish",
+    PackageCheck,
+    "검수·내보내기",
+    "Review & export",
+    "모바일 읽기 흐름과 플랫폼 규격을 확인하고 파일로 내보내기",
+    "Check mobile reading flow and platform requirements before export",
   ),
   learn: item(
     "learn",
@@ -296,10 +317,10 @@ const I = SITE_NAVIGATION_ITEMS;
 
 /** Production navigation: four durable destinations, regardless of feature count. */
 export const TOONSTUDIO_PRIMARY_NAVIGATION = [
+  I.production,
   I.studio,
-  I.make,
   I.studioAssets,
-  I.learn,
+  I.publish,
 ] as const;
 
 /** Reader navigation remains separate from the creation product. */
@@ -315,28 +336,28 @@ export const PRIMARY_SITE_NAVIGATION = TOONSPECTRUM_PRIMARY_NAVIGATION;
 
 export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
   {
-    id: "studio-work",
-    label: { ko: "만들기", en: "Create" },
-    description: { ko: "새 작품을 시작하고 이어서 완성하기", en: "Start, continue and finish your work" },
-    items: [I.studio, I.make, I.studioAssets, I.learn],
+    id: "production-flow",
+    label: { ko: "제작 흐름", en: "Production flow" },
+    description: { ko: "작품 전체를 계획하고 오늘 할 일을 바로 확인", en: "Plan the whole work and see what needs attention today" },
+    items: [I.production, I.studio, I.make],
   },
   {
-    id: "studio-inspiration",
-    label: { ko: "영감 찾기", en: "Find inspiration" },
+    id: "production-resources",
+    label: { ko: "작품 준비", en: "Prepare the work" },
     description: {
-      ko: "작품과 참고자료를 다음 장면으로 연결",
-      en: "Connect stories and references to your next scene",
+      ko: "작품 재료와 참고자료를 작업 가까이에",
+      en: "Keep assets and references close to the work",
     },
-    items: [I.research, I.explore, I.now],
+    items: [I.studioAssets, I.research, I.learn],
   },
   {
-    id: "studio-community",
-    label: { ko: "커뮤니티", en: "Community" },
+    id: "production-delivery",
+    label: { ko: "완성·협업", en: "Finish & collaborate" },
     description: {
-      ko: "작품을 보여주고 경험과 협업을 나누기",
-      en: "Share work, experience and collaboration",
+      ko: "검수하고 내보내고 함께할 사람과 연결",
+      en: "Review, export and connect with collaborators",
     },
-    items: [I.gallery, I.community, I.collaborate],
+    items: [I.publish, I.collaborate, I.gallery, I.community],
   },
 ];
 
@@ -383,10 +404,10 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 export const SITE_NAVIGATION_GROUPS = TOONSPECTRUM_NAVIGATION_GROUPS;
 
 export const TOONSTUDIO_MOBILE_TABS = [
+  I.production,
   I.studio,
   I.make,
   I.studioAssets,
-  I.learn,
   I.me,
 ] as const;
 
@@ -406,6 +427,7 @@ export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 const STUDIO_CONTEXT_PREFIXES = [
   "/",
   "/studio",
+  "/production",
   "/make",
   "/brush-lab",
   "/shaper",

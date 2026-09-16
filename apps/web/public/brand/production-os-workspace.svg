@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Webtoon project management dashboard</title>
+  <desc id="desc">A dashboard with projects, episode progress, tasks, team feedback, file versions and delivery status.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a0c1a"/><stop offset="1" stop-color="#171630"/></linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a17cff"/><stop offset=".52" stop-color="#6fdcff"/><stop offset="1" stop-color="#ff79c9"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e1b6"/><stop offset="1" stop-color="#4ab7d4"/></linearGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dy="22" stdDeviation="24" flood-opacity=".4"/></filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#a397ef" stroke-opacity=".05"/></pattern>
+  </defs>
+  <rect width="1600" height="980" fill="url(#bg)"/><rect width="1600" height="980" fill="url(#grid)"/>
+  <g filter="url(#s)"><rect x="72" y="70" width="1456" height="840" rx="34" fill="#111426" stroke="#9d85ff" stroke-opacity=".24" stroke-width="2"/></g>
+  <rect x="72" y="70" width="1456" height="84" rx="34" fill="#1b1a32"/><path d="M72 120v34h1456v-34" fill="#1b1a32"/>
+  <circle cx="116" cy="112" r="16" fill="url(#brand)"/><text x="148" y="120" fill="#f6f2ff" font-family="Inter, Pretendard, sans-serif" font-size="24" font-weight="800">TOONSTUDIO</text><text x="340" y="119" fill="#8f8eaa" font-family="Inter, sans-serif" font-size="13" letter-spacing="2">PROJECT WORKSPACE</text>
+  <rect x="1270" y="91" width="218" height="42" rx="21" fill="#8d72ff" fill-opacity=".17" stroke="#9d85ff" stroke-opacity=".35"/><text x="1379" y="118" text-anchor="middle" fill="#ddd4ff" font-family="Inter, Pretendard, sans-serif" font-size="14" font-weight="700">+ 새 작품</text>
+  <rect x="72" y="154" width="236" height="756" fill="#0e1120"/>
+  <g font-family="Inter, Pretendard, sans-serif" font-size="14" font-weight="700">
+    <g transform="translate(96 190)"><rect width="188" height="52" rx="14" fill="#8f72ff" fill-opacity=".16"/><circle cx="28" cy="26" r="10" fill="#a98fff"/><text x="52" y="31" fill="#ece7ff">제작 관리</text></g>
+    <g transform="translate(96 254)"><circle cx="28" cy="26" r="10" fill="#63dff8" fill-opacity=".7"/><text x="52" y="31" fill="#aaa9c1">프로젝트</text></g>
+    <g transform="translate(96 310)"><circle cx="28" cy="26" r="10" fill="#ff79c9" fill-opacity=".7"/><text x="52" y="31" fill="#aaa9c1">작품 재료</text></g>
+    <g transform="translate(96 366)"><circle cx="28" cy="26" r="10" fill="#64dfb5" fill-opacity=".7"/><text x="52" y="31" fill="#aaa9c1">검수·내보내기</text></g>
+  </g>
+  <line x1="110" y1="458" x2="270" y2="458" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="110" y="496" fill="#77788f" font-family="Inter, Pretendard, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">오늘의 작품</text>
+  <rect x="96" y="516" width="188" height="170" rx="18" fill="#1a1e35" stroke="#ffffff" stroke-opacity=".07"/><rect x="112" y="532" width="156" height="86" rx="12" fill="#2c274e"/><path d="M124 608c34-35 57-26 78-55 21-29 41-8 54 6v51H124z" fill="#9a7cff" fill-opacity=".35"/><text x="112" y="648" fill="#f4f0ff" font-family="Inter, Pretendard, sans-serif" font-size="13" font-weight="800">달빛 우체국</text><text x="112" y="670" fill="#8e8da5" font-family="Inter, Pretendard, sans-serif" font-size="11">8화 · 작화 진행</text>
+  <rect x="340" y="188" width="1156" height="120" rx="24" fill="#181b31" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="374" y="225" fill="#8e8da9" font-family="Inter, Pretendard, sans-serif" font-size="12" font-weight="700" letter-spacing="1.6">오늘 확인할 것</text>
+  <text x="374" y="264" fill="#f8f4ff" font-family="Inter, Pretendard, sans-serif" font-size="28" font-weight="850">작품 전체 흐름과 다음 할 일을 한눈에</text>
+  <g transform="translate(1070 208)" font-family="Inter, Pretendard, sans-serif"><rect width="186" height="76" rx="18" fill="#25213f"/><text x="20" y="28" fill="#9998b3" font-size="11">진행 중 회차</text><text x="20" y="59" fill="#b49dff" font-size="26" font-weight="800">03</text><rect x="126" y="22" width="38" height="38" rx="12" fill="#987dff" fill-opacity=".18"/><path d="M139 41h12M145 35v12" stroke="#c8bbff" stroke-width="3" stroke-linecap="round"/></g>
+  <g transform="translate(1270 208)" font-family="Inter, Pretendard, sans-serif"><rect width="194" height="76" rx="18" fill="#1d2b36"/><text x="20" y="28" fill="#9998b3" font-size="11">검수 대기</text><text x="20" y="59" fill="#71e3c0" font-size="26" font-weight="800">05</text><circle cx="151" cy="41" r="19" fill="#65deb8" fill-opacity=".16"/><path d="M141 41l7 7 13-17" fill="none" stroke="#a0f0d5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g>
+
+  <rect x="340" y="332" width="742" height="542" rx="24" fill="#15182c" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="374" y="374" fill="#f2edff" font-family="Inter, Pretendard, sans-serif" font-size="17" font-weight="800">회차 작업 보드</text><text x="1000" y="374" text-anchor="end" fill="#8f8da8" font-family="Inter, Pretendard, sans-serif" font-size="12">전체 회차 보기 →</text>
+  <g transform="translate(374 402)" font-family="Inter, Pretendard, sans-serif">
+    <rect width="208" height="430" rx="18" fill="#101322"/><text x="18" y="32" fill="#9999b0" font-size="12" font-weight="700">기획·콘티  2</text>
+    <rect x="14" y="54" width="180" height="118" rx="14" fill="#27233f"/><rect x="28" y="70" width="68" height="8" rx="4" fill="#a48dff"/><text x="28" y="105" fill="#f2efff" font-size="13" font-weight="700">09화 콘티 확정</text><text x="28" y="131" fill="#9291a9" font-size="11">오늘 18:00</text><circle cx="166" cy="142" r="13" fill="#ff83c8"/><text x="166" y="146" text-anchor="middle" fill="#191325" font-size="9" font-weight="800">HY</text>
+    <rect x="14" y="188" width="180" height="105" rx="14" fill="#20293c"/><rect x="28" y="205" width="52" height="8" rx="4" fill="#6fdcff"/><text x="28" y="238" fill="#f2efff" font-size="13" font-weight="700">10화 장면 정리</text><text x="28" y="264" fill="#9291a9" font-size="11">내일</text>
+    <rect x="14" y="310" width="180" height="95" rx="14" fill="#1a1e31" stroke="#ffffff" stroke-opacity=".06" stroke-dasharray="6 6"/><text x="104" y="363" text-anchor="middle" fill="#77778d" font-size="12">+ 작업 추가</text>
+  </g>
+  <g transform="translate(598 402)" font-family="Inter, Pretendard, sans-serif">
+    <rect width="208" height="430" rx="18" fill="#101322"/><text x="18" y="32" fill="#9999b0" font-size="12" font-weight="700">작화 진행  3</text>
+    <rect x="14" y="54" width="180" height="146" rx="14" fill="#2b2443"/><rect x="28" y="70" width="124" height="58" rx="10" fill="#3a315e"/><path d="M36 120c33-38 56-18 78-39 19-18 29 3 34 15v28H36z" fill="#a182ff" fill-opacity=".42"/><text x="28" y="156" fill="#f4f1ff" font-size="13" font-weight="700">08화 최종 작화</text><text x="28" y="181" fill="#ffb1dc" font-size="11">수정 2건</text>
+    <rect x="14" y="216" width="180" height="118" rx="14" fill="#1d2d3c"/><rect x="28" y="232" width="62" height="8" rx="4" fill="#68dff7"/><text x="28" y="267" fill="#f4f1ff" font-size="13" font-weight="700">09화 배경 배치</text><text x="28" y="292" fill="#9291a9" font-size="11">70% 완료</text><rect x="28" y="307" width="132" height="6" rx="3" fill="#344052"/><rect x="28" y="307" width="92" height="6" rx="3" fill="#66dff6"/>
+  </g>
+  <g transform="translate(822 402)" font-family="Inter, Pretendard, sans-serif">
+    <rect width="226" height="430" rx="18" fill="#101322"/><text x="18" y="32" fill="#9999b0" font-size="12" font-weight="700">검수·완료  5</text>
+    <rect x="14" y="54" width="198" height="128" rx="14" fill="#173033"/><circle cx="42" cy="85" r="15" fill="#63deb6" fill-opacity=".18"/><path d="M35 85l5 5 10-13" fill="none" stroke="#9cf0d2" stroke-width="4" stroke-linecap="round"/><text x="68" y="84" fill="#f4f1ff" font-size="13" font-weight="700">07화 검수 완료</text><text x="68" y="108" fill="#83d9bd" font-size="11">내보내기 준비됨</text><rect x="28" y="139" width="154" height="22" rx="11" fill="#61dcb4" fill-opacity=".13"/><text x="105" y="154" text-anchor="middle" fill="#98e9ce" font-size="10" font-weight="700">모든 필수 승인 완료</text>
+    <rect x="14" y="198" width="198" height="105" rx="14" fill="#25233e"/><text x="28" y="231" fill="#f4f1ff" font-size="13" font-weight="700">06화 플랫폼 파일</text><text x="28" y="255" fill="#9291a9" font-size="11">WEBTOON · PDF · ZIP</text><path d="M165 226v35m-12-12 12 12 12-12" fill="none" stroke="#b8a6ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <rect x="1106" y="332" width="390" height="262" rx="24" fill="#15182c" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="1138" y="374" fill="#f2edff" font-family="Inter, Pretendard, sans-serif" font-size="17" font-weight="800">검수·수정</text>
+  <g font-family="Inter, Pretendard, sans-serif"><circle cx="1156" cy="414" r="17" fill="#9b80ff"/><text x="1156" y="419" text-anchor="middle" fill="#171225" font-size="9" font-weight="850">ST</text><rect x="1184" y="397" width="282" height="72" rx="14" fill="#22213a"/><text x="1200" y="424" fill="#f1edff" font-size="12" font-weight="700">컷 18 표정을 조금 더 불안하게</text><text x="1200" y="450" fill="#8f8ea7" font-size="10">08화 · 장면 4 · 최신본에 연결됨</text><circle cx="1156" cy="505" r="17" fill="#64dff7"/><text x="1156" y="510" text-anchor="middle" fill="#0f2028" font-size="9" font-weight="850">AR</text><rect x="1184" y="488" width="282" height="72" rx="14" fill="#1d2939"/><text x="1200" y="515" fill="#f1edff" font-size="12" font-weight="700">수정 반영했습니다. 확인 부탁드려요.</text><text x="1200" y="541" fill="#77d6ed" font-size="10">버전 12 · 방금 전</text></g>
+
+  <rect x="1106" y="618" width="390" height="256" rx="24" fill="#15182c" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="1138" y="660" fill="#f2edff" font-family="Inter, Pretendard, sans-serif" font-size="17" font-weight="800">파일·권리 확인</text>
+  <g font-family="Inter, Pretendard, sans-serif"><rect x="1138" y="686" width="326" height="56" rx="14" fill="#20243a"/><rect x="1154" y="701" width="28" height="28" rx="8" fill="#9b80ff" fill-opacity=".2"/><path d="M1162 708h12v14h-12z" fill="none" stroke="#c8bbff" stroke-width="2"/><text x="1196" y="710" fill="#f1edff" font-size="12" font-weight="700">ep08_final_v12.clip</text><text x="1196" y="730" fill="#8d8ca4" font-size="10">최신 파일 · 자동 백업됨</text><rect x="1138" y="754" width="326" height="56" rx="14" fill="#173033"/><circle cx="1168" cy="782" r="14" fill="#64dfb5" fill-opacity=".16"/><path d="M1161 782l5 5 10-13" fill="none" stroke="#9cefd1" stroke-width="3" stroke-linecap="round"/><text x="1196" y="777" fill="#f1edff" font-size="12" font-weight="700">상업 사용 권리 확인됨</text><text x="1196" y="797" fill="#7ed8bb" font-size="10">배경 12 · 폰트 3 · 오디오 1</text></g>
+</svg>

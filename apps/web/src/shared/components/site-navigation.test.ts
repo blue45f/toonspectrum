@@ -22,10 +22,10 @@ import {
 describe("site navigation information architecture", () => {
   it("separates creation and discovery into distinct product navigation", () => {
     expect(TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
+      "production",
       "studio",
-      "make",
       "studio-assets",
-      "learn",
+      "publish",
     ]);
     expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
       "explore",
@@ -38,7 +38,9 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.make.href).toBe("/studio/new");
     expect(SITE_NAVIGATION_ITEMS.studioAssets.href).toBe("/studio/assets");
     expect(SITE_NAVIGATION_ITEMS.learn.href).toBe("/learn");
-    expect(SITE_NAVIGATION_ITEMS.studioAssets.label.ko).toBe("소재");
+    expect(SITE_NAVIGATION_ITEMS.studioAssets.label.ko).toBe("작품 재료");
+    expect(SITE_NAVIGATION_ITEMS.production.href).toBe("/production");
+    expect(SITE_NAVIGATION_ITEMS.publish.href).toBe("/studio/publish");
   });
 
   it("keeps fortune and tarot in Spectrum's research and growth directory", () => {
@@ -78,6 +80,8 @@ describe("site navigation information architecture", () => {
   it("switches desktop and mobile navigation from the current product context", () => {
     expect(siteNavigationContextForPath("/")).toBe("studio");
     expect(siteNavigationContextForPath("/studio")).toBe("studio");
+    expect(siteNavigationContextForPath("/production")).toBe("studio");
+    expect(siteNavigationContextForPath("/production/projects/sample-project/overview")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
     expect(siteNavigationContextForPath("/learn/webtoon")).toBe("studio");
@@ -103,10 +107,10 @@ describe("site navigation information architecture", () => {
 
   it("uses stable five-slot mobile navigation in each product", () => {
     expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual([
+      "production",
       "studio",
       "make",
       "studio-assets",
-      "learn",
       "me",
     ]);
     expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual([
