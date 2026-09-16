@@ -10,6 +10,5 @@ apps/web/public/data
 .env
 .env.*
 !.env.example
-.vercel
 coverage
 .DS_Store

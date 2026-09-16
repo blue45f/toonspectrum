@@ -83,7 +83,7 @@ test("inspector-only UI changes request browser and build validation without inv
 
 test("deployment configuration is classified independently", () => {
   const classification = classifyStudioChanges([
-    ".github/workflows/deploy-vercel.yml",
+    "deploy/cloudflare-static/wrangler.jsonc",
     "vite.config.ts",
   ]);
 

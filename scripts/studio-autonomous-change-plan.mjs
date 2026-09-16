@@ -57,9 +57,9 @@ const CATEGORY_RULES = Object.freeze({
     // whose filename declares an actual deploy/release target request production build and bundle
     // validation; coordination, CI, benchmark-watch and branch-cleanup workflows stay API-free
     // control-plane changes and are covered by the contract tests above the targeted gates.
-    /^\.github\/workflows\/(?:deploy|release|production|vercel|netlify|cloudflare|service-worker)(?:[-_.]|$)/i,
+    /^\.github\/workflows\/(?:deploy|release|production|netlify|cloudflare|service-worker)(?:[-_.]|$)/i,
     /^deploy\//,
-    /(?:^|\/)(?:vercel|netlify|service-worker|sw)(?:[-_./]|$)/i,
+    /(?:^|\/)(?:netlify|service-worker|sw)(?:[-_./]|$)/i,
     /(?:^|\/)(?:vite\.config|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/,
     /(?:csp|bundle-budget|deployment|production-build)/i,
   ]),

@@ -46,7 +46,7 @@ Studio 라우트 클로저(5.4 MB / 194 청크)는 **의도적으로 프리캐�
 - 오프라인 폴백은 경로별로 갈린다. `/studio*` 는 격리 셸, 그 외는 `/`.
   (`studioServiceWorkerOfflineShellUrl`)
 - `/sw.js` 자체가 `Cross-Origin-Embedder-Policy: credentialless` 로 서빙된다
-  (`vercel.json`). 워커는 자신과 COEP 가 호환되는 클라이언트만 제어할 수 있다.
+  (`config/http-response-headers.json` → `apps/web/public/_headers`). 워커는 자신과 COEP 가 호환되는 클라이언트만 제어할 수 있다.
 
 ### 캐시 무효화 축이 둘인 이유
 

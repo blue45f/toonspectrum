@@ -14,7 +14,7 @@
     "build:bundle": "NODE_OPTIONS='--max-old-space-size=12288' vite build",
     "prebuild:bundle": "pnpm run prebuild",
     "postbuild:bundle": "pnpm run postbuild",
-    "postbuild": "node scripts/generate-third-party-notices.mjs --output dist/legal/THIRD_PARTY_NOTICES.generated.md && node scripts/verify-static-csp.mjs dist/index.html && node scripts/build-og-title-shards.cjs",
+    "postbuild": "node scripts/generate-third-party-notices.mjs --output dist/legal/THIRD_PARTY_NOTICES.generated.md && node scripts/verify-static-csp.mjs dist/index.html",
     "preview": "vite preview --host 0.0.0.0",
     "start": "vite preview --host 0.0.0.0",
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
@@ -184,8 +184,7 @@
     "toonbridge:probe": "node tools/toonbridge/probe.mjs",
     "test:toonbridge": "node --test tools/toonbridge/test/*.test.mjs",
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
-    "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
-    "verify:vercel-fallback": "node scripts/cloudflare-static-rules.mjs --check-vercel-fallback"
+    "verify:studio-production-toolchain": "pnpm run test:production-toolchain"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

@@ -65,7 +65,7 @@ export function validateFreeInfrastructurePolicy(policy) { // NOSONAR javascript
     "forbiddenProviders",
     issues,
   );
-  for (const required of ["oracle", "oci"]) {
+  for (const required of ["oracle", "oci", "vercel"]) {
     if (!forbiddenProviders.includes(required)) {
       issues.push(`forbiddenProviders must include ${required}`);
     }
@@ -231,10 +231,6 @@ export function readFreeInfrastructurePolicy(
   return parsed;
 }
 
-function readJson(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
-}
-
 export function validateFreeInfrastructureRepository(root = process.cwd()) { // NOSONAR javascript:S3776
   const issues = [];
   const at = (relativePath) => resolve(root, relativePath);
@@ -248,8 +244,21 @@ export function validateFreeInfrastructureRepository(root = process.cwd()) { // 
   for (const path of requiredPaths) {
     if (!existsSync(at(path))) issues.push(`missing free infrastructure file: ${path}`);
   }
-  for (const forbiddenPath of ["deploy/oci", "docs/OCI-MIGRATION.md"]) {
-    if (existsSync(at(forbiddenPath))) issues.push(`retired Oracle infrastructure returned: ${forbiddenPath}`);
+  for (const forbiddenPath of [
+    "deploy/oci",
+    "docs/OCI-MIGRATION.md",
+    "vercel.json",
+    ".vercelignore",
+    "api",
+    ".github/workflows/deploy-vercel.yml",
+    "apps/api/og-title-files.cjs",
+    "apps/api/src/serverless.ts",
+    "apps/api/src/studio-live-serverless.ts",
+    "scripts/configure-vercel-production.mjs",
+    "scripts/vercel-workflow-policy.mjs",
+    "scripts/verify-api-serverless-build.mjs",
+  ]) {
+    if (existsSync(at(forbiddenPath))) issues.push(`retired infrastructure returned: ${forbiddenPath}`);
   }
 
   try {
@@ -258,20 +267,6 @@ export function validateFreeInfrastructureRepository(root = process.cwd()) { // 
     issues.push(error instanceof Error ? error.message : String(error));
   }
 
-  if (existsSync(at("vercel.json"))) {
-    try {
-      const vercel = readJson(at("vercel.json"));
-      const deploymentEnabled = vercel.git?.deploymentEnabled;
-      if (!record(deploymentEnabled) || deploymentEnabled["**"] !== false) {
-        issues.push('vercel.json must disable Git deployment for "**"');
-      }
-      if (Object.values(deploymentEnabled ?? {}).some((value) => value === true)) {
-        issues.push("vercel.json must not enable Git deployment for any branch");
-      }
-    } catch (error) {
-      issues.push(`vercel.json could not be validated: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
 
   const activeSurfacePaths = [
     "deploy",

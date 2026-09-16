@@ -32,8 +32,6 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
-.vercel
 
 # Supabase CLI local link/cache metadata (project refs and operator state)
 /supabase/.temp/
