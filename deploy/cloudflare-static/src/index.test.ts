@@ -136,7 +136,7 @@ describe("Cloudflare static gateway", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       policySlug: "privacy-policy",
-      source: "first-party",
+      source: "static",
     }));
     expect(response.headers.get("x-toonspectrum-policy-source")).toBe(
       "first-party-release",

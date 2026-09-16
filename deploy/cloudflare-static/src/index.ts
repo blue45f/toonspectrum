@@ -1,4 +1,9 @@
 import {
+  getStaticPolicyDocument,
+  isPolicySlug,
+} from "../../../packages/core/src/legal-policy";
+
+import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
   cloudflareLargeAssetDescriptor,
   cloudflareLargeAssetKey,
@@ -112,6 +117,31 @@ function edgeLivenessResponse(request: Request): Response {
       ...COMMON_SECURITY_HEADERS,
     },
   });
+}
+
+function edgePolicyResponse(request: Request, requestUrl: URL): Response | null {
+  const prefix = "/api/legal/policies/";
+  if (!requestUrl.pathname.startsWith(prefix)) return null;
+  const method = request.method.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    return withSecurityHeaders(new Response(null, {
+      status: 405,
+      headers: { allow: "GET, HEAD" },
+    }));
+  }
+  const slug = requestUrl.pathname.slice(prefix.length);
+  if (!isPolicySlug(slug) || slug.includes("/")) {
+    return jsonError(404, "policy_not_found");
+  }
+  const body = JSON.stringify(getStaticPolicyDocument(slug));
+  return withSecurityHeaders(new Response(method === "HEAD" ? null : body, {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=300, s-maxage=86400",
+      "x-toonspectrum-policy-source": "first-party-release",
+    },
+  }));
 }
 
 function validatedCoreOriginSecret(raw: string | undefined): string | null {
@@ -700,6 +730,9 @@ export function createCloudflareStaticGateway(
     if (!isDynamicPath(requestUrl.pathname)) {
       return env.ASSETS.fetch(request);
     }
+
+    const policyResponse = edgePolicyResponse(request, requestUrl);
+    if (policyResponse) return policyResponse;
 
     const route = classifyDynamicRoute(request, requestUrl);
     if (route === "large-asset") {
