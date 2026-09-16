@@ -91,18 +91,19 @@ const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numer
 const SURFACES: readonly {
   readonly id: ProductionProjectSurface;
   readonly label: string;
+  readonly description: string;
   readonly icon: typeof LayoutDashboard;
 }[] = [
-  { id: "overview", label: "개요", icon: LayoutDashboard },
-  { id: "planning", label: "기획", icon: BookOpenText },
-  { id: "episodes", label: "회차", icon: PanelTopOpen },
-  { id: "production", label: "제작", icon: Workflow },
-  { id: "schedule", label: "일정", icon: CalendarClock },
-  { id: "handoff", label: "인수인계", icon: Handshake },
-  { id: "review", label: "검수", icon: ClipboardCheck },
-  { id: "procurement", label: "발주", icon: BriefcaseBusiness },
-  { id: "rights", label: "권리·정산", icon: Scale },
-  { id: "settings", label: "협업 설정", icon: Users },
+  { id: "overview", label: "프로젝트 홈", description: "오늘 할 일과 막힌 작업", icon: LayoutDashboard },
+  { id: "planning", label: "기획", description: "작품·시즌·장면 기준", icon: BookOpenText },
+  { id: "episodes", label: "회차", description: "회차별 상태와 원고", icon: PanelTopOpen },
+  { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
+  { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
+  { id: "handoff", label: "작업 넘기기", description: "꼭 지킬 내용과 질문", icon: Handshake },
+  { id: "review", label: "검수·수정", description: "수정 요청과 승인", icon: ClipboardCheck },
+  { id: "procurement", label: "외주·발주", description: "의뢰 범위와 납품", icon: BriefcaseBusiness },
+  { id: "rights", label: "계약·정산", description: "권리·크레딧·보상", icon: Scale },
+  { id: "settings", label: "팀 설정", description: "참여자와 역할", icon: Users },
 ];
 
 const EPISODE_STATE_LABELS: Readonly<Record<EpisodeCollaboration["state"], string>> = {
@@ -113,14 +114,14 @@ const EPISODE_STATE_LABELS: Readonly<Record<EpisodeCollaboration["state"], strin
   "art-clarification": "작화 질문",
   thumbnailing: "콘티 제작",
   "thumbnail-joint-review": "공동 콘티 검수",
-  "thumbnail-locked": "콘티 잠금",
+  "thumbnail-locked": "콘티 확정",
   "final-art-production": "최종 작화",
   "lettering-and-integration": "식자·통합",
   "joint-proof": "공동 교정",
-  "publish-ready": "게시 준비",
-  published: "게시됨",
+  "publish-ready": "공개 준비",
+  published: "공개됨",
   blocked: "차단",
-  "paused-health": "건강 휴지",
+  "paused-health": "건강 사유 휴식",
   "paused-contract": "계약 보류",
   "change-request-open": "변경 검토",
   "creator-replacement": "창작자 교체",
@@ -422,40 +423,40 @@ export function ProductionLandingPage() {
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
-            <span>ToonSpectrum</span><span aria-hidden="true">/</span><span>Production OS</span>
+            <span>ToonStudio</span><span aria-hidden="true">/</span><span>웹툰 제작 관리</span>
           </div>
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
-                이야기의 의도부터 작화·계약·승인본까지 한 계보로
+                흩어진 웹툰 제작을 하나의 흐름으로
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-                스토리 작가와 그림 작가가 각자의 정본과 결정권을 유지하면서, StoryLock·인수인계·콘티 잠금·공동 교정·크레딧을 연결합니다.
+                기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link className={buttonClass({ size: "lg" })} to={`/production/projects/${demo.projectId}/overview`}>
-                  샘플 프로젝트 열기 <ArrowRight className="size-4" aria-hidden="true" />
+                  기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio">
-                  ToonStudio로 이동
+                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio/projects">
+                  내 프로젝트 열기
                 </Link>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Metric label="협업 정본" value="3" detail="서사·시각·통합 lineage" icon={GitBranch} tone="accent" />
-              <Metric label="승인 게이트" value="4" detail="Story · Handoff · Thumbnail · Proof" icon={LockKeyhole} tone="success" />
-              <Metric label="권한 영역" value="11" detail="항목별 제안·승인·veto" icon={ShieldCheck} />
-              <Metric label="추적 범위" value="100%" detail="회차에서 계약·크레딧까지" icon={FileKey2} tone="warning" />
+              <Metric label="작업 기준" value="3" detail="스토리·그림·최종본 연결" icon={GitBranch} tone="accent" />
+              <Metric label="확인 단계" value="4" detail="기획 · 넘기기 · 콘티 · 최종 검수" icon={LockKeyhole} tone="success" />
+              <Metric label="역할·권한" value="11" detail="항목별 제안·승인·거부 권한" icon={ShieldCheck} />
+              <Metric label="연결 범위" value="100%" detail="회차부터 계약·크레딧까지" icon={FileKey2} tone="warning" />
             </div>
           </div>
         </header>
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { icon: BookOpenText, title: "기획 정본", text: "작품·시즌·회차 의도와 Storyworld 제약을 revision으로 고정합니다." },
-            { icon: Handshake, title: "작가 간 인수인계", text: "보존·의도·제안·작가 선택을 분리하고 질문을 차단 조건으로 관리합니다." },
-            { icon: ClipboardCheck, title: "역할별 검수", text: "서사·시각·제작·권리 lane별 quorum과 veto를 적용합니다." },
-            { icon: Scale, title: "크레딧·권리·보상", text: "실제 기여와 계약을 섞지 않고 게시 직전 일치 여부를 검사합니다." },
+            { icon: BookOpenText, title: "기획·회차", text: "작품 목표와 세계관, 시즌·회차별 기준을 최신 버전으로 정리합니다." },
+            { icon: Handshake, title: "작업 넘기기", text: "다음 작업자가 꼭 지킬 내용, 자유롭게 바꿀 부분과 질문을 분명히 나눕니다." },
+            { icon: ClipboardCheck, title: "검수·수정", text: "스토리·그림·제작·권리별 필수 승인과 수정 요청을 파일에 연결합니다." },
+            { icon: Scale, title: "계약·정산", text: "기여 기록, 공개 크레딧, 사용 권리와 보상 기준을 따로 정확히 관리합니다." },
           ].map(({ icon: Icon, title, text }) => (
             <article key={title} className="rounded-2xl border border-line bg-card p-5">
               <Icon className="size-5 text-accent" aria-hidden="true" />
@@ -467,7 +468,7 @@ export function ProductionLandingPage() {
 
         <SectionCard className="mt-6" title="현재 제작 흐름" description="한 화면에서 단계별 상태와 다음 결정자를 확인합니다.">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-            {["StoryLock", "인수인계", "콘티", "최종 작화", "공동 교정", "게시본"].map((label, index) => (
+            {["기획 확정", "작업 넘기기", "콘티", "최종 원고", "검수·수정", "내보내기"].map((label, index) => (
               <div key={label} className="relative rounded-xl border border-line bg-panel p-3">
                 <p className="text-[0.6875rem] font-bold text-accent">{String(index + 1).padStart(2, "0")}</p>
                 <p className="mt-1 text-sm font-semibold text-fg">{label}</p>
@@ -501,9 +502,9 @@ function ProjectHeader({
       <div className="mx-auto flex max-w-[100rem] flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Link className="text-xs font-bold uppercase tracking-[0.12em] text-accent" to="/production">Production</Link>
+            <Link className="text-xs font-bold tracking-[0.08em] text-accent" to="/production">제작 관리</Link>
             <span className="text-fg-3" aria-hidden="true">/</span>
-            <Pill tone={isDemo ? "warning" : "success"}>{isDemo ? "샘플 데이터" : "서버 정본"}</Pill>
+            <Pill tone={isDemo ? "warning" : "success"}>{isDemo ? "기능 미리보기" : "실제 프로젝트"}</Pill>
             <Pill>{access.role ?? "읽기 전용"}</Pill>
           </div>
           <h1 className="mt-1 truncate text-xl font-black tracking-tight text-fg">{aggregate.title}</h1>
@@ -511,7 +512,7 @@ function ProjectHeader({
         <div className="flex flex-wrap items-center gap-2">
           <ProductionCommandPalette aggregate={aggregate} />
           <label className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">
-            <span>역할 관점</span>
+            <span>내 역할</span>
             <select
               className="bg-transparent font-semibold text-fg outline-none"
               value={roleLens}
@@ -526,7 +527,7 @@ function ProjectHeader({
             {saveState === "saving" ? "저장 중…" : saveState === "saved" ? "저장됨" : saveState === "error" ? "저장 실패" : `r${aggregate.revision}`}
           </span>
           <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`/studio/work/${encodeURIComponent(aggregate.workId)}/canvas`}>
-            Studio에서 열기
+            원고 작업 열기
           </Link>
         </div>
       </div>
@@ -538,18 +539,22 @@ function ProjectNav({ projectId, surface }: { readonly projectId: string; readon
   return (
     <nav aria-label="프로젝트 메뉴" className="overflow-x-auto border-b border-line bg-panel lg:sticky lg:top-0 lg:h-[calc(100dvh-0px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
       <div className="flex min-w-max gap-1 p-2 lg:min-w-0 lg:flex-col lg:p-3">
-        {SURFACES.map(({ id, label, icon: Icon }) => (
+        {SURFACES.map(({ id, label, description, icon: Icon }) => (
           <Link
             key={id}
             to={`/production/projects/${encodeURIComponent(projectId)}/${id}`}
             aria-current={surface === id ? "page" : undefined}
+            title={`${label} · ${description}`}
             className={cn(
-              "flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors",
+              "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors lg:min-h-[3.75rem]",
               surface === id ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
             )}
           >
-            <Icon className="size-4" aria-hidden="true" />
-            {label}
+            <Icon className="size-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block whitespace-nowrap">{label}</span>
+              <span className="mt-0.5 hidden truncate text-[0.6875rem] font-normal text-fg-3 lg:block">{description}</span>
+            </span>
           </Link>
         ))}
       </div>
@@ -564,17 +569,17 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
   const dueTasks = [...aggregate.tasks].filter((task) => task.dueAt && !["done", "cancelled", "out-of-scope"].includes(task.status));
   const nextEpisode = activeEpisodes[0];
   const roleCopy = {
-    story: "그림 작가 질문과 서사 승인 요청을 먼저 보여 줍니다.",
-    art: "승인된 입력 revision과 차단 질문, 담당 산출물을 먼저 보여 줍니다.",
-    producer: "일정·승인·발주·계약 위험을 먼저 보여 줍니다.",
+    story: "그림 작업에서 온 질문과 스토리 확인 요청을 먼저 보여 줍니다.",
+    art: "승인된 작업 버전과 막힌 질문, 내가 맡은 결과물을 먼저 보여 줍니다.",
+    producer: "일정·승인·외주·계약에서 확인할 일을 먼저 보여 줍니다.",
   }[roleLens];
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="진행 회차" value={String(activeEpisodes.length)} detail={nextEpisode ? `${nextEpisode.episodeId} · ${EPISODE_STATE_LABELS[nextEpisode.state]}` : "진행 회차 없음"} icon={PanelTopOpen} tone="accent" />
-        <Metric label="차단 질문" value={String(blockers.length)} detail={blockers.length > 0 ? "답변 전 작화 시작 불가" : "인수인계 차단 없음"} icon={MessageCircleQuestion} tone={blockers.length > 0 ? "danger" : "success"} />
+        <Metric label="막힌 질문" value={String(blockers.length)} detail={blockers.length > 0 ? "답변 전 다음 작업 진행 불가" : "막힌 질문 없음"} icon={MessageCircleQuestion} tone={blockers.length > 0 ? "danger" : "success"} />
         <Metric label="열린 작업" value={String(dueTasks.length)} detail={`${dueTasks.filter((task) => task.status === "blocked").length}개 차단`} icon={FolderKanban} tone="warning" />
-        <Metric label="발주 패키지" value={String(aggregate.scopePackages.length)} detail="불변 범위·완료 기준 포함" icon={PackageCheck} />
+        <Metric label="외주 요청" value={String(aggregate.scopePackages.length)} detail="의뢰 범위·완료 기준 포함" icon={PackageCheck} />
       </div>
 
       <div className="rounded-2xl border border-accent/30 bg-accent-soft p-4">
@@ -588,7 +593,7 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard title="회차 흐름" description="정본 잠금과 공동 승인 상태를 회차 단위로 확인합니다.">
+        <SectionCard title="회차 흐름" description="확정된 작업과 함께 확인할 상태를 회차별로 봅니다.">
           <div className="space-y-2">
             {aggregate.episodes.map((episode) => (
               <Link
@@ -603,14 +608,14 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold text-fg">{episode.episodeId}</p>
                     <Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>
-                    {episode.openBlockerCount > 0 ? <Pill tone="danger">blocker {episode.openBlockerCount}</Pill> : null}
+                    {episode.openBlockerCount > 0 ? <Pill tone="danger">막힘 {episode.openBlockerCount}</Pill> : null}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5 text-[0.6875rem] text-fg-3">
-                    <span>Story {episode.storyLockApproved ? "✓" : "—"}</span>
+                    <span>스토리 {episode.storyLockApproved ? "✓" : "—"}</span>
                     <span>·</span>
-                    <span>Thumbnail {episode.thumbnailLockApproved ? "✓" : "—"}</span>
+                    <span>콘티 {episode.thumbnailLockApproved ? "✓" : "—"}</span>
                     <span>·</span>
-                    <span>Proof {episode.jointProofApproved ? "✓" : "—"}</span>
+                    <span>최종 검수 {episode.jointProofApproved ? "✓" : "—"}</span>
                   </div>
                 </div>
                 <ChevronRight className="size-4 text-fg-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
@@ -619,7 +624,7 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
           </div>
         </SectionCard>
 
-        <SectionCard title="다음 결정" description="취향이 아니라 명시된 authority와 승인 정책에 따라 정렬합니다.">
+        <SectionCard title="다음 확인" description="내 역할과 필수 승인 순서에 따라 지금 확인할 일을 보여 줍니다.">
           <div className="space-y-3">
             {blockers.map((thread) => (
               <div key={thread.id} className="rounded-xl border border-bad/30 bg-bad/10 p-3">
@@ -633,7 +638,7 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
         </SectionCard>
       </div>
 
-      <SectionCard title="최근 프로젝트 활동" description="승인·권리·보상과 같은 중요한 변경은 append-only 원장으로 보존됩니다.">
+      <SectionCard title="최근 프로젝트 활동" description="승인·권리·보상의 중요한 변경은 수정할 수 없는 기록으로 남깁니다.">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {[...aggregate.auditEvents].reverse().slice(0, 6).map((event) => (
             <div key={event.id} className="rounded-xl border border-line bg-panel p-3">
@@ -670,14 +675,14 @@ function PlanningSurface({
     <div className="space-y-4">
       <ProductionVisualPlanningWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="기획 기준선" value={brief ? `r${brief.revision}` : "—"} detail={brief?.status ?? "Project Brief 없음"} icon={ScrollText} tone={brief?.status === "approved" ? "success" : "warning"} />
+        <Metric label="기획 기준선" value={brief ? `r${brief.revision}` : "—"} detail={brief?.status ?? "작품 한눈에 보기 없음"} icon={ScrollText} tone={brief?.status === "approved" ? "success" : "warning"} />
         <Metric label="회차 계획" value={String(currentEpisodePlans.length)} detail={`${currentScenePlans.length} scenes · ${currentCutPlans.length} cuts`} icon={PanelTopOpen} tone="accent" />
         <Metric label="에셋 요구" value={String(aggregate.assetRequirements.length)} detail={`${aggregate.assetRequirements.filter((entry) => entry.status === "blocked").length}개 차단`} icon={Boxes} />
         <Metric label="열린 위험" value={String(openRisks.length)} detail={`${openRisks.filter((entry) => entry.probability * entry.impact >= 12).length}개 고위험`} icon={AlertTriangle} tone={openRisks.some((entry) => entry.probability * entry.impact >= 12) ? "danger" : "neutral"} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <SectionCard title="Project Brief" description="작품의 목적·대상·플랫폼·제약을 승인 revision으로 고정합니다.">
+        <SectionCard title="작품 한눈에 보기" description="작품 목표·독자·공개 플랫폼·제약을 확인된 최신 버전으로 정리합니다.">
           {brief ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-accent/30 bg-accent-soft p-4">
@@ -691,20 +696,20 @@ function PlanningSurface({
                 <div className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">사업·제약</p><p className="mt-2 text-xs leading-5 text-fg-2">{[...brief.businessGoals, ...brief.constraints].join(" · ")}</p></div>
               </div>
             </div>
-          ) : <EmptyState title="Project Brief가 없습니다" description="로그라인, 독자, 플랫폼, 권리 기준을 정의해 주세요." />}
+          ) : <EmptyState title="작품 요약이 없습니다" description="한 줄 소개, 독자, 공개 플랫폼과 권리 기준을 먼저 정해 주세요." />}
         </SectionCard>
 
-        <SectionCard title="Series Master" description="작품 전체에 공유되는 세계·캐릭터·스타일 규칙입니다.">
+        <SectionCard title="작품 공통 설정" description="모든 회차가 함께 쓰는 세계·캐릭터·그림 스타일 기준입니다.">
           {seriesMaster ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">Premise</p><p className="mt-1 text-sm font-semibold leading-6 text-fg">{seriesMaster.premise}</p></div><Pill tone="success">{seriesMaster.status} r{seriesMaster.revision}</Pill></div>
+              <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">작품 핵심</p><p className="mt-1 text-sm font-semibold leading-6 text-fg">{seriesMaster.premise}</p></div><Pill tone="success">{seriesMaster.status} r{seriesMaster.revision}</Pill></div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">세계 규칙</p><ul className="mt-2 space-y-1 text-xs leading-5 text-fg-2">{seriesMaster.worldRules.map((entry) => <li key={entry}>• {entry}</li>)}</ul></div>
                 <div className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">시각 규칙</p><ul className="mt-2 space-y-1 text-xs leading-5 text-fg-2">{seriesMaster.styleRules.map((entry) => <li key={entry}>• {entry}</li>)}</ul></div>
               </div>
               {seriesMaster.forbiddenElements.length ? <div className="rounded-xl border border-bad/30 bg-bad/10 p-3"><p className="text-xs font-bold text-fg">금지 요소</p><p className="mt-1 text-xs leading-5 text-fg-2">{seriesMaster.forbiddenElements.join(" · ")}</p></div> : null}
             </div>
-          ) : <EmptyState title="Series Master가 없습니다" description="캐릭터·장소·세계 규칙과 스타일 기준을 한 revision으로 관리하세요." />}
+          ) : <EmptyState title="작품 공통 설정이 없습니다" description="캐릭터·장소·세계 규칙과 그림 기준을 하나의 최신 버전으로 정리하세요." />}
         </SectionCard>
       </div>
 
@@ -726,17 +731,17 @@ function PlanningSurface({
       </SectionCard>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <SectionCard title="Creative Charter" description="작품 기준과 각 작가의 자율 영역을 계약·권한과 분리해 합의합니다.">
+        <SectionCard title="창작 합의" description="함께 지킬 작품 기준과 각 창작자가 자유롭게 결정할 부분을 합의합니다.">
           {charter ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-accent/30 bg-accent-soft p-4"><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">Core Experience</p><p className="mt-2 text-sm font-semibold leading-6 text-fg">{charter.coreExperience}</p></div>
               <div className="grid gap-2 md:grid-cols-2">{[["스토리 자율", charter.storyAutonomy], ["작화 자율", charter.artAutonomy], ["공동 결정", charter.jointDecisionAreas], ["피드백 원칙", charter.feedbackPrinciples]].map(([label, items]) => <div key={label as string} className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">{label as string}</p><ul className="mt-2 space-y-1 text-xs leading-5 text-fg-2">{(items as readonly string[]).map((item) => <li key={item}>• {item}</li>)}</ul></div>)}</div>
             </div>
-          ) : <EmptyState title="Creative Charter가 없습니다" description="창작자 간 자율·공동 결정·피드백 원칙을 합의해 주세요." />}
+          ) : <EmptyState title="창작 합의가 없습니다" description="자율 영역, 함께 결정할 내용과 피드백 원칙을 합의해 주세요." />}
         </SectionCard>
 
         <SectionCard title="창작 결정권 매트릭스" description="프로젝트 관리자 권한과 창작 최종결정권을 분리합니다.">
-          <div className="overflow-x-auto"><table className="w-full min-w-[38rem] border-separate border-spacing-y-1 text-left text-xs"><thead className="text-fg-3"><tr><th className="px-3 py-2">항목</th><th className="px-3 py-2">제안</th><th className="px-3 py-2">승인</th><th className="px-3 py-2">최종 결정</th><th className="px-3 py-2">veto</th></tr></thead><tbody>{domains.map((domain) => { const rule = aggregate.authorityRules.find((entry) => entry.domain === domain); return <tr key={domain} className="bg-panel text-fg-2"><td className="rounded-l-xl px-3 py-2.5 font-semibold text-fg">{domain}</td><td className="px-3 py-2.5">{rule?.proposerAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "—"}</td><td className="px-3 py-2.5">{rule?.requiredApproverAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "—"}</td><td className="px-3 py-2.5">{rule?.decisionAssignmentId ? assignmentLabel(aggregate, rule.decisionAssignmentId) : "공동"}</td><td className="rounded-r-xl px-3 py-2.5">{rule?.vetoAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "없음"}</td></tr>; })}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[38rem] border-separate border-spacing-y-1 text-left text-xs"><thead className="text-fg-3"><tr><th className="px-3 py-2">항목</th><th className="px-3 py-2">제안</th><th className="px-3 py-2">승인</th><th className="px-3 py-2">최종 결정</th><th className="px-3 py-2">거부 권한</th></tr></thead><tbody>{domains.map((domain) => { const rule = aggregate.authorityRules.find((entry) => entry.domain === domain); return <tr key={domain} className="bg-panel text-fg-2"><td className="rounded-l-xl px-3 py-2.5 font-semibold text-fg">{domain}</td><td className="px-3 py-2.5">{rule?.proposerAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "—"}</td><td className="px-3 py-2.5">{rule?.requiredApproverAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "—"}</td><td className="px-3 py-2.5">{rule?.decisionAssignmentId ? assignmentLabel(aggregate, rule.decisionAssignmentId) : "공동"}</td><td className="rounded-r-xl px-3 py-2.5">{rule?.vetoAssignmentIds.map((id) => assignmentLabel(aggregate, id)).join(", ") || "없음"}</td></tr>; })}</tbody></table></div>
         </SectionCard>
       </div>
 
@@ -752,7 +757,7 @@ function PlanningSurface({
   );
 }
 function EpisodesSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
-  const stages = ["Story", "Handoff", "Thumbnail", "Art", "Proof", "Publish"] as const;
+  const stages = ["스토리", "작업 넘기기", "콘티", "작화", "최종 검수", "공개 준비"] as const;
   return (
     <SectionCard title="회차 공정 매트릭스" description="상태 셀을 누르면 해당 회차의 공동 작업실로 이동합니다.">
       <div className="overflow-x-auto">
@@ -851,7 +856,7 @@ function HandoffSurface({
   readonly canEdit: boolean;
 }) {
   const handoff = aggregate.handoffs.find((entry) => !["superseded", "cancelled"].includes(entry.status));
-  if (!handoff) return <EmptyState title="활성 인수인계가 없습니다" description="StoryLock 승인 후 회차 의도와 참조 revision을 묶어 작화팀에 전달하세요." />;
+  if (!handoff) return <EmptyState title="넘길 작업이 없습니다" description="스토리 확정 후 회차 의도와 참고 파일을 묶어 다음 작업자에게 전달하세요." />;
   const clarifications = aggregate.clarifications.filter((entry) => entry.handoffId === handoff.id);
   const readiness = evaluateHandoffReadiness({ package: handoff, clarifications });
   const answerFirstBlocking = async () => {
@@ -868,7 +873,7 @@ function HandoffSurface({
   };
   return (
     <div className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
-      <SectionCard title="인수인계 준비도" description="점수와 무관하게 hard gate가 하나라도 남으면 작화 수락이 차단됩니다.">
+      <SectionCard title="작업 넘기기 준비도" description="필수 확인 항목이 하나라도 남으면 다음 작업을 시작할 수 없습니다.">
         <div className="flex items-end justify-between gap-4 rounded-xl border border-line bg-panel p-4">
           <div><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-fg-3">Readiness</p><p className="mt-1 text-4xl font-black text-fg">{readiness.score}<span className="text-base text-fg-3">/100</span></p></div>
           <Pill tone={readiness.ready ? "success" : "danger"}>{readiness.ready ? "작화 수락 가능" : `${readiness.hardBlocks.length}개 차단`}</Pill>
@@ -885,7 +890,7 @@ function HandoffSurface({
       </SectionCard>
 
       <div className="space-y-4">
-        <SectionCard title={`Story → Art · ${handoff.episodeId}`} description={`Story ${handoff.storyLockRef ? `r${handoff.storyLockRef.revision}` : "미잠금"} · Handoff r${handoff.handoffRevision} · ${handoff.status}`}>
+        <SectionCard title={`스토리 → 작화 · ${handoff.episodeId}`} description={`스토리 ${handoff.storyLockRef ? `버전 ${handoff.storyLockRef.revision}` : "미확정"} · 넘기기 버전 ${handoff.handoffRevision} · ${handoff.status}`}>
           <div className="grid gap-3 md:grid-cols-2">
             {[
               ["반드시 보존", handoff.instructions.filter((entry) => entry.priority === "MUST_PRESERVE")],
@@ -916,7 +921,7 @@ function HandoffSurface({
           <div className="space-y-2">
             {clarifications.map((thread) => (
               <article key={thread.id} className={cn("rounded-xl border p-3", thread.blocking && thread.status === "open" ? "border-bad/30 bg-bad/10" : "border-line bg-panel")}>
-                <div className="flex flex-wrap items-center gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? "BLOCKER" : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
+                <div className="flex flex-wrap items-center gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? "진행 막힘" : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
                 <p className="mt-2 text-sm font-semibold text-fg">{thread.question}</p>
                 {thread.answer ? <p className="mt-2 rounded-lg bg-raised p-2.5 text-xs leading-5 text-fg-2">결정: {thread.answer}</p> : null}
                 <p className="mt-2 text-[0.6875rem] text-fg-3">질문 {assignmentLabel(aggregate, thread.askedByAssignmentId)} → 답변 {assignmentLabel(aggregate, thread.answerOwnerAssignmentId)}</p>
@@ -944,7 +949,7 @@ function ReviewSurface({
   if (!policy) return (
     <div className="space-y-4">
       <ProductionReviewWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />
-      <EmptyState title="검수 정책이 없습니다" description="서사·시각·제작·권리 lane과 quorum을 설정하세요." />
+      <EmptyState title="검수 기준이 없습니다" description="스토리·그림·제작·권리별 검수 항목과 필수 승인 수를 정하세요." />
     </div>
   );
   const roundId = aggregate.reviewDecisions[0]?.reviewRoundId ?? "active-round";
@@ -954,7 +959,7 @@ function ReviewSurface({
     <div className="space-y-4">
       <ProductionReviewWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label="검수 lane" value={String(policy.lanes.length)} detail="역할별 독립 승인" icon={Layers3} />
+        <Metric label="검수 항목" value={String(policy.lanes.length)} detail="역할별 독립 승인" icon={Layers3} />
         <Metric label="승인 완료" value={String(evaluation.laneResults.filter((entry) => entry.approved).length)} detail={`${policy.lanes.length}개 중`} icon={BadgeCheck} tone={evaluation.approved ? "success" : "warning"} />
         <Metric label="게시 차단" value={String(evaluation.blockingLanes.length)} detail={evaluation.blockingLanes.join(", ") || "없음"} icon={LockKeyhole} tone={evaluation.blockingLanes.length ? "danger" : "success"} />
       </div>
@@ -965,12 +970,12 @@ function ReviewSurface({
               <div className="flex items-center justify-between"><span className="text-fg-2">상태</span><Pill tone={result.approved ? "success" : "warning"}>{result.approved ? "승인" : "대기"}</Pill></div>
               <div className="flex items-center justify-between"><span className="text-fg-2">필수 승인 누락</span><span className="font-semibold text-fg">{result.missingRequiredAssignmentIds.length}</span></div>
               <div className="flex items-center justify-between"><span className="text-fg-2">변경 요청</span><span className="font-semibold text-fg">{result.changeRequestedByAssignmentIds.length}</span></div>
-              <div className="flex items-center justify-between"><span className="text-fg-2">veto</span><span className="font-semibold text-fg">{result.vetoedByAssignmentIds.length}</span></div>
+              <div className="flex items-center justify-between"><span className="text-fg-2">거부</span><span className="font-semibold text-fg">{result.vetoedByAssignmentIds.length}</span></div>
             </div>
           </SectionCard>
         ))}
       </div>
-      <SectionCard title="검수 근거" description="Required change와 veto는 승인된 의도·canon·규격·권리 조건 중 하나를 근거로 해야 합니다.">
+      <SectionCard title="검수 근거" description="필수 수정과 거부 결정은 확정된 의도·설정·규격·권리 조건을 근거로 남겨야 합니다.">
         <div className="space-y-2">
           {decisions.map((decision) => (
             <div key={decision.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel p-3 text-xs">
@@ -1022,7 +1027,7 @@ function ProcurementSurface({ aggregate }: { readonly aggregate: ProductionProje
       })}
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <SectionCard title="계약·마일스톤" description="제안서와 발주 범위 revision을 계약 정본에 고정합니다.">
+        <SectionCard title="계약·마일스톤" description="선택한 제안과 외주 범위 버전을 계약 내용으로 확정합니다.">
           <div className="space-y-3">
             {activeAgreements.map((agreement) => {
               const milestones = aggregate.contractMilestones.filter((entry) => entry.agreementId === agreement.id).sort((a, b) => a.sequence - b.sequence);
@@ -1061,13 +1066,13 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
   const plan = aggregate.compensationPlans[0];
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <SectionCard title="Credit Manifest" description="실제 게시 후보 revision과 공개 크레딧을 함께 동결합니다.">
+      <SectionCard title="Credit Manifest" description="실제로 공개할 파일 버전과 공개 크레딧을 함께 확정합니다.">
         {manifest ? <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">상태</p><p className="mt-1 font-bold text-fg">{manifest.status} · r{manifest.revision}</p></div><Pill tone={preflight.passed ? "success" : "warning"}>{preflight.passed ? "게시 일치" : `${preflight.blockers.length} blocker`}</Pill></div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">상태</p><p className="mt-1 font-bold text-fg">{manifest.status} · r{manifest.revision}</p></div><Pill tone={preflight.passed ? "success" : "warning"}>{preflight.passed ? "공개 준비 완료" : `막힌 항목 ${preflight.blockers.length}`}</Pill></div>
           {[...manifest.entries].sort((a, b) => a.order - b.order).map((entry) => <div key={entry.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3"><div className="flex size-9 items-center justify-center rounded-full bg-raised font-black text-accent">{entry.order}</div><div><p className="text-sm font-semibold text-fg">{entry.publicName}</p><p className="text-xs text-fg-2">{entry.roleLabel} · {entry.media.join(", ")}</p></div></div>)}
           {preflight.blockers.map((entry) => <p key={entry} className="rounded-xl border border-bad/30 bg-bad/10 p-3 text-xs text-fg">{entry}</p>)}
           {preflight.warnings.map((entry) => <p key={entry} className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-fg">{entry}</p>)}
-        </div> : <EmptyState title="크레딧 manifest가 없습니다" description="기여 기록과 계약 revision을 근거로 작성하세요." />}
+        </div> : <EmptyState title="공개 크레딧 목록이 없습니다" description="기여 기록과 계약 버전을 근거로 작성하세요." />}
       </SectionCard>
 
       <SectionCard title="권리·동의 원장" description="AI 처리 동의와 AI 학습 동의를 별도 권리 항목으로 보존합니다.">
@@ -1083,7 +1088,7 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
         </div>
       </SectionCard>
 
-      <SectionCard className="xl:col-span-2" title="보상·수익 배분" description="기여 기록은 배분율을 자동 변경하지 않으며 계약 revision으로만 확정됩니다.">
+      <SectionCard className="xl:col-span-2" title="보상·수익 배분" description="기여 기록만으로 배분율이 바뀌지 않으며, 계약 버전에서만 확정됩니다.">
         {plan ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {plan.revenueShareRules.map((rule) => (
             <div key={rule.id} className="rounded-xl border border-line bg-panel p-3">
@@ -1094,7 +1099,7 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
               {rule.deductions.length ? <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">공제: {rule.deductions.join(", ")}</p> : null}
             </div>
           ))}
-        </div> : <EmptyState title="활성 보상 계획이 없습니다" description="고정 대가와 수익원별 배분 기준을 계약 revision에 연결하세요." />}
+        </div> : <EmptyState title="활성 보상 계획이 없습니다" description="고정 대가와 수익원별 배분 기준을 계약 버전에 연결하세요." />}
       </SectionCard>
     </div>
   );
@@ -1169,12 +1174,12 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
 
   if (!projectId) return <Navigate to="/production" replace />;
   if (project.loading) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></main>;
-  if (project.error || !project.aggregate) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">프로덕션 홈</Link></div></main>;
+  if (project.error || !project.aggregate) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">제작 관리 홈</Link></div></main>;
 
   return (
     <main className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={project.aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
-      <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[13rem_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
@@ -1224,12 +1229,12 @@ export function ProductionEpisodeRoomPage() {
     aggregate.parties.find((party) => party.id === assignment.partyId)?.accountUserId === userId);
 
   const pipeline = [
-    { label: "StoryLock", done: episode.storyLockApproved, active: episode.state.startsWith("story") },
-    { label: "Handoff", done: Boolean(episode.activeHandoffId), active: episode.state === "art-clarification" },
-    { label: "Thumbnail", done: episode.thumbnailLockApproved, active: episode.state.includes("thumbnail") },
-    { label: "Final Art", done: Boolean(episode.visualRevisionRef) && episode.thumbnailLockApproved, active: episode.state === "final-art-production" },
-    { label: "Joint Proof", done: episode.jointProofApproved, active: episode.state === "joint-proof" },
-    { label: "Publish", done: episode.state === "published", active: episode.state === "publish-ready" },
+    { label: "스토리 확정", done: episode.storyLockApproved, active: episode.state.startsWith("story") },
+    { label: "작업 넘기기", done: Boolean(episode.activeHandoffId), active: episode.state === "art-clarification" },
+    { label: "콘티", done: episode.thumbnailLockApproved, active: episode.state.includes("thumbnail") },
+    { label: "최종 원고", done: Boolean(episode.visualRevisionRef) && episode.thumbnailLockApproved, active: episode.state === "final-art-production" },
+    { label: "최종 검수", done: episode.jointProofApproved, active: episode.state === "joint-proof" },
+    { label: "공개 준비", done: episode.state === "published", active: episode.state === "publish-ready" },
   ];
 
   const answerBlocker = async (thread: ClarificationThread) => {
@@ -1271,8 +1276,8 @@ export function ProductionEpisodeRoomPage() {
       <div className="border-b border-line bg-card px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-[100rem]">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><Link className="text-xs font-semibold text-fg-3 hover:text-accent" to={`/production/projects/${aggregate.projectId}/episodes`}>← 회차 목록</Link><h1 className="mt-1 text-2xl font-black text-fg">{episode.episodeId} 공동 Episode Room</h1></div>
-            <div className="flex items-center gap-2"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? "success" : "danger"}>Handoff {readiness.score}</Pill> : null}</div>
+            <div><Link className="text-xs font-semibold text-fg-3 hover:text-accent" to={`/production/projects/${aggregate.projectId}/episodes`}>← 회차 목록</Link><h1 className="mt-1 text-2xl font-black text-fg">{episode.episodeId} 공동 회차 작업실</h1></div>
+            <div className="flex items-center gap-2"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? "success" : "danger"}>넘기기 준비도 {readiness.score}</Pill> : null}</div>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">{pipeline.map((step) => <TimelineStep key={step.label} {...step} />)}</div>
         </div>
@@ -1280,8 +1285,8 @@ export function ProductionEpisodeRoomPage() {
 
       <div className="mx-auto grid max-w-[100rem] gap-4 p-4 sm:p-6 xl:grid-cols-[0.8fr_1.25fr_0.95fr]">
         <div className="space-y-4">
-          <SectionCard title="Story Intent" description={`${storyParty?.publicDisplayName ?? "스토리 작가"} · ${episode.narrativeRevisionRef ? `r${episode.narrativeRevisionRef.revision}` : "초안"}`}>
-            <div className="rounded-xl border border-accent/30 bg-accent-soft p-3"><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">Audience Experience</p><p className="mt-2 text-sm font-semibold leading-6 text-fg">독자가 주인공의 선택을 이해한 직후, 봉투의 정체가 그 선택을 뒤집는다는 사실을 깨닫는다.</p></div>
+          <SectionCard title="스토리 의도" description={`${storyParty?.publicDisplayName ?? "스토리 작가"} · ${episode.narrativeRevisionRef ? `r${episode.narrativeRevisionRef.revision}` : "초안"}`}>
+            <div className="rounded-xl border border-accent/30 bg-accent-soft p-3"><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">독자 경험</p><p className="mt-2 text-sm font-semibold leading-6 text-fg">독자가 주인공의 선택을 이해한 직후, 봉투의 정체가 그 선택을 뒤집는다는 사실을 깨닫는다.</p></div>
             <dl className="mt-3 space-y-2 text-xs">
               <div className="flex justify-between gap-3 rounded-lg bg-panel p-2.5"><dt className="text-fg-3">오프닝</dt><dd className="text-right text-fg">빈 우편함과 젖은 손</dd></div>
               <div className="flex justify-between gap-3 rounded-lg bg-panel p-2.5"><dt className="text-fg-3">감정 전환</dt><dd className="text-right text-fg">경계 → 안도 → 의심</dd></div>
@@ -1293,14 +1298,14 @@ export function ProductionEpisodeRoomPage() {
             <div className="space-y-2">
               {handoff?.instructions.map((instruction) => (
                 <div key={instruction.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap gap-2"><Pill tone={instruction.priority === "MUST_PRESERVE" ? "danger" : instruction.priority === "ARTIST_CHOICE" ? "success" : "accent"}>{instruction.priority}</Pill><Pill>{instruction.latitude}</Pill></div><p className="mt-2 text-xs leading-5 text-fg">{instruction.text}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{instruction.rationale}</p></div>
-              )) ?? <p className="text-xs text-fg-3">인수인계 지시가 없습니다.</p>}
+              )) ?? <p className="text-xs text-fg-3">넘길 작업 지시가 없습니다.</p>}
             </div>
           </SectionCard>
         </div>
 
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-3">
-            <div><p className="text-xs font-black text-fg">시각 작업대</p><p className="mt-1 text-[0.6875rem] text-fg-3">{artParty?.publicDisplayName ?? "그림 작가"} · {episode.visualRevisionRef ? `visual r${episode.visualRevisionRef.revision}` : "visual branch 없음"}</p></div>
+            <div><p className="text-xs font-black text-fg">시각 작업대</p><p className="mt-1 text-[0.6875rem] text-fg-3">{artParty?.publicDisplayName ?? "그림 작가"} · {episode.visualRevisionRef ? `그림 버전 ${episode.visualRevisionRef.revision}` : "그림 초안 없음"}</p></div>
             <Link className={buttonClass({ size: "sm" })} to={`/studio/work/${aggregate.workId}/comic`}>Studio 열기</Link>
           </div>
           <ProductionVisualPlanningWorkspace
@@ -1313,12 +1318,12 @@ export function ProductionEpisodeRoomPage() {
             defaultView="scroll"
           />
 
-          <SectionCard title="공동 검수" description="콘티와 스토리 정본의 차이를 lane별로 검수합니다." action={<button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => void approveVisualLane()} disabled={!project.access.edit}>시각 lane 승인</button>}>
+          <SectionCard title="공동 검수" description="콘티가 확정된 스토리 의도와 맞는지 항목별로 함께 확인합니다." action={<button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => void approveVisualLane()} disabled={!project.access.edit}>그림 연출 승인</button>}>
             <div className="grid gap-2 sm:grid-cols-3">
               {[
-                ["Narrative", aggregate.reviewDecisions.some((entry) => entry.lane === "narrative")],
-                ["Visual", aggregate.reviewDecisions.some((entry) => entry.lane === "visual-direction")],
-                ["Production", aggregate.reviewDecisions.some((entry) => entry.lane === "production")],
+                ["스토리", aggregate.reviewDecisions.some((entry) => entry.lane === "narrative")],
+                ["그림 연출", aggregate.reviewDecisions.some((entry) => entry.lane === "visual-direction")],
+                ["제작", aggregate.reviewDecisions.some((entry) => entry.lane === "production")],
               ].map(([label, approved]) => <div key={label as string} className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">{label as string}</p><div className="mt-2"><Pill tone={approved ? "success" : "warning"}>{approved ? "결정 기록됨" : "대기"}</Pill></div></div>)}
             </div>
           </SectionCard>
@@ -1329,7 +1334,7 @@ export function ProductionEpisodeRoomPage() {
             <div className="space-y-2">
               {clarifications.map((thread) => (
                 <article key={thread.id} className={cn("rounded-xl border p-3", thread.blocking && thread.status === "open" ? "border-bad/30 bg-bad/10" : "border-line bg-panel")}>
-                  <div className="flex flex-wrap gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? "BLOCKER" : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
+                  <div className="flex flex-wrap gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? "진행 막힘" : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
                   <p className="mt-2 text-xs font-semibold leading-5 text-fg">{thread.question}</p>
                   {thread.answer ? <p className="mt-2 rounded-lg bg-raised p-2 text-xs leading-5 text-fg-2">{thread.answer}</p> : null}
                   {thread.blocking && thread.status === "open" ? <button type="button" className={cn(buttonClass({ size: "sm" }), "mt-3 w-full")} onClick={() => void answerBlocker(thread)} disabled={!project.access.edit || (project.isDemo && roleLens !== "story") || (!project.isDemo && viewerAssignment?.id !== thread.answerOwnerAssignmentId)}>결정 기록</button> : null}
@@ -1338,11 +1343,11 @@ export function ProductionEpisodeRoomPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="영향·비용" description="StoryLock 이후 변경은 downstream 재작업과 계약 영향을 계산합니다.">
+          <SectionCard title="영향·비용" description="스토리 확정 뒤 생긴 변경이 이후 작업과 계약에 주는 영향을 계산합니다.">
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><span className="text-fg-2">승인 후 변경</span><span className="font-bold text-fg">2건</span></div>
               <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><span className="text-fg-2">재작업 예상</span><span className="font-bold text-warn">6–10h</span></div>
-              <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><span className="text-fg-2">계약 영향</span><Pill tone="warning">ChangeOrder 검토</Pill></div>
+              <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3"><span className="text-fg-2">계약 영향</span><Pill tone="warning">계약 변경 검토</Pill></div>
             </div>
           </SectionCard>
         </div>

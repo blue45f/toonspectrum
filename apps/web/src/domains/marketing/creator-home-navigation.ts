@@ -1,22 +1,28 @@
 /** Existing fragment IDs stay public; never interpret a URL fragment as a selector. */
 export const CREATOR_HOME_SECTIONS = [
-  { id: "creator-process-title", headingId: "creator-process-title", ko: "만드는 과정", en: "The workflow" },
-  { id: "creator-toolkit-title", headingId: "creator-toolkit-title", ko: "창작 도구", en: "Creative tools" },
-  { id: "creator-film", headingId: "creator-film-title", ko: "소개 영상", en: "Brand film" },
-  { id: "creator-faq-title", headingId: "creator-faq-title", ko: "자주 묻는 질문", en: "Questions" },
+  { id: "creator-toolkit-title", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
+  { id: "creator-process-title", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
+  { id: "creator-support-title", headingId: "creator-support-title", ko: "협업·도움", en: "People & help" },
+  { id: "creator-closing-title", headingId: "creator-closing-title", ko: "제작 시작", en: "Start production" },
 ] as const;
 
-const FLAGSHIP_SECTIONS = [
-  { id: "creator-desk-title", headingId: "creator-desk-title", ko: "한글 자료 검색", en: "Reference search" },
-  { id: "creator-offline-title", headingId: "creator-offline-title", ko: "오프라인 준비", en: "Offline preparation" },
+const LEGACY_SECTIONS = [
+  { id: "creator-film", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
+  { id: "creator-faq-title", headingId: "creator-support-title", ko: "협업·도움", en: "People & help" },
+  { id: "creator-desk-title", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
+  { id: "creator-offline-title", headingId: "creator-process-title", ko: "제작 순서", en: "Production flow" },
 ] as const;
+
+export type CreatorHomeSectionId =
+  | (typeof CREATOR_HOME_SECTIONS)[number]["id"]
+  | (typeof LEGACY_SECTIONS)[number]["id"];
 
 export function creatorSectionFromHash(hash: string) {
   if (!hash.startsWith("#") || hash.length > 128) return undefined;
   try {
     const id = decodeURIComponent(hash.slice(1));
     return CREATOR_HOME_SECTIONS.find((section) => section.id === id)
-      ?? FLAGSHIP_SECTIONS.find((section) => section.id === id);
+      ?? LEGACY_SECTIONS.find((section) => section.id === id);
   } catch { return undefined; }
 }
 
