@@ -14,6 +14,7 @@ on:
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
       - "apps/web/src/domains/creator/live/**"
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
+      - "apps/web/src/domains/creator/studio-router/**"
 
   push:
     branches: ["main"]
@@ -27,6 +28,7 @@ on:
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
       - "apps/web/src/domains/creator/live/**"
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
+      - "apps/web/src/domains/creator/studio-router/**"
   workflow_dispatch:
 
   workflow_call:
@@ -60,13 +62,23 @@ jobs:
           scripts/verify-studio-collaboration-entry.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/live/studio-crdt-room-binding.test.ts
+          apps/web/src/domains/creator/live/studio-live-client-identity.test.ts
           apps/web/src/domains/creator/live/studio-live-collaboration-transport.test.ts
+          apps/web/src/domains/creator/live/studio-live-jam-session.test.ts
+          apps/web/src/domains/creator/live/studio-live-page-lifecycle.test.ts
       - name: Lint focused collaboration changes
         run: >-
           pnpm exec eslint
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioCollaborationAccessRuntime.ts
+          apps/web/src/domains/creator/live/studio-live-client-identity.ts
+          apps/web/src/domains/creator/live/studio-live-client-identity.test.ts
+          apps/web/src/domains/creator/live/studio-live-jam-session.ts
+          apps/web/src/domains/creator/live/studio-live-jam-session.test.ts
+          apps/web/src/domains/creator/live/studio-live-page-lifecycle.ts
+          apps/web/src/domains/creator/live/studio-live-page-lifecycle.test.ts
+          apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx
           scripts/lib/studio-collaboration-preview-session.ts
           scripts/verify-studio-collaboration-entry.test.ts
           scripts/verify-studio-collaboration-sync.mts

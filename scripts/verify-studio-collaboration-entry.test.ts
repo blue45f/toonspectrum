@@ -24,11 +24,15 @@ describe("collaboration browser entry contract", () => {
     expect(source).not.toContain("pageA.goto(`${origin}/studio`,");
   });
 
-  it("keeps real canvas, room identity and bidirectional pixel convergence mandatory", () => {
+  it("keeps duplicate-tab identity isolation and bidirectional pixel convergence mandatory", () => {
     expect(source).toContain("Date.now() + 30_000");
     expect(source).toContain("canvas surface unavailable after 30 seconds at ${page.url()}");
     expect(source).not.toContain('canvas.waitFor({ state: "visible", timeout: 1 })');
-    expect(source).toContain("pageB.goto(roomUrl");
+    expect(source).toContain('context.waitForEvent("page")');
+    expect(source).toContain('window.open(url, "_blank")');
+    expect(source).not.toContain("pageB.goto(roomUrl");
+    expect(source).toContain('"duplicated tab reused the source client instance id"');
+    expect(source).toContain("\"duplicated tab retained the source tab's room-owner receipt\"");
     expect(source).toContain("pageC.goto(roomUrl");
     expect(source).toContain('waitForCanvasChange(pageB, blankB, "A -> B remote stroke")');
     expect(source).toContain('waitForCanvasChange(pageA, beforeSecondA, "B -> A remote stroke")');

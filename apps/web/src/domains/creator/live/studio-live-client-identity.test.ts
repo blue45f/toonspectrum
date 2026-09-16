@@ -75,6 +75,41 @@ describe("studio live client identity", () => {
     expect(randomUUID).toHaveBeenCalledOnce();
   });
 
+  it("reuses a stored client instance only for an actual reload", () => {
+    const storage = memoryStorage({
+      [instanceKey("work-reload")]: WORK_A_INSTANCE_ID,
+    });
+    const randomUUID = vi.fn(() => WORK_B_INSTANCE_ID);
+
+    const reloaded = readOrCreateStudioLiveClientInstanceId(
+      "work-reload",
+      storage,
+      randomUUID,
+      "reload",
+    );
+
+    expect(reloaded).toBe(WORK_A_INSTANCE_ID);
+    expect(randomUUID).not.toHaveBeenCalled();
+  });
+
+  it("replaces a client id copied into a duplicated tab", () => {
+    const duplicatedStorage = memoryStorage({
+      [instanceKey("work-duplicate")]: WORK_A_INSTANCE_ID,
+    });
+
+    const duplicated = readOrCreateStudioLiveClientInstanceId(
+      "work-duplicate",
+      duplicatedStorage,
+      () => WORK_B_INSTANCE_ID,
+      "navigate",
+    );
+
+    expect(duplicated).toBe(WORK_B_INSTANCE_ID);
+    expect(duplicatedStorage.getItem(instanceKey("work-duplicate"))).toBe(
+      WORK_B_INSTANCE_ID,
+    );
+  });
+
   it("mints distinct client instance ids for different workIds", () => {
     const storage = memoryStorage();
     const randomUUID = vi.fn()

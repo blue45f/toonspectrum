@@ -2,6 +2,7 @@
  * Browser-level collaboration contract.
  *
  * Unlike the broad collaboration UI smoke, this verifies the authoritative document lane:
+ *   B is created as a storage-cloned duplicate of A but receives a distinct collaboration identity
  *   A authors a real brush stroke -> B renders it
  *   B authors a second stroke -> A renders it
  *   C joins after both operations -> the state-vector bootstrap renders both
@@ -20,6 +21,12 @@ import { join } from "node:path";
 
 import { chromium, type BrowserContext, type Page } from "playwright";
 
+import {
+  STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX,
+} from "../apps/web/src/domains/creator/live/studio-live-client-identity";
+import {
+  STUDIO_LIVE_OWNER_ROOM_SESSION_KEY,
+} from "../apps/web/src/domains/creator/live/studio-live-jam-session";
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
@@ -87,10 +94,10 @@ async function installStudioFirstRunState(page: Page): Promise<void> {
   }, QUICKSTART_KEY);
 }
 
-async function attachPage(
-  context: BrowserContext,
+function observePage(
+  page: Page,
   label: string,
-): Promise<{ readonly page: Page; readonly diagnostics: PageDiagnostics }> {
+): { readonly page: Page; readonly diagnostics: PageDiagnostics } {
   const diagnostics: PageDiagnostics = {
     label,
     pageErrors: [],
@@ -98,7 +105,6 @@ async function attachPage(
     requestFailures: [],
     phases: [],
   };
-  const page = await context.newPage();
   page.setDefaultTimeout(20_000);
   page.on("pageerror", (error) => diagnostics.pageErrors.push(String(error)));
   page.on("console", (message) => {
@@ -114,8 +120,16 @@ async function attachPage(
       diagnostics.requestFailures.push(`${response.status()} ${response.request().method()} ${response.url()}`);
     }
   });
-  await installStudioFirstRunState(page);
   return { page, diagnostics };
+}
+
+async function attachPage(
+  context: BrowserContext,
+  label: string,
+): Promise<{ readonly page: Page; readonly diagnostics: PageDiagnostics }> {
+  const page = await context.newPage();
+  await installStudioFirstRunState(page);
+  return observePage(page, label);
 }
 
 async function dismissOverlays(page: Page): Promise<void> {
@@ -350,6 +364,25 @@ async function peerCount(page: Page): Promise<number> {
   return page.locator('[data-studio-presence-stack="true"] button').count().catch(() => 0);
 }
 
+async function clientInstanceId(page: Page, roomId: string): Promise<string> {
+  const key = `${STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX}${roomId}`;
+  await page.waitForFunction(
+    (storageKey) => Boolean(sessionStorage.getItem(storageKey)),
+    key,
+    { timeout: 30_000 },
+  );
+  const value = await page.evaluate((storageKey) => sessionStorage.getItem(storageKey), key);
+  assert.ok(value, `client instance id unavailable for ${roomId}`);
+  return value;
+}
+
+async function ownerRoomReceipt(page: Page): Promise<string | null> {
+  return page.evaluate(
+    (storageKey) => sessionStorage.getItem(storageKey),
+    STUDIO_LIVE_OWNER_ROOM_SESSION_KEY,
+  );
+}
+
 mkdirSync(SCRATCH, { recursive: true });
 const ownedOrigin = EXISTING_ORIGIN
   ? ""
@@ -378,7 +411,7 @@ const browser = await chromium.launch({
 const diagnostics: PageDiagnostics[] = [];
 const report: Record<string, unknown> = {
   criterion:
-    "Two independent browser tabs exchange authored canvas pixels in both directions, and a late third tab restores the converged document frontier.",
+    "A storage-cloned duplicate tab receives a distinct live identity, exchanges canvas pixels in both directions, and a late third tab restores the converged document frontier.",
   origin,
   browser: browser.version(),
   status: "FAIL",
@@ -403,14 +436,33 @@ try {
   const roomUrl = await waitForRoomUrl(pageA);
   const phaseA = await waitForDocumentLane(pageA, attachedA.diagnostics);
 
-  const attachedB = await attachPage(context, "B");
+  const roomId = new URL(roomUrl).searchParams.get("room");
+  assert.ok(roomId, `room id missing from ${roomUrl}`);
+  const clientInstanceA = await clientInstanceId(pageA, roomId);
+  const duplicatePagePromise = context.waitForEvent("page");
+  log("duplicate A into B with cloned session storage");
+  await pageA.evaluate((url) => {
+    if (!window.open(url, "_blank")) throw new Error("duplicate tab did not open");
+  }, roomUrl);
+  const pageB = await duplicatePagePromise;
+  const attachedB = observePage(pageB, "B");
   diagnostics.push(attachedB.diagnostics);
-  const pageB = attachedB.page;
-  log("open B in same room");
-  await pageB.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await pageB.waitForLoadState("domcontentloaded", { timeout: 30_000 });
   await waitForCanvasSurface(pageB);
   await dismissOverlays(pageB);
   const phaseB = await waitForDocumentLane(pageB, attachedB.diagnostics);
+  const clientInstanceB = await clientInstanceId(pageB, roomId);
+  const duplicatedOwnerReceipt = await ownerRoomReceipt(pageB);
+  assert.notEqual(
+    clientInstanceB,
+    clientInstanceA,
+    "duplicated tab reused the source client instance id",
+  );
+  assert.notEqual(
+    duplicatedOwnerReceipt,
+    roomId,
+    "duplicated tab retained the source tab's room-owner receipt",
+  );
 
   await pageA.waitForTimeout(700);
   await pageB.waitForTimeout(700);
@@ -458,6 +510,11 @@ try {
   report.roomUrl = roomUrl;
   report.phases = { A: phaseA, B: phaseB, C: phaseC };
   report.peers = peers;
+  report.tabIdentity = {
+    A: clientInstanceA,
+    B: clientInstanceB,
+    duplicatedOwnerReceipt,
+  };
   report.fingerprints = {
     blankA,
     blankB,

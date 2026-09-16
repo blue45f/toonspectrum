@@ -60,9 +60,9 @@ export function StudioDocumentLayout({
   const liveRoomParam = readStudioLiveRoomQuery(params);
   const workId = studioRoute.workId;
   const remixId = studioRoute.remixSourceWorkId;
-  // Keep the owner room stable for this tab across reloads and boundary remounts. A companion tab
-  // receives the room URL but not this tab's sessionStorage ownership receipt, so it still gets a
-  // distinct instant id and remains fail-closed until CRDT convergence.
+  // Keep the owner room stable across this page's remounts and real reloads. A duplicated tab may
+  // inherit a cloned sessionStorage receipt, so the resolver also checks the page lifecycle and
+  // gives every non-reload companion a distinct id that stays locked until CRDT convergence.
   const [initialInstantWorkId] = useState(() => resolveStudioLiveInstantWorkIdForTab({
     workId,
     remixId,

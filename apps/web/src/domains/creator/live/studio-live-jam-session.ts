@@ -1,5 +1,9 @@
 import { STUDIO_LIVE_JAM_WORK_ID_PREFIX } from "../../../shared/lib/studio-live-jam-scope";
 import { buildStudioLiveShareHref } from "../creator-studio-links";
+import {
+  readStudioLivePageNavigationType,
+  type StudioLivePageNavigationType,
+} from "./studio-live-page-lifecycle";
 
 export {
   isStudioLiveJamScope,
@@ -25,11 +29,27 @@ export function createStudioLiveInstantWorkId(
   return `${STUDIO_LIVE_JAM_WORK_ID_PREFIX}${now().toString(36)}-${salt}`;
 }
 
-const STUDIO_LIVE_OWNER_ROOM_SESSION_KEY = "toonspectrum:studio-live-owner-room:v1";
+export const STUDIO_LIVE_OWNER_ROOM_SESSION_KEY =
+  "toonspectrum:studio-live-owner-room:v1";
 
 export interface StudioLiveOwnerRoomSessionStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
+}
+
+const runtimeOwnedRooms = new WeakMap<StudioLiveOwnerRoomSessionStorage, Set<string>>();
+const storageLessRuntimeOwnedRooms = new Set<string>();
+
+function pageOwnedRooms(
+  storage: StudioLiveOwnerRoomSessionStorage | null | undefined,
+): Set<string> {
+  if (!storage) return storageLessRuntimeOwnedRooms;
+  const current = runtimeOwnedRooms.get(storage);
+  if (current) return current;
+  const created = new Set<string>();
+  runtimeOwnedRooms.set(storage, created);
+  return created;
 }
 
 function readStudioLiveOwnedRoomId(
@@ -56,13 +76,25 @@ export function rememberStudioLiveOwnedRoomId(
   }
 }
 
+function forgetStudioLiveOwnedRoomId(
+  storage: StudioLiveOwnerRoomSessionStorage | null | undefined,
+): void {
+  if (!storage) return;
+  try {
+    if (storage.removeItem) storage.removeItem(STUDIO_LIVE_OWNER_ROOM_SESSION_KEY);
+    else storage.setItem(STUDIO_LIVE_OWNER_ROOM_SESSION_KEY, "");
+  } catch {
+    // A fresh per-page id still keeps this page on the joiner side of the room boundary.
+  }
+}
+
 /**
  * Keeps the auto-published local room identity stable across reloads and document-boundary remounts.
  *
- * `sessionStorage` is intentionally tab-scoped: the owner tab remembers the room it published, while
- * a companion tab opened with `noopener` receives only the shared URL and therefore generates its own
- * instant id. That preserves the owner-vs-joiner lock boundary after a reload instead of turning the
- * owner into a false remote participant merely because React created a new layout instance.
+ * Browsers clone `sessionStorage` when a tab is duplicated, so the stored receipt alone cannot prove
+ * that the current page owns the room. This page keeps an in-memory ownership receipt for remounts,
+ * accepts the stored receipt only for an actual reload, and demotes every other page lifecycle to a
+ * joiner. That preserves the owner-vs-joiner convergence gate without breaking owner reloads.
  */
 export function resolveStudioLiveInstantWorkIdForTab(input: {
   workId: string | null;
@@ -71,17 +103,28 @@ export function resolveStudioLiveInstantWorkIdForTab(input: {
   storage?: StudioLiveOwnerRoomSessionStorage | null;
   now?: () => number;
   random?: () => number;
+  navigationType?: StudioLivePageNavigationType;
 }): string {
   const fresh = () => createStudioLiveInstantWorkId(input.now, input.random);
 
   if (input.workId || input.remixId) return fresh();
 
   const roomId = input.roomId?.trim() ?? "";
+  const ownedByThisPage = pageOwnedRooms(input.storage);
   if (roomId) {
-    return readStudioLiveOwnedRoomId(input.storage) === roomId ? roomId : fresh();
+    if (ownedByThisPage.has(roomId)) return roomId;
+    const storedOwnerRoom = readStudioLiveOwnedRoomId(input.storage);
+    const navigationType = input.navigationType ?? readStudioLivePageNavigationType();
+    if (storedOwnerRoom === roomId && navigationType === "reload") {
+      ownedByThisPage.add(roomId);
+      return roomId;
+    }
+    if (storedOwnerRoom === roomId) forgetStudioLiveOwnedRoomId(input.storage);
+    return fresh();
   }
 
   const instantWorkId = fresh();
+  ownedByThisPage.add(instantWorkId);
   rememberStudioLiveOwnedRoomId(input.storage, instantWorkId);
   return instantWorkId;
 }
