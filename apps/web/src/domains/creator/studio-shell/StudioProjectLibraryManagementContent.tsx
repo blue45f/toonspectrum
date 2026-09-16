@@ -84,7 +84,7 @@ export function StudioProjectLibraryManagementContent({
             {view === "active"
               ? locale === "ko" ? "새 작업은 그리는 즉시 임시 자동저장되며 이 화면에 나타납니다." : "New work is temporarily autosaved as soon as you draw and appears here."
               : view === "archived"
-                ? locale === "ko" ? "보관핔 프로젝트가 없습니다." : "There are no archived projects."
+                ? locale === "ko" ? "보관한 프로젝트가 없습니다." : "There are no archived projects."
                 : locale === "ko" ? "휴지통이 비어 있습니다." : "Trash is empty."}
           </p>
           {view === "active" && !query ? (
