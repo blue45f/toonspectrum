@@ -77,7 +77,7 @@ export function SiteRouteExperienceBoundary({ children }: { readonly children: R
 
       {desktopRequired ? (
         <aside
-          className="mx-auto mt-3 flex w-[min(100%-2rem,100rem)] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-warn/10 p-3 text-sm text-fg"
+          className="mx-auto mt-3 flex w-[calc(100%-2rem)] max-w-[100rem] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-warn/10 p-3 text-sm text-fg"
           role="note"
           data-route-device-guidance="desktop-required"
         >
@@ -100,7 +100,7 @@ export function SiteRouteExperienceBoundary({ children }: { readonly children: R
 
       {showOfflineGuidance ? (
         <aside
-          className="mx-auto mt-3 flex w-[min(100%-2rem,100rem)] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-panel p-3 text-sm text-fg"
+          className="mx-auto mt-3 flex w-[calc(100%-2rem)] max-w-[100rem] min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-warn/35 bg-panel p-3 text-sm text-fg"
           role="status"
           aria-live="polite"
           data-route-recovery-guidance="offline"
