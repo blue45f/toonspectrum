@@ -13,10 +13,11 @@ describe("creator flagship integration contracts", () => {
     expect(result.status).toBe("passed");
     expect(result.count).toBeGreaterThanOrEqual(46);
   });
-  it("accepts only registered deep-link headings", () => {
-    expect(creatorSectionFromHash("#creator-desk-title")?.headingId).toBe("creator-desk-title");
-    expect(creatorSectionFromHash("#creator-offline-title")?.headingId).toBe("creator-offline-title");
-    expect(creatorSectionFromHash("#creator-film")?.headingId).toBe("creator-film-title");
+  it("maps registered legacy deep links onto current focusable headings", () => {
+    expect(creatorSectionFromHash("#creator-desk-title")?.headingId).toBe("creator-toolkit-title");
+    expect(creatorSectionFromHash("#creator-offline-title")?.headingId).toBe("creator-process-title");
+    expect(creatorSectionFromHash("#creator-film")?.headingId).toBe("creator-process-title");
+    expect(creatorSectionFromHash("#creator-faq-title")?.headingId).toBe("creator-support-title");
     expect(creatorSectionFromHash("#%ZZ")).toBeUndefined();
     expect(creatorSectionFromHash("#input[name=secret]")).toBeUndefined();
   });
