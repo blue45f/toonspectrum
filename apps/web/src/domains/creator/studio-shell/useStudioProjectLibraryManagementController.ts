@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useSession } from "@/compat/auth-session-store";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { removeStudioSaveProfilesBulk } from "../save-first/studio-save-profile-bulk";
@@ -49,8 +50,10 @@ export interface StudioProjectLibraryDeleteRequest {
 
 export function useStudioProjectLibraryManagementController() {
   const [searchParams] = useSearchParams();
+  const { data: session } = useSession();
   const language = useI18n((state) => state.lang);
   const locale = studioProjectLibraryLocale(language);
+  const authUserId = session?.user?.id ?? null;
   const view = resolveStudioProjectLibraryManagementView(searchParams.get("view"));
   const status = view === "archived" ? "archived" : view === "trash" ? "trashed" : "active";
   const library = useStudioProjectLibrary(locale, status);
@@ -314,6 +317,7 @@ export function useStudioProjectLibraryManagementController() {
     }
   };
   return {
+    authUserId,
     locale,
     view,
     library,

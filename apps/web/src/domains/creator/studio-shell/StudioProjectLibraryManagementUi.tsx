@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -23,6 +23,7 @@ import {
   type StudioSaveProfile,
 } from "../save-first/studio-save-profile";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
+import { StudioProjectCardThumbnail } from "./StudioProjectCardThumbnail";
 import {
   STUDIO_PROJECT_KIND_LABELS,
   studioProjectIsTemporaryWork,
@@ -104,12 +105,19 @@ export function StudioProjectLibraryModal({
   readonly onClose: () => void;
   readonly danger?: boolean;
 }) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = danger ? "studio-delete-dialog-title" : "studio-save-dialog-title";
   const descriptionId = danger
     ? "studio-delete-dialog-description"
     : "studio-save-dialog-description";
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-[100] grid place-items-center bg-black/55 p-3 backdrop-blur-sm"
       onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
         if (event.target === event.currentTarget) onClose();
@@ -128,8 +136,8 @@ export function StudioProjectLibraryModal({
             <p id={descriptionId} className="mt-2 text-sm leading-6 text-fg-2">{description}</p>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
-            autoFocus
             onClick={onClose}
             aria-label={closeLabel}
             className={buttonClass({ variant: "quiet", size: "icon" })}
@@ -144,6 +152,7 @@ export function StudioProjectLibraryModal({
 }
 
 export function StudioProjectLibraryCard({
+  authUserId,
   project,
   profile,
   locale,
@@ -162,6 +171,7 @@ export function StudioProjectLibraryCard({
   onArchive,
   onTrash,
 }: {
+  readonly authUserId: string | null;
   readonly project: StudioProjectLibraryEntry;
   readonly profile: StudioSaveProfile;
   readonly locale: StudioProjectLibraryLocale;
@@ -184,10 +194,15 @@ export function StudioProjectLibraryCard({
     <article
       data-selected={checked || undefined}
       className={cn(
-        "rounded-2xl border bg-card p-4 shadow-sm transition-colors",
+        "overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition-colors",
         checked ? "border-accent ring-2 ring-accent/15" : "border-line",
       )}
     >
+      <StudioProjectCardThumbnail
+        authUserId={authUserId}
+        locale={locale}
+        project={project}
+      />
       <div className="flex items-start gap-3">
         <StudioProjectSelectionCheckbox
           checked={checked}
