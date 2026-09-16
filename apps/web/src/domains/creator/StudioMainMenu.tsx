@@ -43,7 +43,7 @@ import {
   type StudioMainMenuCoords,
 } from "./studio-main-menu-viewport";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
-import { STUDIO_Z } from "./studio-z-index";
+import { StudioMainMenuFloatingPanel } from "./StudioMainMenuFloatingPanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
@@ -286,6 +286,7 @@ function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
 
 function MenuDropdown({
   group,
+  surface,
   open,
   onOpen,
   onClose,
@@ -296,6 +297,7 @@ function MenuDropdown({
   t,
 }: {
   group: StudioMainMenuGroup;
+  surface: "primary" | "action";
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -313,6 +315,7 @@ function MenuDropdown({
   const unavailableReasonLabel = localizeText(t, "Unavailable condition", "studio.mainMenu.unavailableReason");
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const openedRef = useRef(false);
@@ -404,7 +407,7 @@ function MenuDropdown({
       function onDoc(e: PointerEvent) {
         const t = e.target as Node | null;
         if (!t) return;
-        if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+        if (buttonRef.current?.contains(t) || surfaceRef.current?.contains(t)) return;
         const otherTrigger = (e.target as HTMLElement | null)?.closest?.(
           "[data-studio-main-menu-trigger]"
         );
@@ -603,40 +606,25 @@ function MenuDropdown({
   const menu =
     open && typeof document !== "undefined"
       ? createPortal(
-          <div
-            ref={menuRef}
-            id={panelId}
-            role="menu"
-            aria-label={group.label}
-            tabIndex={-1}
-            data-studio-main-menu-panel="true"
-            data-studio-main-menu-side={coords.side}
-            data-studio-shortcut-boundary="true"
+          <StudioMainMenuFloatingPanel
+            panelId={panelId}
+            surfaceId={`main-menu:${surface}:${group.id}`}
+            label={group.label}
+            coords={coords}
+            itemCount={group.items.length}
+            onClose={() => closeMenu()}
             onKeyDown={handleMenuKeyDown}
-            className={cn(
-              "fixed overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
-              "[scrollbar-width:thin]"
-            )}
-            style={{
-              top: coords.top,
-              left: coords.left,
-              minWidth: coords.minWidth,
-              maxWidth: coords.maxWidth,
-              transform: coords.side === "top" ? "translateY(-100%)" : undefined,
-              maxHeight: coords.maxHeight,
-              // Body-level: beat studio shell / overflow chrome (options strip, absolute leftovers).
-              zIndex: STUDIO_Z.workspace,
-            }}
+            surfaceRef={surfaceRef}
+            menuRef={menuRef}
           >
             {splitStudioMainMenuSections(group.items).map((section, sectionIndex) => {
-              const rows = section.rows.map(({ item, index }) => renderMenuItem(item, index));
-              if (!section.label) return <Fragment key={`section:${sectionIndex}`}>{rows}</Fragment>;
+              const rows = section.rows.map(({ item, index }) =>
+                renderMenuItem(item, index)
+              );
+              if (!section.label) {
+                return <Fragment key={`section:${sectionIndex}`}>{rows}</Fragment>;
+              }
               const captionId = `${panelId}-section-${sectionIndex}`;
-              // A composite dropdown is one flat list of ~15 rows unless the caption
-              // naming the source catalogue group reaches assistive tech too. `group`
-              // is the ARIA pattern for a labelled section inside a `menu`: the caption
-              // stays visible, labels the wrapper, and the rows keep their own
-              // `menuitem` roles, flat indices and roving tabindex.
               return (
                 <div
                   key={`section:${sectionIndex}`}
@@ -655,7 +643,7 @@ function MenuDropdown({
                 </div>
               );
             })}
-          </div>,
+          </StudioMainMenuFloatingPanel>,
           document.body
         )
       : null;
@@ -850,6 +838,7 @@ export function StudioMainMenu({
           ) : null}
           <MenuDropdown
             group={group}
+            surface={surface}
             open={openId === group.id}
             barActive={barActive}
             isTabStop={groupIndex === activeTabStopIndex}

@@ -12,6 +12,7 @@
  */
 import { useRef } from "react";
 
+import { handleStudioHorizontalWheel } from "./studio-horizontal-wheel";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, STUDIO_TOUCH_TARGET } from "./studio-panel-ui";
 
 import type { LucideIcon } from "lucide-react";
@@ -120,6 +121,7 @@ export function StudioWorkbenchTabStrip({
       ref={listRef}
       role="tablist"
       aria-label={ariaLabel}
+      onWheel={handleStudioHorizontalWheel}
       className={cn(
         "flex min-w-0 gap-1 overflow-x-auto pb-0.5",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",

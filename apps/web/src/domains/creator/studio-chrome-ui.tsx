@@ -23,6 +23,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
+import { handleStudioHorizontalWheel } from "./studio-horizontal-wheel";
+import { STUDIO_DESKTOP_FLOATING_QUERY, StudioDesktopFloatingSurface } from "./StudioDesktopFloatingSurface";
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
@@ -40,6 +43,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import type { StudioToolHintConsumerPreviewFields } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
@@ -192,6 +196,7 @@ export function StudioToolBelt({
       aria-hidden={ariaHidden}
       inert={inert ? true : undefined}
       data-studio-tool-belt="true"
+      onWheel={handleStudioHorizontalWheel}
       className={cn(
         // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
         "sticky top-0 z-[30] flex max-w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto",
@@ -213,18 +218,59 @@ export function StudioToolBelt({
  * 툴바 그룹 팝오버 — document.body 포털.
  * 데스크톱에서 레거시 툴벨트가 off-screen fixed 로 파킹돼 있어도 뷰포트 기준으로 표시된다.
  */
+export interface StudioFloatingToolPopoverDesktopWindow {
+  readonly label: string;
+  readonly onClose: () => void;
+  readonly defaultLayout: StudioFloatingSurfaceLayout;
+  readonly surfaceId?: string;
+  readonly minWidth?: number;
+  readonly minHeight?: number;
+  readonly maxWidth?: number;
+  readonly maxHeight?: number;
+  readonly contentClassName?: string;
+}
+
 export function StudioFloatingToolPopover({
   open,
   children,
   className,
   id = "tool",
+  desktopWindow,
 }: {
   open: boolean;
   children: ReactNode;
   className?: string;
   id?: string;
+  desktopWindow?: StudioFloatingToolPopoverDesktopWindow;
 }): ReactElement | null {
+  const desktop = useMediaQuery(STUDIO_DESKTOP_FLOATING_QUERY);
   if (!open || typeof document === "undefined") return null;
+  if (desktop && desktopWindow) {
+    return createPortal(
+      <StudioDesktopFloatingSurface
+        id={`studio-tool-popover-${id}`}
+        surfaceId={desktopWindow.surfaceId ?? `tool-popover:${id}`}
+        label={desktopWindow.label}
+        defaultLayout={desktopWindow.defaultLayout}
+        onClose={desktopWindow.onClose}
+        minWidth={desktopWindow.minWidth}
+        minHeight={desktopWindow.minHeight}
+        maxWidth={desktopWindow.maxWidth}
+        maxHeight={desktopWindow.maxHeight}
+        contentClassName={cn(
+          "min-h-0 overflow-auto p-2",
+          desktopWindow.contentClassName,
+        )}
+        rootDataAttributes={{
+          "data-studio-tool-popover": id,
+          "data-studio-workspace-tool-popover": "true",
+        }}
+      >
+        {children}
+      </StudioDesktopFloatingSurface>,
+      document.body,
+    );
+  }
   return createPortal(
     <div
       data-studio-tool-popover={id}
@@ -234,7 +280,7 @@ export function StudioFloatingToolPopover({
     >
       {children}
     </div>,
-    document.body
+    document.body,
   );
 }
 
