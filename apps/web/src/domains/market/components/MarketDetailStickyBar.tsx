@@ -10,6 +10,7 @@ import { useMarketLibrary } from "../hooks/use-market-library";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import { marketKindMeta } from "../models/market-kind";
 
+import type { MarketStudioHandoff } from "../models/market-studio-handoff";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -18,11 +19,13 @@ import Link from "@/compat/router-link";
 
 interface MarketDetailStickyBarProps {
   record: CreatorMarketplaceResourceRecord;
+  studioHandoff: MarketStudioHandoff;
   onOpenAcquisition: () => void;
 }
 
 export function MarketDetailStickyBar({
   record,
+  studioHandoff,
   onOpenAcquisition,
 }: MarketDetailStickyBarProps) {
   const [visible, setVisible] = useState(false);
@@ -31,6 +34,9 @@ export function MarketDetailStickyBar({
   const wishlisted = isWishlisted(record.id);
   const acquired = isAcquired(record.id);
   const kind = marketKindMeta(record.kind);
+  const StudioActionIcon = studioHandoff.mode === "install-tool-pack"
+    ? Download
+    : Palette;
 
   useEffect(() => {
     let scrollFrame: number | null = null;
@@ -125,15 +131,16 @@ export function MarketDetailStickyBar({
           )}
 
           <Link
-            href={`/studio?installMarketResource=${record.id}&assetMarket=community`}
+            href={studioHandoff.href}
             className={buttonClass({
               variant: "solid",
               size: "sm",
               className: "gap-1.5 bg-gradient-to-r from-accent to-accent-2 text-on-accent shadow-sm",
             })}
           >
-            <Palette className="size-3.5" />
-            <span>스튜디오에 적용</span>
+            <StudioActionIcon className="size-3.5" aria-hidden="true" />
+            <span className="hidden md:inline">{studioHandoff.actionLabel}</span>
+            <span className="md:hidden">Studio</span>
           </Link>
         </div>
       </div>

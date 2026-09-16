@@ -23,11 +23,7 @@ import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
 } from "./studio-chrome-ui";
-import {
-  preloadStudioAssetMenuPanel,
-  preloadStudioPaletteLibraryPanel,
-  preloadStudioReferencePanel,
-} from "./studio-page-lazy-ui";
+import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
 import { studioToolButtonClass } from "./studio-panel-ui";
 import {
   LazyStudioAiToolPopoverBody,
@@ -39,6 +35,7 @@ import {
   preloadStudioSceneToolPopoverBody,
   preloadStudioStyleToolPopoverBody,
 } from "./studio-tool-belt-lazy-ui";
+import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
 import {
   studioToolbarDisclosureAllows,
   studioToolbarIsExpanded,
@@ -70,6 +67,25 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
     width === "w-72" ? "lg:w-72" : "lg:w-80"
   );
 
+const TOOL_POPOVER_LAYOUTS = {
+  asset: {
+    version: 2, xRatio: 0.02, yRatio: 0.08, width: 420, height: 680,
+    dock: "free", positionLocked: false, sizeLocked: false,
+  },
+  scene: {
+    version: 2, xRatio: 0.03, yRatio: 0.1, width: 380, height: 620,
+    dock: "free", positionLocked: false, sizeLocked: false,
+  },
+  style: {
+    version: 2, xRatio: 0.04, yRatio: 0.12, width: 340, height: 520,
+    dock: "free", positionLocked: false, sizeLocked: false,
+  },
+  ai: {
+    version: 2, xRatio: 0.72, yRatio: 0.08, width: 440, height: 680,
+    dock: "free", positionLocked: false, sizeLocked: false,
+  },
+} satisfies Record<"asset" | "scene" | "style" | "ai", StudioFloatingSurfaceLayout>;
+
 export interface StudioToolBeltCreateModeGroupsProps {
   hints: StudioToolBeltHintMap;
   studioCanvasImageAccept: string;
@@ -88,6 +104,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     drawMode,
     frameAnimOpen,
     frameAnimTargetId,
+    menu,
     menuRef,
     referencePanelOpen,
     selected,
@@ -161,18 +178,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 type="button"
                 aria-label="템플릿·에셋"
                 onClick={() => {
-                  preloadStudioAssetMenuPanel();
-                  setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-                }}
-                onPointerEnter={() => {
                   preloadStudioAssetToolPopoverBody();
-                  preloadStudioAssetMenuPanel();
+                  setMenu(activeToolbarGroup === "assetGroup" ? null : "asset");
                 }}
+                onPointerEnter={preloadStudioAssetToolPopoverBody}
                 onPointerDown={preloadStudioAssetToolPopoverBody}
-                onFocus={() => {
-                  preloadStudioAssetToolPopoverBody();
-                  preloadStudioAssetMenuPanel();
-                }}
+                onFocus={preloadStudioAssetToolPopoverBody}
                 aria-haspopup="menu"
                 aria-expanded={activeToolbarGroup === "assetGroup"}
                 className={cn(
@@ -201,7 +212,23 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
             <StudioFloatingToolPopover
               open={activeToolbarGroup === "assetGroup"}
               id="asset-group"
-              className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
+              className={cn(
+                groupPopoverClass("w-80"),
+                menu === "asset"
+                  ? "lg:left-1/2 lg:w-[min(74rem,calc(100vw-2rem))] lg:max-w-[calc(100vw-2rem)] lg:max-h-[calc(100dvh-7.5rem)] lg:-translate-x-1/2 lg:overflow-hidden"
+                  : "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]",
+              )}
+              desktopWindow={{
+                label: "에셋",
+                surfaceId: "toolbar-assets",
+                defaultLayout: TOOL_POPOVER_LAYOUTS.asset,
+                onClose: () => setMenu(null),
+                minWidth: 320,
+                minHeight: 300,
+                maxWidth: 860,
+                maxHeight: 1100,
+                contentClassName: "overflow-y-auto",
+              }}
             >
               <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>
                 <LazyStudioAssetToolPopoverBody toolBelt={toolBelt} />
@@ -461,6 +488,17 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 open={activeToolbarGroup === "bgGroup"}
                 id="bg-group"
                 className={groupPopoverClass("w-80")}
+                desktopWindow={{
+                  label: "장면",
+                  surfaceId: "toolbar-scene",
+                  defaultLayout: TOOL_POPOVER_LAYOUTS.scene,
+                  onClose: () => setMenu(null),
+                  minWidth: 320,
+                  minHeight: 280,
+                  maxWidth: 820,
+                  maxHeight: 1050,
+                  contentClassName: "overflow-y-auto",
+                }}
               >
                 <Suspense fallback={<StudioPanelLoading label="3D 스튜디오를 여는 중..." />}>
                   <LazyStudioSceneToolPopoverBody toolBelt={toolBelt} />
@@ -481,18 +519,9 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               <button
                 type="button"
                 onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
-                onPointerEnter={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
-                onPointerDown={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
-                onFocus={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
+                onPointerEnter={preloadStudioStyleToolPopoverBody}
+                onPointerDown={preloadStudioStyleToolPopoverBody}
+                onFocus={preloadStudioStyleToolPopoverBody}
                 aria-haspopup="menu"
                 aria-expanded={activeToolbarGroup === "styleGroup"}
                 className={cn(
@@ -520,7 +549,21 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
             <StudioFloatingToolPopover
               open={activeToolbarGroup === "styleGroup"}
               id="style-group"
-              className={groupPopoverClass("w-72")}
+              className={cn(
+                groupPopoverClass("w-80"),
+                "lg:w-[23rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]",
+              )}
+              desktopWindow={{
+                label: "스타일",
+                surfaceId: "toolbar-style",
+                defaultLayout: TOOL_POPOVER_LAYOUTS.style,
+                onClose: () => setMenu(null),
+                minWidth: 300,
+                minHeight: 260,
+                maxWidth: 720,
+                maxHeight: 900,
+                contentClassName: "overflow-y-auto",
+              }}
             >
               <Suspense fallback={<StudioPanelLoading label="스타일 메뉴를 여는 중..." />}>
                 <LazyStudioStyleToolPopoverBody toolBelt={toolBelt} />
@@ -577,6 +620,17 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   groupPopoverClass("w-80"),
                   "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
                 )}
+                desktopWindow={{
+                  label: "AI 도우미",
+                  surfaceId: "toolbar-ai-assistant",
+                  defaultLayout: TOOL_POPOVER_LAYOUTS.ai,
+                  onClose: () => setMenu(null),
+                  minWidth: 360,
+                  minHeight: 360,
+                  maxWidth: 960,
+                  maxHeight: 1100,
+                  contentClassName: "flex flex-col overflow-hidden",
+                }}
               >
                 <Suspense fallback={<StudioPanelLoading label="AI 메뉴를 여는 중..." />}>
                   <LazyStudioAiToolPopoverBody toolBelt={toolBelt} />

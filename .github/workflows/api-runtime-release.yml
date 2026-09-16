@@ -45,7 +45,7 @@ jobs:
           pnpm --filter @webtoon-nest/api build 2>&1 | tee artifacts/api-runtime/build.log
           test -s apps/api/dist/apps/api/src/main.js
           node --check apps/api/dist/apps/api/src/main.js
-          node --check apps/api/dist/apps/api/src/runtime/general-api.module.js
+          node --check apps/api/dist/apps/api/src/modules/og/og.controller.js
           {
             echo "runtime=render-web-service"
             echo "entrypoint=apps/api/dist/apps/api/src/main.js"

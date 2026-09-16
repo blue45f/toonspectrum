@@ -1,5 +1,5 @@
 const STUDIO_LIVE_SOCKET_NAMESPACE = "/studio-live";
-const VERCEL_SERVERLESS_WEB_HOSTS = new Set([
+const STATIC_WEB_HOSTS = new Set([
   "www.toonstudio.cloud",
   "toonstudio.cloud",
 ]);
@@ -40,15 +40,10 @@ function isLoopbackOrigin(value: string | null): boolean {
   }
 }
 
-function isVercelServerlessOrigin(value: string | null): boolean {
+function isStaticWebOrigin(value: string | null): boolean {
   if (!value) return false;
   try {
-    const hostname = new URL(value).hostname.toLowerCase();
-    return (
-      hostname === "vercel.app"
-      || hostname.endsWith(".vercel.app")
-      || VERCEL_SERVERLESS_WEB_HOSTS.has(hostname)
-    );
+    return STATIC_WEB_HOSTS.has(new URL(value).hostname.toLowerCase());
   } catch {
     return false;
   }
@@ -88,10 +83,9 @@ export function resolveStudioLiveSocketEndpoint({
       return null;
     }
   }
-  // Vercel's serverless request lifecycle cannot own the long-running Nest Socket.IO gateway.
-  // This includes the project's custom production domains. A dedicated
-  // VITE_STUDIO_LIVE_ORIGIN is required there.
-  if (!explicitBase && isVercelServerlessOrigin(safeLocationOrigin)) return null;
+  // The public Static Assets shell cannot own the long-running Nest Socket.IO gateway.
+  // A dedicated VITE_STUDIO_LIVE_ORIGIN is required on production web origins.
+  if (!explicitBase && isStaticWebOrigin(safeLocationOrigin)) return null;
 
   const configuredBase =
     explicitBase ?? implicitBase;
@@ -137,7 +131,7 @@ function nonBlank(value: string | null | undefined): string | null {
 
 /**
  * Runtime admission policy for Socket.IO. Missing configuration is a deliberate local-only mode,
- * never an instruction to probe the current static/Vercel origin and start a reconnect loop.
+ * never an instruction to probe the current static origin and start a reconnect loop.
  */
 export function resolveStudioLiveSocketRuntimeEndpoint(
   environment: StudioLiveSocketRuntimeEnvironment,

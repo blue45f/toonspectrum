@@ -33,9 +33,18 @@ describe("market Studio handoff", () => {
     ["3d-preset", "open-3d-background-catalog", "3D 배경"],
     ["3d-asset", "open-3d-asset-library", "3D 모델"],
   ])("maps %s to its real Studio destination", (kind, mode, destination) => {
-    const handoff = marketStudioHandoff({ id: RESOURCE_ID, kind });
+    const handoff = marketStudioHandoff({ id: RESOURCE_ID, kind, resourceVersion: "2.0.0" });
     expect(handoff.mode).toBe(mode);
     expect(handoff.destinationLabel).toContain(destination);
     expect(handoff.href).toContain(`installMarketResource=${RESOURCE_ID}`);
   });
+  it("adapts installable tool CTAs to the verified local lifecycle", () => {
+    const record = { id: RESOURCE_ID, kind: "brush" as const, resourceVersion: "2.0.0" };
+    expect(marketStudioHandoff(record).actionLabel).toBe("스튜디오에 브러시 팩 설치");
+    expect(marketStudioHandoff(record, "installed-current").actionLabel)
+      .toBe("Studio에서 설치 관리");
+    expect(marketStudioHandoff(record, "update-available").actionLabel)
+      .toBe("Studio에서 v2.0.0 업데이트");
+  });
+
 });

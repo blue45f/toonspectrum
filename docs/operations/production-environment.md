@@ -3,8 +3,8 @@
 툰스튜디오 운영 자격 증명은 Git 저장소에 평문으로 저장하지 않는다. 정적 웹의 기본 권위는
 Cloudflare Static Assets, 동적 Core API의 기본 권위는 Render `toonspectrum-core-api`다. 실제
 비밀값은 공급자의 encrypted environment, Render Secret File 또는 GitHub `production` Environment
-Secrets에 보관하고 저장소에는 변수명·검증 규칙·자동화 코드만 둔다. Vercel은 승인형 비상 rollback이며
-Git 자동 배포는 비활성이다.
+Secrets에 보관하고 저장소에는 변수명·검증 규칙·자동화 코드만 둔다. Vercel 런타임과 배포 코드는
+퇴역했으며 Cloudflare/Render 운영 경로에 포함하지 않는다.
 
 ## 운영 원칙
 
@@ -113,28 +113,8 @@ readiness를 확인한다. 대형 파일은 Static Assets sidecar와 R2가 담�
 Cloudflare token은 최소권한으로 제공하며 Core API origin은 비밀이 아닌 검토된 HTTPS origin이다.
 DB migration용 direct URL과 runtime `DATABASE_URL`은 역할과 권한이 다른 값이어야 한다.
 
-Vercel 비상 rollback을 실제 승인했을 때만 다음 값이 필요하다.
-
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
-
-정상 Cloudflare/Render 릴리스는 이 값들을 사용하지 않는다.
-
-## Vercel 감사와 비상 rollback
-
-Vercel Production 환경은 기존 복구점을 보존하기 위해 값 이름 존재 여부만 감사할 수 있다. 기본 감사는
-변수를 추가하거나 배포하지 않는다. `deploy=true` 또는 `deploy-vercel.yml`은 Cloudflare/Render로
-복구할 수 없는 장애에 대해 사용자가 별도로 승인한 경우만 실행한다.
-
-```bash
-VERCEL_TOKEN=... \
-VERCEL_PROJECT_ID=... \
-node scripts/configure-vercel-production.mjs --audit-only
-```
-
-감사 결과에는 변수 이름과 상태만 출력하고 값은 출력하지 않는다. Sensitive 키 존재 확인은 값의 유효성,
-DB 연결이나 schema readiness 검증을 대신하지 않는다.
+정상 릴리스에 필요한 secret만 유지한다. 퇴역한 `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
+`VERCEL_PROJECT_ID`는 GitHub Environment에서 삭제하고 다른 자동화가 참조하지 않는지 확인한다.
 
 ## 키 노출 대응
 
@@ -145,4 +125,3 @@ DB 연결이나 schema readiness 검증을 대신하지 않는다.
 3. Render와 필요한 GitHub Environment Secret을 갱신한다.
 4. 해당 runtime을 수동 재배포하고 readiness·로그인·OAuth를 검증한다.
 5. 노출 기간의 접근 로그와 비용 사용량을 확인한다.
-6. Vercel 복구점을 유지한다면 그 환경의 동일 키도 함께 회전한다.

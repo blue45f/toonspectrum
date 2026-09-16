@@ -141,8 +141,9 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(composition).toContain("projectImportInputRef.current.click()");
     expect(composition).toContain("if (!projectImportInputRef.current)");
     expect(companionRuntime).toContain(
-      'window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES)',
+      'window.open("", "_blank", STUDIO_COMPANION_RESERVATION_FEATURES[surface])',
     );
+    expect(companionRuntime).toContain("surface?: StudioCompanionSurface");
     expect(companionRuntime).toContain(
       "ready.protocol.openReadyStudioToolsCompanionForMenu({",
     );

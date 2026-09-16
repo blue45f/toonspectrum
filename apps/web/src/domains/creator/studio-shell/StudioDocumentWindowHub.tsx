@@ -271,7 +271,10 @@ export function StudioDocumentWindowHub({
       data-studio-document-window-hub="true"
       data-studio-quick-mode={quickMode}
     >
-      <div className="pointer-events-none fixed left-1/2 top-2 z-[121] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden">
+      <div
+        data-studio-document-window-hub-bar="true"
+        className="pointer-events-none fixed left-1/2 top-[3.25rem] z-[60] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden"
+      >
         <div className="pointer-events-auto flex min-h-11 items-center gap-1 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur-xl">
           <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <PanelsTopLeft size={16} aria-hidden="true" />

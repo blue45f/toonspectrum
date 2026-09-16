@@ -73,7 +73,7 @@ describe("auth mutation path recognition", () => {
       path: ticketPath, originalUrl: ticketPath, query: {},
     } as never)).toBe(true);
   });
-  it("recognizes direct, trailing-slash, and Vercel query-path auth requests", () => {
+  it("recognizes direct, trailing-slash, and case-insensitive auth requests", () => {
     expect(
       isAuthMutationRequest({
         path: "/api/auth/login",
@@ -93,13 +93,6 @@ describe("auth mutation path recognition", () => {
         path: "/API/AUTH/LOGIN",
         originalUrl: "/API/AUTH/LOGIN",
         query: {},
-      } as never),
-    ).toBe(true);
-    expect(
-      isAuthMutationRequest({
-        path: "/api/index",
-        originalUrl: "/api/index?path=auth%2Foauth%2Fexchange",
-        query: { path: "auth/oauth/exchange" },
       } as never),
     ).toBe(true);
   });
@@ -123,7 +116,7 @@ describe("auth mutation path recognition", () => {
 });
 
 describe("studio realtime ticket mutation path recognition", () => {
-  it("recognizes direct and Vercel query-path ticket POSTs", () => {
+  it("recognizes direct and case-insensitive ticket POSTs", () => {
     expect(
       isStudioRealtimeTicketMutationRequest({
         path: "/api/studio-realtime/tickets",
@@ -136,13 +129,6 @@ describe("studio realtime ticket mutation path recognition", () => {
         path: "/API/STUDIO-REALTIME/TICKETS",
         originalUrl: "/API/STUDIO-REALTIME/TICKETS",
         query: {},
-      } as never),
-    ).toBe(true);
-    expect(
-      isStudioRealtimeTicketMutationRequest({
-        path: "/api/index",
-        originalUrl: "/api/index?path=studio-realtime%2Ftickets",
-        query: { path: "studio-realtime/tickets" },
       } as never),
     ).toBe(true);
     expect(

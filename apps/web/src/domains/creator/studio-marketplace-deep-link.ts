@@ -12,6 +12,21 @@ export type StudioMarketplaceDeepLinkResult = Readonly<{
   accountSync?: StudioMarketplaceDeepLinkAccountSync;
 }>;
 
+export type StudioMarketplaceInstallPhase =
+  | "preparing"
+  | "downloading"
+  | "validating"
+  | "installing"
+  | "applying"
+  | "opening-catalog"
+  | "synchronizing";
+
+export interface StudioMarketplaceInstallProgress {
+  readonly phase: StudioMarketplaceInstallPhase;
+  readonly message: string;
+  readonly resourceName?: string;
+}
+
 export interface StudioMarketplaceInstallLocationSnapshot<TState = unknown> {
   readonly pathname: string;
   readonly search: string;
@@ -101,6 +116,7 @@ export interface StudioMarketplaceDeepLinkDependencies<TPack, TAsset> {
 export interface StudioMarketplaceDeepLinkOperation<TPack, TAsset> {
   readonly consumeInstallQuery: () => void;
   readonly isCurrent: () => boolean;
+  readonly reportProgress?: (progress: StudioMarketplaceInstallProgress) => void;
   readonly loadDependencies: () => Promise<
     StudioMarketplaceDeepLinkDependencies<TPack, TAsset>
   >;
@@ -170,6 +186,10 @@ export async function executeStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
   const normalizedResourceId = resourceId.trim();
   operation.consumeInstallQuery();
   if (!operation.isCurrent()) return staleResult(normalizedResourceId);
+  operation.reportProgress?.({
+    phase: "preparing",
+    message: "Studio 설치 도구와 기기 저장소를 준비하고 있어요…",
+  });
   const [dependencies, { applyStudioMarketplaceDeepLinkOperation }] = await Promise.all([
     operation.loadDependencies(),
     import("./studio-marketplace-deep-link-operation"),
@@ -177,6 +197,9 @@ export async function executeStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
   if (!operation.isCurrent()) return staleResult(normalizedResourceId);
   return applyStudioMarketplaceDeepLinkOperation(resourceId, dependencies, {
     isCurrent: operation.isCurrent,
+    reportProgress: (progress) => {
+      if (operation.isCurrent()) operation.reportProgress?.(progress);
+    },
   });
 }
 

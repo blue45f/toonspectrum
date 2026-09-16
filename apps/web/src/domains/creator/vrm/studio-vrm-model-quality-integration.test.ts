@@ -31,6 +31,24 @@ describe("VRM technical model quality integration", () => {
     }
   });
 
+  it("restores repaired high-quality characters to the visible catalogue", () => {
+    const visibleIds = new Set(SAMPLE_VRM_ENTRIES.map((entry) => entry.id));
+    expect(STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS).toEqual({});
+    for (const id of [
+      "avatar-a",
+      "avatar-b",
+      "avatar-c",
+      "kage",
+      "mega-angel",
+      "rubin",
+      "shino",
+      "shion",
+      "vita",
+    ]) {
+      expect(visibleIds.has(id), id).toBe(true);
+    }
+  });
+
   it("keeps model admission in the source discovery pipeline", () => {
     expect(librarySource).toContain("isStudioVrmProductionModelUrl(sample.url)");
     expect(librarySource).toContain("isStudioVrmTechnicallyAdmittedModel(sample.id)");

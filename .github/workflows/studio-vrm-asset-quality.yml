@@ -6,10 +6,14 @@ on:
     paths:
       - ".github/workflows/studio-vrm-asset-quality.yml"
       - "apps/web/public/assets/3d/characters/**"
+      - "apps/web/public/assets/3d/models/**"
       - "apps/web/public/vrm/**"
       - "apps/web/src/domains/creator/vrm/**"
+      - "apps/web/src/types/gltf-validator.d.ts"
       - "scripts/generate-vrm-model-technical-denylist.ts"
       - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "scripts/repair-studio-vrm-models.ts"
+      - "scripts/repair-studio-vrm-models.test.ts"
       - "package.json"
       - "pnpm-lock.yaml"
   push:
@@ -17,10 +21,14 @@ on:
     paths:
       - ".github/workflows/studio-vrm-asset-quality.yml"
       - "apps/web/public/assets/3d/characters/**"
+      - "apps/web/public/assets/3d/models/**"
       - "apps/web/public/vrm/**"
       - "apps/web/src/domains/creator/vrm/**"
+      - "apps/web/src/types/gltf-validator.d.ts"
       - "scripts/generate-vrm-model-technical-denylist.ts"
       - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "scripts/repair-studio-vrm-models.ts"
+      - "scripts/repair-studio-vrm-models.test.ts"
       - "package.json"
       - "pnpm-lock.yaml"
   workflow_dispatch:
@@ -58,6 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          pnpm exec tsx scripts/repair-studio-vrm-models.ts --check
           pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts
           pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts
           git diff --exit-code -- \
@@ -75,6 +84,7 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
             apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
             apps/web/src/domains/creator/vrm/vrm-library.test.ts
+            scripts/repair-studio-vrm-models.test.ts
           )
           if [[ -f apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts ]]; then
             tests+=(apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts)
@@ -96,8 +106,11 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts \
             apps/web/src/domains/creator/vrm/vrm-library.ts \
+            apps/web/src/types/gltf-validator.d.ts \
             scripts/generate-vrm-thumbnail-technical-denylist.ts \
-            scripts/generate-vrm-model-technical-denylist.ts
+            scripts/generate-vrm-model-technical-denylist.ts \
+            scripts/repair-studio-vrm-models.ts \
+            scripts/repair-studio-vrm-models.test.ts
           node scripts/validate-architecture.mjs
 
       - name: Typecheck and production build

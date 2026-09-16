@@ -36,10 +36,6 @@ export function loadResponseHeaderPolicy(root = process.cwd()) {
   return policy;
 }
 
-function sameJson(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
 export function verifyCloudflareStaticRules(root = process.cwd()) {
   const policy = loadResponseHeaderPolicy(root);
   const expected = renderCloudflareHeaders(policy);
@@ -54,14 +50,6 @@ export function verifyCloudflareStaticRules(root = process.cwd()) {
   return issues;
 }
 
-export function verifyVercelFallbackRules(root = process.cwd()) {
-  const policy = loadResponseHeaderPolicy(root);
-  const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8"));
-  return sameJson(vercel.headers ?? [], policy.headers)
-    ? []
-    : ["vercel.json emergency fallback headers must mirror config/http-response-headers.json"];
-}
-
 const invoked = process.argv[1]
   && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname);
 if (invoked) {
@@ -69,17 +57,7 @@ if (invoked) {
   const target = resolve(root, "apps/web/public/_headers");
   const policy = loadResponseHeaderPolicy(root);
   const rendered = renderCloudflareHeaders(policy);
-  if (process.argv.includes("--check-vercel-fallback")) {
-    const issues = [
-      ...verifyCloudflareStaticRules(root),
-      ...verifyVercelFallbackRules(root),
-    ];
-    if (issues.length > 0) {
-      for (const issue of issues) console.error(issue);
-      process.exit(1);
-    }
-    console.log("The cold Vercel fallback mirrors the provider-neutral response policy");
-  } else if (process.argv.includes("--check")) {
+  if (process.argv.includes("--check")) {
     const issues = verifyCloudflareStaticRules(root);
     if (issues.length > 0) {
       for (const issue of issues) console.error(issue);

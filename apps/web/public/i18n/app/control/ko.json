@@ -1,7 +1,7 @@
 {
   "control.language.label": "언어 선택",
-  "control.language.group.translated": "번역된 언어",
-  "control.language.group.englishBase": "영어로 표시됨 (번역 준비 중)",
+  "control.language.group.translated": "번역 품질이 높은 언어",
+  "control.language.group.englishBase": "자동 번역 · 영어 폴백",
   "control.sound.enable": "효과음 켜기",
   "control.sound.disable": "효과음 끄기",
   "control.theme.dark": "야간 모드 전환",

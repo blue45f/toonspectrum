@@ -82,6 +82,17 @@ afterEach(() => {
 });
 
 describe("StudioDocumentWindowHub", () => {
+  it("keeps the workspace switcher clear of the app menubar and below tool popovers", () => {
+    renderHub();
+
+    const bar = document.querySelector<HTMLElement>(
+      '[data-studio-document-window-hub-bar="true"]',
+    );
+    expect(bar).not.toBeNull();
+    expect(bar?.className).toContain("top-[3.25rem]");
+    expect(bar?.className).toContain("z-[60]");
+  });
+
   it("keeps the grouped workspace switcher and direct tab/window actions", () => {
     renderHub();
 

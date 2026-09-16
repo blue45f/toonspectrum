@@ -33,7 +33,7 @@ export function rejectOperatorFundedAi(): void {
   if (operatorAiFundingEnabled()) return;
   throw new ServiceUnavailableException({
     code: "USER_AI_CONNECTION_REQUIRED",
-    message: "운영측 AI 생성은 비활성화되어 있습니다. 통합 AI 설정에서 본인 키 또는 개인 추론 서버를 연결하세요.",
+    message: "운영측 AI 생성은 비활성화되어 있습니다. 통합 AI 설정에서 본인 클라우드 API 키 또는 관리형 클라우드 런타임을 연결하세요.",
     settingsHref: "/settings/ai",
     operatorFunded: false,
   });

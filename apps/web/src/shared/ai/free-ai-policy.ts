@@ -1,9 +1,8 @@
 export const USER_AI_COST_POLICIES = [
   "unverified",
-  "local-zero-cost",
-  "self-hosted-zero-cost",
   "provider-free-tier",
   "openrouter-free",
+  "user-funded-byok",
 ] as const;
 
 export type UserAiCostPolicy = (typeof USER_AI_COST_POLICIES)[number];
@@ -18,20 +17,29 @@ export interface FreeAiConnectionLike {
 }
 
 export interface FreeAiPreset {
-  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "qwen-beijing-free" | "sambanova-free" | "zai-free" | "mistral-free" | "siliconflow-free";
+  id:
+    | "openrouter-free"
+    | "groq-free"
+    | "gemini-free"
+    | "qwen-beijing-free"
+    | "sambanova-free"
+    | "zai-free"
+    | "mistral-free"
+    | "siliconflow-free"
+    | "huggingface-free"
+    | "cerebras-free"
+    | "custom-cloud";
   label: string;
   description: string;
   baseUrl: string;
   textModel: string;
   imageModel: string;
-  costPolicy: Exclude<UserAiCostPolicy, "unverified" | "self-hosted-zero-cost">;
-  requiresApiKey: boolean;
+  costPolicy: Exclude<UserAiCostPolicy, "unverified">;
+  requiresApiKey: true;
   docsUrl?: string;
 }
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
-
-/** Exact OpenAI-compatible base paths reviewed on 2026-09-15. */
+/** Exact OpenAI-compatible base paths reviewed on 2026-09-16. */
 const PROVIDER_FREE_TIER_ENDPOINTS: Readonly<Record<string, string>> = Object.freeze({
   "api.groq.com": "/openai/v1",
   "generativelanguage.googleapis.com": "/v1beta/openai",
@@ -39,54 +47,15 @@ const PROVIDER_FREE_TIER_ENDPOINTS: Readonly<Record<string, string>> = Object.fr
   "api.mistral.ai": "/v1",
   "api.z.ai": "/api/paas/v4",
   "api.siliconflow.cn": "/v1",
+  "router.huggingface.co": "/v1",
+  "api.cerebras.ai": "/v1",
 });
-
-/** Public managed APIs cannot be re-labelled as a user-operated zero-cost server. */
-const KNOWN_PUBLIC_AI_PROVIDER_HOSTS = new Set([
-  ...Object.keys(PROVIDER_FREE_TIER_ENDPOINTS),
-  "api.anthropic.com",
-  "api.cerebras.ai",
-  "api.cohere.com",
-  "api.deepgram.com",
-  "api.deepseek.com",
-  "api.fireworks.ai",
-  "api.openai.com",
-  "api.replicate.com",
-  "api.sambanova.ai",
-  "api.together.xyz",
-  "api.voyageai.com",
-  "api.z.ai",
-  "api.siliconflow.cn",
-  "openrouter.ai",
-  "router.huggingface.co",
-]);
 
 export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
-    id: "local-openai",
-    label: "내 컴퓨터 로컬 AI",
-    description: "MLX·LiteLLM·Rapid-MLX 등 OpenAI 호환 로컬 서버. API 키와 토큰 요금이 필요 없습니다.",
-    baseUrl: "http://localhost:8082/v1",
-    textModel: "",
-    imageModel: "",
-    costPolicy: "local-zero-cost",
-    requiresApiKey: false,
-  },
-  {
-    id: "ollama",
-    label: "Ollama 로컬 AI",
-    description: "Ollama의 OpenAI 호환 API를 현재 기기에서 직접 사용합니다.",
-    baseUrl: "http://localhost:11434/v1",
-    textModel: "",
-    imageModel: "",
-    costPolicy: "local-zero-cost",
-    requiresApiKey: false,
-    docsUrl: "https://docs.ollama.com/api/openai-compatibility",
-  },
-  {
     id: "openrouter-free",
     label: "OpenRouter 무료 모델 라우터",
-    description: "모델을 openrouter/free로 고정해 토큰 가격이 0인 텍스트 라우트만 사용합니다.",
+    description: "openrouter/free 또는 :free 모델만 사용합니다. 하나의 키로 여러 무료 모델을 구성할 수 있습니다.",
     baseUrl: "https://openrouter.ai/api/v1",
     textModel: "openrouter/free",
     imageModel: "",
@@ -97,7 +66,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "groq-free",
     label: "Groq 무료 플랜",
-    description: "본인 Groq 키를 사용합니다. 결제수단이 없는 무료 플랜 계정인지 먼저 확인해야 합니다.",
+    description: "본인 Groq 키를 사용합니다. 결제수단이 없는 무료 플랜인지 공급자 콘솔에서 확인하세요.",
     baseUrl: "https://api.groq.com/openai/v1",
     textModel: "",
     imageModel: "",
@@ -108,7 +77,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "gemini-free",
     label: "Gemini 무료 티어",
-    description: "본인 Google AI Studio 키를 사용합니다. 무료 티어 프로젝트이며 유료 결제가 비활성화됐는지 확인해야 합니다.",
+    description: "Google AI Studio 무료 티어 프로젝트의 키를 사용합니다. 유료 결제 연결 여부를 확인하세요.",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     textModel: "",
     imageModel: "",
@@ -119,7 +88,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "qwen-beijing-free",
     label: "Qwen 베이징 무료 할당량",
-    description: "Alibaba Model Studio 베이징 워크스페이스에서 Free Quota Only를 켠 본인 키만 사용합니다. 90일 무료 할당량 소진 시 중단됩니다.",
+    description: "Alibaba Model Studio 베이징 워크스페이스의 Free Quota Only 키를 사용합니다.",
     baseUrl: "https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
     textModel: "qwen3.7-plus",
     imageModel: "",
@@ -129,8 +98,8 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   },
   {
     id: "sambanova-free",
-    label: "SambaNova 무카드 Free Tier",
-    description: "결제수단이 연결되지 않은 Free Tier 계정의 본인 키만 사용합니다. 모델별 무료 일일 한도에서 중단됩니다.",
+    label: "SambaNova Free Tier",
+    description: "결제수단이 없는 Free Tier 계정의 키를 사용하며 모델별 무료 한도에서 중단합니다.",
     baseUrl: "https://api.sambanova.ai/v1",
     textModel: "DeepSeek-V3.1",
     imageModel: "",
@@ -141,7 +110,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "zai-free",
     label: "Z.AI 무료 Flash",
-    description: "가격표가 무료인 GLM-4.7-Flash 또는 GLM-4.5-Flash만 허용합니다. 유료 웹 검색·이미지·영상 도구는 사용하지 않습니다.",
+    description: "가격표상 무료인 GLM Flash 모델만 자동 무료 경로에서 허용합니다.",
     baseUrl: "https://api.z.ai/api/paas/v4",
     textModel: "glm-4.7-flash",
     imageModel: "",
@@ -152,7 +121,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "mistral-free",
     label: "Mistral 무료 모드",
-    description: "카드 없는 Free mode 조직에서 만든 본인 키만 사용합니다. Pay-as-you-go가 비활성화됐는지 확인하세요.",
+    description: "카드 없는 Free mode 조직의 키를 사용합니다. Pay-as-you-go를 비활성화하세요.",
     baseUrl: "https://api.mistral.ai/v1",
     textModel: "",
     imageModel: "",
@@ -163,7 +132,7 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
   {
     id: "siliconflow-free",
     label: "SiliconFlow 무료 텍스트",
-    description: "중국 리전 가격표에서 입력·출력이 무료인 THUDM/GLM-Z1-9B-0414만 허용합니다.",
+    description: "가격표상 무료 모델만 자동 무료 경로에서 허용합니다.",
     baseUrl: "https://api.siliconflow.cn/v1",
     textModel: "THUDM/GLM-Z1-9B-0414",
     imageModel: "",
@@ -171,14 +140,45 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     requiresApiKey: true,
     docsUrl: "https://siliconflow.cn/pricing",
   },
+  {
+    id: "huggingface-free",
+    label: "Hugging Face Inference Providers",
+    description: "Hugging Face 계정의 월 무료 추론 크레딧을 사용합니다. 크레딧 소진 시 자동 유료 전환하지 않습니다.",
+    baseUrl: "https://router.huggingface.co/v1",
+    textModel: "",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://huggingface.co/docs/inference-providers/index",
+  },
+  {
+    id: "cerebras-free",
+    label: "Cerebras 무료 개발자 티어",
+    description: "Cerebras Cloud의 무료 개발자 한도에서 OpenAI 호환 API를 사용합니다.",
+    baseUrl: "https://api.cerebras.ai/v1",
+    textModel: "",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://inference-docs.cerebras.ai/api-reference",
+  },
+  {
+    id: "custom-cloud",
+    label: "기타 관리형 클라우드 API",
+    description: "공개 HTTPS API의 본인 키를 사용합니다. 호출 비용은 공급자 계정에 청구될 수 있습니다.",
+    baseUrl: "https://api.example.com/v1",
+    textModel: "",
+    imageModel: "",
+    costPolicy: "user-funded-byok",
+    requiresApiKey: true,
+  },
 ]);
 
 export const USER_AI_COST_POLICY_LABELS: Readonly<Record<UserAiCostPolicy, string>> = Object.freeze({
-  unverified: "무료 여부 재확인 필요",
-  "local-zero-cost": "내 기기 로컬 실행",
-  "self-hosted-zero-cost": "직접 운영하는 무과금 서버",
-  "provider-free-tier": "결제 비활성 무료 티어",
+  unverified: "비용 정책 재확인 필요",
+  "provider-free-tier": "공급자 무료 티어",
   "openrouter-free": "OpenRouter 무료 모델 전용",
+  "user-funded-byok": "사용자 결제 BYOK",
 });
 
 function parsedUrl(value: string): URL | null {
@@ -193,13 +193,43 @@ function normalizedApiPath(url: URL): string {
   return url.pathname.replace(/\/+$/u, "") || "/";
 }
 
-function unsafeManagedUrlPart(url: URL): boolean {
+function privateOrLocalHostname(value: string): boolean {
+  const hostname = value.toLowerCase().replace(/^\[|\]$/gu, "");
+  if (
+    hostname === "localhost"
+    || hostname === "0.0.0.0"
+    || hostname.endsWith(".localhost")
+    || hostname.endsWith(".local")
+    || hostname.endsWith(".lan")
+    || hostname.endsWith(".internal")
+    || hostname === "::1"
+    || hostname === "::"
+    || hostname.startsWith("fc")
+    || hostname.startsWith("fd")
+    || /^fe[89ab]/u.test(hostname)
+  ) {
+    return true;
+  }
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/u.test(hostname)) return false;
+  const [a, b] = hostname.split(".").map(Number);
+  return a === 0
+    || a === 10
+    || a === 127
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || a >= 224;
+}
+
+function unsafeCloudUrl(url: URL): boolean {
   return Boolean(
-    url.username
+    url.protocol !== "https:"
+    || url.username
     || url.password
     || url.search
     || url.hash
-    || url.port,
+    || privateOrLocalHostname(url.hostname),
   );
 }
 
@@ -208,17 +238,17 @@ function capabilityModelIssue(
   capability: FreeAiCapability | undefined,
 ): string | null {
   if (capability === "text" && !connection.textModel.trim()) {
-    return "이 연결에 사용할 텍스트 모델 ID를 입력하세요.";
+    return "이 경로에 사용할 텍스트 모델 ID를 입력하세요.";
   }
   if (capability === "image" && !connection.imageModel.trim()) {
-    return "이 연결에 사용할 이미지 모델 ID를 입력하세요.";
+    return "이 경로에 사용할 이미지 모델 ID를 입력하세요.";
   }
   return null;
 }
 
 export function isLoopbackAiUrl(value: string): boolean {
   const url = parsedUrl(value);
-  return Boolean(url && LOOPBACK_HOSTS.has(url.hostname));
+  return Boolean(url && privateOrLocalHostname(url.hostname));
 }
 
 export function isOpenRouterFreeModel(model: string): boolean {
@@ -229,11 +259,10 @@ export function isOpenRouterFreeModel(model: string): boolean {
 export function inferLegacyUserAiCostPolicy(
   connection: Pick<FreeAiConnectionLike, "baseUrl" | "textModel" | "imageModel">,
 ): UserAiCostPolicy {
-  if (isLoopbackAiUrl(connection.baseUrl)) return "local-zero-cost";
   const url = parsedUrl(connection.baseUrl);
   if (
-    url?.protocol === "https:"
-    && !unsafeManagedUrlPart(url)
+    url
+    && !unsafeCloudUrl(url)
     && url.hostname === "openrouter.ai"
     && normalizedApiPath(url) === "/api/v1"
     && isOpenRouterFreeModel(connection.textModel)
@@ -272,13 +301,13 @@ function qwenBeijingWorkspaceHost(hostname: string): boolean {
 function reviewedProviderModelIssue(url: URL, model: string): string | null {
   const normalized = model.trim().toLowerCase();
   if (qwenBeijingWorkspaceHost(url.hostname) && !QWEN_FREE_MODELS.has(normalized)) {
-    return "Qwen 개인 연결은 베이징 무료 할당량이 확인된 허용 모델만 사용할 수 있습니다.";
+    return "Qwen 무료 경로는 베이징 무료 할당량이 확인된 모델만 사용할 수 있습니다.";
   }
   if (url.hostname === "api.z.ai" && !ZAI_FREE_MODELS.has(normalized)) {
-    return "Z.AI 개인 연결은 GLM-4.7-Flash 또는 GLM-4.5-Flash만 사용할 수 있습니다.";
+    return "Z.AI 무료 경로는 GLM-4.7-Flash 또는 GLM-4.5-Flash만 사용할 수 있습니다.";
   }
   if (url.hostname === "api.siliconflow.cn" && !SILICONFLOW_FREE_MODELS.has(normalized)) {
-    return "SiliconFlow 개인 연결은 가격표상 무료인 THUDM/GLM-Z1-9B-0414만 사용할 수 있습니다.";
+    return "SiliconFlow 무료 경로는 가격표상 무료인 THUDM/GLM-Z1-9B-0414만 사용할 수 있습니다.";
   }
   return null;
 }
@@ -288,55 +317,30 @@ export function freeAiConnectionPolicyIssue(
   capability?: FreeAiCapability,
 ): string | null {
   const url = parsedUrl(connection.baseUrl);
-  if (!url) return "AI 제공자 주소를 확인하세요.";
-
+  if (!url || unsafeCloudUrl(url)) {
+    return "공개 HTTPS 클라우드 AI 주소를 입력하세요. localhost와 사설망 주소는 사용할 수 없습니다.";
+  }
   if (connection.costPolicy === "unverified") {
-    return "이 연결은 무료 전용 정책을 아직 확인하지 않았습니다. 무료 프리셋을 다시 선택하거나 비용 정책을 확인하세요.";
+    return "이 연결의 비용 정책을 확인하세요. 무료 티어 또는 사용자 결제 BYOK를 명시해야 합니다.";
   }
-
-  if (connection.costPolicy === "local-zero-cost") {
-    if (!LOOPBACK_HOSTS.has(url.hostname)) {
-      return "로컬 무과금 연결은 localhost 또는 루프백 주소만 사용할 수 있습니다.";
-    }
-    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.search || url.hash) {
-      return "로컬 AI 주소는 인증정보·쿼리·조각이 없는 HTTP 또는 HTTPS 주소여야 합니다.";
-    }
+  if (!connection.apiKey.trim()) {
+    return "클라우드 AI 연결에는 본인 API 키가 필요합니다.";
+  }
+  if (connection.costPolicy === "user-funded-byok") {
     return capabilityModelIssue(connection, capability);
   }
-
-  if (connection.costPolicy === "self-hosted-zero-cost") {
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-      return "원격 개인 서버는 인증정보·쿼리·조각이 없는 HTTPS 주소만 사용할 수 있습니다.";
-    }
-    if (KNOWN_PUBLIC_AI_PROVIDER_HOSTS.has(url.hostname) || qwenBeijingWorkspaceHost(url.hostname)) {
-      return "공개 AI 제공자 주소를 직접 운영하는 무과금 서버로 등록할 수 없습니다. 해당 무료 프리셋을 사용하세요.";
-    }
-    if (!connection.apiKey.trim()) {
-      return "원격 개인 서버에는 본인 인증 토큰이 필요합니다.";
-    }
-    return capabilityModelIssue(connection, capability);
-  }
-
   if (connection.costPolicy === "openrouter-free") {
-    if (
-      url.protocol !== "https:"
-      || unsafeManagedUrlPart(url)
-      || url.hostname !== "openrouter.ai"
-      || normalizedApiPath(url) !== "/api/v1"
-    ) {
+    if (url.hostname !== "openrouter.ai" || normalizedApiPath(url) !== "/api/v1") {
       return "OpenRouter 무료 정책은 공식 https://openrouter.ai/api/v1 주소에서만 사용할 수 있습니다.";
     }
-    if (!connection.apiKey.trim()) {
-      return "OpenRouter 무료 연결에는 본인 API 키가 필요합니다.";
-    }
     if (capability && capability !== "text") {
-      return "OpenRouter 무료 라우터 연결은 현재 텍스트 기능에만 배정할 수 있습니다.";
+      return "OpenRouter 무료 라우터는 현재 텍스트 기능에만 배정할 수 있습니다.";
     }
     if (connection.imageModel.trim()) {
       return "OpenRouter 무료 라우터 연결에는 이미지 모델을 등록하지 않습니다.";
     }
     if (connection.textModel.trim() && !isOpenRouterFreeModel(connection.textModel)) {
-      return "OpenRouter 모델은 openrouter/free 또는 :free 접미사가 있는 모델만 사용할 수 있습니다.";
+      return "OpenRouter 무료 모델은 openrouter/free 또는 :free 접미사를 사용해야 합니다.";
     }
     return capabilityModelIssue(connection, capability);
   }
@@ -344,22 +348,14 @@ export function freeAiConnectionPolicyIssue(
   const requiredPath = qwenBeijingWorkspaceHost(url.hostname)
     ? "/compatible-mode/v1"
     : PROVIDER_FREE_TIER_ENDPOINTS[url.hostname];
-  if (
-    url.protocol !== "https:"
-    || unsafeManagedUrlPart(url)
-    || requiredPath === undefined
-    || normalizedApiPath(url) !== requiredPath
-  ) {
-    return "무료 티어 정책은 검토된 외부 제공자의 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
-  }
-  if (!connection.apiKey.trim()) {
-    return "원격 무료 티어 연결에는 본인 API 키가 필요합니다.";
+  if (requiredPath === undefined || normalizedApiPath(url) !== requiredPath || url.port) {
+    return "무료 티어 정책은 검토된 공급자의 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
   }
   if (capability && capability !== "text") {
-    return "외부 자동 무료 풀은 현재 실시간 텍스트 기능만 지원합니다.";
+    return "검토된 자동 무료 경로는 현재 텍스트 기능만 지원합니다. 이미지·영상·3D는 명시적 BYOK 경로를 사용하세요.";
   }
   if (connection.imageModel.trim()) {
-    return "외부 자동 무료 풀 연결에는 이미지 모델을 등록하지 않습니다.";
+    return "자동 무료 텍스트 연결에는 이미지 모델을 등록하지 않습니다.";
   }
   const modelIssue = reviewedProviderModelIssue(url, connection.textModel);
   if (modelIssue) return modelIssue;

@@ -38,7 +38,7 @@ describe("2D content discovery and source replacement", () => {
     expect(screen.getByRole("status").textContent).toBe("2개 장면");
     expect(screen.getByText("장소·시간·문자 필터 · 3개 적용")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
-    expect(screen.getByRole("status").textContent).toBe("64개 장면");
+    expect(screen.getByRole("status").textContent).toBe("68개 장면");
     expect((screen.getByLabelText("장소") as HTMLSelectElement).value).toBe("all");
     expect((screen.getByLabelText("시간대") as HTMLSelectElement).value).toBe("all");
     expect((screen.getByLabelText("문자 형태 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);
@@ -70,9 +70,10 @@ describe("2D content discovery and source replacement", () => {
   });
   it("shows embedded people and text warnings on cards before opening a preview", () => {
     render(<Harness />);
-    const cafe = screen.getByAltText(studio2dDisplayName(BG_SCENES.find((item) => item.id === "webtoon-cafe")!)).closest("article")!;
-    expect(within(cafe).getByText("인물 포함 · 문자 형태 포함")).toBeTruthy();
-    expect(within(cafe).getByText("실내 · 낮")).toBeTruthy();
+    const park = BG_SCENES.find((item) => item.id === "polyhaven-background-rooitou-park")!;
+    const card = screen.getByAltText(studio2dDisplayName(park)).closest("article")!;
+    expect(within(card).getByText("인물 포함 · 문자 형태 포함")).toBeTruthy();
+    expect(within(card).getByText("실외 · 낮 · CC0")).toBeTruthy();
   });
   it("requires a fresh load when SVG bytes change under the same catalog ID", () => {
     const original: Studio2dScene = { id: "changing-vector", label: "벡터 변경", genre: "daily", svg: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>' };

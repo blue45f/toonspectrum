@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+} from "../apps/web/src/shared/lib/creator-marketplace-install-receipt";
+import {
+  creatorMarketplaceStudioPackId,
+} from "../apps/web/src/shared/lib/creator-marketplace-package-identity";
+import {
   creatorMarketplaceJsonByteSize,
 } from "../apps/web/src/shared/lib/creator-marketplace-resource-contract";
 
@@ -196,7 +202,8 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
     await expect(page.getByText(/커뮤니티|내 에셋|자산|에셋/).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("4. 창작 마켓 홈 -> 탐색 -> mock 상세 -> 스튜디오 딥링크 요청 전달 검증", async ({ page }) => {
+  test("4. 창작 마켓 -> 유효 패키지 다운로드 -> Studio 설치 -> 마켓 설치 증거 재확인", async ({ page }) => {
+    test.slow();
     const mockResourceId = "123e4567-e89b-12d3-a456-426614174999";
     const payload = {
       schemaVersion: 1 as const,
@@ -248,17 +255,19 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
 
     // 1) 마켓 홈 방문
     await page.goto("/market");
-    await expect(page.getByRole("heading", { name: "창작 마켓" })).toBeVisible();
+    await expect(page.getByRole("heading", {
+      name: /웹툰의 한 컷을/u,
+    })).toBeVisible();
 
-    // 2) 마켓 탐색 이동
-    await page.getByRole("link", { name: "리소스 둘러보기" }).click();
+    // 2) 현재 소재 중심 탐색 언어로 마켓 찾기 화면 이동
+    await page.getByRole("link", { name: "소재 찾기", exact: true }).click();
     await expect(page).toHaveURL(/market\/browse/);
-    await expect(page.getByRole("heading", { name: "마켓 탐색" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "리소스 찾기" })).toBeVisible();
 
-    // 3) 브러시 필터 칩 클릭
-    const kindGroup = page.getByRole("group", { name: "리소스 종류 필터" });
-    await kindGroup.getByRole("button", { name: /브러시/ }).click();
+    // 3) 브러시 작업군 선택
+    await page.getByRole("button", { name: "브러시", exact: true }).click();
     await expect(page).toHaveURL(/market\/browse\?kind=brush/);
+    await expect(page.getByRole("heading", { name: "브러시 찾기" })).toBeVisible();
 
     // 4) 상세 페이지 API Mocking & 이동
     let mockResourceRequestCount = 0;
@@ -298,7 +307,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
     await expect(page.getByRole("button", { name: "메타데이터 스냅샷 다운로드" })).toBeVisible();
 
     // 5) 스튜디오 딥링크 확인 및 클릭
-    const installLink = page.getByRole("link", { name: "스튜디오에 리소스 팩 설치" });
+    const installLink = page.getByRole("link", { name: "스튜디오에 브러시 팩 설치", exact: true }).first();
     await expect(installLink).toBeVisible();
     await expect(installLink).toHaveAttribute(
       "href",
@@ -308,7 +317,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
     // 6) 딥링크가 Studio에서 실제 리소스 요청과 가시적 설치 상태로 소비되는지 검증
     await installLink.click();
     await expect(page.locator("[data-studio-community-marketplace]")).toBeVisible({
-      timeout: 30_000,
+      timeout: 120_000,
     });
     await expect.poll(() => mockResourceRequestCount).toBeGreaterThanOrEqual(2);
     await expect(
@@ -325,6 +334,36 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
       assetMarket: "community",
       installMarketResource: null,
     });
+
+    // 로컬 영수증은 실제 Studio 저장소 커밋 성공 뒤에만 기록된다.
+    const logicalPackId = creatorMarketplaceStudioPackId(mockResource);
+    const receipt = await page.evaluate(({ storageKey, packId }) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        receipts?: Record<string, unknown>;
+      };
+      return parsed.receipts?.[packId] ?? null;
+    }, {
+      storageKey: CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+      packId: logicalPackId,
+    });
+    expect(receipt).toMatchObject({
+      packageVersion: mockResource.resourceVersion,
+      packageFingerprint: mockResource.manifestHash,
+      kind: "brush",
+    });
+
+    // 같은 브라우저로 마켓 상세에 돌아오면 계정 이력과 별개인 기기 설치 증거를 읽는다.
+    await page.goto(`/market/resource/${mockResourceId}`);
+    await expect(page.getByRole("heading", { name: "마스터 잉크 펜" })).toBeVisible();
+    await expect(page.locator('[data-market-device-install-state="installed-current"]'))
+      .toContainText("이 기기·브라우저에 v1.0.0 설치 확인됨");
+    await expect(page.getByRole("link", { name: "Studio에서 설치 관리" }))
+      .toHaveAttribute(
+        "href",
+        `/studio?installMarketResource=${mockResourceId}&assetMarket=community`,
+      );
   });
 
   test("5. 마켓 팔레트·필터 mock 상세 프리뷰 렌더링 검증", async ({ page }) => {

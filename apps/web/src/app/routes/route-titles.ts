@@ -6,11 +6,11 @@ import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
 import { useT } from "@/shared/lib/i18n";
 import { decodePathSegment } from "@/shared/lib/decode-path-segment";
+import { canonicalSitePath } from "@/shared/lib/site-route-metadata";
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
-
-// 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
-// /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.
+// Static route browser titles. Detail pages that own richer content titles remain responsible for
+// updating the document, while this table still provides an accessible route-level fallback.
 export const STATIC_TITLES: Record<string, string> = {
   "/": "",
   "/ranking": "route.ranking",
@@ -52,6 +52,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/contact": "route.contact",
   "/support": "route.support",
   "/create": "route.create",
+  "/showcase": "route.create",
   "/studio": "route.studio",
   "/shaper": "route.shaper",
   "/me": "route.me",
@@ -59,35 +60,36 @@ export const STATIC_TITLES: Record<string, string> = {
   "/play": "route.play",
 };
 
-export function useRouteTitle(pathname: string, search: string) {
+type Translator = ReturnType<typeof useT>;
+
+export function resolveRouteTitle(pathname: string, t: Translator): string {
+  const canonicalPath = canonicalSitePath(pathname);
+  if (canonicalPath === "/") return `${t("app.name")} · ${t("home.creatorTitle")}`;
+  if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
+  if (canonicalPath in STATIC_TITLES) {
+    const titleKey = STATIC_TITLES[canonicalPath];
+    return titleKey ? t(titleKey) : t("app.name");
+  }
+  if (canonicalPath.startsWith("/author/")) return decodePathSegment(canonicalPath.slice(8));
+  if (canonicalPath.startsWith("/pencafe/")) return `${decodePathSegment(canonicalPath.slice(9))} ${t("route.pencafeSuffix")}`;
+  if (canonicalPath.startsWith("/community/")) return t("route.community");
+  if (canonicalPath.startsWith("/market/resource/")) return t("route.market");
+  if (canonicalPath.startsWith("/admin/")) return t("route.admin");
+  if (canonicalPath === "/me" || canonicalPath.startsWith("/me/")) return t("route.me");
+  if (isStudioRoutePathname(canonicalPath)) return t("route.studio");
+  return t("app.name");
+}
+
+export function useRouteTitle(pathname: string, search: string): string {
   const t = useT();
+  const title = resolveRouteTitle(pathname, t);
   useEffect(() => {
     if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
     if (pathname === "/") {
-      document.title = `${t("app.name")} · ${t("home.creatorTitle")}`;
+      document.title = title;
       return;
     }
-    let title: string | undefined;
-    if (Object.hasOwn(CREATOR_RESOURCE_TITLES, pathname)) {
-      title = CREATOR_RESOURCE_TITLES[pathname];
-    } else if (pathname in STATIC_TITLES) {
-      const titleKey = STATIC_TITLES[pathname];
-      title = titleKey ? t(titleKey) : "";
-    } else if (pathname.startsWith("/author/")) {
-      title = decodePathSegment(pathname.slice(8));
-    } else if (pathname.startsWith("/pencafe/")) {
-      title = `${decodePathSegment(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
-    } else if (pathname.startsWith("/community/")) {
-      title = t("route.community");
-    } else if (pathname.startsWith("/market/resource/")) {
-      title = t("route.market");
-    } else if (pathname.startsWith("/admin/")) {
-      title = t("route.admin");
-    } else if (pathname === "/me" || pathname.startsWith("/me/")) {
-      title = t("route.me");
-    } else if (isStudioRoutePathname(pathname)) {
-      title = t("route.studio");
-    }
-    document.title = title ? `${title} · ${t("app.name")}` : t("app.name");
-  }, [pathname, search, t]);
+    document.title = title === t("app.name") ? title : `${title} · ${t("app.name")}`;
+  }, [pathname, search, t, title]);
+  return title;
 }

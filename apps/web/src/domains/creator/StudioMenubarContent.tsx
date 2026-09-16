@@ -52,6 +52,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_CANVAS_WIDTH as CANVAS_W } from "./canvas/studio-canvas-constants";
+import { handleStudioHorizontalWheel } from "./studio-horizontal-wheel";
 import {
   createStudioCommandExecutionBindings,
   installStudioCommandExecutionBindings,
@@ -60,7 +61,6 @@ import { createStudioMainMenuPresentation } from "./studio-main-menu-presentatio
 import {
   StudioExportMenuPanel,
   StudioMainMenu,
-  preloadStudioAssetMenuPanel,
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
 import {
@@ -73,7 +73,9 @@ import {
 } from "./studio-workspaces";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
 import { StudioProjectCenterSearch, StudioProjectCenterSection } from "./StudioProjectCenterSearch";
+import { StudioProjectCenterSurface } from "./StudioProjectCenterSurface";
 import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
+import { preloadStudioAssetToolPopoverBody } from "./studio-tool-belt-lazy-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
@@ -165,9 +167,9 @@ const MENUBAR_HINTS = {
   assets: {
     id: "menubar-assets",
     title: "템플릿·에셋",
-    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 소재를 엽니다.",
+    description: "템플릿, 장면, 캐릭터, 3D, 효과와 내 에셋을 한 번에 검색·미리보기·삽입합니다.",
     preview: "assets",
-    tip: "자주 쓰는 소재는 내 소재에 모아 반복 작업 시간을 줄여보세요.",
+    tip: "즐겨찾기와 최근 사용으로 반복 작업을 줄이고 적용 전 형식과 이용 조건을 확인할 수 있어요.",
   },
   bubbles: {
     id: "menubar-bubbles",
@@ -1351,8 +1353,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
       icon: Folder,
       hint: MENUBAR_HINTS.assets,
       run: () => {
-        preloadStudioAssetMenuPanel();
-        setMenu("template");
+        preloadStudioAssetToolPopoverBody();
+        setMenu("asset");
       },
     },
     bubbles: {
@@ -1388,6 +1390,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           ref={menubarLaneRef}
           data-testid="studio-menubar-primary"
           data-studio-menubar-primary="true"
+          onWheel={handleStudioHorizontalWheel}
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             mobileImmersive && "hidden"
@@ -1468,9 +1471,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <button
               type="button"
               onClick={() => {
-                preloadStudioAssetMenuPanel();
-                setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+                preloadStudioAssetToolPopoverBody();
+                setMenu(activeToolbarGroup === "assetGroup" ? null : "asset");
               }}
+              onPointerEnter={preloadStudioAssetToolPopoverBody}
+              onPointerDown={preloadStudioAssetToolPopoverBody}
+              onFocus={preloadStudioAssetToolPopoverBody}
               aria-label="템플릿·에셋"
               aria-haspopup="menu"
               aria-expanded={activeToolbarGroup === "assetGroup"}
@@ -1755,21 +1761,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             </StudioToolHintTarget>
             {projectActionsOpen && typeof document !== "undefined"
               ? createPortal(
-              <div
-                id="studio-project-actions-menu"
-                data-studio-project-actions-menu="true"
-                role="dialog"
-                aria-label="프로젝트 센터"
-                onClickCapture={(event) => {
-                  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
-                  if (button && !button.dataset.projectKeepOpen) {
-                    globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
-                  }
-                }}
-                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(44rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+              <StudioProjectCenterSurface
+                desktop={!isMobile}
+                onClose={() => setProjectActionsOpen(false)}
               >
                 <div className="sticky top-0 z-20 col-span-full -mx-2.5 -mt-2.5 border-b border-line/70 bg-panel/95 px-3 pb-3 pt-2.5 backdrop-blur-xl">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className={cn("flex items-start justify-between gap-3", !isMobile && "hidden")}>
                     <span className="min-w-0">
                       <span className="block text-sm font-bold tracking-tight text-fg">프로젝트 센터</span>
                       <span className="mt-0.5 block text-[0.67rem] leading-relaxed text-fg-3">백업 · 기획 · 제작 · 검수 · 게시</span>
@@ -2205,7 +2202,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               openPageReview,
             }}
           />
-              </div>,
+              </StudioProjectCenterSurface>,
               document.body
             )
             : null}

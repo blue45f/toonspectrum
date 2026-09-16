@@ -126,7 +126,7 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
     expect(
       screen.getByRole("link", { name: "스튜디오 캔버스에 에셋 삽입" }).getAttribute("href"),
     ).toBe(`/studio?installMarketResource=${record.id}&assetMarket=community`);
-    expect(screen.getByText(/지원되는 첫 에셋을 현재 캔버스에 삽입/u)).toBeTruthy();
+    expect(screen.getAllByText(/지원되는 첫 에셋을 현재 캔버스에 삽입/u).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "마켓 작가" }).getAttribute("href"))
       .toBe(`/u/${record.publisher.id}`);
     expect(screen.getByRole("link", { name: "이 배급자의 마켓 리소스" }).getAttribute("href"))
@@ -152,7 +152,7 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
     renderDetail(marketRecord("template"));
 
     expect(screen.getByRole("link", { name: "장면 템플릿 카탈로그 열기" })).toBeTruthy();
-    expect(screen.getByText(/장면 카드를 눌러야 현재 컷에 적용/u)).toBeTruthy();
+    expect(screen.getAllByText(/장면 카드를 선택해야 현재 컷에 적용/u).length).toBeGreaterThan(0);
     expect(screen.queryByText("스튜디오에 리소스 팩 설치")).toBeNull();
     expect(screen.queryByText(/1클릭으로 설치 및 캔버스 삽입/u)).toBeNull();
   });
@@ -161,19 +161,25 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
     renderDetail(marketRecord("3d-preset"));
 
     expect(screen.getByRole("link", { name: "3D 배경 카탈로그 열기" })).toBeTruthy();
-    expect(screen.getByText(/항목을 직접 선택해야 장면에 추가/u)).toBeTruthy();
+    expect(screen.getAllByText(/항목을 선택해야 현재 장면에 추가/u).length).toBeGreaterThan(0);
     expect(screen.queryByText(/3D.*삽입/u)).toBeNull();
   });
 
   it("describes installable brush resources as local tool-library packs", () => {
     renderDetail(marketRecord("brush"));
 
-    expect(screen.getByRole("link", { name: "스튜디오에 리소스 팩 설치" })).toBeTruthy();
-    expect(screen.getByText(/로컬 도구 라이브러리에 설치/u)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "스튜디오에 브러시 팩 설치" })).toBeTruthy();
+    expect(screen.getAllByText(/로컬 도구 라이브러리에 설치/u).length).toBeGreaterThan(0);
     expect(screen.getByText("이 기기·브라우저에서 확인된 설치 영수증 없음"))
       .toBeTruthy();
-    expect(screen.getByText(/계정 소유권이나 클라우드 동기화 상태가 아닙니다/u))
+    expect(screen.getByText(/계정 소장·클라우드 확인 이력과는 별개입니다/u))
       .toBeTruthy();
+    expect(screen.getByRole("heading", { name: "실제 다운로드·설치 흐름" }))
+      .toBeTruthy();
+    expect(document.querySelector('[data-market-install-step="download"]')
+      ?.getAttribute("data-market-install-step-state")).toBe("active");
+    expect(document.querySelector('[data-market-install-step="activate"]')
+      ?.textContent).toContain("기기 Studio 라이브러리에 설치");
   });
 
   it("labels an exact local receipt as installed and an older release receipt as updateable", () => {
@@ -190,8 +196,12 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
 
     expect(screen.getByText(`이 기기·브라우저에 v${current.resourceVersion} 설치 확인됨`))
       .toBeTruthy();
-    expect(screen.getByRole("link", { name: "스튜디오에서 설치 상태 확인" }))
+    expect(screen.getByRole("link", { name: "Studio에서 설치 관리" }))
       .toBeTruthy();
+    expect(document.querySelector('[data-market-install-step="download"]')
+      ?.getAttribute("data-market-install-step-state")).toBe("complete");
+    expect(document.querySelector('[data-market-install-step="activate"]')
+      ?.getAttribute("data-market-install-step-state")).toBe("complete");
 
     cleanup();
     const nextRelease = {
@@ -204,7 +214,7 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
 
     expect(screen.getByText("업데이트 가능 · 설치 v1.0.0 → 마켓 v2.0.0"))
       .toBeTruthy();
-    expect(screen.getByRole("link", { name: "스튜디오에서 v2.0.0로 업데이트" }))
+    expect(screen.getByRole("link", { name: "Studio에서 v2.0.0 업데이트" }))
       .toBeTruthy();
   });
 

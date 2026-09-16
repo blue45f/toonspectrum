@@ -41,25 +41,25 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("2D scene browser", () => {
   it("pages the complete production catalog without counting any scene twice", () => {
     render(<Harness />);
-    expect(screen.getByRole("status").textContent).toBe("64개 장면");
+    expect(screen.getByRole("status").textContent).toBe("68개 장면");
     expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
-    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" }));
+    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" }));
     const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
-    expect(ids).toHaveLength(64);
-    expect(new Set(ids).size).toBe(64);
+    expect(ids).toHaveLength(68);
+    expect(new Set(ids).size).toBe(68);
     expect(screen.queryByRole("button", { name: /장면 더 보기/u })).toBeNull();
   });
   it("returns to the first results when filters or search change after scrolling", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" }));
+    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" }));
     const grid = document.querySelector<HTMLElement>("[data-studio-2d-grid]")!;
     grid.scrollTop = 800;
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "recommended" } });
     expect(grid.scrollTop).toBe(0);
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(5);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(33);
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
-    expect(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" })).toBeTruthy();
   });
   it("finds metadata tags and independent genre/recommendation filters", () => {
     render(<Harness />);
@@ -67,9 +67,9 @@ describe("2D scene browser", () => {
     expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "recommended" } });
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(5);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(33);
     fireEvent.change(screen.getByLabelText("장르"), { target: { value: "로맨스" } });
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(6);
     expect(screen.getByText(title)).toBeTruthy();
   });
   it("recovers obsolete recommendation genre state without emptying the catalog", () => {
@@ -151,6 +151,6 @@ describe("2D scene browser", () => {
     expect(image.getAttribute("loading")).toBe("lazy");
     expect(image.getAttribute("decoding")).toBe("async");
     expect(image.className).toContain("object-contain");
-    expect(screen.getAllByText("소형 컷용 · 확대 주의")).toHaveLength(20);
+    expect(screen.queryByText("소형 컷용 · 확대 주의")).toBeNull();
   });
 });

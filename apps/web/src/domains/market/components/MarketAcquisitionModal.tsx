@@ -7,12 +7,20 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useMarketLibrary } from "../hooks/use-market-library";
+import {
+  resolveCurrentMarketAcquisitionRecord,
+} from "../models/market-acquisition-target";
+import type {
+  ResolvedMarketAcquisitionRecord,
+} from "../models/market-acquisition-target";
 import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
+import { marketStudioResourceHref } from "../models/market-studio-handoff";
 
+import type { MarketStudioHandoff } from "../models/market-studio-handoff";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -21,57 +29,148 @@ interface MarketAcquisitionModalProps {
   open: boolean;
   onClose: () => void;
   record: CreatorMarketplaceResourceRecord;
+  studioHandoff: MarketStudioHandoff;
   onAcquiredSuccess?: () => void;
+}
+
+function isAbortError(error: unknown): boolean {
+  return Boolean(
+    error
+    && typeof error === "object"
+    && "name" in error
+    && (error as { name?: unknown }).name === "AbortError"
+  );
 }
 
 export function MarketAcquisitionModal({
   open,
   onClose,
   record,
+  studioHandoff,
   onAcquiredSuccess,
 }: MarketAcquisitionModalProps) {
   const navigate = useNavigate();
   const { acquireResource } = useMarketLibrary();
+  const acquisitionAbortRef = useRef<AbortController | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [versionNotice, setVersionNotice] = useState<string | null>(null);
+  const [acquisition, setAcquisition] =
+    useState<ResolvedMarketAcquisitionRecord | null>(null);
+
+  useEffect(() => {
+    acquisitionAbortRef.current?.abort();
+    acquisitionAbortRef.current = null;
+    setAgreed(false);
+    setSubmitting(false);
+    setCompleted(false);
+    setError(null);
+    setVersionNotice(null);
+    setAcquisition(null);
+
+    return () => {
+      acquisitionAbortRef.current?.abort();
+      acquisitionAbortRef.current = null;
+    };
+  }, [open, record.id]);
 
   if (!open) return null;
 
-  const kind = marketKindMeta(record.kind);
-  const license = marketLicenseMeta(record.license);
+  const activeRecord = acquisition?.record ?? record;
+  const kind = marketKindMeta(activeRecord.kind);
+  const license = marketLicenseMeta(activeRecord.license);
+  const redirectedToCurrentHead = acquisition?.redirectedToCurrentHead ?? false;
+  const activeStudioActionLabel = redirectedToCurrentHead
+    && studioHandoff.mode === "install-tool-pack"
+      ? `Studio에서 v${activeRecord.resourceVersion} 설치·확인`
+      : studioHandoff.actionLabel;
+
+  const closeModal = () => {
+    acquisitionAbortRef.current?.abort();
+    acquisitionAbortRef.current = null;
+    onClose();
+  };
 
   const handleAcquire = async () => {
     if (!agreed || submitting) return;
+
+    acquisitionAbortRef.current?.abort();
+    const controller = new AbortController();
+    acquisitionAbortRef.current = controller;
     setSubmitting(true);
     setError(null);
+
     try {
-      const acquired = await acquireResource(record);
+      const resolved = await resolveCurrentMarketAcquisitionRecord(activeRecord, {
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted
+        || acquisitionAbortRef.current !== controller
+      ) return;
+
+      const retainedResolution = acquisition?.redirectedToCurrentHead
+        ? {
+            ...resolved,
+            requestedReleaseId: acquisition.requestedReleaseId,
+            redirectedToCurrentHead: true,
+          }
+        : resolved;
+
+      if (resolved.redirectedToCurrentHead) {
+        setAcquisition(retainedResolution);
+        setAgreed(false);
+        setVersionNotice(
+          `현재 공개 버전 v${resolved.record.resourceVersion}으로 설치 대상이 변경되었습니다. 최신 라이선스와 출처 조건을 확인한 뒤 다시 동의해 주세요.`,
+        );
+        return;
+      }
+
+      const acquired = await acquireResource(
+        resolved.record,
+        resolved.target.logicalPackId,
+      );
+      if (
+        controller.signal.aborted
+        || acquisitionAbortRef.current !== controller
+      ) return;
       if (!acquired) {
         setError(
           "내 에셋에 추가하지 못했습니다. 아직 계정에 보관되지 않았습니다. 네트워크와 로그인 상태를 확인한 뒤 다시 시도해 주세요.",
         );
         return;
       }
+
+      setAcquisition(retainedResolution);
+      setVersionNotice(null);
       setCompleted(true);
       onAcquiredSuccess?.();
     } catch (caught) {
+      if (
+        controller.signal.aborted
+        || acquisitionAbortRef.current !== controller
+        || isAbortError(caught)
+      ) return;
       setError(caught instanceof Error && caught.message.trim()
         ? caught.message
         : "내 에셋에 추가하지 못했습니다. 현재 에셋은 계정에 보관되지 않았습니다.");
     } finally {
-      setSubmitting(false);
+      if (acquisitionAbortRef.current === controller) {
+        acquisitionAbortRef.current = null;
+        setSubmitting(false);
+      }
     }
   };
 
   const handleOpenInStudio = () => {
-    onClose();
-    navigate(`/studio?installMarketResource=${record.id}&assetMarket=community`);
+    closeModal();
+    navigate(marketStudioResourceHref(activeRecord.id));
   };
 
   const handleGoToLibrary = () => {
-    onClose();
+    closeModal();
     navigate("/market/library");
   };
 
@@ -90,7 +189,7 @@ export function MarketAcquisitionModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeModal}
             aria-label="닫기"
             className="rounded-lg p-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
@@ -106,21 +205,30 @@ export function MarketAcquisitionModal({
             <div>
               <h3 className="text-lg font-bold text-fg">내 에셋에 안전하게 보관했습니다</h3>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                계정 보관과 현재 기기 설치는 서로 다른 단계입니다. 지금 Studio에서 열면 이 기기에 설치하고 바로 시험할 수 있습니다.
+                계정 보관과 현재 기기 설치·적용은 서로 다른 단계입니다. {studioHandoff.summary}
               </p>
             </div>
 
-            <div className="space-y-1 rounded-xl border border-line bg-panel p-3.5 text-left text-xs">
+            {redirectedToCurrentHead ? (
+              <div className="rounded-xl border border-accent/35 bg-accent/10 p-3 text-left text-xs leading-relaxed text-fg-2">
+                상세에서 본 v{record.resourceVersion}은 이전 릴리스입니다. 같은 제작자·패키지·종류임을 확인한 뒤 현재 공개 버전 v{activeRecord.resourceVersion}을 내 에셋에 추가했습니다.
+              </div>
+            ) : null}
+
+            <div className="space-y-2 rounded-xl border border-line bg-panel p-3.5 text-left text-xs">
               <p className="flex items-center gap-1.5 font-semibold text-fg">
                 <ShieldCheck className="size-3.5 text-good" aria-hidden="true" />
                 <span>{license.label}</span>
               </p>
               <p className="text-[0.68rem] leading-relaxed text-fg-3">{license.summary}</p>
-              {record.attributionText ? (
+              {activeRecord.attributionText ? (
                 <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  출처 표기: {record.attributionText}
+                  출처 표기: {activeRecord.attributionText}
                 </p>
               ) : null}
+              <p className="border-t border-line pt-2 text-[0.68rem] leading-relaxed text-fg-3">
+                설치 대상: v{activeRecord.resourceVersion} · 무결성 {activeRecord.manifestHash.slice(0, 12)}…
+              </p>
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -130,7 +238,7 @@ export function MarketAcquisitionModal({
                 className={buttonClass({ variant: "solid", size: "md", className: "w-full gap-2" })}
               >
                 <Palette className="size-4" aria-hidden="true" />
-                <span>Studio에서 설치하고 시험하기</span>
+                <span>{activeStudioActionLabel}</span>
               </button>
               <button
                 type="button"
@@ -151,11 +259,18 @@ export function MarketAcquisitionModal({
                 <span className="inline-flex rounded bg-accent/20 px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
                   {kind.label}
                 </span>
-                <h3 className="truncate text-sm font-bold leading-snug text-fg">{record.name}</h3>
+                <h3 className="truncate text-sm font-bold leading-snug text-fg">{activeRecord.name}</h3>
                 <p className="text-[0.68rem] text-fg-3">
-                  제작자: {record.publisher.name} · v{record.resourceVersion}
+                  제작자: {activeRecord.publisher.name} · 설치 대상 v{activeRecord.resourceVersion}
                 </p>
               </div>
+            </div>
+
+            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-xl border border-line bg-panel/60 p-3 text-[0.7rem] leading-relaxed text-fg-2">
+              <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[0.62rem] font-bold text-on-accent">1</span>
+              <span>서버에서 같은 패키지의 현재 공개 릴리스와 제작자·종류·안정 식별자를 확인합니다.</span>
+              <span className="flex size-5 items-center justify-center rounded-full bg-raised text-[0.62rem] font-bold text-fg">2</span>
+              <span>현재 릴리스를 내 계정에 보관한 뒤, Studio에서 그 정확한 버전을 설치합니다.</span>
             </div>
 
             <div className="space-y-2 rounded-xl border border-good/40 bg-good/10 p-3.5">
@@ -172,13 +287,20 @@ export function MarketAcquisitionModal({
                   <span>{license.label}</span>
                 </p>
                 <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">{license.summary}</p>
-                {record.attributionText ? (
+                {activeRecord.attributionText ? (
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                    출처 표기: {record.attributionText}
+                    출처 표기: {activeRecord.attributionText}
                   </p>
                 ) : null}
               </div>
             </div>
+
+            {versionNotice ? (
+              <div role="status" className="flex items-start gap-2 rounded-xl border border-accent/40 bg-accent/10 p-3 text-xs leading-relaxed text-fg">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+                <span>{versionNotice}</span>
+              </div>
+            ) : null}
 
             <label className="flex cursor-pointer select-none items-start gap-2 rounded-xl border border-line/70 bg-panel/45 p-3 text-xs text-fg-2 transition-colors hover:border-line-strong">
               <input
@@ -202,7 +324,7 @@ export function MarketAcquisitionModal({
             <div className="flex items-center justify-end gap-2 border-t border-line pt-4">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={closeModal}
                 className={buttonClass({ variant: "ghost", size: "sm" })}
               >
                 취소
@@ -220,7 +342,11 @@ export function MarketAcquisitionModal({
                 })}
               >
                 <Download className="size-4" aria-hidden="true" />
-                <span>{submitting ? "내 에셋에 추가 중…" : "내 에셋에 추가"}</span>
+                <span>{submitting
+                  ? "현재 버전 확인 중…"
+                  : versionNotice
+                    ? `현재 v${activeRecord.resourceVersion} 조건 확인 후 추가`
+                    : "내 에셋에 추가"}</span>
               </button>
             </div>
           </div>

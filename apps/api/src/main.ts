@@ -2,17 +2,11 @@ import "./load-env"; // 반드시 첫 import — apps/api/src/db가 DATABASE_URL
 import "reflect-metadata";
 import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import {
-  type NextFunction,
-  type Request,
-  type Response,
-} from "express";
 import { Logger } from "nestjs-pino";
 
 import { CapabilityWorkerAppModule } from "./capability-worker-app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundary";
-import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { createEdgeOriginAuthMiddleware } from "./config/edge-origin-auth";
@@ -50,15 +44,8 @@ async function bootstrap() {
   app.use(createApiSecurityHeadersMiddleware(process.env));
   app.use(createEdgeOriginAuthMiddleware(process.env));
   if (runtimeRole !== "capability-worker") {
-    configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
+    configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·Render에서 동일하게 처리
   }
-  // Compatibility adapters may tunnel the canonical API path through `?path=`. Rewrite it
-  // before every role, authentication and CSRF boundary so those guards authorize the route that
-  // Nest will actually dispatch, never the harmless-looking pre-rewrite path.
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    rewriteQueryPathToUrl(req);
-    next();
-  });
   app.use(createApiRuntimeRoleGuard(process.env));
   if (runtimeRole === "capability-worker") {
     configureApiBodyParserBoundary(app, capabilityWorkerPolicy);
@@ -82,7 +69,6 @@ async function bootstrap() {
   let studioLiveAdapter: StudioLivePostgresIoAdapter | null = null;
   try {
     // 명시적으로 postgres 모드를 선택한 장기 실행 API에서만 클러스터 adapter를 장착한다.
-    // 비상 serverless 호환 경로(serverless.ts)는 WebSocket 수명주기가 다르므로 이 factory를 호출하지 않는다.
     studioLiveAdapter =
       runtimeRole === "capability-worker"
         ? null

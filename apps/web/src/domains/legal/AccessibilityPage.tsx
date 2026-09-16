@@ -1,5 +1,7 @@
 import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide-react";
 
+import { AccessibilityLab } from "./AccessibilityLab";
+
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
@@ -69,10 +71,12 @@ export function AccessibilityPage() {
         })}
       </div>
 
+      <AccessibilityLab />
+
       <section className="mt-8 rounded-2xl border border-accent/30 bg-accent-soft/30 p-5 sm:p-6">
         <p className="max-w-3xl text-sm leading-7 text-fg-2">{copy.note}</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/feedback" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">{copy.feedback}</Link>
+          <Link href="/feedback?type=bug&tag=accessibility" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">{copy.feedback}</Link>
           <Link href="/help" className="inline-flex min-h-11 items-center rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 hover:border-line-strong hover:text-fg">{copy.help}</Link>
         </div>
       </section>

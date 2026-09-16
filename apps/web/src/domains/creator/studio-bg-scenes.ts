@@ -1,4 +1,5 @@
 import { isRecommendedStudio2dScene } from "./studio-2d-asset-quality";
+import cc0SceneManifest from "./studio-2d-cc0-scene-manifest.json";
 
 // 창작 스튜디오 — 장르 전면 배경 씬(풀캔버스 배경 이미지로 삽입).
 // 720×1080 세로 캔버스에 맞춘 자체 벡터 SVG 배경. 라이선스 이슈 없는 순수 원본 벡터만 사용
@@ -680,7 +681,7 @@ const sRomanceBloomingRoses = (() => {
   return scene(defs, body);
 })();
 
-export const BG_SCENES: BgScene[] = [
+const LEGACY_RASTER_BG_SCENES: BgScene[] = [
   { id: "webtoon-classroom", label: "웹툰 교실 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_classroom.jpg", width: 1024, height: 1024 },
   { id: "webtoon-street", label: "웹툰 노을 거리 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_street.jpg", width: 1024, height: 1024 },
   { id: "webtoon-bedroom", label: "웹툰 방 야경 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_bedroom.jpg", width: 627, height: 940 },
@@ -710,6 +711,30 @@ export const BG_SCENES: BgScene[] = [
   { id: "webtoon-horror-abandoned-hospital", label: "웹툰 폐병원 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_abandoned_hospital.jpg", width: 627, height: 940 },
   { id: "webtoon-horror-foggy-cabin", label: "웹툰 안개 오두막 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_foggy_cabin.jpg", width: 627, height: 940 },
   { id: "webtoon-horror-dark-tunnel", label: "웹툰 어둠의 터널 (AI)", genre: "스릴러", imgSrc: "/assets/studio/backgrounds/webtoon_horror_dark_tunnel.jpg", width: 627, height: 940 },
+];
+
+export const CURATED_CC0_BG_SCENES: readonly BgScene[] = Object.freeze(
+  cc0SceneManifest.assets.map(({ id, label, genre, src, width, height }) => Object.freeze({
+    id,
+    label,
+    genre,
+    imgSrc: src,
+    width,
+    height,
+  })),
+);
+
+/**
+ * Kept only so older saved documents and explicit migration tools can resolve the previous IDs.
+ * These scenes are intentionally absent from the default picker because they are small, visually
+ * awkward, contain baked-in people/text, or do not have a sufficiently clear source record.
+ */
+export const BG_SCENE_COMPATIBILITY_LIBRARY: readonly BgScene[] = Object.freeze(
+  LEGACY_RASTER_BG_SCENES.filter((scene) => !isRecommendedStudio2dScene(scene)),
+);
+
+const REVIEWED_LEGACY_BG_SCENES = LEGACY_RASTER_BG_SCENES.filter(isRecommendedStudio2dScene);
+const VECTOR_BG_SCENES: BgScene[] = [
   { id: "fantasy-forest", label: "판타지 숲", genre: "fantasy", svg: sFantasyForest },
   { id: "magic-castle", label: "마법 성", genre: "fantasy", svg: sMagicCastle },
   { id: "bright-sky", label: "환한 하늘", genre: "daily", svg: sBrightSky },
@@ -728,6 +753,20 @@ export const BG_SCENES: BgScene[] = [
   { id: "cyberpunk-hologram", label: "사이버네온 홀로그램", genre: "sf", svg: sCyberpunkHologram },
   { id: "romance-blooming-roses", label: "장미빛 로맨스", genre: "romance", svg: sRomanceBloomingRoses },
 ];
+
+/** Default picker catalog: reviewed high-resolution raster references plus resolution-independent vectors. */
+export const BG_SCENES: BgScene[] = [
+  ...REVIEWED_LEGACY_BG_SCENES,
+  ...CURATED_CC0_BG_SCENES,
+  ...VECTOR_BG_SCENES,
+];
+
+/** Full resolver catalog for migrations and compatibility checks; do not pass this to the default picker. */
+export const ALL_BG_SCENES: readonly BgScene[] = Object.freeze([
+  ...BG_SCENES,
+  ...BG_SCENE_COMPATIBILITY_LIBRARY,
+]);
+
 
 // ── 장르 분류 통일 + 표시 우선순위 ──────────────────────────
 // BG_SCENES(영문 genre)와 BG_SCENES_EXTRA(한글 genre) 표기를 한 체계로 정규화하고

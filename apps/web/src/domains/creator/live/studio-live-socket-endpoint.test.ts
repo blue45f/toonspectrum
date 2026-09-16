@@ -23,7 +23,7 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
         explicitOrigin: "https://realtime.toonspectrum.example/socket-host?ignored=yes",
-        viteApiBase: "https://serverless.toonspectrum.example/api",
+        viteApiBase: "https://api.toonspectrum.example/api",
         runtimeApiBase: "https://runtime-api.toonspectrum.example/api",
       })
     ).toBe("https://realtime.toonspectrum.example/studio-live");
@@ -46,14 +46,14 @@ describe("Studio live Socket.IO endpoint resolver", () => {
   it("never inherits the production API origin from a local dev or preview shell", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
-        viteApiBase: "https://toonspectrum.vercel.app/api",
-        runtimeApiBase: "https://toonspectrum.vercel.app/api",
+        viteApiBase: "https://api.toonstudio.cloud/api",
+        runtimeApiBase: "https://api.toonstudio.cloud/api",
         locationOrigin: "http://127.0.0.1:5199",
       })
     ).toBeNull();
     expect(
       resolveStudioLiveSocketEndpoint({
-        viteApiBase: "https://toonspectrum.vercel.app/api",
+        viteApiBase: "https://api.toonstudio.cloud/api",
         locationOrigin: "https://dev-shell.internal.example",
         localDevelopment: true,
       })
@@ -82,18 +82,7 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     ).toBe("http://127.0.0.1:4001/studio-live");
   });
 
-  it("requires an explicit long-running realtime origin on Vercel serverless", () => {
-    expect(
-      resolveStudioLiveSocketEndpoint({
-        locationOrigin: "https://toonspectrum.vercel.app",
-      })
-    ).toBeNull();
-    expect(
-      resolveStudioLiveSocketEndpoint({
-        viteApiBase: "https://toonspectrum.vercel.app/api",
-        locationOrigin: "https://preview-branch.vercel.app",
-      })
-    ).toBeNull();
+  it("requires an explicit long-running realtime origin on production static hosts", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
         locationOrigin: "https://www.toonstudio.cloud",
@@ -116,7 +105,7 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
         explicitOrigin: "https://realtime.toonspectrum.example/base",
-        viteApiBase: "https://toonspectrum.vercel.app/api",
+        viteApiBase: "https://api.toonstudio.cloud/api",
         locationOrigin: "http://localhost:5199",
         localDevelopment: true,
       })

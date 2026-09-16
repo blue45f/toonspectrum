@@ -404,4 +404,4 @@ apps/api/            NestJS 백엔드
 
 ### 런타임 소스 지도
 
-프런트엔드는 `apps/web/src/app`(부트스트랩·라우팅), `apps/web/src/domains`(기능 도메인), `apps/web/src/shared`(도메인 간 브라우저 서비스·호환 경계)를 중심으로 구성합니다. 백엔드 기능은 `apps/api/src/modules`, 외부 서비스 어댑터는 `apps/api/src/infrastructure`, 스키마·마이그레이션은 `apps/api/src/db`, 서버 유스케이스는 `apps/api/src/server`에 둡니다. 루트 `api/` 파일은 Vercel 진입점용 어댑터이며 애플리케이션 로직이 아닙니다.
+프런트엔드는 `apps/web/src/app`(부트스트랩·라우팅), `apps/web/src/domains`(기능 도메인), `apps/web/src/shared`(도메인 간 브라우저 서비스·호환 경계)를 중심으로 구성합니다. 백엔드 기능은 `apps/api/src/modules`, 외부 서비스 어댑터는 `apps/api/src/infrastructure`, 스키마·마이그레이션은 `apps/api/src/db`, 서버 유스케이스는 `apps/api/src/server`에 둡니다. 운영 HTTP 진입점은 Render에서 실행되는 `apps/api/src/main.ts` 하나입니다.

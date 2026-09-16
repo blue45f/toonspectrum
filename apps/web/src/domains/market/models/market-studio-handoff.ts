@@ -1,3 +1,4 @@
+import type { CreatorMarketplaceInstallReceiptState } from "@/shared/lib/creator-marketplace-install-receipt";
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
@@ -94,10 +95,23 @@ export function marketStudioResourceHref(resourceId: string): string {
 }
 
 export function marketStudioHandoff(
-  record: Pick<CreatorMarketplaceResourceRecord, "id" | "kind">,
+  record: Pick<
+    CreatorMarketplaceResourceRecord,
+    "id" | "kind" | "resourceVersion"
+  >,
+  installState: CreatorMarketplaceInstallReceiptState = "no-verified-receipt",
 ): MarketStudioHandoff {
+  const base = HANDOFF_BY_KIND[record.kind];
+  const actionLabel = base.mode !== "install-tool-pack"
+    ? base.actionLabel
+    : installState === "update-available"
+      ? `Studio에서 v${record.resourceVersion} 업데이트`
+      : installState === "installed-current"
+        ? "Studio에서 설치 관리"
+        : base.actionLabel;
   return {
     href: marketStudioResourceHref(record.id),
-    ...HANDOFF_BY_KIND[record.kind],
+    ...base,
+    actionLabel,
   };
 }

@@ -16,19 +16,19 @@ const SUPPORT_LINKS = [
     icon: MessagesSquare,
     title: "사이트 문의",
     body: "서비스 이용, 계정, 데이터 표시처럼 일반 문의를 남깁니다.",
-    href: "/feedback?category=question",
+    href: "/support",
   },
   {
     icon: Handshake,
     title: "제휴 문의",
     body: "광고, 플랫폼 연동, 콘텐츠 제휴 같은 비즈니스 제안을 접수합니다.",
-    href: "/feedback?category=idea",
+    href: "/feedback?type=idea",
   },
   {
     icon: Bug,
     title: "버그 제보",
     body: "오류 화면, 재현 경로, 기대 동작을 자사 제보 보드에 남깁니다.",
-    href: "/feedback?category=bug",
+    href: "/feedback?type=bug",
   },
 ] as const;
 
@@ -62,7 +62,7 @@ export function ContactPage() {
       <PublicStoryHero
         eyebrow="CONTACT · CREATE SOMETHING TOGETHER"
         title="웹툰을 만드는 더 나은 환경, 함께."
-        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 모든 문의는 툰스펙트럼의 자체 피드백 보드에서 접수하고 상태를 확인할 수 있습니다."
+        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서 해결 경로를 찾고, 공개 제안과 협업 아이디어는 피드백 보드에서 함께 논의할 수 있습니다."
         image="materials"
         imageAlt="브러시와 재료가 놓인 웹툰 작업실 콘셉트 아트"
         caption="LET’S MAKE ROOM FOR IDEAS · 드로잉 재료 콘셉트 아트"
@@ -122,17 +122,16 @@ export function ContactPage() {
 
         <aside>
           <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-5">
-            <h2 className="text-sm font-semibold text-fg">문의 작성과 진행 상태</h2>
+            <h2 className="text-sm font-semibold text-fg">문의 성격에 맞는 경로</h2>
             <p className="mt-2 text-xs leading-relaxed text-fg-3">
-              외부 게시 서비스로 이동하지 않습니다. 질문, 아이디어, 오류 제보를
-              툰스펙트럼 피드백 보드에 남기고 댓글과 운영 답변을 같은 화면에서
-              확인할 수 있습니다.
+              사용 중 발생한 문제는 지원 센터에서 해결 방법과 진단 정보를 확인하세요.
+              공개해도 되는 제안과 오류는 피드백 보드에서 댓글과 운영 상태를 함께 볼 수 있습니다.
             </p>
             <Link
-              href="/feedback"
+              href="/support"
               className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2"
             >
-              피드백 보드 열기
+              지원 센터 열기
             </Link>
           </div>
         </aside>

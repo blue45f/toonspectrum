@@ -124,11 +124,11 @@ pnpm run cloudflare:static:deploy
 
 ## 커스텀 도메인 전환
 
-`workers_dev` URL은 배포 후 독립 canary로 유지한다. 이 Static Assets Worker는 Cloudflare 영역 라우트 `www.toonstudio.cloud/*`만 담당하며 실패 모드는 fail-open이다. apex `toonstudio.cloud/*`는 [`../cloudflare-apex-redirect`](../cloudflare-apex-redirect/)의 초소형 `308` Worker가 별도로 담당한다. 이 분리는 apex 정본화 때문에 모든 정적 파일 요청을 Worker 코드로 통과시키는 비용·장애 결합을 피한다. `origin.toonstudio.cloud`는 정상 Worker 변수와 프록시 체인에서 제외한 DNS-only 수동 Vercel 재해복구 원본으로만 남겨 API와 R2 fallback의 재귀 프록시 및 자동 비용 경로를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
+`workers_dev` URL은 배포 후 독립 canary로 유지한다. 이 Static Assets Worker는 Cloudflare 영역 라우트 `www.toonstudio.cloud/*`만 담당하며 실패 모드는 fail-open이다. apex `toonstudio.cloud/*`는 [`../cloudflare-apex-redirect`](../cloudflare-apex-redirect/)의 초소형 `308` Worker가 별도로 담당한다. 이 분리는 apex 정본화 때문에 모든 정적 파일 요청을 Worker 코드로 통과시키는 비용·장애 결합을 피한다. `origin.toonstudio.cloud`와 퇴역 Vercel project domain은 정상 Worker 변수와 프록시 체인에서 제외한다. DNS·project 연결 삭제는 별도 운영 변경으로 수행한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
 
 ## 헤더 계약
 
-`apps/web/public/_headers`는 `vercel.json`의 기존 보안·캐시 헤더로부터 생성한다. Vite가 이를 `dist/_headers`로 복사하고 Static Assets가 정적 응답에 적용한다.
+`apps/web/public/_headers`는 `config/http-response-headers.json`의 공급자 중립 보안·캐시 계약에서 생성한다. Vite가 이를 `dist/_headers`로 복사하고 Static Assets가 정적 응답에 적용한다.
 
 ```bash
 pnpm run generate:cloudflare-static-rules
@@ -143,6 +143,6 @@ pnpm run generate:cloudflare-static-rules -- --check
 - 공개 읽기 replica 장애는 안전한 읽기 요청 안에서만 다른 replica를 시도한다.
 - core·social·playground·admin·realtime 권위는 임의의 다른 공급자로 자동 write failover하지 않는다.
 - 특정 기능 권위가 중단되어도 정적 앱과 로컬 OPFS 프로젝트는 계속 사용할 수 있어야 한다.
-- Vercel 수동 fallback은 Cloudflare 또는 Render를 복구할 수 없는 비상 rollback일 뿐 정상 트래픽·자동 배포 권위가 아니다.
+- Vercel fallback은 제거되었으며 Cloudflare Worker/Static Assets와 Render의 직전 검증 version으로만 롤백한다.
 - 사용자 프로젝트 원본은 이 정적 배포 단위에 저장하지 않는다.
 - 사용 금지된 퇴역 공급자는 운영·fallback·복구 경로에 포함하지 않는다.

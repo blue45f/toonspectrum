@@ -24,7 +24,7 @@ const repository = () => createStudioDurableSaveIntentRepository({
 beforeEach(() => { storage.clear(); vi.clearAllMocks(); });
 
 describe("durable save intent: shared SQLite authority, no automatic replay", () => {
-  it("persists a serverless local document across repository instances", async () => {
+  it("persists a server-free local document across repository instances", async () => {
     const entry = await repository().remember(scope, null);
     expect(await repository().load(scope)).toEqual(entry);
     expect(database.kvSet).toHaveBeenCalledWith(STUDIO_DURABLE_SAVE_INTENT_NAMESPACE,

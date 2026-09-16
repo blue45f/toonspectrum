@@ -11,7 +11,7 @@ import type {
 /**
  * Legal policy authority is first-party and bundled with the release.
  *
- * The previous resolver fetched a Vercel-hosted TermsDesk service on demand.
+ * The previous resolver fetched an external TermsDesk service on demand.
  * Keeping the policy body in the reviewed repository removes that runtime,
  * latency, availability and billing dependency. A fresh object is returned to
  * every caller so application code cannot mutate the frozen canonical copy.

@@ -29,37 +29,15 @@ function normalizedRequestPath(value: string): string | null {
   return normalized.toLowerCase();
 }
 
-function queryPath(req: Request): string | null {
-  const value =
-    req.query && typeof req.query === "object" ? req.query.path : undefined;
-  const joined = Array.isArray(value)
-    ? value
-        .filter((part): part is string => typeof part === "string")
-        .join("/")
-    : typeof value === "string"
-      ? value
-      : null;
-  if (!joined) return null;
-  const normalized = normalizedRequestPath(joined);
-  if (!normalized) return null;
-  return normalized.startsWith("/api/")
-    ? normalized
-    : `/api${normalized}`;
-}
-
 /**
  * Authentication POSTs can establish or replace an ambient HttpOnly session even
  * before a cookie exists. They therefore need login-CSRF protection as well as
  * the ordinary cookie-authenticated mutation boundary.
- *
- * `queryPath` mirrors the optional `/api/index?path=...` compatibility adapter shape because this
- * middleware deliberately runs before the adapter rewrites the request URL.
  */
 export function isAuthMutationRequest(req: Request): boolean {
   const candidates = [
     normalizedRequestPath(req.path),
     normalizedRequestPath(req.originalUrl),
-    queryPath(req),
   ];
   return candidates.some((path) =>
     path === "/auth"
@@ -78,7 +56,6 @@ export function isStudioRealtimeTicketMutationRequest(req: Request): boolean {
   const candidates = [
     normalizedRequestPath(req.path),
     normalizedRequestPath(req.originalUrl),
-    queryPath(req),
   ];
   return candidates.some(
     (path) =>

@@ -36,7 +36,7 @@ if (enabled) {
     || !["127.0.0.1", "[::1]"].includes(target.hostname)
     || !target.username || !target.password || target.search || target.hash
     || !/^\/toonspectrum_creator_hub_test$/u.test(target.pathname)
-    || process.env.VERCEL || process.env.RENDER_SERVICE_ID) {
+    || process.env.RENDER_SERVICE_ID) {
     throw new Error("Creator hub integration requires an explicit local, disposable toonspectrum_creator_hub_test database in test mode.");
   }
 }

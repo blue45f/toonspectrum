@@ -80,6 +80,12 @@ const ContactPage = lazyRetry(
   })),
   "ContactPage",
 );
+const SupportPage = lazyRetry(
+  () => import("@/domains/legal/SupportPage").then((module) => ({
+    default: module.SupportPage,
+  })),
+  "SupportPage",
+);
 const FeedbackPage = lazyRetry(
   () => import("@/domains/legal/FeedbackPage").then((module) => ({
     default: module.FeedbackPage,
@@ -109,6 +115,6 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-privacy", path: "/privacy", element: <PrivacyPage /> },
   { id: "legal-copyright", path: "/copyright", element: <CopyrightPage /> },
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
-  { id: "legal-support", path: "/support", element: <FeedbackPage /> },
+  { id: "legal-support", path: "/support", element: <SupportPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);

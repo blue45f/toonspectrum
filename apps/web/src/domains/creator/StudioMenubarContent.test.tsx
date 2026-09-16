@@ -18,13 +18,17 @@ import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 import { useI18n } from "@/shared/lib/i18n";
 
 const {
-  preloadStudioAssetMenuPanel,
+  preloadStudioAssetToolPopoverBody,
   preloadStudioExportMenuPanel,
   mainMenuTriggerClicks,
 } = vi.hoisted(() => ({
-  preloadStudioAssetMenuPanel: vi.fn(),
+  preloadStudioAssetToolPopoverBody: vi.fn(),
   preloadStudioExportMenuPanel: vi.fn(),
   mainMenuTriggerClicks: [] as string[],
+}));
+
+vi.mock("./studio-tool-belt-lazy-ui", () => ({
+  preloadStudioAssetToolPopoverBody,
 }));
 
 vi.mock("./studio-page-lazy-ui", () => ({
@@ -59,7 +63,6 @@ vi.mock("./studio-page-lazy-ui", () => ({
       ))}
     </nav>
   ),
-  preloadStudioAssetMenuPanel,
   preloadStudioExportMenuPanel,
 }));
 
@@ -801,8 +804,8 @@ describe("StudioMenubarContent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "템플릿·에셋" }));
 
-    expect(preloadStudioAssetMenuPanel).toHaveBeenCalledOnce();
-    expect(setMenu).toHaveBeenCalledWith("template");
+    expect(preloadStudioAssetToolPopoverBody).toHaveBeenCalledOnce();
+    expect(setMenu).toHaveBeenCalledWith("asset");
   });
 
   it("exposes one authoritative desktop history cluster and delegates its commands", () => {

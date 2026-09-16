@@ -683,10 +683,10 @@ describe("StudioToolsCompanionPage", () => {
         && message.control.kind === "reference-preview-demand"
       ));
 
-    expect(screen.queryByRole("heading", { name: "레퍼런스 전용 화면" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "레퍼런스" }));
 
-    expect(await screen.findByRole("heading", { name: "레퍼런스 전용 화면" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeTruthy();
     await waitFor(() => expect(referenceDemands()).toEqual([
       expect.objectContaining({
         generation: 1,
@@ -699,7 +699,7 @@ describe("StudioToolsCompanionPage", () => {
       expect.objectContaining({ control: { kind: "reference-preview-demand", active: true } }),
       expect.objectContaining({ control: { kind: "reference-preview-demand", active: false } }),
     ]));
-    expect(screen.queryByRole("heading", { name: "레퍼런스 전용 화면" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeNull();
   });
 
   it("never treats another companion ping as primary activity", () => {
@@ -1206,8 +1206,8 @@ describe("StudioToolsCompanionPage", () => {
     connectReferencePrimary({ channel, companionInstance });
 
     expect(screen.queryByRole("tablist", { name: "컴패니언 모드" })).toBeNull();
-    expect(screen.getByRole("heading", { level: 1, name: "레퍼런스 화면" })).toBeTruthy();
-    expect(await screen.findByRole("heading", { name: "레퍼런스 전용 화면" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "레퍼런스 캔버스" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeTruthy();
     await waitFor(() => expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: "companion-control",
       generation: 1,
@@ -1217,7 +1217,7 @@ describe("StudioToolsCompanionPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
 
     expect(screen.getByRole("heading", { name: "발표 안전 모드" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "레퍼런스 전용 화면" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeNull();
     await waitFor(() => expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: "companion-control",
       generation: 1,
@@ -1374,7 +1374,7 @@ describe("StudioToolsCompanionPage", () => {
       itemCount: 1,
       resolvedItemCount: 1,
     });
-    await screen.findByRole("heading", { name: "레퍼런스 전용 화면" });
+    await screen.findByRole("heading", { name: "분리 레퍼런스 캔버스" });
     await waitFor(() => expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: "companion-control",
       control: { kind: "reference-preview-demand", active: true },
@@ -1396,7 +1396,7 @@ describe("StudioToolsCompanionPage", () => {
     const picker = screen.getByRole("button", { name: "스포이드" }) as HTMLButtonElement;
     await waitFor(() => expect(picker.disabled).toBe(false));
     fireEvent.click(picker);
-    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 캔버스" });
     Object.defineProperty(viewport, "getBoundingClientRect", {
       configurable: true,
       value: () => ({
@@ -1492,7 +1492,7 @@ describe("StudioToolsCompanionPage", () => {
         mutationId: "presentation-peer-b-0002",
       },
     })));
-    expect(await screen.findByRole("heading", { name: "레퍼런스 전용 화면" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "분리 레퍼런스 캔버스" })).toBeTruthy();
     expect(screen.queryByLabelText("최근 선택 색상 #AABBCC")).toBeNull();
   });
 

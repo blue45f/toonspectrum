@@ -11,7 +11,7 @@ export const CREATOR_PUBLICATION_SWEEP_INTERVAL_MS = 30_000;
 
 /**
  * Process-local accelerator for scheduled releases. Request-path promotion in the creator server
- * remains the serverless/cold-start safety net, so correctness never depends on this timer living
+ * remains the restart/cold-start safety net, so correctness never depends on this timer living
  * forever. Revision-fenced updates make overlapping replicas idempotent.
  */
 @Injectable()

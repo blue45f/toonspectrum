@@ -6,7 +6,8 @@
   "defaultProjectStorage": "local-or-byos",
   "forbiddenProviders": [
     "oracle",
-    "oci"
+    "oci",
+    "vercel"
   ],
   "quotaThresholds": {
     "warn": 0.6,

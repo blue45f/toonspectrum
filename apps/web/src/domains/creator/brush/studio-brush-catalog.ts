@@ -27,6 +27,11 @@ import {
   STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
 } from "./studio-brush-quality-portfolio";
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
+import {
+  STUDIO_V6_BRUSH_CATALOG_COUNT,
+  STUDIO_V6_BRUSH_CATALOG_ITEMS,
+  studioV6BrushCatalogItemById,
+} from "./studio-brush-v6-catalog";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
 
 import type { StudioToolOperation } from "../studio-brush";
@@ -92,7 +97,9 @@ export function studioBrushCatalogItemById(
   brushId: unknown,
 ): StudioBrushCatalogItem | null {
   return typeof brushId === "string"
-    ? STUDIO_BRUSH_CATALOG_BY_ID.get(brushId) ?? null
+    ? STUDIO_BRUSH_CATALOG_BY_ID.get(brushId)
+      ?? studioV6BrushCatalogItemById(brushId)
+      ?? null
     : null;
 }
 
@@ -160,7 +167,18 @@ export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogI
     ...STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS,
   ]);
 
-/** Search and selection intentionally share one non-quarantined source of truth. */
+/**
+ * Artist-facing complete library. V6 recipes sit directly after the audited representatives so
+ * progressive rendering reaches them before the long tail of classic engine variants.
+ */
+export const STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze([
+    ...STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
+    ...STUDIO_V6_BRUSH_CATALOG_ITEMS,
+    ...STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS,
+  ]);
+
+/** Classic searchable registry used by renderer audits and replay-safe tooling. */
 export const STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS =
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
 
@@ -192,12 +210,37 @@ export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatal
     ),
   );
 
-const STUDIO_LISTED_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
-  new Map(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));
+export const STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+  );
+
+export const STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+  );
+
+export const STUDIO_BRUSH_LIBRARY_COUNTS = Object.freeze({
+  classic: STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length,
+  v6: STUDIO_V6_BRUSH_CATALOG_COUNT,
+  total: STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS.length,
+  paint: STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS.length,
+  erase: STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS.length,
+});
+
+const STUDIO_LIBRARY_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
+  new Map(STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));
 
 function operationInventory(
   operation: StudioToolOperation | undefined,
+  includeV6: boolean,
 ): readonly StudioBrushCatalogItem[] {
+  if (includeV6) {
+    if (operation === undefined) return STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS;
+    return operation === "erase"
+      ? STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS
+      : STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS;
+  }
   if (operation === undefined) return STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
   return operation === "erase"
     ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS
@@ -210,8 +253,10 @@ export function filterStudioBrushCatalogItems(options: {
   query?: string;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
+  /** Include V6 material recipes on artist-facing library surfaces. */
+  includeV6?: boolean;
 } = {}): StudioBrushCatalogItem[] {
-  const { operation, ...libraryOptions } = options;
+  const { operation, includeV6 = false, ...libraryOptions } = options;
   const query = (libraryOptions.query ?? "").trim();
   const pinnedLane =
     libraryOptions.category === "favorites" ||
@@ -222,7 +267,7 @@ export function filterStudioBrushCatalogItems(options: {
     ...libraryOptions,
     category,
     query,
-    catalogItems: operationInventory(operation),
+    catalogItems: operationInventory(operation, includeV6),
   }) as StudioBrushCatalogItem[];
 }
 
@@ -238,7 +283,7 @@ function quickCatalogInventory(options: {
     ...(options.favoriteIds ?? []),
     ...(options.recentIds ?? []),
   ]) {
-    const item = STUDIO_LISTED_BRUSH_CATALOG_BY_ID.get(id);
+    const item = STUDIO_LIBRARY_BRUSH_CATALOG_BY_ID.get(id);
     if (item) byId.set(item.id, item);
   }
 

@@ -1,4 +1,5 @@
 import type { StudioProjectKind } from "../studio-project-library-store";
+import { STUDIO_WEBTOON_CANVAS_PRESETS } from "../studio-webtoon-canvas-presets";
 import type { StudioStorageProvider } from "./studio-save-profile";
 
 export interface StudioProjectCreateKindOption {
@@ -27,6 +28,14 @@ export interface StudioProjectCreateStorageOption {
   readonly badgeKo: string;
   readonly badgeEn: string;
 }
+
+const WEBTOON_CANVAS_TEMPLATE_OPTIONS: readonly StudioProjectCreateTemplateOption[] = Object.freeze(
+  STUDIO_WEBTOON_CANVAS_PRESETS.map((preset) => ({
+    id: preset.id,
+    labelKo: preset.labelKo,
+    labelEn: preset.labelEn,
+  })),
+);
 
 export const STUDIO_PROJECT_CREATE_KINDS: readonly StudioProjectCreateKindOption[] = Object.freeze([
   {
@@ -115,9 +124,9 @@ export const STUDIO_PROJECT_CREATE_TEMPLATES: Readonly<
   Record<StudioProjectKind, readonly StudioProjectCreateTemplateOption[]>
 > = Object.freeze({
   webtoon: Object.freeze([
-    { id: "webtoon-vertical", labelKo: "세로 웹툰", labelEn: "Vertical webtoon" },
-    { id: "webtoon-four-cut", labelKo: "4컷·컷툰", labelEn: "Four-panel comic" },
-    { id: "webtoon-page", labelKo: "페이지 만화", labelEn: "Page comic" },
+    ...WEBTOON_CANVAS_TEMPLATE_OPTIONS,
+    { id: "webtoon-four-cut", labelKo: "4컷·컷툰 · 1080 × 4320px", labelEn: "Four-panel comic · 1080 × 4320px" },
+    { id: "webtoon-page", labelKo: "페이지 만화 · 1600 × 2400px", labelEn: "Page comic · 1600 × 2400px" },
   ]),
   illustration: Object.freeze([
     { id: "illustration-portrait", labelKo: "인물 일러스트", labelEn: "Character illustration" },

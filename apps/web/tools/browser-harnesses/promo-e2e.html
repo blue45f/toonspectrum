@@ -21,14 +21,14 @@
         connections: [{
           id: "promo-e2e",
           label: "Promo E2E fixture",
-          baseUrl: "https://promo-ai.invalid/v1",
+          baseUrl: "https://openrouter.ai/api/v1",
           apiKey: "promo-e2e-key",
-          textModel: "ci-text-fixture",
+          textModel: "openrouter/free",
           imageModel: "",
           imageGenerationPath: "/images/generations",
           imageEditPath: "/images/edits",
           chatCompletionsPath: "/chat/completions",
-          costPolicy: "self-hosted-zero-cost",
+          costPolicy: "openrouter-free",
         }],
         assignments: { text: "promo-e2e", image: null, inference: null, "three-d": null },
       });

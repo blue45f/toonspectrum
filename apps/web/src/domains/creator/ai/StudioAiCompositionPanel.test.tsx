@@ -49,7 +49,7 @@ describe("StudioAiCompositionPanel server operation identity", () => {
     );
 
     expect(screen.getByText(/로그인하면 자동 무료 AI를 먼저 사용합니다/u)).toBeTruthy();
-    expect(screen.getByText(/개인 무료 키 또는 로컬 AI를 연결하세요/u)).toBeTruthy();
+    expect(screen.getByText(/개인 클라우드 API 키와 모델을 연결하세요/u)).toBeTruthy();
   });
 
   it("binds the tracked operation ID to the server request and settlement", async () => {

@@ -12807,6 +12807,7 @@ export function StudioCuttoonEditor({
   const {
     companionRuntimeRef,
     companionWindowRef,
+    companionReferenceWindowRef,
     companionPendingTextTimerRef,
     companionUiRef,
     companionReviewProjectionInputRef,
@@ -15691,6 +15692,9 @@ No text, logo, watermark, or copyrighted character.`;
             );
           },
           isCurrent: isCurrentOperation,
+          reportProgress: (progress) => {
+            if (isCurrentOperation()) setStatusNotice(progress.message);
+          },
           loadDependencies: async () => {
             const [
               { getCreatorMarketplaceResource },
@@ -24095,6 +24099,7 @@ No text, logo, watermark, or copyrighted character.`;
       collaborationOperationSyncRequired,
       collaborationLockMessage,
       studioCrdtAuthoritativeSaveBarrierRef,
+      studioCrdtSceneRuntimeRef,
       studioCrdtDocumentRef,
       sharedDocumentSaveAbortRef,
       ownerDetailAbortRef,
@@ -28880,6 +28885,15 @@ function clearSelectionForEdit() {
       redo={redo}
       referenceBoard={referenceBoard}
       referencePanelOpen={referencePanelOpen}
+      openReferenceCompanionWindow={() => openStudioToolsCompanionForMenu({
+        surface: "reference",
+        ensureRuntime: ensureStudioToolsCompanionRuntime,
+        runtimeRef: companionRuntimeRef,
+        windowRef: companionReferenceWindowRef,
+        announce: studioMainMenuActions.announceDrawingShortcut,
+        workId,
+        t,
+      })}
       refreshQuickMaskTint={refreshQuickMaskTint}
       releaseSchedule={releaseSchedule}
       removeSelected={removeSelected}

@@ -9,35 +9,62 @@ import {
   studio2dOrientation,
   studio2dResolutionLabel,
 } from "./studio-2d-asset-quality";
-import { BG_SCENES, bgSceneSections, groupBgScenes } from "./studio-bg-scenes";
+import {
+  ALL_BG_SCENES,
+  BG_SCENE_COMPATIBILITY_LIBRARY,
+  BG_SCENES,
+  bgSceneSections,
+  CURATED_CC0_BG_SCENES,
+  groupBgScenes,
+} from "./studio-bg-scenes";
 
 import type { Studio2dScene } from "./studio-2d-asset-quality";
 
 const groups = groupBgScenes(BG_SCENES);
 const scene = (id: string) => BG_SCENES.find((item) => item.id === id)!;
+const anyScene = (id: string) => ALL_BG_SCENES.find((item) => item.id === id)!;
 
 describe("2D scene quality and discovery", () => {
-  it("recommends only the five individually reviewed large originals", () => {
+  it("exposes only reviewed large raster originals in the default picker", () => {
     const result = filterStudio2dScenes(groups, { quality: "recommended" });
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(33);
     expect(result.every(isRecommendedStudio2dScene)).toBe(true);
-    expect(result).not.toContain(scene("webtoon-bedroom"));
+    expect(filterStudio2dScenes(groups, { quality: "raster" })).toEqual(result);
+    expect(result).not.toContain(anyScene("webtoon-bedroom"));
+    expect(result).toContain(scene("polyhaven-background-wide-street-01"));
   });
-  it("retains all original IDs exactly once after recommendation regrouping", () => {
+  it("keeps low-quality legacy IDs for document compatibility without exposing them by default", () => {
+    expect(BG_SCENE_COMPATIBILITY_LIBRARY).toHaveLength(24);
+    expect(CURATED_CC0_BG_SCENES).toHaveLength(28);
+    const activeIds = new Set(BG_SCENES.map((item) => item.id));
+    expect(BG_SCENE_COMPATIBILITY_LIBRARY.every((item) => !activeIds.has(item.id))).toBe(true);
+    expect(ALL_BG_SCENES).toHaveLength(BG_SCENES.length + BG_SCENE_COMPATIBILITY_LIBRARY.length);
+    expect(anyScene("webtoon-bedroom")).toBeTruthy();
+  });
+  it("retains every active ID exactly once after recommendation regrouping", () => {
     const sections = bgSceneSections(BG_SCENES);
     expect(sections[0].genre).toBe("추천");
-    expect(sections[0].scenes).toHaveLength(5);
+    expect(sections[0].scenes).toHaveLength(33);
     const ids = sections.flatMap((group) => group.scenes.map((item) => item.id));
     expect(new Set(ids).size).toBe(BG_SCENES.length);
     expect(ids).toHaveLength(BG_SCENES.length);
   });
-  it("does not mistake every raster for a large original", () => {
-    expect(filterStudio2dScenes(groups, { quality: "large" })).toHaveLength(9);
-    expect(filterStudio2dScenes(groups, { quality: "raster" })).toHaveLength(29);
+  it("registers every curated CC0 replacement as a verified 2048 by 1152 photo reference", () => {
+    for (const replacement of CURATED_CC0_BG_SCENES) {
+      const metadata = getStudio2dAssetMetadata(replacement)!;
+      expect(metadata.width).toBe(2048);
+      expect(metadata.height).toBe(1152);
+      expect(metadata.mediaType).toBe("image/webp");
+      expect(metadata.style).toBe("photographic-reference");
+      expect(metadata.provenance.licenseStatus).toBe("cc0-verified");
+      expect(metadata.provenance.provider).toBe("Poly Haven");
+      expect(isRecommendedStudio2dScene(replacement)).toBe(true);
+    }
   });
-  it("keeps all raster scenes discoverable in their normalized genre", () => {
-    expect(filterStudio2dScenes(groups, { genre: "일상·학원", quality: "raster" })).toContain(scene("webtoon-classroom"));
-    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toEqual([scene("webtoon-rooftop-sunset")]);
+  it("keeps high-quality raster scenes discoverable in their normalized genre", () => {
+    expect(filterStudio2dScenes(groups, { genre: "일상·학원", quality: "raster" })).toContain(scene("polyhaven-background-wide-street-01"));
+    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toContain(scene("webtoon-rooftop-sunset"));
+    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toHaveLength(6);
   });
   it("searches multiple terms across tags and time of day", () => {
     expect(filterStudio2dScenes(groups, { query: " 비   밤 " })).toContain(scene("webtoon-neon-alley"));
@@ -47,21 +74,21 @@ describe("2D scene quality and discovery", () => {
   it("handles case and full-width normalization", () => {
     expect(filterStudio2dScenes(groups, { query: "ｓｆ" })).toEqual(filterStudio2dScenes(groups, { query: "SF" }));
   });
-  it("filters original aspect ratios without guessing unknown dimensions", () => {
-    expect(filterStudio2dScenes(groups, { orientation: "landscape" })).toHaveLength(4);
-    expect(filterStudio2dScenes(groups, { orientation: "square" })).toHaveLength(5);
-    expect(filterStudio2dScenes(groups, { orientation: "portrait" })).toHaveLength(20);
+  it("filters reviewed source aspect ratios without guessing vector dimensions", () => {
+    expect(filterStudio2dScenes(groups, { orientation: "landscape" })).toHaveLength(32);
+    expect(filterStudio2dScenes(groups, { orientation: "square" })).toEqual([scene("webtoon-palace")]);
+    expect(filterStudio2dScenes(groups, { orientation: "portrait" })).toEqual([]);
   });
-  it("does not advertise crowd scenes or unknown vectors as person-free images", () => {
+  it("does not advertise people scenes or unknown vectors as person-free images", () => {
     const result = filterStudio2dScenes(groups, { emptySceneOnly: true });
-    expect(result).not.toContain(scene("webtoon-cafe"));
-    expect(result).not.toContain(scene("webtoon-corridor"));
+    expect(result).not.toContain(scene("polyhaven-background-rooitou-park"));
+    expect(result).not.toContain(scene("polyhaven-background-the-sky-is-on-fire"));
     expect(result).toContain(scene("webtoon-rooftop-sunset"));
     expect(result.every((item) => getStudio2dAssetMetadata(item)?.containsPeople === false)).toBe(true);
   });
   it("preserves metadata for verified compatibility aliases but not unrelated replacements", () => {
     const asset = STUDIO_2D_ASSET_METADATA.find((item) => item.legacySrc)!;
-    const original = scene(asset.id);
+    const original = anyScene(asset.id);
     expect(getStudio2dAssetMetadata({ ...original, imgSrc: asset.legacySrc! })).toBe(asset);
     expect(getStudio2dAssetMetadata({ ...original, imgSrc: "/unreviewed.jpg" })).toBeUndefined();
   });

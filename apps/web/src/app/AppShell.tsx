@@ -13,6 +13,7 @@ import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteCo
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
+import { recordSiteRouteVisit } from "@/shared/lib/site-route-history";
 
 import "@toonspectrum/core/fx/fx.css";
 
@@ -46,7 +47,10 @@ const ToastHost = lazy(() =>
 /** Records allow-listed creator destinations, never artwork or arbitrary query parameters. */
 function CreatorContinuityTracker() {
   const { pathname, search } = useLocation();
-  useEffect(() => { recordCreatorDestination(pathname, search); }, [pathname, search]);
+  useEffect(() => {
+    recordCreatorDestination(pathname, search);
+    recordSiteRouteVisit(pathname);
+  }, [pathname, search]);
   return null;
 }
 

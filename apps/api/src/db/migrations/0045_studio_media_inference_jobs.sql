@@ -1,4 +1,4 @@
--- Apply once with the normal database migration runner before enabling STUDIO_COMFYUI_URL.
+-- Apply once with the normal database migration runner before enabling STUDIO_MEDIA_CLOUD_API_URL.
 -- No existing artist documents, billing rows or provider configuration are changed.
 CREATE TABLE IF NOT EXISTS studio_media_inference_jobs (
   id uuid PRIMARY KEY,

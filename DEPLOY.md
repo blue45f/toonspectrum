@@ -2,15 +2,15 @@
 
 > **2026-09-15 사용자 정책:** 자동 빌드·배포 금지. PR 병합은 배포 승인이 아닙니다.
 > 승인한 main SHA의 변경 배포 단위만 Cloudflare와 Render에 수동 반영합니다.
-> Vercel은 정상 운영 권위가 아니라 승인형 emergency prebuilt rollback입니다.
+> Vercel 런타임·설정·배포 workflow는 퇴역했으며 Cloudflare/Render만 운영 권위로 사용합니다.
 > [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)이 이전 자동 배포 지침을 대체합니다.
 
 기본 운영 권위는 무료 우선으로 분리합니다. Cloudflare Static Assets가 SPA와 정적 카탈로그를
 직접 제공하고, 최소 Worker gateway는 API·Socket.IO·OG crawler 경로만 검토된 Core API origin으로
 전달합니다. Neon/호환 PostgreSQL은 동적 원장, Cloudflare Durable Objects는 Studio의 임시 실시간
 상태, Upstash는 선택형 분산 제한·조정, 목적별 R2/B2/Supabase private storage는 파일 data plane을
-담당합니다. Core API의 기본 origin은 Render `toonspectrum-core-api`이며 Vercel은 수동 비상
-rollback일 뿐 Git 자동 배포나 정상 트래픽 권위가 아닙니다.
+담당합니다. Core API의 기본 origin은 Render `toonspectrum-core-api`이며 배포와 롤백은 각
+Cloudflare/Render 배포 단위의 검증된 version으로 수행합니다.
 
 한 제공자가 다른 제공자의 전체 폴백이 되지는 않습니다. 각 workload는 하나의 authority를 가지며,
 동등 계약·quota snapshot·복구 절차가 검증되지 않은 공급자에는 자동으로 쓰지 않습니다.
@@ -44,7 +44,7 @@ rollback일 뿐 Git 자동 배포나 정상 트래픽 권위가 아닙니다.
 
 - Node 24.16+와 pnpm 11 (`corepack enable` 권장)
 - Cloudflare 계정과 수동 배포 권한
-- Render Core API 서비스와 수동 배포 권한(Vercel 비상 rollback은 선택)
+- Render Core API 서비스와 수동 배포 권한
 - Neon 또는 호환 PostgreSQL `DATABASE_URL`
 - 소셜 로그인 실연동 시 Google Cloud / Kakao Developers / Naver Developers / GitHub OAuth App
 
@@ -76,14 +76,10 @@ pnpm run cloudflare:static:deploy
 
 Core API에는 `.env.production.example`의 PostgreSQL·인증·CORS·목적별 object storage 설정을
 Render encrypted environment 또는 root `.env.local` Secret File로 주입합니다. `CORE_API_ORIGIN`은
-credential, path, query가 없는 별도 HTTPS origin이어야 하며 readiness와 비-Vercel 검사를 통과해야 합니다.
+credential, path, query가 없는 별도 HTTPS origin이어야 하며 readiness와 origin provenance 검사를 통과해야 합니다.
 프런트의 상대경로 `/api/...`는 Cloudflare gateway를 통해 동일 origin 경험을 유지합니다.
 `/market/library`, `/market/publish` 같은 SPA 화면은 Worker를 실행하지 않고 Static Assets가
 처리하며, `/market`, `/market/browse`, `/market/resource/:id`의 crawler HTML만 OG endpoint로 갑니다.
-
-`vercel.json`의 Git 배포는 모든 branch에서 비활성입니다. `.github/workflows/deploy-vercel.yml`은
-Cloudflare 또는 Render를 즉시 복구할 수 없는 경우 production reviewer가 승인한 current-main
-ancestor만 prebuilt로 올리는 비상 절차이며 일반 릴리스 경로가 아닙니다.
 
 ## 3. OAuth 콜백
 
@@ -145,38 +141,8 @@ Cloudflare는 presence, comment invalidation, screen-share signaling을
 
 로그인한 사용자가 저장된 작품을 다시 편집하고 서버에 저장하려면 CRDT 변경을 영속 저장하는
 Socket.IO 권위 서버가 필요합니다. Cloudflare presence나 local/P2P 전달은 이 저장 확인을
-대신하지 않습니다. 기본 장기 실행 Nest 경로는 Render의 별도 runtime이며, 아래 Vercel native
-함수는 emergency rollback 호환성만 제공합니다. 자동으로 확인을 생략하거나 Cloudflare 권위를
-변경하지 않습니다.
-
-### 비상 롤백용 Vercel native WebSocket 함수
-
-[현재 Vercel WebSocket 문서](https://vercel.com/docs/functions/websockets)는 Fluid Compute에서
-Node `http.Server` export와 WebSocket 전용 Socket.IO 클라이언트를 지원합니다.
-`api/studio-live.js`는 별도 native 서버를 export하고 `/socket.io` rewrite만 담당합니다.
-기존 `api/index.js`와 `/api/*` HTTP 경로는 그대로 유지됩니다.
-
-```env
-# 서버 환경. API_RUNTIME_ROLE=full을 studio-live로 바꾸지 않습니다.
-STUDIO_LIVE_VERCEL_ENABLED=true
-STUDIO_LIVE_CLUSTER_ADAPTER=postgres
-STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/DATABASE?sslmode=verify-full&channel_binding=require
-STUDIO_LIVE_POSTGRES_POOL_MAX=2
-# Vite 빌드에서만 공개되는 실제 같은 프로젝트 origin
-VITE_STUDIO_LIVE_ORIGIN=https://www.toonstudio.cloud
-```
-
-이 경로는 opt-in이나 PostgreSQL adapter 설정이 없으면 503으로 거절하며 memory adapter로
-폴백하지 않습니다. 일반 HTTP 함수는 이 별도 LISTEN 풀을 만들지 않습니다. 기존 migration과
-최소권한 runtime role, 정확한 Origin allowlist, 같은 세션 인증 설정을 먼저 확인해야 합니다.
-이 문서와 로컬 테스트는 원격 환경변수를 설정하거나 운영 배포를 활성화하지 않습니다.
-
-함수의 현재 `maxDuration`은 60초이며 Vercel은 함수 수명이 끝나면 연결을 닫습니다. 재연결은
-다른 인스턴스나 새 배포에 도착할 수 있으므로 PostgreSQL cluster adapter가 필요합니다.
-활성화 검증은 실제 upgrade 경로·인증/Origin 거절·두 인스턴스 전달·연결 만료 후 재동기화·
-ACK 이후 저장/재열기를 포함합니다. LISTEN용 direct PostgreSQL 연결은 인스턴스당 기본 2개이므로
-DB의 전체 연결 예산도 확인합니다. 초기화 실패는 해당 인스턴스에서 다시 초기화하지 않으며,
-새 인스턴스가 새 자원으로 시작합니다. 종료 시 열린 연결과 adapter 풀을 정리합니다.
+대신하지 않습니다. 기본 장기 실행 Nest 경로는 Render의 별도 runtime입니다. 이 경로는
+Cloudflare 권위를 자동으로 바꾸거나 저장 확인을 생략하지 않습니다.
 
 `render.yaml`의 Nest 프로세스는 전체 모듈 그래프를 재사용하지만
 `API_RUNTIME_ROLE=studio-live`가 공개 표면을 다음으로 제한합니다.
@@ -192,7 +158,7 @@ Cloudflare의 `CORE_API_ORIGIN`은 전자를, 선택적인 `REALTIME_API_ORIGIN`
 
 ### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
 
-일반 `api/index.js` 진입점은 PostgreSQL Socket.IO adapter를 장착하지 않습니다.
+Core API와 실시간 runtime은 서로 다른 역할을 유지합니다.
 실시간 협업만 별도 Render/Fly 등 승인된 장기 실행 Nest 서버로 보낼 수 있도록 프런트 빌드에
 별도 origin을 지정합니다. SPA의 일반 HTTP API는 Cloudflare gateway가 Render Core API로 전달합니다.
 
@@ -220,7 +186,7 @@ STUDIO_RASTER_ASSET_ADMISSION=verified-renderer-handoff-v1
 수동 실행입니다. 저장소 `production-database` Environment에 required reviewer와
 `PRODUCTION_DATABASE_DIRECT_URL` secret, `PRODUCTION_RUNTIME_DATABASE_ROLE` variable을 설정하고,
 검토한 정확한 40자리 release SHA와 확인 문구를 입력합니다. direct URL의 사용자는 DDL 전용
-migrator이고 variable은 Vercel/Render 앱이 실제 사용하는 별도 최소권한 PostgreSQL role입니다.
+migrator이고 variable은 Render 앱이 실제 사용하는 별도 최소권한 PostgreSQL role입니다.
 두 role이 같거나 runtime role이 migrator를 상속하면 runner가 DDL 전에 거부합니다. runtime
 role은 `LOGIN`, 현재 DB `CONNECT`, `public` schema `USAGE`가 있어야 하며 superuser/CREATEROLE이면
 안 됩니다. CREATEDB/REPLICATION/BYPASSRLS 같은 elevated role flag도 허용하지 않습니다.
@@ -268,8 +234,8 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
 `drizzle-kit push`를 실행하지 않습니다.
 
-프로덕션 배포는 `origin/main` push와 분리합니다. `vercel.json`은 모든 Git branch 배포를
-비활성화하고, 정적 웹의 기본 권위는 `deploy/cloudflare-static`의 Cloudflare Static Assets입니다.
+프로덕션 배포는 `origin/main` push와 분리합니다. 정적 웹의 기본 권위는
+`deploy/cloudflare-static`의 Cloudflare Static Assets입니다.
 PR 생성, main merge, scheduled catalog commit은 배포를 만들지 않습니다. 검토된 운영자가 clean
 `main`에서 명시적 approval 문자열을 제공한 수동 명령만 실행할 수 있습니다.
 
@@ -290,11 +256,6 @@ Vitest·빌드 게이트) 성공이 머지 조건입니다. `core`는 병렬 잡
 `studio-3d-runtime`을 합칩니다. 관리자 우회는 배포 우회가 아니며, 우회 커밋 역시 별도 수동
 릴리스 전에는 운영에 반영되지 않습니다. 우회 이유는 PR이나 커밋 본문에 기록하고 다음 PR에서
 필수 검증을 다시 녹색으로 돌립니다.
-
-`.github/workflows/deploy-vercel.yml`은 Cloudflare 전환 기간의 수동 비상 fallback만 담당합니다.
-`workflow_dispatch` 외 trigger가 없고 current main ancestry·production environment review·고정 CLI·
-prebuilt artifact 검증을 모두 요구합니다. 일반 릴리스, preview, data refresh가 이 workflow를 자동
-호출해서는 안 됩니다.
 
 migration을 동반하는 release는 expand/contract 두 번의 reviewed merge로 나눕니다. 자동 배포가
 없어졌으므로 migration과 runtime 순서를 명시적으로 제어할 수 있지만, release migration workflow는

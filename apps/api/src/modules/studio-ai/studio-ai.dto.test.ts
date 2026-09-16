@@ -30,7 +30,7 @@ describe("StudioAiChatSchema", () => {
     ).toBe(false);
   });
 
-  it("서버 제공자는 auto·Z.ai·DeepSeek만 명시적으로 선택할 수 있다", () => {
+  it("서버 제공자와 무료 공급자 우선순위를 안전하게 검증한다", () => {
     expect(StudioAiChatSchema.safeParse({ ...StudioAiChatSchema.parse({
       task: "dialogue",
       promptVersion: 1,
@@ -40,6 +40,22 @@ describe("StudioAiChatSchema", () => {
     expect(StudioAiChatSchema.safeParse({
       task: "dialogue",
       provider: "unknown-provider",
+      promptVersion: 1,
+      system: "대사를 제안하세요.",
+      user: "장면",
+    }).success).toBe(false);
+    expect(StudioAiChatSchema.safeParse({
+      task: "dialogue",
+      provider: "auto",
+      providerOrder: ["groq", "gemini", "openrouter"],
+      promptVersion: 1,
+      system: "대사를 제안하세요.",
+      user: "장면",
+    }).success).toBe(true);
+    expect(StudioAiChatSchema.safeParse({
+      task: "dialogue",
+      provider: "auto",
+      providerOrder: ["groq", "groq"],
       promptVersion: 1,
       system: "대사를 제안하세요.",
       user: "장면",

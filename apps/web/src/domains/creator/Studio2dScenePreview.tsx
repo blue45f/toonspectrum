@@ -32,6 +32,10 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
   const actualPixels = state.pixels;
   const actualSize = actualPixels ? `${actualPixels.width} × ${actualPixels.height}px` : "";
   const mismatch = status === "mismatch";
+  const formatLabel = metadata?.mediaType === "image/jpeg" ? "JPEG"
+    : metadata?.mediaType === "image/png" ? "PNG"
+      : metadata?.mediaType === "image/webp" ? "WebP"
+        : scene.imgSrc ? "이미지" : "SVG";
   const retryImage = () => { setPixelView(false); retry(); };
 
   useStudioModalSheet({ activeKey: scene.id, dialogRef, rootRef, onDismiss: onClose });
@@ -47,7 +51,7 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
         <header className="flex items-start justify-between gap-3 border-b border-line p-4">
           <div className="min-w-0">
             <h2 id={`${id}-title`} className="text-sm font-bold">{title}</h2>
-            <p id={`${id}-description`} className="mt-1 text-xs text-fg-3">{studio2dResolutionLabel(scene)} · {metadata?.mediaType === "image/jpeg" ? "JPEG" : metadata ? "PNG" : scene.imgSrc ? "이미지" : "SVG"}</p>
+            <p id={`${id}-description`} className="mt-1 text-xs text-fg-3">{studio2dResolutionLabel(scene)} · {formatLabel}</p>
           </div>
           <button type="button" aria-label="배경 미리보기 닫기" onClick={onClose}
             className="rounded-lg p-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><X size={18} /></button>
@@ -74,7 +78,8 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
             {mismatch && <p role="alert" className="text-bad">실제 이미지 크기({actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다. <button type="button" className="ml-2 underline" onClick={retryImage}>다시 불러오기</button></p>}
             {metadata && <p className="text-fg-3">{metadata.environment} · {metadata.timeOfDay} · {metadata.containsPeople ? "인물 포함" : "인물 없는 배경"} · {isLargeStudio2dAsset(metadata) ? "큰 원본" : "소형 컷용 원본"}</p>}
             {metadata?.review.notes.map((note) => <p key={note} className="rounded-lg border border-line bg-raised p-2">{note}</p>)}
-            {scene.imgSrc && <p className="rounded-lg border border-line p-2 text-fg-3">기존 카탈로그 소재 · 이용 권리 기록 미확인. 상업 이용·소재 재배포 전 출처와 이용 조건을 확인하세요. 추천 표시는 라이선스 승인이 아닙니다.</p>}
+            {metadata?.provenance.licenseStatus === "cc0-verified" ? <p className="rounded-lg border border-line bg-raised p-2 text-fg-3">CC0 1.0 · {metadata.provenance.provider ?? "출처 확인 완료"} · 상업 이용과 수정이 가능한 출처 확인 소재입니다.</p>
+              : scene.imgSrc && <p className="rounded-lg border border-line p-2 text-fg-3">기존 카탈로그 소재 · 이용 권리 기록 미확인. 상업 이용·소재 재배포 전 출처와 이용 조건을 확인하세요. 추천 표시는 라이선스 승인이 아닙니다.</p>}
           </div>
         </div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line p-4">

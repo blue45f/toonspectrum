@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">High contrast creative motifs</title>
+  <desc id="desc">Focus target, bold comic grid and keyboard focus controls.</desc>
+  <g data-panel="1">
+    <rect width="400" height="400" fill="#000"/>
+    <circle cx="200" cy="200" r="145" fill="#fff"/><circle cx="200" cy="200" r="106" fill="#000"/><circle cx="200" cy="200" r="66" fill="#fff"/><circle cx="200" cy="200" r="28" fill="#ffe500"/>
+    <path d="M200 25v78M200 297v78M25 200h78M297 200h78" stroke="#ffe500" stroke-width="18"/>
+    <path d="m296 84 20 20-58 58-20-20Z" fill="#ffe500"/>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" fill="#fff"/>
+    <rect x="28" y="28" width="344" height="344" fill="#000"/>
+    <rect x="48" y="48" width="138" height="126" fill="#fff"/><rect x="206" y="48" width="146" height="126" fill="#ffe500"/>
+    <rect x="48" y="194" width="94" height="158" fill="#ffe500"/><rect x="162" y="194" width="190" height="158" fill="#fff"/>
+    <path d="M78 140 118 81l39 59M236 87h86M236 115h61M187 231h128M187 269h99M187 307h68" fill="none" stroke="#000" stroke-width="15" stroke-linecap="square"/>
+    <path d="M75 239h41v66H75Z" fill="#000"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" fill="#000"/>
+    <rect x="46" y="77" width="308" height="247" rx="18" fill="#fff" stroke="#ffe500" stroke-width="12"/>
+    <g fill="#000"><rect x="72" y="106" width="58" height="48" rx="7"/><rect x="143" y="106" width="58" height="48" rx="7"/><rect x="214" y="106" width="58" height="48" rx="7"/><rect x="285" y="106" width="43" height="48" rx="7"/><rect x="72" y="168" width="76" height="48" rx="7"/><rect x="160" y="168" width="76" height="48" rx="7"/><rect x="248" y="168" width="80" height="48" rx="7"/><rect x="72" y="230" width="180" height="48" rx="7"/></g>
+    <rect x="263" y="230" width="65" height="48" rx="7" fill="#ffe500" stroke="#000" stroke-width="5"/>
+    <path d="m280 254 12 10 20-24" fill="none" stroke="#000" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M93 348h214" stroke="#ffe500" stroke-width="14"/>
+  </g>
+</svg>

@@ -42,15 +42,16 @@ const StudioCrossOriginIsolationGate = lazyRetry(
 );
 
 /** Render the registered application routes inside their loading and error boundaries. */
-function AppRouteTree({ pathname, search }: {
+function AppRouteTree({ pathname, search, title }: {
   readonly pathname: string;
   readonly search: string;
+  readonly title: string;
 }) {
   return (
-    <RouteStage pathname={pathname} search={search}>
+    <RouteStage pathname={pathname} search={search} accessibleTitle={title}>
       <ErrorBoundary resetKey={`${pathname}${search}`}>
         <CommandPaletteEventBridge />
-        <Suspense fallback={<RouteFallback />}>
+        <Suspense fallback={<RouteFallback accessibleTitle={title} />}>
           <Routes>
             {appRoutes.map(({ element, id, path }) => (
               <Route key={id} id={id} path={path} element={element} />
@@ -65,7 +66,7 @@ function AppRouteTree({ pathname, search }: {
 /** Render application routing with cross-origin isolation limited to editor workspaces. */
 export function AppRouter() {
   const { pathname, search } = useLocation();
-  useRouteTitle(pathname, search);
+  const routeTitle = useRouteTitle(pathname, search);
 
   const legacyEditorHref = legacyStudioEditorHref(pathname, search);
   if (legacyEditorHref) return <Navigate replace to={legacyEditorHref} />;
@@ -74,7 +75,7 @@ export function AppRouter() {
     INITIAL_DOCUMENT_PATHNAME ?? pathname,
   );
   const currentIsStudioEditor = isStudioWorkspaceLocation({ pathname, search });
-  const routeTree = <AppRouteTree pathname={pathname} search={search} />;
+  const routeTree = <AppRouteTree pathname={pathname} search={search} title={routeTitle} />;
   const needsIsolationGate =
     currentIsStudioEditor
     || documentWasStudioEditor
@@ -83,11 +84,11 @@ export function AppRouter() {
   if (!needsIsolationGate) return routeTree;
 
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<RouteFallback accessibleTitle={routeTitle} />}>
       <StudioCrossOriginIsolationGate
         pathname={pathname}
         documentWasStudio={documentWasStudioEditor}
-        pending={<RouteFallback />}
+        pending={<RouteFallback accessibleTitle={routeTitle} />}
       >
         {routeTree}
       </StudioCrossOriginIsolationGate>

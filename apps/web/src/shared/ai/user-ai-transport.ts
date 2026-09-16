@@ -15,7 +15,7 @@ import {
   validateUserAiBaseUrl,
   validateUserAiPath,
   type UserAiCapability,
-  type UserAiConnection,
+  type UserAiResolvedConnection,
 } from "./user-ai-types";
 
 export interface UserAiRequestOptions {
@@ -26,7 +26,7 @@ export interface UserAiRequestOptions {
   maxBytes?: number;
   headers?: HeadersInit;
   /** Internal explicit candidate used by the automatic free connection chain. */
-  connection?: UserAiConnection;
+  connection?: UserAiResolvedConnection;
 }
 
 export type UserAiTransportErrorCode =
@@ -210,7 +210,7 @@ export async function userAiFetch(
       throw error;
     }
     if (error instanceof TypeError) {
-      throw new Error("제공자 연결 또는 CORS를 확인하세요. 로컬 게이트웨이를 사용할 수 있으며 운영측 프록시나 유료 경로로 전환하지 않습니다.", { cause: error });
+      throw new Error("클라우드 제공자 연결·CORS·네트워크 상태를 확인하세요. 다른 경로로 중복 전송하지 않았습니다.", { cause: error });
     }
     throw error;
   } finally {
@@ -234,8 +234,9 @@ export async function userAiJson<T = unknown>(
 
 export interface CompletedUserAiText {
   content: string;
-  connection: UserAiConnection;
+  connection: UserAiResolvedConnection;
   attemptedConnectionIds: string[];
+  attemptedRouteIds: string[];
 }
 
 export async function completeUserAiTextDetailed(
@@ -250,14 +251,17 @@ export async function completeUserAiTextDetailed(
   if (candidates.length === 0) {
     throw new UserAiTransportError(
       "not-configured",
-      "통합 AI 설정에 사용할 수 있는 외부 개인 무료 AI 연결이 없습니다. 로컬 LLM과 배치 경로는 자동 풀에 포함되지 않습니다.",
+      "통합 AI 설정에 사용할 수 있는 클라우드 AI 경로가 없습니다. 무료 공급자 키를 추가하거나 명시적으로 BYOK를 구성하세요.",
     );
   }
 
   const attemptedConnectionIds: string[] = [];
-  let lastQuotaError: unknown;
+  const attemptedRouteIds: string[] = [];
+  let lastSafeFailoverError: unknown;
+  let sawQuotaExhaustion = false;
   for (const connection of candidates) {
     attemptedConnectionIds.push(connection.id);
+    attemptedRouteIds.push(connection.routeId);
     try {
       const result = await userAiJson<{
         choices?: Array<{ message?: { content?: unknown } }>;
@@ -289,17 +293,25 @@ export async function completeUserAiTextDetailed(
           : content,
         connection,
         attemptedConnectionIds,
+        attemptedRouteIds,
       };
     } catch (error) {
-      if (!isUserAiQuotaExhaustion(error)) throw error;
-      lastQuotaError = error;
+      const quotaExhaustion = isUserAiQuotaExhaustion(error);
+      const safeAuthenticationFailover = error instanceof UserAiTransportError
+        && error.code === "authentication";
+      if (!quotaExhaustion && !safeAuthenticationFailover) throw error;
+      sawQuotaExhaustion ||= quotaExhaustion;
+      lastSafeFailoverError = error;
     }
   }
 
+  if (!sawQuotaExhaustion && lastSafeFailoverError instanceof UserAiTransportError) {
+    throw lastSafeFailoverError;
+  }
   throw new UserAiTransportError(
     "all-free-exhausted",
-    "등록된 외부 개인 무료 AI 연결도 모두 무료 한도 또는 요청 제한 상태입니다. 로컬 LLM과 배치 경로로 자동 전환하지 않습니다.",
-    lastQuotaError instanceof UserAiTransportError ? lastQuotaError.status : undefined,
+    "등록된 클라우드 AI 경로가 모두 무료 한도·요청 제한·인증 오류 상태입니다. 로컬 실행으로 전환하지 않습니다.",
+    lastSafeFailoverError instanceof UserAiTransportError ? lastSafeFailoverError.status : undefined,
   );
 }
 
@@ -311,28 +323,62 @@ export async function completeUserAiText(
   return (await completeUserAiTextDetailed(system, user, signal)).content;
 }
 
+function isSafeUserAiRouteFailover(error: unknown): boolean {
+  return isUserAiQuotaExhaustion(error)
+    || (error instanceof UserAiTransportError && error.code === "authentication");
+}
+
+function cloneFormData(source: FormData): FormData {
+  const clone = new FormData();
+  source.forEach((value, key) => clone.append(key, value));
+  return clone;
+}
+
 export async function userAiLegacyJson(
   capability: "text" | "image",
   body: unknown,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const connection = requireUserAiConnection(capability);
-  assertFreeAiConnection(connection, capability);
-  const model = capability === "text" ? connection.textModel : connection.imageModel;
-  if (!model) throw new Error("통합 AI 설정에서 사용할 모델을 입력하세요.");
-  const values: Record<string, unknown> = body && typeof body === "object"
-    ? { ...body, model } as Record<string, unknown>
-    : { model };
-  if (capability === "image" && model.startsWith("gpt-image")) {
-    delete values.response_format;
+  const candidates = userAiAutomaticExternalConnectionsForCapability(capability);
+  if (!candidates.length) {
+    throw new UserAiTransportError(
+      "not-configured",
+      `통합 AI 설정에 사용할 ${capability === "text" ? "텍스트" : "이미지"} 클라우드 경로가 없습니다.`,
+    );
   }
-  return userAiJson(
-    capability,
-    capability === "text"
-      ? connection.chatCompletionsPath
-      : connection.imageGenerationPath,
-    values,
-    { signal },
+  let lastSafeFailure: unknown;
+  let sawQuotaExhaustion = false;
+  for (const connection of candidates) {
+    const model = capability === "text" ? connection.textModel : connection.imageModel;
+    if (!model) continue;
+    const values: Record<string, unknown> = body && typeof body === "object"
+      ? { ...body, model } as Record<string, unknown>
+      : { model };
+    if (capability === "image" && model.startsWith("gpt-image")) {
+      delete values.response_format;
+    }
+    try {
+      return await userAiJson(
+        capability,
+        capability === "text"
+          ? connection.chatCompletionsPath
+          : connection.imageGenerationPath,
+        values,
+        { signal, connection, connectionId: connection.id },
+      );
+    } catch (error) {
+      if (!isSafeUserAiRouteFailover(error)) throw error;
+      sawQuotaExhaustion ||= isUserAiQuotaExhaustion(error);
+      lastSafeFailure = error;
+    }
+  }
+  if (!sawQuotaExhaustion && lastSafeFailure instanceof UserAiTransportError) {
+    throw lastSafeFailure;
+  }
+  throw new UserAiTransportError(
+    "all-free-exhausted",
+    "등록된 클라우드 AI 경로가 모두 한도 소진 또는 인증 오류 상태입니다.",
+    lastSafeFailure instanceof UserAiTransportError ? lastSafeFailure.status : undefined,
   );
 }
 
@@ -340,14 +386,41 @@ export async function userAiLegacyForm(
   form: FormData,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const connection = requireUserAiConnection("image");
-  assertFreeAiConnection(connection, "image");
-  if (!connection.imageModel) {
-    throw new Error("통합 AI 설정에서 이미지 모델을 입력하세요.");
+  const candidates = userAiAutomaticExternalConnectionsForCapability("image");
+  if (!candidates.length) {
+    throw new UserAiTransportError(
+      "not-configured",
+      "통합 AI 설정에 사용할 이미지 클라우드 경로가 없습니다.",
+    );
   }
-  form.set("model", connection.imageModel);
-  if (connection.imageModel.startsWith("gpt-image")) {
-    form.delete("response_format");
+  let lastSafeFailure: unknown;
+  let sawQuotaExhaustion = false;
+  for (const connection of candidates) {
+    if (!connection.imageModel) continue;
+    const requestForm = cloneFormData(form);
+    requestForm.set("model", connection.imageModel);
+    if (connection.imageModel.startsWith("gpt-image")) {
+      requestForm.delete("response_format");
+    }
+    try {
+      return await userAiJson(
+        "image",
+        connection.imageEditPath,
+        requestForm,
+        { signal, connection, connectionId: connection.id },
+      );
+    } catch (error) {
+      if (!isSafeUserAiRouteFailover(error)) throw error;
+      sawQuotaExhaustion ||= isUserAiQuotaExhaustion(error);
+      lastSafeFailure = error;
+    }
   }
-  return userAiJson("image", connection.imageEditPath, form, { signal });
+  if (!sawQuotaExhaustion && lastSafeFailure instanceof UserAiTransportError) {
+    throw lastSafeFailure;
+  }
+  throw new UserAiTransportError(
+    "all-free-exhausted",
+    "등록된 이미지 클라우드 경로가 모두 한도 소진 또는 인증 오류 상태입니다.",
+    lastSafeFailure instanceof UserAiTransportError ? lastSafeFailure.status : undefined,
+  );
 }

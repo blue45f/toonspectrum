@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Blossom creative motifs</title>
+  <desc id="desc">Cat illustrator, flower desk and peach storyboard.</desc>
+  <defs>
+    <linearGradient id="b-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8f4"/><stop offset="1" stop-color="#ffe2e7"/></linearGradient>
+    <linearGradient id="b-petal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb7c8"/><stop offset="1" stop-color="#ff7f9e"/></linearGradient>
+    <filter id="b-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dy="16" stdDeviation="14" flood-color="#b34d6e" flood-opacity=".18"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="40" fill="url(#b-bg)"/>
+    <circle cx="205" cy="211" r="125" fill="#fff" filter="url(#b-shadow)"/>
+    <path d="M108 164 93 83l78 51m122 30 15-81-78 51" fill="#ffd9d1" stroke="#6d4c55" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M120 170c0-74 52-120 91-120 58 0 91 54 91 120v63c0 62-39 105-91 105s-91-43-91-105Z" fill="#fff3e5" stroke="#6d4c55" stroke-width="8"/>
+    <path d="M133 125c25-53 126-61 157 2-43-18-113-16-157-2Z" fill="#e76f8c"/>
+    <ellipse cx="175" cy="208" rx="9" ry="13" fill="#6d4c55"/><ellipse cx="248" cy="208" rx="9" ry="13" fill="#6d4c55"/>
+    <path d="m204 227 9 7 9-7m-9 7v17m0 0c-10 8-20 8-30 0m30 0c10 8 20 8 30 0" fill="none" stroke="#6d4c55" stroke-width="6" stroke-linecap="round"/>
+    <path d="m291 294 45 35-36 47-43-14 10-43Z" fill="#fff" stroke="#6d4c55" stroke-width="6"/><path d="m266 355 42-38" stroke="#6d4c55" stroke-width="6"/>
+    <g fill="url(#b-petal)"><ellipse cx="62" cy="276" rx="10" ry="20" transform="rotate(-28 62 276)"/><ellipse cx="337" cy="100" rx="9" ry="18" transform="rotate(32 337 100)"/><ellipse cx="339" cy="250" rx="8" ry="16" transform="rotate(-52 339 250)"/></g>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="40" fill="#fff6ee"/>
+    <ellipse cx="200" cy="331" rx="150" ry="31" fill="#d77c73" opacity=".15"/>
+    <g filter="url(#b-shadow)"><rect x="65" y="215" width="270" height="105" rx="28" fill="#f8c1b6"/><rect x="86" y="234" width="94" height="66" rx="18" fill="#fff9f2"/><circle cx="133" cy="267" r="22" fill="#f2a4b9"/></g>
+    <path d="M204 245c-7-62 0-126 34-174m-16 95c-36-17-57-43-62-75m67 51c35-22 55-49 60-81" fill="none" stroke="#688b65" stroke-width="8" stroke-linecap="round"/>
+    <g fill="url(#b-petal)"><ellipse cx="238" cy="70" rx="22" ry="35"/><ellipse cx="270" cy="88" rx="22" ry="35" transform="rotate(62 270 88)"/><ellipse cx="254" cy="121" rx="22" ry="35" transform="rotate(120 254 121)"/><ellipse cx="218" cy="113" rx="22" ry="35" transform="rotate(-122 218 113)"/><ellipse cx="205" cy="82" rx="22" ry="35" transform="rotate(-62 205 82)"/></g>
+    <circle cx="238" cy="95" r="17" fill="#ffd36f"/>
+    <g transform="rotate(-13 300 241)"><rect x="289" y="124" width="21" height="171" rx="10" fill="#7f6acb"/><path d="m289 124 10-30 11 30Z" fill="#6d4c55"/></g>
+    <path d="M84 168c30-29 66-29 96 0" fill="none" stroke="#f0aa8b" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="40" fill="url(#b-bg)"/>
+    <g transform="translate(42 52) rotate(-4 158 148)" filter="url(#b-shadow)">
+      <rect width="316" height="296" rx="28" fill="#fffdf9"/>
+      <rect x="22" y="22" width="128" height="101" rx="14" fill="#ffd3ca"/><rect x="166" y="22" width="128" height="101" rx="14" fill="#f8b8cc"/>
+      <rect x="22" y="139" width="82" height="132" rx="14" fill="#f7dca8"/><rect x="120" y="139" width="174" height="132" rx="14" fill="#ffe6e8"/>
+      <path d="M52 94c13-34 48-34 61 0" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round"/>
+      <path d="M197 55h63c13 0 24 11 24 24v2c0 13-11 24-24 24h-27l-17 16 3-16h-22c-13 0-24-11-24-24v-2c0-13 11-24 24-24Z" fill="#fff"/>
+      <path d="M153 184c28-29 67-29 95 0m-86 34h80m-80 26h55" stroke="#c98394" stroke-width="9" stroke-linecap="round"/>
+    </g>
+    <path d="m344 48 5 13 13 5-13 5-5 13-5-13-13-5 13-5Z" fill="#f18aa7"/>
+  </g>
+</svg>

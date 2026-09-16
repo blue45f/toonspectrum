@@ -188,6 +188,8 @@ const lifecycle = vi.hoisted(() => ({
     closeCount: number;
     closeGracefullyCount: number;
     authoritativeBarrierCount: number;
+    draftProtectionTimeouts: Array<number | undefined>;
+    acknowledgedDraftProtection: string[][];
     deliveryTimeouts: Array<number | undefined>;
     deliveryBarrier: Promise<void> | null;
     document: { destroyCount: number };
@@ -338,6 +340,8 @@ vi.mock("./studio-crdt-room-binding", () => ({
         closeCount: 0,
         closeGracefullyCount: 0,
         authoritativeBarrierCount: 0,
+        draftProtectionTimeouts: [],
+        acknowledgedDraftProtection: [],
         deliveryTimeouts: [],
         deliveryBarrier: null,
         document: options.document.record,
@@ -380,6 +384,26 @@ vi.mock("./studio-crdt-room-binding", () => ({
     async flushAndWaitForDelivery(timeoutMs?: number): Promise<void> {
       this.record.deliveryTimeouts.push(timeoutMs);
       await this.record.deliveryBarrier;
+    }
+
+    async flushAndWaitForDraftProtection(timeoutMs?: number): Promise<{
+      protection: "device";
+      serverSequence: null;
+      acknowledgedAt: null;
+      protectedUpdateIds: readonly string[];
+    }> {
+      this.record.draftProtectionTimeouts.push(timeoutMs);
+      await this.record.deliveryBarrier;
+      return {
+        protection: "device",
+        serverSequence: null,
+        acknowledgedAt: null,
+        protectedUpdateIds: ["update-1"],
+      };
+    }
+
+    async acknowledgeDraftProtection(protectedUpdateIds: readonly string[]): Promise<void> {
+      this.record.acknowledgedDraftProtection.push([...protectedUpdateIds]);
     }
   },
 }));
@@ -1004,12 +1028,24 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     await vi.waitFor(() => expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything()));
     const runtime = onCrdtDocumentChange.mock.calls.find(([document]) => document !== null)![1] as StudioCrdtSceneGraphRuntime;
     await runtime.flushAndWaitForDelivery(321);
+    await expect(runtime.flushAndWaitForDraftProtection(654)).resolves.toEqual({
+      protection: "device",
+      serverSequence: null,
+      acknowledgedAt: null,
+      protectedUpdateIds: ["update-1"],
+    });
+    await runtime.acknowledgeDraftProtection(["update-1"]);
     expect(lifecycle.bindings[0]?.deliveryTimeouts).toEqual([321]);
+    expect(lifecycle.bindings[0]?.draftProtectionTimeouts).toEqual([654]);
+    expect(lifecycle.bindings[0]?.acknowledgedDraftProtection).toEqual([["update-1"]]);
     expect(lifecycle.bindings[0]?.authoritativeBarrierCount).toBe(0);
     hooks.unmount();
     expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
     await expect(runtime.flushAndWaitForDelivery()).rejects.toThrow("원고가 변경되었습니다");
+    await expect(runtime.flushAndWaitForDraftProtection()).rejects.toThrow("원고가 변경되었습니다");
+    await expect(runtime.acknowledgeDraftProtection(["update-2"])).rejects.toThrow("원고가 변경되었습니다");
     expect(lifecycle.bindings[0]?.deliveryTimeouts).toEqual([321]);
+    expect(lifecycle.bindings[0]?.draftProtectionTimeouts).toEqual([654]);
   });
 
   it("rejects a late delivery completion from an older binding without affecting the new document runtime", async () => {
