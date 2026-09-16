@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Paper creative motifs</title>
+  <desc id="desc">Storyboard sheet, drawing tools and folded paper character.</desc>
+  <defs>
+    <linearGradient id="p-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdf8"/><stop offset="1" stop-color="#eee9dd"/></linearGradient>
+    <linearGradient id="p-blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5fa9db"/><stop offset="1" stop-color="#416ca7"/></linearGradient>
+    <filter id="p-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dy="15" stdDeviation="12" flood-color="#6d675a" flood-opacity=".18"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="30" fill="url(#p-bg)"/>
+    <g transform="translate(55 37) rotate(-4 145 160)" filter="url(#p-shadow)"><rect width="290" height="326" rx="18" fill="#fff" stroke="#c7c1b6" stroke-width="5"/><rect x="20" y="22" width="112" height="89" rx="8" fill="#dfeaf3"/><rect x="150" y="22" width="120" height="89" rx="8" fill="#f0d5c8"/><rect x="20" y="130" width="250" height="104" rx="8" fill="#e8e4da"/><rect x="20" y="252" width="78" height="50" rx="8" fill="#d3e3ce"/><rect x="116" y="252" width="154" height="50" rx="8" fill="#eee0b7"/>
+      <path d="M34 92c24-43 53-45 83-4m50-12c28-31 56-31 84 0m-198 116c45-49 95-55 153-18" fill="none" stroke="#6a7275" stroke-width="7" stroke-linecap="round"/>
+      <g fill="#8d8a82"><rect x="34" y="146" width="74" height="8" rx="4"/><rect x="34" y="163" width="50" height="7" rx="4"/><rect x="138" y="268" width="105" height="7" rx="4"/></g>
+    </g>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="30" fill="#f4f1e9"/>
+    <ellipse cx="199" cy="326" rx="150" ry="25" fill="#b1aa9d" opacity=".22"/>
+    <g transform="rotate(-17 134 204)" filter="url(#p-shadow)"><rect x="119" y="57" width="31" height="246" rx="15" fill="#e5b247"/><path d="m119 57 16-44 15 44Z" fill="#4f4a42"/><rect x="119" y="248" width="31" height="55" rx="12" fill="#cf6f59"/></g>
+    <g transform="rotate(14 245 217)" filter="url(#p-shadow)"><path d="M176 99h143v193H176Z" fill="#d7e6ed" stroke="#52758a" stroke-width="7"/><path d="M176 99 319 292m0-193L176 292M211 99v193m36-193v193m36-193v193" stroke="#7899aa" stroke-width="4" opacity=".7"/></g>
+    <path d="M66 285c49-32 92-32 130 0" fill="none" stroke="url(#p-blue)" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="76" cy="82" r="10" fill="#cf6f59"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="30" fill="url(#p-bg)"/>
+    <path d="m54 238 280-154-93 275-61-102Z" fill="#fff" stroke="#8e918e" stroke-width="6" stroke-linejoin="round" filter="url(#p-shadow)"/>
+    <path d="m54 238 126 19 154-173-93 275-61-102Z" fill="#e5edf2" stroke="#8e918e" stroke-width="5" stroke-linejoin="round"/>
+    <path d="m180 257 154-173-93 275Z" fill="#d6e3e9"/>
+    <circle cx="116" cy="104" r="34" fill="#f1c95a" opacity=".75"/>
+    <path d="M88 330h90m24 0h94" stroke="#8d8b83" stroke-width="9" stroke-linecap="round"/>
+    <path d="m315 290 5 13 13 5-13 5-5 13-5-13-13-5 13-5Z" fill="#5d84b8"/>
+  </g>
+</svg>

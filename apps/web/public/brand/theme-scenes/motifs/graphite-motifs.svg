@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Graphite creative motifs</title>
+  <desc id="desc">Perspective grid, pose mannequin and charcoal drawing tools.</desc>
+  <defs>
+    <linearGradient id="g-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#313235"/><stop offset="1" stop-color="#151618"/></linearGradient>
+    <linearGradient id="g-paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f2f2ef"/><stop offset="1" stop-color="#c9cbca"/></linearGradient>
+    <filter id="g-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dy="15" stdDeviation="13" flood-color="#000" flood-opacity=".48"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="24" fill="url(#g-bg)"/>
+    <path d="M200 72 30 350h340Z" fill="#222326" stroke="#72757a" stroke-width="4"/>
+    <g stroke="#8d9094" stroke-width="2" opacity=".7"><path d="M200 72v278M200 72 58 350m142-278 142 278M200 72 95 350m105-278 105 278M200 72 140 350m60-278 60 278"/><path d="M74 324h252M89 294h222M105 264h190M124 230h152M143 197h114M161 162h78M180 126h40"/></g>
+    <circle cx="200" cy="72" r="10" fill="#e7e7e4"/>
+    <path d="M41 349h318" stroke="#f2f2ef" stroke-width="6"/>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="24" fill="#252629"/>
+    <g filter="url(#g-shadow)" stroke="#c5c8c7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="#696c70"><circle cx="201" cy="78" r="34"/><path d="M201 112v101m0-68-67 40m67-40 70 31m-70 37-50 105m50-105 61 104"/><ellipse cx="201" cy="171" rx="44" ry="66" fill="#4b4d51"/></g>
+    <g fill="#dadbd8"><circle cx="134" cy="185" r="9"/><circle cx="271" cy="176" r="9"/><circle cx="151" cy="318" r="9"/><circle cx="262" cy="317" r="9"/></g>
+    <path d="M63 342h274" stroke="#85888a" stroke-width="6" stroke-linecap="round"/>
+    <g stroke="#4c4e52" stroke-width="3" opacity=".8"><path d="M69 60h82M250 60h82M69 84h55M276 84h56"/></g>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="24" fill="url(#g-paper)"/>
+    <g transform="translate(52 52) rotate(-4 148 148)" filter="url(#g-shadow)"><rect width="296" height="296" rx="12" fill="#e8e9e6"/><path d="M38 246c32-108 90-169 174-159 38 5 62 27 70 67-54-27-108-12-154 44-28 34-55 50-90 48Z" fill="#55575a" opacity=".45"/><path d="M58 244c35-89 87-135 157-139" fill="none" stroke="#2a2b2d" stroke-width="18" stroke-linecap="round"/><g stroke="#6d6f72" stroke-width="5" opacity=".48"><path d="m42 82 192 159M66 57l192 159M36 137l155 128"/></g></g>
+    <g transform="rotate(15 310 275)"><rect x="295" y="159" width="28" height="171" rx="12" fill="#28292b"/><path d="m295 159 14-39 14 39Z" fill="#777a7d"/></g>
+    <rect x="61" y="320" width="118" height="16" rx="8" fill="#77797b"/>
+  </g>
+</svg>
