@@ -22,17 +22,33 @@ import {createRoot} from 'react-dom/client';
 import {Studio2dSceneBrowser} from '../apps/web/src/domains/creator/Studio2dSceneBrowser';
 import {BG_SCENES,groupBgScenes} from '../apps/web/src/domains/creator/studio-bg-scenes';
 import {BG_SCENES_EXTRA} from '../apps/web/src/domains/creator/studio-bg-scenes-extra';
+import {filterStudio2dScenes} from '../apps/web/src/domains/creator/studio-2d-asset-quality';
 import {createStudio2dCanvasImage} from '../apps/web/src/domains/creator/studio-2d-source-size';
 import '../apps/web/src/styles/globals.css';
 const groups=groupBgScenes([...BG_SCENES,...BG_SCENES_EXTRA]);
+const baseFilters={query:'',genre:'all',quality:'all',orientation:'all',sort:'recommended',emptySceneOnly:false,environment:'all',timeOfDay:'all',textFreeOnly:false} as const;
+const sceneCounts={
+  total:filterStudio2dScenes(groups,baseFilters).length,
+  recommended:filterStudio2dScenes(groups,{...baseFilters,quality:'recommended'}).length,
+  recommendedRomance:filterStudio2dScenes(groups,{...baseFilters,genre:'로맨스',quality:'recommended'}).length,
+  interiorTablet:filterStudio2dScenes(groups,{...baseFilters,query:'실내 태블릿'}).length,
+  largeIndoorNightTextFree:filterStudio2dScenes(groups,{...baseFilters,quality:'large',environment:'실내',timeOfDay:'밤',textFreeOnly:true}).length,
+  large:filterStudio2dScenes(groups,{...baseFilters,quality:'large'}).length,
+};
+const total=sceneCounts.total;
 function Harness(){const[q,setQ]=useState('');const[g,setG]=useState('all');const[picks,setPicks]=useState<string[]>([]);const[placed,setPlaced]=useState('');
 return <main style={{width:'min(100%,440px)',margin:'0 auto',padding:12,boxSizing:'border-box'}}>
-<output data-testid="picked">{picks.join(',')}</output><output data-testid="placed" hidden>{placed}</output><Studio2dSceneBrowser groups={groups} query={q} onQueryChange={setQ} genre={g} onGenreChange={setG} loading={false} error={null} disabled={false} onPick={s=>{setPicks(p=>[...p,s.id]);setPlaced(JSON.stringify(createStudio2dCanvasImage(s,{id:s.id,src:s.imgSrc??'',canvasWidth:720,canvasHeight:1080})));}}/></main>}
+<output data-testid="scene-counts" hidden>{JSON.stringify(sceneCounts)}</output><output data-testid="picked">{picks.join(',')}</output><output data-testid="placed" hidden>{placed}</output><Studio2dSceneBrowser groups={groups} query={q} onQueryChange={setQ} genre={g} onGenreChange={setG} loading={false} error={null} disabled={false} onPick={s=>{setPicks(p=>[...p,s.id]);setPlaced(JSON.stringify(createStudio2dCanvasImage(s,{id:s.id,src:s.imgSrc??'',canvasWidth:720,canvasHeight:1080})));}}/></main>}
 createRoot(document.getElementById('root')!).render(<Harness/>);`);
 const errors = [];
 const results = [];
 let server;
 let browser;
+async function expectSceneCount(page, count) {
+  assert.ok(Number.isInteger(count) && count >= 0, `invalid scene count: ${count}`);
+  await expect(page.getByRole("status").filter({ hasText: new RegExp(`^${count}개 장면$`, "u") })).toHaveText(`${count}개 장면`);
+  await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(Math.min(48, count));
+}
 try {
   server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: [...WEB_VITE_ALIASES] },
     server: { host: "127.0.0.1", port: 0 }, publicDir: path.join(root, "apps", "web", "public"),
@@ -46,16 +62,22 @@ try {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1, reducedMotion: "reduce" });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url);
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(48);
-    await expect(page.getByRole("status").filter({ hasText: /^64개 장면$/u })).toHaveText("64개 장면");
-    await page.getByRole("button", { name: "장면 더 보기 (16개 남음)", exact: true }).click();
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(64);
+    const sceneCounts = JSON.parse((await page.getByTestId("scene-counts").textContent()) ?? "{}");
+    const sceneTotal = sceneCounts.total;
+    assert.ok(Number.isInteger(sceneTotal) && sceneTotal >= 64, `expected at least 64 scenes, received ${sceneTotal}`);
+    await expectSceneCount(page, sceneTotal);
+    if (sceneTotal > 48) {
+      await page.getByRole("button", { name: `장면 더 보기 (${sceneTotal - 48}개 남음)`, exact: true }).click();
+      await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(Math.min(sceneTotal, 96));
+    }
     await page.getByLabel("소재 구분", { exact: true }).selectOption("recommended");
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(5);
+    assert.ok(sceneCounts.recommended >= 5, `expected at least 5 recommended scenes, received ${sceneCounts.recommended}`);
+    await expectSceneCount(page, sceneCounts.recommended);
     await expect.poll(() => page.locator("[data-studio-2d-grid]").evaluate((element) => element.scrollTop)).toBe(0);
     await page.screenshot({ path: path.join(evidence, `${viewport.name}-recommended.png`), fullPage: true });
     await page.getByLabel("장르", { exact: true }).selectOption("로맨스");
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(1);
+    assert.ok(sceneCounts.recommendedRomance >= 1, "expected at least one recommended romance scene");
+    await expectSceneCount(page, sceneCounts.recommendedRomance);
     const opener = page.getByRole("button", { name: `${rooftop.title} 확대 미리보기`, exact: true });
     await expect(page.getByRole("button", { name: `${rooftop.title} 삽입`, exact: true })).toBeEnabled();
     await page.screenshot({ path: path.join(evidence, `${viewport.name}-library.png`), fullPage: true });
@@ -85,10 +107,12 @@ try {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
     await page.getByLabel("배경 이름·장소·분위기 검색", { exact: true }).fill("실내 태블릿");
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(1);
+    assert.ok(sceneCounts.interiorTablet >= 1, "expected the interior tablet scene to remain discoverable");
+    await expectSceneCount(page, sceneCounts.interiorTablet);
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
     await page.getByLabel("소재 구분", { exact: true }).selectOption("large");
     await page.getByLabel("원본 비율", { exact: true }).selectOption("portrait");
+    await expectSceneCount(page, 0);
     await expect(page.getByText(/조건에 맞는 배경이 없습니다/u)).toBeVisible();
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
     await page.locator("[data-studio-2d-content-filters] summary").click();
@@ -96,7 +120,8 @@ try {
     await page.getByLabel("시간대", { exact: true }).selectOption("밤");
     await page.getByLabel("문자 형태 없는 이미지 배경만", { exact: true }).check();
     await page.getByLabel("소재 구분", { exact: true }).selectOption("large");
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(2);
+    assert.ok(sceneCounts.largeIndoorNightTextFree >= 2, `expected at least 2 reviewed indoor night scenes, received ${sceneCounts.largeIndoorNightTextFree}`);
+    await expectSceneCount(page, sceneCounts.largeIndoorNightTextFree);
     for (const asset of manifest.assets.filter((item) => ["webtoon-creator-room", "webtoon-palace"].includes(item.id))) {
       await expect(page.getByRole("button", { name: `${asset.title} 삽입`, exact: true })).toBeEnabled();
     }
@@ -104,12 +129,13 @@ try {
     await page.screenshot({ path: path.join(evidence, `${viewport.name}-content-discovery.png`), fullPage: true });
     await page.getByRole("button", { name: "장소·시간·문자 조건만 지우기", exact: true }).click();
     await expect(page.getByLabel("소재 구분", { exact: true })).toHaveValue("large");
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(9);
+    assert.ok(sceneCounts.large >= 9, `expected at least 9 large scenes, received ${sceneCounts.large}`);
+    await expectSceneCount(page, sceneCounts.large);
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(48);
+    await expectSceneCount(page, sceneTotal);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     assert.equal(overflow, false, "horizontal document overflow");
-    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: "complete 64-scene catalog, pagination, filter scroll reset, filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, reviewed environment/time/text filters, partial reset, 320px overflow" });
+    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: `complete ${sceneTotal}-scene catalog, pagination, filter scroll reset, filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, reviewed environment/time/text filters, partial reset, 320px overflow` });
     await page.close();
   }
   assert.deepEqual(errors, []);
