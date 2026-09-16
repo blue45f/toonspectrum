@@ -1,8 +1,10 @@
 /** Tiny, dependency-free rescue payload. No auth/API cache or cloud document mutation. */
-export const LOCAL_DRAWING_URL = "/offline-drawing.html";
+// Static hosts expose the HTML file at the clean canonical URL. Requesting the
+// physical .html path follows a redirect, which is intentionally rejected below.
+export const LOCAL_DRAWING_URL = "/offline-drawing";
 export const LOCAL_DRAWING_URLS = [LOCAL_DRAWING_URL, "/offline-drawing/app.js", "/offline-drawing/model.js", "/offline-drawing/style.css"] as const;
 // Bump when rescue bytes change; the worker script then changes and installs a fresh rescue cache.
-export const LOCAL_DRAWING_RELEASE = "20260915.1";
+export const LOCAL_DRAWING_RELEASE = "20260916.1";
 const PREFIX = "toonstudio-local-drawing-";
 export const LOCAL_DRAWING_CACHE = `${PREFIX}${LOCAL_DRAWING_RELEASE}`;
 export const LOCAL_DRAWING_NAVIGATION_TIMEOUT_MS = 4000;
@@ -14,7 +16,7 @@ export function isLocalDrawingRequest(request: Request, origin: string): boolean
 export function usableLocalDrawingResponse(path: string, response: Response): boolean {
   const mime = (response.headers.get("content-type") ?? "").split(";")[0].trim();
   return response.status === 200 && !response.redirected && (
-    path.endsWith(".html") ? mime === "text/html" : path.endsWith(".css") ? mime === "text/css"
+    (path === LOCAL_DRAWING_URL || path.endsWith(".html")) ? mime === "text/html" : path.endsWith(".css") ? mime === "text/css"
       : ["text/javascript", "application/javascript"].includes(mime)
   );
 }

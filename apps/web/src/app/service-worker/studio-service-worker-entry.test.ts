@@ -108,7 +108,7 @@ function shell(body: string, isolated = false): Response {
 }
 function assetResponse(url: string): Response {
   const mime = url.endsWith(".js") ? "application/javascript" : url.endsWith(".css") ? "text/css" : "text/html";
-  return new Response(url.endsWith("/offline-drawing.html") ? "local rescue" : "body", { headers: { "content-type": mime } });
+  return new Response(url.endsWith("/offline-drawing") ? "local rescue" : "body", { headers: { "content-type": mime } });
 }
 beforeEach(() => { harness = createHarness(); });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -119,6 +119,8 @@ describe("install", () => {
     await loadWorker(); await harness.dispatch("install");
     const precache = harness.caches.entries(PRECACHE);
     expect(precache).toHaveLength(4); expect(precache).toContain(`${ORIGIN}/studio`);
+    expect(harness.fetchCalls).toContain(`${ORIGIN}/offline-drawing`);
+    expect(harness.fetchCalls).not.toContain(`${ORIGIN}/offline-drawing.html`);
     expect(harness.counters.skipWaiting).toBe(0);
   });
   it("fails install atomically when a critical URL is missing", async () => {
