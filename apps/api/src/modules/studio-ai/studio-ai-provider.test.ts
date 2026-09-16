@@ -70,11 +70,15 @@ describe("Studio AI provider resolution", () => {
     const freeEnv = {
       NODE_ENV: "production",
       STUDIO_AI_FREE_POOL_ENABLED: "true",
-      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,openrouter",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,mistral,openrouter",
       STUDIO_AI_FREE_GEMINI_API_KEY: "gemini-free-key",
       STUDIO_AI_FREE_GEMINI_CONFIRMED: "true",
       STUDIO_AI_FREE_GROQ_API_KEY: "groq-free-key",
       STUDIO_AI_FREE_GROQ_CONFIRMED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_API_KEY: "sambanova-free-key",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_API_KEY: "mistral-free-key",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_API_KEY: "openrouter-free-key",
       STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_MODEL: "openrouter/free",
@@ -84,20 +88,35 @@ describe("Studio AI provider resolution", () => {
       .toEqual([
         { id: "gemini", model: "gemini-3.8-flash" },
         { id: "groq", model: "openai/gpt-oss-120b" },
+        { id: "sambanova", model: "DeepSeek-V3.1" },
+        { id: "mistral", model: "mistral-small-latest" },
         { id: "openrouter", model: "openrouter/free" },
       ]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
       STUDIO_AI_FREE_GROQ_CONFIRMED: "false",
-    }).map(({ id }) => id)).toEqual(["gemini", "openrouter"]);
+    }).map(({ id }) => id)).toEqual(["gemini", "sambanova", "mistral", "openrouter"]);
+    expect(resolveStudioAiProviders("auto", {
+      ...freeEnv,
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "false",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "false",
+    }).map(({ id }) => id)).toEqual(["gemini", "groq", "openrouter"]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
       STUDIO_AI_FREE_OPENROUTER_MODEL: "vendor/paid-model",
-    }).map(({ id }) => id)).toEqual(["gemini", "groq"]);
+    }).map(({ id }) => id)).toEqual(["gemini", "groq", "sambanova", "mistral"]);
     expect(classifyStudioAiProviderFailure("gemini", 429)).toMatchObject({
       kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
       billingFailoverEligible: true,
       failoverReason: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+    });
+    expect(classifyStudioAiProviderFailure("sambanova", 429)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+    });
+    expect(classifyStudioAiProviderFailure("mistral", 402)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
     });
     expect(classifyStudioAiProviderFailure("groq", 503)).toMatchObject({
       kind: "provider_unavailable",
@@ -115,6 +134,12 @@ describe("Studio AI provider resolution", () => {
 
   it("공통 timeout을 우선하고 제공자 request ID를 제한해 추출한다", () => {
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000" })).toBe(6000);
+    expect(resolveStudioAiTimeoutMs("sambanova", {
+      STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS: "8000",
+    })).toBe(8000);
+    expect(resolveStudioAiTimeoutMs("mistral", {
+      STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS: "9000",
+    })).toBe(9000);
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000", STUDIO_AI_TIMEOUT_MS: "7000" }))
       .toBe(7000);
     expect(studioAiProviderRequestId({ request_id: " req-1 " })).toBe("req-1");

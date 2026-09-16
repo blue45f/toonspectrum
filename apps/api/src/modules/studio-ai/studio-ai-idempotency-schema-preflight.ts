@@ -2,6 +2,8 @@ import { runSchemaPreflightToleratingDbUnavailability } from "../../common/datab
 import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
 import { dbPool } from "../../db";
 
+import { STUDIO_AI_MAX_PROVIDER_ATTEMPTS } from "./studio-ai-provider";
+
 import type { Pool } from "pg";
 
 export const STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT = Symbol(
@@ -32,7 +34,7 @@ export const STUDIO_AI_IDEMPOTENCY_CANONICAL_CHECK_DEFINITIONS: Readonly<
   studio_ai_request_receipt_status_check:
     `CHECK ("status" = ANY (ARRAY['admitted'::text, 'sent'::text, 'succeeded'::text, 'ambiguous'::text]::text[]))`,
   studio_ai_request_receipt_attempt_count_check:
-    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= 3)`,
+    `CHECK ("attemptCount" >= 0 AND "attemptCount" <= ${STUDIO_AI_MAX_PROVIDER_ATTEMPTS})`,
   studio_ai_request_receipt_expiry_check:
     `CHECK ("expiresAt" > "createdAt")`,
 };
@@ -54,7 +56,7 @@ interface ReceiptSchemaRow {
 type QueryablePool = Pick<Pool, "query">;
 
 const INCOMPLETE_SCHEMA_MESSAGE =
-  "Studio AI idempotency schema is incomplete; apply production migrations through 0056_studio_ai_free_pool_contract.sql before starting the API";
+  "Studio AI idempotency schema is incomplete; apply production migrations through 0057_studio_ai_free_provider_expansion.sql before starting the API";
 
 function compactDefault(value: unknown): string | null {
   if (typeof value !== "string") return null;

@@ -38,10 +38,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(59);
+  expect(manifest).toHaveLength(60);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0059_member_messaging");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(59);
+  expect(manifest.at(-1).id).toBe(
+    "0060_studio_ai_free_provider_expansion",
+  );
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(60);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
@@ -57,6 +59,27 @@ test("Studio AI free pool migration supports three reviewed provider attempts", 
     "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'",
     'CHECK ("attemptCount" BETWEEN 1 AND 3)',
     'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("Studio AI provider expansion supports five reviewed free attempts", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0060_studio_ai_free_provider_expansion",
+  );
+  expect(migration?.id).toBe("0060_studio_ai_free_provider_expansion");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CHECK ("attemptCount" BETWEEN 0 AND 5)',
+    "'gemini', 'groq', 'sambanova', 'mistral', 'openrouter', 'zai', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 5)',
+    'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_provider_check"',
     'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
   ]) {
     expect(sql).toContain(requiredFragment);
