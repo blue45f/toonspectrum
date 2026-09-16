@@ -7,7 +7,10 @@ import {
 } from "../brush-lab/brush-studio-version-integration";
 
 import {
+  STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   filterStudioBrushCatalogItems,
 } from "./studio-brush-catalog";
 import { STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS } from "./studio-brush-quality-portfolio";
@@ -20,11 +23,22 @@ import {
 describe("original material product integration", () => {
   it("shares exact ordered identities across the picker, quality editor and curated inventory", () => {
     expect(STUDIO_MATERIAL_BRUSH_IDS).toHaveLength(40);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(88);
-    expect(BRUSH_QUALITY_CATALOG.map(({ id }) => id)).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id)).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(({ operation }) => operation === "paint")).toHaveLength(86);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(({ operation }) => operation === "erase")).toHaveLength(2);
+    expect(BRUSH_QUALITY_CATALOG.map(({ id }) => id)).toEqual(
+      STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
+    );
+    expect(STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map(({ id }) => id)).toEqual(
+      STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
+    );
+    expect(
+      STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+        .slice(0, STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length)
+        .map(({ id }) => id),
+    ).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length).toBeGreaterThan(
+      STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.length,
+    );
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBeGreaterThan(86);
+    expect(STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS).toHaveLength(2);
   });
 
   it.each(STUDIO_MATERIAL_BRUSH_DEFINITIONS)("preserves $program through Korean search, selection and an explicit editing-start handoff", async (definition) => {

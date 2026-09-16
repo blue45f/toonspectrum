@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   filterStudioBrushCatalogItems,
+  isStudioDefaultQualityBrushCatalogId,
   listStudioQuickBrushCatalogItems,
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
   STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
@@ -41,7 +44,7 @@ const perfect = {
 } as const;
 
 describe("consolidated Studio brush product portfolio", () => {
-  it("uses 88 materially distinct representatives as the only product catalogue", () => {
+  it("keeps 88 quality representatives first inside the complete selectable catalogue", () => {
     expect(STUDIO_BRUSH_QUALITY_PORTFOLIO).toHaveLength(88);
     expect(new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS).size).toBe(88);
     expect(STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS).toMatchObject({
@@ -58,17 +61,22 @@ describe("consolidated Studio brush product portfolio", () => {
     expect(
       STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => item.id),
     ).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
-    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toBe(
-      STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
-    );
+    expect(
+      STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+        .slice(0, STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length)
+        .map((item) => item.id),
+    ).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
     expect(STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS).toBe(
-      STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
+      STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
     );
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toBe(
-      STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
+    expect(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(
+      STUDIO_BRUSH_LISTED_CATALOG_COUNTS.total,
     );
-    expect(STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS).toBe(
-      STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS,
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(
+      STUDIO_BRUSH_LISTED_CATALOG_COUNTS.paint,
+    );
+    expect(STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS).toHaveLength(
+      STUDIO_BRUSH_LISTED_CATALOG_COUNTS.erase,
     );
     expect(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(86);
     expect(STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS).toHaveLength(2);
@@ -76,34 +84,33 @@ describe("consolidated Studio brush product portfolio", () => {
       filterStudioBrushCatalogItems({ category: "all" }).map(
         (item) => item.id,
       ),
-    ).toEqual(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
+    ).toEqual(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id));
   });
 
-  it("keeps renderer implementation rows internal instead of presenting them as products", () => {
-    const productIds = new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length).toBeGreaterThan(
-      productIds.size,
+  it("exposes every non-quarantined advanced row through search and personal lanes", () => {
+    const expectedListed = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => !isStudioBrushQuarantinedPresetId(item.id),
     );
+    expect(new Set(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toEqual(
+      new Set(expectedListed.map((item) => item.id)),
+    );
+    expect(STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS).toHaveLength(
+      STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length
+        - STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.length,
+    );
+    expect(STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS.length).toBeGreaterThan(0);
 
     for (const item of STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS) {
-      expect(productIds.has(item.id), item.id).toBe(true);
+      expect(isStudioBrushQuarantinedPresetId(item.id), item.id).toBe(false);
       expect(studioBrushCatalogItemById(item.id), item.id).toBe(item);
     }
 
-    const hiddenRegistered = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
-      (item) =>
-        !productIds.has(item.id) &&
-        !isStudioBrushQuarantinedPresetId(item.id),
-    );
-    expect(hiddenRegistered.length).toBeGreaterThan(0);
-
-    for (const item of hiddenRegistered.slice(0, 24)) {
-      const matches = filterStudioBrushCatalogItems({ query: item.id });
-      expect(matches.some((candidate) => candidate.id === item.id), item.id).toBe(
-        false,
-      );
+    for (const item of STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS.slice(0, 24)) {
+      expect(isStudioDefaultQualityBrushCatalogId(item.id), item.id).toBe(false);
       expect(
-        matches.every((candidate) => productIds.has(candidate.id)),
+        filterStudioBrushCatalogItems({ query: item.id }).some(
+          (candidate) => candidate.id === item.id,
+        ),
         item.id,
       ).toBe(true);
       expect(
@@ -112,7 +119,7 @@ describe("consolidated Studio brush product portfolio", () => {
           favoriteIds: [item.id],
         }).some((candidate) => candidate.id === item.id),
         item.id,
-      ).toBe(false);
+      ).toBe(true);
       expect(
         listStudioQuickBrushCatalogItems({
           favoriteIds: [item.id],
@@ -120,7 +127,7 @@ describe("consolidated Studio brush product portfolio", () => {
           limit: 8,
         }).some((candidate) => candidate.id === item.id),
         item.id,
-      ).toBe(false);
+      ).toBe(true);
     }
   });
 
@@ -149,8 +156,8 @@ describe("consolidated Studio brush product portfolio", () => {
     }
   });
 
-  it("uses absorbed ids only as curation evidence, never as product identities", () => {
-    const productIds = new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
+  it("uses absorbed ids as curation evidence without deleting selectable advanced identities", () => {
+    const qualityIds = new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS);
     const absorbedEntries = Object.entries(
       STUDIO_BRUSH_QUALITY_ABSORBED_ID_OWNER,
     );
@@ -161,17 +168,20 @@ describe("consolidated Studio brush product portfolio", () => {
     );
 
     for (const [absorbedId, ownerId] of absorbedEntries) {
-      expect(productIds.has(absorbedId), absorbedId).toBe(false);
-      expect(productIds.has(ownerId), ownerId).toBe(true);
+      expect(qualityIds.has(absorbedId), absorbedId).toBe(false);
+      expect(qualityIds.has(ownerId), ownerId).toBe(true);
       expect(isStudioBrushQualityPortfolioId(absorbedId), absorbedId).toBe(
         false,
       );
-      expect(
-        filterStudioBrushCatalogItems({ query: absorbedId }).some(
-          (item) => item.id === absorbedId,
-        ),
-        absorbedId,
-      ).toBe(false);
+      const registered = studioBrushCatalogItemById(absorbedId);
+      const directlySearchable = filterStudioBrushCatalogItems({
+        query: absorbedId,
+      }).some((item) => item.id === absorbedId);
+      if (registered && !isStudioBrushQuarantinedPresetId(absorbedId)) {
+        expect(directlySearchable, absorbedId).toBe(true);
+      } else {
+        expect(directlySearchable, absorbedId).toBe(false);
+      }
     }
   });
 
