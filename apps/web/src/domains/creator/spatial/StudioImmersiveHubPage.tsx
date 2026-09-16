@@ -174,7 +174,7 @@ export function StudioImmersiveHubPage() {
     : locale === "ko" ? "2D 제작과 감상은 그대로 사용할 수 있으며, 지원되는 기기에서 AR/VR을 추가로 시작합니다." : "2D creation and reading remain available; AR/VR is added on supported devices.";
 
   return (
-    <main data-studio-immersive-hub="true" className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div data-studio-immersive-hub="true" className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-12">
         <section className="grid items-center gap-7 lg:grid-cols-[1.05fr_0.95fr]" aria-labelledby="immersive-hub-title">
           <div>
@@ -452,6 +452,6 @@ export function StudioImmersiveHubPage() {
           </Link>
         </footer>
       </Container>
-    </main>
+    </div>
   );
 }

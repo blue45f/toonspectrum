@@ -1,5 +1,5 @@
 import { ArrowLeft, LoaderCircle, MailPlus, Send, ShieldCheck } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
@@ -45,6 +45,7 @@ export function MessageRequestPage() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,8 +70,37 @@ export function MessageRequestPage() {
     }
   }
 
+  useEffect(() => {
+    if (session.ready) {
+      setSessionCheckTimedOut(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setSessionCheckTimedOut(true), 4_500);
+    return () => window.clearTimeout(timeoutId);
+  }, [session.ready]);
+
+  if (!session.ready && !sessionCheckTimedOut) {
+    return (
+      <div data-route-pending="" role="status" className="grid min-h-[55vh] place-items-center px-6 text-center">
+        <div>
+          <LoaderCircle className="mx-auto animate-spin text-accent" aria-hidden="true" />
+          <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!session.ready) {
-    return <div className="grid min-h-[55vh] place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>;
+    return (
+      <Container size="prose" className="py-16 sm:py-24">
+        <div role="alert" className="rounded-3xl border border-warn/35 bg-card p-8 text-center sm:p-12">
+          <MailPlus size={36} className="mx-auto text-warn" aria-hidden="true" />
+          <h1 className="mt-4 text-2xl font-bold">새 메시지</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">로그인 상태를 확인하지 못했어요. 받는 회원과 작성 중인 주소는 유지됩니다.</p>
+          <button type="button" onClick={() => window.location.reload()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}>다시 확인</button>
+        </div>
+      </Container>
+    );
   }
 
   if (session.status !== "authenticated") {

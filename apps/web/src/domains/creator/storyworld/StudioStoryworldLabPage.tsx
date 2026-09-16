@@ -837,14 +837,14 @@ export function StudioStoryworldLabPage(props: StudioStoryworldLabPageProps) {
   }, [key, attempt]);
   if (loaded === null || loaded.key !== key) {
     return (
-      <main className="storyworld-main" aria-busy={error === null}>
+      <div className="storyworld-main" aria-busy={error === null}>
         <h1>스토리월드 인과관계 랩</h1>
         <p role={error === null ? "status" : "alert"}>
           {error === null ? "SQLite/OPFS에서 스토리월드 초안을 복원하는 중입니다." : `복원 실패: ${error} 저장된 원본은 변경하지 않았습니다.`}
         </p>
         {error !== null ? <button className="storyworld-button" type="button" onClick={() => setAttempt((value) => value + 1)}>저장소 다시 열기</button> : null}
         <Link className="storyworld-button" href={editorHref(props.workId, props.remixSourceWorkId)}>Studio 편집기로 돌아가기</Link>
-      </main>
+      </div>
     );
   }
   return <StudioStoryworldLabEditor key={key} {...props} initialProject={loaded.project} />;
@@ -964,7 +964,7 @@ function StudioStoryworldLabEditor({
           </div>
         </aside>
 
-        <main className="storyworld-main">
+        <div className="storyworld-main">
           <div className="storyworld-page-heading">
             <div>
               <span className="storyworld-eyebrow">{documentScope} · 캔버스 원고와 자동 연결되지 않은 로컬 실험</span>
@@ -983,7 +983,7 @@ function StudioStoryworldLabEditor({
           {activeTab === "contracts" ? <ContractsTab result={result} /> : null}
           {activeTab === "capabilities" ? <CapabilitiesTab /> : null}
           {activeTab === "json" ? <JsonTab onApply={(next) => { setProject(next); setStatusText("JSON 변경을 적용해 다시 분석했습니다."); }} project={project} /> : null}
-        </main>
+        </div>
       </div>
       <div aria-live="polite" className="storyworld-statusbar">
         <CircleDot aria-hidden size={13} />

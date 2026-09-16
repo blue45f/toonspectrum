@@ -278,7 +278,7 @@ export function StudioAiComicDirectorRoute({
     && session.approval.candidateDigest === candidateDigest;
 
   return (
-    <main
+    <div
       className="min-h-[calc(100dvh-4rem)] bg-canvas px-3 py-4 text-fg sm:px-5 lg:px-8"
       data-studio-ai-comic-director-route="true"
     >
@@ -562,6 +562,6 @@ export function StudioAiComicDirectorRoute({
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

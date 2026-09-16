@@ -686,7 +686,7 @@ export function StudioUnifiedAssetWorkspace({
               ) : null}
             </aside>
 
-            <main className="min-w-0 rounded-xl border border-line bg-panel p-2 sm:p-3">
+            <div className="min-w-0 rounded-xl border border-line bg-panel p-2 sm:p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p role="status" aria-live="polite" className="text-xs text-fg-3">
                   {query.trim()
@@ -847,7 +847,7 @@ export function StudioUnifiedAssetWorkspace({
                   </div>
                 </div>
               )}
-            </main>
+            </div>
 
             <aside className="min-w-0 rounded-xl border border-line bg-panel p-3 lg:max-h-[min(68dvh,46rem)] lg:overflow-y-auto">
               {selected && selectedPreview ? (

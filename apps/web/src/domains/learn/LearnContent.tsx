@@ -543,7 +543,7 @@ export function LearnPage() {
         <Link to="/learn/studio" aria-current={location.pathname.startsWith("/learn/studio") ? "page" : undefined}>툰스튜디오 실습</Link>
       </nav>
       {store.warning && <p className="learn-caution" role="status">{store.warning}</p>}
-      <main id="learn-main">
+      <div id="learn-main">
         <Routes>
           <Route index element={<Curriculum store={store} />} />
           <Route path="lessons/:lessonId" element={<LessonDetail store={store} />} />
@@ -551,7 +551,7 @@ export function LearnPage() {
           <Route path="studio" element={<StudioCourses store={store} />} />
           <Route path="*" element={<LearningNotFound />} />
         </Routes>
-      </main>
+      </div>
       <footer className="learn-local-footer">
         <p>한국어 학습 콘텐츠 · 로그인 없이 이용 가능 · 학습 기록은 현재 브라우저에만 저장됩니다.</p>
         <p>공식 문서와 공개 교육 자료를 참고해 본문·도식·과제를 새로 작성했습니다. 특정 교육 기관의 공식 인증 과정이 아닙니다.</p>

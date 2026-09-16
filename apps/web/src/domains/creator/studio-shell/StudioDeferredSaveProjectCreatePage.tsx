@@ -131,7 +131,7 @@ export function StudioDeferredSaveProjectCreatePage() {
     : `Start ${selected.titleEn}`;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-12">
         <div className="mx-auto max-w-6xl">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -282,6 +282,6 @@ export function StudioDeferredSaveProjectCreatePage() {
           </div>
         </div>
       </Container>
-    </main>
+    </div>
   );
 }

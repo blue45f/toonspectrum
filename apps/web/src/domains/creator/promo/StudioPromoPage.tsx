@@ -163,7 +163,7 @@ export function StudioPromoPage() {
     patch({ panels });
   };
   return (
-    <main className="promo-studio" aria-labelledby="promo-title">
+    <div className="promo-studio" aria-labelledby="promo-title">
       <header className="promo-header">
         <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>애니 오프닝 스타일 · 모션툰 · 예고편 · 쇼츠를 브라우저에서 직접 만드세요.</p></div>
         <span className="promo-badge">15 / 30 / 60초</span>
@@ -249,6 +249,6 @@ export function StudioPromoPage() {
           {error ? <p className="promo-error" role="alert">{error}</p> : null}
         </aside>
       </div>
-    </main>
+    </div>
   );
 }

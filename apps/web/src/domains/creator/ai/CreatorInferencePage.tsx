@@ -90,7 +90,7 @@ export function CreatorInferencePage() {
     finally { operation.current = null; if (mounted.current) setBusy(false); }
   };
   const cancel = async (job: InferenceJob) => { try { await cancelInferenceJob(job.id); await refresh(); } catch (reason) { await notifyError(reason); } };
-  return <main className="creator-inference-page">
+  return <div className="creator-inference-page">
     <nav aria-label="제작실 이동"><Link href="/studio">← 스튜디오</Link><Link href="/showcase/promo">컷 기반 홍보 영상</Link><a href="/spatial-reader/">공간형 감상</a></nav>
     <header><p className="inference-kicker">MANAGED CLOUD CREATIVE ENGINES</p><h1>그림에서 움직임으로.<br />입체에서 새로운 그림으로.</h1><p>실제 모델 추론으로 만드는 제작실입니다. 모델과 GPU가 준비되지 않으면 생성 성공으로 표시하지 않습니다.</p></header>
     <details className="my-6 rounded-xl border border-line p-4"><summary className="min-h-11 cursor-pointer font-semibold">통합 AI 설정 · 클라우드 런타임 연결</summary><UnifiedAiSettings /></details>
@@ -123,5 +123,5 @@ export function CreatorInferencePage() {
       </article>)}
       {preview && <figure><figcaption>{preview.name} · 무결성 검증된 파일</figcaption>{preview.mime === "video/mp4" ? <video key={preview.url} src={preview.url} controls muted playsInline preload="metadata" aria-label={`${preview.name} · 소리 없이 재생되는 생성형 애니메이션 미리보기`} /> : preview.mime === "image/png" ? <img src={preview.url} alt="선택한 생성 작업의 결과 또는 참조 이미지" /> : <p>파일을 저장했습니다. GLB는 3D 스튜디오, PNG는 드로잉, MP4는 영상 편집에서 불러올 수 있습니다.</p>}</figure>}
     </section></div>
-  </main>;
+  </div>;
 }

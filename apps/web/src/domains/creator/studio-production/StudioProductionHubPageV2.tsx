@@ -690,7 +690,7 @@ function StudioProductionHubWorkspace({
         </nav>
       </header>
 
-      <main className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
+      <div className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         <ModeNotice mode={mode} />
 
         {loadError ? (
@@ -974,7 +974,7 @@ function StudioProductionHubWorkspace({
             </div>
           </Card>
         ) : null}
-      </main>
+      </div>
     </div>
   );
 }

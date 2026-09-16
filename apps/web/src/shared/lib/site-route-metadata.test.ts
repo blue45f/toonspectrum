@@ -20,6 +20,40 @@ describe("site route metadata", () => {
     });
   });
 
+  it("keeps current Studio primary routes and Production in the Studio product authority", () => {
+    expect(resolveSiteRouteMetadata("/production")).toMatchObject({
+      product: "studio",
+      purpose: "manage",
+      access: "public",
+      projectContext: "optional",
+    });
+    expect(resolveSiteRouteMetadata("/studio/new")).toMatchObject({
+      product: "studio",
+      purpose: "create",
+      projectContext: "none",
+    });
+    expect(resolveSiteRouteMetadata("/studio/assets")).toMatchObject({
+      product: "studio",
+      purpose: "manage",
+      projectContext: "optional",
+    });
+  });
+
+  it("classifies Production and Studio project families without duplicating runtime parsing", () => {
+    expect(resolveSiteRouteMetadata("/production/projects/sample-project/review")).toMatchObject({
+      product: "studio",
+      purpose: "manage",
+      access: "project",
+      projectContext: "required",
+    });
+    expect(resolveSiteRouteMetadata("/studio/p/project-1/review")).toMatchObject({
+      product: "studio",
+      purpose: "manage",
+      access: "project",
+      projectContext: "required",
+    });
+  });
+
   it("classifies policy and discovery destinations independently", () => {
     expect(resolveSiteRouteMetadata("/privacy")).toMatchObject({ product: "docs", purpose: "trust", maturity: "stable" });
     expect(resolveSiteRouteMetadata("/ranking")).toMatchObject({ product: "spectrum", purpose: "discover", access: "public" });

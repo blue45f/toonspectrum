@@ -318,7 +318,7 @@ export function SearchExplorer({
         </div>
       </aside>
 
-      <main>
+      <div data-search-results="">
         <div className="rounded-2xl border border-line bg-card p-3 sm:p-4">
           <label htmlFor="search-explorer-query" className="sr-only">
             {t("search.explorer.search.label")}
@@ -661,7 +661,7 @@ export function SearchExplorer({
             )}
           </>
         )}
-      </main>
+      </div>
     </section>
   );
 }

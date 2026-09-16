@@ -420,7 +420,7 @@ function useProductionProject(projectId: string | undefined) {
 export function ProductionLandingPage() {
   const demo = useMemo(() => createProductionDemoProject(), []);
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div className="min-h-dvh bg-canvas text-fg">
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
@@ -479,7 +479,7 @@ export function ProductionLandingPage() {
           </div>
         </SectionCard>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -1157,11 +1157,11 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
   const [roleLens, setRoleLens] = useState<RoleLens>("producer");
 
   if (!projectId) return <Navigate to="/production" replace />;
-  if (project.loading) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></main>;
-  if (project.error || !project.aggregate) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">제작 관리 홈</Link></div></main>;
+  if (project.loading) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></div>;
+  if (project.error || !project.aggregate) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">제작 관리 홈</Link></div></div>;
 
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={project.aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
@@ -1170,7 +1170,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
           <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} />
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -1198,12 +1198,12 @@ export function ProductionEpisodeRoomPage() {
   const userId = useApp((state) => state.userId);
 
   if (!params.projectId || !params.episodeId) return <Navigate to="/production" replace />;
-  if (project.loading) return <main className="min-h-dvh bg-canvas p-6 text-fg">회차 작업실을 불러오는 중…</main>;
-  if (!project.aggregate || project.error) return <main className="min-h-dvh bg-canvas p-6 text-fg">{project.error ?? "회차 데이터가 없습니다."}</main>;
+  if (project.loading) return <div className="min-h-dvh bg-canvas p-6 text-fg">회차 작업실을 불러오는 중…</div>;
+  if (!project.aggregate || project.error) return <div className="min-h-dvh bg-canvas p-6 text-fg">{project.error ?? "회차 데이터가 없습니다."}</div>;
 
   const aggregate = project.aggregate;
   const episode = aggregate.episodes.find((entry) => entry.episodeId === params.episodeId);
-  if (!episode) return <main className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-3xl rounded-2xl border border-line bg-card p-6">회차를 찾을 수 없습니다.</div></main>;
+  if (!episode) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-3xl rounded-2xl border border-line bg-card p-6">회차를 찾을 수 없습니다.</div></div>;
   const handoff = aggregate.handoffs.find((entry) => entry.episodeId === episode.episodeId && !["superseded", "cancelled"].includes(entry.status));
   const clarifications = handoff ? aggregate.clarifications.filter((entry) => entry.handoffId === handoff.id) : [];
   const readiness = handoff ? evaluateHandoffReadiness({ package: handoff, clarifications }) : null;
@@ -1255,7 +1255,7 @@ export function ProductionEpisodeRoomPage() {
   };
 
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="border-b border-line bg-card px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-[100rem]">
@@ -1336,6 +1336,6 @@ export function ProductionEpisodeRoomPage() {
           </SectionCard>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

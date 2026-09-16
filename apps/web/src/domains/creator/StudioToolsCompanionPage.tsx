@@ -1532,7 +1532,7 @@ export function StudioToolsCompanionPage({
         ) : null}
       </header>
 
-      <main className={cn(
+      <div className={cn(
         "mx-auto w-full max-w-xl pt-4 [padding-bottom:max(1rem,var(--studio-safe-bottom))] [padding-left:max(0.75rem,var(--studio-safe-left))] [padding-right:max(0.75rem,var(--studio-safe-right))]",
         dedicatedLayout ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4"
       )}>
@@ -1841,7 +1841,7 @@ export function StudioToolsCompanionPage({
           <p className={cn("text-xs leading-relaxed text-fg-3", dedicatedLayout && "shrink-0")}>
             {t("studio.toolsCompanion.footer")}
           </p>
-      </main>
+      </div>
     </div>
   );
 }

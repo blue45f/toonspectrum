@@ -395,7 +395,7 @@ export function StudioSaveFirstProjectLibraryPage({
   const secondaryNavigation: readonly LibraryView[] = ["storage", "exports", "publications"];
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -698,6 +698,6 @@ export function StudioSaveFirstProjectLibraryPage({
           {locale === "ko" ? "저장, 백업, 내보내기, 외부 제출, ToonSpectrum 게시는 서로 독립적으로 관리됩니다." : "Saving, backup, export, external submission and ToonSpectrum publishing are managed independently."}
         </footer>
       </Container>
-    </main>
+    </div>
   );
 }

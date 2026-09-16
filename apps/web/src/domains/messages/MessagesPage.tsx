@@ -415,6 +415,7 @@ export function MessagesPage() {
   const [reportReason, setReportReason] = useState<MessagingReportReason>("spam");
   const [reportDetails, setReportDetails] = useState("");
   const [olderLoading, setOlderLoading] = useState(false);
+  const [sessionCheckTimedOut, setSessionCheckTimedOut] = useState(false);
   const messageViewportRef = useRef<HTMLDivElement>(null);
   const shouldScrollToLatestRef = useRef(true);
 
@@ -677,10 +678,39 @@ export function MessagesPage() {
     }
   }
 
+  useEffect(() => {
+    if (session.ready) {
+      setSessionCheckTimedOut(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setSessionCheckTimedOut(true), 4_500);
+    return () => window.clearTimeout(timeoutId);
+  }, [session.ready]);
+
   const messages = useMemo(() => detail?.messages ?? [], [detail]);
 
+  if (!session.ready && !sessionCheckTimedOut) {
+    return (
+      <div data-route-pending="" role="status" className="grid min-h-[55vh] place-items-center px-6 text-center">
+        <div>
+          <LoaderCircle className="mx-auto animate-spin text-accent" aria-hidden="true" />
+          <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!session.ready) {
-    return <div className="grid min-h-[55vh] place-items-center"><LoaderCircle className="animate-spin text-accent" /></div>;
+    return (
+      <Container size="prose" className="py-16 sm:py-24">
+        <div role="alert" className="rounded-3xl border border-warn/35 bg-card p-8 text-center shadow-sm sm:p-12">
+          <Mail size={36} className="mx-auto text-warn" aria-hidden="true" />
+          <h1 className="mt-4 text-2xl font-bold">메시지</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">로그인 상태를 확인하지 못했어요. 현재 주소는 유지되며 연결이 돌아오면 다시 확인할 수 있습니다.</p>
+          <button type="button" onClick={() => window.location.reload()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}>다시 확인</button>
+        </div>
+      </Container>
+    );
   }
 
   if (!authenticated) {
@@ -768,7 +798,7 @@ export function MessagesPage() {
           )}
         </aside>
 
-        <main className={cn("relative min-w-0 bg-bg", showMobileList ? "hidden lg:block" : "block")}>
+        <div className={cn("relative min-w-0 bg-bg", showMobileList ? "hidden lg:block" : "block")}>
           {!threadId ? (
             <div className="grid min-h-[620px] place-items-center p-8 text-center">
               <div>
@@ -900,7 +930,7 @@ export function MessagesPage() {
               </form>
             </div>
           ) : null}
-        </main>
+        </div>
 
         {settingsOpen && <MessagingSettingsPanel onClose={() => setSettingsOpen(false)} />}
       </div>

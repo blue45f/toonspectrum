@@ -734,7 +734,7 @@ export function StudioProductionBiblePanelSurface({
           </div>
         </aside>
 
-        <main className="min-h-0 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 overflow-y-auto overscroll-contain">
           {!selectedEntry ? (
             <div className="grid min-h-full place-items-center px-5 py-12 text-center">
               <div className="max-w-md">
@@ -931,7 +931,7 @@ export function StudioProductionBiblePanelSurface({
               </section>
             </div>
           )}
-        </main>
+        </div>
         </div>
       )}
     </div>

@@ -29,6 +29,26 @@ describe("route stage semantic and recovery guarantees", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
+  it("publishes pending and ready route state for browser health checks", async () => {
+    const { rerender } = render(
+      <RouteStage pathname="/production" search="" accessibleTitle="Production">
+        <div data-route-loading-fallback="">Loading</div>
+      </RouteStage>,
+    );
+    expect(document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-state"))
+      .toBe("pending");
+
+    rerender(
+      <RouteStage pathname="/production" search="" accessibleTitle="Production">
+        <section data-route-ready=""><h1>Production</h1></section>
+      </RouteStage>,
+    );
+    await waitFor(() => {
+      expect(document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-state"))
+        .toBe("ready");
+    });
+  });
+
   it("shows an actionable recovery panel after an empty public route stalls", async () => {
     vi.useFakeTimers();
     render(<RouteStage pathname="/market/browse" search="?type=brush" accessibleTitle="Browse assets">{null}</RouteStage>);
