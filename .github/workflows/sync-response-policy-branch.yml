@@ -40,3 +40,5 @@ jobs:
           git fetch origin "+refs/heads/${GITHUB_REF_NAME}:refs/remotes/origin/${GITHUB_REF_NAME}" --depth=50
           git rebase "origin/${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+
+# Temporary branch workflow: remove after the generated edge policy commit lands.
