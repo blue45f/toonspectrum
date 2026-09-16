@@ -14,11 +14,13 @@ export function VrmLighting({
   tone,
   lighting,
   env,
+  formStudy = false,
   envRootRef,
 }: {
   tone: LightingTone;
   lighting?: LightingParams;
   env?: EnvVariant;
+  formStudy?: boolean;
   /** Capture lease hides this group so subject-only inserts exclude floor/wall env. */
   envRootRef?: { current: THREE.Group | null };
 }) {
@@ -32,10 +34,12 @@ export function VrmLighting({
                tone === "studio" ? { amb: [0.92, "#ffffff"], d1: [1.5, "#ffffff"], d2: [0.8, "#ffffff"], d3: [0.8, "#ffffff"] } :
                { amb: [0.68, "#ffffff"], d1: [1.32, "#ffffff"], d2: [0.54, "#f7d8c4"], d3: [0.42, "#cfdcff"] };
 
-  const ambI = (base.amb[0] as number) * (iMul * 0.9);
-  const d1I = (base.d1[0] as number) * iMul;
-  const d2I = (base.d2[0] as number) * iMul * 0.9;
-  const d3I = (base.d3[0] as number) * iMul * 0.8;
+  // Clay/reference mode uses a lower fill, stronger key, and brighter rear rim so anatomy reads
+  // clearly without changing the user's authored lighting preset.
+  const ambI = (base.amb[0] as number) * (iMul * 0.9) * (formStudy ? 0.68 : 1);
+  const d1I = (base.d1[0] as number) * iMul * (formStudy ? 1.12 : 1);
+  const d2I = (base.d2[0] as number) * iMul * 0.9 * (formStudy ? 0.82 : 1);
+  const d3I = (base.d3[0] as number) * iMul * 0.8 * (formStudy ? 1.38 : 1);
 
   const c1 = col ? `rgb(${Math.round(col[0]*255)},${Math.round(col[1]*255)},${Math.round(col[2]*255)})` : (base.d1[1] as string);
   const c2 = col ? `rgb(${Math.round(col[0]*255*0.85)},${Math.round(col[1]*255*0.85)},${Math.round(col[2]*255*0.9)})` : (base.d2[1] as string);
@@ -43,6 +47,13 @@ export function VrmLighting({
   return (
     <>
       <ambientLight intensity={ambI} color={base.amb[1] as string} />
+      {formStudy ? (
+        <hemisphereLight
+          intensity={0.24 * iMul}
+          color="#fff8ec"
+          groundColor="#596473"
+        />
+      ) : null}
       <directionalLight intensity={d1I} position={dirPos as [number,number,number]} color={c1} />
       <directionalLight intensity={d2I} position={[-3.2, 2.6, 2.1]} color={c2} />
       <directionalLight intensity={d3I} position={[-1.6, 3.4, -3.2]} color={base.d3[1] as string} />

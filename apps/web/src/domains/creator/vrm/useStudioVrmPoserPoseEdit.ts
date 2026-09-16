@@ -63,6 +63,7 @@ import {
 } from "./studio-vrm-pose-translations";
 import {
   BONE_CATEGORIES,
+  BONE_LABELS,
   type ExpressionAction,
 } from "./studio-vrm-poser-catalogs";
 import {
@@ -116,8 +117,16 @@ import type {
   StudioVrmPhotoPoseApplyPayload,
 } from "./StudioVrmPhotoPoseScanner";
 
+import type {
+  StudioVrmJointHandleBone,
+  StudioVrmJointRotationDelta,
+  StudioVrmJointRotationPhase,
+} from "./StudioVrmJointHandles";
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
-import type { CustomPose } from "./StudioVrmPoserTypes";
+import type {
+  CustomPose,
+  StudioVrmDirectJointRotationTransaction,
+} from "./StudioVrmPoserTypes";
 import type {
   VRMHumanBoneName,
 } from "@pixiv/three-vrm";
@@ -146,6 +155,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     lockedPoseBones,
     setLockedPoseBones,
     setSelectedViewportPoseBone,
+    setSelectedJointHandle,
     viewportHandIkEnabled,
     setIsViewportHandIkDragging,
     setActiveExpressionId,
@@ -154,7 +164,9 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     recentPreferencesRuntime,
     bodyRotation,
     setBodyRotation,
-    jointHandleInteracting,
+    idleAnimation,
+    webcamActive,
+    isCapturing,
     setJointHandleStatus,
     setTurntable,
     fullStateHistoryRef,
@@ -176,9 +188,11 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     wardrobeAutoHide,
     physicsPreview,
     vrmRef,
+    directJointRotationTransactionRef,
     jointIkTransactionRef,
     persistentIkResolvedSignatureRef,
     pendingPersistentIkCommandRef,
+    persistentIkReconciling,
     setPersistentIkReconciling,
     persistentIkCaptureIsReady,
     cancelJointIkTransaction,
@@ -186,6 +200,10 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     poseMaterialRuntimeDisabled,
     handleCustomPoseSelect,
   } = h;
+  const directRotationTransactionRef = (directJointRotationTransactionRef ?? { current: null }) as {
+    current: StudioVrmDirectJointRotationTransaction | null;
+  };
+
   function handlePoseSelect(poseId: string) {
     const pose = findPose(poseId);
     const strippedBones = stripFingerBones(pose.bones);
@@ -574,7 +592,14 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
   }
 
   function togglePoseBoneLock(boneName: VRMHumanBoneName) {
-    if (jointHandleInteracting || jointIkTransactionRef.current) {
+    const directRotation = directRotationTransactionRef.current;
+    if (directRotation) {
+      restoreDirectJointRotationTransaction(
+        directRotation,
+        "진행 중인 관절 회전을 취소하고 잠금을 변경했습니다.",
+      );
+    }
+    if (jointIkTransactionRef.current) {
       cancelJointIkTransaction({ status: "진행 중인 IK 이동을 취소하고 관절 잠금을 변경했습니다." });
     }
     if (!lockedPoseBones.includes(boneName)) {
@@ -604,6 +629,226 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
         ?.querySelector(`[data-vrm-pose-bone="${boneName}"]`)
         ?.scrollIntoView({ block: "nearest" });
     });
+  }
+
+  function restoreDirectJointRotationTransaction(
+    transaction: StudioVrmDirectJointRotationTransaction,
+    statusMessage: string,
+  ) {
+    directRotationTransactionRef.current = null;
+    setActivePoseId(transaction.originalPoseId);
+    setCustomBones(transaction.before.bones);
+    setCustomYOffset(transaction.before.yOffset);
+    setPoseTranslations(cloneStudioVrmPoseTranslations(transaction.before.poseTranslations));
+    setFingerEdits(transaction.before.fingerOverrides ?? {});
+    if (vrmRef.current === transaction.vrm) {
+      applyPoserVisualState(transaction.vrm, {
+        bones: transaction.before.bones,
+        yOffset: transaction.before.yOffset,
+        poseTranslations: transaction.before.poseTranslations,
+        fingerEdits: transaction.before.fingerOverrides ?? {},
+        bodyScale: transaction.before.bodyScale ?? bodyScale,
+      });
+    }
+    setJointHandleStatus(statusMessage);
+  }
+
+  function handleViewportJointRotationGesture(
+    boneName: StudioVrmJointHandleBone,
+    deltaDegrees: StudioVrmJointRotationDelta,
+    phase: StudioVrmJointRotationPhase,
+  ) {
+    const currentVrm = vrmRef.current;
+    if (phase === "cancel") {
+      const transaction = directRotationTransactionRef.current;
+      if (transaction?.bone === boneName) {
+        restoreDirectJointRotationTransaction(
+          transaction,
+          `${BONE_LABELS[boneName] ?? boneName} 회전을 취소하고 시작 자세로 되돌렸습니다.`,
+        );
+      }
+      return;
+    }
+
+    if (phase === "start") {
+      const previous = directRotationTransactionRef.current;
+      if (previous) {
+        restoreDirectJointRotationTransaction(
+          previous,
+          "이전 관절 회전을 취소하고 새 관절 편집을 시작했습니다.",
+        );
+      }
+      if (
+        !currentVrm
+        || webcamActive
+        || idleAnimation
+        || isCapturing
+        || persistentIkReconciling
+        || jointIkTransactionRef.current
+        || (typeof persistentIkCaptureIsReady === "function" && !persistentIkCaptureIsReady())
+      ) {
+        setJointHandleStatus(
+          "실시간 추적·대기 애니메이션·캡처·IK 재계산 중에는 관절을 직접 회전할 수 없습니다.",
+        );
+        return;
+      }
+      if (lockedPoseBones.includes(boneName)) {
+        setJointHandleStatus(`${BONE_LABELS[boneName] ?? boneName} 관절이 잠겨 있습니다.`);
+        return;
+      }
+      const node = currentVrm.humanoid?.getNormalizedBoneNode(boneName);
+      if (!node) {
+        setJointHandleStatus("이 캐릭터에는 선택한 휴머노이드 관절이 없습니다.");
+        return;
+      }
+      const conflictingPin = ikConstraints.find((constraint: StudioVrmIkConstraint) => {
+        if (!constraint.enabled || !constraint.locked) return false;
+        const chain = STUDIO_VRM_USER_IK_CHAINS[constraint.effector];
+        return [chain.upper, chain.lower, chain.end].includes(boneName);
+      });
+      if (conflictingPin) {
+        setJointHandleStatus(
+          "이 관절은 유지 중인 손·발 고정점이 사용합니다. 먼저 해당 고정점 유지를 해제해 주세요.",
+        );
+        return;
+      }
+      const baked = bakeStudioVrmRuntimePose(currentVrm, STUDIO_VRM_DIRECT_EDIT_BONES);
+      if (!baked) {
+        setJointHandleStatus("현재 보이는 자세를 직접 회전용 관절값으로 변환하지 못했습니다.");
+        return;
+      }
+      const baselineBones: PoseBoneMap = {
+        ...customBones,
+        ...stripFingerBones(baked.bones),
+      };
+      const baselineRotation = getPoseBoneRotation(baselineBones[boneName]);
+      const before = captureFullState();
+      directRotationTransactionRef.current = {
+        vrm: currentVrm,
+        bone: boneName,
+        before,
+        originalPoseId: activePoseId,
+        baselineBones,
+        baselineRotation: [...baselineRotation],
+        latestBones: baselineBones,
+        latestRotation: [...baselineRotation],
+        didPreview: false,
+      };
+      setSelectedJointHandle?.(boneName);
+      setSelectedViewportPoseBone(boneName);
+      const category = BONE_CATEGORIES.find((candidate) => candidate.bones.includes(boneName));
+      if (category) setActiveCategory(category.id);
+      setTurntable(false);
+      setJointHandleStatus(
+        `${BONE_LABELS[boneName] ?? boneName} 직접 회전 · 놓으면 한 번의 편집으로 저장됩니다.`,
+      );
+      return;
+    }
+
+    const transaction = directRotationTransactionRef.current;
+    if (!transaction || transaction.bone !== boneName || transaction.vrm !== currentVrm) return;
+    if (!deltaDegrees.every(Number.isFinite)) {
+      restoreDirectJointRotationTransaction(transaction, "유효하지 않은 회전 입력을 취소했습니다.");
+      return;
+    }
+
+    if (phase === "move") {
+      const requestedRotation = transaction.baselineRotation.map((value, index) => (
+        value + THREE.MathUtils.degToRad(deltaDegrees[index] ?? 0)
+      )) as [number, number, number];
+      const nextRotation = jointLimitsEnabled
+        ? clampStudioVrmJointRotation(boneName, requestedRotation)
+        : requestedRotation;
+      const nextBones: PoseBoneMap = {
+        ...transaction.baselineBones,
+        [boneName]: { rotation: [...nextRotation] },
+      };
+      transaction.latestBones = nextBones;
+      transaction.latestRotation = [...nextRotation];
+      transaction.didPreview = true;
+      setActivePoseId("manual-pose");
+      setCustomBones(nextBones);
+      applyPoserVisualState(transaction.vrm, {
+        bones: nextBones,
+        yOffset: transaction.before.yOffset,
+        poseTranslations: transaction.before.poseTranslations,
+        fingerEdits: transaction.before.fingerOverrides ?? {},
+        bodyScale: transaction.before.bodyScale ?? bodyScale,
+      });
+      const renderedDelta = nextRotation.map((value, index) => Math.round(
+        THREE.MathUtils.radToDeg(value - transaction.baselineRotation[index]),
+      ));
+      const limited = nextRotation.some((value, index) => (
+        Math.abs(value - requestedRotation[index]) > 1e-5
+      ));
+      setJointHandleStatus(
+        `${BONE_LABELS[boneName] ?? boneName} 회전 중 · X ${renderedDelta[0]}° · Y ${renderedDelta[1]}° · Z ${renderedDelta[2]}°${limited ? " · 관절 안전 범위 적용" : ""}`,
+      );
+      return;
+    }
+
+    if (phase !== "end") return;
+    directRotationTransactionRef.current = null;
+    if (!transaction.didPreview) return;
+    const after = serializeFullVrmState({
+      ...transaction.before,
+      poseId: "manual-pose",
+      bones: transaction.latestBones,
+    });
+    const candidateSignature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: transaction.latestBones,
+      fingerEdits: after.fingerOverrides ?? {},
+      yOffset: after.yOffset,
+      translations: after.poseTranslations,
+      bodyRotation: after.bodyRotation,
+      bodyScale: after.bodyScale ?? bodyScale,
+      proportions: parseAvatarForgeState(after.avatarForge).proportions,
+      constraints: after.ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    const needsPersistentIkReconcile = after.ikConstraints.some((constraint) => (
+      constraint.enabled && constraint.locked
+    )) && persistentIkResolvedSignatureRef.current !== candidateSignature;
+
+    if (needsPersistentIkReconcile) {
+      pendingPersistentIkCommandRef.current = {
+        before: transaction.before,
+        candidateAfter: after,
+        inputSignature: candidateSignature,
+        historyGeneration: fullStateHistoryRef.current.generation,
+      };
+      setPersistentIkReconciling(true);
+    } else {
+      const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+        fullStateHistoryRef.current,
+        transaction.before,
+        after,
+        activeModelId,
+      );
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
+      setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    }
+
+    setActivePoseId("manual-pose");
+    setCustomBones(transaction.latestBones);
+    applyPoserVisualState(transaction.vrm, {
+      bones: transaction.latestBones,
+      yOffset: after.yOffset,
+      poseTranslations: after.poseTranslations,
+      fingerEdits: after.fingerOverrides ?? fingerEdits,
+      bodyScale: after.bodyScale ?? bodyScale,
+    });
+    setJointHandleStatus(
+      needsPersistentIkReconcile
+        ? `${BONE_LABELS[boneName] ?? boneName} 회전 적용 · 유지 중인 손·발 고정점을 다시 맞추는 중입니다.`
+        : `${BONE_LABELS[boneName] ?? boneName} 회전 적용 완료 · 실행 취소로 한 번에 되돌릴 수 있습니다.`,
+    );
   }
 
   function handleViewportHandIkDrag(
@@ -849,6 +1094,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     handleStraightenUpperBody,
     togglePoseBoneLock,
     selectViewportPoseBone,
+    handleViewportJointRotationGesture,
     handleViewportHandIkDrag,
     handleBoneRotationChange,
     handleYOffsetChange,

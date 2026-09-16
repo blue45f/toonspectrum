@@ -84,6 +84,13 @@ type MannequinMaterial = THREE.Material & {
   map?: THREE.Texture | null;
   metalness?: number;
   roughness?: number;
+  envMapIntensity?: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+  sheen?: number;
+  sheenRoughness?: number;
+  sheenColor?: THREE.Color;
+  specularIntensity?: number;
 };
 
 type MannequinMaterialSnapshot = {
@@ -94,6 +101,13 @@ type MannequinMaterialSnapshot = {
   map: THREE.Texture | null | undefined;
   metalness: number | undefined;
   roughness: number | undefined;
+  envMapIntensity: number | undefined;
+  clearcoat: number | undefined;
+  clearcoatRoughness: number | undefined;
+  sheen: number | undefined;
+  sheenRoughness: number | undefined;
+  sheenColor: THREE.Color | null;
+  specularIntensity: number | undefined;
 };
 
 // ── StudioVrmMannequinMaterial ──────────────────────────────────────
@@ -115,12 +129,19 @@ export function StudioVrmMannequinMaterial({
   const enforce = () => {
     for (const { material } of snapshotsRef.current) {
       material.userData.__vrmMannequinActive = true;
-      material.color?.set("#b7b2a8");
+      material.color?.set("#c8c0b2");
       material.emissive?.set("#000000");
       if (material.emissiveIntensity !== undefined) material.emissiveIntensity = 0;
       if (material.map !== undefined) material.map = null;
       if (material.metalness !== undefined) material.metalness = 0;
-      if (material.roughness !== undefined) material.roughness = 0.82;
+      if (material.roughness !== undefined) material.roughness = 0.7;
+      if (material.envMapIntensity !== undefined) material.envMapIntensity = 0.55;
+      if (material.clearcoat !== undefined) material.clearcoat = 0.06;
+      if (material.clearcoatRoughness !== undefined) material.clearcoatRoughness = 0.65;
+      if (material.sheen !== undefined) material.sheen = 0.08;
+      if (material.sheenRoughness !== undefined) material.sheenRoughness = 0.9;
+      material.sheenColor?.set("#fff2df");
+      if (material.specularIntensity !== undefined) material.specularIntensity = 0.28;
     }
   };
 
@@ -134,6 +155,13 @@ export function StudioVrmMannequinMaterial({
         if (snapshot.map !== undefined) snapshot.material.map = snapshot.map;
         if (snapshot.metalness !== undefined) snapshot.material.metalness = snapshot.metalness;
         if (snapshot.roughness !== undefined) snapshot.material.roughness = snapshot.roughness;
+        if (snapshot.envMapIntensity !== undefined) snapshot.material.envMapIntensity = snapshot.envMapIntensity;
+        if (snapshot.clearcoat !== undefined) snapshot.material.clearcoat = snapshot.clearcoat;
+        if (snapshot.clearcoatRoughness !== undefined) snapshot.material.clearcoatRoughness = snapshot.clearcoatRoughness;
+        if (snapshot.sheen !== undefined) snapshot.material.sheen = snapshot.sheen;
+        if (snapshot.sheenRoughness !== undefined) snapshot.material.sheenRoughness = snapshot.sheenRoughness;
+        if (snapshot.sheenColor && snapshot.material.sheenColor) snapshot.material.sheenColor.copy(snapshot.sheenColor);
+        if (snapshot.specularIntensity !== undefined) snapshot.material.specularIntensity = snapshot.specularIntensity;
         snapshot.material.needsUpdate = true;
       }
       snapshotsRef.current = [];
@@ -167,6 +195,13 @@ export function StudioVrmMannequinMaterial({
           map: material.map,
           metalness: material.metalness,
           roughness: material.roughness,
+          envMapIntensity: material.envMapIntensity,
+          clearcoat: material.clearcoat,
+          clearcoatRoughness: material.clearcoatRoughness,
+          sheen: material.sheen,
+          sheenRoughness: material.sheenRoughness,
+          sheenColor: material.sheenColor?.clone() ?? null,
+          specularIntensity: material.specularIntensity,
         });
         material.userData.__vrmMannequinActive = true;
         material.needsUpdate = true;

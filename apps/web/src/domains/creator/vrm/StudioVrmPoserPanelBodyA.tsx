@@ -617,9 +617,9 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                 <div className="mb-3 rounded-xl border border-accent/25 bg-accent-soft/20 p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[0.7rem] font-bold text-fg">뷰포트 관절 핸들 · 손발 IK</p>
+                      <p className="text-[0.7rem] font-bold text-fg">직접 관절 조작 · 손발 IK</p>
                       <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-                        손·발 마름모는 목표를, 주황색 P는 팔꿈치·무릎 방향을 조절합니다.
+                        원형 관절은 끌어서 직접 회전하고, 손·발 마름모는 IK 위치, 주황색 P는 굽힘 방향을 조절합니다. 우클릭·길게 누르기로 잠글 수 있습니다.
                       </p>
                     </div>
                     <button
@@ -681,7 +681,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                       <div
                         className="flex max-w-full gap-1 overflow-x-auto"
                         role="group"
-                        aria-label="IK 핸들 축 제한"
+                        aria-label="관절·IK 축 제한"
                       >
                         {STUDIO_VRM_IK_AXIS_LOCKS.map((axis) => (
                           <button
@@ -693,7 +693,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                             onClick={() => {
                               cancelJointIkTransaction();
                               setIkHandleAxisLock(axis.id);
-                              setJointHandleStatus(`IK 핸들 ${axis.description} 모드입니다.`);
+                              setJointHandleStatus(`관절 회전은 로컬 축, 손·발 IK는 장면 축 기준의 ${axis.description} 모드입니다.`);
                             }}
                             className={cx(
                               "min-h-11 min-w-11 flex-1 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors disabled:opacity-45",

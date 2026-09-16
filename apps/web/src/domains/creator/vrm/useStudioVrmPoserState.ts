@@ -162,6 +162,7 @@ import {
   type PendingStudioVrmPersistentIkCommand,
   type StudioVrmBroadcastCameraLease,
   type StudioVrmCaptureVisualAuthority,
+  type StudioVrmDirectJointRotationTransaction,
   type StudioVrmIkTransaction,
   type StudioVrmPoserProps,
   type TexturePaintPersistenceStatus,
@@ -579,6 +580,8 @@ export function useStudioVrmPoserState({
   const pendingCameraRestoreFrameRef = useRef<number | null>(null);
   const panelScrollRef = useRef<HTMLDivElement>(null);
   const manualPoseDetailsRef = useRef<HTMLDetailsElement>(null);
+  const directJointRotationTransactionRef =
+    useRef<StudioVrmDirectJointRotationTransaction | null>(null);
   const jointIkTransactionRef = useRef<StudioVrmIkTransaction | null>(null);
   const jointIkRevisionRef = useRef(0);
   const persistentIkReconcileRevisionRef = useRef(0);
@@ -965,6 +968,7 @@ export function useStudioVrmPoserState({
     pendingCameraRestoreFrameRef,
     panelScrollRef,
     manualPoseDetailsRef,
+    directJointRotationTransactionRef,
     jointIkTransactionRef,
     jointIkRevisionRef,
     persistentIkReconcileRevisionRef,
