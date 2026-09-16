@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -23,6 +23,8 @@ import {
   type StudioSaveProfile,
 } from "../save-first/studio-save-profile";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
+import { StudioProjectCardThumbnail } from "./StudioProjectCardThumbnail";
+import { useStudioModalSheet } from "../useStudioModalSheet";
 import {
   STUDIO_PROJECT_KIND_LABELS,
   studioProjectIsTemporaryWork,
@@ -104,23 +106,41 @@ export function StudioProjectLibraryModal({
   readonly onClose: () => void;
   readonly danger?: boolean;
 }) {
-  const titleId = danger ? "studio-delete-dialog-title" : "studio-save-dialog-title";
-  const descriptionId = danger
-    ? "studio-delete-dialog-description"
-    : "studio-save-dialog-description";
+  const instanceId = useId().replace(/:/gu, "");
+  const titleId = `${instanceId}-title`;
+  const descriptionId = `${instanceId}-description`;
+  const dialogRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLElement | null>(
+    typeof document === "undefined" ? null : document.body,
+  );
+  useStudioModalSheet({
+    activeKey: `project-library-modal:${instanceId}`,
+    dialogRef,
+    onDismiss: onClose,
+    rootRef,
+  });
   return (
     <div
-      className="fixed inset-0 z-[100] grid place-items-center bg-black/55 p-3 backdrop-blur-sm"
-      onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      role="presentation"
+      className="fixed inset-0 z-[100] grid place-items-center p-3"
     >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-studio-modal-backdrop="true"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
+      />
       <section
+        ref={dialogRef}
         role={danger ? "alertdialog" : "dialog"}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-3xl border border-line bg-card p-5 shadow-2xl sm:p-6"
+        data-studio-shortcut-boundary="true"
+        tabIndex={-1}
+        className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-3xl border border-line bg-card p-5 shadow-2xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -129,7 +149,6 @@ export function StudioProjectLibraryModal({
           </div>
           <button
             type="button"
-            autoFocus
             onClick={onClose}
             aria-label={closeLabel}
             className={buttonClass({ variant: "quiet", size: "icon" })}
@@ -147,6 +166,7 @@ export function StudioProjectLibraryCard({
   project,
   profile,
   locale,
+  authUserId,
   checked,
   temporary,
   localFileSaved,
@@ -165,6 +185,7 @@ export function StudioProjectLibraryCard({
   readonly project: StudioProjectLibraryEntry;
   readonly profile: StudioSaveProfile;
   readonly locale: StudioProjectLibraryLocale;
+  readonly authUserId: string | null;
   readonly checked: boolean;
   readonly temporary: boolean;
   readonly localFileSaved: boolean;
@@ -184,11 +205,16 @@ export function StudioProjectLibraryCard({
     <article
       data-selected={checked || undefined}
       className={cn(
-        "rounded-2xl border bg-card p-4 shadow-sm transition-colors",
+        "overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition-colors",
         checked ? "border-accent ring-2 ring-accent/15" : "border-line",
       )}
     >
-      <div className="flex items-start gap-3">
+      <StudioProjectCardThumbnail
+        authUserId={authUserId}
+        locale={locale}
+        project={project}
+      />
+      <div className="mt-4 flex items-start gap-3">
         <StudioProjectSelectionCheckbox
           checked={checked}
           label={locale === "ko" ? `${project.title} 선택` : `Select ${project.title}`}

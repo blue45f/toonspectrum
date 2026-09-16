@@ -10,6 +10,8 @@ import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaboration
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
 import { lazy, Suspense } from "react";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
+import { returnFromStudioEditorInBrowser } from "../studio-editor-return-navigation";
+import { StudioEditorReturnButton } from "../StudioEditorReturnButton";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
 import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
@@ -169,7 +171,12 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         <StudioCuttoonEditorContextMenu {...s} />
       </Container>
     {canvasOnlyMode ? (
-      <div className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[45] flex justify-center px-3">
+      <div className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[45] flex justify-center gap-2 px-3">
+        <StudioEditorReturnButton
+          variant="canvas-only"
+          onReturn={returnFromStudioEditorInBrowser}
+          className="pointer-events-auto"
+        />
         <button
           type="button"
           onClick={() => setCanvasOnlyMode(false)}

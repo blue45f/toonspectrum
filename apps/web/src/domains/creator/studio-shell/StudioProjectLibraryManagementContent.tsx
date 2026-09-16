@@ -16,8 +16,8 @@ export function StudioProjectLibraryManagementContent({
   readonly controller: StudioProjectLibraryManagementController;
 }) {
   const {
-    locale, view, library, profiles, query, selectedIds, setSelection,
-    busyProjectId, setSaveTarget, setDeleteRequest, listedProjects,
+    locale, authUserId, view, library, profiles, query, selectedIds, setSelection,
+    busyProjectId, setSaveTarget, setDeleteRequest,
     visibleProjects, temporaryProjects, savedProjects, archiveProjects,
     trashProjects, restoreProjects, duplicateProject, savePackage,
     projectOverviewHref, continueProjectHref,
@@ -35,6 +35,7 @@ export function StudioProjectLibraryManagementContent({
         project={project}
         profile={profile}
         locale={locale}
+        authUserId={authUserId}
         checked={checked}
         temporary={temporary}
         localFileSaved={localFileSaved}

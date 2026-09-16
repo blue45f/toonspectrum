@@ -639,6 +639,12 @@ export function removeStudioSaveProfile(
   }), options.target);
 }
 
+/** True until the artist explicitly chooses a file or remote destination. */
+export function studioSaveProfileNeedsDestination(profile: StudioSaveProfile): boolean {
+  return profile.lastManualSaveAt === null
+    && profile.bindings.every((binding) => binding.provider === "browser");
+}
+
 export function studioSaveSafetySummary(profile: StudioSaveProfile): StudioSaveSafetySummary {
   const hasDurableFile = profile.bindings.some((binding) => (
     binding.provider === "local-file" && binding.syncState === "synced" && binding.lastSyncedAt !== null

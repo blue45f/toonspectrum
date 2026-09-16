@@ -28,6 +28,13 @@ describe("studio project package", () => {
         now: "2026-09-15T00:00:00.000Z",
       }),
       exportedAt: "2026-09-15T01:00:00.000Z",
+      additionalEntries: {
+        "documents/index.json": JSON.stringify({ documents: [] }),
+        "documents/document-0001.autosave.json": JSON.stringify({
+          savedAt: "2026-09-15T00:30:00.000Z",
+          pagesList: [{ id: "page-1", elements: [{ id: "stroke-1", type: "draw" }] }],
+        }),
+      },
     });
     const bytes = new Uint8Array(await result.blob.arrayBuffer());
 
@@ -35,7 +42,11 @@ describe("studio project package", () => {
     expect(result.fileName).toBe("비공개 원고.toonstudio");
     expect(result.manifest.accessMode).toBe("owner-only");
     expect(result.manifest.distributionState).toBe("none");
-    expect(new TextDecoder().decode(bytes)).toContain("manifest.json");
+    const decoded = new TextDecoder().decode(bytes);
+    expect(decoded).toContain("manifest.json");
+    expect(result.manifest.entryNames).toContain("workspace/documents/index.json");
+    expect(result.manifest.entryNames).toContain("workspace/documents/document-0001.autosave.json");
+    expect(decoded).toContain("stroke-1");
   });
 
   it("computes a standard CRC32", () => {

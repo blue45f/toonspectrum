@@ -29,7 +29,7 @@ interface ZipEntry {
   readonly bytes: Uint8Array;
 }
 
-interface WritableFileHandle {
+export interface StudioProjectPackageWritableFileHandle {
   createWritable(): Promise<{
     write(data: Blob): Promise<void>;
     close(): Promise<void>;
@@ -43,7 +43,7 @@ interface FilePickerWindow extends Window {
       description: string;
       accept: Readonly<Record<string, readonly string[]>>;
     }>[];
-  }) => Promise<WritableFileHandle>;
+  }) => Promise<StudioProjectPackageWritableFileHandle>;
 }
 
 const encoder = new TextEncoder();
@@ -168,7 +168,7 @@ function jsonEntry(name: string, value: unknown): ZipEntry {
   return { name, bytes: encoder.encode(`${JSON.stringify(value, null, 2)}\n`) };
 }
 
-function safeFileStem(value: string): string {
+export function studioProjectPackageFileStem(value: string): string {
   const stem = value
     .normalize("NFKC")
     // eslint-disable-next-line no-control-regex -- ASCII control bytes are invalid in file names.
@@ -177,6 +177,10 @@ function safeFileStem(value: string): string {
     .trim()
     .slice(0, 100);
   return stem || "toonstudio-project";
+}
+
+export function studioProjectPackageFileName(projectTitle: string): string {
+  return `${studioProjectPackageFileStem(projectTitle)}.toonstudio`;
 }
 
 export function buildStudioProjectPackage(input: {
@@ -224,25 +228,50 @@ export function buildStudioProjectPackage(input: {
   new Uint8Array(zipBuffer).set(zip);
   return Object.freeze({
     blob: new Blob([zipBuffer], { type: STUDIO_PROJECT_PACKAGE_MIME }),
-    fileName: `${safeFileStem(input.project.title)}.toonstudio`,
+    fileName: studioProjectPackageFileName(input.project.title),
     manifest,
   });
 }
 
-export async function saveStudioProjectPackage(
-  result: StudioProjectPackageResult,
+export type StudioProjectPackageSaveTarget =
+  | Readonly<{
+      kind: "file-handle";
+      handle: StudioProjectPackageWritableFileHandle;
+    }>
+  | Readonly<{
+      kind: "download";
+      ownerWindow: Window;
+    }>;
+
+/**
+ * Ask for the destination before asynchronous snapshot collection starts. Browsers require the
+ * file picker to run inside the original click/keyboard activation; separating selection from the
+ * later write preserves that contract even when a large project must read OPFS/SQLite first.
+ */
+export async function chooseStudioProjectPackageSaveTarget(
+  suggestedName: string,
   ownerWindow: Window = window,
-): Promise<"file-picker" | "download"> {
+): Promise<StudioProjectPackageSaveTarget> {
   const pickerWindow = ownerWindow as FilePickerWindow;
   if (typeof pickerWindow.showSaveFilePicker === "function") {
     const handle = await pickerWindow.showSaveFilePicker({
-      suggestedName: result.fileName,
+      suggestedName,
       types: [{
         description: "ToonStudio project",
         accept: { [STUDIO_PROJECT_PACKAGE_MIME]: [".toonstudio"] },
       }],
     });
-    const writable = await handle.createWritable();
+    return Object.freeze({ kind: "file-handle", handle });
+  }
+  return Object.freeze({ kind: "download", ownerWindow });
+}
+
+export async function writeStudioProjectPackageToTarget(
+  result: StudioProjectPackageResult,
+  target: StudioProjectPackageSaveTarget,
+): Promise<"file-picker" | "download"> {
+  if (target.kind === "file-handle") {
+    const writable = await target.handle.createWritable();
     await writable.write(result.blob);
     await writable.close();
     return "file-picker";
@@ -250,13 +279,21 @@ export async function saveStudioProjectPackage(
 
   const url = URL.createObjectURL(result.blob);
   try {
-    const anchor = ownerWindow.document.createElement("a");
+    const anchor = target.ownerWindow.document.createElement("a");
     anchor.href = url;
     anchor.download = result.fileName;
     anchor.rel = "noopener";
     anchor.click();
   } finally {
-    ownerWindow.setTimeout(() => URL.revokeObjectURL(url), 0);
+    target.ownerWindow.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
   return "download";
+}
+
+export async function saveStudioProjectPackage(
+  result: StudioProjectPackageResult,
+  ownerWindow: Window = window,
+): Promise<"file-picker" | "download"> {
+  const target = await chooseStudioProjectPackageSaveTarget(result.fileName, ownerWindow);
+  return writeStudioProjectPackageToTarget(result, target);
 }

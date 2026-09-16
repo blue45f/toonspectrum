@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  STUDIO_IMPORT_HANDOFF_ACCEPT,
   clearStudioImportHandoffsForTests,
   consumeStudioImportHandoff,
   peekStudioImportHandoff,
@@ -14,6 +15,11 @@ import {
 beforeEach(clearStudioImportHandoffsForTests);
 
 describe("Studio import handoff", () => {
+  it("allows the portable ToonStudio project package at the import front door", () => {
+    expect(STUDIO_IMPORT_HANDOFF_ACCEPT).toContain(".toonstudio");
+    expect(STUDIO_IMPORT_HANDOFF_ACCEPT).toContain("application/vnd.toonstudio.project+zip");
+  });
+
   it("maps only formats already owned by the established editor import handlers", () => {
     expect(studioImportHandoffTargetForFormat("json")).toBe("project-json");
     expect(studioImportHandoffTargetForFormat("psd")).toBe("psd");
