@@ -29,6 +29,8 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclSql,
+  buildStudioProjectGraphRuntimeAclSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
   buildStudioProductionRuntimeAclViolationSql,
   decideMigrationAction,
   loadMigrationManifest,
@@ -38,10 +40,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(62);
+  expect(manifest).toHaveLength(63);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0062_auth_identity_hardening");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(62);
+  expect(manifest.at(-1).id).toBe("0063_studio_project_graph_v3");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(63);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -71,6 +73,32 @@ test("auth identity hardening migration preserves legacy access and enforces nor
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("Studio ProjectGraph migration installs immutable revisions and loss-visible imports", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0063_studio_project_graph_v3",
+  );
+  expect(migration?.id).toBe("0063_studio_project_graph_v3");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "CREATE TABLE IF NOT EXISTS studio_project_graph",
+    "CREATE TABLE IF NOT EXISTS studio_artifact",
+    "CREATE TABLE IF NOT EXISTS studio_revision",
+    "CREATE TABLE IF NOT EXISTS studio_blob",
+    "CREATE TABLE IF NOT EXISTS studio_external_file_binding",
+    "CREATE TABLE IF NOT EXISTS studio_compatibility_report",
+    "CREATE TABLE IF NOT EXISTS studio_review_comment",
+    "CREATE TABLE IF NOT EXISTS studio_capability_ledger",
+    "studio_revision_immutable_update",
+    "studio_validate_review_comment_anchor",
+    "studio_compatibility_report_approval_only",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;\s*$/u);
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
@@ -721,6 +749,55 @@ test("creator object-storage grants and verification share one exact SQL contrac
   expect(violation).toContain("'toonspectrum_runtime'");
 });
 
+test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () => {
+  const sql = buildStudioProjectGraphRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildStudioProjectGraphRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain("DO $studio_project_graph_acl$");
+  expect(sql).toContain("public.studio_project_graph");
+  expect(sql).toContain("public.studio_revision");
+  expect(sql).toContain("public.studio_external_file_binding");
+  expect(sql).toContain("public.studio_capability_ledger");
+  expect(sql).toContain(
+    'GRANT UPDATE ("headRevisionId", "approvedRevisionId", "updatedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("approvedBy", "approvedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("displayPath", "syncMode", "remoteVersion", "remoteEtag", "contentHash", "lastSyncedRevisionId", "lastSyncedAt", "updatedAt")',
+  );
+  expect(sql).not.toMatch(/GRANT UPDATE \([^)]*rootGraphHash/u);
+  expect(sql).not.toMatch(/GRANT UPDATE \([^)]*operation/u);
+  expect(sql).not.toMatch(/GRANT INSERT[^;]*studio_capability_ledger/u);
+
+  for (const relation of [
+    "studio_project_graph",
+    "studio_artifact",
+    "studio_revision",
+    "studio_operation",
+    "studio_compatibility_report",
+    "studio_external_file_binding",
+    "studio_review",
+    "studio_capability_ledger",
+  ]) {
+    expect(violation).toContain(`'${relation}'`);
+  }
+  for (const privilege of [
+    "SELECT WITH GRANT OPTION",
+    "INSERT WITH GRANT OPTION",
+    "UPDATE WITH GRANT OPTION",
+    "DELETE WITH GRANT OPTION",
+    "TRUNCATE WITH GRANT OPTION",
+    "REFERENCES WITH GRANT OPTION",
+    "TRIGGER WITH GRANT OPTION",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
+});
+
 test("Studio production runtime ACL is exact and append-only where required", () => {
   const sql = buildStudioProductionRuntimeAclSql("toonspectrum_runtime");
   const violation = buildStudioProductionRuntimeAclViolationSql(
@@ -1074,6 +1151,21 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "production_project_event",
     "production_project_mutation_receipt",
     "production_push_subscription",
+    "studio_artifact",
+    "studio_blob",
+    "studio_capability_ledger",
+    "studio_compatibility_report",
+    "studio_external_file_binding",
+    "studio_mutation_receipt",
+    "studio_operation",
+    "studio_project_graph",
+    "studio_review",
+    "studio_review_comment",
+    "studio_review_comment_assignee",
+    "studio_review_reviewer",
+    "studio_revision",
+    "studio_revision_blob",
+    "studio_revision_parent",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",
