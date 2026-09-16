@@ -8,7 +8,7 @@ import { FloatingControls } from "./FloatingControls";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
-import { useI18n } from "@/shared/lib/i18n";
+import { NORMALIZED_LOCALE_OPTIONS, useI18n } from "@/shared/lib/i18n";
 
 vi.mock("../../domains/auth/components/auth-menu-shell", () => ({
   AuthMenuShell: () => <button type="button">계정</button>,
@@ -122,16 +122,32 @@ describe("mobile site shell accessibility", () => {
     expect(language.selectedOptions[0]?.textContent).toContain("한국어");
   });
 
-  it("lists only fully translated languages in the floating control", () => {
+  it("restores the worldwide language catalog in the floating control", () => {
     useI18n.getState().setLang("ko");
     render(<FloatingControls placement="static" showTheme={false} />);
-    const language = screen.getByRole<HTMLSelectElement>("combobox", { name: "언어 선택" });
+
+    const language = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "언어 선택",
+    });
     const values = [...language.options].map((option) => option.value);
-    expect(values).toEqual(expect.arrayContaining(["ko", "en", "ja"]));
-    expect(values).not.toContain("af");
-    expect(values).not.toContain("en-us");
-    expect(values).not.toContain("en-gb");
-    expect(values.length).toBeLessThanOrEqual(8);
+
+    expect(values).toHaveLength(NORMALIZED_LOCALE_OPTIONS.length);
+    expect(values).toEqual(
+      expect.arrayContaining([
+        "ko",
+        "en",
+        "ja",
+        "af",
+        "ar",
+        "eo",
+        "he",
+        "tlh",
+        "yue",
+        "en-us",
+        "zh-hant",
+      ]),
+    );
+    expect(language.querySelectorAll("optgroup")).toHaveLength(2);
   });
 
 

@@ -1,5 +1,5 @@
 import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
@@ -98,11 +98,13 @@ export function SettingsPage() {
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const t = useT();
-  const langOptions = getLanguageOptions(lang).map((entry) => ({
-    id: entry.code,
-    code: entry.code,
-    label: entry.label,
-  }));
+  const languageGroups = useMemo(() => {
+    const options = getLanguageOptions(lang);
+    return {
+      translated: options.filter((option) => option.fullyTranslated),
+      automatic: options.filter((option) => !option.fullyTranslated),
+    };
+  }, [lang]);
   const scaleOptions: { id: RatingScale; label: string }[] = [
     { id: "star", label: t("settings.rating.star") },
     { id: "ten", label: t("settings.rating.ten") },
@@ -189,11 +191,20 @@ export function SettingsPage() {
               aria-label={t("settings.language.title")}
               className="h-9 w-[18rem] max-w-full rounded-lg border border-line bg-card px-2 py-1 text-sm text-fg outline-none transition-colors focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
             >
-              {langOptions.map((entry) => (
-                <option key={entry.code} value={entry.code} title={entry.label}>
-                  {entry.label}
-                </option>
-              ))}
+              <optgroup label={t("control.language.group.translated")}>
+                {languageGroups.translated.map((entry) => (
+                  <option key={entry.code} value={entry.code} title={entry.label}>
+                    {entry.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={t("control.language.group.englishBase")}>
+                {languageGroups.automatic.map((entry) => (
+                  <option key={entry.code} value={entry.code} title={entry.label}>
+                    {entry.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </label>
         </Row>

@@ -1,46 +1,67 @@
 import {
+  isFullyTranslatedAppLocale,
+  loadAppI18nLocale,
   resolveAppI18nAssetLocale,
-  loadAppI18nLocale, loadStudioAssetIfAvailable 
 } from "./i18n-asset-loader";
+import { builtinAppDictionaries } from "./i18n-built-in-dictionaries";
 import {
   DICT,
   FALLBACK_LANG,
   triggerTranslationBundleUpdate,
 } from "./i18n-core";
-import { normalizeLocaleCode } from "./i18n-intl-utils";
+import {
+  getLocaleCandidateChain,
+  normalizeLocaleCode,
+} from "./i18n-intl-utils";
 
 import type { Dict } from "./i18n-core";
 
 const RUNTIME_TRANSLATION_SOURCE = "en";
-const RUNTIME_TRANSLATION_CACHE_VERSION = 1;
+const RUNTIME_TRANSLATION_CACHE_VERSION = 2;
 const I18N_TRANSLATION_ENDPOINT = "https://api.mymemory.translated.net/get";
-const I18N_TRANSLATION_TARGET_LOCALE_FALLBACK = "en";
-const I18N_TRANSLATION_CONCURRENCY = 4;
-const RUNTIME_TRANSLATION_TIMEOUT_MS = 8000;
+const I18N_TRANSLATION_CONCURRENCY = 8;
+const RUNTIME_TRANSLATION_TIMEOUT_MS = 8_000;
 const RUNTIME_TRANSLATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 const RUNTIME_TRANSLATION_STORAGE_PREFIX = "toonspectrum-i18n-runtime";
+const RUNTIME_TRANSLATION_MAX_VALUE_CHARACTERS = 4_000;
+const RUNTIME_TRANSLATION_PROGRESS_BATCH = 32;
+
+// Translate only the public app-shell source surface. Studio owns its own namespace-aware loader;
+// reading the immutable built-in dictionary also avoids coupling the runtime translator to route
+// dictionaries that are registered into DICT after startup.
+const RUNTIME_APP_SOURCE_DICTIONARY: Readonly<Dict> =
+  builtinAppDictionaries[RUNTIME_TRANSLATION_SOURCE];
+const RUNTIME_APP_SOURCE_KEYS = Object.freeze(
+  Object.keys(RUNTIME_APP_SOURCE_DICTIONARY),
+);
+const RUNTIME_APP_SOURCE_KEY_SET: ReadonlySet<string> = new Set(
+  RUNTIME_APP_SOURCE_KEYS,
+);
 
 const runtimeTranslationBundles = new Map<string, Dict>();
 const runtimeTranslationLoads = new Map<string, Promise<void>>();
+const runtimeTranslationAttemptedKeys = new Map<string, Set<string>>();
 
 type RuntimeTranslationCachePayload = {
   v: number;
   locale: string;
   updatedAt: number;
+  complete: true;
   dict: Dict;
 };
 
 function normalizeTranslatorLocale(raw: string): string {
   const normalized = normalizeLocaleCode(raw);
-  if (!normalized) return I18N_TRANSLATION_TARGET_LOCALE_FALLBACK;
+  if (!normalized) return "";
 
-  const parts = normalized.split("-");
-  return parts
+  return normalized
+    .split("-")
     .map((part, index) => {
       if (index === 0) return part.toLowerCase();
-      if (/^\d{3}$/.test(part)) return part;
-      if (part.length === 4)
+      if (/^\d{3}$/u.test(part)) return part;
+      if (part.length === 4) {
         return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+      }
       return part.toUpperCase();
     })
     .join("-");
@@ -48,47 +69,27 @@ function normalizeTranslatorLocale(raw: string): string {
 
 function getTranslatorLocaleCandidates(locale: string): string[] {
   const normalized = normalizeLocaleCode(locale);
-  if (!normalized) return [I18N_TRANSLATION_TARGET_LOCALE_FALLBACK];
+  if (!normalized) return [];
 
-  const parts = normalized.split("-");
   const candidates = new Set<string>();
-
-  if (parts.length > 0) {
-    candidates.add(normalizeTranslatorLocale(parts.join("-")));
+  for (const candidate of getLocaleCandidateChain(normalized, [])) {
+    const translatorLocale = normalizeTranslatorLocale(candidate);
+    if (translatorLocale) candidates.add(translatorLocale);
   }
-
-  if (parts.length >= 2) {
-    candidates.add(normalizeTranslatorLocale(parts[0]));
-  }
-
-  if (parts.length >= 3) {
-    candidates.add(normalizeTranslatorLocale(`${parts[0]}-${parts[1]}`));
-    candidates.add(
-      normalizeTranslatorLocale(`${parts[0]}-${parts[parts.length - 1]}`),
-    );
-  }
-
-  // 항상 en을 최후의 폴백으로 남겨두고, 정합성/중복을 정리.
-  candidates.add(I18N_TRANSLATION_TARGET_LOCALE_FALLBACK);
-
   return [...candidates];
 }
 
-function shouldTranslateLocale(locale: string): boolean {
+function shouldAutoTranslateLocale(locale: string): boolean {
   const normalized = normalizeLocaleCode(locale);
   if (!normalized) return false;
-  if (normalized === FALLBACK_LANG) return false;
-  if (normalized === RUNTIME_TRANSLATION_SOURCE) return false;
-  // 사전이 지연 자산으로 바뀐 뒤 DICT 존재 여부만 보면, 아직 로드되지 않은 배포 로케일이
-  // "번역 없음"으로 오판돼 525개 키에 대한 외부 기계번역 호출이 터진다. 판단 기준은
-  // 언제나 "배포된 자산이 있는가"여야 한다.
-  if (resolveAppI18nAssetLocale(normalized)) return false;
-  if (DICT[normalized]) return false;
 
   const root = normalized.split("-")[0];
-  if (DICT[root]) return false;
+  if (root === FALLBACK_LANG || root === RUNTIME_TRANSLATION_SOURCE) {
+    return false;
+  }
 
-  return true;
+  // High-coverage human-authored dictionaries should never be shadowed by machine translation.
+  return !isFullyTranslatedAppLocale(normalized);
 }
 
 function parseMymemoryResponse(data: unknown): string | null {
@@ -108,7 +109,15 @@ function parseMymemoryResponse(data: unknown): string | null {
         : typed.responseStatus;
     if (status !== 200) return null;
   }
-  return typed.responseData.translatedText.trim() || null;
+
+  const translated = typed.responseData.translatedText.trim();
+  if (
+    translated.length === 0 ||
+    translated.length > RUNTIME_TRANSLATION_MAX_VALUE_CHARACTERS
+  ) {
+    return null;
+  }
+  return translated;
 }
 
 function getRuntimeTranslationStorageKey(locale: string): string {
@@ -118,6 +127,20 @@ function getRuntimeTranslationStorageKey(locale: string): string {
 function clearInvalidRuntimeTranslationCache(locale: string): void {
   if (typeof localStorage === "undefined") return;
   localStorage.removeItem(getRuntimeTranslationStorageKey(locale));
+}
+
+function isRuntimeTranslationDictionary(value: unknown): value is Dict {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([key, entry]) =>
+      RUNTIME_APP_SOURCE_KEY_SET.has(key) &&
+      typeof entry === "string" &&
+      entry.length > 0 &&
+      entry.length <= RUNTIME_TRANSLATION_MAX_VALUE_CHARACTERS,
+  );
 }
 
 function readCachedRuntimeTranslation(locale: string): Dict | null {
@@ -135,14 +158,14 @@ function readCachedRuntimeTranslation(locale: string): Dict | null {
       parsed.locale !== locale ||
       typeof parsed.updatedAt !== "number" ||
       Date.now() - parsed.updatedAt > RUNTIME_TRANSLATION_CACHE_TTL_MS ||
-      typeof parsed.dict !== "object" ||
-      parsed.dict === null
+      parsed.complete !== true ||
+      !isRuntimeTranslationDictionary(parsed.dict)
     ) {
       clearInvalidRuntimeTranslationCache(locale);
       return null;
     }
 
-    return parsed.dict;
+    return { ...parsed.dict };
   } catch {
     clearInvalidRuntimeTranslationCache(locale);
     return null;
@@ -151,18 +174,20 @@ function readCachedRuntimeTranslation(locale: string): Dict | null {
 
 function writeRuntimeTranslationCache(locale: string, dict: Dict): void {
   if (typeof localStorage === "undefined") return;
+
   const key = getRuntimeTranslationStorageKey(locale);
   const payload: RuntimeTranslationCachePayload = {
     v: RUNTIME_TRANSLATION_CACHE_VERSION,
     locale,
     updatedAt: Date.now(),
+    complete: true,
     dict,
   };
 
   try {
     localStorage.setItem(key, JSON.stringify(payload));
   } catch {
-    // localStorage 용량 초과/차단 시 폴백으로 캐시만 스킵.
+    // Storage can be blocked or full. The in-memory bundle still remains usable.
   }
 }
 
@@ -170,6 +195,9 @@ async function translateViaMymemory(
   source: string,
   targetLocale: string,
 ): Promise<string | null> {
+  const normalizedTarget = normalizeTranslatorLocale(targetLocale);
+  if (!normalizedTarget) return null;
+
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -179,13 +207,12 @@ async function translateViaMymemory(
   try {
     const url = `${I18N_TRANSLATION_ENDPOINT}?${new URLSearchParams({
       q: source,
-      langpair: `${RUNTIME_TRANSLATION_SOURCE}|${normalizeTranslatorLocale(targetLocale)}`,
+      langpair: `${RUNTIME_TRANSLATION_SOURCE}|${normalizedTarget}`,
     }).toString()}`;
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) return null;
 
-    const payload = await response.json();
-    return parseMymemoryResponse(payload);
+    return parseMymemoryResponse(await response.json());
   } catch {
     return null;
   } finally {
@@ -201,8 +228,41 @@ async function translateViaMymemoryWithFallback(
     const translated = await translateViaMymemory(source, candidate);
     if (translated) return translated;
   }
-
   return null;
+}
+
+function getLocaleDictionary(locale: string): Dict | undefined {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return undefined;
+
+  const assetLocale = resolveAppI18nAssetLocale(normalized);
+  return DICT[normalized] ?? (assetLocale ? DICT[assetLocale] : undefined);
+}
+
+function getAttemptedKeys(locale: string): Set<string> {
+  const existing = runtimeTranslationAttemptedKeys.get(locale);
+  if (existing) return existing;
+
+  const created = new Set<string>();
+  runtimeTranslationAttemptedKeys.set(locale, created);
+  return created;
+}
+
+function getKeysNeedingAutomaticTranslation(locale: string): string[] {
+  const targetDictionary = getLocaleDictionary(locale);
+  const runtimeBundle = runtimeTranslationBundles.get(locale);
+  const attempted = getAttemptedKeys(locale);
+
+  return RUNTIME_APP_SOURCE_KEYS.filter((key) => {
+    const source = RUNTIME_APP_SOURCE_DICTIONARY[key];
+    if (!source || !/[\p{L}\p{N}]/u.test(source)) return false;
+    if (runtimeBundle?.[key] !== undefined || attempted.has(key)) return false;
+
+    const authoredValue = targetDictionary?.[key];
+    // Preserve every human-authored value that differs from the English source. Empty strings are
+    // intentional translations too and must not be replaced.
+    return authoredValue === undefined || authoredValue === source;
+  });
 }
 
 export function getRuntimeTranslationBundle(locale: string): Dict | undefined {
@@ -213,75 +273,80 @@ export async function loadRuntimeTranslationBundle(locale: string): Promise<void
   const normalized = normalizeLocaleCode(locale);
   if (!normalized) return;
 
-  // 활성 로케일 하나만 받는다. ko/en 은 셸에 있으므로 즉시 반환하고, 그 외에는
-  // public/i18n/app/<namespace>/<locale>.json 1건만 요청한다.
   await loadAppI18nLocale(normalized);
-  void loadStudioAssetIfAvailable(normalized);
+  if (!shouldAutoTranslateLocale(normalized)) return;
 
-  if (!shouldTranslateLocale(normalized)) return;
-
-  const existing = getRuntimeTranslationBundle(normalized);
-  if (existing) return;
-
-  const cached = readCachedRuntimeTranslation(normalized);
-  if (cached) {
-    runtimeTranslationBundles.set(normalized, cached);
-    triggerTranslationBundleUpdate();
-    // ({
-
-    return;
-  }
-
-  const existingLoad = runtimeTranslationLoads.get(normalized);
-  if (existingLoad) {
-    await existingLoad;
-    return;
-  }
-
-  const allKeys = Object.keys(DICT[RUNTIME_TRANSLATION_SOURCE]);
-  const bundle: Dict = {};
-
-  const loadJob = (async () => {
-    for (
-      let index = 0;
-      index < allKeys.length;
-      index += I18N_TRANSLATION_CONCURRENCY
-    ) {
-      const chunkKeys = allKeys.slice(
-        index,
-        index + I18N_TRANSLATION_CONCURRENCY,
-      );
-      const translated = await Promise.all(
-        chunkKeys.map(async (key) => {
-          const source = DICT[RUNTIME_TRANSLATION_SOURCE][key];
-          if (!source) return null;
-          const translatedText = await translateViaMymemoryWithFallback(
-            source,
-            normalized,
-          );
-          if (!translatedText) return null;
-          return [key, translatedText] as const;
-        }),
-      );
-
-      for (const entry of translated) {
-        if (!entry) continue;
-        const [key, value] = entry;
-        bundle[key] = value;
-      }
+  if (!runtimeTranslationBundles.has(normalized)) {
+    const cached = readCachedRuntimeTranslation(normalized);
+    if (cached) {
+      runtimeTranslationBundles.set(normalized, cached);
+      if (Object.keys(cached).length > 0) triggerTranslationBundleUpdate();
+      return;
     }
+  }
 
-    runtimeTranslationBundles.set(normalized, bundle);
-    writeRuntimeTranslationCache(normalized, bundle);
-    if (Object.keys(bundle).length > 0) {
-      triggerTranslationBundleUpdate();
-      // ({
+  const inFlight = runtimeTranslationLoads.get(normalized);
+  if (inFlight) {
+    await inFlight;
+    return;
+  }
+
+  const keys = getKeysNeedingAutomaticTranslation(normalized);
+  if (keys.length === 0) return;
+
+  const bundle = runtimeTranslationBundles.get(normalized) ?? {};
+  runtimeTranslationBundles.set(normalized, bundle);
+  const attempted = getAttemptedKeys(normalized);
+
+  const job = (async () => {
+    let pendingRevisionEntries = 0;
+    try {
+      for (
+        let index = 0;
+        index < keys.length;
+        index += I18N_TRANSLATION_CONCURRENCY
+      ) {
+        const chunkKeys = keys.slice(
+          index,
+          index + I18N_TRANSLATION_CONCURRENCY,
+        );
+        for (const key of chunkKeys) attempted.add(key);
+
+        const translatedEntries = await Promise.all(
+          chunkKeys.map(async (key) => {
+            const source = RUNTIME_APP_SOURCE_DICTIONARY[key];
+            if (!source) return null;
+
+            const translated = await translateViaMymemoryWithFallback(
+              source,
+              normalized,
+            );
+            return translated ? ([key, translated] as const) : null;
+          }),
+        );
+
+        for (const entry of translatedEntries) {
+          if (!entry) continue;
+          const [key, value] = entry;
+          bundle[key] = value;
+          pendingRevisionEntries += 1;
+        }
+
+        if (pendingRevisionEntries >= RUNTIME_TRANSLATION_PROGRESS_BATCH) {
+          pendingRevisionEntries = 0;
+          triggerTranslationBundleUpdate();
+        }
+      }
+
+      writeRuntimeTranslationCache(normalized, bundle);
+      if (pendingRevisionEntries > 0) triggerTranslationBundleUpdate();
+    } finally {
+      runtimeTranslationLoads.delete(normalized);
     }
   })();
 
-  runtimeTranslationLoads.set(normalized, loadJob);
-  await loadJob;
-  runtimeTranslationLoads.delete(normalized);
+  runtimeTranslationLoads.set(normalized, job);
+  await job;
 }
 
 export async function ensureRuntimeLocaleBundle(locale: string): Promise<void> {
