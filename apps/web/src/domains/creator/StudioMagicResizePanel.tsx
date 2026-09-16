@@ -21,6 +21,7 @@ import {
   type MagicResizeStrategy,
 } from "./studio-magic-resize";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioToggleChip } from "./studio-panel-ui";
+import { StudioWebtoonCanvasPresetPicker } from "./StudioWebtoonCanvasPresetPicker";
 
 import type { ReactElement } from "react";
 
@@ -77,7 +78,15 @@ export function StudioMagicResizePanel({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <StudioWebtoonCanvasPresetPicker
+        currentSize={currentSize}
+        disabled={disabled}
+        onApplyPreset={onApplyPreset}
+      />
+
+      <div>
+        <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">기본 비율</p>
+        <div className="grid grid-cols-2 gap-1.5">
         {MAGIC_RESIZE_PRESETS.map((preset) => {
           const Icon = PRESET_ICONS[preset.id] ?? Square;
           const size = presetCanvasSize(preset);
@@ -132,7 +141,9 @@ export function StudioMagicResizePanel({
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );
 }
+

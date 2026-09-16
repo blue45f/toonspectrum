@@ -32,6 +32,14 @@ describe("toonstudio.cloud production domain", () => {
     expect(read("apps/web/public/llms.txt")).toContain(`${CANONICAL_ORIGIN}/studio`);
   });
 
+  it("loads public production build variables from the repository root", () => {
+    const viteConfig = read("vite.config.ts");
+    const productionExample = read(".env.production.example");
+
+    expect(viteConfig).toContain("envDir: repositoryRoot");
+    expect(productionExample).toContain("VITE_KAKAO_JAVASCRIPT_KEY=");
+  });
+
   it("keeps the Render Core API canonical and the realtime fallback isolated", () => {
     const production = read(".env.production.example");
     const render = parse(read("render.yaml")) as {

@@ -144,6 +144,7 @@ const ROUTES: readonly RouteProbe[] = Object.freeze([
  * 샌드박스 네트워크가 아니므로, 그 두 부류만 콘솔 실패에서 제외한다.
  */
 const IGNORED_CONSOLE = [
+  "/api/health/ready",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/",

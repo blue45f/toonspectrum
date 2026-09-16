@@ -39,6 +39,10 @@ import {
 } from "playwright";
 
 import {
+  readDurableStudioAutosaveDocument,
+  readDurableStudioAutosaveError,
+} from "./lib/studio-verify-durable-autosave.mjs";
+import {
   findFreePort,
   stopChildProcess,
   waitForServer,
@@ -74,6 +78,7 @@ const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const CANVAS_HEIGHT_ENV = "TOONSPECTRUM_NATIVE_RASTER_CANVAS_HEIGHT";
 const CANVAS_HEIGHT_RANGE = { min: 360, max: 6_000 } as const;
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/health/ready",
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
@@ -1132,128 +1137,19 @@ async function readTrustedPointerAudit(page: Page): Promise<FixtureEvidence["poi
 }
 
 async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null> {
-  return page.evaluate(async ({ prefix, autosaveKey }) => {
+  const durable = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY);
+  if (!durable) return null;
+  return page.evaluate(async ({ key, raw }) => {
     type RawPage = { id?: unknown; elements?: unknown[] };
     type RawPayload = {
       savedAt?: unknown;
       currentPageId?: unknown;
       pagesList?: RawPage[];
     };
-    type BrowserAutosaveReadResult =
-      | { state: "snapshot"; savedAt: string; payload: RawPayload }
-      | { state: "cleared"; savedAt: string }
-      | null;
-    type BrowserAutosaveSession = {
-      readLatest: () => Promise<BrowserAutosaveReadResult>;
-    };
-    type BrowserAutosaveSessionFactory = (
-      key: string,
-      scope?: unknown,
-      options?: { readOnly?: boolean },
-    ) => Promise<BrowserAutosaveSession | null>;
-    type BrowserAutosaveRuntime = {
-      createStudioAutosaveOpfsSession?: BrowserAutosaveSessionFactory;
-    };
-    type NativeRasterAutosaveReader = {
-      key: string;
-      session: BrowserAutosaveSession;
-    };
+    const latest = { key, payload: JSON.parse(raw) as RawPayload };
     const browserWindow = window as typeof window & {
-      __studioNativeRasterAutosaveReader?: NativeRasterAutosaveReader;
-      __studioNativeRasterAutosaveReadError?: string;
       __studioNativeRasterDurableImageSources?: Map<string, string>;
     };
-    let latest: { key: string; payload: RawPayload } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const payload = JSON.parse(raw) as RawPayload;
-        if (!Array.isArray(payload.pagesList)) continue;
-        if (
-          !latest
-          || String(payload.savedAt ?? "") >= String(latest.payload.savedAt ?? "")
-        ) latest = { key, payload };
-      } catch {
-        // Ignore unrelated storage records.
-      }
-    }
-    try {
-      let reader = browserWindow.__studioNativeRasterAutosaveReader;
-      if (!reader || reader.key !== autosaveKey) {
-        const resourceUrls = performance.getEntriesByType("resource")
-          .map((entry) => entry.name)
-          .filter((url) => url.startsWith(window.location.origin));
-        let moduleUrl = resourceUrls.find((url) =>
-          /\/assets\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
-        ) ?? resourceUrls.find((url) =>
-          /\/src\/domains\/creator\/studio-autosave-opfs-session\.ts(?:\?.*)?$/u.test(url)
-        ) ?? null;
-        if (!moduleUrl && resourceUrls.some((url) => url.includes("/@vite/client"))) {
-          moduleUrl = new URL("/src/domains/creator/studio-autosave-opfs-session.ts",
-            window.location.origin,
-          ).href;
-        }
-        if (!moduleUrl) {
-          const studioPageUrl = resourceUrls.find((url) =>
-            /\/assets\/StudioPage-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
-          );
-          if (studioPageUrl) {
-            const source = await fetch(studioPageUrl).then((response) => response.text());
-            const match = source.match(
-              /\.\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js/u,
-            );
-            if (match) moduleUrl = new URL(match[0], studioPageUrl).href;
-          }
-        }
-        if (moduleUrl) {
-          const runtime = await import(moduleUrl) as BrowserAutosaveRuntime;
-          let factory = runtime.createStudioAutosaveOpfsSession;
-          if (typeof factory !== "function") {
-            // Rollup minifies production chunk exports (`export { namespace as n }`). The authored
-            // factory remains on that namespace object, which is also how the shipped app reaches
-            // it. Dev modules retain the direct named export and take the fast path above.
-            for (const exported of Object.values(runtime)) {
-              const candidate = await Promise.resolve(exported as BrowserAutosaveRuntime)
-                .then((namespace) => namespace?.createStudioAutosaveOpfsSession)
-                .catch(() => undefined);
-              if (typeof candidate === "function") {
-                factory = candidate;
-                break;
-              }
-            }
-          }
-          if (typeof factory !== "function") {
-            throw new Error(`no autosave session factory export was found in ${moduleUrl}`);
-          }
-          const session = await factory(autosaveKey, undefined, { readOnly: true });
-          if (session) {
-            reader = { key: autosaveKey, session };
-            browserWindow.__studioNativeRasterAutosaveReader = reader;
-          }
-        }
-      }
-      const durable = await reader?.session.readLatest() ?? null;
-      if (
-        durable?.state === "snapshot"
-        && Array.isArray(durable.payload.pagesList)
-        && (
-          !latest
-          || String(durable.payload.savedAt ?? durable.savedAt)
-            >= String(latest.payload.savedAt ?? "")
-        )
-      ) {
-        latest = { key: autosaveKey, payload: durable.payload };
-      }
-      browserWindow.__studioNativeRasterAutosaveReadError = undefined;
-    } catch (error) {
-      // A writer may be publishing the next immutable head while this advisory reader polls.
-      // Keep the last compatibility candidate and retry; preserve the exact failure for timeout
-      // diagnostics without introducing a product-only test hook.
-      browserWindow.__studioNativeRasterAutosaveReadError = String(error);
-    }
     if (!latest?.payload.pagesList) return null;
     const currentPageId = typeof latest.payload.currentPageId === "string"
       ? latest.payload.currentPageId
@@ -1376,7 +1272,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
         element.type === "draw" && !element.hidden
       ).length,
     };
-  }, { prefix: AUTOSAVE_PREFIX, autosaveKey: AUTOSAVE_KEY });
+  }, { key: durable.key, raw: durable.raw });
 }
 
 async function waitForDocumentSnapshot(
@@ -1392,11 +1288,7 @@ async function waitForDocumentSnapshot(
     if (latest && predicate(latest)) return latest;
     await page.waitForTimeout(120);
   }
-  const durableReadError = await page.evaluate(() =>
-    (window as typeof window & {
-      __studioNativeRasterAutosaveReadError?: string;
-    }).__studioNativeRasterAutosaveReadError ?? null
-  );
+  const durableReadError = await readDurableStudioAutosaveError(page);
   throw new Error(
     `${description}; latest=${JSON.stringify(latest)}; durableReadError=${JSON.stringify(durableReadError)}`,
   );

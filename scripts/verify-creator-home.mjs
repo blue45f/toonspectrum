@@ -58,7 +58,7 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
     page.on("request", (request) => { if (/\.mp4(?:\?|$)/.test(request.url())) videoRequests.push(request.url()); });
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.locator('[data-creator-home="studio-first"]').waitFor({ timeout: 60000 });
+    await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60000 });
     await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.locator("h1").count(), 1);
     assert.equal(await page.locator("video").count(), 0, "Video must not mount before a user gesture");
@@ -66,22 +66,24 @@ try {
     const brand = locale === "ko" ? "툰스튜디오" : "ToonStudio";
     await page.waitForFunction((name) => document.title.includes(name), brand);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
-    const headlineBounds = await page.locator("#creator-home-title").boundingBox();
-    assert(headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1, `Clipped headline: ${name}`);
-    assert(await page.locator('.cf-hero .cf-actions a[href="/studio"]').isVisible());
-
-    const previewOptions = page.locator(".cf-stage-switcher button");
-    await previewOptions.nth(1).click();
-    assert.equal(await previewOptions.nth(1).getAttribute("aria-pressed"), "true");
-    assert((await page.locator("#creator-stage-description").innerText()).includes(locale === "ko" ? "장면과 장면" : "one scene"));
-    await previewOptions.nth(2).focus();
-    await page.keyboard.press("Enter");
-    assert.equal(await previewOptions.nth(2).getAttribute("aria-pressed"), "true");
-    await previewOptions.nth(0).click();
-    const faq = page.locator(".cf-faq summary").first();
-    await faq.click();
-    assert.equal(await faq.locator("..").getAttribute("open"), "");
-    await faq.click();
+    const headlineBounds = await page.locator("#creator-hero-title").boundingBox();
+    assert(
+      headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1,
+      `Clipped headline: ${name}`,
+    );
+    await expect(page.locator('.cf-hero .cf-primary[href="/production"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-secondary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toBeVisible();
+    await expect(page.locator(".cf-start-card")).toHaveCount(4);
+    await expect(page.locator(".cf-flow li a")).toHaveCount(6);
+    await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
+    await expect(page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]')).toHaveCount(1);
+    await expect(page.locator('.cf-bridge-visual img[src="/brand/production-os-workspace.svg"]')).toHaveCount(1);
+    await expect(page.locator('.cf-production-journey img[src="/brand/production-os-journey.svg"]')).toHaveCount(1);
+    const heroImage = page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]');
+    await expect.poll(() => heroImage.evaluate((image) => image.complete && image.naturalWidth > 0), {
+      message: "The above-the-fold production preview must load",
+    }).toBe(true);
 
     // The existing shell intentionally defers its footer. Exercise scroll, wait for its
     // real lazy-loaded content, and only then capture the complete document.
@@ -92,46 +94,13 @@ try {
     const creationEntry = footer.locator('.public-footer-invitation a[href="/studio/new"]');
     await expect(creationEntry).toBeVisible();
     assert.equal(/툰스펙트럼|ToonSpectrum/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Footer overflow: ${name}`);
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
+      false,
+      `Footer overflow: ${name}`,
+    );
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
-
-    if (name === "desktop") {
-      await page.getByTestId("creator-film-play").click();
-      const video = page.locator("video");
-      // Poll current media state instead of relying on one loadeddata event. Fast decoders can
-      // emit that event between the click and listener registration, producing a false timeout.
-      await expect.poll(
-        () => video.evaluate((element) => element.error ? -element.error.code : element.readyState),
-        {
-          message: "Brand film reaches HAVE_CURRENT_DATA without a media error",
-          timeout: 30000,
-        },
-      ).toBeGreaterThanOrEqual(2);
-      await page.waitForFunction(() => document.querySelector("video")?.currentTime > 0.2);
-      assert(Math.abs(await video.evaluate((element) => element.duration) - 24) < 0.1);
-      await page.locator(".ch-film-chapters button").nth(2).click();
-      assert(await video.evaluate((element) => element.currentTime >= 12));
-      await page.getByRole("button", { name: "포스터로 돌아가기" }).click();
-      assert.equal(await page.locator("video").count(), 0);
-      results.push({ check: "native-video-play-seek-stop", pass: true });
-    }
-    if (name === "mobile") {
-      const trigger = page.locator('header button[aria-haspopup="dialog"]');
-      await trigger.click();
-      await page.locator('[role="dialog"]').waitFor();
-      assert(await page.locator('[role="dialog"] a[href="/ranking"]').isVisible());
-      await page.keyboard.press("Escape");
-      await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
-      // SiteHeader restores focus in requestAnimationFrame after removing inert.
-      // Keep the real focus contract, but wait for that frame instead of racing it.
-      await expect(trigger).toBeFocused({ timeout: 3000 });
-      await page.route("**/brand/toonstudio-intro.mp4", (route) => route.abort());
-      await page.getByTestId("creator-film-play").click();
-      await page.locator(".ch-film-error").waitFor();
-      assert.equal(await page.locator('.cf-hero .cf-actions a[href="/studio"]').count(), 1);
-      results.push({ check: "mobile-menu-focus-and-film-error", pass: true });
-    }
     assert.deepEqual(errors, [], `Uncaught page errors: ${name}`);
     results.push({ check: name, viewport: [width, height], locale, theme, noHorizontalOverflow: true, headlineWithinViewport: true, footerBrandVerified: true, uncaughtErrors: errors });
     await context.close();

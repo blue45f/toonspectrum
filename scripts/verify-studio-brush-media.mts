@@ -69,6 +69,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 const OPTIONAL_STATIC_PREVIEW_PATHS = [
+  "/api/health/ready",
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
@@ -1079,7 +1080,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = `${origin}studio/canvas`;
   const server: ChildProcess | null = externalOrigin
     ? null
     : spawn(

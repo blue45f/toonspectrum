@@ -29,7 +29,7 @@ try {
     });
     try {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
-      await page.locator('[data-creator-home="studio-first"]').waitFor();
+      await page.locator('[data-creator-home="production-first"]').waitFor();
       await page.evaluate(() => document.fonts.ready);
       await page.waitForFunction(() => document.title.includes("툰스튜디오") || document.title.includes("ToonStudio"));
       assert.equal(requests.length, 0);
@@ -37,7 +37,7 @@ try {
 
       const playButton = page.getByTestId("creator-film-play");
       if (await playButton.count() === 0) {
-        await expect(page.locator('[data-creator-experience="clarity-v1"]')).toHaveCount(1);
+        await expect(page.locator('[data-creator-experience="production-os-v2"]')).toHaveCount(1);
         const manifestResponse = await context.request.get(`${origin}/brand/film-manifest.json`);
         assert.equal(manifestResponse.ok(), true);
         const manifest = await manifestResponse.json();

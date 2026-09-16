@@ -57,6 +57,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const APP_SETTINGS_KEY = "toonspectrum-studio-app-settings";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/health/ready",
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
@@ -1023,9 +1024,12 @@ async function selectBrush(
 }
 
 async function openLayerNavigator(page: Page): Promise<void> {
+  const splitPane = page.locator('[data-studio-inspector-layers-split="true"]');
+  if (await splitPane.isVisible().catch(() => false)) return;
   const navigator = page.getByTestId("studio-inspector-navigator");
   await navigator.waitFor({ state: "visible" });
   const layers = navigator.locator('[data-studio-inspector-primary-tab="layers"]');
+  await layers.waitFor({ state: "visible" });
   if (await layers.getAttribute("aria-selected") !== "true") await layers.click();
 }
 

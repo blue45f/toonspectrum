@@ -22,6 +22,7 @@ import {
   type MagicResizeStrategy,
 } from "../studio-magic-resize";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { StudioWebtoonCanvasPresetPicker } from "../StudioWebtoonCanvasPresetPicker";
 
 import {
   adjustStudioCanvasHeight,
@@ -231,6 +232,18 @@ export function StudioCanvasResizer({
           ))}
         </div>
       ) : null}
+
+      <StudioWebtoonCanvasPresetPicker
+        currentSize={{ width: canvasW, height: canvasH }}
+        disabled={disabled}
+        onApplyPreset={(preset) => {
+          if (mode === "height-only") {
+            onSetHeight(clampStudioCanvasHeight(presetCanvasSize(preset, canvasW).height));
+            return;
+          }
+          onMagicResizePreset(preset);
+        }}
+      />
 
       <div>
         <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">빠른 규격</p>

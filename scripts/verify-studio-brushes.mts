@@ -63,7 +63,8 @@ import {
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
-  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
@@ -78,6 +79,7 @@ import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "../apps/web/src/domains/creator/brush/studio-brush-selection";
+import { isStudioV6BrushCatalogId } from "../apps/web/src/domains/creator/brush/studio-brush-v6-id";
 import { captureStudioDrawPointerPressureContract } from "../apps/web/src/domains/creator/brush/studio-draw-pointer-pressure-contract";
 import { classifyStudioDryMediaCatalogIdV1 } from "../apps/web/src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
 import { studioWetInkBrushDepositsPigment } from "../apps/web/src/domains/creator/brush/studio-wet-ink-brush-runtime";
@@ -127,6 +129,7 @@ const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/health/ready",
   "/api/auth/session",
   // The durability audit navigates to the catalogue home as its away-target. That route's data
   // comes from the API (or the static catalogue bundle) which no local preview serves. Excused
@@ -174,7 +177,7 @@ const REQUESTED_BRUSH_VERIFY_ID_SET = new Set(REQUESTED_BRUSH_VERIFY_IDS);
 // quarantined ids stay registered for persisted replay but are not selectable choices.
 const BRUSH_MATRIX_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   REQUESTED_BRUSH_VERIFY_IDS.length > 0
-    ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) =>
+    ? STUDIO_LIBRARY_ALL_BRUSH_CATALOG_ITEMS.filter((item) =>
         REQUESTED_BRUSH_VERIFY_ID_SET.has(item.id)
       )
     : STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
@@ -1002,7 +1005,7 @@ async function assertUiBrushCatalogMatchesProductCatalog(
   await expandFullBrushCatalog(catalog);
   const expectedSelections = expectedCatalogItems.map((item) => ({
     label: `${item.name} 선택`,
-    source: item.source,
+    source: isStudioV6BrushCatalogId(item.id) ? "v6" : item.source,
   }));
   const actualSelections = await catalog
     .locator('button[aria-label$=" 선택"]')
@@ -1713,7 +1716,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     if (!skipUiCatalogMatch) {
       await assertUiBrushCatalogMatchesProductCatalog(
         firstCatalog,
-        STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+        STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,
         "paint",
       );
     } else {
@@ -4283,7 +4286,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
     await expandFullBrushCatalog(catalog);
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
-    const expectedCatalogCount = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
+    const expectedCatalogCount = STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS.length;
     invariant(
       selectionCount === expectedCatalogCount,
       `mobile paint catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,

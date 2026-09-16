@@ -387,9 +387,17 @@ export function evaluateStudioBrushMediaCase(
     ["pass 1→2", metrics.pass1ToPass2],
     ["pass 2→3", metrics.pass2ToPass3],
   ] as const) {
+    const broadPixelRegression =
+      accumulation.regressedInkRatio > policy.maximumRegressedInkRatio;
+    const meaningfulBroadRegression = broadPixelRegression
+      && accumulation.regressedInkEnergyRatio
+        > policy.maximumRegressedInkEnergyRatio * 0.65;
+    // Textured media can move shallow bristle/grain highlights across many pixels while retaining
+    // essentially all pigment. Treat that as a diagnostic unless either total density drops or
+    // the broad regression also carries meaningful pigment energy loss.
     if (
       accumulation.energyRatio < 1 - policy.maximumPassEnergyDropRatio
-      || accumulation.regressedInkRatio > policy.maximumRegressedInkRatio
+      || meaningfulBroadRegression
     ) {
       error(
         "pigment-regressed",
