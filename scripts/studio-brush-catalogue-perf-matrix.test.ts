@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+import {
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+} from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 import {
   resolveStudioBrushDynamics,
   resolveStudioBrushDynamicsForNormalizedSettings,
@@ -392,14 +395,14 @@ describe("reduceStudioBrushCrayonFamilyPasses", () => {
 });
 
 describe("studio brush catalogue paint performance matrix", () => {
-  it("exercises every shipped paint catalogue id on product planner paths", () => {
+  it("exercises every listed paint catalogue id on product planner paths", () => {
     const report = evaluateStudioBrushCataloguePaintPerfMatrix();
 
-    expect(report.paintCatalogCount).toBe(STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length);
-    expect(report.rowCount).toBe(STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length);
+    expect(report.paintCatalogCount).toBe(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length);
+    expect(report.rowCount).toBe(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length);
     expect(report.missingCatalogIds).toEqual([]);
     expect(new Set(report.rows.map((row) => row.catalogId)).size).toBe(
-      STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length,
+      STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
     );
 
     const failures = report.rows.filter((row) => !row.ok);
