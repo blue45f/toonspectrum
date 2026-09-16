@@ -23,3 +23,5 @@ export * from "./command/journal-store";
 export * from "./command/recovery";
 export * from "./command/bus";
 export * from "./testing/fault-injection";
+export * from "./graph/index";
+export * from "./command/transaction";
