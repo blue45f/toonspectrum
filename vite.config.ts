@@ -462,6 +462,10 @@ export default defineConfig(({ mode }) => ({
       NODE_ENV: mode === "production" ? "production" : "development",
     }),
   },
+  // Public VITE_* configuration is documented and stored at the repository root.
+  // Without an explicit envDir, Vite follows `root` (apps/web) and silently drops
+  // production-only values such as the Kakao JavaScript sharing key.
+  envDir: repositoryRoot,
   root: webRoot,
   publicDir: path.resolve(webRoot, "public"),
   resolve: {

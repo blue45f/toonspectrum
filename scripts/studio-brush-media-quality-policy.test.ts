@@ -222,6 +222,30 @@ describe("Studio browser brush-media quality policy", () => {
     ]);
   });
 
+  it("keeps broad low-energy oil texture movement diagnostic-only", () => {
+    const policy = STUDIO_BRUSH_MEDIA_CASES.find((entry) => entry.id === "oil")!;
+    const result = evaluateStudioBrushMediaCase(policy, metrics(policy.id, {
+      pass2ToPass3: {
+        previousInkEnergy: 340,
+        nextInkEnergy: 327,
+        energyRatio: 327 / 340,
+        regressedInkPixels: 207,
+        previousInkPixels: 560,
+        regressedInkRatio: 207 / 560,
+        regressedInkEnergy: 19,
+        regressedInkEnergyRatio: 19 / 340,
+        maximumPigmentLossDelta: 24,
+      },
+    }));
+
+    expect(result.ok).toBe(true);
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      level: "warning",
+      code: "pigment-regressed",
+    }));
+    expect(result.findings.some((finding) => finding.level === "error")).toBe(false);
+  });
+
   it("fails faint ink, live parity drift, scalloping, tiling, and local pigment energy loss", () => {
     const policy = STUDIO_BRUSH_MEDIA_CASES.find((entry) => entry.id === "g-pen-flex")!;
     const result = evaluateStudioBrushMediaCase(policy, metrics(policy.id, {

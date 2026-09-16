@@ -39,6 +39,7 @@ function mockCanvas(width = 256, height = 128) {
   let strokeCalls = 0;
   let fillCalls = 0;
   let drawImageCalls = 0;
+  let putImageDataCalls = 0;
   const paintColors: string[] = [];
   const transforms: number[][] = [];
   const translations: number[][] = [];
@@ -87,7 +88,7 @@ function mockCanvas(width = 256, height = 128) {
       getArea += Math.max(0, w) * Math.max(0, h);
       return { data: pixels.slice(0, w * h * 4), width: w, height: h };
     },
-    putImageData() {},
+    putImageData() { putImageDataCalls += 1; },
   };
   const canvas = {
     width,
@@ -102,7 +103,15 @@ function mockCanvas(width = 256, height = 128) {
     translations,
     rotations,
     paintOperations,
-    stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls, drawImageCalls }),
+    stats: () => ({
+      getCalls,
+      getArea,
+      clearCalls,
+      strokeCalls,
+      fillCalls,
+      drawImageCalls,
+      putImageDataCalls,
+    }),
   };
 }
 
@@ -323,6 +332,22 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     expect(renderer.releaseSettledPrefix(1)).toBe(1);
     expect(renderer.settledStrokeCount).toBe(0);
     expect(settled.stats().clearCalls).toBeGreaterThan(0);
+  });
+
+  it("restores immediate oil Redo from the exact settled pixel snapshot", () => {
+    const { renderer, settled } = attachedRenderer();
+    const stroke = drawElement("oil-exact-redo", "oil", [12, 20, 40, 28, 70, 36]);
+    expect(renderer.begin(stroke).status).toBe("started");
+    expect(renderer.end(stroke).status).toBe("settled");
+    const beforeUndo = settled.stats();
+    expect(renderer.hideSettledPixels([stroke.id])).toBe(true);
+    expect(settled.stats().getCalls).toBe(beforeUndo.getCalls + 1);
+    const beforeRedo = settled.stats();
+    expect(renderer.showSettledPixels([stroke.id])).toBe(true);
+    const afterRedo = settled.stats();
+    expect(afterRedo.putImageDataCalls).toBe(beforeRedo.putImageDataCalls + 1);
+    expect(afterRedo.fillCalls).toBe(beforeRedo.fillCalls);
+    expect(afterRedo.strokeCalls).toBe(beforeRedo.strokeCalls);
   });
 
   it("keeps undone settled strokes hidden through resize, reattach, and cancellation", () => {

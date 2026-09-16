@@ -1,3 +1,5 @@
+import type { MagicResizePreset } from "./studio-magic-resize";
+
 export type StudioWebtoonCanvasPresetId =
   | "webtoon-vertical"
   | "webtoon-naver"
@@ -58,3 +60,22 @@ export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[]
     height: 8000,
   },
 ]);
+
+export function findStudioWebtoonCanvasPreset(
+  id: StudioWebtoonCanvasPresetId,
+): StudioWebtoonCanvasPreset | undefined {
+  return STUDIO_WEBTOON_CANVAS_PRESETS.find((preset) => preset.id === id);
+}
+
+/** Convert an exact platform target into the fixed-width editor's aspect resize preset. */
+export function studioWebtoonCanvasMagicResizePreset(
+  preset: StudioWebtoonCanvasPreset,
+): MagicResizePreset {
+  return {
+    id: preset.id,
+    label: preset.labelKo,
+    hint: `${preset.width} × ${preset.height}px 플랫폼 비율로 현재 캔버스를 바꿉니다.`,
+    aspectW: preset.width,
+    aspectH: preset.height,
+  };
+}

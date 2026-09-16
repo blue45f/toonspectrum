@@ -373,6 +373,14 @@ interface ActiveRetainedStroke {
   pencilProgram?: StudioLivePencilPaintCommand[];
 }
 
+type StudioRetainedRedoPixelSnapshot = {
+  readonly strokeIds: readonly string[];
+  readonly pixels: ImageData;
+  readonly width: number;
+  readonly height: number;
+  readonly hadPixels: boolean;
+};
+
 export class StudioLiveRetainedMediaOverlayRenderer {
   private activeCanvas: HTMLCanvasElement | null = null;
   private settledCanvas: HTMLCanvasElement | null = null;
@@ -386,6 +394,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private readonly settledPencilPrograms = new Map<string, readonly StudioLivePencilPaintCommand[]>();
   private settledHasPixels = false;
   private readonly hiddenSettledStrokeIds = new Set<string>();
+  /** Exact full-surface pixels retained across the single pending-stroke Undo/Redo branch. */
+  private retainedRedoPixelSnapshot: StudioRetainedRedoPixelSnapshot | null = null;
   private activePaintedOntoSettled = false;
   private lastFailureReason: StudioLiveRetainedMediaFailureReason | null = null;
 
@@ -423,6 +433,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     readonly activeCanvas: HTMLCanvasElement;
     readonly settledCanvas: HTMLCanvasElement;
   } | null): void {
+    this.invalidateRetainedRedoPixelSnapshot();
     this.activeCanvas = canvases?.activeCanvas ?? null;
     this.settledCanvas = canvases?.settledCanvas ?? null;
     this.activeContext = this.activeCanvas
@@ -448,6 +459,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       || previous.documentWidth !== surface.documentWidth
       || previous.flipX !== surface.flipX;
     if (!changed) return;
+    this.invalidateRetainedRedoPixelSnapshot();
     this.applySurface();
     if (this.active || this.settled.length > 0) this.replay();
   }
@@ -482,6 +494,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   begin(element: DrawEl): StudioLiveRetainedMediaBeginResult {
+    this.invalidateRetainedRedoPixelSnapshot();
     if (!studioLiveRetainedMediaOverlaySupportsElement(element)) {
       return retainedMediaOperationFailure("unsupported");
     }
@@ -605,6 +618,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   releaseSettledPrefix(count: number): number {
+    this.invalidateRetainedRedoPixelSnapshot();
     const requested = count === Number.POSITIVE_INFINITY
       ? this.settled.length
       : Number.isFinite(count)
@@ -636,8 +650,17 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   /** Hide only an undone batch; older strokes may still be awaiting canonical handoff. */
   hideSettledPixels(strokeIds?: readonly string[]): boolean {
     const selected = strokeIds ? new Set(strokeIds) : null;
-    const strokes = this.settled.filter((stroke) => !selected || selected.has(stroke.id));
+    const strokes = this.settled.filter((stroke) => (
+      (!selected || selected.has(stroke.id))
+      && !this.hiddenSettledStrokeIds.has(stroke.id)
+    ));
     if (strokes.length === 0) return false;
+    // The product owns one pending retained-stroke redo branch. Capture the exact composited
+    // pixels before hiding it so immediate Redo restores oil/bristle texture byte-for-byte rather
+    // than rebuilding the stroke through a fresh incremental planner.
+    if (this.hiddenSettledStrokeIds.size === 0) {
+      this.captureRetainedRedoPixelSnapshot(strokes.map((stroke) => stroke.id));
+    }
     for (const stroke of strokes) this.hiddenSettledStrokeIds.add(stroke.id);
     this.replaySettledOnly();
     return true;
@@ -647,13 +670,24 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const selected = strokeIds ? new Set(strokeIds) : null;
     const strokes = this.settled.filter((stroke) => !selected || selected.has(stroke.id));
     if (strokes.length === 0) return false;
-    for (const stroke of strokes) this.hiddenSettledStrokeIds.delete(stroke.id);
+    const hiddenStrokes = strokes.filter((stroke) => this.hiddenSettledStrokeIds.has(stroke.id));
+    // Preserve the original public contract: callers can ask for a replay even when the selected
+    // strokes are already visible (for example after a document/session ownership transition).
+    if (hiddenStrokes.length === 0) {
+      this.replaySettledOnly();
+      return true;
+    }
+    const ids = hiddenStrokes.map((stroke) => stroke.id);
+    for (const stroke of hiddenStrokes) this.hiddenSettledStrokeIds.delete(stroke.id);
+    if (this.restoreRetainedRedoPixelSnapshot(ids)) return true;
+    this.invalidateRetainedRedoPixelSnapshot();
     this.replaySettledOnly();
     return true;
   }
 
   /** A new edit invalidates the undone overlay's redo branch. */
   discardHiddenSettledStrokes(strokeIds?: readonly string[]): void {
+    this.invalidateRetainedRedoPixelSnapshot();
     const discarded = new Set(strokeIds ?? this.hiddenSettledStrokeIds);
     for (const id of discarded) {
       if (!this.hiddenSettledStrokeIds.has(id)) discarded.delete(id);
@@ -668,6 +702,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   clear(): void {
+    this.invalidateRetainedRedoPixelSnapshot();
     this.resetActiveState();
     this.lastFailureReason = null;
     this.settled = [];
@@ -1243,7 +1278,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     if (context === this.settledContext) {
       this.settledHasPixels = true;
       // Replaying an older highlighter must not claim that the current stroke was flattened.
-      if (stroke === this.active) this.activePaintedOntoSettled = true;
+      if (stroke === this.active) {
+        this.invalidateRetainedRedoPixelSnapshot();
+        this.activePaintedOntoSettled = true;
+      }
     }
   }
 
@@ -1266,6 +1304,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   private flattenActiveToSettled(): boolean {
+    this.invalidateRetainedRedoPixelSnapshot();
     const context = this.settledContext;
     const canvas = this.activeCanvas;
     if (!context || !canvas) return false;
@@ -1279,6 +1318,57 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       context.drawImage(canvas, 0, 0);
       context.restore();
       this.settledHasPixels = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private invalidateRetainedRedoPixelSnapshot(): void {
+    this.retainedRedoPixelSnapshot = null;
+  }
+
+  private captureRetainedRedoPixelSnapshot(strokeIds: readonly string[]): void {
+    this.invalidateRetainedRedoPixelSnapshot();
+    const context = this.settledContext;
+    const canvas = this.settledCanvas;
+    const uniqueIds = [...new Set(strokeIds)].sort();
+    if (!context || !canvas || uniqueIds.length === 0 || canvas.width < 1 || canvas.height < 1) {
+      return;
+    }
+    try {
+      this.retainedRedoPixelSnapshot = {
+        strokeIds: uniqueIds,
+        pixels: context.getImageData(0, 0, canvas.width, canvas.height),
+        width: canvas.width,
+        height: canvas.height,
+        hadPixels: this.settledHasPixels,
+      };
+    } catch {
+      // Readback can be unavailable on a constrained/tainted surface. Vector replay remains the
+      // safe fallback; never block Undo merely because the exact Redo optimization is absent.
+      this.invalidateRetainedRedoPixelSnapshot();
+    }
+  }
+
+  private restoreRetainedRedoPixelSnapshot(strokeIds: readonly string[]): boolean {
+    const snapshot = this.retainedRedoPixelSnapshot;
+    const context = this.settledContext;
+    const canvas = this.settledCanvas;
+    if (!snapshot || !context || !canvas) return false;
+    const uniqueIds = [...new Set(strokeIds)].sort();
+    if (
+      uniqueIds.length !== snapshot.strokeIds.length
+      || uniqueIds.some((id, index) => id !== snapshot.strokeIds[index])
+      || canvas.width !== snapshot.width
+      || canvas.height !== snapshot.height
+    ) {
+      return false;
+    }
+    try {
+      context.putImageData(snapshot.pixels, 0, 0);
+      this.settledHasPixels = snapshot.hadPixels;
+      this.invalidateRetainedRedoPixelSnapshot();
       return true;
     } catch {
       return false;
