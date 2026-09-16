@@ -1,5 +1,5 @@
 import { ChevronUp, ChevronDown, Minus, HelpCircle, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { AdultOverlay } from "./adult-overlay";
 import { PlatformTags } from "./availability";
@@ -104,6 +104,7 @@ export function RankRow({
   entryIndex?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const detailId = useId();
   const { title, rank, delta } = ranked;
   const top3 = rank <= 3;
   const m = metric?.(title);
@@ -133,6 +134,9 @@ export function RankRow({
           type="button"
           onClick={() => setExpanded(!expanded)}
           title={t("ranking.detailTitle")}
+          aria-label={`${rank}위 ${title.title} · ${t("ranking.detailTitle")}`}
+          aria-expanded={expanded}
+          aria-controls={detailId}
           className={cn(
             "relative flex min-h-11 flex-col items-center justify-center rounded-xl border px-1.5 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/30",
             top3 ? "border-accent/45 bg-accent/10 text-accent" : "border-line/70 bg-canvas/40 text-fg-3",
@@ -156,7 +160,7 @@ export function RankRow({
           )}
         </button>
 
-        <Link href={`/title/${title.slug}`} className="w-9 sm:w-10">
+        <Link href={`/title/${title.slug}`} className="w-9 sm:w-10" aria-label={`${title.title} 작품 상세`}>
           <MiniPoster title={title} className="w-9 transition-transform group-hover/row:scale-105 sm:w-10" />
         </Link>
 
@@ -198,6 +202,9 @@ export function RankRow({
             type="button"
             onClick={() => setExpanded(!expanded)}
             title={t("ranking.detailTitle")}
+            aria-label={`${title.title} · ${t("ranking.why")}`}
+            aria-expanded={expanded}
+            aria-controls={detailId}
             className={cn(
               "flex items-center gap-2 rounded-md border text-right px-2 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/20",
               expanded ? "border-accent/40 bg-accent-soft/20" : "border-line/70 bg-canvas/30"
@@ -227,7 +234,7 @@ export function RankRow({
 
       {/* Expanded Score breakdown panel */}
       {expanded && (
-        <div className="border-t border-line/45 bg-canvas/40 px-3 py-3 text-xs rounded-b-xl animate-fade-in">
+        <div id={detailId} className="border-t border-line/45 bg-canvas/40 px-3 py-3 text-xs rounded-b-xl animate-fade-in">
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1 font-semibold text-accent text-[0.7rem] uppercase tracking-wider">

@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { SiteDirectoryPersonalized } from "./SiteDirectoryPersonalized";
 import { SiteDirectorySearch } from "./SiteDirectorySearch";
 
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/shared/components/site-navigation";
 import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
+import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import Link from "@/compat/router-link";
 
 interface ExtendedDestination {
@@ -130,8 +132,8 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/studio/character-convert", "캐릭터 변환", "Character conversion", "2D 캐릭터를 제작용 형식으로 변환", "Convert 2D characters into production-ready formats"),
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
-      destination("/brush-lab", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
-      destination("/music", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
+      destination("/studio/assets/brushes/new", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
+      destination("/studio/assets/audio", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
       destination("/showcase/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
     ],
   },
@@ -150,7 +152,6 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/learn/records", "학습 기록 관리", "Learning records", "진행 기록을 백업하고 복원", "Back up and restore learning progress"),
       destination("/learn/recipes", "제작 레시피", "Creative recipes", "연출을 직접 조작하며 학습", "Learn direction through hands-on recipes"),
       destination("/story-lab", "스토리 연구실", "Story lab", "인물·욕망·갈등 설계", "Shape characters, desire and conflict"),
-      destination("/publishing", "연재·출판 준비", "Publishing prep", "원고·권리·소개 자료 점검", "Check manuscripts, rights and pitch materials"),
     ],
   },
   {
@@ -305,6 +306,34 @@ const PAGE_COPY = {
   },
 } as const;
 
+function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "en" }) {
+  const metadata = resolveSiteRouteMetadata(href);
+  const labels = locale === "ko"
+    ? { beta: "베타", experimental: "실험", "sign-in": "로그인 필요", project: "프로젝트 필요", desktop: "데스크톱 권장" }
+    : { beta: "Beta", experimental: "Experimental", "sign-in": "Sign-in required", project: "Project required", desktop: "Desktop recommended" };
+  const badges = [
+    metadata.maturity === "beta" ? { key: "beta", label: labels.beta, tone: "accent" } : null,
+    metadata.maturity === "experimental" ? { key: "experimental", label: labels.experimental, tone: "warning" } : null,
+    metadata.access === "sign-in" ? { key: "sign-in", label: labels["sign-in"], tone: "neutral" } : null,
+    metadata.access === "project" ? { key: "project", label: labels.project, tone: "warning" } : null,
+    metadata.device === "desktop-first" ? { key: "desktop", label: labels.desktop, tone: "neutral" } : null,
+  ].filter((badge): badge is { key: string; label: string; tone: string } => badge !== null);
+  if (!badges.length) return null;
+  return (
+    <span className="mt-2 flex flex-wrap gap-1" aria-label={locale === "ko" ? "사용 조건" : "Usage conditions"}>
+      {badges.map((badge) => (
+        <small
+          key={badge.key}
+          data-tone={badge.tone}
+          className="inline-flex min-h-5 items-center rounded-full border border-line bg-panel px-2 text-[0.58rem] font-bold leading-none text-fg-3 data-[tone=accent]:border-accent/30 data-[tone=accent]:text-accent data-[tone=warning]:border-amber-500/35 data-[tone=warning]:text-amber-500"
+        >
+          {badge.label}
+        </small>
+      ))}
+    </span>
+  );
+}
+
 export function SitemapPage() {
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
@@ -350,6 +379,7 @@ export function SitemapPage() {
       </section>
 
       <SiteDirectorySearch entries={DIRECTORY_ENTRIES} locale={locale} />
+      <SiteDirectoryPersonalized entries={DIRECTORY_ENTRIES} locale={locale} />
 
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -404,6 +434,7 @@ export function SitemapPage() {
                           <span className="mt-1 block text-xs leading-5 text-fg-3">
                             {siteNavigationText(item.description, locale)}
                           </span>
+                          <RouteConditionBadges href={item.href} locale={locale} />
                         </span>
                       </Link>
                     </li>
@@ -436,7 +467,10 @@ export function SitemapPage() {
                 className="group flex min-h-16 items-center gap-3 rounded-2xl border border-line bg-card/75 px-4 py-3 text-sm font-bold text-fg-2 transition-colors hover:border-line-strong hover:bg-card hover:text-fg"
               >
                 <Icon size={17} className="text-fg-3 transition-colors group-hover:text-accent" aria-hidden="true" />
-                <span>{siteNavigationText(item.label, locale)}</span>
+                <span className="min-w-0">
+                  <span className="block">{siteNavigationText(item.label, locale)}</span>
+                  <RouteConditionBadges href={item.href} locale={locale} />
+                </span>
                 <ArrowRight size={15} className="ml-auto text-fg-3" aria-hidden="true" />
               </Link>
             );
@@ -490,6 +524,7 @@ export function SitemapPage() {
                           <span className="mt-0.5 line-clamp-1 block text-[0.69rem] leading-5 text-fg-3">
                             {siteNavigationText(item.description, locale)}
                           </span>
+                          <RouteConditionBadges href={item.href} locale={locale} />
                         </span>
                       </Link>
                     </li>

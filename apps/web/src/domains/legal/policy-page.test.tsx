@@ -151,7 +151,9 @@ describe("PolicyArticle", () => {
     const html = renderToStaticMarkup(<PolicyArticle doc={doc} />);
 
     expect(html).toContain("제1조 (목적)");
-    expect(html).toMatch(/<h2[^>]*>제1조 \(목적\)<\/h2>/);
+    expect(html).toContain('id="policy-section-1"');
+    expect(html).toContain('href="#policy-section-1"');
+    expect(html).toMatch(/<h2[^>]*>.*제1조 \(목적\).*<\/h2>/s);
     expect(html).toContain("<strong");
     expect(html).toContain("<li>항목 하나</li>");
     expect(html).toContain("v1");
