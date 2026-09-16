@@ -1,32 +1,37 @@
-# 툰스펙트럼
+# 툰스튜디오
 
-> 네이버 웹툰·시리즈, 카카오웹툰·페이지, 리디 등 국내 웹툰·웹소설 플랫폼을 가로지르는 통합 인덱스와 브라우저 기반 창작 환경입니다. 작품 탐색과 창작은 목적별 시작점에서 연결됩니다.
+> 기획부터 연재까지 대본·콘티·전문 2D 작화·3D 캐릭터와 배경·소재·클라우드 파일·일정·협업·검수·게시 준비를 하나의 작품 프로젝트에서 연결하는 올인원 웹툰 제작 스튜디오입니다.
 
-## 핵심 페이지
+## 핵심 제작 흐름
 
-- [만들기](https://www.toonstudio.cloud/make): 빈 캔버스·세로 웹툰·컷툰·캐릭터·에셋·리서치에서 목적별로 창작 시작
-- [찾기](https://www.toonstudio.cloud/discover): 검색·취향 탐색·추천·랭킹·캘린더·랜덤·비교를 목적별로 선택
-- [내 공간](https://www.toonstudio.cloud/my): 프로젝트·공개 작품·서재·에셋·활동·프로필·설정 통합 진입점
-- [웹툰 창작 스튜디오](https://www.toonstudio.cloud/studio): 브라우저 기반 드로잉·편집·3D·협업 작업 공간
-- [프로젝트 센터](https://www.toonstudio.cloud/studio/projects): 최근 프로젝트·공유 작업·버전·복구 흐름
-- [캐릭터 셰이퍼](https://www.toonstudio.cloud/shaper): 프리셋·표면 드로잉·기기 내 AI 보조로 3D 웹툰 캐릭터를 만들어 투명 PNG·레이어 PSD로 내보내는 스튜디오 도구 안내
-- [통합 검색](https://www.toonstudio.cloud/search): 전 플랫폼 작품을 한 번에 검색
-- [스펙트럼 탐색](https://www.toonstudio.cloud/explore): 장르와 취향으로 작품 탐색
+- [새 작품 시작](https://www.toonstudio.cloud/studio/new): 아이디어·대본·기존 원고·팀 프로젝트에서 알맞은 작업공간 시작
+- [기획실](https://www.toonstudio.cloud/story-lab): 작품 설정·캐릭터·세계관·시즌·회차·대본 정리
+- [2D 스튜디오](https://www.toonstudio.cloud/studio): 브러시·레이어·선택·보정·컷·말풍선·식자·세로 웹툰 편집
+- [3D 배경 스튜디오](https://www.toonstudio.cloud/studio/bg3d): 웹툰 배경·소품·재질·카메라 장면 제작
+- [캐릭터 제작](https://www.toonstudio.cloud/studio/character): 캐릭터 체형·표정·포즈·의상과 웹툰용 출력 제작
+- [작품 소재](https://www.toonstudio.cloud/studio/assets): 브러시·배경·캐릭터·3D·폰트·오디오와 사용 권리 관리
+- [프로젝트 센터](https://www.toonstudio.cloud/studio/projects): 최근 작업·공유 프로젝트·버전·복구 가능한 초안 확인
+- [제작·협업](https://www.toonstudio.cloud/production): 회차·역할·담당자·일정·인수인계·검수·권리와 진행 상태 운영
+- [검토·연재 준비](https://www.toonstudio.cloud/studio/publish): 검수본·승인본·규격·권리·모바일 미리보기와 게시본 생성
+- [창작 마켓](https://www.toonstudio.cloud/market): Studio에서 바로 사용할 소재 탐색·배포·라이선스 확인
+- [함께 만들기](https://www.toonstudio.cloud/collaborate): 역할·작업 범위·마감·완료 기준을 바탕으로 팀원과 외부 작업자 연결
+- [배우기](https://www.toonstudio.cloud/learn): 현재 제작 단계와 막힌 문제에서 기능·예제·복구 경로 검색
+- [도움말](https://www.toonstudio.cloud/help): 기능, 저장, 호환성, 협업과 연재 문제 해결
+
+## 작품 탐색과 인사이트
+
+ToonSpectrum 탐색 기능은 ToonStudio의 확장 영역입니다. 공개 작품·장르·태그·랭킹·플랫폼 정보를 찾아 기획 참고자료로 연결할 수 있습니다.
+
+- [작품 탐색](https://www.toonstudio.cloud/discover): 작품·장르·태그·플랫폼 흐름 탐색
+- [통합 검색](https://www.toonstudio.cloud/search): 공개 작품과 작가 검색
 - [통합 랭킹](https://www.toonstudio.cloud/ranking): 공개 산식 기반 다축 랭킹
-- [맞춤 추천](https://www.toonstudio.cloud/recommend): 크로스플랫폼 취향 기반 추천
-- [연재 캘린더](https://www.toonstudio.cloud/calendar): 요일별 연재작
-- [창작 리서치 데스크](https://www.toonstudio.cloud/research): 출처·이용조건을 보존하는 창작 자료 작업공간
-- [창작 마켓](https://www.toonstudio.cloud/market): Studio에서 사용할 브러시·팔레트·템플릿·3D 에셋 탐색과 배포
-- [커뮤니티](https://www.toonstudio.cloud/community): 작품·작가·창작 경험을 나누는 커뮤니티
-- [도움말 센터](https://www.toonstudio.cloud/help): 작업 목적과 문제에서 기능·가이드·복구 경로 검색
-- [접근성](https://www.toonstudio.cloud/accessibility): 키보드·터치·펜·확대·모션 감소 지원 원칙
-- [랭킹 산정 방식](https://www.toonstudio.cloud/guide): 랭킹 데이터와 산식 설명
-- [트렌드 인사이트](https://www.toonstudio.cloud/insights): 플랫폼·장르 트렌드 대시보드
-- [서비스 소개](https://www.toonstudio.cloud/about): 서비스 소개와 운영 원칙
+- [트렌드 인사이트](https://www.toonstudio.cloud/insights): 장르·플랫폼·연도·평점·가격·어댑테이션 분석
 
-## 데이터 정책
+## 데이터와 파일 원칙
 
-- 작품 메타데이터·표지는 각 플랫폼 공개 카탈로그에서 수집한 실데이터입니다.
-- 실수집값과 조회·관심 등 일부 추정 보조 지표는 화면에서 구분해 표기합니다.
-- 가격·조회수를 과장하지 않으며, 순위는 공개된 산식으로만 계산합니다.
-- 드라마·영화·애니 영상화와 OST는 공식 플랫폼으로 링크아웃하며, 외부 유료 본문이나 회차 이미지를 호스팅하지 않습니다.
+- 사용자의 작업물은 자동 저장·복구·버전 상태를 구분해 표시합니다.
+- 원본 파일을 가져올 때 지원·변환·래스터화·제외 항목을 숨기지 않습니다.
+- 검수본·승인본·게시본은 서로 다른 상태로 관리합니다.
+- 소재의 출처·사용 권리·프로젝트 사용 위치를 함께 기록합니다.
+- 공개 작품 메타데이터와 일부 추정 보조 지표는 화면에서 구분해 표기합니다.
+- 외부 유료 본문이나 회차 이미지를 무단 호스팅하지 않습니다.

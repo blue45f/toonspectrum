@@ -37,7 +37,7 @@ try {
     await expect(home).toBeVisible({ timeout: 30000 });
     const experience = await home.getAttribute("data-creator-experience");
 
-    assert.equal(experience, "production-os-v2", `Unexpected creator experience: ${experience}`);
+    assert.equal(experience, "all-in-one-studio-v3", `Unexpected creator experience: ${experience}`);
     const supportTitle = page.locator("#creator-support-title");
     await expect(page).toHaveURL(/#creator-faq-title$/);
     await expect(supportTitle).toBeFocused({ timeout: 30000 });
@@ -49,14 +49,15 @@ try {
         && target.y < height);
     }, { message: "The legacy support fragment must resolve below the public header" }).toBe(true);
 
-    await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/production");
-    await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/studio/new");
+    await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/studio/new");
+    await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/production");
     await expect(page.locator(".cf-hero-links a")).toHaveAttribute("href", "/studio/projects");
     await expect(page.locator(".ch-jump-nav a")).toHaveCount(4);
     await expect(page.locator(".cf-jump-nav a")).toHaveCount(3);
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
+    await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
 
     await page.evaluate(() => { window.location.hash = "creator-process-title"; });
     const processTitle = page.locator("#creator-process-title");
@@ -82,7 +83,7 @@ try {
     await expect(processTitle).toBeFocused();
 
     assert.equal(await page.locator("video").count(), 0);
-    assert.deepEqual(mediaRequests, [], "The production homepage must not mount or download a video");
+    assert.deepEqual(mediaRequests, [], "The all-in-one homepage must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     for (const control of await page.locator(
       ".cf-actions a,.cf-start-card,.cf-flow li a,.cf-support-grid a,.ch-jump-nav a,.cf-jump-nav a",

@@ -3,10 +3,16 @@ name: Creator flagship quality
 on:
   pull_request:
     paths:
+      - 'apps/web/index.html'
+      - 'apps/web/public/llms.txt'
+      - 'apps/web/public/**/*.webmanifest'
+      - 'apps/web/public/i18n/app/footer/**'
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/domains/creator-resources/**'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
+      - 'apps/web/src/shared/lib/product-identity*'
+      - 'apps/web/src/shared/lib/site-route-ux*'
       - 'apps/api/src/modules/creator-resources/**'
       - 'packages/core/**'
       - 'tests/creator-flagship-contracts.test.ts'
@@ -40,7 +46,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Deterministic language, storage and mode contracts
         run: node tools/verify-creator-flagship.mjs
-      - name: React and navigation regressions
+      - name: React, product identity and navigation regressions
         run: >-
           pnpm exec vitest run
           tests/creator-flagship-contracts.test.ts
@@ -48,6 +54,8 @@ jobs:
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
           apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
+          apps/web/src/shared/lib/product-identity.test.ts
+          apps/web/src/shared/lib/site-route-ux.test.ts
       - name: Full application typecheck
         run: pnpm run typecheck
       - name: Production bundle and CSP
