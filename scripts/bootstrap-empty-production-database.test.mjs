@@ -406,6 +406,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0057_community_threaded_comments",
       "0058_community_cafe_governance",
       "0059_member_messaging",
+      "0060_member_messaging_cutover_marker",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });
