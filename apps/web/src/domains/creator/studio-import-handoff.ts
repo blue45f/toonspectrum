@@ -4,7 +4,7 @@ import type { StudioImportFormat } from "./studio-import-compatibility";
 
 export const STUDIO_IMPORT_HANDOFF_QUERY_KEY = "importHandoff";
 export const STUDIO_IMPORT_HANDOFF_ACCEPT =
-  ".json,.psd,.ora,.cbz,.abr,.myb,.kpp,image/*,.tif,.tiff";
+  ".toonstudio,.json,.psd,.ora,.cbz,.abr,.myb,.kpp,image/*,.tif,.tiff,application/vnd.toonstudio.project+zip";
 
 export type StudioImportHandoffTarget =
   | "brush-pack"

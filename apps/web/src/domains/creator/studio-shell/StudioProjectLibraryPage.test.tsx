@@ -5,14 +5,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import { serializeStudioAutosave, studioAutosaveKey } from "../studio-autosave";
-import { ensureInitialStudioProjectDocument } from "../studio-project-document-store";
+import {
+  ensureInitialStudioProjectDocument,
+  studioProjectDocumentStorageKey,
+} from "../studio-project-document-store";
 import {
   createStudioProject,
   markStudioProjectOpened,
   readStudioProjectLibrary,
   trashStudioProject,
 } from "../studio-project-library-store";
-import { studioProjectDocumentStorageKey } from "../studio-project-document-store";
 import {
   ensureStudioSaveProfile,
   readStudioSaveProfiles,
@@ -54,7 +56,7 @@ describe("StudioProjectLibraryPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/어디에 정식 저장할까요|Where should this be formally saved/u)).toBeTruthy();
     expect(within(dialog).getByText(/파일·동기화 폴더|File or synced folder/u)).toBeTruthy();
-    expect(within(dialog).getByText(/개인 드라이브|Personal drive/u)).toBeTruthy();
+    expect(within(dialog).getByRole("link", { name: /개인 드라이브|Personal drive/u })).toBeTruthy();
   });
 
   it("creates a usable temporary duplicate", async () => {

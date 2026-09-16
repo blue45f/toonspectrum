@@ -7,6 +7,7 @@ import {
   readStudioSaveProfiles,
   recordStudioExport,
   recordStudioPublication,
+  studioSaveProfileNeedsDestination,
   studioSaveSafetySummary,
   upsertStudioStorageBinding,
   type StudioSaveProfileStorage,
@@ -32,6 +33,7 @@ describe("studio save profile", () => {
       hasRemoteBackup: false,
       needsBackup: true,
     });
+    expect(studioSaveProfileNeedsDestination(profile)).toBe(true);
   });
 
   it("does not call a selected but disconnected drive a backup", () => {
@@ -60,6 +62,7 @@ describe("studio save profile", () => {
       needsBackup: false,
       headline: "원격 백업 완료",
     });
+    expect(studioSaveProfileNeedsDestination(synced)).toBe(false);
   });
 
   it("keeps export separate from publication", () => {
