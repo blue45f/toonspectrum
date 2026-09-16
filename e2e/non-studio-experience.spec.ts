@@ -134,10 +134,13 @@ test("theme artwork, contrast surfaces and reduced motion remain functional", as
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const home = page.locator('[data-creator-experience="clarity-v1"]');
-  const artwork = home.locator(".cf-home-preview img");
+  const artwork = home.locator(".cf-home-preview .cf-theme-scene-image");
+  const collageArtwork = home.locator(".cf-theme-collage img");
   await expect(home).toHaveAttribute("data-theme-art", "light");
-  await expect(artwork).toHaveAttribute("data-art-asset", "process");
-  await expect(artwork).toHaveAttribute("srcset", /640w/u);
+  await expect(artwork).toHaveAttribute("data-art-asset", "paper");
+  await expect(artwork).toHaveAttribute("src", "/brand/theme-scenes/paper-studio.svg");
+  await expect(collageArtwork).toHaveCount(2);
+  await expect(collageArtwork.first()).toHaveAttribute("srcset", /640w/u);
   expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   await capturePageEvidence(page, testInfo, "home-320-light");
@@ -155,7 +158,8 @@ test("theme artwork, contrast surfaces and reduced motion remain functional", as
     }));
   }, dark);
   await expect(home).toHaveAttribute("data-theme-art", "dark");
-  await expect(artwork).toHaveAttribute("data-art-asset", "world");
+  await expect(artwork).toHaveAttribute("data-art-asset", "ink");
+  await expect(artwork).toHaveAttribute("src", "/brand/theme-scenes/ink-studio.svg");
   expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   await capturePageEvidence(page, testInfo, "home-320-dark");
 });
