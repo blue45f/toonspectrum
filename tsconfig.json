@@ -57,6 +57,9 @@
     "artifacts/**",
     "apps/api/**",
     "dist/**",
-    "**/__diag*"
+    "**/__diag*",
+    "worktrees/**",
+    ".worktrees/**",
+    ".claude/worktrees/**"
   ]
 }
