@@ -569,11 +569,13 @@ export const StudioDockButton = forwardRef<
             size={STUDIO_ICON_SIZE.dock}
             strokeWidth={STUDIO_ICON_STROKE}
             aria-hidden
-            className={studioChromeIconClass({
-              tone: danger ? "danger" : active ? "accent" : "default",
-              active,
-              disabled,
-            })}
+            className={cn(
+              studioChromeIconClass({
+                tone: danger ? "danger" : "default",
+                disabled,
+              }),
+              active && "text-on-accent"
+            )}
           />
         ) : null)}
       <span>{label}</span>
@@ -690,10 +692,10 @@ export function StudioContextActionButton({
         size={STUDIO_ICON_SIZE.context}
         strokeWidth={STUDIO_ICON_STROKE}
         aria-hidden
-        className={studioChromeIconClass({
-          tone: danger ? "danger" : active ? "accent" : "default",
-          active,
-        })}
+        className={cn(
+          studioChromeIconClass({ tone: danger ? "danger" : "default" }),
+          active && "text-on-accent"
+        )}
       />
       {label}
     </button>
