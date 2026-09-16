@@ -95,7 +95,7 @@ const CSP = [
   "default-src 'none'",
   "script-src 'self' 'wasm-unsafe-eval'",
   // `blob:` because GLTFLoader fetches a GLB's embedded textures through blob URLs, and
-  // production already allows it (see vercel.json). Without it the harness renders a VRM with
+  // the provider-neutral production CSP already allows it. Without it the harness renders a VRM with
   // every texture silently missing -- invisible while the pinned model had none, and a wrong
   // answer the moment one does. `img-src` and `worker-src` below already carry blob:.
   "connect-src 'self' blob: ws:",

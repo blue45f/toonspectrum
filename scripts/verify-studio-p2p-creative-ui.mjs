@@ -8,8 +8,12 @@ import { createServer } from "vite";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const fixture = "/tools/browser-harnesses/studio-p2p-creative-fixture.tsx";
 const out = process.env.P2P_QA_OUTPUT ?? `${root}.qa/p2p-creative`;
-const deploy = JSON.parse(readFileSync(`${root}vercel.json`, "utf8"));
-const policy = deploy.headers.find((r) => r.source === "/(.*)").headers.find((h) => h.key === "Permissions-Policy").value;
+const responsePolicy = JSON.parse(
+  readFileSync(`${root}config/http-response-headers.json`, "utf8"),
+);
+const policy = responsePolicy.headers
+  .find((rule) => rule.source === "/(.*)").headers
+  .find((header) => header.key === "Permissions-Policy").value;
 const server = await createServer({ configFile: false, root: `${root}apps/web`, css: { postcss: root },
   resolve: { alias: { "@": `${root}apps/web/src` } }, define: { "process.env": JSON.stringify({ NODE_ENV: "test" }) },
   optimizeDeps: { noDiscovery: true, include: ["react/jsx-dev-runtime", "lucide-react", "react", "react/jsx-runtime", "react/compiler-runtime", "react-dom/client"] },

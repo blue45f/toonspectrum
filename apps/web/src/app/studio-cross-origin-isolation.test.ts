@@ -515,12 +515,15 @@ describe("Studio isolation runtime diagnostic", () => {
 });
 
 describe("P2P capture deployment policy", () => {
-  it("keeps Vercel and Vite same-origin capture permissions in sync", async () => {
+  it("keeps the provider-neutral static policy and Vite permissions in sync", async () => {
     const { readFileSync } = await import("node:fs");
-    const deployment = JSON.parse(readFileSync(new URL("../../../../vercel.json", import.meta.url), "utf8")) as {
+    const responsePolicy = JSON.parse(readFileSync(
+      new URL("../../../../config/http-response-headers.json", import.meta.url),
+      "utf8",
+    )) as {
       headers: { source: string; headers: { key: string; value: string }[] }[];
     };
-    const policy = deployment.headers.find((rule) => rule.source === "/(.*)")?.headers
+    const policy = responsePolicy.headers.find((rule) => rule.source === "/(.*)")?.headers
       .find((header) => header.key === "Permissions-Policy")?.value;
     expect(policy).toBe(STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS["Permissions-Policy"]);
     expect(policy).toContain("camera=(self)");

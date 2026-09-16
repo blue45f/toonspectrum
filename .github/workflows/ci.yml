@@ -351,7 +351,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/core
           git rev-parse HEAD > artifacts/core/commit.txt
-          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json && pnpm run verify:api-serverless-build) 2>&1 | tee artifacts/core/build.log
+          (pnpm --filter @webtoon-nest/api build && test -s apps/api/dist/apps/api/src/main.js && node --check apps/api/dist/apps/api/src/main.js && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:

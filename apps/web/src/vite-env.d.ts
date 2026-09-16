@@ -35,8 +35,4 @@ interface ImportMetaEnv {
   // NotifyDesk — 인앱 알림 벨/인박스.
   readonly VITE_NOTIFYDESK_URL?: string;
   readonly VITE_NOTIFYDESK_PK?: string;
-  // 선택형 레거시 문의/통계 어댑터. 미설정 시 네트워크 호출을 하지 않는다.
-  readonly VITE_DESK_PLATFORM_URL?: string;
-  // 명시적인 베이스 URL과 함께 `1`일 때만 레거시 방문 ping을 허용한다.
-  readonly VITE_DESK_PLATFORM_VISITS?: "1";
 }

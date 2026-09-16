@@ -137,7 +137,7 @@ describe("backend capability policy", () => {
     const policy = resolveBackendCapabilityPolicy({
       NODE_ENV: "test",
       BACKEND_DISTRIBUTION_ENABLED: "true",
-      BACKEND_STUDIO_ASSET_PROVIDER_ORDER: "vercel,cloudflare",
+      BACKEND_STUDIO_ASSET_PROVIDER_ORDER: "render,cloudflare",
       ...configuredCloudflare,
     });
 
@@ -183,7 +183,7 @@ describe("backend capability policy", () => {
     const policy = resolveBackendCapabilityPolicy({
       NODE_ENV: "test",
       BACKEND_DISTRIBUTION_ENABLED: "true",
-      BACKEND_THUMBNAIL_PROVIDER_ORDER: "vercel",
+      BACKEND_THUMBNAIL_PROVIDER_ORDER: "cloudflare",
     });
 
     expect(policy.workloadProviderOrder.thumbnail).toEqual([]);

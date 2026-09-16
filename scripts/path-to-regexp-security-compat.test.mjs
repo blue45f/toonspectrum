@@ -7,9 +7,6 @@ import { describe, expect, it } from "vitest";
 const repositoryRoot = process.cwd();
 const apiRequire = createRequire(join(repositoryRoot, "apps/api/package.json"));
 const nestRequire = createRequire(apiRequire.resolve("@nestjs/platform-express"));
-const vercelRequire = createRequire(
-  realpathSync(join(repositoryRoot, "node_modules/vercel/package.json")),
-);
 const wranglerRequire = createRequire(
   realpathSync(join(repositoryRoot, "node_modules/wrangler/package.json")),
 );
@@ -100,8 +97,6 @@ describe("security-patched path-to-regexp consumer APIs", () => {
   });
 
   it.each([
-    ["Vercel Node", createRequire(vercelRequire.resolve("@vercel/node"))],
-    ["Vercel Remix", createRequire(vercelRequire.resolve("@vercel/remix-builder"))],
     ["Wrangler", wranglerRequire],
   ])("preserves %s's v6 RegExp and optional-parameter contract", (_name, consumerRequire) => {
     const { pathToRegexp, compile } = consumerRequire("path-to-regexp");

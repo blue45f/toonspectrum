@@ -162,7 +162,7 @@ export function isStudioCrossOriginIsolationDocumentRequest(
     accept?.includes("text/html") || accept?.includes("application/xhtml+xml"),
   );
   // A controlling service worker's network-first `fetch(navigationRequest)` can
-  // reach Vite/Vercel with `Sec-Fetch-Dest: empty` even though its Accept header
+  // reach a dev or static origin with `Sec-Fetch-Dest: empty` even though its Accept header
   // still identifies an HTML navigation. Keep that route isolatable, but never
   // let a script/image request with a generic `*/*` Accept inherit document headers.
   if (destination && destination !== "document" && destination !== "iframe") {

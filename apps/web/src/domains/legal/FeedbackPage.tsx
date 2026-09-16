@@ -94,7 +94,7 @@ export function FeedbackPage() {
           <summary><span><MessageSquarePlus size={18} aria-hidden="true" />새 제보 작성</span><span className="fb-caption">열기 / 접기</span></summary>
           <div className="fb-composer-content"><FeedbackComposer key={userId ?? "guest"} kind={kind} onKindChange={setKind} userId={userId} hydrated={hydrated} apiReady={feed.apiReady} onCreated={created} onSearch={searchExisting} /></div>
         </details>
-        <section className="fb-guidelines" aria-labelledby="fb-guidelines-title"><p className="fb-eyebrow">BETTER TOGETHER</p><h2 id="fb-guidelines-title">좋은 의견이 좋은 도구를 만듭니다</h2><p><b>하나의 글에는 하나의 주제</b><br />관련 기능과 원하는 결과를 구체적으로 알려주세요.</p><p><b>같은 의견에는 공감과 댓글</b><br />중복 제보 대신 경험을 보태면 검토에 도움이 됩니다.</p><p><b>답변과 실제 반영은 구분합니다</b><br />‘운영자 답변’은 응답 여부, ‘처리 상태’는 개선 진행 상황입니다.</p><a href="/support" className="fb-text-button">기존 공개 문의 게시판 <ArrowUpRight size={14} aria-hidden="true" /></a></section>
+        <section className="fb-guidelines" aria-labelledby="fb-guidelines-title"><p className="fb-eyebrow">BETTER TOGETHER</p><h2 id="fb-guidelines-title">좋은 의견이 좋은 도구를 만듭니다</h2><p><b>하나의 글에는 하나의 주제</b><br />관련 기능과 원하는 결과를 구체적으로 알려주세요.</p><p><b>같은 의견에는 공감과 댓글</b><br />중복 제보 대신 경험을 보태면 검토에 도움이 됩니다.</p><p><b>답변과 실제 반영은 구분합니다</b><br />‘운영자 답변’은 응답 여부, ‘처리 상태’는 개선 진행 상황입니다.</p><a href="/contact" className="fb-text-button">문의·제휴 안내 <ArrowUpRight size={14} aria-hidden="true" /></a></section>
       </aside>
     </div>
   </Container>;

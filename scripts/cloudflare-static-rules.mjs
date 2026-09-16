@@ -51,13 +51,15 @@ export function verifyCloudflareStaticRules(root = process.cwd()) {
     );
   }
 
-  const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8"));
-  if (!sameJson(vercel.headers ?? [], policy.headers)) {
-    issues.push(
-      "vercel.json emergency fallback headers must mirror config/http-response-headers.json",
-    );
-  }
   return issues;
+}
+
+export function verifyVercelFallbackRules(root = process.cwd()) {
+  const policy = loadResponseHeaderPolicy(root);
+  const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8"));
+  return sameJson(vercel.headers ?? [], policy.headers)
+    ? []
+    : ["vercel.json emergency fallback headers must mirror config/http-response-headers.json"];
 }
 
 const invoked = process.argv[1]
@@ -67,15 +69,23 @@ if (invoked) {
   const target = resolve(root, "apps/web/public/_headers");
   const policy = loadResponseHeaderPolicy(root);
   const rendered = renderCloudflareHeaders(policy);
-  if (process.argv.includes("--check")) {
+  if (process.argv.includes("--check-vercel-fallback")) {
+    const issues = [
+      ...verifyCloudflareStaticRules(root),
+      ...verifyVercelFallbackRules(root),
+    ];
+    if (issues.length > 0) {
+      for (const issue of issues) console.error(issue);
+      process.exit(1);
+    }
+    console.log("The cold Vercel fallback mirrors the provider-neutral response policy");
+  } else if (process.argv.includes("--check")) {
     const issues = verifyCloudflareStaticRules(root);
     if (issues.length > 0) {
       for (const issue of issues) console.error(issue);
       process.exit(1);
     }
-    console.log(
-      "Cloudflare and emergency fallback headers are synchronized with the provider-neutral response policy",
-    );
+    console.log("Cloudflare Static Assets headers match the provider-neutral response policy");
   } else {
     writeFileSync(target, rendered);
     console.log(`wrote ${target}`);

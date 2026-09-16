@@ -49,8 +49,13 @@ test("routes retain original community paths and include promotion paths", () =>
   for (const route of ["/reviews", "/community", "/community/cafes", "/community/cafes/:slug", "/community/post/:id", "/community/:scope", "/pencafe/:name", "/community/promote", "/community/promote/new", "/community/promote/:id", "/community/promote/:id/edit", "/community/promote/moderation"]) assert.ok(routes.includes(`path: "${route}"`), route);
 });
 test("production CSP permits only fixed video hosts while preserving frame restrictions", () => {
-  const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
-  const csp = config.headers.find((entry) => entry.source === "/(.*)").headers.find((header) => header.key === "Content-Security-Policy").value;
+  const policy = JSON.parse(readFileSync(
+    new URL("../config/http-response-headers.json", import.meta.url),
+    "utf8",
+  ));
+  const csp = policy.headers
+    .find((entry) => entry.source === "/(.*)").headers
+    .find((header) => header.key === "Content-Security-Policy").value;
   assert.match(csp, /frame-src https:\/\/accounts.google.com https:\/\/www.youtube-nocookie.com https:\/\/player.vimeo.com;/u);
   assert.ok(csp.includes("frame-ancestors 'none'")); assert.ok(csp.includes("object-src 'none'"));
 });
