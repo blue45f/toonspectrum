@@ -282,23 +282,6 @@ describe("cookie-authenticated Nest CSRF boundary", () => {
     expect(allowed.status).toBe(201);
   });
 
-  it("protects the Vercel query-path auth adapter before its URL rewrite", async () => {
-    const blocked = await fetch(`${baseUrl}/api/index?path=auth/login`, {
-      method: "POST",
-      headers: { Origin: "https://evil.example" },
-    });
-    const allowed = await fetch(`${baseUrl}/api/index?path=auth/login`, {
-      method: "POST",
-      headers: {
-        Origin: ALLOWED_ORIGIN,
-        [TOONSPECTRUM_CSRF_HEADER]: TOONSPECTRUM_CSRF_HEADER_VALUE,
-      },
-    });
-
-    expect(blocked.status).toBe(403);
-    expect(allowed.status).toBe(404);
-  });
-
   it("grants the CSRF header only to a configured preflight Origin", async () => {
     const response = await fetch(`${baseUrl}/api/csrf-probe/mutation`, {
       method: "OPTIONS",

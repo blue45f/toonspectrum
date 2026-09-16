@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateVercelFallbackWorkflow } from "./vercel-workflow-policy.mjs";
-
 const ROOT = process.cwd();
 const resolve = (relativePath) => path.join(ROOT, relativePath);
 const exists = (relativePath) => fs.existsSync(resolve(relativePath));
@@ -55,12 +53,9 @@ requirePaths(
     "pnpm-workspace.yaml",
     "tsconfig.json",
     "commitlint.config.cjs",
-    ".github/workflows/deploy-vercel.yml",
     "config/free-infrastructure-policy.json",
     "deploy/cloudflare-static/wrangler.jsonc",
     "docs/FREE_INFRASTRUCTURE.md",
-    "scripts/vercel-workflow-policy.mjs",
-    "scripts/vercel-workflow-policy.test.mjs",
     "apps/web/src/app/routes/app-route-definition.ts",
     "apps/web/src/app/routes/groups/app-routes.tsx",
     "apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
@@ -80,6 +75,56 @@ forbidPaths(
   ],
   "automated data collection workflow must stay removed",
 );
+
+forbidPaths(
+  [
+    ".vercel",
+    ".vercelignore",
+    "vercel.json",
+    ".github/workflows/deploy-vercel.yml",
+    "api",
+    "apps/api/og-title-files.cjs",
+    "apps/api/src/config/api-path-rewrite.ts",
+    "apps/api/src/config/catalog-initialization.ts",
+    "apps/api/src/modules/catalog/lazy-serverless-catalog.service.ts",
+    "apps/api/src/realtime/studio-live-native-server.ts",
+    "apps/api/src/runtime/serverless-bootstrap.ts",
+    "apps/api/src/runtime/serverless-route-group.ts",
+    "apps/api/src/runtime/auth-api.module.ts",
+    "apps/api/src/runtime/studio-api.module.ts",
+    "apps/api/src/runtime/general-api.module.ts",
+    "apps/api/src/server/marketplace-og.ts",
+    "apps/api/src/serverless.ts",
+    "apps/api/src/studio-live-serverless.ts",
+    "scripts/build-og-title-shards.cjs",
+    "scripts/configure-vercel-production.mjs",
+    "scripts/configure-vercel-production.test.mjs",
+    "scripts/manual-deployment-policy.mjs",
+    "scripts/vercel-deployment-policy.test.mjs",
+    "scripts/vercel-workflow-policy.mjs",
+    "scripts/vercel-workflow-policy.test.mjs",
+    "scripts/verify-api-serverless-build.mjs",
+    "scripts/verify-api-serverless-build.test.mjs",
+  ],
+  "retired Vercel infrastructure must stay removed",
+);
+
+for (const [name, command] of Object.entries(scripts)) {
+  if (/vercel/iu.test(name) || /(?:^|\s)vercel(?:\s|$)/iu.test(String(command))) {
+    issues.push(`retired Vercel package script must stay removed: ${name}`);
+  }
+}
+for (const dependencySection of [
+  pkg.dependencies ?? {},
+  pkg.devDependencies ?? {},
+  pkg.optionalDependencies ?? {},
+]) {
+  for (const dependency of Object.keys(dependencySection)) {
+    if (/vercel/iu.test(dependency)) {
+      issues.push(`retired Vercel dependency must stay removed: ${dependency}`);
+    }
+  }
+}
 
 // Canonical Vite application and browser-only test assets.
 requirePaths(
@@ -272,13 +317,6 @@ if (!exists(apiPackagePath)) {
   const apiPackage = JSON.parse(read(apiPackagePath));
   if (!apiPackage.name) issues.push('apps/api has no "name"');
   if (!apiPackage.scripts?.build) issues.push('apps/api has no "build" script');
-}
-
-const vercelDeployWorkflowPath = ".github/workflows/deploy-vercel.yml";
-if (exists(vercelDeployWorkflowPath)) {
-  for (const issue of validateVercelFallbackWorkflow(read(vercelDeployWorkflowPath))) {
-    issues.push(`${vercelDeployWorkflowPath}: ${issue}`);
-  }
 }
 
 if (issues.length > 0) {

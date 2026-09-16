@@ -4,37 +4,34 @@
 
 - 정본(canonical): `https://www.toonstudio.cloud`
 - apex: `https://toonstudio.cloud` → 정본으로 영구 `308`
-- 비상 원본: `https://origin.toonstudio.cloud` → DNS-only Vercel fallback, canonical 아님
+- 정적 웹: Cloudflare Static Assets Worker `toonspectrum-web`
+- 동적 API와 crawler OG: Cloudflare gateway → Render `toonspectrum-core-api`
 
-Cloudflare의 `toonstudio-apex-redirect` Worker가 `toonstudio.cloud/*`만 담당하고, 경로와
-query를 그대로 유지한 `308`을 반환합니다. `www.toonstudio.cloud/*`는 Static Assets Worker
-`toonspectrum-web`가 담당합니다. 두 역할을 분리해 정적 파일을 모두 Worker 코드로 통과시키지
-않으면서도 apex 정본화를 보장합니다.
+Cloudflare의 `toonstudio-apex-redirect` Worker가 `toonstudio.cloud/*`만 담당하고 경로와 query를
+유지한 `308`을 반환한다. `www.toonstudio.cloud/*`는 Static Assets Worker가 담당한다. 사람의
+`/title/:slug`, `/market`, `/market/browse`, `/market/resource/:id` 탐색은 SPA 정적 자산으로
+처리하고, 알려진 crawler user-agent만 Render의 `/api/og`로 전달한다.
 
-`origin.toonstudio.cloud`는 Cloudflare API/R2 장애 시 확인할 DNS-only Vercel 원본이며
-페이지의 canonical/OG/JSON-LD는 항상 `www`를 가리켜야 합니다. 역사적으로 사용한
-`toonspectrum.vercel.app`은 현재 운영 계정이 관리하는 도메인이 아니므로 배포·스모크 계약에
-포함하지 않습니다. `vercel.json`의 해당 host redirect는 도메인이 다시 연결될 경우를 위한
-방어적 규칙으로만 유지합니다.
+Vercel 런타임과 저장소 설정은 퇴역했다. `origin.toonstudio.cloud` 또는 기존 Vercel project domain은
+정상·비상 origin으로 사용하지 않는다. 해당 DNS 레코드와 Vercel custom-domain 연결 삭제는 코드
+변경과 분리한 운영 작업으로 수행하며, 삭제 전에는 `www`와 apex가 Cloudflare 권위를 가리키는지
+확인한다.
 
-## Vercel Production 환경 변수
-
-비밀 값은 저장소에 넣지 말고 Vercel Production 환경에만 설정합니다.
+## Render Core API 환경 변수
 
 ```dotenv
 CANONICAL_HOST=www.toonstudio.cloud
 API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud
 WEB_APP_BASE_URL=https://www.toonstudio.cloud
-WEBDEX_SITE_URL=https://www.toonstudio.cloud # 기존 알림 스크립트 호환 키
 ```
 
-프론트와 `/api`가 같은 Vercel 배포에 있으므로 `VITE_API_BASE_URL`은 비워 둡니다. 브라우저는
-기존처럼 상대경로 `/api/...`를 사용하며, 별도 API origin을 하드코딩하지 않습니다.
+브라우저는 상대경로 `/api/...`를 사용하고 Cloudflare gateway가 검증된 Render origin으로 전달한다.
+별도 API origin을 프런트에 하드코딩하지 않는다.
 
 ## OAuth 공급자 콘솔
 
-인가 코드 흐름을 쓰는 공급자에는 다음 콜백 URI를 정확히 등록합니다.
+인가 코드 흐름을 쓰는 공급자에는 다음 콜백 URI를 정확히 등록한다.
 
 ```text
 https://www.toonstudio.cloud/api/auth/oauth/google/callback
@@ -43,60 +40,36 @@ https://www.toonstudio.cloud/api/auth/oauth/naver/callback
 https://www.toonstudio.cloud/api/auth/oauth/github/callback
 ```
 
-Google Identity Services의 승인된 JavaScript origin에는
-`https://www.toonstudio.cloud`를 등록합니다. apex는 애플리케이션을 실행하기 전에 정본으로
-리다이렉트되므로 OAuth callback과 JavaScript origin의 기준은 `www` 하나로 유지합니다.
+Google Identity Services의 승인된 JavaScript origin에는 `https://www.toonstudio.cloud`를 등록한다.
+apex는 애플리케이션 실행 전에 정본으로 리다이렉트하므로 callback과 JavaScript origin의 기준은
+`www` 하나로 유지한다.
 
 ## Studio 실시간 협업
 
-2026-08-02 기준 ephemeral realtime 권위는 Cloudflare Durable Objects이며, 검증된
-`workers.dev` origin을 사용합니다. `realtime.toonstudio.cloud`는 Cloudflare zone이 없어
-custom hostname/DNS/TLS가 완료되지 않았으므로 아직 권위 origin으로 설정하지 않습니다.
-
-프론트(Vercel build-time):
-
-```dotenv
-VITE_STUDIO_REALTIME_ORIGIN=https://toonspectrum-realtime.toonstudio-realtime.workers.dev
-```
-
-Cloudflare와 Vercel은 같은 `STUDIO_REALTIME_TICKET_SECRET`을 각각의 secret manager에서
-주입해야 하며, 브라우저·Git·`VITE_` 변수에는 노출하지 않습니다. Cloudflare는
-presence, comment invalidation, screen-share signaling만 담당하고 작품 ACL·raster
-pixel·음성 media 권위가 아닙니다.
-
-Vercel Functions는 장기 실행 Socket.IO 서버가 아닙니다. CRDT fanout·lock에 별도
-Nest Socket.IO host가 필요한 승인된 폴백에서만 다음 경계를 추가합니다.
-
-프론트(Vercel build-time, 선택):
+임시 realtime 권위는 Cloudflare Durable Objects의 `realtime.toonstudio.cloud`이고,
+`workers.dev` origin은 독립 canary·rollback 확인용으로 유지한다. 두 경로 모두 작품 원장이나
+raster pixel 저장소가 아니다. 영속 CRDT Socket.IO가 필요한 기능은 `render.yaml`의 별도
+`toonspectrum-studio-live` 장기 실행 runtime을 사용한다.
 
 ```dotenv
-VITE_STUDIO_LIVE_ORIGIN=https://approved-socket-origin.example.com
+VITE_STUDIO_REALTIME_ORIGIN=https://realtime.toonstudio.cloud
+VITE_STUDIO_LIVE_ORIGIN=https://<reviewed-studio-live-origin>
 ```
 
-장기 실행 Nest 서버:
-
-```dotenv
-NODE_ENV=production
-API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
-WEB_APP_BASE_URL=https://www.toonstudio.cloud
-```
-
-명시적 `VITE_STUDIO_LIVE_ORIGIN`이 없는 Vercel/custom-domain 빌드에서는 선택형 Socket.IO가
-`wss://www.toonstudio.cloud/socket.io`에 잘못 연결하지 않고 Socket.IO transport만 비활성화합니다.
-Socket.IO의 HTTP CORS와 WebSocket upgrade `Origin` 검사는 같은 exact allowlist를 사용하며,
-credentialed wildcard CORS는 사용하지 않습니다.
+비공개 ticket secret과 PostgreSQL adapter 설정은 각 서버 secret manager에만 저장하며 브라우저,
+Git 또는 `VITE_` 변수에 넣지 않는다. Socket.IO HTTP CORS와 WebSocket upgrade `Origin` 검사는
+같은 exact allowlist를 사용한다.
 
 ## 배포 후 확인
 
 ```bash
 curl -I https://toonstudio.cloud/studio
 curl -I https://www.toonstudio.cloud/studio
-curl -I https://origin.toonstudio.cloud/studio
 curl -s https://www.toonstudio.cloud/robots.txt
-curl -s https://www.toonstudio.cloud/ | grep -E 'canonical|og:url'
+curl -A 'Googlebot/2.1' -s https://www.toonstudio.cloud/market | grep -E 'canonical|og:title'
+curl -s https://www.toonstudio.cloud/api/health/ready
 ```
 
-첫 요청은 `https://www.toonstudio.cloud/studio`로 `308` 리다이렉트되어야 합니다. `www`와
-비상 원본은 모두 `200`이어야 하지만, 양쪽 HTML의 canonical/OG/JSON-LD 및 `robots.txt`의
-sitemap은 모두 `www`를 가리켜야 합니다. `origin`은 검색·OAuth·사용자 공유 URL로 쓰지
-않습니다.
+첫 요청은 `https://www.toonstudio.cloud/studio`로 `308` 리다이렉트되어야 한다. `www`는 `200`,
+Core readiness는 `200 {"status":"ready"}`, crawler HTML의 canonical/OG/JSON-LD는 모두 `www`를
+가리켜야 한다.

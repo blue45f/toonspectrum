@@ -93,7 +93,7 @@ const envSchema = z.object({
   CI: z.enum(["true", "false", "1", "0"]).optional(),
   TZ: z.preprocess(
     (value) =>
-      // 일부 serverless 런타임이 POSIX 형식의 `:UTC`를 주입한다. 선행 콜론을
+      // 일부 호스트 런타임이 POSIX 형식의 `:UTC`를 주입한다. 선행 콜론을
       // 벗긴 뒤 검증해 콜드스타트마다 거짓 경고가 찍히지 않게 한다.
       typeof value === "string" ? value.replace(/^:/u, "") : value,
     z

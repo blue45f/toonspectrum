@@ -18,7 +18,7 @@ import type { StudioDataDestructionAdapter } from "./studio-data-destruction";
 
 /** V11.1 §12.5 gate: 3중 플래그가 전부 정확해야만 파괴가 실행된다. */
 
-const DEPLOYMENT = "toonspectrum-prod-vercel";
+const DEPLOYMENT = "toonspectrum-prod-render";
 
 const VALID_FLAGS = {
   RESET_EXISTING_STUDIO_DATA: "YES",

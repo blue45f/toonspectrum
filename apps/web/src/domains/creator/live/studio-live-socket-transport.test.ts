@@ -462,7 +462,7 @@ describe("StudioLiveSocketTransport", () => {
     expect(resolveStudioLiveSocketRuntimeEndpoint({})).toBeNull();
     expect(
       resolveStudioLiveSocketRuntimeEndpoint({
-        locationOrigin: "https://preview-branch.vercel.app",
+        locationOrigin: "https://static-preview.example.test",
       }),
     ).toBeNull();
     expect(

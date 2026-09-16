@@ -24,7 +24,7 @@ const INSERT_USER = `INSERT INTO "user"
 /** Pure validation; does not resolve DNS or establish any connections. */
 export function validateAdminQaTarget(environment = process.env) { // NOSONAR javascript:S3776
   if (environment.NODE_ENV !== 'test') throw new Error('NODE_ENV=test is required.');
-  for (const key of ['VERCEL_ENV', 'VERCEL_TARGET_ENV', 'CONTEXT', 'RAILWAY_ENVIRONMENT_NAME']) {
+  for (const key of ['CONTEXT', 'RAILWAY_ENVIRONMENT_NAME']) {
     if (String(environment[key] ?? '').trim().toLowerCase() === 'production') {
       throw new Error('Production execution is forbidden.');
     }

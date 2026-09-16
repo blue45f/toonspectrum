@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-function source(file: string) { return readFileSync(new URL(file, import.meta.url), "utf8"); }
+function source(file: string) {
+  return readFileSync(new URL(file, import.meta.url), "utf8");
+}
 
-// Parse imports rather than matching prose, comments or string literals. Track the
-// original binding too, so renaming a forbidden module cannot bypass the check.
 function importedBindings(code: string): Set<string> {
   const file = ts.createSourceFile("boundary.ts", code, ts.ScriptTarget.Latest, true);
   const bindings = new Set<string>();
@@ -24,42 +24,62 @@ function importedBindings(code: string): Set<string> {
   return bindings;
 }
 
-describe("serverless partition ownership and security wiring", () => {
+describe("long-running API ownership and security wiring", () => {
   it("checks real multiline and aliased imports without matching documentation", () => {
-    const bindings = importedBindings('// do not import AppModule or CatalogModule\nimport {\n CatalogModule as HiddenCatalog,\n} from "./catalog";\nconst note = "import AppModule";');
+    const bindings = importedBindings(
+      '// do not import AppModule\nimport {\n CatalogModule as HiddenCatalog,\n} from "./catalog";\nconst note = "import AppModule";',
+    );
     expect(bindings.has("AppModule")).toBe(false);
     expect(bindings.has("CatalogModule")).toBe(true);
     expect(bindings.has("HiddenCatalog")).toBe(true);
   });
-  it("keeps one shared ordered HTTP boundary for auth, Studio and general modules", () => {
-    const code = source("./serverless-bootstrap.ts");
+
+  it("keeps one ordered HTTP boundary for the Render Core API", () => {
+    const code = source("../main.ts");
     let previous = -1;
-    for (const operation of ["app.useLogger", "app.use(createApiSecurityHeadersMiddleware", "configureCors(app)", "rewriteQueryPathToUrl(req)",
-      "app.use(createApiRuntimeRoleGuard", "app.use(sessionAuth)", "app.use(createCsrfProtectionMiddleware", "configureApiBodyParserBoundary(app", "app.setGlobalPrefix", "app.useGlobalPipes", "await app.init()"]) {
+    for (const operation of [
+      "app.useLogger",
+      "app.enableShutdownHooks",
+      "app.use(createApiSecurityHeadersMiddleware",
+      "app.use(createEdgeOriginAuthMiddleware",
+      "configureCors(app)",
+      "app.use(createApiRuntimeRoleGuard",
+      "app.setGlobalPrefix",
+      "app.useGlobalPipes",
+      "await createStudioLivePostgresIoAdapter",
+      "await app.listen",
+    ]) {
       const position = code.indexOf(operation);
-      expect(position, operation).toBeGreaterThan(previous); previous = position;
+      expect(position, operation).toBeGreaterThan(previous);
+      previous = position;
     }
-    expect(code).toContain("abortOnError: false");
-    expect(code).toContain("await app.close()");
-    for (const module of ["auth-api.module.ts", "studio-api.module.ts", "general-api.module.ts"]) {
-      expect(source(`./${module}`)).toContain("ApiHttpInfrastructureModule");
-    }
+
+    const session = code.indexOf("app.use(sessionAuth)");
+    const csrf = code.indexOf("app.use(createCsrfProtectionMiddleware");
+    const bodyParser = code.indexOf("configureApiBodyParserBoundary(app, null)");
+    expect(session).toBeGreaterThan(code.indexOf("app.use(createApiRuntimeRoleGuard"));
+    expect(csrf).toBeGreaterThan(session);
+    expect(bodyParser).toBeGreaterThan(csrf);
+    expect(code).toContain("app.enableShutdownHooks()");
+    expect(code).toContain('await import("./app.module")');
   });
-  it("preserves generic marketplace namespace protection without importing Studio into general", () => {
-    const general = source("./general-api.module.ts");
-    expect(general).toContain("APP_GUARD, useClass: CreatorMarketplaceSocialBoundaryGuard");
-    for (const forbidden of ["CreatorModule", "AuthModule", "StudioApiModule"]) {
-      expect(importedBindings(general).has(forbidden), forbidden).toBe(false);
-    }
-    for (const module of ["auth-api.module.ts", "studio-api.module.ts"]) {
-      const imports = importedBindings(source(`./${module}`));
-      for (const forbidden of ["AppModule", "CatalogModule"]) {
-        expect(imports.has(forbidden), `${module}: ${forbidden}`).toBe(false);
-      }
-    }
+
+  it("keeps shared infrastructure in AppModule without retired provider adapters", () => {
+    const main = source("../main.ts");
+    const appModule = source("../app.module.ts");
     const infrastructure = source("./api-http-infrastructure.module.ts");
+
+    expect(appModule).toContain("ApiHttpInfrastructureModule");
+    expect(appModule).toContain("OgModule");
     expect(infrastructure).toContain("SAFE_HTTP_LOG_SERIALIZERS");
     expect(infrastructure).toContain("SAFE_HTTP_LOG_REDACT_PATHS");
     expect(infrastructure).toContain("APP_FILTER, useClass: AllExceptionsFilter");
+
+    const imports = importedBindings(main);
+    for (const retired of ["AuthApiModule", "StudioApiModule", "GeneralApiModule"]) {
+      expect(imports.has(retired), retired).toBe(false);
+    }
+    expect(main).not.toContain("serverless");
+    expect(main).not.toContain("rewriteQueryPathToUrl");
   });
 });

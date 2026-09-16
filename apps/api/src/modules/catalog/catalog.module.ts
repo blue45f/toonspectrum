@@ -5,12 +5,11 @@ import { CatalogPublicCacheInterceptor } from "./catalog-public-cache.intercepto
 import { CatalogController } from "./catalog.controller";
 import { CatalogService } from "./catalog.service";
 import { KmasReferenceController } from "./kmas-reference.controller";
-import { LazyServerlessCatalogService } from "./lazy-serverless-catalog.service";
 
 @Module({
   controllers: [CatalogController, KmasReferenceController],
   providers: [
-    { provide: CatalogService, useClass: LazyServerlessCatalogService },
+    CatalogService,
     { provide: APP_INTERCEPTOR, useClass: CatalogPublicCacheInterceptor },
   ],
 })

@@ -84,8 +84,6 @@ function fail(message) {
 function isProductionRuntime(environment) {
   return (
     environment.NODE_ENV?.trim().toLowerCase() === "production" ||
-    environment.VERCEL_ENV?.trim().toLowerCase() === "production" ||
-    environment.VERCEL_TARGET_ENV?.trim().toLowerCase() === "production" ||
     environment.CONTEXT?.trim().toLowerCase() === "production" ||
     Boolean(environment.RENDER_SERVICE_ID?.trim())
   );

@@ -5,7 +5,6 @@
 - 루트 `package.json`은 Vite·React 프런트엔드의 단일 툴체인 소유자입니다. `apps/web`은 별도 pnpm 패키지가 아니라 이 루트 패키지가 사용하는 브라우저 소스 루트입니다.
 - `apps/api`는 독립된 NestJS workspace package입니다. HTTP, WebSocket, DB, 영속성, 외부 서비스 연동은 서버 전용으로 유지합니다.
 - `packages`에는 브라우저와 서버가 함께 사용할 수 있는 런타임 중립 계약·순수 모델·Studio 엔진만 둡니다.
-- `api`에는 Vercel 진입점용 얇은 어댑터만 두고 실제 서버 구현은 `apps/api`에 둡니다.
 - 루트에는 모노레포·빌드·배포 설정, 횡단 검증, 문서와 운영 자동화를 둡니다. 제품 브라우저 코드는 루트에 두지 않습니다.
 
 `@/*`는 `apps/web/*`, `@/shared/*`는 `apps/web/src/shared/*`를 가리킵니다. 백엔드는 웹 앱을 import하지 않으며, 생성된 QA 결과는 CI artifact로만 보관합니다.
@@ -41,7 +40,6 @@ apps/api/                         # 서버 전용 NestJS workspace package
   src/db/                         # 스키마·마이그레이션·시드
   src/server/                     # 서버 전용 유스케이스와 정책
 packages/                         # 웹/API 공용 런타임 중립 계약·엔진
-api/                              # Vercel 진입점용 얇은 어댑터
 scripts/, tools/, e2e/, tests/    # 저장소 횡단 도구와 검증 코드
 ```
 
