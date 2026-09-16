@@ -11,10 +11,12 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { MarketDeviceInstallStatus } from "../components/MarketDeviceInstallStatus";
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { useMarketDeviceInstall } from "../hooks/use-market-device-install";
 import { marketAuthorityErrorMessage } from "../models/market-authority";
 import { marketKindMeta } from "../models/market-kind";
-import { marketStudioResourceHref } from "../models/market-studio-handoff";
+import { marketStudioHandoff } from "../models/market-studio-handoff";
 
 import type {
   CreatorMarketplaceCloudLibraryItem,
@@ -51,12 +53,49 @@ function catalogMessage(item: CreatorMarketplaceCloudLibraryItem): string {
     const installed = item.confirmation.state === "confirmed"
       ? item.confirmation.resourceVersion
       : "확인되지 않음";
-    return `계정 설치 확인 ${installed} → 최신 ${item.catalog.head.resourceVersion}`;
+    return `계정 이력 · 설치 확인 ${installed} → 최신 ${item.catalog.head.resourceVersion}`;
   }
   if (item.updateState === "account-confirmed-current-head") {
-    return `이 계정에서 Studio v${item.catalog.head.resourceVersion} 설치 확인`;
+    return `계정 이력 · Studio v${item.catalog.head.resourceVersion} 설치 확인`;
   }
-  return "이 계정에서 확인된 Studio 설치 없음";
+  return "계정 이력 · 확인된 Studio 설치 없음";
+}
+
+type MarketCloudLibraryCatalogHead = Extract<
+  CreatorMarketplaceCloudLibraryItem["catalog"],
+  { readonly state: "available" }
+>["head"];
+
+function MarketCloudLibraryDeviceAction({
+  logicalPackId,
+  record,
+}: {
+  readonly logicalPackId: string;
+  readonly record: MarketCloudLibraryCatalogHead;
+}) {
+  const deviceInstall = useMarketDeviceInstall({
+    logicalPackId,
+    kind: record.kind,
+    resourceVersion: record.resourceVersion,
+    manifestHash: record.manifestHash,
+  });
+  const handoff = marketStudioHandoff(record, deviceInstall.state);
+  return (
+    <>
+      <MarketDeviceInstallStatus
+        record={record}
+        snapshot={deviceInstall}
+        compact
+      />
+      <Link
+        href={handoff.href}
+        className={buttonClass({ variant: "solid", size: "sm", className: "w-full" })}
+      >
+        <Palette className="size-3.5" aria-hidden="true" />
+        {handoff.actionLabel}
+      </Link>
+    </>
+  );
 }
 
 export function MarketLibraryPage() {
@@ -350,12 +389,10 @@ export function MarketLibraryPage() {
 
                     <div className="mt-auto grid gap-2 pt-5">
                       {head ? (
-                        <Link href={marketStudioResourceHref(head.id)} className={buttonClass({ variant: "solid", size: "sm", className: "w-full" })}>
-                          <Palette className="size-3.5" aria-hidden="true" />
-                          {item.updateState === "account-confirmed-update-available"
-                            ? `Studio에서 v${head.resourceVersion} 업데이트`
-                            : "Studio에서 열기"}
-                        </Link>
+                        <MarketCloudLibraryDeviceAction
+                          logicalPackId={item.logicalPackId}
+                          record={head}
+                        />
                       ) : (
                         <div className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-fg-2">
                           {catalogMessage(item)}

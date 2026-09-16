@@ -15691,6 +15691,9 @@ No text, logo, watermark, or copyrighted character.`;
             );
           },
           isCurrent: isCurrentOperation,
+          reportProgress: (progress) => {
+            if (isCurrentOperation()) setStatusNotice(progress.message);
+          },
           loadDependencies: async () => {
             const [
               { getCreatorMarketplaceResource },
