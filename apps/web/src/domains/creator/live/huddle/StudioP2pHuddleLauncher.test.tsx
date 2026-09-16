@@ -28,7 +28,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUse
 describe("P2P launcher consent and lifetime", () => {
   it("keeps devices off until an explicit media action and preserves calls while collapsed", async () => {
     environment(); render(view(fixture()));
-    fireEvent.click(screen.getByRole("button", { name: "P2P 채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
     expect(getUserMedia).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
     expect(getUserMedia).not.toHaveBeenCalled();
@@ -43,7 +43,7 @@ describe("P2P launcher consent and lifetime", () => {
   });
   it.each(["room", "permission"])("releases capture on %s changes", async (change) => {
     environment(); const original = fixture(); const rendered = render(view(original));
-    fireEvent.click(screen.getByRole("button", { name: "P2P 채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
     fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
     fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
@@ -52,12 +52,12 @@ describe("P2P launcher consent and lifetime", () => {
   });
   it("disables participation without a strict RTC port", () => {
     environment(); render(view(fixture("local", false)));
-    fireEvent.click(screen.getByRole("button", { name: "P2P 채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
     expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
     expect(getUserMedia).not.toHaveBeenCalled();
   });
   it("does not expose publishing controls to viewers", () => {
     environment(); render(view(fixture(), false));
-    expect(screen.queryByRole("button", { name: "P2P 채팅·통화" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "채팅·통화" })).toBeNull();
   });
 });

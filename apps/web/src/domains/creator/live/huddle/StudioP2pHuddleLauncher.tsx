@@ -64,7 +64,12 @@ export default function StudioP2pHuddleLauncher() {
   if (!room || !live.canChat) return null;
   const canJoin = Boolean(room.direct && live.availability === "ready");
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
-  return <aside className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+env(safe-area-inset-bottom)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3" aria-label="협업 대화">
+  return <aside
+    className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+env(safe-area-inset-bottom)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
+    aria-label="협업 대화"
+    data-studio-shell-floating-target="collaboration"
+    data-studio-shell-force-visible={active ? "true" : undefined}
+  >
     <section hidden={!open} className="mb-2 w-[360px] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
       <header className="flex items-center justify-between border-b border-line p-3">

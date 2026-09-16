@@ -89,6 +89,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     id: "view",
     caption: "보기",
     items: [
+      "플로팅 UI · 배치 설정…",
       "확대",
       "축소",
       "왼쪽으로 90° 회전",
