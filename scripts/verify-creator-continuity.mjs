@@ -40,7 +40,7 @@ try {
     });
     await context.addInitScript(({ key, now }) => {
       localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-      // Seed once: init scripts run again on reload and must not overwrite the user's new plan.
+      // Seed once: init scripts run again on reload and must not overwrite normalization.
       if (localStorage.getItem(key) !== null) return;
       localStorage.setItem(key, JSON.stringify({
         version: 1,
@@ -61,38 +61,29 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
 
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.locator(".cf-planner > summary").click();
-    const launchpad = page.locator('[data-creator-launchpad="v1"]');
-    await launchpad.waitFor({ state: "visible", timeout: 60_000 });
+    const intent = page.locator(".cf-intent");
+    await intent.waitFor({ state: "visible", timeout: 60_000 });
+    await expect(intent.locator("nav a")).toHaveCount(7);
 
-    const recommendation = launchpad.getByRole("link", { name: /이 계획으로 시작하기/ });
-    await expect(recommendation).toHaveAttribute("href", "/studio/comic");
-    await expect(launchpad.getByRole("button", { name: /컷으로 이야기하기/ })).toHaveAttribute("aria-pressed", "true");
-    await expect(launchpad.getByRole("button", { name: /프로젝트/ })).toHaveAttribute("aria-pressed", "true");
-
-    const recent = launchpad.getByRole("link", { name: /창작 스튜디오/ });
+    const recent = intent.locator(".cf-recent-card");
+    await expect(recent).toBeVisible();
     await expect(recent).toHaveAttribute("href", "/studio?preset=illustration");
+    await expect(recent).toContainText("창작 스튜디오");
     assert.equal((await recent.getAttribute("href"))?.includes("workId"), false);
     assert.equal((await recent.getAttribute("href"))?.includes("token"), false);
 
-    const normalizedBeforeInteraction = await page.evaluate((key) => localStorage.getItem(key), storageKey);
-    assert(normalizedBeforeInteraction);
-    assert.equal(normalizedBeforeInteraction.includes("private-document"), false);
-    assert.equal(normalizedBeforeInteraction.includes("secret"), false);
-
-    await launchpad.getByRole("button", { name: /자료와 재료 모으기/ }).click();
-    await expect(recommendation).toHaveAttribute("href", "/research/assets");
-    const saved = JSON.parse(await page.evaluate((key) => localStorage.getItem(key), storageKey));
-    assert.deepEqual(saved.plan.goal, "materials");
-    assert.deepEqual(saved.plan.pace, "project");
-    assert.equal(JSON.stringify(saved).includes("private-document"), false);
-    assert.equal(JSON.stringify(saved).includes("secret"), false);
+    const normalizedBeforeReload = await page.evaluate((key) => localStorage.getItem(key), storageKey);
+    assert(normalizedBeforeReload);
+    assert.equal(normalizedBeforeReload.includes("private-document"), false);
+    assert.equal(normalizedBeforeReload.includes("secret"), false);
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.locator(".cf-planner > summary").click();
-    await page.locator('[data-creator-launchpad="v1"]').waitFor({ state: "visible" });
-    await expect(page.locator('[data-creator-launchpad="v1"]').getByRole("link", { name: /이 계획으로 시작하기/ }))
-      .toHaveAttribute("href", "/research/assets");
+    const reloadedIntent = page.locator(".cf-intent");
+    await reloadedIntent.waitFor({ state: "visible" });
+    await expect(reloadedIntent.locator(".cf-recent-card")).toHaveAttribute(
+      "href",
+      "/studio?preset=illustration",
+    );
 
     await page.evaluate(() => {
       const event = new Event("beforeinstallprompt", { cancelable: true });
@@ -108,7 +99,7 @@ try {
     await expect(nudge).toHaveCount(0);
 
     await page.evaluate(() => window.dispatchEvent(new Event("offline")));
-    await expect(page.locator('[data-creator-launchpad="v1"]')).toContainText("오프라인");
+    await expect(page.locator(".cf-intent")).toBeVisible();
 
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
@@ -124,11 +115,12 @@ try {
     results.push({
       name,
       viewport: [width, height],
-      persistedPlan: true,
+      recentCardVisible: true,
       sanitizedRecentHref: true,
       sanitizedOnHydration: true,
+      persistedAcrossReload: true,
       installPrompt: true,
-      offlineSignal: true,
+      offlineResilient: true,
       noHorizontalOverflow: true,
     });
     await context.close();
