@@ -583,10 +583,7 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
     var(--cf-paper);
 }
 .creator-home[data-creator-home="production-first"] .cf-hero h1 em {
-  background: linear-gradient(100deg, var(--cf-accent) 0%, var(--cf-cyan) 54%, var(--cf-pink) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--cf-accent);
 }
 .creator-flagship .cf-production-preview {
   position: relative;
