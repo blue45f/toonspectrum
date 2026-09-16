@@ -10,7 +10,7 @@ interface ImportMetaEnv {
   // Emergency build-time off switch. `1`, `true`, or `on` marks live ink unavailable without
   // selecting another renderer.
   readonly VITE_STUDIO_LIVE_INK_KILL_SWITCH?: string;
-  // 장기 실행 Nest Socket.IO origin. Vercel serverless HTTP API와 realtime을 분리할 때 사용.
+  // 장기 실행 Socket.IO origin. HTTP Core API와 realtime을 분리할 때 사용한다.
   readonly VITE_STUDIO_LIVE_ORIGIN?: string;
   // 로컬 Vite의 /socket.io + /studio-live 프록시를 실제 Nest 개발 서버에 연결할 때만 true.
   // 미설정이면 개발 빌드도 브라우저 로컬 협업으로 fail-closed한다.
@@ -35,9 +35,8 @@ interface ImportMetaEnv {
   // NotifyDesk — 인앱 알림 벨/인박스.
   readonly VITE_NOTIFYDESK_URL?: string;
   readonly VITE_NOTIFYDESK_PK?: string;
-  // desk-platform — 공개 문의(Inquiry) 게시판 백엔드 베이스 URL.
-  // 미설정 시 prod 기본값(https://desk-platform.vercel.app)으로 폴백한다. (lib/inquiry-api.ts)
+  // 선택형 레거시 문의/통계 어댑터. 미설정 시 네트워크 호출을 하지 않는다.
   readonly VITE_DESK_PLATFORM_URL?: string;
-  // `1` re-enables automatic visits/ping. Default off — desk-platform currently 502s without CORS.
+  // 명시적인 베이스 URL과 함께 `1`일 때만 레거시 방문 ping을 허용한다.
   readonly VITE_DESK_PLATFORM_VISITS?: "1";
 }
