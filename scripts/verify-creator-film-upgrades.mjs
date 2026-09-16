@@ -30,14 +30,31 @@ try {
     try {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
       await page.locator('[data-creator-home="studio-first"]').waitFor();
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForFunction(() => document.title.includes("툰스튜디오") || document.title.includes("ToonStudio"));
+      assert.equal(requests.length, 0);
+      assert.equal(await page.locator("video").count(), 0);
+
       const playButton = page.getByTestId("creator-film-play");
       if (await playButton.count() === 0) {
         await expect(page.locator('[data-creator-experience="clarity-v1"]')).toHaveCount(1);
-        results.push({ scenario, passed: true, skipped: true, reason: "The active clarity-v1 homepage does not mount the legacy brand-film player.", uncaughtErrors: errors });
+        const manifestResponse = await context.request.get(`${origin}/brand/film-manifest.json`);
+        assert.equal(manifestResponse.ok(), true);
+        const manifest = await manifestResponse.json();
+        const assets = Object.values(manifest.assets ?? {});
+        assert.equal(assets.length, 3);
+        for (const asset of assets) {
+          assert.equal(typeof asset.src, "string");
+          const assetResponse = await context.request.head(new URL(asset.src, origin).href);
+          assert.equal(assetResponse.ok(), true);
+          const contentLength = Number(assetResponse.headers()["content-length"] ?? 0);
+          if (contentLength > 0) assert.equal(contentLength, asset.bytes);
+        }
+        results.push({ scenario, passed: true, deferredFirstLoad: true,
+          eagerVideoRequests: requests.length, publishedAssets: assets.length, uncaughtErrors: errors });
         continue;
       }
-      assert.equal(requests.length, 0);
-      assert.equal(await page.locator("video").count(), 0);
+
       await playButton.click();
       let requestTimeout;
       await Promise.race([
