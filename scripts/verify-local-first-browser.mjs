@@ -18,7 +18,7 @@ const server=createServer((request,response)=>{void(async()=>{
   const pathname=new URL(request.url,'http://localhost').pathname;
   if(pathname.startsWith('/api/')){apiRequests++;response.writeHead(503);response.end('API disabled for offline test');return;}
   if(outage&&pathname.startsWith('/studio')){response.writeHead(503,{'Content-Type':'text/html'});response.end('<h1>Controlled origin outage</h1>');return;}
-  let path=resolve(dist,`.${decodeURIComponent(pathname)}`);
+  let path=pathname==='/offline-drawing' ? join(dist,'offline-drawing.html') : resolve(dist,`.${decodeURIComponent(pathname)}`);
   if(path!==dist&&!path.startsWith(dist+sep)){response.writeHead(403);response.end();return;}
   const info=await stat(path).catch(()=>null);
   if(!info?.isFile())path=join(dist,'index.html');
@@ -34,14 +34,14 @@ async function check(name,fn){await fn();results.push({name,passed:true});}
 try{
   browser=await chromium.launch();const context=await browser.newContext({acceptDownloads:true,viewport:{width:1280,height:960}});
   const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(String(error)));
-  await page.goto(`${origin}/offline-drawing.html`);
+  await page.goto(`${origin}/offline-drawing`);
   await page.waitForFunction(()=>document.getElementById('readiness').textContent.includes('준비 완료'),{},{timeout:30000});
   await check('real active service worker confirms all rescue files cached',async()=>assert.ok(await page.evaluate(()=>Boolean(navigator.serviceWorker.controller))));
   let originalInk;
   await check('pen produces pixels and autosave commits',async()=>{await stroke(page);originalInk=await ink(page);assert.ok(originalInk>500);});
   await check('network-offline reload restores identical drawing',async()=>{await context.setOffline(true);await page.reload();await page.waitForFunction(()=>!document.getElementById('undo').disabled);assert.equal(await ink(page),originalInk);});
   await check('undo and redo preserve drawing offline',async()=>{await page.click('#undo');await page.waitForFunction(()=>document.getElementById('undo').disabled);assert.equal(await ink(page),0);await page.click('#redo');await saved(page);assert.equal(await ink(page),originalInk);});
-  await check('origin 503 navigation opens independent drawing rescue',async()=>{await context.setOffline(false);outage=true;await page.goto(`${origin}/studio?document=unavailable`);await page.locator('h1').filter({hasText:'서버 없이'}).waitFor();await page.waitForFunction(()=>!document.getElementById('undo').disabled);assert.equal(await ink(page),originalInk);});
+  await check('origin 503 without a cached Studio shell opens independent drawing rescue',async()=>{await page.evaluate(async()=>{for(const name of await caches.keys()){if(!name.startsWith('toonspectrum-sw-precache-'))continue;const cache=await caches.open(name);for(const request of await cache.keys())if(new URL(request.url).pathname==='/studio')await cache.delete(request);}});await context.setOffline(false);outage=true;await page.goto(`${origin}/studio?document=unavailable`);await page.waitForFunction(()=>document.documentElement.dataset.localDrawingReady==='true');await page.waitForFunction(()=>!document.getElementById('undo').disabled);assert.equal(await ink(page),originalInk);});
   await check('simultaneous real IDB transactions fork a stale revision',async()=>{const result=await page.evaluate(async()=>{const m=await import('/offline-drawing/model.js');const db=await m.openDrawingDatabase();const first=await m.saveDocument(db,m.newDocument(),0);const both=await Promise.all([m.saveDocument(db,{...first.document,title:'Tab A'},1),m.saveDocument(db,{...first.document,title:'Tab B'},1)]);const all=await m.listDocuments(db);db.close();return{distinct:both[0].document.id!==both[1].document.id,forks:both.filter(x=>x.forked).length,preserved:both.every(x=>all.some(y=>y.id===x.document.id))};});assert.deepEqual(result,{distinct:true,forks:1,preserved:true});});
   await check('malformed import leaves current artwork intact',async()=>{await page.locator('#import').setInputFiles({name:'broken.json',mimeType:'application/json',buffer:Buffer.from('{"format":"wrong"}')});await page.waitForFunction(()=>document.getElementById('status').dataset.error==='true');assert.equal(await ink(page),originalInk);});
   await check('portable HTML opens saved strokes in a new network-offline browser context',async()=>{const pending=page.waitForEvent('download');await page.click('#portable');const file=await pending;const path=join(evidence,'portable-test.html');await file.saveAs(path);const isolated=await browser.newContext();await isolated.setOffline(true);const local=await isolated.newPage();await local.goto(pathToFileURL(path).href);await local.waitForFunction(()=>!document.getElementById('undo').disabled);assert.equal(await ink(local),originalInk);await isolated.close();});

@@ -10,6 +10,10 @@ class Server(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs): super().__init__(*args, directory=str(PUBLIC), **kwargs)
     def log_message(self, *args): pass
     def do_GET(self):
+        # Production static hosting canonicalizes the physical HTML file to this clean URL.
+        # Mirror that response directly so the worker can keep rejecting redirected payloads.
+        if self.path.split('?', 1)[0] == '/offline-drawing':
+            self.path = '/offline-drawing.html'
         if self.path.startswith('/studio'):
             if Server.status_mode == 'hang': time.sleep(8)
             code = 503 if Server.status_mode == '503' else 200
