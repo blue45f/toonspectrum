@@ -11,6 +11,7 @@ import { useI18n } from "@/shared/lib/i18n";
 function useNarrowViewport() {
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
     const media = window.matchMedia("(max-width: 767px)");
     const sync = () => setNarrow(media.matches);
     sync();
