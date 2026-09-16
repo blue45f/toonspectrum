@@ -1,0 +1,1238 @@
+{
+  "version": 1,
+  "description": "기본 2D 장면 라이브러리에 노출하는 고해상도 CC0 포토 레퍼런스 배경입니다. 2026-09-16 전체 프레임·원본 픽셀·출처 원장을 검수했습니다.",
+  "assets": [
+    {
+      "id": "polyhaven-background-wide-street-01",
+      "label": "햇빛 드는 넓은 도심 거리 · CC0 포토 레퍼런스",
+      "title": "햇빛 드는 넓은 도심 거리",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-wide-street-01/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-wide-street-01/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 636614,
+      "sha256": "f0833abc600e49583d4fa8872e6815eb9a201c573e4afaea92ef83d85eba5b15",
+      "tags": [
+        "도시",
+        "거리",
+        "도로",
+        "가로수",
+        "낮",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wide_street_01",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-crosswalk",
+      "label": "숲 가장자리 횡단보도 · CC0 포토 레퍼런스",
+      "title": "숲 가장자리 횡단보도",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-crosswalk/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-crosswalk/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 742190,
+      "sha256": "3f26ee79aa89bce82227bdabd1bd58e315bdd1557670ba904366db8284d42092",
+      "tags": [
+        "횡단보도",
+        "공원",
+        "도로",
+        "숲",
+        "낮",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/crosswalk",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-cayley-interior",
+      "label": "호수 전망 발코니 실내 · CC0 포토 레퍼런스",
+      "title": "호수 전망 발코니 실내",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-cayley-interior/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-cayley-interior/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 251566,
+      "sha256": "4afe9120595a14d6d37b55b372eb7c5cbbf141e77662db49b836b45c6e582547",
+      "tags": [
+        "실내",
+        "창문",
+        "발코니",
+        "호수",
+        "전망",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/cayley_interior",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-wooden-lounge",
+      "label": "따뜻한 원목 라운지 · CC0 포토 레퍼런스",
+      "title": "따뜻한 원목 라운지",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 344564,
+      "sha256": "0b90d29ee6af8e2182b9266d50bdc6d345c54406df57491c2f16ccf4e8187324",
+      "tags": [
+        "라운지",
+        "소파",
+        "거실",
+        "원목",
+        "실내",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_lounge",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-decor-shop",
+      "label": "소품이 진열된 인테리어 숍 · CC0 포토 레퍼런스",
+      "title": "소품이 진열된 인테리어 숍",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-decor-shop/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-decor-shop/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 473210,
+      "sha256": "b22bd156383755c4648a88bca06cba8cade13ca061216fa8e69d580bf557cce5",
+      "tags": [
+        "상점",
+        "인테리어",
+        "소품",
+        "쇼룸",
+        "소파",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/decor_shop",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-urban-courtyard-02",
+      "label": "아파트 사이 도시 안뜰 · CC0 포토 레퍼런스",
+      "title": "아파트 사이 도시 안뜰",
+      "genre": "daily",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-urban-courtyard-02/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-urban-courtyard-02/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 792608,
+      "sha256": "e7f87901f90a2637a286fe6bb383dca2b575e6ad3999057a09f9f082fcde4fbf",
+      "tags": [
+        "도시",
+        "아파트",
+        "안뜰",
+        "울타리",
+        "일상",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/urban_courtyard_02",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-rooitou-park",
+      "label": "햇살이 비치는 잔디 공원 · CC0 포토 레퍼런스",
+      "title": "햇살이 비치는 잔디 공원",
+      "genre": "romance",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-rooitou-park/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-rooitou-park/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 677910,
+      "sha256": "259a547ea8cc527eebf37c9c104001e85747073877c7baa8eb57d5595fdc5960",
+      "tags": [
+        "공원",
+        "잔디",
+        "햇살",
+        "데이트",
+        "로맨스",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": true,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rooitou_park",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-autumn-park",
+      "label": "가을빛 열린 공원 · CC0 포토 레퍼런스",
+      "title": "가을빛 열린 공원",
+      "genre": "romance",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-autumn-park/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-autumn-park/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 963472,
+      "sha256": "d09d81651a7b86c19dd7be5da853429db4557df0eefa260b6258f9bd7a8f6f7a",
+      "tags": [
+        "공원",
+        "가을",
+        "나무",
+        "잔디",
+        "데이트",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/autumn_park",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-venice-sunset",
+      "label": "잔잔한 바다의 노을 · CC0 포토 레퍼런스",
+      "title": "잔잔한 바다의 노을",
+      "genre": "romance",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-venice-sunset/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-venice-sunset/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 268952,
+      "sha256": "df83b4b10bf24089f0e96cedf93ee385c61e774d2ac1a9ba0f6df58a9aa85499",
+      "tags": [
+        "바다",
+        "수평선",
+        "노을",
+        "석양",
+        "로맨스",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/venice_sunset",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-rooftop-night",
+      "label": "조명이 켜진 황혼 옥상 · CC0 포토 레퍼런스",
+      "title": "조명이 켜진 황혼 옥상",
+      "genre": "romance",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-rooftop-night/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-rooftop-night/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 332800,
+      "sha256": "740cf1eba221659ab7581b19ad79d060ce1e39b3eace3dfdef2376d8b4aab4c0",
+      "tags": [
+        "옥상",
+        "황혼",
+        "야간",
+        "조명",
+        "로맨스",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rooftop_night",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-the-sky-is-on-fire",
+      "label": "붉은 노을 해안 산책로 · CC0 포토 레퍼런스",
+      "title": "붉은 노을 해안 산책로",
+      "genre": "romance",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-the-sky-is-on-fire/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-the-sky-is-on-fire/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 312316,
+      "sha256": "0170ee54dfa7d490ff484e2b2e3f19e7748b6576d1b36b4d2cb71f30eca4ab8d",
+      "tags": [
+        "해안",
+        "산책로",
+        "노을",
+        "하늘",
+        "데이트",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": true,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/the_sky_is_on_fire",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-kiara-1-dawn",
+      "label": "새벽빛 바위 계곡 · CC0 포토 레퍼런스",
+      "title": "새벽빛 바위 계곡",
+      "genre": "fantasy",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-kiara-1-dawn/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-kiara-1-dawn/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 347638,
+      "sha256": "af64ba65fb5f1336b8cc12b96921edfc42f4a636af38bb2f05809eae064b413d",
+      "tags": [
+        "계곡",
+        "바위",
+        "산",
+        "새벽",
+        "판타지",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/kiara_1_dawn",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-mossy-forest",
+      "label": "이끼 낀 숲 계곡 · CC0 포토 레퍼런스",
+      "title": "이끼 낀 숲 계곡",
+      "genre": "fantasy",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-mossy-forest/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-mossy-forest/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 935116,
+      "sha256": "9c3545b50afd13807178fe4efa5d039083f4382c22968b155a97404be3a6bf95",
+      "tags": [
+        "숲",
+        "이끼",
+        "계곡",
+        "바위",
+        "판타지",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/mossy_forest",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-river-walk-1",
+      "label": "햇살 드는 숲길 · CC0 포토 레퍼런스",
+      "title": "햇살 드는 숲길",
+      "genre": "fantasy",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-river-walk-1/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-river-walk-1/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 1158128,
+      "sha256": "4cc14fce4250b2d884d66c4c591f7839703a70b09126c2823fcb96260d10ab71",
+      "tags": [
+        "숲길",
+        "나무",
+        "햇살",
+        "모험",
+        "판타지",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/river_walk_1",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-venetian-crossroads",
+      "label": "베네치아 골목 교차로 · CC0 포토 레퍼런스",
+      "title": "베네치아 골목 교차로",
+      "genre": "wuxia",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-venetian-crossroads/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-venetian-crossroads/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 447024,
+      "sha256": "f0996546876f4d26f92d237e9e93030752c51661ce2fc7bf7851d9ad7dc66a38",
+      "tags": [
+        "고풍",
+        "골목",
+        "석조",
+        "역사",
+        "사극",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/venetian_crossroads",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-leadenhall-market",
+      "label": "고풍스러운 아케이드 시장 · CC0 포토 레퍼런스",
+      "title": "고풍스러운 아케이드 시장",
+      "genre": "wuxia",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-leadenhall-market/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-leadenhall-market/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 748686,
+      "sha256": "a04f17e3234a62e891849426eb4e292433f173f7f85c95168a780eac12657bb8",
+      "tags": [
+        "시장",
+        "상점",
+        "아케이드",
+        "고풍",
+        "사극",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/leadenhall_market",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-large-corridor",
+      "label": "햇빛 드는 대형 복도 · CC0 포토 레퍼런스",
+      "title": "햇빛 드는 대형 복도",
+      "genre": "드라마",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-large-corridor/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-large-corridor/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 191892,
+      "sha256": "6e1b45138541c5d2e2c30521f3eb77c23726585e3006c5d8da8201c42e24fd4e",
+      "tags": [
+        "복도",
+        "홀",
+        "창문",
+        "드라마",
+        "실내",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/large_corridor",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-ballroom",
+      "label": "샹들리에가 있는 연회장 · CC0 포토 레퍼런스",
+      "title": "샹들리에가 있는 연회장",
+      "genre": "드라마",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-ballroom/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-ballroom/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 552116,
+      "sha256": "e9824290e5ba564b76e901db614ace3b42dc4e2191d07a6a514e8196d7e2f481",
+      "tags": [
+        "연회장",
+        "샹들리에",
+        "저택",
+        "드라마",
+        "실내",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/ballroom",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-modern-buildings-night",
+      "label": "야간 현대 건축 아트리움 · CC0 포토 레퍼런스",
+      "title": "야간 현대 건축 아트리움",
+      "genre": "sf",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-modern-buildings-night/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-modern-buildings-night/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 364622,
+      "sha256": "2edb1ea1ec984297aae2217da28dbb7d4f5a57cdc6ba32f03250ece4f7f37556",
+      "tags": [
+        "현대건축",
+        "아트리움",
+        "야간",
+        "SF",
+        "미래",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/modern_buildings_night",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-portland-landing-pad",
+      "label": "공사 중인 도심 착륙장 · CC0 포토 레퍼런스",
+      "title": "공사 중인 도심 착륙장",
+      "genre": "sf",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-portland-landing-pad/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-portland-landing-pad/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 460652,
+      "sha256": "eff8b41fdb037cf81ad8121379d90630b1f97e72296f0cf905d49e335d1101c4",
+      "tags": [
+        "도시",
+        "착륙장",
+        "헬리패드",
+        "공사",
+        "SF",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/portland_landing_pad",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-royal-esplanade",
+      "label": "현대적인 실내 산책로 · CC0 포토 레퍼런스",
+      "title": "현대적인 실내 산책로",
+      "genre": "sf",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-royal-esplanade/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-royal-esplanade/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 327120,
+      "sha256": "755a39b5444d7c36fe4f0e8c0bf0f76b536fc77ea0cde047fc690bd6efbebadd",
+      "tags": [
+        "현대",
+        "실내",
+        "산책로",
+        "상업공간",
+        "SF",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/royal_esplanade",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-derelict-overpass",
+      "label": "버려진 고가도로 · CC0 포토 레퍼런스",
+      "title": "버려진 고가도로",
+      "genre": "액션",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-derelict-overpass/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-derelict-overpass/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 448152,
+      "sha256": "8cfe8d86df73f3dff4bebd22298a3ae31115198691b94931bf588b86551056c2",
+      "tags": [
+        "고가도로",
+        "폐허",
+        "도로",
+        "추격",
+        "액션",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/derelict_overpass",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-empty-warehouse-01",
+      "label": "비어 있는 산업 창고 · CC0 포토 레퍼런스",
+      "title": "비어 있는 산업 창고",
+      "genre": "액션",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-empty-warehouse-01/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-empty-warehouse-01/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 396176,
+      "sha256": "994b5c82468c2ac096ff6a85a3730ebc8160088ebf52d687c296f87a8c55085e",
+      "tags": [
+        "창고",
+        "산업",
+        "폐허",
+        "추격",
+        "액션",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/empty_warehouse_01",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-misty-pines",
+      "label": "안개 낀 소나무 숲 · CC0 포토 레퍼런스",
+      "title": "안개 낀 소나무 숲",
+      "genre": "공포",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-misty-pines/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-misty-pines/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 641714,
+      "sha256": "cc776f85921dd834c5333f765d50def1500b65d9a47a9e3958af1163aa8c77f5",
+      "tags": [
+        "안개",
+        "소나무",
+        "숲",
+        "공포",
+        "스릴러",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/misty_pines",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-courtyard-night",
+      "label": "노란 조명의 야간 안뜰 · CC0 포토 레퍼런스",
+      "title": "노란 조명의 야간 안뜰",
+      "genre": "공포",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-courtyard-night/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-courtyard-night/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 418976,
+      "sha256": "316019fed4b94e1313b0201d88b8b825b18cacbd7b6c48bcce40c5a3962f2213",
+      "tags": [
+        "안뜰",
+        "야간",
+        "조명",
+        "공포",
+        "스릴러",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/courtyard_night",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-abandoned-slipway",
+      "label": "버려진 선착장 · CC0 포토 레퍼런스",
+      "title": "버려진 선착장",
+      "genre": "공포",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-abandoned-slipway/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-abandoned-slipway/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 407116,
+      "sha256": "f4f93ce987ca75d53acd74c17c28ae69bbb0284df79369065fd2351726107c14",
+      "tags": [
+        "선착장",
+        "물가",
+        "폐허",
+        "공포",
+        "스릴러",
+        "포토 레퍼런스"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/abandoned_slipway",
+        "checkedOn": "2026-09-12"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-dresden-station-night",
+      "label": "야간 기차역 플랫폼 · CC0 포토 레퍼런스",
+      "title": "야간 기차역 플랫폼",
+      "genre": "드라마",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-dresden-station-night/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-dresden-station-night/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 442298,
+      "sha256": "559b498e0bafd26a2f33abf31349a0f0ff41575cd9fb83b9d9b677e6bedf3a91",
+      "tags": [
+        "기차역",
+        "플랫폼",
+        "야간",
+        "철도",
+        "드라마",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/dresden_station_night",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    },
+    {
+      "id": "polyhaven-background-subway-entrance",
+      "label": "지하철 입구 계단 · CC0 포토 레퍼런스",
+      "title": "지하철 입구 계단",
+      "genre": "드라마",
+      "src": "/assets/studio/cc0-20260906/assets/polyhaven-background-subway-entrance/background.webp",
+      "sourceManifest": "/assets/studio/cc0-20260906/assets/polyhaven-background-subway-entrance/SOURCE.json",
+      "width": 2048,
+      "height": 1152,
+      "bytes": 280774,
+      "sha256": "990088ce73dfdd45abc6f32f5f7fa98af94317d999269338a536f80a98149bc5",
+      "tags": [
+        "지하철",
+        "역",
+        "계단",
+        "입구",
+        "드라마",
+        "포토 레퍼런스"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": true,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-16",
+        "notes": [
+          "전체 프레임을 확대 검수했으며 왜곡된 생성형 문자·기하 오류가 없는 사진 원본입니다."
+        ]
+      },
+      "provenance": {
+        "kind": "poly-haven-cc0",
+        "licenseStatus": "cc0-verified",
+        "licenseId": "CC0-1.0",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/subway_entrance",
+        "checkedOn": "2026-09-13"
+      },
+      "mediaType": "image/webp",
+      "style": "photographic-reference",
+      "legacySrc": null
+    }
+  ]
+}

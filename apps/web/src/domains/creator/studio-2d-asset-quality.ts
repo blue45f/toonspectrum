@@ -1,4 +1,5 @@
-import manifest from "./studio-2d-asset-manifest.json";
+import legacyManifest from "./studio-2d-asset-manifest.json";
+import cc0Manifest from "./studio-2d-cc0-scene-manifest.json";
 
 export interface Studio2dScene {
   readonly id: string;
@@ -10,7 +11,42 @@ export interface Studio2dScene {
   readonly height?: number;
 }
 
-export type Studio2dAssetMetadata = (typeof manifest.assets)[number];
+export interface Studio2dAssetMetadata {
+  readonly id: string;
+  readonly title: string;
+  readonly src: string;
+  readonly width: number;
+  readonly height: number;
+  readonly bytes: number;
+  readonly sha256: string;
+  readonly tags: readonly string[];
+  readonly environment: "실내" | "실외";
+  readonly timeOfDay: "낮" | "노을" | "밤";
+  readonly containsPeople: boolean;
+  readonly containsText: boolean;
+  readonly recommended: boolean;
+  readonly review: {
+    readonly method: "full-image" | "contact-sheet";
+    readonly status: "usable" | "small-panel-only";
+    readonly reviewedAt: string;
+    readonly notes: readonly string[];
+  };
+  readonly provenance: {
+    readonly kind: "legacy-catalog" | "poly-haven-cc0";
+    readonly licenseStatus: "unverified" | "cc0-verified";
+    readonly aiLabelInCatalog?: boolean;
+    readonly licenseId?: string;
+    readonly provider?: string;
+    readonly sourceUrl?: string;
+    readonly checkedOn?: string;
+  };
+  readonly mediaType: "image/jpeg" | "image/png" | "image/webp";
+  readonly legacySrc: string | null;
+  readonly label?: string;
+  readonly genre?: string;
+  readonly sourceManifest?: string;
+  readonly style?: "photographic-reference";
+}
 export type Studio2dOrientation = "all" | "landscape" | "portrait" | "square";
 export type Studio2dQualityFilter = "all" | "recommended" | "large" | "raster" | "vector";
 export type Studio2dSort = "recommended" | "resolution" | "name";
@@ -29,7 +65,10 @@ export interface Studio2dFilters {
   readonly sort?: Studio2dSort;
 }
 
-export const STUDIO_2D_ASSET_METADATA: readonly Studio2dAssetMetadata[] = manifest.assets;
+export const STUDIO_2D_ASSET_METADATA: readonly Studio2dAssetMetadata[] = Object.freeze([
+  ...legacyManifest.assets,
+  ...cc0Manifest.assets,
+] as unknown as Studio2dAssetMetadata[]);
 const byId = new Map(STUDIO_2D_ASSET_METADATA.map((asset) => [asset.id, asset]));
 
 /** An ID alone is insufficient: replacing the source must invalidate the old metadata. */
