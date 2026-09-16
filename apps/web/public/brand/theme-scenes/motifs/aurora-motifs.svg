@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Aurora creative motifs</title>
+  <desc id="desc">Spectrum ribbon, floating drawing tablet and colourful comic cards.</desc>
+  <defs>
+    <linearGradient id="a-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eefcff"/><stop offset=".48" stop-color="#eee8ff"/><stop offset="1" stop-color="#fff0f8"/></linearGradient>
+    <linearGradient id="a-ribbon" x1="40" y1="60" x2="350" y2="330" gradientUnits="userSpaceOnUse"><stop stop-color="#55dfe9"/><stop offset=".38" stop-color="#7184ff"/><stop offset=".7" stop-color="#d879f2"/><stop offset="1" stop-color="#ffad77"/></linearGradient>
+    <filter id="a-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#6f65c9" flood-opacity=".24"/></filter>
+  </defs>
+  <g data-panel="1">
+    <rect width="400" height="400" rx="44" fill="url(#a-bg)"/>
+    <circle cx="85" cy="78" r="54" fill="#74e2e5" opacity=".25"/><circle cx="322" cy="88" r="72" fill="#d387ef" opacity=".2"/>
+    <path d="M60 108c80-76 222-38 250 35 24 63-70 74-137 58-54-13-91 13-74 56 22 55 137 54 231-5" fill="none" stroke="url(#a-ribbon)" stroke-width="32" stroke-linecap="round" filter="url(#a-shadow)"/>
+    <path d="m293 268 52 42-45 55-49-18 12-51Z" fill="#fffdf8" stroke="#4c4f79" stroke-width="7"/>
+    <path d="m270 343 48-45" stroke="#4c4f79" stroke-width="7" stroke-linecap="round"/><circle cx="319" cy="299" r="7" fill="#4c4f79"/>
+    <g fill="#fff8b8"><path d="m80 283 6 15 15 6-15 6-6 15-6-15-15-6 15-6Z"/><path d="m328 42 4 10 10 4-10 4-4 10-4-10-10-4 10-4Z"/></g>
+  </g>
+  <g data-panel="2" transform="translate(400)">
+    <rect width="400" height="400" rx="44" fill="#141936"/>
+    <ellipse cx="205" cy="336" rx="139" ry="30" fill="#090d22" opacity=".7"/>
+    <g transform="rotate(-5 198 194)" filter="url(#a-shadow)">
+      <rect x="58" y="61" width="286" height="244" rx="30" fill="#252c55" stroke="#8ca1ff" stroke-width="5"/>
+      <rect x="78" y="80" width="246" height="204" rx="20" fill="url(#a-bg)"/>
+      <path d="M95 230c48-69 92-29 126-84 25-41 55-30 86-48" fill="none" stroke="url(#a-ribbon)" stroke-width="22" stroke-linecap="round"/>
+      <rect x="98" y="103" width="75" height="58" rx="13" fill="#fff" opacity=".8"/><rect x="186" y="178" width="102" height="72" rx="16" fill="#fff" opacity=".72"/>
+    </g>
+    <g transform="rotate(28 310 287)"><rect x="291" y="177" width="19" height="154" rx="10" fill="#f9f6ff"/><path d="m291 177 10-28 9 28Z" fill="#ffad77"/></g>
+    <circle cx="89" cy="54" r="5" fill="#5fe5ea"/><circle cx="338" cy="111" r="7" fill="#ef8ced"/>
+  </g>
+  <g data-panel="3" transform="translate(800)">
+    <rect width="400" height="400" rx="44" fill="#f8f4ff"/>
+    <path d="M0 302c84-52 148-30 220-76 68-44 108-99 180-89v263H0Z" fill="#d9f7f6"/>
+    <g filter="url(#a-shadow)">
+      <g transform="translate(48 70) rotate(-7 78 112)"><rect width="156" height="224" rx="24" fill="#fff"/><rect x="18" y="18" width="120" height="82" rx="14" fill="#6fd7e0"/><path d="m31 86 35-33 28 22 28-30 16 41Z" fill="#edfaff"/><rect x="18" y="116" width="120" height="17" rx="8" fill="#776cff" opacity=".7"/><rect x="18" y="148" width="87" height="12" rx="6" fill="#d2ccf3"/></g>
+      <g transform="translate(182 40) rotate(6 82 120)"><rect width="164" height="242" rx="24" fill="#fff"/><rect x="18" y="18" width="128" height="92" rx="14" fill="#f3acd9"/><path d="M34 82c28-44 58-44 92 0" fill="none" stroke="#fff5dc" stroke-width="17" stroke-linecap="round"/><rect x="18" y="126" width="128" height="17" rx="8" fill="#ff9f79" opacity=".78"/><rect x="18" y="158" width="98" height="12" rx="6" fill="#e2cee0"/></g>
+    </g>
+    <path d="m331 300 7 18 18 7-18 7-7 18-7-18-18-7 18-7Z" fill="#776cff"/><circle cx="50" cy="337" r="14" fill="#ffad77"/>
+  </g>
+</svg>

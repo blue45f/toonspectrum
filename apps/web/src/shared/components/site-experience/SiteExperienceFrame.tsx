@@ -9,14 +9,22 @@ import { getThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
 
 import "./site-experience.css";
 import "./site-art-direction.css";
+import "./site-theme-choreography.css";
 
+const THEME_MOTIF_PANELS = [1, 2, 3] as const;
 
 function SiteThemeAmbientArt() {
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const scene = getThemeSceneAsset(resolvedTheme);
   return (
-    <div className="site-experience-ambient" aria-hidden="true">
+    <div
+      className="site-experience-ambient"
+      aria-hidden="true"
+      data-theme-scene={scene.id}
+      data-theme-motion={scene.motion}
+    >
       <img
+        key={scene.src}
         className="site-theme-scene"
         src={scene.src}
         width={1200}
@@ -24,7 +32,24 @@ function SiteThemeAmbientArt() {
         decoding="async"
         alt=""
         data-theme-scene={scene.id}
+        draggable={false}
       />
+      <div className="site-theme-mosaic" data-theme-mosaic={scene.id} key={scene.motifSrc}>
+        {THEME_MOTIF_PANELS.map((panel) => (
+          <span className="site-theme-mosaic__panel" data-panel={panel} key={panel}>
+            <img
+              className="site-theme-mosaic__strip"
+              src={scene.motifSrc}
+              width={1200}
+              height={400}
+              decoding="async"
+              loading="lazy"
+              alt=""
+              draggable={false}
+            />
+          </span>
+        ))}
+      </div>
       <span className="site-theme-art site-theme-art--ribbon"><i /><i /><i /></span>
       <span className="site-theme-art site-theme-art--petals"><i /><i /><i /><i /><i /><i /></span>
       <span className="site-theme-art site-theme-art--orbit"><i /><i /><i /></span>
