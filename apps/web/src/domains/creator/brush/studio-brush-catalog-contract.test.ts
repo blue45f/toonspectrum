@@ -17,6 +17,7 @@ import {
   listStudioQuickBrushCatalogItems,
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
@@ -84,7 +85,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps the full registry internal and exposes one 88-brush product catalogue", () => {
+  it("keeps replay registration complete and exposes every non-quarantined brush", () => {
     const counts = STUDIO_BRUSH_CATALOG_COUNTS;
     expect(counts.core).toBe(BRUSH_PRESETS.length);
     expect(counts.pro).toBe(200);
@@ -97,10 +98,15 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       counts.total,
     );
 
-    const productIds = new Set(
-      filterStudioBrushCatalogItems({ category: "all" }).map((item) => item.id),
+    const listed = filterStudioBrushCatalogItems({ category: "all" });
+    const listedIds = new Set(listed.map((item) => item.id));
+    const expectedListedIds = new Set(
+      STUDIO_ALL_BRUSH_CATALOG_ITEMS
+        .filter((item) => !isStudioBrushQuarantinedPresetId(item.id))
+        .map((item) => item.id),
     );
-    expect(productIds.size).toBe(88);
+    expect(listed).toHaveLength(STUDIO_BRUSH_LISTED_CATALOG_COUNTS.total);
+    expect(listedIds).toEqual(expectedListedIds);
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
@@ -112,15 +118,13 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
         query: item.id,
       });
       expect(
-        matches.every((candidate) => productIds.has(candidate.id)),
-        `${item.id}: search escaped the product catalogue`,
+        matches.every((candidate) => listedIds.has(candidate.id)),
+        `${item.id}: search escaped the selectable catalogue`,
       ).toBe(true);
-      if (!productIds.has(item.id)) {
-        expect(
-          matches.some((candidate) => candidate.id === item.id),
-          `${item.id}: internal implementation became a product`,
-        ).toBe(false);
-      }
+      expect(
+        matches.some((candidate) => candidate.id === item.id),
+        `${item.id}: exact-id visibility drift`,
+      ).toBe(!isStudioBrushQuarantinedPresetId(item.id));
     }
 
     const quick = listStudioQuickBrushCatalogItems({
@@ -133,6 +137,31 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       ["pencil", "recent"],
       ["pen", "recent"],
     ]);
+  });
+
+  it("discovers advanced brushes by engine lane and procedural runtime metadata", () => {
+    const capsuleOutline = filterStudioBrushCatalogItems({
+      category: "beginner",
+      query: "캡슐 아웃라인",
+    });
+    expect(capsuleOutline.map((item) => item.id)).toEqual(
+      expect.arrayContaining([
+        "gpen--croquis-capsule",
+        "pen--croquis-stabilized",
+      ]),
+    );
+    expect(
+      filterStudioBrushCatalogItems({
+        query: "croquis-capsule-pulled-string",
+      }).some((item) => item.id === "pen--croquis-stabilized"),
+    ).toBe(true);
+
+    const procedural = filterStudioBrushCatalogItems({ query: "프로시저럴" });
+    expect(procedural.length).toBeGreaterThan(0);
+    expect(procedural.every((item) => item.source === "pro")).toBe(true);
+
+    const sharedRuntime = filterStudioBrushCatalogItems({ query: "ink-particle" });
+    expect(sharedRuntime.some((item) => item.source === "pro")).toBe(true);
   });
 
   it("keeps quarantined presets resolvable for persisted documents while removing picker exposure", () => {
