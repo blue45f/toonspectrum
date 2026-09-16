@@ -1,5 +1,4 @@
 import { defineAppRoutes } from "../app-route-definition";
-
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const AboutPage = lazyRetry(
