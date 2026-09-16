@@ -156,7 +156,7 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
       </header>
       <p id={helpId} className="spatial-reader-intro">집중해서 한 구간씩, 또는 공간에 펼쳐 읽으세요. 원고는 수정하지 않습니다.</p>
       <div className="spatial-reader-layout">
-        <main className="spatial-reader-main">
+        <div className="spatial-reader-main">
           <section className="spatial-reader-preview" aria-label="공간 웹툰 2D 읽기">
             {pages.length === 0 ? <div className="spatial-reader-empty"><span aria-hidden>▤</span><h3>원고를 공간에 펼쳐 보세요</h3><p>이미지를 선택하면 바로 읽을 수 있습니다.<br />계정·API 키·유료 변환은 필요하지 않습니다.</p></div>
               : !imageSource ? <p role="alert">지원하지 않는 이미지 주소입니다. 원본 보기로 돌아가 주세요.</p>
@@ -201,7 +201,7 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
           {crops.length > 1 && <label className="spatial-reader-page-jump">긴 원고 구간 <output>{current.segment + 1} / {crops.length}</output>
             <input aria-label="공간 리더 구간 바로가기" type="range" min={0} max={crops.length - 1} value={current.segment} onChange={(event) => setCursor({ page: current.page, segment: Number(event.target.value) })} />
           </label>}
-        </main>
+        </div>
         <aside className="spatial-reader-settings" aria-label="공간 읽기 설정">
           <h3>나에게 맞는 읽기 공간</h3>
           <fieldset><legend>XR 배치</legend><div className="spatial-reader-presets">

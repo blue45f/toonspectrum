@@ -170,7 +170,7 @@ export function CreatorHomeExperience() {
   const copy = COPY[locale];
 
   return (
-    <main
+    <div
       className="creator-home creator-experience creator-flagship"
       data-creator-home="production-first"
       data-creator-experience="production-os-v2"
@@ -280,6 +280,6 @@ export function CreatorHomeExperience() {
           <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

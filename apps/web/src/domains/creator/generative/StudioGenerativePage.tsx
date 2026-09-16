@@ -59,7 +59,7 @@ export function StudioGenerativePage(){
     if(exportProgress!==null)return;const controller=new AbortController();exportAbort.current=controller;setExportProgress(0);setError("");
     try{const blob=await exportGeneratedClips(clips,controller.signal,setExportProgress);download(blob,`toonstudio-generated-promo.${blob.type==="video/mp4"?"mp4":"webm"}`);}catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"영상 연결에 실패했어요.");}finally{setExportProgress(null);exportAbort.current=null;}
   }
-  return <main className="advanced-studio">
+  return <div className="advanced-studio">
     <header><div><p className="eyebrow">TOONSTUDIO / GENERATIVE LAB</p><h1>캐릭터에서, 움직이는 이야기로</h1><p>원본을 보존하면서 영상·3D·2D 결과를 별도 에셋으로 생성합니다.</p></div><nav><Link to="/read/spatial">공간 웹툰 감상</Link><Link to="/showcase/promo">컷 기반 홍보 영상</Link><Link to="/studio">오프라인 대응 스튜디오</Link></nav></header>
     <section className="advanced-notice"><strong>{status?.configured?"자체 추론 서버 연결됨":"자체 GPU 추론 서버 준비 필요"}</strong><p>실제 모델이 설치되고 작업 저장소가 준비된 기능만 실행할 수 있습니다. 외부 유료 생성 서비스로 자동 전환하지 않습니다. 결과의 캐릭터 동일성·형태·저작권은 최종 사용 전에 확인해 주세요.</p>{status?.capabilities.map(capability=><p key={capability.kind}>{LABELS[capability.kind]} · {capability.ready?"준비됨":`준비 안 됨: ${capability.missing.join(", ")}`}</p>)}</section>
     {error&&<p role="alert" className="advanced-error">{error}</p>}
@@ -87,5 +87,5 @@ export function StudioGenerativePage(){
       {clips.map((clip,index)=><div className="advanced-row" key={index}><span>{index+1}번 영상</span><input aria-label={`${index+1}번 영상 자막`} value={clip.caption} maxLength={100} onChange={event=>setClips(current=>current.map((item,i)=>i===index?{...item,caption:event.target.value}:item))}/><button disabled={index===0||exportProgress!==null} onClick={()=>setClips(current=>{const next=[...current];[next[index-1],next[index]]=[next[index],next[index-1]];return next;})}>위로</button><button disabled={exportProgress!==null} onClick={()=>setClips(current=>current.filter((_,i)=>i!==index))}>제거</button></div>)}
       <button disabled={!clips.length||exportProgress!==null} onClick={()=>void assemble()}>연결 영상 내보내기</button>{exportProgress!==null&&<><progress max={1} value={exportProgress}/><button onClick={()=>exportAbort.current?.abort()}>내보내기 취소</button></>}
     </section>
-  </main>;
+  </div>;
 }

@@ -24,6 +24,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  primarySiteRouteAuthority,
+  type SitePrimaryRouteId,
+} from "@/shared/lib/site-route-authority";
+
 export type SiteNavigationLocale = "ko" | "en";
 export type SiteNavigationContext = "studio" | "spectrum";
 export type SiteNavigationText = Record<SiteNavigationLocale, string>;
@@ -62,6 +67,25 @@ const item = (
   description: { ko: koDescription, en: enDescription },
 });
 
+const primaryItem = (
+  id: string,
+  routeId: SitePrimaryRouteId,
+  icon: LucideIcon,
+  exact = false,
+): SiteNavigationItem => {
+  const definition = primarySiteRouteAuthority(routeId);
+  return item(
+    id,
+    definition.canonicalPath,
+    icon,
+    definition.label.ko,
+    definition.label.en,
+    definition.description.ko,
+    definition.description.en,
+    exact,
+  );
+};
+
 export const SITE_NAVIGATION_ITEMS = {
   home: item(
     "home",
@@ -73,54 +97,11 @@ export const SITE_NAVIGATION_ITEMS = {
     "Discover stories and explore the service",
     true,
   ),
-  production: item(
-    "production",
-    "/production",
-    Workflow,
-    "제작 관리",
-    "Production",
-    "기획·회차·일정·검수·계약을 한 흐름으로 관리",
-    "Manage planning, episodes, schedules, review and agreements in one flow",
-    true,
-  ),
-  make: item(
-    "make",
-    "/studio/new",
-    Palette,
-    "새 작품",
-    "New work",
-    "웹툰·컷툰·일러스트를 알맞은 작업공간에서 시작",
-    "Start a webtoon, short comic or illustration in the right workspace",
-    true,
-  ),
-  studio: item(
-    "studio",
-    "/studio",
-    Palette,
-    "프로젝트",
-    "Projects",
-    "최근 작품·공유 작업·복구 항목을 한곳에서",
-    "Recent projects, shared work and recovery in one place",
-    true,
-  ),
-  studioAssets: item(
-    "studio-assets",
-    "/studio/assets",
-    Store,
-    "작품 재료",
-    "Assets",
-    "캐릭터·배경·브러시·오디오와 사용 권리를 함께 정리",
-    "Organize characters, backgrounds, brushes, audio and usage rights",
-  ),
-  publish: item(
-    "publish",
-    "/studio/publish",
-    PackageCheck,
-    "검수·내보내기",
-    "Review & export",
-    "모바일 읽기 흐름과 플랫폼 규격을 확인하고 파일로 내보내기",
-    "Check mobile reading flow and platform requirements before export",
-  ),
+  production: primaryItem("production", "production", Workflow, true),
+  make: primaryItem("make", "studio-new", Palette, true),
+  studio: primaryItem("studio", "studio-home", Palette, true),
+  studioAssets: primaryItem("studio-assets", "studio-assets", Store),
+  publish: primaryItem("publish", "studio-publish", PackageCheck),
   learn: item(
     "learn",
     "/learn",

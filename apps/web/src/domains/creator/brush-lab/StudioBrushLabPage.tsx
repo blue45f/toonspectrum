@@ -90,7 +90,7 @@ export function StudioBrushLabPage() {
   const context = routeContext(params);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1920px] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="mx-auto min-h-screen w-full max-w-[1920px] px-4 py-5 sm:px-6 lg:px-8">
       <header className="overflow-hidden rounded-[1.75rem] border border-line bg-card/55 p-5 shadow-sm sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-4xl">
@@ -166,6 +166,6 @@ export function StudioBrushLabPage() {
         <StudioBrushIntegratedWorkbench scope={context.scope} />
         <StudioBrushProductCataloguePanel baseHref={context.baseHref} />
       </div>
-    </main>
+    </div>
   );
 }

@@ -55,7 +55,7 @@ export function StudioDocumentWorkspaceRoute() {
 
   return (
     <Container size="wide" className="py-10">
-      <main
+      <div
         className="mx-auto max-w-2xl rounded-3xl border border-danger/35 bg-card p-6 shadow-sm sm:p-8"
         role="alert"
       >
@@ -77,7 +77,7 @@ export function StudioDocumentWorkspaceRoute() {
           <ArrowLeft size={15} aria-hidden="true" />
           {locale === "ko" ? "내 작업으로" : "Back to My work"}
         </Link>
-      </main>
+      </div>
     </Container>
   );
 }

@@ -54,7 +54,7 @@ export function StudioSpatialReaderPage(){
   function focus(next:number){if(!book)return;const clamped=nextSpatialPanel(next,0,book.panels.length);runtime.current?.focus(clamped);setIndex(clamped);setAuto(false);}
   function updatePanel(update:Partial<SpatialPanel>){setBook(current=>current?{...current,panels:current.panels.map((item,i)=>i===index?{...item,...update}:item)}:null);}
   async function enter(mode:"immersive-vr"|"immersive-ar"){setError("");setAuto(false);try{if(!runtime.current)throw new Error("먼저 공간 보기를 켠 뒤 AR/VR 버튼을 눌러주세요.");await runtime.current.enter(mode);}catch(cause){setError(cause instanceof Error?cause.message:"이 기기에서 공간 세션을 열지 못했어요. 일반 감상은 사용할 수 있습니다.");}}
-  return <main className="advanced-studio"><header><div><p className="eyebrow">TOONSTUDIO / SPATIAL READER</p><h1>웹툰의 공간 안으로</h1><p>컷·대사·깊이 레이어를 보존하는 감상 모드. 일반 화면, VR, AR에서 같은 작품을 읽습니다.</p></div><nav><Link to="/studio/generate">생성형 스튜디오</Link><Link to="/studio">스튜디오 홈 · 오프라인 자동 전환</Link></nav></header>
+  return <div className="advanced-studio"><header><div><p className="eyebrow">TOONSTUDIO / SPATIAL READER</p><h1>웹툰의 공간 안으로</h1><p>컷·대사·깊이 레이어를 보존하는 감상 모드. 일반 화면, VR, AR에서 같은 작품을 읽습니다.</p></div><nav><Link to="/studio/generate">생성형 스튜디오</Link><Link to="/studio">스튜디오 홈 · 오프라인 자동 전환</Link></nav></header>
     <section className="advanced-notice"><strong>권한 요청은 AR/VR 실행 버튼을 누를 때만 합니다.</strong><p>이미지·작품 파일은 이 브라우저에서 읽으며 서버에 업로드하지 않습니다. 감상 위치만 이 기기에 저장됩니다. AR/VR 미지원 기기에서는 일반 보기와 키보드·터치로 모든 컷을 감상할 수 있습니다.</p></section>
     <div className="advanced-row"><label>컷 이미지 여러 장<input disabled={busy} type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value="";if(files.length)void openImages(files);}}/></label><label>공간 웹툰 JSON<input disabled={busy} type="file" accept=".json" onChange={event=>{const file=event.target.files?.[0];event.target.value="";if(file)void openBook(file);}}/></label></div>
     {error&&<p role="alert" className="advanced-error">{error}</p>}<p role="status">{busy?"작품을 읽는 중…":status}</p>
@@ -73,5 +73,5 @@ export function StudioSpatialReaderPage(){
         <label>음악 / 내레이션 내장 · 10MB 이하<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/mp4" onChange={event=>{const file=event.target.files?.[0];event.target.value="";if(!file)return;if(file.size>10*1024*1024){setError("오디오는 10MB 이하여야 해요.");return;}const id=book.id;const reader=new FileReader();reader.onload=()=>{try{const current=bookRef.current;if(current?.id!==id)return;const next=parseSpatialBook({...current,audio:reader.result});setBook(next);}catch(cause){setError(String(cause));}};reader.onerror=()=>setError("오디오를 읽지 못했어요.");reader.readAsDataURL(file);}}/></label>
       </details>
     </>}
-  </main>;
+  </div>;
 }

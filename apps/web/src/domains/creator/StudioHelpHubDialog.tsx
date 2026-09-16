@@ -1029,7 +1029,7 @@ export function StudioHelpHubDialog({
             </div>
           </nav>
 
-          <main className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
             {selectedArticle
               ? renderArticleDetail(selectedArticle)
               : searching && activeTab !== "shortcuts"
@@ -1043,7 +1043,7 @@ export function StudioHelpHubDialog({
                       : activeTab === "solve"
                         ? renderSolve()
                         : renderUpdates()}
-          </main>
+          </div>
         </div>
       </div>
     </div>

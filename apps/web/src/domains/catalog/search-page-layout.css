@@ -6,8 +6,8 @@
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
 }
-.search-page-results > section > main { min-width: 0; }
-.search-page-results > section > main [role="tablist"] { flex-shrink: 0; }
+.search-page-results > section > [data-search-results] { min-width: 0; }
+.search-page-results > section > [data-search-results] [role="tablist"] { flex-shrink: 0; }
 @media (min-width: 1024px) {
   .search-page-results > section { grid-template-columns: 16rem minmax(0, 1fr); }
 }

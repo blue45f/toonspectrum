@@ -25,6 +25,7 @@ interface RouteStageProps {
 export function RouteStage({ pathname, search, accessibleTitle, children }: RouteStageProps) {
   const [settled, setSettled] = useState(false);
   const [needsHeading, setNeedsHeading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [stalled, setStalled] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const language = useI18n((state) => state.lang);
@@ -35,6 +36,9 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
     : null;
   const instantEditorEntry = studioResolution?.kind === "editor"
     || studioResolution?.kind === "publish";
+  const surfaceIdentity = studioResolution && studioResolution.kind !== "invalid"
+    ? studioResolution.kind
+    : undefined;
   const instantAdminEntry = pathname === "/admin" || pathname.startsWith("/admin/");
   const instantEntry = instantEditorEntry || instantAdminEntry;
   const stageKey = studioResolution?.lifecycleKey ?? studioRouteStageKey(location);
@@ -58,13 +62,22 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
   useEffect(() => {
     const root = stageRef.current;
     if (!root) return;
+    setReady(false);
     setStalled(false);
     const delay = isStudioRoutePathname(pathname) ? 12_000 : 8_000;
-    const inspect = () => setStalled(!hasMeaningfulRouteContent(root));
-    const timeoutId = window.setTimeout(inspect, delay);
-    const observer = new MutationObserver(() => {
-      if (hasMeaningfulRouteContent(root)) setStalled(false);
-    });
+    const inspect = () => {
+      const meaningful = hasMeaningfulRouteContent(root);
+      if (meaningful) {
+        setReady(true);
+        setStalled(false);
+      }
+      return meaningful;
+    };
+    inspect();
+    const timeoutId = window.setTimeout(() => {
+      if (!inspect()) setStalled(true);
+    }, delay);
+    const observer = new MutationObserver(inspect);
     observer.observe(root, { childList: true, subtree: true, characterData: true });
     return () => {
       window.clearTimeout(timeoutId);
@@ -85,6 +98,9 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       ref={stageRef}
       key={stageKey}
       data-route-stage-key={stageKey}
+      data-route-state={stalled ? "stalled" : ready ? "ready" : "pending"}
+      data-route-surface-identity={surfaceIdentity}
+      aria-busy={!ready && !stalled}
       className={cn(
         "route-stage",
         (settled || instantEntry) && "route-stage--settled",

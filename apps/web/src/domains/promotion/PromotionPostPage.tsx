@@ -116,7 +116,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
   const readingUrl = post ? safePromotionUrl(post.readingUrl) : null;
 
   return (
-    <main className="pc-shell pc-narrow">
+    <div className="pc-shell pc-narrow">
       <Link to="/community/promote">← 신작·작가 홍보</Link>
 
       {error ? (
@@ -301,6 +301,6 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
           ) : null}
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

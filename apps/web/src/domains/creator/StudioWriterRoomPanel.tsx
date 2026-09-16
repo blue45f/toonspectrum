@@ -1735,7 +1735,7 @@ export function StudioWriterRoomPanel({
         ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_23rem] xl:overflow-hidden">
-          <main
+          <div
             id={`writer-room-panel-${activeStage}`}
             role="tabpanel"
             aria-labelledby={`writer-room-tab-${activeStage}`}
@@ -1743,7 +1743,7 @@ export function StudioWriterRoomPanel({
             className="min-h-0 bg-canvas focus:outline-none xl:overflow-y-auto"
           >
             {stageEditor}
-          </main>
+          </div>
           <StudioWriterRoomSuggestionsPanel
             stage={activeStage}
             document={document}

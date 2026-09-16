@@ -678,7 +678,7 @@ function CharacterFortunePage() {
           </aside>
 
           {/* 오른쪽: 메인 입력 및 결과창 (8/12 cols) */}
-          <main className="lg:col-span-8 flex flex-col gap-6">
+          <div className="lg:col-span-8 flex flex-col gap-6">
             
             {/* 탭 네비게이션 — 항상 노출(결과를 보면서도 전환, 탭별 결과 유지) · 모바일 가로 스크롤 + ARIA */}
             <div
@@ -1687,7 +1687,7 @@ function CharacterFortunePage() {
               )}
 
             </div>
-          </main>
+          </div>
 
         </div>
       )}

@@ -794,7 +794,7 @@ export function StudioContextHelpDialog({
             </button>
           </aside>
 
-          <main className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-border bg-background/95 p-2 backdrop-blur md:hidden" aria-label="도움말 탐색">
               {internalNav.map((item) => (
                 <button
@@ -837,7 +837,7 @@ export function StudioContextHelpDialog({
                 onRunDestination={runDestination}
               />
             )}
-          </main>
+          </div>
         </div>
       </div>
     </div>,

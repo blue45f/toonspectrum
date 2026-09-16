@@ -190,7 +190,7 @@ export function CafesPage() {
       </header>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
-        <main className="order-2 min-w-0 lg:order-1">
+        <div className="order-2 min-w-0 lg:order-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <label className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs focus-within:border-accent/50 sm:basis-56">
               <Search size={14} className="shrink-0 text-fg-3" />
@@ -335,7 +335,7 @@ export function CafesPage() {
               ))}
             </ul>
           )}
-        </main>
+        </div>
 
         <aside className="order-1 min-w-0 lg:order-2">
           <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-4">

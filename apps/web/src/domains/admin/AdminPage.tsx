@@ -188,7 +188,7 @@ export function AdminPage() {
               </nav>
             </div>
 
-            <main
+            <div
               id={`admin-panel-${tab}`}
               role="tabpanel"
               aria-labelledby={`admin-tab-${tab}`}
@@ -211,7 +211,7 @@ export function AdminPage() {
               {tab === "audit" ? <AdminAuditLogs userId={uid} /> : null}
               {tab === "campaigns" ? <AdminCampaigns uid={uid} /> : null}
               {tab === "ops" ? <AdminOps uid={uid} /> : null}
-            </main>
+            </div>
           </div>
         ) : null}
       </Container>

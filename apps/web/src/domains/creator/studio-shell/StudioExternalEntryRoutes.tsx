@@ -36,7 +36,7 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
     },
   };
   return (
-    <main className="min-h-[70vh] bg-canvas">
+    <div className="min-h-[70vh] bg-canvas">
       <Container size="prose" className="py-16 sm:py-24">
         <section className="rounded-3xl border border-line bg-card p-6 text-center shadow-sm sm:p-10">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-warning-soft/25 text-warning">
@@ -52,7 +52,7 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
           </Link>
         </section>
       </Container>
-    </main>
+    </div>
   );
 }
 

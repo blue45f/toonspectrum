@@ -263,7 +263,7 @@ export function StudioTemplatesPage() {
   };
 
   return (
-    <main className="min-h-[70vh] bg-canvas">
+    <div className="min-h-[70vh] bg-canvas">
       <Container size="wide" className="py-8 sm:py-12">
         <header className="max-w-4xl">
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
@@ -431,6 +431,6 @@ export function StudioTemplatesPage() {
           ) : null}
         </div>
       </Container>
-    </main>
+    </div>
   );
 }

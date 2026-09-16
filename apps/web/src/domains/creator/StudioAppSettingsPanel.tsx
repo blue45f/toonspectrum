@@ -397,7 +397,7 @@ export function StudioAppSettingsPanel({
           ) : null}
         </header>
 
-        <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <section className="rounded-2xl border border-accent/20 bg-accent-soft/45 p-4">
             <div className="flex items-start gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-panel text-accent shadow-sm">
@@ -566,7 +566,7 @@ export function StudioAppSettingsPanel({
               </div>
             </Card>
           </div>
-        </main>
+        </div>
 
         <footer className="flex items-center gap-2 border-t border-line px-4 py-3">
           <div className="min-w-0 flex-1" aria-live="polite">

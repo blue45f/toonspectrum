@@ -18,7 +18,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 export function PromotionEditorPage() {
   const { id } = useParams(), userId = useApp((state) => state.userId), hydrated = useHydrated();
   useDocumentTitle(id ? "작품 소개 수정 · ToonStudio" : "내 작품 소개하기 · ToonStudio");
-  if (!hydrated || !userId) return <main className="pc-shell pc-narrow"><Link to="/community/promote">← 홍보 커뮤니티</Link><div className="pc-empty"><h1>{hydrated ? "로그인 후 작품을 소개해 주세요" : "로그인 상태 확인 중"}</h1><p>상단 로그인 버튼을 이용해 주세요. 작품 감상은 로그인 없이 이용할 수 있어요.</p></div></main>;
+  if (!hydrated || !userId) return <div className="pc-shell pc-narrow"><Link to="/community/promote">← 홍보 커뮤니티</Link><div className="pc-empty"><h1>{hydrated ? "로그인 후 작품을 소개해 주세요" : "로그인 상태 확인 중"}</h1><p>상단 로그인 버튼을 이용해 주세요. 작품 감상은 로그인 없이 이용할 수 있어요.</p></div></div>;
   return <PromotionEditor key={`${userId}:${id ?? "new"}`} id={id} userId={userId} />;
 }
 function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
@@ -83,7 +83,7 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
     } catch (cause) { const message = await getApiErrorMessage(cause, "등록하지 못했어요. 입력 내용은 유지됩니다."); if (live.current) setError(message); }
     finally { busy.current = false; if (live.current) setSending(false); }
   };
-  return <main className="pc-shell pc-narrow"><Link to={id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote"}>← {id ? "게시물로 돌아가기" : "홍보 커뮤니티"}</Link><header className="pc-editor-heading"><p className="pc-eyebrow">YOUR STORY STARTS HERE</p><h1>{id ? "작품 소개 수정" : "내 작품 소개하기"}</h1><p>첫 독자에게 작품의 매력과 만나러 갈 곳을 알려주세요.</p></header>
+  return <div className="pc-shell pc-narrow"><Link to={id ? `/community/promote/${encodeURIComponent(id)}` : "/community/promote"}>← {id ? "게시물로 돌아가기" : "홍보 커뮤니티"}</Link><header className="pc-editor-heading"><p className="pc-eyebrow">YOUR STORY STARTS HERE</p><h1>{id ? "작품 소개 수정" : "내 작품 소개하기"}</h1><p>첫 독자에게 작품의 매력과 만나러 갈 곳을 알려주세요.</p></header>
     {!id && <aside className="pc-notice" aria-label="홍보 초안 저장 안내">{recovery?.status === "restored" && <p>이 탭에 임시 저장한 초안을 불러왔어요. 게시 권한은 공개 전에 다시 확인해 주세요.</p>}<p role="status">{draftStatus}</p></aside>}
     {error && <p className="pc-error" role="alert">{error}</p>}{loading && <p role="status">기존 내용을 불러오고 있어요.</p>}
     {!loading && (!id || version !== null) && <form className="pc-form" onSubmit={(event) => void submit(event)}><fieldset disabled={sending}><legend className="sr-only">작품 소개 작성</legend>
@@ -99,5 +99,5 @@ function PromotionEditor({ id, userId }: { id?: string; userId: string }) {
       <label className="pc-check"><input type="checkbox" checked={draft.rightsConfirmed} onChange={(event) => field("rightsConfirmed", event.target.checked)} required /><span>작품·표지·영상·사용 음원의 게시 권한이 있으며, 공개 가능한 콘텐츠임을 확인했습니다.</span></label>
       <button className="pc-button pc-primary" type="submit" disabled={sending || coverBusy}><Save size={17} aria-hidden="true" />{sending ? "저장 중…" : id ? "변경 사항 저장" : "작품 소개 공개하기"}</button>
     </fieldset></form>}
-  </main>;
+  </div>;
 }

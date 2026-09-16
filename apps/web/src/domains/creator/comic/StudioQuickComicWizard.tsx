@@ -505,7 +505,7 @@ export function StudioQuickComicWizard({
           </div>
         </header>
 
-        <main
+        <div
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
           data-studio-quick-comic-scroll-body="true"
         >
@@ -861,7 +861,7 @@ export function StudioQuickComicWizard({
               )}
             </section>
           ) : null}
-        </main>
+        </div>
 
         <footer
           className="flex shrink-0 items-center gap-2 border-t border-line bg-panel px-4 py-3 sm:px-5"

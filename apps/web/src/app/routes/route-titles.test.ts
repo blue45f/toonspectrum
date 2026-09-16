@@ -11,9 +11,16 @@ describe("route title resolution", () => {
   });
 
   it("normalizes redirected creation tools before resolving their title", () => {
-    expect(resolveRouteTitle("/publishing", translate)).toBe("route.studio");
+    expect(resolveRouteTitle("/publishing", translate)).toBe("route.studioPublish");
     expect(resolveRouteTitle("/music", translate)).toBe("route.studio");
     expect(resolveRouteTitle("/brush-lab", translate)).toBe("route.studio");
+  });
+
+  it("uses the primary route authority for Production and Studio front doors", () => {
+    expect(resolveRouteTitle("/production", translate)).toBe("route.production");
+    expect(resolveRouteTitle("/production/projects/sample-project/review", translate)).toBe("route.production");
+    expect(resolveRouteTitle("/studio/new", translate)).toBe("route.studioNew");
+    expect(resolveRouteTitle("/studio/assets", translate)).toBe("route.studioAssets");
   });
 
   it("provides specific accessible labels for canvas-first studio workspaces", () => {

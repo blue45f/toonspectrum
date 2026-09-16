@@ -557,7 +557,7 @@ export function StudioLayerLiftDialog({
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_19rem]">
-          <main className="flex min-h-[44dvh] min-w-0 flex-1 flex-col border-line lg:min-h-0 lg:border-r">
+          <div className="flex min-h-[44dvh] min-w-0 flex-1 flex-col border-line lg:min-h-0 lg:border-r">
             <div
               role="tablist"
               aria-label="레이어 복원 미리보기"
@@ -698,7 +698,7 @@ export function StudioLayerLiftDialog({
                 </p>
               </div>
             ) : null}
-          </main>
+          </div>
 
           <aside className="min-h-0 shrink-0 overflow-y-auto overscroll-contain bg-panel px-3 py-3 [scrollbar-width:thin] sm:px-4 lg:w-auto">
             <div

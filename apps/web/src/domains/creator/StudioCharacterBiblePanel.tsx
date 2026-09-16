@@ -455,7 +455,7 @@ export function StudioCharacterBiblePanel({
             </div>
           </aside>
 
-          <main className="min-h-0 overflow-y-auto">
+          <div className="min-h-0 overflow-y-auto">
             {!selectedCharacter ? (
               <div className="grid min-h-full place-items-center px-5 py-12 text-center">
                 <div className="max-w-sm">
@@ -553,7 +553,7 @@ export function StudioCharacterBiblePanel({
                 </div>
               </div>
             )}
-          </main>
+          </div>
         </div>
 
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-line px-4 py-2 text-[0.65rem] leading-relaxed text-fg-3 sm:px-5">

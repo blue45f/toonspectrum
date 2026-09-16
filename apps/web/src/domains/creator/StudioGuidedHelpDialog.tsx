@@ -674,7 +674,8 @@ export function StudioGuidedHelpDialog({
     if (!STUDIO_GUIDED_HELP_ARTICLE_BY_ID.has(articleId)) return;
     setActiveArticleId(articleId);
     setQuery("");
-    dialogRef.current?.querySelector<HTMLElement>("[data-guided-help-scroll]")?.scrollTo({ top: 0 });
+    const scrollPane = dialogRef.current?.querySelector<HTMLElement>("[data-guided-help-scroll]");
+    if (typeof scrollPane?.scrollTo === "function") scrollPane.scrollTo({ top: 0 });
   }, []);
 
   const goHome = useCallback(() => {
@@ -795,7 +796,7 @@ export function StudioGuidedHelpDialog({
             </div>
           </nav>
 
-          <main data-guided-help-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div data-guided-help-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {activeArticle ? (
               <GuidedHelpArticle
                 article={activeArticle}
@@ -816,7 +817,7 @@ export function StudioGuidedHelpDialog({
                 searchInputRef={searchInputRef}
               />
             )}
-          </main>
+          </div>
         </div>
       </div>
     </div>,

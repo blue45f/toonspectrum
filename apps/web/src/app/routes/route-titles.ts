@@ -6,6 +6,7 @@ import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
 import { useT } from "@/shared/lib/i18n";
 import { decodePathSegment } from "@/shared/lib/decode-path-segment";
+import { resolveSiteRouteAuthority } from "@/shared/lib/site-route-authority";
 import { canonicalSitePath } from "@/shared/lib/site-route-metadata";
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
@@ -66,6 +67,8 @@ export function resolveRouteTitle(pathname: string, t: Translator): string {
   const canonicalPath = canonicalSitePath(pathname);
   if (canonicalPath === "/") return `${t("app.name")} · ${t("home.creatorTitle")}`;
   if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
+  const authority = resolveSiteRouteAuthority(canonicalPath);
+  if (authority) return t(authority.titleKey);
   if (canonicalPath in STATIC_TITLES) {
     const titleKey = STATIC_TITLES[canonicalPath];
     return titleKey ? t(titleKey) : t("app.name");
