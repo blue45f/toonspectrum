@@ -60,7 +60,6 @@ import { createStudioMainMenuPresentation } from "./studio-main-menu-presentatio
 import {
   StudioExportMenuPanel,
   StudioMainMenu,
-  preloadStudioAssetMenuPanel,
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
 import {
@@ -74,6 +73,7 @@ import {
 import { studioWriterRoomHasContent } from "./studio-writer-room";
 import { StudioProjectCenterSearch, StudioProjectCenterSection } from "./StudioProjectCenterSearch";
 import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
+import { preloadStudioAssetToolPopoverBody } from "./studio-tool-belt-lazy-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
@@ -165,9 +165,9 @@ const MENUBAR_HINTS = {
   assets: {
     id: "menubar-assets",
     title: "템플릿·에셋",
-    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 소재를 엽니다.",
+    description: "템플릿, 장면, 캐릭터, 3D, 효과와 내 에셋을 한 번에 검색·미리보기·삽입합니다.",
     preview: "assets",
-    tip: "자주 쓰는 소재는 내 소재에 모아 반복 작업 시간을 줄여보세요.",
+    tip: "즐겨찾기와 최근 사용으로 반복 작업을 줄이고 적용 전 형식과 이용 조건을 확인할 수 있어요.",
   },
   bubbles: {
     id: "menubar-bubbles",
@@ -1351,8 +1351,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
       icon: Folder,
       hint: MENUBAR_HINTS.assets,
       run: () => {
-        preloadStudioAssetMenuPanel();
-        setMenu("template");
+        preloadStudioAssetToolPopoverBody();
+        setMenu("asset");
       },
     },
     bubbles: {
@@ -1468,9 +1468,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <button
               type="button"
               onClick={() => {
-                preloadStudioAssetMenuPanel();
-                setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+                preloadStudioAssetToolPopoverBody();
+                setMenu(activeToolbarGroup === "assetGroup" ? null : "asset");
               }}
+              onPointerEnter={preloadStudioAssetToolPopoverBody}
+              onPointerDown={preloadStudioAssetToolPopoverBody}
+              onFocus={preloadStudioAssetToolPopoverBody}
               aria-label="템플릿·에셋"
               aria-haspopup="menu"
               aria-expanded={activeToolbarGroup === "assetGroup"}

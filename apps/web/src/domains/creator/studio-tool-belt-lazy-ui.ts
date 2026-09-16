@@ -6,9 +6,13 @@ function warmStudioToolPopoverChunk(importer: () => Promise<unknown>): void {
   void importer().catch(() => undefined);
 }
 
-const studioAssetToolPopoverBodyLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioAssetToolPopoverWorkspace")
-);
+const studioAssetToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
+  // The canonical entry now opens the unified visual workspace. Warm its catalog and direct-drag
+  // leaves beside the lightweight shell so click-only entry has no shell -> workspace waterfall.
+  warmStudioToolPopoverChunk(() => import("./StudioUnifiedAssetToolPopoverContent"));
+  warmStudioToolPopoverChunk(() => import("./StudioUnifiedAssetToolPopoverContentDirectDrag"));
+  return import("./StudioAssetToolPopoverWorkspace");
+});
 const studioSceneToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   // bgFill is the initial scene tab. Start its leaves alongside the body so the
   // second Suspense boundary does not create a body -> panel network waterfall.
@@ -16,12 +20,11 @@ const studioSceneToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   warmStudioToolPopoverChunk(() => import("./canvas/StudioCanvasResizer"));
   return import("./StudioSceneToolPopoverBody");
 });
-const studioStyleToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
-  // Palette is the initial style tab, including programmatic menu activations
-  // which do not pass through the toolbar button's pointer/focus warm-up.
-  warmStudioToolPopoverChunk(() => import("./StudioPaletteLibraryPanel"));
-  return import("./StudioStyleToolPopoverBody");
-});
+const studioStyleToolPopoverBodyLoader = createStudioIntentLazyLoader(() =>
+  // The initial style surface is the lightweight color workbench. The heavier saved-palette
+  // library remains lazy until its explicit tab is selected.
+  import("./StudioStyleToolPopoverBody")
+);
 const studioAiToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   // The AI hub opens on the background tool by default. Warm both leaves in
   // parallel with the body while retaining their independent lazy chunks.
