@@ -285,7 +285,7 @@ export function StudioDraftOperationSyncAssistant({
                 triggerRef.current?.focus({ preventScroll: true });
               }}
               aria-label="기기·서버 동기화 닫기"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <X className="h-4 w-4" aria-hidden />
             </button>

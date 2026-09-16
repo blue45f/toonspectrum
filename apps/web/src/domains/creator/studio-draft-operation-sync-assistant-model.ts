@@ -148,7 +148,7 @@ function serverSummary(input: StudioDraftOperationSyncAssistantInput): string {
     return `서버 원고 r${revision}까지 확인되어 다른 기기에서 이어서 작업할 수 있습니다.`;
   }
   if (input.mode === "local" && input.syncPhase === "synced") {
-    return `같은 기기 탭끼리의 변경만 맞췄습니다. 서버 원고 r${revision} 저장도 완료해야 다른 기기에서 이어갈 수 있습니다.`;
+    return `같은 기기 탭끼리의 변경만 맞췄습니다. 다른 기기에서 이어가려면 서버 원고 저장도 완료해야 합니다. 현재 서버 원고는 r${revision}입니다.`;
   }
   return `서버 원고 r${revision}은 유지되며, 대기 변경이 끝난 뒤 최신 초안으로 갱신할 수 있습니다.`;
 }
@@ -177,7 +177,7 @@ export function resolveStudioDraftOperationSyncAssistant(
   let tone: StudioDraftOperationSyncTone = "neutral";
   let compactLabel = "변경 동기화 확인";
   let headline = "기기와 서버의 변경 상태를 확인하고 있어요";
-  let detail = operationSummary(input);
+  const detail = operationSummary(input);
   let primaryAction: StudioDraftOperationSyncAction = null;
 
   if (input.syncPhase === "recovery-required" || recoveryCount > 0) {

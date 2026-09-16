@@ -78,6 +78,18 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
     });
   }, [workId]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || workId === null) return;
+    const onOnline = () => {
+      setHasQueuedReceipt(readStudioDraftSaveOutbox({
+        storage: outboxStorage(),
+        workId,
+      }) !== null);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [workId]);
+
   const onSaveDraft = useCallback((): Promise<unknown> => {
     if (saveInFlightRef.current !== null) return saveInFlightRef.current;
 

@@ -2,7 +2,7 @@ import { collectStudioManifestClosure, type StudioViteManifest } from "./studio-
 
 // Studio-only offline pack: never paid by catalogue visitors or during worker install.
 // The mounted Studio prepares this bounded pack in the background after first online use.
-export const DRAWING_ROOTS = ["StudioRouter", "StudioInspectorAside", "StudioToolHintBubble", "StudioColorVisionHintPreview", "studio-legacy-editor-adapter", "studio-pages-history-durable-runtime",
+export const DRAWING_ROOTS = ["StudioRouter", "StudioInspectorAside", "StudioToolHintBubble", "StudioColorVisionHintPreview", "StudioDraftSaveCenter", "studio-legacy-editor-adapter", "studio-pages-history-durable-runtime",
   "StudioEnhancedExportMenuPanel", "studio-export", "studio-capture-readiness", "studio-project-file", "studio-release-schedule", "studio-publication-analytics", "studio-autosave-sqlite-store", "studio-local-database-worker-client"];
 
 /** Build-authoritative closure: resource timing may drop entries after its buffer fills. */
