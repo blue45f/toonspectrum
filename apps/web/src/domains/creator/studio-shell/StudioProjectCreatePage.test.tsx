@@ -80,6 +80,41 @@ describe("StudioProjectCreatePage", () => {
     expect(profile.bindings[0]).toMatchObject({ provider: "browser", syncState: "local-only" });
   });
 
+  it("restores platform canvas choices and creates the selected authoring size", async () => {
+    render(
+      <MemoryRouter initialEntries={["/studio/new"]}>
+        <StudioProjectCreatePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    const template = screen.getByRole("combobox", {
+      name: /시작 템플릿|Starting template/u,
+    }) as HTMLSelectElement;
+    expect(Array.from(template.options, (option) => option.value)).toEqual(expect.arrayContaining([
+      "webtoon-vertical",
+      "webtoon-naver",
+      "webtoon-kakao",
+      "webtoon-canvas",
+      "webtoon-four-cut",
+      "webtoon-page",
+    ]));
+    expect(template.textContent).toMatch(/네이버|Naver/u);
+    expect(template.textContent).toMatch(/카카오|Kakao/u);
+    expect(template.textContent).toMatch(/WEBTOON Canvas/u);
+
+    fireEvent.change(template, { target: { value: "webtoon-naver" } });
+    fireEvent.click(screen.getByRole("button", { name: /웹툰 시작|Start Webtoon/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toMatch(/^\/studio\/p\//u);
+    });
+    const project = readStudioProjectLibrary(window.localStorage).projects[0]!;
+    expect(project.templateId).toBe("webtoon-naver");
+    const document = readStudioProjectDocuments(window.localStorage, project.id).documents[0]!;
+    expect(document).toMatchObject({ width: 690, height: 8000 });
+  });
+
   it("honors a homepage deep link for project kind and starting template", () => {
     render(
       <MemoryRouter initialEntries={["/studio/new?kind=illustration&template=illustration-portrait"]}>

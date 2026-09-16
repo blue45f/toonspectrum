@@ -1,3 +1,8 @@
+import {
+  STUDIO_WEBTOON_CANVAS_PRESETS,
+  type StudioWebtoonWidthStandardId,
+} from "./studio-webtoon-canvas-presets";
+
 /**
  * Studio Webtoon Guides — 웹툰 표준폭 가이드·세이프영역·분량 피드백 헬퍼.
  * 기존 userGuides는 작가가 손으로 끄는 수동 드래그선뿐이라, 여기에 더해
@@ -14,23 +19,24 @@
  */
 
 export interface WebtoonWidthStandard {
-  id: string;
+  id: StudioWebtoonWidthStandardId;
   label: string;
   width: number;
 }
 
 /**
  * 대표 웹툰 플랫폼/작업 표준 연재폭(px). 좁은 폭부터 넓은 폭 순서.
- * - 네이버 690 / 카카오 720: 실제 모바일 연재 기준폭.
- * - 웹툰 캔버스 800: 자유 연재 플랫폼 권장 작업폭.
- * - 고화질 작업 1080: 레티나/확대 대비 고해상 작업 캔버스.
+ * 새 문서 프리셋과 같은 데이터를 사용해 생성 화면과 가이드가 서로 다른 폭을 말하지 않게 한다.
  */
-export const WEBTOON_WIDTH_STANDARDS: WebtoonWidthStandard[] = [
-  { id: "naver", label: "네이버", width: 690 },
-  { id: "kakao", label: "카카오", width: 720 },
-  { id: "canvas", label: "웹툰 캔버스", width: 800 },
-  { id: "hires", label: "고화질 작업", width: 1080 },
-];
+export const WEBTOON_WIDTH_STANDARDS: readonly WebtoonWidthStandard[] = Object.freeze(
+  [...STUDIO_WEBTOON_CANVAS_PRESETS]
+    .sort((left, right) => left.width - right.width)
+    .map((preset) => ({
+      id: preset.guideId,
+      label: preset.guideLabelKo,
+      width: preset.width,
+    })),
+);
 
 /** 오버레이가 그릴 세로 가이드선 한 줄(축 x 고정 — 표준폭은 좌우 경계만 짚는다). */
 export type GuideLine = { axis: "x"; pos: number; label: string };
