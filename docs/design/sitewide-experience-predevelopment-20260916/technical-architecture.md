@@ -1,5 +1,9 @@
 # 기술 아키텍처와 코드 변경 설계
 
+## 0. 2026-09-17 main 보정
+
+최신 main에는 partial route metadata·RouteStage와 Production Hub·first-save restore가 존재한다. 구현은 이 문서를 처음부터 새로 적용하지 않고 [`main-revalidation-20260917.md`](./main-revalidation-20260917.md)의 수렴 순서를 따른다. AppShell이 browser document의 유일한 `main` landmark를 소유하고, product shell과 domain page는 그 내부에 렌더한다.
+
 ## 1. 아키텍처 목표
 
 사이트 경험 개편은 기존 Vite SPA, React Router 선언형 모드, 도메인별 lazy route, Studio 문서 런타임을 유지하면서 다음 권위를 분리한다.
@@ -84,7 +88,9 @@ export interface SiteRouteDefinition {
   maturity: RouteMaturity;
   device: DeviceMode;
   mobileMode: MobileMode;
-  copy: LocalizedRouteCopy;
+  titleKey: string;
+  labelKey: string;
+  descriptionKey: string;
   keywords: readonly string[];
   primaryAction: RouteActionDefinition;
   owner: RouteOwner;
@@ -99,6 +105,25 @@ export const marketRoutes: AppRouteDefinition[] = [
 ```
 
 CI는 `AppRouteDefinition.id/path`와 Registry를 대조하되, 동적 상세 route는 별도 allowlist와 패턴 계약으로 검증한다.
+### Domain catalog composition
+
+현재 main의 `STUDIO_ROUTE_REGISTRY`, `STUDIO_ROUTE_MANIFEST`, `productionRoutes`는 삭제하거나 세 번째 path grammar로 복사하지 않는다. 각 domain은 경로·runtime identity의 권위를 유지하고 전역 Registry가 필요한 projection만 adapter로 제공한다.
+
+```ts
+interface DomainRouteCatalogAdapter {
+  readonly domain: string;
+  routes(): readonly SiteRouteDefinition[];
+  integrity(): readonly RouteIntegrityIssue[];
+}
+```
+
+- Studio product registry: product IA, aliases, project/document resource
+- Studio runtime manifest: resolver kind, lifecycle, title ownership
+- Production catalog: project·episode route family와 shell/access/readiness
+- Public route groups: static Browse·Docs destination metadata
+
+두 Studio catalog가 같은 route를 설명할 때 전역 projection은 id를 새로 만들지 않고 source id와 runtime manifest id를 함께 참조한다.
+
 ## 5. Registry selector API
 
 ```ts
@@ -399,8 +424,10 @@ interface UrlStateCodec<T> {
 
 ```html
 <body>
-  <div data-route-shell="browse|creator|docs">
-    <main data-route-id="market-browse" data-route-state="ready">
+  <main id="main-content">
+    <div data-route-shell="browse|creator|docs"
+         data-route-id="market-browse"
+         data-route-state="ready">
 ```
 
 ### 브레이크포인트

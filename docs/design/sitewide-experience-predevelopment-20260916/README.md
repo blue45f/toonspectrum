@@ -1,9 +1,21 @@
 # ToonStudio 전면 사이트 경험 — 개발 전 설계 패키지
 
-상태: **Implementation-ready design**  
-기준일: 2026-09-16  
-기준 커밋: `e23362011`  
+상태: **Implementation-ready design · main revalidated**
+최초 기준일: 2026-09-16
+최초 기준 커밋: `e23362011`
+최신 main 재검토: 2026-09-17 · `ecae7445966a`
 대상: 공개 사이트, 탐색·커뮤니티·학습·마켓, 개인 공간, Studio 프로젝트 운영·편집 표면
+
+## 0. 최신 main 재검토 안내
+
+현재 구현 판단과 다음 개발 우선순위는 [`main-revalidation-20260917.md`](./main-revalidation-20260917.md)를 따른다.
+
+- 현재 사이트맵 canonical 목적지: 108개
+- 사이트맵 자기 자신과 누락된 Studio 1차 목적지를 포함한 정적 재검토: 112개
+- 추가 Production route pattern: 14개(정적·동적 포함)
+- 최초 빈 화면 P0 일부는 main에서 복구됐고, 새 P0는 route authority·main landmark·readiness 계약으로 이동했다.
+- 기존 `route-inventory.csv`와 `implementation-backlog.csv`는 2026-09-16 시점의 역사적 기준으로 유지한다.
+- 현재 상태는 `main-route-revalidation-20260917.csv`와 `main-backlog-revalidation-20260917.csv`에서 확인한다.
 
 ## 1. 목적
 
@@ -75,7 +87,11 @@
 | `shell-component-contracts.md` | 셸·페이지 템플릿·공통 상태·컴포넌트 API |
 | `wireframes-and-flows.md` | 핵심 화면 와이어프레임과 사용자 흐름 |
 | `route-inventory.csv` | 108개 라우트의 구현 가능한 분류·우선순위 |
-| `implementation-backlog.csv` | Epic·작업·의존성·완료 조건 |
+| `implementation-backlog.csv` | 최초 Epic·작업·의존성·완료 조건 |
+| `main-revalidation-20260917.md` | 최신 main 기준 재판정과 수정 설계 |
+| `main-route-revalidation-20260917.csv` | 112개 정적 경로 현재 상태와 조치 |
+| `main-route-authorities-20260917.csv` | Studio·Production의 57개 domain route authority record |
+| `main-backlog-revalidation-20260917.csv` | 기존 77개 작업 상태와 main 신규 10개 작업 |
 | `delivery-plan.md` | 단계별 PR·플래그·마이그레이션·롤백 전략 |
 | `qa-acceptance.md` | 자동·수동 검증 매트릭스와 출시 게이트 |
 
@@ -175,7 +191,7 @@ flowchart TD
 - 시각 토큰과 브랜드 언어: `DESIGN.md`
 - 프론트엔드 의존 방향: `docs/architecture/frontend-layered-architecture.md`
 - Studio 라우트·문서 런타임: `docs/adr/0016-studio-route-document-runtime-boundaries.md`
-- 제안된 사이트 전면 경계 결정: `docs/adr/0023-sitewide-route-registry-and-shell-boundaries.md`
+- 수용·부분 구현 중인 사이트 전면 경계 결정: `docs/adr/0023-sitewide-route-registry-and-shell-boundaries.md`
 - 기존 공개 사이트 방향: `docs/design/site-experience-v3.md`
 
 충돌 시 제품·아키텍처 ADR을 우선하며, 이 패키지는 그 경계 안에서 사이트 경험을 구체화한다.

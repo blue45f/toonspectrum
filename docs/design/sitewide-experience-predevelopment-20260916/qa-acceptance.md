@@ -1,5 +1,25 @@
 # QA·접근성·출시 승인 기준
 
+## 0. 2026-09-17 main 재검토 추가 게이트
+
+최신 게이트는 108개 directory 결과만 검사하지 않는다. 다음 집합을 분리해 검증한다.
+
+- directory canonical destination 108개
+- `/sitemap`, `/production`, `/studio/new`, `/studio/assets`를 포함한 static review set 112개
+- `/production` route group의 정적·동적 pattern 14개
+- legacy alias direct-entry matrix
+
+추가 필수 조건:
+
+1. `main` landmark 정확히 하나
+2. visible page identity 또는 explicit editor ready/degraded/blocked state
+3. hidden fallback H1만으로 route success 판정 금지
+4. primary navigation 목적지와 directory·metadata·title parity
+5. route type별 loading budget
+6. local dev, production build, deployed host 결과를 분리 기록
+
+상세 근거는 [`main-revalidation-20260917.md`](./main-revalidation-20260917.md)를 따른다.
+
 ## 1. 검증 피라미드
 
 | 계층 | 목적 | 도구 예시 |
@@ -19,20 +39,20 @@
 - dynamic detail·admin·auth callback·internal companion 제외
 - `access=project`와 `projectContext=required` 일치
 - Creator immersive route에 모바일 모드 존재
-- 한국어·영어 label·description·title 존재
+- label·description·title 번역 키와 한국어 source fallback 존재
 - Primary action 정확히 하나
 - route group의 정식 경로가 Registry에 누락되지 않음
 - Registry 항목이 실제 route 없이 고아로 남지 않음
-## 3. 108개 route smoke 계약
+## 3. static·dynamic route smoke 계약
 
-각 정식 목적지를 데스크톱 `1440×1000`, 모바일 `390×844`에서 검사한다.
+각 정식 목적지와 대표 dynamic family를 데스크톱 `1440×1000`, 모바일 `390×844`에서 검사한다.
 
 ### 공통 통과 조건
 
 - 예상 URL 또는 승인된 canonical로 도착
 - HTTP 2xx
 - `main` 정확히 하나
-- 실제 또는 RouteFrame 보조 H1 정확히 하나
+- 실제 visible H1 하나 또는 명시적 editor surface identity; loading fallback H1은 ready 판정에 사용하지 않음
 - 32자 이상의 의미 있는 본문 또는 명시적 loading·empty·error 상태
 - 빈 흰색·회색·검정 화면이 아님
 - 처리되지 않은 page error 없음
@@ -256,7 +276,7 @@ UI 테스트뿐 아니라 실제 storage adapter와 runtime contract 테스트�
 
 ## 15. 최종 전체 회귀
 
-- 108개 정식 목적지 desktop·mobile 순회
+- directory 108개와 static review set 112개 desktop·mobile 순회
 - canonical alias 별도 순회
 - 한국어·영어 내비게이션
 - 비로그인·로그인·프로젝트 있음·없음
