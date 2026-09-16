@@ -18,6 +18,7 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
   loadMigrationManifest,
 } from "./run-production-database-migrations.mjs";
 import {
@@ -435,6 +436,12 @@ BEGIN
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact cutover-readiness ledger privileges';
+  END IF;
+
+
+  IF ${buildStudioProjectGraphRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact Studio ProjectGraph privileges';
   END IF;
 
   IF ${buildStudioProductionRuntimeAclViolationSql(runtimeDatabaseRole)} THEN

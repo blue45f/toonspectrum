@@ -16,6 +16,7 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
 } from "./run-production-database-migrations.mjs";
 
 test("loads the runtime health readiness relation and cutover contract", () => {
@@ -63,6 +64,7 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildStudioProductionRuntimeAclViolationSql("webdex_runtime"),
+    buildStudioProjectGraphRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildPersonalCloudRuntimeAclViolationSql("webdex_runtime"),
