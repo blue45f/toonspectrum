@@ -26,7 +26,7 @@ export function StudioEditorReturnButton({
         buttonClass({ size: "sm", variant: "quiet" }),
         "min-h-11 min-w-11 shrink-0 gap-1.5",
         variant === "lane" &&
-          "sticky left-0 z-20 bg-panel/95 px-2.5 shadow-[0_0_0_4px_var(--color-panel)]",
+          "border border-line/70 bg-panel/95 px-2.5",
         variant === "immersive" &&
           "rounded-full border border-line/70 bg-raised/80 px-2.5 max-[429px]:size-11 max-[429px]:px-0",
         canvasOnly && "rounded-full border border-line bg-panel/95 px-3 shadow-lg backdrop-blur",
