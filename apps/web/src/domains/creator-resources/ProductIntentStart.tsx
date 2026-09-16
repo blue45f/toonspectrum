@@ -2,6 +2,7 @@ import { ArrowRight, Clock3, Search } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import Link from "@/compat/router-link";
+import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import {
   creatorDestinationDescription,
   creatorDestinationLabel,
@@ -74,6 +75,7 @@ export function ProductIntentStart() {
           <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
           <span>{recent ? creatorDestinationDescription(recent.id, locale) : copy.fallbackBody}</span>
           {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
+          {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
         <Link className="cf-link" href="/studio/projects">
