@@ -46,7 +46,8 @@ const DEFAULT_LEAF_MODULES = [
   "./ai/StudioAiBackgroundPanel",
   "./StudioBackgroundPanel",
   "./canvas/StudioCanvasResizer",
-  "./StudioPaletteLibraryPanel",
+  "./StudioUnifiedAssetToolPopoverContent",
+  "./StudioUnifiedAssetToolPopoverContentDirectDrag",
 ] as const;
 
 function read(relativePath: string): string {

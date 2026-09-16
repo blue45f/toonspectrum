@@ -23,11 +23,7 @@ import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
 } from "./studio-chrome-ui";
-import {
-  preloadStudioAssetMenuPanel,
-  preloadStudioPaletteLibraryPanel,
-  preloadStudioReferencePanel,
-} from "./studio-page-lazy-ui";
+import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
 import { studioToolButtonClass } from "./studio-panel-ui";
 import {
   LazyStudioAiToolPopoverBody,
@@ -108,6 +104,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     drawMode,
     frameAnimOpen,
     frameAnimTargetId,
+    menu,
     menuRef,
     referencePanelOpen,
     selected,
@@ -181,18 +178,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 type="button"
                 aria-label="템플릿·에셋"
                 onClick={() => {
-                  preloadStudioAssetMenuPanel();
-                  setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-                }}
-                onPointerEnter={() => {
                   preloadStudioAssetToolPopoverBody();
-                  preloadStudioAssetMenuPanel();
+                  setMenu(activeToolbarGroup === "assetGroup" ? null : "asset");
                 }}
+                onPointerEnter={preloadStudioAssetToolPopoverBody}
                 onPointerDown={preloadStudioAssetToolPopoverBody}
-                onFocus={() => {
-                  preloadStudioAssetToolPopoverBody();
-                  preloadStudioAssetMenuPanel();
-                }}
+                onFocus={preloadStudioAssetToolPopoverBody}
                 aria-haspopup="menu"
                 aria-expanded={activeToolbarGroup === "assetGroup"}
                 className={cn(
@@ -221,7 +212,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
             <StudioFloatingToolPopover
               open={activeToolbarGroup === "assetGroup"}
               id="asset-group"
-              className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
+              className={cn(
+                groupPopoverClass("w-80"),
+                menu === "asset"
+                  ? "lg:left-1/2 lg:w-[min(74rem,calc(100vw-2rem))] lg:max-w-[calc(100vw-2rem)] lg:max-h-[calc(100dvh-7.5rem)] lg:-translate-x-1/2 lg:overflow-hidden"
+                  : "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]",
+              )}
               desktopWindow={{
                 label: "에셋",
                 surfaceId: "toolbar-assets",
@@ -523,18 +519,9 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               <button
                 type="button"
                 onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
-                onPointerEnter={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
-                onPointerDown={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
-                onFocus={() => {
-                  preloadStudioStyleToolPopoverBody();
-                  preloadStudioPaletteLibraryPanel();
-                }}
+                onPointerEnter={preloadStudioStyleToolPopoverBody}
+                onPointerDown={preloadStudioStyleToolPopoverBody}
+                onFocus={preloadStudioStyleToolPopoverBody}
                 aria-haspopup="menu"
                 aria-expanded={activeToolbarGroup === "styleGroup"}
                 className={cn(
@@ -562,7 +549,10 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
             <StudioFloatingToolPopover
               open={activeToolbarGroup === "styleGroup"}
               id="style-group"
-              className={groupPopoverClass("w-72")}
+              className={cn(
+                groupPopoverClass("w-80"),
+                "lg:w-[23rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]",
+              )}
               desktopWindow={{
                 label: "스타일",
                 surfaceId: "toolbar-style",

@@ -12,7 +12,13 @@ type Children = { children?: ReactNode };
 vi.mock("./studio-chrome-ui", () => ({
   StudioToolbarCluster: ({ children }: Children) => <div>{children}</div>,
   StudioToolbarDivider: () => null,
-  StudioFloatingToolPopover: ({ children, open, id }: Children & { open: boolean; id: string }) => open ? <div data-testid={id}>{children}</div> : null,
+  StudioFloatingToolPopover: ({
+    children,
+    open,
+    id,
+    className,
+  }: Children & { open: boolean; id: string; className?: string }) =>
+    open ? <div data-testid={id} className={className}>{children}</div> : null,
   studioChromeIconClass: () => "",
   STUDIO_ICON_SIZE: { toolCompact: 16, subtab: 12 },
   STUDIO_ICON_STROKE: 1.5,
@@ -85,6 +91,19 @@ describe("Studio toolbar disclosure integration", () => {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
     expect(screen.queryByTestId("specialist-utilities")).toBeNull();
+  });
+
+  it("opens the unified asset workspace from the primary template and asset entry", () => {
+    const { toolBelt } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "템플릿·에셋" }));
+    expect(toolBelt.setMenu).toHaveBeenCalledWith("asset");
+  });
+
+  it("gives the unified asset workspace a viewport-safe desktop surface without nested outer scrolling", () => {
+    setup({ activeToolbarGroup: "assetGroup", menu: "asset" });
+    const popover = screen.getByTestId("asset-group");
+    expect(popover.className).toContain("lg:max-h-[calc(100dvh-7.5rem)]");
+    expect(popover.className).toContain("lg:overflow-hidden");
   });
 
   it("expands and collapses without executing an edit", () => {
