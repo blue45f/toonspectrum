@@ -3,6 +3,8 @@
  * Search · category · favorites · recent · render-faithful preview tiles.
  */
 import {
+  Gauge,
+  GitBranch,
   Grid2X2,
   LoaderCircle,
   RotateCcw,
@@ -46,12 +48,12 @@ import {
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
-import {
-  resolveStudioBrushEngineLaneLabelKo,
-  studioBrushEngineLaneRowById,
-} from "./studio-brush-engine-lane-catalog";
 import { isStudioBrushMaterialGroup } from "./studio-brush-material-group";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import {
+  listStudioBrushEngineFamilyOptions,
+  studioBrushProductProfile,
+} from "./studio-brush-product-profile";
 import {
   materializeStudioBrushCatalogSelection,
   preloadStudioBrushCatalogSelection,
@@ -774,6 +776,145 @@ export function LargeBrushPreview({
   );
 }
 
+interface StudioBrushProfileCardProps {
+  item: StudioBrushCatalogItem;
+  active: boolean;
+  compact: boolean;
+  operation: StudioToolOperation;
+  viewMode: StudioBrushCatalogViewMode;
+}
+
+function StudioBrushProfileCard({
+  item,
+  active,
+  compact,
+  operation,
+  viewMode,
+}: StudioBrushProfileCardProps): ReactElement {
+  const profile = studioBrushProductProfile(item);
+  const nextGen = isStudioV6BrushCatalogId(item.id);
+  const kindLabel = studioBrushCatalogKindLabel(item);
+  const sizeLabel = profile.size.normalized
+    ? `기본 ${profile.size.defaultWidth}px · 권장 ${profile.size.recommendedMin}–${profile.size.recommendedMax}px · 원본 ${Math.round(profile.size.sourceWidth)}px 보정`
+    : `기본 ${profile.size.defaultWidth}px · 권장 ${profile.size.recommendedMin}–${profile.size.recommendedMax}px · ${profile.size.sizeClassLabel}`;
+
+  return (
+    <section
+      aria-label={`${item.name} 브러시 특성`}
+      data-studio-brush-profile-card={item.id}
+      data-studio-brush-engine-family={profile.engineFamilyId}
+      className={cn(
+        "sticky top-0 z-20 mb-2 overflow-hidden rounded-xl border border-line bg-panel/95 p-2 shadow-[0_7px_18px_oklch(0.12_0.02_70/0.18)] backdrop-blur",
+        compact && "p-1.5",
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-2">
+        <div className={cn("w-[6.5rem] shrink-0 overflow-hidden rounded-lg", compact && "w-[5.25rem]")}>
+          {viewMode === "text" ? (
+            <div
+              data-studio-brush-profile-icon="true"
+              className={cn(
+                "grid h-8 place-items-center rounded-lg bg-card",
+                active ? "text-accent" : "text-fg-2",
+              )}
+            >
+              <StudioBrushPresetIcon brushId={item.id} size={18} strokeWidth={2} />
+            </div>
+          ) : nextGen ? (
+            <StudioNextGenBrushPreview
+              catalogId={item.id}
+              active={active}
+              compact
+              density="stroke"
+            />
+          ) : (
+            <LargeBrushPreview item={item} active={active} compact density="stroke" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <strong className="truncate text-xs text-fg">{item.name}</strong>
+            {nextGen ? (
+              <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.56rem] font-black text-accent">
+                V6
+              </span>
+            ) : null}
+            <span className="shrink-0 rounded-full bg-raised px-1.5 py-0.5 text-[0.56rem] font-bold text-fg-2">
+              {kindLabel}
+            </span>
+          </div>
+          <p className="mt-0.5 line-clamp-2 text-[0.62rem] leading-relaxed text-fg-3">
+            {profile.behaviorSummary}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1.5 text-[0.61rem] sm:grid-cols-2">
+        <div className="min-w-0 rounded-lg bg-card px-2 py-1.5 text-fg-2">
+          <span className="flex items-center gap-1 font-bold text-fg">
+            <GitBranch size={11} aria-hidden />
+            {profile.engineFamilyLabel}
+          </span>
+          <span className="mt-0.5 block truncate" title={profile.engineSummary}>
+            {profile.engineSummary}
+          </span>
+        </div>
+        <div className="min-w-0 rounded-lg bg-card px-2 py-1.5 text-fg-2">
+          <span className="flex items-center gap-1 font-bold text-fg">
+            <Gauge size={11} aria-hidden />
+            시작 굵기
+          </span>
+          <span
+            data-studio-brush-size-profile={profile.size.sizeClassLabel}
+            className="mt-0.5 block truncate"
+            title={sizeLabel}
+          >
+            {sizeLabel}
+          </span>
+        </div>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1" aria-label="브러시 핵심 특성">
+        {profile.traits.map((trait) => (
+          <span
+            key={trait}
+            data-studio-brush-trait={trait}
+            className="rounded-full border border-line bg-card px-1.5 py-0.5 text-[0.56rem] font-semibold text-fg-2"
+          >
+            {trait}
+          </span>
+        ))}
+      </div>
+      <details className="mt-1.5 rounded-lg border border-line/70 bg-card/60 px-2 py-1 text-[0.6rem] text-fg-2">
+        <summary className="min-h-7 cursor-pointer select-none py-1 font-bold text-fg">
+          엔진 조합 {profile.engineStages.length}단계 자세히
+        </summary>
+        <ol className="grid gap-1 pb-1 sm:grid-cols-2">
+          {profile.engineStages.map((stage, index) => (
+            <li
+              key={`${stage.role}-${stage.id}-${index}`}
+              className="min-w-0 rounded-md bg-panel px-2 py-1"
+              data-studio-brush-engine-stage={stage.role}
+            >
+              <span className="font-bold text-accent">{stage.roleLabel}</span>{" "}
+              <span className="font-semibold text-fg">{stage.label}</span>
+              <span className="block truncate text-[0.55rem] text-fg-3" title={stage.provider}>
+                {stage.provider}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
+      {operation === "paint" ? (
+        <p
+          data-studio-brush-text-size-policy="preserve"
+          className="mt-1.5 text-[0.56rem] font-semibold text-fg-3"
+        >
+          브러시를 바꾸면 획 굵기만 이 기본값으로 바뀌며, 텍스트 글자 크기는 유지됩니다.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function StudioBrushLibrarySheet({
   open,
   activeBrushId,
@@ -820,6 +961,7 @@ export function StudioBrushLibrarySheet({
   const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>(
     restoredView?.viewMode ?? "stroke",
   );
+  const [engineFamilyFilter, setEngineFamilyFilter] = useState("all");
   const [visibleLimit, setVisibleLimit] = useState(
     STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
   );
@@ -890,6 +1032,10 @@ export function StudioBrushLibrarySheet({
   }, [catalogTabs, open, operation, tab]);
 
   useEffect(() => {
+    setEngineFamilyFilter("all");
+  }, [operation]);
+
+  useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -922,7 +1068,15 @@ export function StudioBrushLibrarySheet({
   const normalizedQuery = query.trim();
   const personalSearch = tab === "favorites" || tab === "recent";
   const favoriteIdSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
-  const items = useMemo(() => filterStudioBrushCatalogItems({
+  const engineFamilyOptions = useMemo(
+    () => listStudioBrushEngineFamilyOptions(
+      operation === "erase"
+        ? STUDIO_LIBRARY_ERASER_BRUSH_CATALOG_ITEMS
+        : STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,
+    ),
+    [operation],
+  );
+  const catalogItems = useMemo(() => filterStudioBrushCatalogItems({
     operation,
     category: tab,
     query: normalizedQuery,
@@ -930,10 +1084,19 @@ export function StudioBrushLibrarySheet({
     recentIds,
     includeV6: true,
   }), [favoriteIds, normalizedQuery, operation, recentIds, tab]);
+  const items = useMemo(
+    () => engineFamilyFilter === "all"
+      ? catalogItems
+      : catalogItems.filter(
+          (item) => studioBrushProductProfile(item).engineFamilyId === engineFamilyFilter,
+        ),
+    [catalogItems, engineFamilyFilter],
+  );
   const progressiveFilterKey = [
     operation,
     tab,
     normalizedQuery,
+    engineFamilyFilter,
     tab === "favorites" ? favoriteIds.join("\u001f") : "",
     tab === "recent" ? recentIds.join("\u001f") : "",
   ].join("\u001e");
@@ -954,6 +1117,10 @@ export function StudioBrushLibrarySheet({
       ? activeBrushId
       : visibleItems[0]?.id ?? null;
   const activeCatalogItem = studioBrushCatalogItemById(activeBrushId);
+  const inspectedCatalogItem = visibleItems.find((item) => item.id === focusedBrushId)
+    ?? items.find((item) => item.id === activeBrushId)
+    ?? visibleItems[0]
+    ?? activeCatalogItem;
   const activeEraserId: StudioEraserQuickPickerId =
     activeBrushId === "kneaded-eraser" ? "kneaded-eraser" : "standard-eraser";
   const showEraserQuickPicker =
@@ -1224,7 +1391,7 @@ export function StudioBrushLibrarySheet({
               ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"}에서 이름·용도로 검색`
               : operation === "erase"
               ? `지우개 ${operationCatalogCount}종 검색`
-              : `전체 ${operationCatalogCount}종 검색 (네온, 수채, G펜…)`}
+              : `전체 ${operationCatalogCount}종 검색 (Hokusai, 강모, 과립, G펜…)`}
             className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
             aria-label={`${personalSearch ? tab === "favorites" ? "즐겨찾기" : "최근 사용" : "전체"} ${operationLabel} 검색`}
             aria-controls={panelId}
@@ -1246,8 +1413,47 @@ export function StudioBrushLibrarySheet({
             ? `재질 분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
             : operation === "erase"
               ? "지우는 강도와 결과를 비교해 선택하세요."
-              : "재질을 고르거나 이름·용도·종류로 전체 검색"}
+              : "재질·엔진을 고르거나 이름·용도·질감·특성으로 전체 검색"}
         </p>
+        {operation === "paint" ? (
+          <div
+            data-studio-brush-engine-filter="true"
+            className={cn(
+              "mt-1.5 flex min-w-0 items-center gap-2 px-1",
+              compact && "mt-0 shrink-0 px-0",
+              "[@media(max-height:32rem)]:mt-0 [@media(max-height:32rem)]:shrink-0 [@media(max-height:32rem)]:px-0",
+            )}
+          >
+            <label
+              htmlFor={`${titleId}-engine-filter`}
+              className={cn(
+                "shrink-0 text-[0.62rem] font-semibold text-fg-3",
+                compact && "sr-only",
+                "[@media(max-height:32rem)]:sr-only",
+              )}
+            >
+              엔진
+            </label>
+            <select
+              id={`${titleId}-engine-filter`}
+              value={engineFamilyFilter}
+              aria-label="브러시 엔진 계열 필터"
+              onChange={(event) => {
+                setEngineFamilyFilter(event.target.value);
+                setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
+                setFocusedBrushId(null);
+              }}
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
+            >
+              <option value="all">모든 엔진 · {catalogItems.length}종</option>
+              {engineFamilyOptions.map((family) => (
+                <option key={family.id} value={family.id}>
+                  {family.label} · {family.count}종
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         {operation === "paint" ? <div
           className={cn(
             "mt-1.5 flex min-w-0 items-center justify-between gap-2 px-1",
@@ -1373,6 +1579,15 @@ export function StudioBrushLibrarySheet({
         <p role="status" aria-live="polite" className="sr-only">
           {visibleItems.length}/{items.length}개의 {operationLabel}가 표시됩니다.
         </p>
+        {inspectedCatalogItem ? (
+          <StudioBrushProfileCard
+            item={inspectedCatalogItem}
+            active={inspectedCatalogItem.id === activeBrushId}
+            compact={compact}
+            operation={operation}
+            viewMode={viewMode}
+          />
+        ) : null}
         {showEraserQuickPicker ? (
           <StudioEraserQuickPicker
             selectedId={activeEraserId}
@@ -1413,10 +1628,8 @@ export function StudioBrushLibrarySheet({
               const kindLabel = studioBrushCatalogKindLabel(item);
               const qualityRepresentative = isStudioDefaultQualityBrushCatalogId(item.id);
               const nextGen = isStudioV6BrushCatalogId(item.id);
-              const engineLaneLabel = nextGen
-                ? "V6 재질 엔진"
-                : resolveStudioBrushEngineLaneLabelKo(item.id);
-              const engineLane = nextGen ? null : studioBrushEngineLaneRowById(item.id);
+              const profile = studioBrushProductProfile(item);
+              const primaryTrait = profile.traits[0] ?? kindLabel;
               return (
                 <div
                   key={item.id}
@@ -1425,7 +1638,9 @@ export function StudioBrushLibrarySheet({
                     ? "nextgen"
                     : qualityRepresentative ? "verified" : "extended"}
                   data-studio-brush-kind={item.mediaGroup}
-                  data-studio-brush-engine-lane={nextGen ? "v6-material" : engineLane?.lane}
+                  data-studio-brush-engine-lane={profile.engineFamilyId}
+                  data-studio-brush-default-size={profile.size.defaultWidth}
+                  data-studio-brush-primary-trait={primaryTrait}
                   className={cn(
                     "group relative flex border [content-visibility:auto]",
                     STUDIO_EASE,
@@ -1446,13 +1661,15 @@ export function StudioBrushLibrarySheet({
                   <button
                     type="button"
                     onPointerEnter={() => {
+                      setFocusedBrushId(item.id);
                       void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onFocus={() => {
+                      setFocusedBrushId(item.id);
                       void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onClick={() => void selectCatalogItem(item)}
-                    title={item.hint}
+                    title={`${profile.engineFamilyLabel} · ${profile.traits.join(" · ")} · ${item.hint}`}
                     aria-label={`${item.name} 선택`}
                     aria-pressed={active}
                     aria-keyshortcuts={onToggleFavorite ? "F" : undefined}
@@ -1518,15 +1735,18 @@ export function StudioBrushLibrarySheet({
                               active ? "text-on-accent/75" : "text-fg-3"
                             )}
                           >
-                            {engineLaneLabel ? `${engineLaneLabel} · ` : ""}{kindLabel} · {item.defaultWidth}px ·{" "}
-                            {Math.round(item.defaultOpacity * 100)}%
+                            {profile.engineFamilyLabel} · {primaryTrait} · {kindLabel} ·{" "}
+                            {profile.size.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
                           </span>
                         ) : null}
                       </span>
                       {pendingSelectionId === item.id ? (
                         <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
                       ) : nextGen ? (
-                        <span className="ml-auto shrink-0 rounded-full bg-accent/20 px-1.5 py-0.5 text-[0.58rem] font-black text-accent" title="V6 재질 엔진">
+                        <span
+                          className="ml-auto shrink-0 rounded-full bg-accent/20 px-1.5 py-0.5 text-[0.58rem] font-black text-accent"
+                          title={profile.engineFamilyLabel}
+                        >
                           V6
                         </span>
                       ) : item.source === "pro" ? (
@@ -1546,29 +1766,28 @@ export function StudioBrushLibrarySheet({
                         )}
                       >
                         <span className="truncate">
-                          {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
+                          {profile.size.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
                         </span>
-                        <span className="flex shrink-0 items-center gap-1">
-                          {engineLaneLabel ? (
-                            <span
-                              data-studio-brush-engine-chip={engineLane?.lane}
-                              className={cn(
-                                "rounded-full px-1.5 py-0.5 font-bold",
-                                active
-                                  ? "bg-on-accent/20 text-on-accent"
-                                  : "bg-accent/12 text-accent"
-                              )}
-                              title={`엔진: ${engineLaneLabel}`}
-                            >
-                              {engineLaneLabel}
-                            </span>
-                          ) : null}
+                        <span className="flex min-w-0 shrink-0 items-center gap-1">
+                          <span
+                            data-studio-brush-engine-chip={profile.engineFamilyId}
+                            className={cn(
+                              "max-w-24 truncate rounded-full px-1.5 py-0.5 font-bold",
+                              active
+                                ? "bg-on-accent/20 text-on-accent"
+                                : "bg-accent/12 text-accent"
+                            )}
+                            title={`엔진: ${profile.engineSummary}`}
+                          >
+                            {profile.engineFamilyLabel}
+                          </span>
                           <span
                             data-studio-brush-kind-badge={item.mediaGroup}
                             className={cn(
-                              "rounded-full px-1.5 py-0.5 font-bold",
+                              "max-w-20 truncate rounded-full px-1.5 py-0.5 font-bold",
                               active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
                             )}
+                            title={`재질: ${kindLabel} · 특성: ${profile.traits.join(" · ")}`}
                           >
                             {kindLabel}
                           </span>
@@ -1682,7 +1901,7 @@ export function StudioBrushLibrarySheet({
               {activeCatalogItem
                 ? operation === "erase"
                   ? `${activeCatalogItem.name}의 굵기·지우기 강도·촉 반응`
-                  : `${activeCatalogItem.name}의 굵기·불투명도·촉 반응`
+                  : `${activeCatalogItem.name}의 굵기·불투명도·촉 반응 · 텍스트 글자 크기 유지`
                 : `사용자 저장 ${operationLabel}는 내 브러시에서 다시 적용`}
             </span>
           </span>
