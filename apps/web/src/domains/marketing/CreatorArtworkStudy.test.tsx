@@ -3,10 +3,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CreatorArtworkStudy } from "./CreatorArtworkStudy";
+import { CREATOR_ART_ASSETS } from "./creator-theme-art";
 
 afterEach(cleanup);
 
 describe("artwork study controls", () => {
+  it("switches the responsive source with the active theme art direction", () => {
+    const { container } = render(<CreatorArtworkStudy locale="ko" stage={0} image={CREATOR_ART_ASSETS.process} />);
+    expect(container.querySelector("figure")?.getAttribute("data-art-asset")).toBe("process");
+    expect(screen.getByRole("img").getAttribute("src")).toBe("/brand/atelier-process.webp");
+    expect(screen.getByRole("img").getAttribute("srcset")).toContain("atelier-process-640.webp");
+  });
   it("lets the artist compare actual values and color without loading video", () => {
     const { container } = render(<CreatorArtworkStudy locale="ko" stage={0} />);
     const slider = screen.getByRole("slider", { name: "일러스트의 명암과 컬러 비교" });
