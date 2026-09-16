@@ -169,15 +169,32 @@ describe("studio chrome UI", () => {
     expect(html).toContain("max-lg:min-h-11");
   });
 
-  it("keeps mobile dock targets at least 44px in both axes and marks active state", () => {
-    const html = renderToStaticMarkup(
+  it("keeps mobile dock targets at least 44px and preserves selected-icon contrast", () => {
+    const { container } = render(
       <StudioDockButton icon={Pencil} label="펜" active />
     );
-    expect(html).toContain("min-h-11");
-    expect(html).toContain("min-w-11");
-    expect(html).toContain("bg-accent");
-    expect(html).toContain("text-on-accent");
-    expect(html).toContain("펜");
+    const button = screen.getByRole("button", { name: "펜" });
+    const icon = container.querySelector("svg");
+
+    expect(button.className).toContain("min-h-11");
+    expect(button.className).toContain("min-w-11");
+    expect(button.className).toContain("bg-accent");
+    expect(button.className).toContain("text-on-accent");
+    expect(icon?.getAttribute("class")).toContain("text-on-accent");
+    expect(icon?.getAttribute("class")).not.toContain("text-accent");
+  });
+
+  it("preserves selected-icon contrast in the contextual mobile footer", () => {
+    const { container } = render(
+      <StudioContextActionButton icon={Pencil} label="속성" active />
+    );
+    const icon = container.querySelector("svg");
+
+    expect(screen.getByRole("button", { name: "속성" }).className).toContain(
+      "bg-accent"
+    );
+    expect(icon?.getAttribute("class")).toContain("text-on-accent");
+    expect(icon?.getAttribute("class")).not.toContain("text-accent");
   });
 
   it("offers motion-coach intent targets on mobile dock controls", () => {
