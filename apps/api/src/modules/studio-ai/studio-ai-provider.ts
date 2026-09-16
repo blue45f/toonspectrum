@@ -1,7 +1,18 @@
 import type { StudioAiProviderPreference } from "./studio-ai.dto";
 
-export const STUDIO_AI_FREE_PROVIDER_IDS = ["gemini", "groq", "openrouter"] as const;
-const STUDIO_AI_LEGACY_TEST_PROVIDER_IDS = ["zai", "deepseek"] as const;
+export const STUDIO_AI_FREE_PROVIDER_IDS = [
+  "gemini",
+  "qwen",
+  "groq",
+  "sambanova",
+  "zai",
+  "mistral",
+  "cloudflare",
+  "openrouter",
+  "siliconflow",
+] as const;
+export const STUDIO_AI_MAX_PROVIDER_ATTEMPTS = STUDIO_AI_FREE_PROVIDER_IDS.length;
+const STUDIO_AI_LEGACY_TEST_PROVIDER_IDS = ["deepseek"] as const;
 export const STUDIO_AI_PROVIDER_IDS = [
   ...STUDIO_AI_FREE_PROVIDER_IDS,
   ...STUDIO_AI_LEGACY_TEST_PROVIDER_IDS,
@@ -46,8 +57,14 @@ type EnvLike = Partial<Record<string, string | undefined>>;
 
 const DEFAULT_FREE_PROVIDER_ORDER: readonly StudioAiFreeProviderId[] = [
   "gemini",
+  "qwen",
   "groq",
+  "sambanova",
+  "zai",
+  "mistral",
+  "cloudflare",
   "openrouter",
+  "siliconflow",
 ];
 const DEFAULT_LEGACY_PROVIDER_ORDER: readonly StudioAiProviderId[] = [
   "zai",
@@ -80,6 +97,50 @@ function isOpenRouterFreeModel(model: string): boolean {
   return normalized === "openrouter/free" || normalized.endsWith(":free");
 }
 
+const CLOUDFLARE_WORKERS_AI_FREE_MODELS = new Set([
+  "@cf/qwen/qwen3-30b-a3b-fp8",
+  "@cf/zai-org/glm-4.7-flash",
+  "@cf/google/gemma-4-26b-a4b-it",
+  "@cf/nvidia/nemotron-3-120b-a12b",
+]);
+
+export function isCloudflareWorkersAiFreeModel(model: string): boolean {
+  return CLOUDFLARE_WORKERS_AI_FREE_MODELS.has(model.trim().toLowerCase());
+}
+
+const QWEN_BEIJING_FREE_QUOTA_MODELS = new Set([
+  "qwen3.7-plus",
+  "qwen3.7-plus-2026-05-26",
+  "qwen3.8-27b",
+  "qwen3.8-2.4t-a95b",
+  "qwen3.6-flash-2026-04-16",
+  "qwen-turbo",
+]);
+
+export function isQwenBeijingFreeQuotaModel(model: string): boolean {
+  return QWEN_BEIJING_FREE_QUOTA_MODELS.has(model.trim().toLowerCase());
+}
+
+const ZAI_FREE_MODELS = new Set(["glm-4.7-flash", "glm-4.5-flash"]);
+
+export function isZaiFreeModel(model: string): boolean {
+  return ZAI_FREE_MODELS.has(model.trim().toLowerCase());
+}
+
+const SILICONFLOW_FREE_TEXT_MODELS = new Set(["thudm/glm-z1-9b-0414"]);
+
+export function isSiliconFlowFreeTextModel(model: string): boolean {
+  return SILICONFLOW_FREE_TEXT_MODELS.has(model.trim().toLowerCase());
+}
+
+function validQwenWorkspaceId(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{5,127}$/iu.test(value);
+}
+
+function validCloudflareAccountId(value: string): boolean {
+  return /^[0-9a-f]{32}$/u.test(value);
+}
+
 function freeProviderConfig(
   id: StudioAiFreeProviderId,
   env: EnvLike,
@@ -97,6 +158,26 @@ function freeProviderConfig(
       freePool: true,
     };
   }
+  if (id === "qwen") {
+    const workspaceId = env.STUDIO_AI_FREE_QWEN_WORKSPACE_ID?.trim() ?? "";
+    const apiKey = env.STUDIO_AI_FREE_QWEN_API_KEY?.trim() ?? "";
+    const model = boundedText(env.STUDIO_AI_FREE_QWEN_MODEL, "qwen3.7-plus", 200);
+    return {
+      id,
+      label: "Qwen 베이징 무료 할당량",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_QWEN_CONFIRMED)
+        && validQwenWorkspaceId(workspaceId)
+        && apiKey.length > 0
+        && isQwenBeijingFreeQuotaModel(model),
+      endpoint: validQwenWorkspaceId(workspaceId)
+        ? `https://${workspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions`
+        : "",
+      apiKey,
+      model,
+      freePool: true,
+    };
+  }
   if (id === "groq") {
     const apiKey = env.STUDIO_AI_FREE_GROQ_API_KEY?.trim() ?? "";
     return {
@@ -106,6 +187,94 @@ function freeProviderConfig(
       endpoint: "https://api.groq.com/openai/v1/chat/completions",
       apiKey,
       model: boundedText(env.STUDIO_AI_FREE_GROQ_MODEL, "openai/gpt-oss-120b", 200),
+      freePool: true,
+    };
+  }
+  if (id === "sambanova") {
+    const apiKey = env.STUDIO_AI_FREE_SAMBANOVA_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "SambaNova 무료",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED)
+        && apiKey.length > 0,
+      endpoint: "https://api.sambanova.ai/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_SAMBANOVA_MODEL, "DeepSeek-V3.1", 200),
+      freePool: true,
+    };
+  }
+  if (id === "zai") {
+    const apiKey = env.STUDIO_AI_FREE_ZAI_API_KEY?.trim() ?? "";
+    const model = boundedText(env.STUDIO_AI_FREE_ZAI_MODEL, "glm-4.7-flash", 200);
+    return {
+      id,
+      label: "Z.AI 무료 Flash",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_ZAI_CONFIRMED)
+        && apiKey.length > 0
+        && isZaiFreeModel(model),
+      endpoint: "https://api.z.ai/api/paas/v4/chat/completions",
+      apiKey,
+      model,
+      freePool: true,
+    };
+  }
+  if (id === "mistral") {
+    const apiKey = env.STUDIO_AI_FREE_MISTRAL_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "Mistral 무료",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_MISTRAL_CONFIRMED)
+        && apiKey.length > 0,
+      endpoint: "https://api.mistral.ai/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.STUDIO_AI_FREE_MISTRAL_MODEL, "mistral-small-latest", 200),
+      freePool: true,
+    };
+  }
+  if (id === "cloudflare") {
+    const accountId = env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID?.trim().toLowerCase() ?? "";
+    const apiKey = env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN?.trim() ?? "";
+    const model = boundedText(
+      env.STUDIO_AI_FREE_CLOUDFLARE_MODEL,
+      "@cf/qwen/qwen3-30b-a3b-fp8",
+      200,
+    );
+    return {
+      id,
+      label: "Cloudflare Workers AI 무료",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED)
+        && validCloudflareAccountId(accountId)
+        && apiKey.length > 0
+        && isCloudflareWorkersAiFreeModel(model),
+      endpoint: validCloudflareAccountId(accountId)
+        ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`
+        : "",
+      apiKey,
+      model,
+      freePool: true,
+    };
+  }
+  if (id === "siliconflow") {
+    const apiKey = env.STUDIO_AI_FREE_SILICONFLOW_API_KEY?.trim() ?? "";
+    const model = boundedText(
+      env.STUDIO_AI_FREE_SILICONFLOW_MODEL,
+      "THUDM/GLM-Z1-9B-0414",
+      200,
+    );
+    return {
+      id,
+      label: "SiliconFlow 무료 텍스트",
+      configured: poolEnabled
+        && enabled(env.STUDIO_AI_FREE_SILICONFLOW_CONFIRMED)
+        && apiKey.length > 0
+        && isSiliconFlowFreeTextModel(model),
+      endpoint: "https://api.siliconflow.cn/v1/chat/completions",
+      apiKey,
+      model,
       freePool: true,
     };
   }
@@ -166,7 +335,22 @@ function legacyTestProviderConfig(
 }
 
 function providerConfig(id: StudioAiProviderId, env: EnvLike): StudioAiProviderConfig {
-  if (id === "gemini" || id === "groq") return freeProviderConfig(id, env);
+  if (id === "zai") {
+    return studioAiFreePoolEnabled(env)
+      ? freeProviderConfig(id, env)
+      : legacyTestProviderConfig(id, env);
+  }
+  if (
+    id === "gemini"
+    || id === "qwen"
+    || id === "groq"
+    || id === "sambanova"
+    || id === "mistral"
+    || id === "cloudflare"
+    || id === "siliconflow"
+  ) {
+    return freeProviderConfig(id, env);
+  }
   if (id === "openrouter") {
     return studioAiFreePoolEnabled(env)
       ? freeProviderConfig(id, env)
@@ -237,17 +421,24 @@ export function resolveStudioAiTimeoutMs(
   firstProvider: StudioAiProviderId | undefined,
   env: EnvLike = process.env,
 ): number {
-  const providerTimeout = firstProvider === "gemini"
-    ? env.STUDIO_AI_FREE_GEMINI_TIMEOUT_MS
-    : firstProvider === "groq"
-      ? env.STUDIO_AI_FREE_GROQ_TIMEOUT_MS
-      : firstProvider === "openrouter" && studioAiFreePoolEnabled(env)
-        ? env.STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS
-        : firstProvider === "zai"
-          ? env.ZAI_TIMEOUT_MS
-          : firstProvider === "openrouter"
-            ? env.OPENROUTER_TIMEOUT_MS
-            : env.DEEPSEEK_TIMEOUT_MS;
+  const freeTimeouts: Partial<Record<StudioAiFreeProviderId, string | undefined>> = {
+    gemini: env.STUDIO_AI_FREE_GEMINI_TIMEOUT_MS,
+    qwen: env.STUDIO_AI_FREE_QWEN_TIMEOUT_MS,
+    groq: env.STUDIO_AI_FREE_GROQ_TIMEOUT_MS,
+    sambanova: env.STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS,
+    zai: env.STUDIO_AI_FREE_ZAI_TIMEOUT_MS,
+    mistral: env.STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS,
+    cloudflare: env.STUDIO_AI_FREE_CLOUDFLARE_TIMEOUT_MS,
+    openrouter: env.STUDIO_AI_FREE_OPENROUTER_TIMEOUT_MS,
+    siliconflow: env.STUDIO_AI_FREE_SILICONFLOW_TIMEOUT_MS,
+  };
+  const providerTimeout = studioAiFreePoolEnabled(env) && firstProvider
+    ? freeTimeouts[firstProvider as StudioAiFreeProviderId]
+    : firstProvider === "zai"
+      ? env.ZAI_TIMEOUT_MS
+      : firstProvider === "openrouter"
+        ? env.OPENROUTER_TIMEOUT_MS
+        : env.DEEPSEEK_TIMEOUT_MS;
   const parsed = Number(env.STUDIO_AI_TIMEOUT_MS ?? providerTimeout);
   return Number.isFinite(parsed) && parsed >= 5_000 && parsed <= 120_000
     ? Math.round(parsed)
@@ -270,7 +461,7 @@ const ZAI_BILLING_OR_PACKAGE_EXHAUSTED_CODES = new Set([
 function boundedBusinessCode(value: unknown): string | undefined {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
   const code = String(value).trim();
-  return /^\d{3,8}$/u.test(code) ? code : undefined;
+  return /^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+){0,7}$/u.test(code) ? code : undefined;
 }
 
 export function studioAiProviderBusinessCode(payload: unknown): string | undefined {
@@ -278,6 +469,14 @@ export function studioAiProviderBusinessCode(payload: unknown): string | undefin
   const record = payload as Record<string, unknown>;
   const directCode = boundedBusinessCode(record.code ?? record.error_code);
   if (directCode) return directCode;
+  if (Array.isArray(record.errors)) {
+    for (const candidate of record.errors) {
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+      const error = candidate as Record<string, unknown>;
+      const arrayCode = boundedBusinessCode(error.code ?? error.error_code);
+      if (arrayCode) return arrayCode;
+    }
+  }
   if (!record.error || typeof record.error !== "object" || Array.isArray(record.error)) {
     return undefined;
   }
@@ -289,11 +488,25 @@ export function classifyStudioAiProviderFailure(
   provider: StudioAiProviderId,
   responseStatus: number,
   payload?: unknown,
-  freePool = provider === "gemini" || provider === "groq",
+  freePool = STUDIO_AI_FREE_PROVIDER_IDS.includes(provider as StudioAiFreeProviderId),
 ): StudioAiProviderFailureClassification {
   const businessCode = studioAiProviderBusinessCode(payload);
   const freeProvider = freePool;
-  if (freeProvider && (responseStatus === 402 || responseStatus === 429)) {
+  const cloudflarePaidPlanRequired = provider === "cloudflare"
+    && responseStatus === 403
+    && businessCode === "5035";
+  const qwenFreeQuotaOnlyExhausted = provider === "qwen"
+    && responseStatus === 403
+    && businessCode === "AllocationQuota.FreeTierOnly";
+  if (
+    freeProvider
+    && (
+      responseStatus === 402
+      || responseStatus === 429
+      || cloudflarePaidPlanRequired
+      || qwenFreeQuotaOnlyExhausted
+    )
+  ) {
     return {
       kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
       billingFailoverEligible: true,

@@ -66,46 +66,87 @@ describe("Studio AI provider resolution", () => {
     expect(JSON.stringify(status)).not.toContain("test-key");
   });
 
-  it("무료 풀은 명시적으로 확인된 제공자만 품질 순서대로 노출한다", () => {
+  it("무료 풀은 확인된 외부 실시간 제공자만 품질 순서대로 노출한다", () => {
     const freeEnv = {
       NODE_ENV: "production",
       STUDIO_AI_FREE_POOL_ENABLED: "true",
-      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,openrouter",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,qwen,groq,sambanova,zai,mistral,cloudflare,openrouter,siliconflow",
       STUDIO_AI_FREE_GEMINI_API_KEY: "gemini-free-key",
       STUDIO_AI_FREE_GEMINI_CONFIRMED: "true",
+      STUDIO_AI_FREE_QWEN_WORKSPACE_ID: "workspace_123456",
+      STUDIO_AI_FREE_QWEN_API_KEY: "qwen-free-key",
+      STUDIO_AI_FREE_QWEN_CONFIRMED: "true",
       STUDIO_AI_FREE_GROQ_API_KEY: "groq-free-key",
       STUDIO_AI_FREE_GROQ_CONFIRMED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_API_KEY: "sambanova-free-key",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+      STUDIO_AI_FREE_ZAI_API_KEY: "zai-free-key",
+      STUDIO_AI_FREE_ZAI_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_API_KEY: "mistral-free-key",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+      STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID: "00000000000000000000000000000000",
+      STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN: "cloudflare-free-token",
+      STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_API_KEY: "openrouter-free-key",
       STUDIO_AI_FREE_OPENROUTER_CONFIRMED: "true",
       STUDIO_AI_FREE_OPENROUTER_MODEL: "openrouter/free",
+      STUDIO_AI_FREE_SILICONFLOW_API_KEY: "siliconflow-free-key",
+      STUDIO_AI_FREE_SILICONFLOW_CONFIRMED: "true",
     };
 
     expect(resolveStudioAiProviders("auto", freeEnv).map(({ id, model }) => ({ id, model })))
       .toEqual([
         { id: "gemini", model: "gemini-3.8-flash" },
+        { id: "qwen", model: "qwen3.7-plus" },
         { id: "groq", model: "openai/gpt-oss-120b" },
+        { id: "sambanova", model: "DeepSeek-V3.1" },
+        { id: "zai", model: "glm-4.7-flash" },
+        { id: "mistral", model: "mistral-small-latest" },
+        { id: "cloudflare", model: "@cf/qwen/qwen3-30b-a3b-fp8" },
         { id: "openrouter", model: "openrouter/free" },
+        { id: "siliconflow", model: "THUDM/GLM-Z1-9B-0414" },
       ]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
-      STUDIO_AI_FREE_GROQ_CONFIRMED: "false",
-    }).map(({ id }) => id)).toEqual(["gemini", "openrouter"]);
+      STUDIO_AI_FREE_QWEN_MODEL: "qwen-paid-or-unreviewed",
+      STUDIO_AI_FREE_ZAI_MODEL: "glm-5.1",
+      STUDIO_AI_FREE_SILICONFLOW_MODEL: "deepseek-ai/DeepSeek-V4-Pro",
+    }).map(({ id }) => id)).toEqual([
+      "gemini", "groq", "sambanova", "mistral", "cloudflare", "openrouter",
+    ]);
     expect(resolveStudioAiProviders("auto", {
       ...freeEnv,
-      STUDIO_AI_FREE_OPENROUTER_MODEL: "vendor/paid-model",
-    }).map(({ id }) => id)).toEqual(["gemini", "groq"]);
-    expect(classifyStudioAiProviderFailure("gemini", 429)).toMatchObject({
+      STUDIO_AI_FREE_QWEN_CONFIRMED: "false",
+      STUDIO_AI_FREE_ZAI_CONFIRMED: "false",
+      STUDIO_AI_FREE_SILICONFLOW_CONFIRMED: "false",
+    }).map(({ id }) => id)).toEqual([
+      "gemini", "groq", "sambanova", "mistral", "cloudflare", "openrouter",
+    ]);
+    expect(classifyStudioAiProviderFailure("qwen", 403, {
+      error: { code: "AllocationQuota.FreeTierOnly", message: "redacted" },
+    })).toMatchObject({
       kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
       billingFailoverEligible: true,
-      failoverReason: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      businessCode: "AllocationQuota.FreeTierOnly",
+    });
+    expect(classifyStudioAiProviderFailure("zai", 429, { code: 1304 }, true)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+    });
+    expect(classifyStudioAiProviderFailure("siliconflow", 402)).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+    });
+    expect(classifyStudioAiProviderFailure("cloudflare", 403, {
+      errors: [{ code: 5035, message: "redacted" }],
+    })).toMatchObject({
+      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
+      billingFailoverEligible: true,
+      businessCode: "5035",
     });
     expect(classifyStudioAiProviderFailure("groq", 503)).toMatchObject({
       kind: "provider_unavailable",
       billingFailoverEligible: false,
-    });
-    expect(classifyStudioAiProviderFailure("openrouter", 402, undefined, true)).toMatchObject({
-      kind: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
-      failoverReason: STUDIO_AI_FREE_QUOTA_FAILOVER_REASON,
     });
     expect(classifyStudioAiProviderFailure("openrouter", 402, undefined, false)).toMatchObject({
       kind: STUDIO_AI_BILLING_FAILOVER_REASON,
@@ -115,6 +156,26 @@ describe("Studio AI provider resolution", () => {
 
   it("공통 timeout을 우선하고 제공자 request ID를 제한해 추출한다", () => {
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000" })).toBe(6000);
+    expect(resolveStudioAiTimeoutMs("sambanova", {
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_TIMEOUT_MS: "8000",
+    })).toBe(8000);
+    expect(resolveStudioAiTimeoutMs("mistral", {
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_MISTRAL_TIMEOUT_MS: "9000",
+    })).toBe(9000);
+    expect(resolveStudioAiTimeoutMs("cloudflare", {
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_CLOUDFLARE_TIMEOUT_MS: "10000",
+    })).toBe(10000);
+    expect(resolveStudioAiTimeoutMs("qwen", {
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_QWEN_TIMEOUT_MS: "11000",
+    })).toBe(11000);
+    expect(resolveStudioAiTimeoutMs("siliconflow", {
+      STUDIO_AI_FREE_POOL_ENABLED: "true",
+      STUDIO_AI_FREE_SILICONFLOW_TIMEOUT_MS: "12000",
+    })).toBe(12000);
     expect(resolveStudioAiTimeoutMs("zai", { ZAI_TIMEOUT_MS: "6000", STUDIO_AI_TIMEOUT_MS: "7000" }))
       .toBe(7000);
     expect(studioAiProviderRequestId({ request_id: " req-1 " })).toBe("req-1");
@@ -146,7 +207,7 @@ describe("Studio AI provider resolution", () => {
     (code) => {
       expect(classifyStudioAiProviderFailure("zai", 429, {
         error: { code, message: "must never be surfaced" },
-      })).toEqual({
+      }, false)).toEqual({
         kind: STUDIO_AI_BILLING_FAILOVER_REASON,
         billingFailoverEligible: true,
         failoverReason: STUDIO_AI_BILLING_FAILOVER_REASON,
@@ -158,7 +219,7 @@ describe("Studio AI provider resolution", () => {
   it.each(["1302", "1303", "1305", "1312"])(
     "Z.ai 429 business code %s는 속도·혼잡 응답이므로 결제 전환 대상이 아니다",
     (code) => {
-      expect(classifyStudioAiProviderFailure("zai", 429, { code })).toEqual({
+      expect(classifyStudioAiProviderFailure("zai", 429, { code }, false)).toEqual({
         kind: "rate_limited",
         billingFailoverEligible: false,
         businessCode: code,
@@ -169,10 +230,10 @@ describe("Studio AI provider resolution", () => {
   it("Z.ai는 코드가 없거나 잘못된 HTTP 상태면 잔액 문구만으로 전환하지 않는다", () => {
     expect(classifyStudioAiProviderFailure("zai", 429, {
       error: { message: "1113 insufficient balance" },
-    })).toMatchObject({ kind: "rate_limited", billingFailoverEligible: false });
+    }, false)).toMatchObject({ kind: "rate_limited", billingFailoverEligible: false });
     expect(classifyStudioAiProviderFailure("zai", 500, {
       error: { code: 1113 },
-    })).toMatchObject({
+    }, false)).toMatchObject({
       kind: "provider_unavailable",
       billingFailoverEligible: false,
       businessCode: "1113",
@@ -183,6 +244,9 @@ describe("Studio AI provider resolution", () => {
     expect(studioAiProviderBusinessCode({ error: { error_code: 1113, message: "secret" } }))
       .toBe("1113");
     expect(studioAiProviderBusinessCode({ code: " 1308 " })).toBe("1308");
+    expect(studioAiProviderBusinessCode({ errors: [{ code: 5035 }] })).toBe("5035");
+    expect(studioAiProviderBusinessCode({ error: { code: "AllocationQuota.FreeTierOnly" } }))
+      .toBe("AllocationQuota.FreeTierOnly");
     expect(studioAiProviderBusinessCode({ code: "1113-secret" })).toBeUndefined();
     expect(studioAiProviderBusinessCode({ message: "1113" })).toBeUndefined();
   });

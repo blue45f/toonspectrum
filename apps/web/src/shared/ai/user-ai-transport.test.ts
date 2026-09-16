@@ -105,6 +105,75 @@ describe("managed free AI transport response limits", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("excludes local and self-hosted connections from automatic fallback", async () => {
+    const local: UserAiConnection = {
+      ...managedConnection,
+      id: "local-user",
+      label: "Local LLM",
+      baseUrl: "http://localhost:8082/v1",
+      apiKey: "",
+      textModel: "local-model",
+      costPolicy: "local-zero-cost",
+    };
+    const selfHosted: UserAiConnection = {
+      ...managedConnection,
+      id: "self-hosted-user",
+      label: "Self hosted",
+      baseUrl: "https://my-private-runtime.example/v1",
+      apiKey: "private-runtime-key",
+      textModel: "private-model",
+      costPolicy: "self-hosted-zero-cost",
+    };
+    const groq: UserAiConnection = {
+      ...managedConnection,
+      id: "groq-user",
+      label: "Groq free",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "groq-user-key",
+      textModel: "groq-free-model",
+      costPolicy: "provider-free-tier",
+    };
+    setUserAiConfiguration({
+      version: 1,
+      connections: [local, selfHosted, groq],
+      assignments: { text: local.id, image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "External only" } }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).resolves.toMatchObject({
+      content: "External only",
+      connection: { id: "groq-user" },
+      attemptedConnectionIds: ["groq-user"],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("api.groq.com");
+  });
+
+  it("does not invoke the network when only local or self-hosted connections exist", async () => {
+    setUserAiConfiguration({
+      version: 1,
+      connections: [{
+        ...managedConnection,
+        id: "local-only",
+        baseUrl: "http://localhost:8082/v1",
+        apiKey: "",
+        textModel: "local-model",
+        costPolicy: "local-zero-cost",
+      }],
+      assignments: { text: "local-only", image: null, inference: null, "three-d": null },
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeUserAiTextDetailed("system", "user")).rejects.toMatchObject({
+      code: "not-configured",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("falls through personal free connections by quality only after quota exhaustion", async () => {
     const gemini: UserAiConnection = {
       ...managedConnection,
@@ -127,7 +196,7 @@ describe("managed free AI transport response limits", () => {
     setUserAiConfiguration({
       version: 1,
       connections: [groq, gemini],
-      assignments: { text: null, image: null, inference: null, "three-d": null },
+      assignments: { text: groq.id, image: null, inference: null, "three-d": null },
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

@@ -1,7 +1,7 @@
 import { api } from "@/infrastructure/api";
 
 export interface FreeAiPoolProviderStatus {
-  id: "gemini" | "groq" | "openrouter" | "zai" | "deepseek";
+  id: "gemini" | "qwen" | "groq" | "sambanova" | "zai" | "mistral" | "cloudflare" | "openrouter" | "siliconflow" | "deepseek";
   label: string;
   configured: boolean;
   model: string;

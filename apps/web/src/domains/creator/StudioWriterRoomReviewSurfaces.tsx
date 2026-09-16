@@ -33,10 +33,15 @@ import type { StudioCharacterBibleEntry } from "./studio-character-bible";
 // 있어 라벨만 로컬로 둔다. studio-server-ai-client의 StudioServerAiProvider와 동일한 집합을 유지한다.
 const FAILOVER_PROVIDER_LABELS = {
   gemini: "Gemini 무료",
+  qwen: "Qwen 베이징 무료 할당량",
   groq: "Groq 무료",
+  sambanova: "SambaNova 무료",
+  zai: "Z.AI 무료 Flash",
+  mistral: "Mistral 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
   openrouter: "OpenRouter 무료",
+  siliconflow: "SiliconFlow 무료 텍스트",
   user: "내 무료 AI",
-  zai: "Z.ai",
   deepseek: "DeepSeek",
 } as const;
 
