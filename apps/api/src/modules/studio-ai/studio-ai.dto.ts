@@ -13,11 +13,14 @@ export const StudioAiTaskSchema = z.enum([
 export const StudioAiProviderPreferenceSchema = z.enum([
   "auto",
   "gemini",
+  "qwen",
   "groq",
   "sambanova",
-  "mistral",
-  "openrouter",
   "zai",
+  "mistral",
+  "cloudflare",
+  "openrouter",
+  "siliconflow",
   "deepseek",
 ]);
 

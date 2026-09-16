@@ -182,18 +182,36 @@ describe("StudioAiService", () => {
     delete process.env.STUDIO_AI_FREE_GEMINI_API_KEY;
     delete process.env.STUDIO_AI_FREE_GEMINI_MODEL;
     delete process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_QWEN_WORKSPACE_ID;
+    delete process.env.STUDIO_AI_FREE_QWEN_API_KEY;
+    delete process.env.STUDIO_AI_FREE_QWEN_MODEL;
+    delete process.env.STUDIO_AI_FREE_QWEN_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_QWEN_TIMEOUT_MS;
     delete process.env.STUDIO_AI_FREE_GROQ_API_KEY;
     delete process.env.STUDIO_AI_FREE_GROQ_MODEL;
     delete process.env.STUDIO_AI_FREE_GROQ_CONFIRMED;
     delete process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY;
     delete process.env.STUDIO_AI_FREE_SAMBANOVA_MODEL;
     delete process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_ZAI_API_KEY;
+    delete process.env.STUDIO_AI_FREE_ZAI_MODEL;
+    delete process.env.STUDIO_AI_FREE_ZAI_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_ZAI_TIMEOUT_MS;
     delete process.env.STUDIO_AI_FREE_MISTRAL_API_KEY;
     delete process.env.STUDIO_AI_FREE_MISTRAL_MODEL;
     delete process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_MODEL;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_CLOUDFLARE_TIMEOUT_MS;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_MODEL;
     delete process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_SILICONFLOW_API_KEY;
+    delete process.env.STUDIO_AI_FREE_SILICONFLOW_MODEL;
+    delete process.env.STUDIO_AI_FREE_SILICONFLOW_CONFIRMED;
+    delete process.env.STUDIO_AI_FREE_SILICONFLOW_TIMEOUT_MS;
     delete process.env.STUDIO_AI_TIMEOUT_MS;
     delete process.env.DEEPSEEK_MODEL;
     delete process.env.DEEPSEEK_TIMEOUT_MS;
@@ -964,23 +982,36 @@ describe("StudioAiService", () => {
     expect(JSON.stringify(error.getResponse())).not.toContain("postgres release connection detail");
   });
 
-  it("공유 무료 풀은 다섯 제공자의 무료 한도를 품질 순서대로 전환한다", async () => {
+  it("공유 무료 풀은 아홉 외부 제공자의 무료 한도를 순서대로 전환한다", async () => {
     process.env.STUDIO_AI_FREE_POOL_ENABLED = "true";
-    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,groq,sambanova,mistral,openrouter";
+    process.env.STUDIO_AI_FREE_PROVIDER_ORDER = "gemini,qwen,groq,sambanova,zai,mistral,cloudflare,openrouter,siliconflow";
     process.env.STUDIO_AI_FREE_GEMINI_API_KEY = "gemini-free-test-key";
     process.env.STUDIO_AI_FREE_GEMINI_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_QWEN_WORKSPACE_ID = "workspace_123456";
+    process.env.STUDIO_AI_FREE_QWEN_API_KEY = "qwen-free-test-key";
+    process.env.STUDIO_AI_FREE_QWEN_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_GROQ_API_KEY = "groq-free-test-key";
     process.env.STUDIO_AI_FREE_GROQ_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_SAMBANOVA_API_KEY = "sambanova-free-test-key";
     process.env.STUDIO_AI_FREE_SAMBANOVA_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_ZAI_API_KEY = "zai-free-test-key";
+    process.env.STUDIO_AI_FREE_ZAI_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_MISTRAL_API_KEY = "mistral-free-test-key";
     process.env.STUDIO_AI_FREE_MISTRAL_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID = "00000000000000000000000000000000";
+    process.env.STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN = "cloudflare-free-test-token";
+    process.env.STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED = "true";
     process.env.STUDIO_AI_FREE_OPENROUTER_API_KEY = "openrouter-free-test-key";
     process.env.STUDIO_AI_FREE_OPENROUTER_CONFIRMED = "true";
+    process.env.STUDIO_AI_FREE_SILICONFLOW_API_KEY = "siliconflow-free-test-key";
+    process.env.STUDIO_AI_FREE_SILICONFLOW_CONFIRMED = "true";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response('{"error":{"message":"gemini-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"code":"AllocationQuota.FreeTierOnly","message":"qwen-private-quota-detail"}}', { status: 403 })
       )
       .mockResolvedValueOnce(
         new Response('{"error":{"message":"groq-private-quota-detail"}}', { status: 429 })
@@ -989,13 +1020,22 @@ describe("StudioAiService", () => {
         new Response('{"error":{"message":"sambanova-private-quota-detail"}}', { status: 429 })
       )
       .mockResolvedValueOnce(
+        new Response('{"error":{"code":1304,"message":"zai-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
         new Response('{"error":{"message":"mistral-private-quota-detail"}}', { status: 429 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"errors":[{"code":5035,"message":"cloudflare-private-quota-detail"}]}', { status: 403 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"error":{"message":"openrouter-private-quota-detail"}}', { status: 429 })
       )
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            id: "openrouter-free-request-5",
-            model: "openrouter/free-selected-model",
+            id: "siliconflow-free-request-9",
+            model: "THUDM/GLM-Z1-9B-0414",
             choices: [{ finish_reason: "stop", message: { content: "무료 풀 전환 완료" } }],
             usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
           }),
@@ -1005,39 +1045,43 @@ describe("StudioAiService", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { service, finalize, markSent, markSucceeded } = createService();
 
-    const result = await complete(service, "studio-user-five-free-providers", {
+    const result = await complete(service, "studio-user-nine-free-providers", {
       ...compositionInput,
       task: "assistant",
     });
 
     expect(result).toMatchObject({
       content: "무료 풀 전환 완료",
-      provider: "openrouter",
-      model: "openrouter/free-selected-model",
-      requestId: "openrouter-free-request-5",
+      provider: "siliconflow",
+      model: "THUDM/GLM-Z1-9B-0414",
+      requestId: "siliconflow-free-request-9",
       failover: {
-        attemptedProvider: "mistral",
-        attemptedModel: "mistral-small-latest",
-        actualProvider: "openrouter",
-        actualModel: "openrouter/free-selected-model",
+        attemptedProvider: "openrouter",
+        attemptedModel: "openrouter/free",
+        actualProvider: "siliconflow",
+        actualModel: "THUDM/GLM-Z1-9B-0414",
         reason: "free_quota_exhausted",
       },
     });
     expect(JSON.stringify(result)).not.toContain("private-quota-detail");
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
       "https://api.groq.com/openai/v1/chat/completions",
       "https://api.sambanova.ai/v1/chat/completions",
+      "https://api.z.ai/api/paas/v4/chat/completions",
       "https://api.mistral.ai/v1/chat/completions",
+      "https://api.cloudflare.com/client/v4/accounts/00000000000000000000000000000000/ai/v1/chat/completions",
       "https://openrouter.ai/api/v1/chat/completions",
+      "https://api.siliconflow.cn/v1/chat/completions",
     ]);
-    expect(markSent).toHaveBeenCalledTimes(5);
+    expect(markSent).toHaveBeenCalledTimes(9);
     expect(markSucceeded).toHaveBeenCalledOnce();
     expect(finalize).toHaveBeenCalledWith(expect.objectContaining({
       task: "assistant",
-      provider: "openrouter",
-      model: "openrouter/free",
-      attemptCount: 5,
+      provider: "siliconflow",
+      model: "THUDM/GLM-Z1-9B-0414",
+      attemptCount: 9,
       status: "success",
     }));
   });

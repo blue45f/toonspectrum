@@ -18,7 +18,7 @@ export interface FreeAiConnectionLike {
 }
 
 export interface FreeAiPreset {
-  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "sambanova-free" | "mistral-free";
+  id: "local-openai" | "ollama" | "openrouter-free" | "groq-free" | "gemini-free" | "qwen-beijing-free" | "sambanova-free" | "zai-free" | "mistral-free" | "siliconflow-free";
   label: string;
   description: string;
   baseUrl: string;
@@ -37,6 +37,8 @@ const PROVIDER_FREE_TIER_ENDPOINTS: Readonly<Record<string, string>> = Object.fr
   "generativelanguage.googleapis.com": "/v1beta/openai",
   "api.sambanova.ai": "/v1",
   "api.mistral.ai": "/v1",
+  "api.z.ai": "/api/paas/v4",
+  "api.siliconflow.cn": "/v1",
 });
 
 /** Public managed APIs cannot be re-labelled as a user-operated zero-cost server. */
@@ -54,6 +56,7 @@ const KNOWN_PUBLIC_AI_PROVIDER_HOSTS = new Set([
   "api.together.xyz",
   "api.voyageai.com",
   "api.z.ai",
+  "api.siliconflow.cn",
   "openrouter.ai",
   "router.huggingface.co",
 ]);
@@ -114,6 +117,17 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     docsUrl: "https://ai.google.dev/gemini-api/docs/openai",
   },
   {
+    id: "qwen-beijing-free",
+    label: "Qwen 베이징 무료 할당량",
+    description: "Alibaba Model Studio 베이징 워크스페이스에서 Free Quota Only를 켠 본인 키만 사용합니다. 90일 무료 할당량 소진 시 중단됩니다.",
+    baseUrl: "https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    textModel: "qwen3.7-plus",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://help.aliyun.com/en/model-studio/new-free-quota",
+  },
+  {
     id: "sambanova-free",
     label: "SambaNova 무카드 Free Tier",
     description: "결제수단이 연결되지 않은 Free Tier 계정의 본인 키만 사용합니다. 모델별 무료 일일 한도에서 중단됩니다.",
@@ -125,6 +139,17 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     docsUrl: "https://docs.sambanova.ai/docs/en/models/rate-limits",
   },
   {
+    id: "zai-free",
+    label: "Z.AI 무료 Flash",
+    description: "가격표가 무료인 GLM-4.7-Flash 또는 GLM-4.5-Flash만 허용합니다. 유료 웹 검색·이미지·영상 도구는 사용하지 않습니다.",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    textModel: "glm-4.7-flash",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://docs.z.ai/guides/overview/pricing",
+  },
+  {
     id: "mistral-free",
     label: "Mistral 무료 모드",
     description: "카드 없는 Free mode 조직에서 만든 본인 키만 사용합니다. Pay-as-you-go가 비활성화됐는지 확인하세요.",
@@ -134,6 +159,17 @@ export const FREE_AI_PRESETS: readonly FreeAiPreset[] = Object.freeze([
     costPolicy: "provider-free-tier",
     requiresApiKey: true,
     docsUrl: "https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key",
+  },
+  {
+    id: "siliconflow-free",
+    label: "SiliconFlow 무료 텍스트",
+    description: "중국 리전 가격표에서 입력·출력이 무료인 THUDM/GLM-Z1-9B-0414만 허용합니다.",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    textModel: "THUDM/GLM-Z1-9B-0414",
+    imageModel: "",
+    costPolicy: "provider-free-tier",
+    requiresApiKey: true,
+    docsUrl: "https://siliconflow.cn/pricing",
   },
 ]);
 
@@ -208,6 +244,35 @@ export function inferLegacyUserAiCostPolicy(
   return "unverified";
 }
 
+const QWEN_FREE_MODELS = new Set([
+  "qwen3.7-plus",
+  "qwen3.7-plus-2026-05-26",
+  "qwen3.8-27b",
+  "qwen3.8-2.4t-a95b",
+  "qwen3.6-flash-2026-04-16",
+  "qwen-turbo",
+]);
+const ZAI_FREE_MODELS = new Set(["glm-4.7-flash", "glm-4.5-flash"]);
+const SILICONFLOW_FREE_MODELS = new Set(["thudm/glm-z1-9b-0414"]);
+
+function qwenBeijingWorkspaceHost(hostname: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]{5,127}\.cn-beijing\.maas\.aliyuncs\.com$/iu.test(hostname);
+}
+
+function reviewedProviderModelIssue(url: URL, model: string): string | null {
+  const normalized = model.trim().toLowerCase();
+  if (qwenBeijingWorkspaceHost(url.hostname) && !QWEN_FREE_MODELS.has(normalized)) {
+    return "Qwen 개인 연결은 베이징 무료 할당량이 확인된 허용 모델만 사용할 수 있습니다.";
+  }
+  if (url.hostname === "api.z.ai" && !ZAI_FREE_MODELS.has(normalized)) {
+    return "Z.AI 개인 연결은 GLM-4.7-Flash 또는 GLM-4.5-Flash만 사용할 수 있습니다.";
+  }
+  if (url.hostname === "api.siliconflow.cn" && !SILICONFLOW_FREE_MODELS.has(normalized)) {
+    return "SiliconFlow 개인 연결은 가격표상 무료인 THUDM/GLM-Z1-9B-0414만 사용할 수 있습니다.";
+  }
+  return null;
+}
+
 export function freeAiConnectionPolicyIssue(
   connection: FreeAiConnectionLike,
   capability?: FreeAiCapability,
@@ -233,7 +298,7 @@ export function freeAiConnectionPolicyIssue(
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
       return "원격 개인 서버는 인증정보·쿼리·조각이 없는 HTTPS 주소만 사용할 수 있습니다.";
     }
-    if (KNOWN_PUBLIC_AI_PROVIDER_HOSTS.has(url.hostname)) {
+    if (KNOWN_PUBLIC_AI_PROVIDER_HOSTS.has(url.hostname) || qwenBeijingWorkspaceHost(url.hostname)) {
       return "공개 AI 제공자 주소를 직접 운영하는 무과금 서버로 등록할 수 없습니다. 해당 무료 프리셋을 사용하세요.";
     }
     if (!connection.apiKey.trim()) {
@@ -266,24 +331,28 @@ export function freeAiConnectionPolicyIssue(
     return capabilityModelIssue(connection, capability);
   }
 
-  const requiredPath = PROVIDER_FREE_TIER_ENDPOINTS[url.hostname];
+  const requiredPath = qwenBeijingWorkspaceHost(url.hostname)
+    ? "/compatible-mode/v1"
+    : PROVIDER_FREE_TIER_ENDPOINTS[url.hostname];
   if (
     url.protocol !== "https:"
     || unsafeManagedUrlPart(url)
     || requiredPath === undefined
     || normalizedApiPath(url) !== requiredPath
   ) {
-    return "무료 티어 정책은 현재 등록된 Gemini·Groq·SambaNova·Mistral 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
+    return "무료 티어 정책은 검토된 외부 제공자의 공식 OpenAI 호환 API 주소에서만 사용할 수 있습니다.";
   }
   if (!connection.apiKey.trim()) {
     return "원격 무료 티어 연결에는 본인 API 키가 필요합니다.";
   }
   if (capability && capability !== "text") {
-    return "외부 제공자의 무료 티어 연결은 현재 텍스트 기능에만 배정할 수 있습니다. 이미지·영상·3D는 로컬 또는 직접 운영 서버를 사용하세요.";
+    return "외부 자동 무료 풀은 현재 실시간 텍스트 기능만 지원합니다.";
   }
   if (connection.imageModel.trim()) {
-    return "외부 무료 티어 연결에는 이미지 모델을 등록하지 않습니다. 이미지 생성은 로컬 또는 직접 운영 서버를 사용하세요.";
+    return "외부 자동 무료 풀 연결에는 이미지 모델을 등록하지 않습니다.";
   }
+  const modelIssue = reviewedProviderModelIssue(url, connection.textModel);
+  if (modelIssue) return modelIssue;
   return capabilityModelIssue(connection, capability);
 }
 

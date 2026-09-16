@@ -5,39 +5,47 @@ cross-instance quota authority.
 
 ## Automatic free provider routing
 
-Production text AI is free-first and fail-closed. The default shared pool order is:
+Production text AI is free-first and fail-closed. The default automatic external pool order is:
 
 1. Gemini free tier;
-2. Groq free tier;
-3. SambaNova Free Tier;
-4. Mistral Free mode;
-5. OpenRouter free router.
+2. Qwen China (Beijing) with Free Quota Only;
+3. Groq free tier;
+4. SambaNova Free Tier;
+5. Z.AI free Flash;
+6. Mistral Free mode;
+7. Cloudflare Workers AI on Workers Free;
+8. OpenRouter free router;
+9. SiliconFlow free text model.
 
-`STUDIO_AI_FREE_PROVIDER_ORDER` may reorder only those reviewed providers. A
+`STUDIO_AI_FREE_PROVIDER_ORDER` may reorder only those reviewed external providers. A
 provider is eligible only when the shared pool is enabled, its server-side key
-is present, its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is present,
-and—on OpenRouter—the model is `openrouter/free` or ends in `:free`. SambaNova
-approval additionally asserts that no payment method is linked to the account;
-Mistral approval asserts that the organization remains in cardless Free mode
-with Pay-as-you-go disabled.
+is present, and its matching `STUDIO_AI_FREE_*_CONFIRMED=true` approval is present.
+Qwen is additionally locked to a Beijing workspace, a reviewed free-quota model,
+and an operator-confirmed Free Quota Only setting. Z.AI and SiliconFlow accept
+only exact free-model allowlists. Cloudflare accepts only reviewed Workers Free
+models, and OpenRouter accepts only `openrouter/free` or `:free` models. SambaNova
+approval asserts that no payment method is linked; Mistral approval asserts
+cardless Free mode with Pay-as-you-go disabled. Local LLM, self-hosted runtimes,
+and batch APIs are intentionally excluded from automatic routing.
 
 The confirmation flag is a deployment assertion that billing is disabled or a
 provider-side hard free-only boundary exists. It is not an automatic billing
 inspection. Credentials remain server-side and must never use a `VITE_`
 variable.
 
-The server advances to the next shared provider only when `402` or `429`
-definitively rejects the request before inference because the current free
-route cannot accept more work. Network errors, timeouts, `5xx`, malformed
+The server advances to the next shared provider only when `402`, `429`, Qwen
+`403/AllocationQuota.FreeTierOnly`, or Cloudflare `403/5035` definitively rejects
+the request before inference because the current free route cannot accept more work. Network errors, timeouts, `5xx`, malformed
 success responses, authentication errors, and post-acceptance failures are not
 replayed elsewhere. This avoids duplicate inference after an ambiguous outcome.
 
 When every shared route is unavailable because of a free-capacity or request
-limit, the browser tries the user's policy-validated personal free connection,
-then the remaining personal connections in deterministic quality order. If no
-free route can run, the client directs the user to `/settings/ai` to add a
-personal free key or local AI and otherwise leaves the feature unavailable. It
-never selects a paid model or silently enables billing.
+limit, the browser tries only the user's policy-validated external personal free
+connections in deterministic quality order. Local LLM, self-hosted and batch
+connections are not selected automatically. If no external free route can run,
+the client directs the user to `/settings/ai` to add a reviewed personal free key
+and otherwise leaves the feature unavailable. It never selects a paid model or
+silently enables billing.
 
 Shared providers are text-only. Image, video, and 3D generation remain local,
 self-hosted, or explicitly configured personal integrations.
@@ -133,9 +141,10 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
 Apply the production migration manifest through
-`apps/api/src/db/migrations/0057_studio_ai_free_provider_expansion.sql` before
-deploying this API build. Migration `0056` establishes the original three-provider
-free-pool contract; migration `0057` expands idempotency receipts to five attempts
-and admits the `sambanova` and `mistral` usage-ledger values. The schema preflight
+`apps/api/src/db/migrations/0060_studio_ai_free_provider_expansion.sql` before
+deploying this API build. Migration `0056` establishes the original three-provider free-pool contract;
+migration `0059` expands the external-only pool to nine attempts and admits Qwen,
+SambaNova, Z.AI free Flash, Mistral, Cloudflare Workers AI, and SiliconFlow ledger
+values. Local LLM, self-hosted and batch execution are not automatic routes. The schema preflight
 rejects an incomplete contract, and quota/admission storage failures return a
 sanitized error before provider use.

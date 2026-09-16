@@ -76,7 +76,7 @@ export function UnifiedAiSettings() {
             : id;
         })
         .join(" → ") || "준비된 공용 무료 제공자 없음"
-    : "Gemini 무료 → Groq 무료 → SambaNova 무료 → Mistral 무료 → OpenRouter 무료";
+    : "Gemini 무료 → Groq 무료 → SambaNova 무료 → Mistral 무료 → Cloudflare Workers AI 무료 → OpenRouter 무료";
 
   return (
     <section
@@ -487,7 +487,7 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
       </fieldset>
 
       <p className="text-sm leading-6 text-fg-2">
-        외부 무료 티어와 OpenRouter 무료 라우터는 텍스트 기능에만 사용합니다. 여러 개인 연결이 있으면 선택한 연결을 먼저 사용하고, 무료 한도 또는 요청 제한이 확인될 때만 Gemini → Groq → SambaNova → Mistral → OpenRouter → 로컬·개인 서버 순으로 다음 유효 연결을 확인합니다. 이미지·영상·3D는 로컬 또는 직접 운영하는 개인 서버만 허용합니다.
+        자동 무료 풀은 외부 실시간 텍스트 API만 사용합니다. 무료 한도 또는 요청 제한이 추론 전에 확인될 때만 Gemini → Qwen → Groq → SambaNova → Z.AI → Mistral → Cloudflare Workers AI → OpenRouter → SiliconFlow 순으로 이동합니다. 로컬 LLM·직접 운영 서버·배치 API는 자동 호출하지 않으며, 수동으로 명시한 기능에서만 사용할 수 있습니다.
       </p>
 
       <div className="flex flex-wrap gap-2">

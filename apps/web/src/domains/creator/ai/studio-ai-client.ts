@@ -555,31 +555,22 @@ function extractTextAiProvenance(
     : "";
   const provider = rawProvider || (
     transport.mode === "server"
-      ? transport.provider === "gemini"
-        ? "gemini"
-        : transport.provider === "groq"
-          ? "groq"
-          : transport.provider === "sambanova"
-            ? "sambanova"
-            : transport.provider === "mistral"
-              ? "mistral"
-              : transport.provider === "openrouter"
-                ? "openrouter"
-                : transport.provider === "zai"
-                  ? "zai"
-                  : transport.provider === "deepseek"
-                    ? "deepseek"
-                    : "server-auto"
+      ? transport.provider && transport.provider !== "auto"
+        ? transport.provider
+        : "server-auto"
       : textProviderFromSettings(settings)
   );
   const model = rawModel || settings.textModel.trim().slice(0, 200) || "unknown";
   const failover = transport.mode === "server"
     && (provider === "gemini"
+      || provider === "qwen"
       || provider === "groq"
       || provider === "sambanova"
-      || provider === "mistral"
-      || provider === "openrouter"
       || provider === "zai"
+      || provider === "mistral"
+      || provider === "cloudflare"
+      || provider === "openrouter"
+      || provider === "siliconflow"
       || provider === "deepseek")
     ? parseStudioServerAiFailoverMetadata(record.failover, { provider, model })
     : undefined;

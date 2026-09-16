@@ -1739,7 +1739,7 @@ export const studioAiRequestReceipts = pgTable(
     ),
     check(
       "studio_ai_request_receipt_attempt_count_check",
-      sql`${t.attemptCount} between 0 and 5`
+      sql`${t.attemptCount} between 0 and 9`
     ),
     check(
       "studio_ai_request_receipt_expiry_check",
@@ -1817,10 +1817,10 @@ export const studioAiUsageLedger = pgTable(
     ),
     check(
       "studio_ai_usage_provider_check",
-      sql`${t.provider} in ('gemini', 'groq', 'sambanova', 'mistral', 'openrouter', 'zai', 'deepseek')`
+      sql`${t.provider} in ('gemini', 'qwen', 'groq', 'sambanova', 'zai', 'mistral', 'cloudflare', 'openrouter', 'siliconflow', 'deepseek')`
     ),
     check("studio_ai_usage_model_check", sql`char_length(${t.model}) between 1 and 200`),
-    check("studio_ai_usage_attempt_count_check", sql`${t.attemptCount} between 1 and 5`),
+    check("studio_ai_usage_attempt_count_check", sql`${t.attemptCount} between 1 and 9`),
     check(
       "studio_ai_usage_status_check",
       sql`${t.status} in ('success', 'client_aborted', 'timeout', 'provider_rate_limited', 'provider_error', 'network_error', 'content_filtered')`

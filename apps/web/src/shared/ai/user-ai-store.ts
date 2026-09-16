@@ -89,12 +89,14 @@ function connectionQualityRank(connection: UserAiConnection): number {
     return 10_000;
   }
   if (host === "generativelanguage.googleapis.com") return 10;
-  if (host === "api.groq.com") return 20;
-  if (host === "api.sambanova.ai") return 30;
-  if (host === "api.mistral.ai") return 40;
-  if (host === "openrouter.ai") return 50;
-  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return 60;
-  return connection.costPolicy === "self-hosted-zero-cost" ? 70 : 100;
+  if (host.endsWith(".cn-beijing.maas.aliyuncs.com")) return 20;
+  if (host === "api.groq.com") return 30;
+  if (host === "api.sambanova.ai") return 40;
+  if (host === "api.z.ai") return 50;
+  if (host === "api.mistral.ai") return 60;
+  if (host === "openrouter.ai") return 70;
+  if (host === "api.siliconflow.cn") return 80;
+  return 100;
 }
 
 /**
@@ -110,6 +112,20 @@ export function userAiConnectionsForCapability(
     .sort((left, right) => {
       if (left.id === assigned && right.id !== assigned) return -1;
       if (right.id === assigned && left.id !== assigned) return 1;
+      const rank = connectionQualityRank(left) - connectionQualityRank(right);
+      return rank || left.id.localeCompare(right.id);
+    });
+}
+
+export function userAiAutomaticExternalConnectionsForCapability(
+  capability: UserAiCapability,
+): UserAiConnection[] {
+  return snapshot.configuration.connections
+    .filter((connection) => (
+      connection.costPolicy === "provider-free-tier"
+        || connection.costPolicy === "openrouter-free"
+    ) && freeAiConnectionPolicyIssue(connection, capability) === null)
+    .sort((left, right) => {
       const rank = connectionQualityRank(left) - connectionQualityRank(right);
       return rank || left.id.localeCompare(right.id);
     });

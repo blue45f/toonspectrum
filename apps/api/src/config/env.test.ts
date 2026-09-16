@@ -183,25 +183,39 @@ describe("authentication boundary environment validation", () => {
 });
 
 describe("Studio AI quota environment validation", () => {
-  it("accepts the reviewed five-provider free-only order", () => {
+  it("accepts the reviewed nine-provider external free-only order", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
 
     const result = validateEnv(
       {
         NODE_ENV: "test",
-        STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,mistral,openrouter",
+        STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,qwen,groq,sambanova,zai,mistral,cloudflare,openrouter,siliconflow",
+        STUDIO_AI_FREE_QWEN_WORKSPACE_ID: "workspace_123456",
+        STUDIO_AI_FREE_QWEN_API_KEY: "free-only-qwen-key",
+        STUDIO_AI_FREE_QWEN_CONFIRMED: "true",
         STUDIO_AI_FREE_SAMBANOVA_API_KEY: "free-only-sambanova-key",
-        STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+        STUDIO_AI_FREE_QWEN_CONFIRMED: "true",
+      STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
+        STUDIO_AI_FREE_ZAI_API_KEY: "free-only-zai-key",
+        STUDIO_AI_FREE_ZAI_CONFIRMED: "true",
         STUDIO_AI_FREE_MISTRAL_API_KEY: "free-only-mistral-key",
-        STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+        STUDIO_AI_FREE_ZAI_CONFIRMED: "true",
+      STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+        STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID: "00000000000000000000000000000000",
+        STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN: "test-value",
+        STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED: "true",
+      STUDIO_AI_FREE_SILICONFLOW_CONFIRMED: "true",
+        STUDIO_AI_FREE_SILICONFLOW_API_KEY: "free-only-siliconflow-key",
+        STUDIO_AI_FREE_SILICONFLOW_CONFIRMED: "true",
       },
       logger
     );
 
     expect(result).toMatchObject({
-      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,groq,sambanova,mistral,openrouter",
+      STUDIO_AI_FREE_PROVIDER_ORDER: "gemini,qwen,groq,sambanova,zai,mistral,cloudflare,openrouter,siliconflow",
       STUDIO_AI_FREE_SAMBANOVA_CONFIRMED: "true",
       STUDIO_AI_FREE_MISTRAL_CONFIRMED: "true",
+      STUDIO_AI_FREE_CLOUDFLARE_CONFIRMED: "true",
     });
     expect(logger.warn).not.toHaveBeenCalled();
   });

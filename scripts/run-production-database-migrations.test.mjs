@@ -67,7 +67,7 @@ test("Studio AI free pool migration supports three reviewed provider attempts", 
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
-test("Studio AI provider expansion supports five reviewed free attempts", () => {
+test("Studio AI provider expansion supports nine reviewed external free attempts", () => {
   const migration = loadMigrationManifest().find(
     ({ id }) => id === "0060_studio_ai_free_provider_expansion",
   );
@@ -75,9 +75,9 @@ test("Studio AI provider expansion supports five reviewed free attempts", () => 
   const sql = migration?.contents ?? "";
 
   for (const requiredFragment of [
-    'CHECK ("attemptCount" BETWEEN 0 AND 5)',
-    "'gemini', 'groq', 'sambanova', 'mistral', 'openrouter', 'zai', 'deepseek'",
-    'CHECK ("attemptCount" BETWEEN 1 AND 5)',
+    'CHECK ("attemptCount" BETWEEN 0 AND 9)',
+    "'gemini', 'qwen', 'groq', 'sambanova', 'zai', 'mistral', 'cloudflare', 'openrouter', 'siliconflow', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 9)',
     'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
     'VALIDATE CONSTRAINT "studio_ai_usage_provider_check"',
     'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',

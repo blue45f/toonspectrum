@@ -2,18 +2,21 @@ import { HTTPError, api, getApiErrorMessage } from "@/infrastructure/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 
 export type StudioServerAiTask = "assistant" | "composition" | "scenario" | "translation" | "dialogue" | "palette";
-export type StudioFreePoolProvider = "gemini" | "groq" | "sambanova" | "mistral" | "openrouter" | "zai" | "deepseek";
+export type StudioFreePoolProvider = "gemini" | "qwen" | "groq" | "sambanova" | "zai" | "mistral" | "cloudflare" | "openrouter" | "siliconflow" | "deepseek";
 export type StudioServerAiProvider = StudioFreePoolProvider | "user";
 export type StudioServerAiProviderPreference = "auto" | StudioFreePoolProvider;
 export type StudioServerAiFailoverReason = "free_quota_exhausted" | "billing_quota_exhausted";
 
 const LABELS: Record<StudioServerAiProvider, string> = {
   gemini: "Gemini 무료",
+  qwen: "Qwen 베이징 무료 할당량",
   groq: "Groq 무료",
   sambanova: "SambaNova 무료",
+  zai: "Z.AI 무료 Flash",
   mistral: "Mistral 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
   openrouter: "OpenRouter 무료",
-  zai: "Z.ai",
+  siliconflow: "SiliconFlow 무료 텍스트",
   deepseek: "DeepSeek",
   user: "내 무료 AI",
 };
@@ -109,11 +112,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function provider(value: unknown): StudioServerAiProvider | undefined {
   return value === "gemini"
+    || value === "qwen"
     || value === "groq"
     || value === "sambanova"
-    || value === "mistral"
-    || value === "openrouter"
     || value === "zai"
+    || value === "mistral"
+    || value === "cloudflare"
+    || value === "openrouter"
+    || value === "siliconflow"
     || value === "deepseek"
     || value === "user"
     ? value
