@@ -33,8 +33,8 @@ import {
   studioProjectLibrarySearchText,
   type StudioProjectLibrarySortMode,
 } from "./studio-project-library-management-model";
-import { useStudioProjectLibrary } from "./useSudioProjectLibrary";
-import { useStudioSaveProfiles } from "./useSudioSaveProfiles";
+import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
+import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
 
 export interface StudioProjectLibraryNoticeState {
   readonly message: string;
@@ -84,7 +84,7 @@ export function useStudioProjectLibraryManagementController() {
     ? visibleProjects.filter((project) => studioProjectIsTemporaryWork(profiles.profileFor(project.id)))
     : [], [profiles, view, visibleProjects]);
   const savedProjects = useMemo(() => view === "active"
-    ? visibleProjects.filter((project) => !studioProjectIsTemporaryWork(profiles.profileFor(project.id))
+    ? visibleProjects.filter((project) => !studioProjectIsTemporaryWork(profiles.profileFor(project.id)))
     : visibleProjects, [profiles, view, visibleProjects]);
 
   const selectedProjects = useMemo(
