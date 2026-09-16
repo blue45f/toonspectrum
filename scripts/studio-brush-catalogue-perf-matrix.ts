@@ -11,7 +11,7 @@ import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 import {
-  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
 } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 import {
   normalizeStudioBrushDynamicsSettings,
@@ -963,7 +963,7 @@ export function evaluateStudioBrushCataloguePaintSoak(
 export const STUDIO_BRUSH_CATALOGUE_DETERMINISM_SAMPLE_STRIDE = 12;
 
 export function listStudioBrushCatalogueDeterminismSampleIds(): readonly string[] {
-  const paintIds = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+  const paintIds = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id);
   const sampled = new Set<string>(STUDIO_BRUSH_CRAYON_FAMILY_IDS);
   for (
     let index = 0;
@@ -976,7 +976,7 @@ export function listStudioBrushCatalogueDeterminismSampleIds(): readonly string[
 }
 
 export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCataloguePerfMatrixReport {
-  const paintIds = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+  const paintIds = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id);
   const packById = new Map(
     materializeAllStudioBrushPackSelections().map((selection) => [
       selection.catalogId,

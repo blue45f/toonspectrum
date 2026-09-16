@@ -1,9 +1,10 @@
 /**
  * Product-facing Studio brush catalogue.
  *
- * The renderer still owns a larger internal registry, but the picker, search, material tabs,
- * favorites and recents expose only the curated quality portfolio. A brush earns a product slot
- * only when its material result or hand feel is meaningfully distinct.
+ * The replay registry remains resolution-complete, the quality portfolio stays first-ranked, and
+ * every non-quarantined brush is selectable through the full library, material tabs and search.
+ * Favorites and recents may therefore restore advanced engine variants without widening the
+ * always-visible quick shelf or eagerly loading procedural runtime code.
  */
 import {
   listStudioQuickBrushTrayItems,
@@ -14,6 +15,7 @@ import {
 
 import {
   STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   listStudioCoreBrushCatalogItems,
   studioBrushCatalogKindLabel,
@@ -31,6 +33,7 @@ import type { StudioToolOperation } from "../studio-brush";
 
 export {
   STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   listStudioCoreBrushCatalogItems,
   studioBrushCatalogKindLabel,
@@ -46,6 +49,13 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
         name: descriptor.catalogName,
         shortName: descriptor.shortName,
         hint: descriptor.hint,
+        searchAliases: Object.freeze([
+          descriptor.category,
+          descriptor.runtimeBrushId,
+          descriptor.mediaGroup,
+          "프로시저럴",
+          "procedural",
+        ]),
         defaultWidth: descriptor.defaultWidth,
         defaultOpacity: descriptor.defaultOpacity,
         operation: "paint" as const,
@@ -58,7 +68,7 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
     ),
   );
 
-/** Internal renderer registry. It is not the user-facing brush list. */
+/** Replay-complete renderer registry, including quarantined identities kept for old documents. */
 export const STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze([
     ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
@@ -117,19 +127,42 @@ function materializeProductPortfolio(): readonly StudioBrushCatalogItem[] {
   return Object.freeze(productItems);
 }
 
-/** The only product-facing brush inventory. */
+/** Quality-audited representatives used for ordering, starter recommendations and score gates. */
 export const STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   materializeProductPortfolio();
 
-/**
- * Historical export names remain for call-site compatibility, but all product lanes now resolve
- * to the same curated portfolio. There is no hidden "all registered brushes" escape hatch.
- */
-export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS =
-  STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS;
+const STUDIO_DEFAULT_QUALITY_BRUSH_ID_SET: ReadonlySet<string> = new Set(
+  STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => item.id),
+);
 
+export function isStudioDefaultQualityBrushCatalogId(brushId: unknown): boolean {
+  return typeof brushId === "string" && STUDIO_DEFAULT_QUALITY_BRUSH_ID_SET.has(brushId);
+}
+
+/**
+ * Advanced, selectable rows that passed quarantine but are not one of the compact quality
+ * representatives. Keeping this partition explicit lets the UI rank quality first without
+ * silently dropping engine variants from the complete library.
+ */
+export const STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) =>
+        !isStudioBrushQuarantinedPresetId(item.id)
+        && !STUDIO_DEFAULT_QUALITY_BRUSH_ID_SET.has(item.id),
+    ),
+  );
+
+/** Complete selectable inventory: quality representatives first, then advanced variants. */
+export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze([
+    ...STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
+    ...STUDIO_LISTED_EXTENDED_BRUSH_CATALOG_ITEMS,
+  ]);
+
+/** Search and selection intentionally share one non-quarantined source of truth. */
 export const STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS =
-  STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS;
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
 
 export const STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
@@ -145,20 +178,30 @@ export const STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioB
     ),
   );
 
-export const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS =
-  STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS;
+export const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "paint",
+    ),
+  );
 
-export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS =
-  STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS;
+export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "erase",
+    ),
+  );
+
+const STUDIO_LISTED_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
+  new Map(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));
 
 function operationInventory(
   operation: StudioToolOperation | undefined,
 ): readonly StudioBrushCatalogItem[] {
-  return operation === undefined
-    ? STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS
-    : STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter(
-        (item) => item.operation === operation,
-      );
+  if (operation === undefined) return STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
+  return operation === "erase"
+    ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS
+    : STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS;
 }
 
 export function filterStudioBrushCatalogItems(options: {
@@ -195,7 +238,7 @@ function quickCatalogInventory(options: {
     ...(options.favoriteIds ?? []),
     ...(options.recentIds ?? []),
   ]) {
-    const item = byId.get(id);
+    const item = STUDIO_LISTED_BRUSH_CATALOG_BY_ID.get(id);
     if (item) byId.set(item.id, item);
   }
 

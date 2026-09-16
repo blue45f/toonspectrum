@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">High contrast focus board</title>
+  <desc id="desc">A bold black, white and yellow interface with clear comic panels and focus guides.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="yellow" x1="80" y1="80" x2="1120" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#fff46a"/><stop offset="1" stop-color="#ffd800"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="#050505"/><path d="M0 0h350L0 350Zm1200 800H850l350-350Z" fill="url(#yellow)"/>
+  <g filter="url(#shadow)"><rect x="170" y="105" width="860" height="590" rx="18" fill="#fff" stroke="#fff" stroke-width="4"/><rect x="216" y="151" width="346" height="220" fill="#050505"/><rect x="592" y="151" width="392" height="220" fill="url(#yellow)"/><rect x="216" y="405" width="768" height="244" fill="#050505"/>
+    <path d="M264 320c82-128 185-136 258-22" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/><path d="M642 318c88-123 204-132 292-16" fill="none" stroke="#050505" stroke-width="22" stroke-linecap="round"/><path d="M278 589c166-157 386-163 650-31" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="388" cy="260" r="62" fill="#fff"/><path d="M351 260h74M388 223v74" stroke="#050505" stroke-width="12"/><circle cx="788" cy="258" r="62" fill="#050505"/><path d="M751 258h74M788 221v74" stroke="#fff" stroke-width="12"/></g>
+  <g fill="none" stroke="url(#yellow)" stroke-width="9"><path d="M76 400h104M128 348v104M1020 400h104M1072 348v104"/><rect x="94" y="80" width="104" height="104"/><rect x="1002" y="616" width="104" height="104"/></g>
+  <path d="m104 640 48-83 48 83Z" fill="#fff"/><circle cx="1070" cy="128" r="45" fill="#fff"/><path d="M1070 98v60M1040 128h60" stroke="#050505" stroke-width="10"/>
+</svg>

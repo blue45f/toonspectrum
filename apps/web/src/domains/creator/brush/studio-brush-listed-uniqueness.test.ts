@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BRUSH_PRESETS } from "../studio-brush";
 
 import {
+  STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
@@ -35,22 +36,31 @@ import {
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 
 describe("listed paint uniqueness and consolidated product portfolio", () => {
-  it("exposes exactly 86 distinct paint products", () => {
+  it("exposes every safe paint identity with the 86 audited representatives first", () => {
+    const qualityCount = STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint;
+    const qualityFirst = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.slice(0, qualityCount);
+    const expectedSafeIds = STUDIO_ALL_BRUSH_CATALOG_ITEMS
+      .filter(
+        (item) =>
+          item.operation === "paint" &&
+          !isStudioBrushQuarantinedPresetId(item.id),
+      )
+      .map((item) => item.id);
+
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBeLessThan(
       STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT,
     );
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toBe(
-      STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBeGreaterThan(
+      qualityCount,
     );
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(
-      STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint,
-    );
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(86);
+    expect(qualityFirst).toEqual(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS);
+    qualityFirst.forEach((item, index) => {
+      expect(item).toBe(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS[index]);
+    });
+    expect(qualityFirst).toHaveLength(86);
     expect(
-      STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.every(
-        (item) => !isStudioBrushQuarantinedPresetId(item.id),
-      ),
-    ).toBe(true);
+      new Set(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id)),
+    ).toEqual(new Set(expectedSafeIds));
   });
 
   it("keeps no two product paint ids on the same uniqueness key", () => {

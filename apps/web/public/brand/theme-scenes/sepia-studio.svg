@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Sepia archive desk</title>
+  <desc id="desc">A warm vintage scrapbook with a film strip, dried leaves, ink bottle and illustrated memories.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="bg" x1="70" y1="40" x2="1130" y2="760" gradientUnits="userSpaceOnUse"><stop stop-color="#efe3ce"/><stop offset=".55" stop-color="#d7bea0"/><stop offset="1" stop-color="#b98d68"/></linearGradient>
+    <linearGradient id="paper" x1="250" y1="110" x2="850" y2="680" gradientUnits="userSpaceOnUse"><stop stop-color="#f8efd9"/><stop offset="1" stop-color="#ddc5a4"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="url(#bg)"/><path d="M0 98h1200M0 705h1200" stroke="#8c674c" stroke-opacity=".25" stroke-width="4"/>
+  <g filter="url(#shadow)"><rect x="220" y="88" width="680" height="618" rx="18" fill="url(#paper)" transform="rotate(-2 220 88)"/><rect x="268" y="142" width="248" height="216" rx="6" fill="#8f6f58" stroke="#583f31" stroke-width="5"/><rect x="548" y="142" width="300" height="216" rx="6" fill="#b58b68" stroke="#583f31" stroke-width="5"/><rect x="268" y="390" width="580" height="258" rx="6" fill="#ccb08c" stroke="#583f31" stroke-width="5"/>
+    <path d="M302 315c56-94 132-104 181-26M586 307c72-86 153-80 224-13M312 602c131-130 294-136 491-26" fill="none" stroke="#513b2e" stroke-width="10" stroke-linecap="round"/>
+    <path d="M254 122h100v26H254Zm515 534h100v26H769Z" fill="#9b7350" opacity=".5"/></g>
+  <g transform="translate(60 182) rotate(-8)" filter="url(#shadow)"><rect width="170" height="420" rx="12" fill="#4e392e"/><g fill="#e2c49d"><rect x="18" y="28" width="134" height="82"/><rect x="18" y="129" width="134" height="82"/><rect x="18" y="230" width="134" height="82"/><rect x="18" y="331" width="134" height="62"/></g><g fill="#c49b71"><circle cx="8" cy="24" r="4"/><circle cx="8" cy="56" r="4"/><circle cx="8" cy="88" r="4"/><circle cx="8" cy="120" r="4"/><circle cx="8" cy="152" r="4"/><circle cx="162" cy="24" r="4"/><circle cx="162" cy="56" r="4"/><circle cx="162" cy="88" r="4"/><circle cx="162" cy="120" r="4"/><circle cx="162" cy="152" r="4"/></g></g>
+  <g transform="translate(902 478)" filter="url(#shadow)"><ellipse cx="91" cy="178" rx="99" ry="28" fill="#76513a" opacity=".35"/><rect x="22" y="54" width="136" height="126" rx="22" fill="#3f2d25"/><path d="M46 54c6-60 82-60 88 0" fill="#2c211c"/><rect x="53" y="79" width="74" height="52" rx="8" fill="#a98562"/><path d="M91 54V8" stroke="#3f2d25" stroke-width="24" stroke-linecap="round"/></g>
+  <g fill="none" stroke="#6e5039" stroke-width="9" stroke-linecap="round"><path d="M969 392c64-115 83-220 53-322"/><path d="M1010 252c-50-17-75-50-83-96M1028 185c49-15 78-45 90-90M986 323c-51 0-88-24-111-63"/></g>
+  <g fill="#9b6b4b"><ellipse cx="929" cy="154" rx="42" ry="16" transform="rotate(31 929 154)"/><ellipse cx="1112" cy="94" rx="46" ry="17" transform="rotate(-32 1112 94)"/><ellipse cx="876" cy="258" rx="44" ry="16" transform="rotate(28 876 258)"/></g>
+</svg>

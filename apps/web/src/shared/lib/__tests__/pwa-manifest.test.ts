@@ -70,7 +70,7 @@ describe("PWA manifest", () => {
     expect(maskable.map((icon) => icon.sizes).sort()).toEqual(["192x192", "512x512"]);
     for (const icon of maskable) {
       expect(icon.type).toBe("image/png");
-      expect(new URL(icon.src, appOrigin).searchParams.get("v")).toBe("ink-panel-v1");
+      expect(new URL(icon.src, appOrigin).pathname).toMatch(/^\/brand\/spectrum-ribbon-v2\//u);
       expect(existsSync(publicAssetPath(icon.src))).toBe(true);
     }
   });
@@ -123,8 +123,8 @@ describe("PWA manifest", () => {
     expect(href).toBeDefined();
     const url = new URL(href ?? "", appOrigin);
     expect(url.origin).toBe(appOrigin);
-    expect(url.pathname).toBe("/apple-touch-icon.png");
-    expect(url.searchParams.get("v")).toBe("ink-panel-v1");
+    expect(url.pathname).toBe("/brand/spectrum-ribbon-v2/apple-touch-icon.png");
+    expect(url.search).toBe("");
     expect(existsSync(publicAssetPath(url.href))).toBe(true);
   });
 });

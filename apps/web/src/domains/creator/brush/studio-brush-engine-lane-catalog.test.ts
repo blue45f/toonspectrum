@@ -18,6 +18,7 @@ import {
   STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
   isStudioBrushEngineLaneId,
   listStudioBrushEngineLaneIds,
+  listStudioBrushEngineLanePresets,
   resolveStudioBrushEngineLaneBaseId,
   resolveStudioBrushEngineLaneCroquisCapsuleProgramId,
   resolveStudioBrushEngineLaneLabelKo,
@@ -60,9 +61,15 @@ function exportBrushSvg(brushId: string): string {
 describe("studio brush engine-lane catalog", () => {
   it("ships unique lane ids into BRUSH_PRESETS with runtime contracts", () => {
     const ids = listStudioBrushEngineLaneIds();
+    const presets = listStudioBrushEngineLanePresets();
+    expect(ids).toBe(listStudioBrushEngineLaneIds());
+    expect(presets).toBe(listStudioBrushEngineLanePresets());
     expect(ids.length).toBeGreaterThanOrEqual(30);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) {
+    expect(presets.map((preset) => preset.id)).toEqual(ids);
+    for (const row of STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS) {
+      const id = row.id;
+      expect(studioBrushEngineLaneRowById(id)).toBe(row);
       expect(isStudioBrushEngineLaneId(id)).toBe(true);
       expect(BRUSH_PRESETS.some((p) => p.id === id)).toBe(true);
       expect(resolveStudioBrushRuntimeContract(id)).not.toBeNull();

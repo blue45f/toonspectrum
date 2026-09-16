@@ -1,7 +1,7 @@
 /**
  * Launch-safe brush catalogue contract.
  *
- * Core brushes stay on the always-visible quick shelf. The 160 procedural descriptors live in
+ * Core brushes stay on the always-visible quick shelf. Procedural descriptors live in
  * `studio-brush-catalog.ts` and load when a saved pro brush needs metadata or the full library opens.
  *
  * Counts are derived from the live catalogues — never hardcode historical totals in product copy.
@@ -43,8 +43,8 @@ export function listStudioCoreBrushCatalogItems(
 }
 
 /**
- * Resolution-complete core listing. The curated 48-tool default portfolio is a separate lazy UI
- * projection; exhaustive checks, saved-document lookup and explicit user pins retain every
+ * Resolution-complete core listing. The curated quality portfolio is a separate lazy UI ranking;
+ * exhaustive checks, saved-document lookup and explicit user pins retain every
  * non-quarantined core id here.
  */
 export const STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =

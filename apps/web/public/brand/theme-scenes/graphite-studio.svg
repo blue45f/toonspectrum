@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Graphite drafting board</title>
+  <desc id="desc">A monochrome drafting table with perspective grids, charcoal marks and storyboard thumbnails.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".18" /></filter>
+    <linearGradient id="bg" x1="70" y1="30" x2="1130" y2="770" gradientUnits="userSpaceOnUse"><stop stop-color="#181818"/><stop offset=".5" stop-color="#303030"/><stop offset="1" stop-color="#1f1f1f"/></linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0v40" fill="none" stroke="#777" stroke-opacity=".22"/></pattern>
+  </defs>
+  <rect width="1200" height="800" rx="54" fill="url(#bg)"/><rect x="60" y="50" width="1080" height="700" rx="34" fill="url(#grid)" stroke="#6c6c6c" stroke-width="3"/>
+  <g opacity=".34" stroke="#c9c9c9" stroke-width="2"><path d="M600 72 103 718M600 72l496 646M600 72 370 718M600 72l229 646M600 72v646"/><path d="M120 640h960M166 548h868M230 458h740M300 368h600M390 278h420"/></g>
+  <g filter="url(#shadow)"><rect x="216" y="126" width="690" height="530" rx="8" fill="#dadada" transform="rotate(-1 216 126)"/><rect x="258" y="172" width="274" height="196" fill="#707070" stroke="#222" stroke-width="6"/><rect x="558" y="172" width="306" height="196" fill="#ababab" stroke="#222" stroke-width="6"/><rect x="258" y="396" width="606" height="214" fill="#8b8b8b" stroke="#222" stroke-width="6"/>
+    <path d="M290 326c63-112 156-116 216-12M596 322c64-96 154-101 236-11M306 570c154-142 322-143 514-20" fill="none" stroke="#222" stroke-width="11" stroke-linecap="round"/>
+    <g fill="none" stroke="#525252" stroke-width="3" stroke-dasharray="8 7"><path d="M258 270h274M695 172v196M561 503h303"/></g></g>
+  <g transform="translate(860 510) rotate(-11)" filter="url(#shadow)"><rect width="250" height="34" rx="7" fill="#d4b25a"/><path d="M25 0v34m25-34v34m25-34v34m25-34v34m25-34v34m25-34v34m25-34v34m25-34v34" stroke="#5e4a17" stroke-width="3"/></g>
+  <g fill="#101010" filter="url(#shadow)"><rect x="90" y="270" width="42" height="260" rx="12" transform="rotate(16 90 270)"/><rect x="1030" y="210" width="36" height="250" rx="10" transform="rotate(-17 1030 210)"/><ellipse cx="993" cy="650" rx="96" ry="32" opacity=".7"/></g>
+  <path d="M80 112c150 37 222 3 335-46M890 92c91 47 155 39 234 12" fill="none" stroke="#f0d070" stroke-width="8" stroke-linecap="round" opacity=".75"/>
+</svg>
