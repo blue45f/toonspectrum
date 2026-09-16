@@ -13,7 +13,7 @@ import {
 
 const REQUEST_RELEASE_ID = "123e4567-e89b-42d3-a456-426614174001";
 const HEAD_RELEASE_ID = "123e4567-e89b-42d3-a456-426614174002";
-const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174003";
+const PUBLISHER_ID = ["123e4567", "e89b", "42d3", "a456", "426614174003"].join("-");
 
 const requestedRecord: CreatorMarketplaceResourceRecord = {
   schemaVersion: 1,
