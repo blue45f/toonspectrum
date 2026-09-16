@@ -11,6 +11,7 @@ on:
       - 'apps/web/src/app/routes/route-fallback.tsx'
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/domains/creator-resources/**'
+      - 'apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage*'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
       - 'apps/web/src/shared/components/SiteRouteExperienceBoundary*'
@@ -22,6 +23,7 @@ on:
       - 'apps/api/src/modules/creator-resources/**'
       - 'config/http-response-headers.json'
       - 'scripts/cloudflare-static-rules.mjs'
+      - 'scripts/cloudflare-static-rules.test.mjs'
       - 'deploy/cloudflare-static/src/index.ts'
       - 'packages/core/**'
       - 'tests/creator-flagship-contracts.test.ts'
@@ -60,6 +62,7 @@ jobs:
           pnpm exec vitest run
           tests/creator-flagship-contracts.test.ts
           apps/web/src/domains/creator-resources/open-creation.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage.contract.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
           apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
@@ -67,6 +70,7 @@ jobs:
           apps/web/src/shared/lib/site-route-ux.test.ts
           apps/web/src/shared/lib/site-route-experience.test.ts
           apps/web/src/shared/lib/workflow-trust.test.ts
+          scripts/cloudflare-static-rules.test.mjs
       - name: Response policy generation contract
         run: node scripts/cloudflare-static-rules.mjs --check
       - name: Full application typecheck
