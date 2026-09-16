@@ -187,6 +187,35 @@ describe("fetch routing", () => {
     const { response } = await harness.dispatch("fetch", navigationEvent("/ranking"));
     expect(await response?.text()).toBe("<html>public shell</html>");
   });
+  it("removes modulepreloads from a controlled public navigation", async () => {
+    const document = `<html><head>
+      <link rel="modulepreload" href="/assets/index-abc.js">
+      <link rel="stylesheet" href="/assets/index-abc.css">
+    </head><body><script type="module" src="/assets/index-abc.js"></script></body></html>`;
+    harness.setNetwork(async () => shell(document));
+    await loadWorker();
+    const { response } = await harness.dispatch("fetch", navigationEvent("/ranking"));
+    const html = await response?.text();
+    expect(html).not.toContain("modulepreload");
+    expect(html).toContain('rel="stylesheet"');
+    expect(html).toContain('type="module"');
+  });
+  it("removes modulepreloads from a healthy controlled Studio navigation", async () => {
+    const document = `<html><head>
+      <link rel="modulepreload" crossorigin href="/assets/index-abc.js">
+      <link rel="stylesheet" href="/assets/index-abc.css">
+    </head><body><script type="module" src="/assets/index-abc.js"></script></body></html>`;
+    harness.setNetwork(async (url) => url.includes("/i18n/")
+      ? new Response("{}", { headers: { "content-type": "application/json" } })
+      : shell(document, true));
+    await loadWorker();
+    const { response } = await harness.dispatch("fetch", navigationEvent("/studio/work/42"));
+    const html = await response?.text();
+    expect(html).not.toContain("modulepreload");
+    expect(html).toContain('rel="stylesheet"');
+    expect(html).toContain('type="module"');
+    expect(response?.headers.get("cross-origin-opener-policy")).toBe("same-origin");
+  });
   it("falls back on an HTTP 503 without caching the error page", async () => {
     harness.caches.seed(PRECACHE, "/studio", shell("saved shell", true));
     harness.setNetwork(async () => new Response("unavailable", { status: 503 })); await loadWorker();

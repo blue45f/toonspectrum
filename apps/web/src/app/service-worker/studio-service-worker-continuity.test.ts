@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveStudioNavigation } from "./studio-service-worker-navigation";
+import {
+  prepareControlledNavigationDocument,
+  resolveStudioNavigation,
+  stripModulePreloadLinks,
+} from "./studio-service-worker-navigation";
 import { hasPreparedStudioDrawingResources } from "./studio-service-worker-offline";
 
 const shell = (isolated = true) => new Response("studio", { headers: {
@@ -49,6 +53,51 @@ describe("prepared Studio continuity", () => {
       read: async (url) => { active++; maximum = Math.max(maximum, active); await new Promise(resolve => setTimeout(resolve, 1)); active--; return responseFor(url); },
     })).toBe(true);
     expect(maximum).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("controlled document preload boundary", () => {
+  it("removes modulepreload links while preserving other document resources", async () => {
+    const source = `<!doctype html><html><head>
+      <link crossorigin href="/assets/a.js" rel="modulepreload">
+      <link rel='modulepreload' href='/assets/b.js'>
+      <link rel=modulepreload href=/assets/c.js>
+      <link rel="preload" as="font" href="/font.woff2">
+      <link rel="stylesheet" href="/app.css">
+      <link data-rel="modulepreload" rel="stylesheet" href="/data-rel.css">
+    </head><body><script type="module" src="/entry.js"></script></body></html>`;
+    const response = new Response(source, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "content-encoding": "br",
+        "content-length": "999",
+        etag: '"upstream"',
+        "last-modified": "Wed, 16 Sep 2026 00:00:00 GMT",
+        "content-security-policy": "default-src 'self'",
+      },
+    });
+
+    const prepared = await prepareControlledNavigationDocument(response);
+    const html = await prepared.text();
+    expect(stripModulePreloadLinks(source)).toBe(html);
+    expect(html).not.toMatch(
+      /<link\b(?=[^>]*\srel\s*=\s*(?:"modulepreload"|'modulepreload'|modulepreload\b))[^>]*>/iu,
+    );
+    expect(html).toContain('rel="preload"');
+    expect(html).toContain('rel="stylesheet"');
+    expect(html).toContain('data-rel="modulepreload"');
+    expect(html).toContain('type="module"');
+    expect(prepared.headers.get("content-security-policy")).toBe("default-src 'self'");
+    for (const name of ["content-encoding", "content-length", "etag", "last-modified"]) {
+      expect(prepared.headers.get(name)).toBeNull();
+    }
+  });
+
+  it("leaves non-HTML and documents without modulepreloads untouched", async () => {
+    const script = new Response("export {};", { headers: { "content-type": "application/javascript" } });
+    const html = shell(false);
+    expect(await prepareControlledNavigationDocument(script)).toBe(script);
+    expect(await prepareControlledNavigationDocument(html)).toBe(html);
   });
 });
 
