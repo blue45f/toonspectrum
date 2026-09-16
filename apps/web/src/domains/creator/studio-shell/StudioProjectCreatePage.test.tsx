@@ -90,7 +90,7 @@ describe("StudioProjectCreatePage", () => {
     const illustrationOption = screen.getAllByRole("button", { name: /일러스트|Illustration/u })
       .find((element) => element.hasAttribute("aria-pressed"));
     expect(illustrationOption?.getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByRole("combobox", { name: /시작 텠플릿|Starting template/u }) as HTMLSelectElement).value)
+    expect((screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }) as HTMLSelectElement).value)
       .toBe("illustration-portrait");
   });
 
