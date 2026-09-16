@@ -25,8 +25,8 @@ export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[]
     id: "webtoon-vertical",
     guideId: "hires",
     guideLabelKo: "고화질 작업",
-    labelKo: "범용·고화질 세로 웹툰 · 1080px",
-    labelEn: "Universal high-resolution vertical · 1080px",
+    labelKo: "범용·고화질 세로 웹툰 · 1080 × 8000px",
+    labelEn: "Universal high-resolution vertical · 1080 × 8000px",
     width: 1080,
     height: 8000,
   },
@@ -34,8 +34,8 @@ export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[]
     id: "webtoon-naver",
     guideId: "naver",
     guideLabelKo: "네이버",
-    labelKo: "네이버 연재형 · 690px",
-    labelEn: "Naver publishing canvas · 690px",
+    labelKo: "네이버 연재형 · 690 × 8000px",
+    labelEn: "Naver publishing canvas · 690 × 8000px",
     width: 690,
     height: 8000,
   },
@@ -43,8 +43,8 @@ export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[]
     id: "webtoon-kakao",
     guideId: "kakao",
     guideLabelKo: "카카오",
-    labelKo: "카카오 연재형 · 720px",
-    labelEn: "Kakao publishing canvas · 720px",
+    labelKo: "카카오 연재형 · 720 × 8000px",
+    labelEn: "Kakao publishing canvas · 720 × 8000px",
     width: 720,
     height: 8000,
   },
@@ -52,18 +52,9 @@ export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[]
     id: "webtoon-canvas",
     guideId: "canvas",
     guideLabelKo: "웹툰 캔버스",
-    labelKo: "WEBTOON Canvas형 · 800px",
-    labelEn: "WEBTOON Canvas · 800px",
+    labelKo: "WEBTOON Canvas형 · 800 × 8000px",
+    labelEn: "WEBTOON Canvas · 800 × 8000px",
     width: 800,
     height: 8000,
   },
 ]);
-
-export const DEFAULT_STUDIO_WEBTOON_CANVAS_PRESET_ID: StudioWebtoonCanvasPresetId = "webtoon-vertical";
-
-export function studioWebtoonCanvasPreset(
-  id?: string | null,
-): StudioWebtoonCanvasPreset {
-  return STUDIO_WEBTOON_CANVAS_PRESETS.find((preset) => preset.id === id)
-    ?? STUDIO_WEBTOON_CANVAS_PRESETS[0]!;
-}
