@@ -7,7 +7,7 @@
  * Expects production build in dist/ when origin is not provided.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -202,6 +202,7 @@ async function liveStatus(page: Page): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  mkdirSync(SCRATCH, { recursive: true });
   const ownedOrigin = EXISTING_ORIGIN ? "" : `http://127.0.0.1:${await findFreePort({ unavailableMessage: "port" })}`;
   const origin = EXISTING_ORIGIN || ownedOrigin;
   const server: ChildProcess | null = EXISTING_ORIGIN
@@ -222,8 +223,8 @@ async function main(): Promise<void> {
       permissions: ["clipboard-read", "clipboard-write"],
     });
     const page = await attachPage(context, "a", pageErrors);
-    log(`goto ${origin}/studio`);
-    await page.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 20_000 });
+    log(`goto ${origin}/studio/canvas`);
+    await page.goto(`${origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 20_000 });
     await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 20_000 });
     await page.waitForTimeout(500);
     await dismissOverlays(page);
