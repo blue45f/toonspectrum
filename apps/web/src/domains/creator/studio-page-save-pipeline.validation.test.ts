@@ -81,6 +81,75 @@ describe("runStudioPageSavePipeline metadata entry", () => {
     );
   });
 
+  it("device-protects a direct draft instead of requiring a server ACK", async () => {
+    const draftProtection = vi.fn().mockResolvedValue({
+      protection: "device",
+      serverSequence: null,
+      acknowledgedAt: null,
+      protectedUpdateIds: ["update-1"],
+    });
+    const acknowledgeDraftProtection = vi.fn();
+    const authoritativeBarrier = vi.fn();
+    const setError = vi.fn();
+    const openWorkMetadataStep = vi.fn();
+    const page = { id: "page-1", elements: [] } as never;
+
+    await runStudioPageSavePipeline("draft", validationDeps({
+      title: "1화",
+      setError,
+      openWorkMetadataStep,
+      clearPendingSaveIntent: vi.fn(),
+      pendingStrokeCommitsRef: { current: null },
+      pagesHistoryRef: { current: [[page]] },
+      pagesHiRef: { current: 0 },
+      pages: [page],
+      master: { elements: [] } as never,
+      sharedDocumentSaveAbortRef: { current: null },
+      markStudioDocumentChanged: vi.fn(() => true),
+      captureStudioMutationTicket: vi.fn(() => ({
+        accessGeneration: 0,
+        authScopeKey: null,
+        documentGeneration: 0,
+        workId: null,
+      })),
+      canApplyStudioMutation: vi.fn(() => true),
+      preserveStudioViewBeforeCapture: vi.fn(),
+      setSaving: vi.fn(),
+      setSharedDocumentNotice: vi.fn(),
+      setSelectedId: vi.fn(),
+      setMasterEditMode: vi.fn(),
+      hideStrokeGuide: vi.fn(),
+      setIsExporting: vi.fn(),
+      currentPageId: "page-1",
+      masterEditMode: false,
+      collaborationOperationSyncRequired: true,
+      studioCrdtAuthoritativeSaveBarrierRef: { current: authoritativeBarrier },
+      studioCrdtSceneRuntimeRef: {
+        current: {
+          flushAndWaitForDraftProtection: draftProtection,
+          acknowledgeDraftProtection,
+        } as never,
+      },
+      studioCrdtDocumentRef: { current: null },
+      captureReadyStageForPage: vi.fn(async () => {
+        throw new Error("capture failed after device protection");
+      }),
+      studioAuthUserId: null,
+      workId: null,
+      currentStudioDocumentScopeRef: {
+        current: { authScopeKey: null, workId: null },
+      },
+      editorMountedRef: { current: true },
+      setCurrentPageId: vi.fn(() => true),
+    }));
+
+    expect(draftProtection).toHaveBeenCalledExactlyOnceWith(10_000);
+    expect(authoritativeBarrier).not.toHaveBeenCalled();
+    expect(acknowledgeDraftProtection).not.toHaveBeenCalled();
+    expect(setError).toHaveBeenCalledWith("capture failed after device protection");
+    expect(openWorkMetadataStep).toHaveBeenCalledWith("draft");
+  });
+
   it("restores the exact pending intent after an attempted save fails", async () => {
     const clearPendingSaveIntent = vi.fn();
     const openWorkMetadataStep = vi.fn();
@@ -113,7 +182,9 @@ describe("runStudioPageSavePipeline metadata entry", () => {
       currentPageId: "page-1",
       masterEditMode: false,
       collaborationOperationSyncRequired: true,
+      sharedDocument: { role: "owner" } as never,
       studioCrdtAuthoritativeSaveBarrierRef: { current: null },
+      studioCrdtSceneRuntimeRef: { current: null },
       studioAuthUserId: null,
       workId: null,
       currentStudioDocumentScopeRef: {

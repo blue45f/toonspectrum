@@ -91,6 +91,15 @@ export interface StudioCrdtAuthoritativeAckBarrierResult {
   acknowledgedAt: number | null;
 }
 
+export interface StudioCrdtDraftProtectionBarrierResult {
+  /** Local/P2P drafts may be device-protected without claiming a server ACK. */
+  protection: "server" | "device" | "peer";
+  serverSequence: string | null;
+  acknowledgedAt: number | null;
+  /** Exact local batches represented by the REST draft snapshot. Empty after an authoritative ACK. */
+  protectedUpdateIds: readonly string[];
+}
+
 export interface StudioCrdtRoomBindingOptions {
   document: StudioCrdtDocument;
   room: StudioLiveRoom;
@@ -276,6 +285,104 @@ export class StudioCrdtRoomBinding {
     void this.drainPending();
   }
 
+  /**
+   * Protects a normal draft without pretending a local/P2P receipt is an authoritative server ACK.
+   * Server-backed rooms keep the strict ACK fence. During a local fallback, authenticated edits are
+   * committed to the durable CRDT outbox first and replay automatically after reconnect.
+   */
+  async flushAndWaitForDraftProtection(
+    timeoutMs = 2_000
+  ): Promise<StudioCrdtDraftProtectionBarrierResult> {
+    if (this.hasAuthoritativeServer()) {
+      const acknowledgement = await this.flushAndWaitForAuthoritativeAck(timeoutMs);
+      return {
+        protection: "server",
+        serverSequence: acknowledgement.serverSequence,
+        acknowledgedAt: acknowledgement.acknowledgedAt,
+        protectedUpdateIds: [],
+      };
+    }
+    if (this.closed) throw new Error("이미 닫힌 CRDT 바인딩입니다.");
+    if (!this.started) throw new Error("CRDT 바인딩이 아직 시작되지 않았습니다.");
+    if (this.recoveryState) throw new Error(this.recoveryState.message);
+
+    // Include the final sub-frame batch before taking the durable-outbox boundary.
+    this.batchSubscription?.flush();
+    const deadline = Date.now() + Math.max(100, Math.min(10_000, timeoutMs));
+    const pendingAtBoundary = [...this.pending.values()];
+
+    if (this.outboxScope !== null) {
+      const persisted = await this.completeBeforeDeadline(
+        Promise.all(pendingAtBoundary.map((pending) => this.ensurePendingPersistence(pending))),
+        deadline,
+        "초안을 이 기기의 복구 저장소에 보호하는 시간이 초과됐습니다."
+      );
+      if (persisted.every(Boolean)) {
+        // Keep the exact stable update ids until a real server ACK removes them.
+        if (this.room.ready) void this.drainPending();
+        return {
+          protection: "device",
+          serverSequence: null,
+          acknowledgedAt: null,
+          protectedUpdateIds: pendingAtBoundary.map(({ request }) => request.updateId),
+        };
+      }
+    }
+
+    // No usable durable outbox: require the current local/P2P room to receive the final frontier.
+    await this.flushAndWaitForPeerDraftDelivery(deadline);
+    return {
+      protection: "peer",
+      serverSequence: null,
+      acknowledgedAt: null,
+      protectedUpdateIds: pendingAtBoundary.map(({ request }) => request.updateId),
+    };
+  }
+
+  /**
+   * Releases only the local batches proven to be included in a successful REST draft snapshot.
+   * A failed cleanup leaves the remaining rows retryable; server save success is never fabricated.
+   */
+  async acknowledgeDraftProtection(
+    protectedUpdateIds: readonly string[]
+  ): Promise<void> {
+    if (protectedUpdateIds.length === 0) return;
+    if (this.closed) throw new Error("이미 닫힌 CRDT 바인딩입니다.");
+    if (!this.started) throw new Error("CRDT 바인딩이 아직 시작되지 않았습니다.");
+    if (this.recoveryState) throw new Error(this.recoveryState.message);
+
+    const uniqueIds = [...new Set(protectedUpdateIds)];
+    const scope = this.outboxScope;
+    for (const updateId of uniqueIds) {
+      const pending = this.pending.get(updateId);
+      if (!pending) continue;
+      if (scope) {
+        const persisted = await this.ensurePendingPersistence(pending);
+        if (!persisted) {
+          throw new Error("서버에 저장된 초안의 로컬 동기화 기록을 확인하지 못했습니다.");
+        }
+        this.outbox.removeEmergency?.(
+          scope,
+          pending.request.workId,
+          pending.request.updateId
+        );
+        await this.withPersistenceTimeout(this.outbox.remove(
+          scope,
+          pending.request.workId,
+          pending.request.updateId
+        ));
+      }
+      this.pending.delete(updateId);
+    }
+    if (!this.closed && !this.recoveryState) {
+      this.captureOutboxStatus();
+      this.emitStatus({
+        state: "ready",
+        message: "초안이 서버에 저장되었고 로컬 동기화 기록도 정리되었습니다.",
+      });
+    }
+  }
+
   /** Holds a collaborative edit lease through delivery without treating peer receipts as server ACKs. */
   async flushAndWaitForDelivery(timeoutMs = 2_000): Promise<void> {
     this.assertDeliveryActive();
@@ -317,6 +424,35 @@ export class StudioCrdtRoomBinding {
     if (!this.started) throw new Error("CRDT 바인딩이 아직 시작되지 않았습니다.");
     if (this.recoveryState) throw new Error(this.recoveryState.message);
     if (!this.room.ready) throw new Error("공동 편집 전송 채널의 연결이 끊겼습니다.");
+  }
+
+  private async flushAndWaitForPeerDraftDelivery(deadline: number): Promise<void> {
+    const timeoutMessage = "공동 편집 변경을 기기·참여자에게 보호하는 시간이 초과됐습니다.";
+    this.assertDeliveryActive();
+    if (this.syncPromise) {
+      await this.completeBeforeDeadline(this.syncPromise, deadline, timeoutMessage);
+      this.assertDeliveryActive();
+    }
+    await this.completeBeforeDeadline(this.syncNow(), deadline, timeoutMessage);
+    this.assertDeliveryActive();
+
+    const hasUndeliveredPending = () => [...this.pending.values()].some(
+      (pending) => pending.localBroadcasted !== true
+    );
+    while (hasUndeliveredPending()) {
+      if (this.retryTimer !== null) {
+        this.cancelTimeout(this.retryTimer);
+        this.retryTimer = null;
+      }
+      await this.completeBeforeDeadline(this.drainPending(), deadline, timeoutMessage);
+      this.assertDeliveryActive();
+      if (hasUndeliveredPending()) {
+        await this.completeBeforeDeadline(new Promise<void>((resolve) => {
+          this.scheduleTimeout(resolve, 25);
+        }), deadline, timeoutMessage);
+        this.assertDeliveryActive();
+      }
+    }
   }
 
   async flushAndWaitForAuthoritativeAck(

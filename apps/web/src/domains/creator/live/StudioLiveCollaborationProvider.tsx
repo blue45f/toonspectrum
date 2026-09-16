@@ -27,6 +27,7 @@ import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault"
 import type {
   StudioCrdtAuthoritativeAckBarrierResult,
   StudioCrdtBindingStatus,
+  StudioCrdtDraftProtectionBarrierResult,
   StudioCrdtRoomBinding,
 } from "./studio-crdt-room-binding";
 import type {
@@ -48,6 +49,12 @@ export type StudioCrdtAuthoritativeSaveBarrier = (
 
 export interface StudioCrdtSceneGraphRuntime {
   flushAndWaitForDelivery: (timeoutMs?: number) => Promise<void>;
+  flushAndWaitForDraftProtection: (
+    timeoutMs?: number
+  ) => Promise<StudioCrdtDraftProtectionBarrierResult>;
+  acknowledgeDraftProtection: (
+    protectedUpdateIds: readonly string[]
+  ) => Promise<void>;
   publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
   reconcileHistory: typeof import( "./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
   reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
@@ -684,6 +691,17 @@ export function StudioLiveCollaborationProvider({
               flushAndWaitForDelivery: async (timeoutMs) => {
                 if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
                 await readyBinding.flushAndWaitForDelivery(timeoutMs);
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+              },
+              flushAndWaitForDraftProtection: async (timeoutMs) => {
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+                const result = await readyBinding.flushAndWaitForDraftProtection(timeoutMs);
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+                return result;
+              },
+              acknowledgeDraftProtection: async (protectedUpdateIds) => {
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+                await readyBinding.acknowledgeDraftProtection(protectedUpdateIds);
                 if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
               },
               publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
