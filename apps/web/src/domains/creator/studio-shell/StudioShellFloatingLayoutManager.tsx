@@ -160,7 +160,7 @@ export function StudioShellFloatingLayoutManager() {
 
       <div
         data-studio-shell-view-options="true"
-        className="pointer-events-auto fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[210] max-w-[calc(100vw-1.5rem)] text-fg print:hidden"
+        className="pointer-events-auto fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden"
       >
         {open ? (
           <div
@@ -201,7 +201,7 @@ export function StudioShellFloatingLayoutManager() {
                       화면에 보이는 요소
                     </h3>
                     <p className="mt-1 text-[0.68rem] text-fg-3">
-                      {visibleCount}/{STUDIO_SHELL_FLOATING_VISIBILITY_IDS.length}개 표시 중
+                      설정상 {visibleCount}/{STUDIO_SHELL_FLOATING_VISIBILITY_IDS.length}개 표시
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -371,7 +371,7 @@ export function StudioShellFloatingLayoutManager() {
               <section className="rounded-xl border border-line bg-raised/50 p-3 text-[0.68rem] leading-5 text-fg-3">
                 <p className="font-bold text-fg-2">전수 조사 적용 범위</p>
                 <p className="mt-1">
-                  새 통합 대상: 작업공간 바, 문서 도구/웹툰 원고 도구, 저장 상태, 펜 입력 센터, 오프라인 상태, 채팅·통화.
+                  새 통합 대상: 작업공간 바, 문서 도구/웹툰 원고 도구, 저장 상태, 그리기 옵션, 펜 입력 센터, 오프라인 상태, 채팅·통화, 배치 편집 도구.
                 </p>
                 <p className="mt-1">
                   기존 배치 대상 유지: 페이지, 그리기 도구, 작업 패널/플랫폼 규격, 레이어, Navigator, 레퍼런스, 드로잉 팔레트와 기타 분리 창.

@@ -1057,6 +1057,50 @@ async function assertDrawOptionsBar(page: Page): Promise<string[]> {
   return failures;
 }
 
+async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  try {
+    const launcher = page.locator('[data-studio-shell-view-options="true"] > button');
+    await launcher.waitFor({ state: "visible", timeout: 5000 });
+    await launcher.click();
+    const dialog = page.getByRole("dialog", { name: "보기 및 플로팅 UI 설정" });
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const drawingOptions = page.locator('[data-studio-draw-options-dock="true"]');
+    if (await drawingOptions.count() === 0) {
+      failures.push("보기 설정이 관리할 그리기 옵션 바를 찾지 못함");
+    } else {
+      await dialog.getByRole("switch", { name: "그리기 옵션 숨기기" }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      await dialog.getByRole("switch", { name: "그리기 옵션 표시하기" }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+
+      await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
+      const handle = page.locator('[data-studio-shell-floating-handle="drawing-options"]');
+      await handle.waitFor({ state: "visible", timeout: 3000 });
+      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금" }).click();
+      if (!(await handle.getByRole("button", { name: "그리기 옵션 이동" }).isDisabled())) {
+        failures.push("그리기 옵션 위치 잠금 미적용");
+      }
+      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금 해제" }).click();
+      await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
+
+      await dialog.getByRole("button", { name: "모두 숨김" }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");
+      await dialog.getByRole("button", { name: "모두 표시" }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+    }
+
+    await dialog.getByRole("button", { name: "보기 설정 닫기" }).click();
+    if (failures.length === 0) log("  floating visibility + WYSIWYG layout ok");
+  } catch (err) {
+    failures.push(`플로팅 보기·배치: ${err instanceof Error ? err.message : String(err)}`);
+    await page.keyboard.press("Escape").catch(() => undefined);
+  }
+  return failures;
+}
+
 async function assertExportOptions(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
@@ -1136,6 +1180,7 @@ async function main() {
       ...(await assertMenuDrivenPopovers(page)),
       ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
+      ...(await assertFloatingLayoutManager(page)),
       ...(await assertExportOptions(page)),
     ];
 
