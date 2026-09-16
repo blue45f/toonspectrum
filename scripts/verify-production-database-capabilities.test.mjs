@@ -10,6 +10,7 @@ import {
 import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
+  buildMessagingRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
@@ -35,6 +36,8 @@ test("loads the runtime health readiness relation and cutover contract", () => {
     expect(contract.relationNames).toContain(relation);
   }
   expect(contract.relationNames).toContain("personal_cloud_connection");
+  expect(contract.relationNames).toContain("member_message_thread");
+  expect(contract.relationNames).toContain("member_message_report");
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
     "0025_auth_lifecycle_contract",
@@ -46,6 +49,7 @@ test("loads the runtime health readiness relation and cutover contract", () => {
     "0033_creator_marketplace_cloud_library",
     "0034_creator_marketplace_package_moderation",
     "0051_personal_cloud_connections",
+    "0059_member_messaging",
   ]);
 });
 
@@ -211,4 +215,12 @@ test("capability verifier rejects an implicit or unsafe runtime role", () => {
   expect(() => buildProductionCapabilityVerificationSql()).toThrow(
     /explicit lowercase PostgreSQL role/u,
   );
+});
+
+test("production verification includes the member messaging ACL boundary", () => {
+  const violation = buildMessagingRuntimeAclViolationSql("webdex_runtime");
+  expect(violation).toContain("public.member_message_thread");
+  expect(violation).toContain("SELECT, INSERT, UPDATE, DELETE");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });

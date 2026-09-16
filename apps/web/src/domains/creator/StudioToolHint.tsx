@@ -84,7 +84,7 @@ function isUsableRect(value: DOMRect | null): value is DOMRect {
   );
 }
 
-function hasUsableArea(value: DOMRect | null): boolean {
+function hasUsableArea(value: DOMRect | null): value is DOMRect {
   return isUsableRect(value) && value.width > 0 && value.height > 0;
 }
 
@@ -593,6 +593,7 @@ export function StudioToolHintTarget({
   const preferences = useContext(StudioToolHintPreferencesContext);
   const richCoachEnabled = preferences.mode === "rich";
   const tipId = useId();
+  const pointerSuppressionKey = hint?.id ?? tipId;
   const coordinator = preferences.coordinator;
   const exposure = preferences.exposure;
   const interaction = preferences.interaction;
@@ -622,6 +623,7 @@ export function StudioToolHintTarget({
   const describedFocusTarget = useRef<HTMLElement | null>(null);
   const observedDismissEpoch = useRef(dismissEpoch);
   const [expanded, setExpanded] = useState(false);
+  const [richPreviewEnabledForReveal, setRichPreviewEnabledForReveal] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const lastValidAnchor = useRef<DOMRect | null>(null);
 
@@ -635,8 +637,8 @@ export function StudioToolHintTarget({
       showTimer.current = 0;
       if (!coordinator.clearPending(tipId)) return;
       if (coordinator.getDismissEpoch() !== intentEpoch) return;
-      if (isPointerSuppressionActiveForTip(tipId)) {
-        const remaining = getPointerSuppressionRemainingForTip(tipId);
+      if (isPointerSuppressionActiveForTip(pointerSuppressionKey)) {
+        const remaining = getPointerSuppressionRemainingForTip(pointerSuppressionKey);
         scheduleHintRevealWithDelay(Math.max(remaining ?? 0, SHOW_DELAY_MS));
         return;
       }
@@ -681,9 +683,14 @@ export function StudioToolHintTarget({
   function readAnchor(): DOMRect | null {
     const el = wrapRef.current;
     const rootRect = el?.getBoundingClientRect() ?? null;
-    if (isUsableRect(rootRect)) return rootRect;
-
     const childRect = el?.firstElementChild?.getBoundingClientRect() ?? null;
+
+    // Inline wrappers can transiently report a zero-sized box while their button
+    // child already has stable geometry. Prefer a real hit area before falling
+    // back to finite zero geometry for the retry path.
+    if (hasUsableArea(rootRect)) return rootRect;
+    if (hasUsableArea(childRect)) return childRect;
+    if (isUsableRect(rootRect)) return rootRect;
     if (isUsableRect(childRect)) return childRect;
 
     return null;
@@ -708,13 +715,15 @@ export function StudioToolHintTarget({
     const effectiveIntent = alreadyOpen && previousIntent === "focus" && intent === "hover"
       ? "focus"
       : intent;
-    // A usage condition is operational accessibility information, not passive
-    // coaching. Keep it available on every deliberate hover/focus even after
-    // ordinary feature coaches have reached their repetition cooldown.
-    if (!alreadyOpen && !unavailableReason && !exposure.canReveal(hint.id, intent)) {
-      coordinator.clearPending(tipId);
-      return;
-    }
+    // The compact explanation is product affordance, not optional coaching.
+    // Exposure limits only quiet the richer animated preview; they must never
+    // make an icon or unfamiliar control look undocumented.
+    const automaticRichCoachAllowed =
+      effectiveIntent !== "hover" ||
+      Boolean(unavailableReason) ||
+      exposure.canReveal(hint.id, "hover");
+    const richPreviewAllowed =
+      richCoachEnabled && effectiveIntent !== "touch" && automaticRichCoachAllowed;
     coordinator.clearPending(tipId);
     preloadStudioToolHintBubbleModule();
     if (hideTimer.current) {
@@ -722,54 +731,50 @@ export function StudioToolHintTarget({
       hideTimer.current = 0;
     }
     const nextAnchor = readAnchor();
-    const fallbackAnchor = isUsableRect(lastValidAnchor.current)
+    const fallbackAnchor = hasUsableArea(lastValidAnchor.current)
       ? lastValidAnchor.current
       : null;
 
     if (!isUsableRect(nextAnchor)) {
-      if (fallbackAnchor) {
-        setAnchor(fallbackAnchor);
-      }
-      if (fallbackAnchor && anchorRetryRemaining <= 0) {
-        // Continue with last known geometry rather than dropping the tooltip
-        // when the layout briefly reports a zero-sized rect.
-      } else {
-      if (anchorRetryRemaining <= 0) return;
-      const retryDelay = ANCHOR_READ_RETRY_DELAY_MS
-        * ANCHOR_READ_RETRY_BACKOFF_FACTOR ** (ANCHOR_READ_RETRY_COUNT - anchorRetryRemaining);
+      if (fallbackAnchor) setAnchor(fallbackAnchor);
+      if (anchorRetryRemaining > 0) {
+        const retryDelay =
+          ANCHOR_READ_RETRY_DELAY_MS *
+          ANCHOR_READ_RETRY_BACKOFF_FACTOR **
+            (ANCHOR_READ_RETRY_COUNT - anchorRetryRemaining);
         showTimer.current = globalThis.setTimeout(() => {
           showTimer.current = 0;
-          // If geometry is being recalculated right as the control remounts,
-          // retry before dropping the hint intent.
+          // Layout transitions and remounts can report a zero-sized inline
+          // wrapper for a few frames. Retry instead of silently losing help.
           reveal(expandImmediately, intent, anchorRetryRemaining - 1);
         }, retryDelay) as unknown as number;
         return;
       }
     }
 
-    const anchorToUse = isUsableRect(nextAnchor)
+    const anchorToUse = hasUsableArea(nextAnchor)
       ? nextAnchor
-      : fallbackAnchor && hasUsableArea(fallbackAnchor)
-        ? fallbackAnchor
-        : null;
+      : fallbackAnchor ?? (isUsableRect(nextAnchor) ? nextAnchor : null);
     if (!anchorToUse) return;
 
     lastValidAnchor.current = anchorToUse;
     setAnchor(anchorToUse);
     activeRevealIntent.current = effectiveIntent;
     interaction.markReveal(tipId, effectiveIntent);
+    setRichPreviewEnabledForReveal(richPreviewAllowed);
     const previousHintId = coordinator.claim(tipId);
-    if (!alreadyOpen && !unavailableReason) exposure.markRevealed(hint.id, intent);
+    if (
+      !alreadyOpen &&
+      richPreviewAllowed &&
+      effectiveIntent === "hover" &&
+      !unavailableReason
+    ) {
+      exposure.markRevealed(hint.id, "hover");
+    }
     if (previousHintId && previousHintId !== tipId) {
       hideRenderedTooltipImmediately(previousHintId);
     }
-    if (!richCoachEnabled) {
-      if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
-      expandTimer.current = 0;
-      setExpanded(false);
-      return;
-    }
-    if (effectiveIntent === "touch") {
+    if (!richPreviewAllowed) {
       if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
       expandTimer.current = 0;
       setExpanded(false);
@@ -805,9 +810,16 @@ export function StudioToolHintTarget({
 
     const now = Date.now();
     const revealDelay = interaction.getHoverRevealDelay(tipId, now);
-    const pointerSuppressionRemaining = getPointerSuppressionRemainingForTip(tipId, now);
-    if (pointerSuppressionRemaining !== null) {
-      scheduleHintRevealWithDelay(pointerSuppressionRemaining + revealDelay);
+    if (getPointerSuppressionRemainingForTip(pointerSuppressionKey, now) !== null) {
+      // A click can remount the selected control while the physical pointer is
+      // still parked over it. Do not manufacture a delayed hover from that
+      // remount; actual pointer movement or keyboard focus re-arms discovery.
+      return;
+    }
+    if (exposure.isCompactRevealGuarded(hint.id, now)) {
+      // Keep the newly activated control quiet for one short beat. Unlike the
+      // rich-coach cooldown this guard is brief, so a later deliberate revisit
+      // still receives the compact explanation instead of appearing broken.
       return;
     }
     if (interaction.isHoverSuppressed(now)) {
@@ -815,7 +827,6 @@ export function StudioToolHintTarget({
       scheduleHintRevealWithDelay(hoverRemaining + revealDelay);
       return;
     }
-    if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     preloadStudioToolHintBubbleModule();
     scheduleHintRevealWithDelay(revealDelay);
   }
@@ -833,6 +844,7 @@ export function StudioToolHintTarget({
       interaction.clearReveal(tipId);
       activeRevealIntent.current = null;
       setExpanded(false);
+      setRichPreviewEnabledForReveal(false);
       hideTimer.current = 0;
     }, HIDE_DELAY_MS) as unknown as number;
   }
@@ -855,11 +867,12 @@ export function StudioToolHintTarget({
     // coach under the user's cursor; leaving the target re-arms hover/focus.
     pointerDismissed.current = true;
     if (hint && !disabled && !unavailableReason) exposure.markActivated(hint.id);
-    armPointerSuppression(tipId, event?.clientX ?? 0, event?.clientY ?? 0);
+    armPointerSuppression(pointerSuppressionKey, event?.clientX ?? 0, event?.clientY ?? 0);
     touchHoldOpened.current = false;
     clearTimers();
     dismissCoordinatedHintsImmediately();
     setExpanded(false);
+    setRichPreviewEnabledForReveal(false);
   }
 
   function handlePointerDownCapture(event: ReactPointerEvent<HTMLSpanElement>) {
@@ -877,9 +890,10 @@ export function StudioToolHintTarget({
       y: event.clientY,
     };
     pointerDismissed.current = true;
-    armPointerSuppression(tipId, event.clientX, event.clientY);
+    armPointerSuppression(pointerSuppressionKey, event.clientX, event.clientY);
     touchHoldOpened.current = false;
     setExpanded(false);
+    setRichPreviewEnabledForReveal(false);
     preloadStudioToolHintBubbleModule();
     const intentEpoch = coordinator.getDismissEpoch();
     coordinator.markPending(tipId);
@@ -950,6 +964,7 @@ export function StudioToolHintTarget({
     pointerDismissed.current = false;
     clearPointerSuppression();
     setExpanded(false);
+    setRichPreviewEnabledForReveal(false);
   }
 
   function clearFocusedDescription(target = describedFocusTarget.current) {
@@ -1031,6 +1046,7 @@ export function StudioToolHintTarget({
       if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
       expandTimer.current = 0;
       setExpanded(false);
+      setRichPreviewEnabledForReveal(false);
       if (preferences.mode === "off") {
         if (coordinator.getActiveHintId() === tipId) hideRenderedToolHintElement(tipId);
         coordinator.release(tipId);
@@ -1061,6 +1077,7 @@ export function StudioToolHintTarget({
     clearTimers();
     activeRevealIntent.current = null;
     setExpanded(false);
+    setRichPreviewEnabledForReveal(false);
     const target = describedFocusTarget.current;
     if (target) removeAriaDescription(target, tipId);
     describedFocusTarget.current = null;
@@ -1072,6 +1089,7 @@ export function StudioToolHintTarget({
     interaction.clearReveal(tipId);
     activeRevealIntent.current = null;
     setExpanded(false);
+    setRichPreviewEnabledForReveal(false);
     const target = describedFocusTarget.current;
     if (!target) return;
     removeAriaDescription(target, tipId);
@@ -1090,6 +1108,7 @@ export function StudioToolHintTarget({
       interaction.clearReveal(tipId);
       activeRevealIntent.current = null;
       setExpanded(false);
+      setRichPreviewEnabledForReveal(false);
       setAnchor(null);
     }
 
@@ -1187,7 +1206,7 @@ export function StudioToolHintTarget({
       tabIndex={disabled ? 0 : undefined}
     >
       {describedChildren}
-      {open && !isPointerSuppressionActiveForTip(tipId) && anchor && typeof document !== "undefined"
+      {open && !isPointerSuppressionActiveForTip(pointerSuppressionKey) && anchor && typeof document !== "undefined"
         ? createPortal(
             <Suspense
               fallback={(
@@ -1208,9 +1227,7 @@ export function StudioToolHintTarget({
                 hint={hint}
                 anchor={anchor}
                 expanded={expanded}
-                richPreviewEnabled={
-                  richCoachEnabled && activeRevealIntent.current !== "touch"
-                }
+                richPreviewEnabled={richPreviewEnabledForReveal}
                 reducedMotion={preferences.reduceMotion}
                 unavailableReason={unavailableReason}
                 preferredSide={preferredSide}

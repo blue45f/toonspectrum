@@ -4,27 +4,35 @@ ToonSpectrum may provide text AI without requiring every user to paste a key, bu
 
 ## End-to-end routing
 
-For text requests the default order is:
+For text requests the default automatic order is:
 
 1. shared Gemini free tier;
-2. shared Groq free tier;
-3. shared OpenRouter free router;
-4. the user's explicitly selected personal free connection;
-5. remaining valid personal free connections in quality order: Gemini, Groq, OpenRouter, Mistral, then local/self-hosted connections.
+2. shared Qwen China (Beijing) Free Quota Only;
+3. shared Groq free tier;
+4. shared SambaNova Free Tier;
+5. shared Z.AI free Flash;
+6. shared Mistral Free mode;
+7. shared Cloudflare Workers AI on Workers Free;
+8. shared OpenRouter free router;
+9. shared SiliconFlow free text model;
+10. the user's reviewed external personal free connections in the same quality order.
 
-A route advances only after a definitive pre-inference free-capacity or request-limit rejection (`402` or `429`) or the application's own local free-budget exhaustion. Network errors, timeouts, `5xx` responses, malformed responses, and authentication errors are surfaced immediately and are not sent to another provider. This avoids duplicate inference after an ambiguous failure.
+Local LLM, self-hosted runtime, and batch APIs are deliberately excluded from automatic routing. Existing manual connections remain available only when the user explicitly invokes a feature assigned to them.
 
-When every free route is exhausted or currently rate-limited, the UI explains that the user may add a personal free API key or local AI, retry after the provider limit clears, or leave the feature unavailable. The runtime never substitutes a paid model or silently enables billing.
+A route advances only after a definitive pre-inference free-capacity or request-limit rejection (`402`, `429`, Qwen `403/AllocationQuota.FreeTierOnly`, or Cloudflare `403/5035`) or the application's own browser safety-budget exhaustion. Network errors, timeouts, `5xx` responses, malformed responses, and authentication errors are surfaced immediately and are not sent to another provider. This avoids duplicate inference after an ambiguous failure.
+
+When every external free route is exhausted or currently rate-limited, the UI explains that the user may add a reviewed personal free API key, retry after the provider limit clears, or leave the feature unavailable. It does not automatically invoke local AI or a batch job. The runtime never substitutes a paid model or silently enables billing.
 
 ## Shared free pool invariants
 
 1. `STUDIO_AI_FREE_POOL_ENABLED=true` is required.
 2. Every provider needs a server-side key and a matching `STUDIO_AI_FREE_*_CONFIRMED=true` operational approval.
-3. Approval means the account was checked to have billing disabled or an enforced free-only boundary.
-4. OpenRouter is limited to `openrouter/free` or a model ending in `:free`.
-5. Shared credentials are never exposed through `VITE_` variables or API responses.
-6. Existing user-level and service-wide UTC daily request/token admissions remain authoritative and fail closed when their storage is unavailable.
-7. Shared providers are text-only. Image, video, and 3D generation remain local/self-hosted or use an explicitly configured personal integration.
+3. Approval means the account was checked to have billing disabled or an enforced free-only boundary. Qwen must use China (Beijing) with Free Quota Only; SambaNova must have no linked payment method; Mistral must remain in cardless Free mode with Pay-as-you-go disabled; Cloudflare must remain on Workers Free without prepaid AI Gateway billing.
+4. Qwen, Z.AI, Cloudflare, OpenRouter, and SiliconFlow are limited to exact hardcoded free-model allowlists and official endpoints.
+5. OpenRouter is limited to `openrouter/free` or a model ending in `:free`.
+6. Shared credentials are never exposed through `VITE_` variables or API responses.
+7. Existing user-level and service-wide UTC daily request/token admissions remain authoritative and fail closed when their storage is unavailable.
+8. Shared providers are text-only. Image, video, 3D, local LLM, self-hosted and batch execution are outside the automatic pool.
 
 The application cannot independently inspect every provider's billing configuration. The `CONFIRMED` flags are therefore deliberate deployment approvals, not automatic billing guarantees. Use accounts with no payment method or provider-side hard spending limits wherever possible.
 
@@ -35,7 +43,7 @@ The application cannot independently inspect every provider's billing configurat
 | `local-zero-cost` | Only `localhost`, `127.0.0.1`, or `::1`; API key optional. |
 | `self-hosted-zero-cost` | Authenticated HTTPS endpoint explicitly operated by the user. Known public AI provider hosts are rejected. |
 | `openrouter-free` | Exact OpenRouter API base URL and `openrouter/free` or a model ending in `:free`; text only. |
-| `provider-free-tier` | Exact official Groq, Gemini, or Mistral OpenAI-compatible endpoint with the user's key; text only. The user confirms billing is disabled. |
+| `provider-free-tier` | Exact reviewed Gemini, Qwen Beijing, Groq, SambaNova, Z.AI, Mistral, or SiliconFlow OpenAI-compatible endpoint with an allowlisted free model; text only. The user confirms the account is free-only and has no paid fallback. |
 | `unverified` | Always blocked until the user reviews the migrated or changed connection. |
 
 Personal API keys stay in memory by default. Optional persistence uses the existing encrypted local vault. Browser requests omit cookies, reject redirects, and do not automatically retry.
@@ -45,9 +53,9 @@ Personal API keys stay in memory by default. Optional persistence uses the exist
 `/settings/ai`, the Studio settings page, Studio popovers, and account settings all render the same `UnifiedAiSettings` owner. It contains:
 
 - shared free-pool status and provider order;
-- personal free API keys and local/self-hosted AI connections;
+- personal external free API keys plus separately managed manual local/self-hosted connections;
 - per-connection local request/token budget and blocker state;
-- capability assignments used after the shared pool is exhausted or currently limited;
+- external personal text assignments used after the shared pool is exhausted or currently limited; manual local/self-hosted assignments are never auto-selected;
 - Hyper3D/Rodin personal key;
 - personal Creator Runtime URL, token, and owner ID;
 - optional encrypted local persistence.

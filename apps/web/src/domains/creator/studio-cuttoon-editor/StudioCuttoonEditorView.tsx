@@ -79,6 +79,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       data-studio-ui-density={uiDensityMode}
+      data-studio-tool-hint-mode={appSettings.general.toolHintMode}
       data-studio-reduce-motion={appSettings.other.reduceMotion ? "true" : "false"}
       data-studio-device-kind={isMobile ? "mobile" : "desktop"}
       data-studio-editor="true"

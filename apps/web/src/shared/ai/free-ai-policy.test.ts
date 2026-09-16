@@ -70,6 +70,46 @@ describe("free-only AI connection policy", () => {
     expect(() => assertFreeAiConnection(groq, "text")).not.toThrow();
     expect(() => assertFreeAiConnection({
       ...groq,
+      baseUrl: "https://api.sambanova.ai/v1",
+      textModel: "DeepSeek-V3.1",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.mistral.ai/v1",
+      textModel: "mistral-small-latest",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      textModel: "qwen3.7-plus",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.z.ai/api/paas/v4",
+      textModel: "glm-4.7-flash",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.siliconflow.cn/v1",
+      textModel: "THUDM/GLM-Z1-9B-0414",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      textModel: "qwen-paid-or-unreviewed",
+    }, "text")).toThrow(/허용 모델/u);
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.z.ai/api/paas/v4",
+      textModel: "glm-5.1",
+    }, "text")).toThrow(/GLM-4\.7-Flash/u);
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://api.siliconflow.cn/v1",
+      textModel: "deepseek-ai/DeepSeek-V4-Pro",
+    }, "text")).toThrow(/THUDM\/GLM-Z1-9B-0414/u);
+    expect(() => assertFreeAiConnection({
+      ...groq,
       baseUrl: "https://api.example.com/v1",
     }, "text")).toThrow(/공식 OpenAI 호환 API/u);
     expect(() => assertFreeAiConnection({
@@ -83,6 +123,12 @@ describe("free-only AI connection policy", () => {
     expect(() => assertFreeAiConnection({
       ...connection,
       baseUrl: "https://api.openai.com/v1",
+      apiKey: "user-key",
+      costPolicy: "self-hosted-zero-cost",
+    }, "text")).toThrow(/공개 AI 제공자/u);
+    expect(() => assertFreeAiConnection({
+      ...connection,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
       apiKey: "user-key",
       costPolicy: "self-hosted-zero-cost",
     }, "text")).toThrow(/공개 AI 제공자/u);
@@ -108,8 +154,13 @@ describe("free-only AI connection policy", () => {
   });
 
   it("ships only free-policy presets", () => {
-    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(5);
+    expect(FREE_AI_PRESETS.length).toBeGreaterThanOrEqual(10);
     expect(FREE_AI_PRESETS.map((preset) => String(preset.costPolicy))).not.toContain("unverified");
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "sambanova-free")).toBe(true);
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "mistral-free")).toBe(true);
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "qwen-beijing-free")).toBe(true);
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "zai-free")).toBe(true);
+    expect(FREE_AI_PRESETS.some((preset) => preset.id === "siliconflow-free")).toBe(true);
     expect(FREE_AI_PRESETS.some((preset) => preset.textModel === "openrouter/free")).toBe(true);
     expect(FREE_AI_PRESETS.every((preset) => preset.imageModel === "")).toBe(true);
   });

@@ -8,12 +8,12 @@ import { useUi } from "@/shared/lib/ui-store";
 
 const COPY = {
   ko: {
-    title: "오늘 하려던 일, 이어서.", search: "작품·도구·에셋·도움말 검색", recent: "최근 작업 이어하기",
+    title: "오늘 하려던 일, 이어서.", search: "작품·도구·소재·도움말 검색", recent: "최근 작업 이어하기",
     fallback: "프로젝트 센터에서 작업 이어가기", fallbackBody: "최근 프로젝트, 로컬 초안, 공유받은 작업과 복구 항목을 확인하세요.",
     all: "프로젝트 센터", destinations: ["만들기 시작", "작품 찾기", "리서치 열기", "커뮤니티 열기", "에셋 마켓", "내 서재", "도움말"],
   },
   en: {
-    title: "Pick up your next step.", search: "Search stories, tools, assets and help", recent: "Continue where you left off",
+    title: "Pick up your next step.", search: "Search stories, tools, materials and help", recent: "Continue where you left off",
     fallback: "Continue from Project Center", fallbackBody: "Find recent projects, local drafts, shared work and recovery items.",
     all: "Project Center", destinations: ["Start creating", "Find stories", "Open research", "Open community", "Asset market", "My library", "Help"],
   },

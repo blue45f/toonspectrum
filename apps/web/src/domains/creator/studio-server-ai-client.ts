@@ -2,16 +2,21 @@ import { HTTPError, api, getApiErrorMessage } from "@/infrastructure/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 
 export type StudioServerAiTask = "assistant" | "composition" | "scenario" | "translation" | "dialogue" | "palette";
-export type StudioFreePoolProvider = "gemini" | "groq" | "openrouter" | "zai" | "deepseek";
+export type StudioFreePoolProvider = "gemini" | "qwen" | "groq" | "sambanova" | "zai" | "mistral" | "cloudflare" | "openrouter" | "siliconflow" | "deepseek";
 export type StudioServerAiProvider = StudioFreePoolProvider | "user";
 export type StudioServerAiProviderPreference = "auto" | StudioFreePoolProvider;
 export type StudioServerAiFailoverReason = "free_quota_exhausted" | "billing_quota_exhausted";
 
 const LABELS: Record<StudioServerAiProvider, string> = {
   gemini: "Gemini 무료",
+  qwen: "Qwen 베이징 무료 할당량",
   groq: "Groq 무료",
+  sambanova: "SambaNova 무료",
+  zai: "Z.AI 무료 Flash",
+  mistral: "Mistral 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
   openrouter: "OpenRouter 무료",
-  zai: "Z.ai",
+  siliconflow: "SiliconFlow 무료 텍스트",
   deepseek: "DeepSeek",
   user: "내 무료 AI",
 };
@@ -19,6 +24,7 @@ const LABELS: Record<StudioServerAiProvider, string> = {
 export function studioServerAiProviderLabel(provider: StudioServerAiProvider): string {
   return LABELS[provider];
 }
+
 
 export interface StudioServerAiFailoverMetadata {
   attemptedProvider: StudioServerAiProvider;
@@ -60,6 +66,16 @@ export type StudioServerAiStatus = {
   };
 };
 
+export function resolveActiveServerAiProviderLabel(
+  preference: StudioServerAiProviderPreference,
+  status: Pick<StudioServerAiStatus, "configured" | "providers"> | null,
+): string {
+  if (preference === "auto") {
+    return status?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키";
+  }
+  return status?.providers.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
+}
+
 export type StudioServerAiCompletion = {
   content: string;
   provider: StudioServerAiProvider;
@@ -96,9 +112,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function provider(value: unknown): StudioServerAiProvider | undefined {
   return value === "gemini"
+    || value === "qwen"
     || value === "groq"
-    || value === "openrouter"
+    || value === "sambanova"
     || value === "zai"
+    || value === "mistral"
+    || value === "cloudflare"
+    || value === "openrouter"
+    || value === "siliconflow"
     || value === "deepseek"
     || value === "user"
     ? value

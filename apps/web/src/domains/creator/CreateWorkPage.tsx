@@ -7,6 +7,7 @@ import {
   Heart,
   Layers,
   Link2,
+  Mail,
   MessageCircle,
   Pencil,
   Settings2,
@@ -776,7 +777,29 @@ export function CreateWorkPage() {
           ) : null}
 
           {!work.isOwner && (
-            <div className="ml-auto">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {userId && work.author.id ? (
+                <Link
+                  href={{
+                    pathname: "/messages/new",
+                    query: {
+                      to: work.author.id,
+                      name: work.author.name,
+                      contextType: "work",
+                      contextId: work.id,
+                      contextLabel: work.title,
+                    },
+                  }}
+                  className={buttonClass({
+                    size: "sm",
+                    variant: "outline",
+                    className: "gap-1.5",
+                  })}
+                >
+                  <Mail size={14} />
+                  작가에게 문의
+                </Link>
+              ) : null}
               <CreatorWorkReportControl workId={work.id} authenticated={Boolean(userId)} />
             </div>
           )}

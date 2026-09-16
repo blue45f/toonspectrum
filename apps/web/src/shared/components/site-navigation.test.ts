@@ -38,6 +38,7 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.make.href).toBe("/studio/new");
     expect(SITE_NAVIGATION_ITEMS.studioAssets.href).toBe("/studio/assets");
     expect(SITE_NAVIGATION_ITEMS.learn.href).toBe("/learn");
+    expect(SITE_NAVIGATION_ITEMS.studioAssets.label.ko).toBe("소재");
   });
 
   it("keeps fortune and tarot in Spectrum's research and growth directory", () => {
@@ -75,6 +76,7 @@ describe("site navigation information architecture", () => {
   });
 
   it("switches desktop and mobile navigation from the current product context", () => {
+    expect(siteNavigationContextForPath("/")).toBe("studio");
     expect(siteNavigationContextForPath("/studio")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
@@ -86,11 +88,14 @@ describe("site navigation information architecture", () => {
     expect(siteNavigationContextForPath("/community")).toBe("spectrum");
     expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");
 
+    expect(primarySiteNavigationForPath("/")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/help")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/discover")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
+    expect(siteNavigationGroupsForPath("/")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
     expect(siteNavigationGroupsForPath("/studio")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
     expect(siteNavigationGroupsForPath("/discover")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
+    expect(mobileSiteTabsForPath("/")).toBe(TOONSTUDIO_MOBILE_TABS);
     expect(mobileSiteTabsForPath("/studio")).toBe(TOONSTUDIO_MOBILE_TABS);
     expect(mobileSiteTabsForPath("/help")).toBe(TOONSTUDIO_MOBILE_TABS);
     expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);

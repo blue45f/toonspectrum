@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const ROOT_HOME = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
+const HOME_EXPERIENCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
 const PRODUCT_INTENT = "apps/web/src/domains/creator-resources/ProductIntentStart.tsx";
 const MAKE_HUB = "apps/web/src/domains/creator-resources/MakeHubPage.tsx";
 const CREATOR_ROUTES = "apps/web/src/app/routes/groups/creator-resources.routes.tsx";
@@ -17,17 +18,21 @@ const MARKET_NAV = "apps/web/src/domains/market/components/MarketNavHeader.tsx";
 const RANDOM_PAGE = "apps/web/src/domains/catalog/RandomPage.tsx";
 
 describe("purpose-first product UX foundation", () => {
-  it("puts the goal launcher before the deeper creator homepage", () => {
-    const source = readFileSync(ROOT_HOME, "utf8");
-    expect(source).toContain("<ProductIntentStart />");
-    expect(source.indexOf("<ProductIntentStart />")).toBeLessThan(source.indexOf("<CreatorHomeExperience />"));
+  it("puts the task launcher before detailed creator guidance", () => {
+    const root = readFileSync(ROOT_HOME, "utf8");
+    const experience = readFileSync(HOME_EXPERIENCE, "utf8");
+    expect(root).toContain("<CreatorHomeExperience />");
+    expect(experience).toContain("<ProductIntentStart />");
+    expect(experience.indexOf("<ProductIntentStart />")).toBeLessThan(
+      experience.indexOf('id="creator-start"'),
+    );
   });
 
   it("opens the true global command palette from the home search launcher", () => {
     const source = readFileSync(PRODUCT_INTENT, "utf8");
     expect(source).toContain("state.openCommandPalette");
     expect(source).toContain("onClick={openSearch}");
-    expect(source).toContain("작품·도구·에셋·도움말 검색");
+    expect(source).toContain("작품·도구·소재·도움말 검색");
     expect(source).not.toContain('href="/search"\n              className="mt-6');
   });
 
@@ -48,7 +53,7 @@ describe("purpose-first product UX foundation", () => {
     for (const path of ["/search", "/explore", "/ranking", "/recommend", "/calendar", "/random", "/compare"]) {
       expect(routes).toContain(`path: "${path}"`);
     }
-    expect(navigation).toContain('item("explore", "/discover"');
+    expect(navigation).toMatch(/explore:\s*item\(\s*"explore",\s*"\/discover"/u);
   });
 
   it("routes My Space as the global account destination while preserving detailed account pages", () => {
@@ -56,7 +61,7 @@ describe("purpose-first product UX foundation", () => {
     const navigation = readFileSync(SITE_NAVIGATION, "utf8");
     expect(routes).toContain('path: "/my"');
     expect(routes).toContain('path: "/me"');
-    expect(navigation).toContain('item("me", "/my"');
+    expect(navigation).toMatch(/me:\s*item\(\s*"me",\s*"\/my"/u);
   });
 
   it("keeps purpose-level active state separate from exact drawer destinations", () => {
@@ -84,8 +89,8 @@ describe("purpose-first product UX foundation", () => {
 
   it("uses distribution language for the free-first marketplace", () => {
     const source = readFileSync(MARKET_NAV, "utf8");
-    expect(source).toContain("배포 관리");
-    expect(source).toContain("에셋 배포");
+    expect(source).toContain("배포하기");
+    expect(source).toContain("웹툰 소재 작업실");
     expect(source).not.toContain("판매자 센터");
   });
 

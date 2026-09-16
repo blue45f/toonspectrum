@@ -67,9 +67,9 @@ describe("Studio collaboration route gateways", () => {
   // Review is now an actual production surface, not an asset-guidance placeholder. Exercise the
   // shipped surface and its scope-preserving editor exit instead of widening the placeholder API.
   it.each([
-    ["/studio/review", "draft", "/studio/canvas", "SQLite/OPFS 저장됨", null],
-    ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas", "서버 저장됨", "work-1"],
-    ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas", "SQLite/OPFS 저장됨", null],
+    ["/studio/review", "draft", "/studio/canvas", "이 기기에 저장됨", null],
+    ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas", "팀에 저장됨", "work-1"],
+    ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas", "이 기기에 저장됨", null],
   ])("opens the review workspace rather than a dead end at %s", async (
     pathname,
     scopeKey,
@@ -93,8 +93,8 @@ describe("Studio collaboration route gateways", () => {
       expect(database.kvGet).toHaveBeenCalledWith("studio-production-command-center-v1", scopeKey);
       expect(server.loadWorkspace).not.toHaveBeenCalled();
     }
-    expect(screen.getByRole("heading", { name: "리뷰 및 승인" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^리뷰$/u }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { name: "검토 및 승인" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^검토$/u }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(editorHref);
     expect(screen.queryByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeNull();
     expect(database.kvSet).not.toHaveBeenCalled();

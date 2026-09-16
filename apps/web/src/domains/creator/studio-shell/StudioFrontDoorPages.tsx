@@ -445,19 +445,19 @@ export function StudioImportPage() {
 export function StudioAssetsPage() {
   const language = useI18n((state) => state.lang);
   const locale = studioFrontDoorLocale(language);
-  useDocumentTitle(locale === "ko" ? "에셋" : "Assets");
+  useDocumentTitle(locale === "ko" ? "소재" : "Materials");
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PageHeader
-        eyebrow="ASSETS"
-        title={locale === "ko" ? "찾기부터 제작·설치·사용까지 한곳에서." : "Discover, create, install and use assets in one place."}
+        eyebrow="MATERIALS"
+        title={locale === "ko" ? "찾기부터 제작·설치·사용까지 한곳에서." : "Discover, create, install and use materials in one place."}
         description={locale === "ko"
-          ? "브러시·캐릭터·3D·오디오를 각각 다른 제품처럼 찾지 않고, 현재 프로젝트에 필요한 자산으로 연결합니다."
-          : "Use brushes, characters, 3D and audio as project assets instead of separate products."}
+          ? "브러시·캐릭터·3D·오디오를 각각 다른 제품처럼 찾지 않고, 현재 프로젝트에 필요한 소재로 연결합니다."
+          : "Use brushes, characters, 3D and audio as project materials instead of separate products."}
         locale={locale}
         action={
-          <Link href="/market" className={buttonClass({ size: "lg", className: "gap-2" })}>
+          <Link href="/studio/assets?view=market" className={buttonClass({ size: "lg", className: "gap-2" })}>
             <Store size={17} aria-hidden="true" />
             {locale === "ko" ? "마켓에서 찾기" : "Browse market"}
           </Link>
@@ -465,7 +465,7 @@ export function StudioAssetsPage() {
       />
 
       <section className="mt-8" aria-labelledby="studio-asset-categories">
-        <h2 id="studio-asset-categories" className="sr-only">{locale === "ko" ? "에셋 종류" : "Asset categories"}</h2>
+        <h2 id="studio-asset-categories" className="sr-only">{locale === "ko" ? "소재 종류" : "Material categories"}</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ASSET_CATEGORIES.map((card) => <FrontDoorCardView key={card.href} card={card} locale={locale} />)}
         </div>

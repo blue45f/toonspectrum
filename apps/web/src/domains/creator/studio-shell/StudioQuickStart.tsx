@@ -1,46 +1,35 @@
-import { ArrowRight, LayoutTemplate, PanelsTopLeft, PencilLine, Zap } from "lucide-react";
+import { ArrowRight, PanelsTopLeft, PencilLine, Plus, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 
 const QUICK_STARTS = [
   {
-    id: "draw",
-    kind: "illustration",
-    templateId: "quick-sketch",
-    icon: PencilLine,
-    labelKo: "바로 그리기",
-    labelEn: "Draw now",
-    titleKo: "빠른 스케치",
-    titleEn: "Quick sketch",
-    uiMode: "focus",
-    startTool: "draw",
-  },
-  {
     id: "webtoon",
     kind: "webtoon",
     templateId: "webtoon-vertical",
     icon: PanelsTopLeft,
-    labelKo: "웹툰 바로 열기",
-    labelEn: "Open webtoon",
+    labelKo: "웹툰 시작하기",
+    labelEn: "Start a webtoon",
     titleKo: "새 웹툰",
     titleEn: "New webtoon",
     uiMode: "basic",
     startTool: "draw",
   },
   {
-    id: "design",
-    kind: "design",
-    templateId: "design-social",
-    icon: LayoutTemplate,
-    labelKo: "디자인 바로 열기",
-    labelEn: "Open design",
-    titleKo: "새 디자인",
-    titleEn: "New design",
-    uiMode: "basic",
-    startTool: "select",
+    id: "draw",
+    kind: "illustration",
+    templateId: "quick-sketch",
+    icon: PencilLine,
+    labelKo: "그림 시작하기",
+    labelEn: "Start drawing",
+    titleKo: "빠른 스케치",
+    titleEn: "Quick sketch",
+    uiMode: "focus",
+    startTool: "draw",
   },
 ] as const;
 
@@ -52,6 +41,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
   const starting = useRef(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   function start(item: QuickStart) {
     if (starting.current) return;
     starting.current = true;
@@ -73,19 +63,27 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
         : "This browser could not save a new project. Check available storage and browser settings, then retry. Existing work was not changed.");
     }
   }
+
   return (
-    <section id="quick-draw" className="mt-6 border-y border-accent/30 bg-accent-soft/20 px-4 py-5 sm:px-6" aria-label={locale === "ko" ? "퀵모드" : "Quick mode"} data-studio-quick-start="true">
+    <section
+      id="quick-draw"
+      className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft/20 px-4 py-5 sm:px-6"
+      aria-label={locale === "ko" ? "빠른 시작" : "Quick start"}
+      data-studio-quick-start="true"
+    >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-xs font-black text-accent">
             <Zap size={15} aria-hidden="true" />
-            {locale === "ko" ? "설정 없이, 바로 한 획" : "Skip setup. Make your first mark."}
+            {locale === "ko" ? "설정 없이 시작" : "Start without setup"}
           </p>
-          <h2 className="mt-2 text-xl font-black text-fg">{locale === "ko" ? "일단 만들어 보세요" : "Just start creating"}</h2>
+          <h2 className="mt-2 text-xl font-black text-fg">
+            {locale === "ko" ? "바로 시작하기" : "Start right away"}
+          </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-fg-2">
             {locale === "ko"
-              ? "이름·종류를 고르지 않고 그림, 웹툰, 디자인 작업을 바로 시작합니다. 모든 작업은 내 작업에 남아요."
-              : "Start drawing, webtoon, or design work without filling out a setup form. Every project remains in My work."}
+              ? "웹툰이나 그림을 바로 열 수 있어요. 더 많은 형식은 새 작품 만들기에서 선택하세요."
+              : "Open a webtoon or drawing immediately. Choose other formats from Create new work."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -99,7 +97,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
                 disabled={busyId !== null}
                 onClick={() => start(item)}
                 className={buttonClass({
-                  variant: item.id === "draw" ? "solid" : "outline",
+                  variant: item.id === "webtoon" ? "solid" : "outline",
                   size: "lg",
                   className: "min-h-12 shrink-0 gap-2",
                 })}
@@ -110,6 +108,10 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
               </button>
             );
           })}
+          <Link href="/studio/new" className={buttonClass({ variant: "quiet", size: "lg", className: "min-h-12 gap-2" })}>
+            <Plus size={17} aria-hidden="true" />
+            {locale === "ko" ? "다른 작업 만들기" : "More project types"}
+          </Link>
         </div>
       </div>
       {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}

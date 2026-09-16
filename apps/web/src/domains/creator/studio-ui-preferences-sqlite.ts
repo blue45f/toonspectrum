@@ -115,9 +115,14 @@ function parseJson(raw: string | null): unknown {
 
 function normalizeServerAiProvider(value: unknown): StudioServerAiProviderPreference {
   return value === "gemini"
+    || value === "qwen"
     || value === "groq"
-    || value === "openrouter"
+    || value === "sambanova"
     || value === "zai"
+    || value === "mistral"
+    || value === "cloudflare"
+    || value === "openrouter"
+    || value === "siliconflow"
     || value === "deepseek"
     ? value
     : "auto";

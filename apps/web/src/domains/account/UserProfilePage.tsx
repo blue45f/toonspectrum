@@ -1,9 +1,11 @@
-import { BookOpen, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
+import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 
 import type { SeedReview, Title } from "@/shared/lib/types";
+
+import Link from "@/compat/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
 import { Container } from "@/shared/components/section";
@@ -248,23 +250,41 @@ export function UserProfilePage() {
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
             </div>
-            {/* 팔로우 버튼 — 본인 프로필이면 숨김, 비로그인은 비활성 안내 */}
+            {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
             {profile && !isSelf && (
-              <button
-                type="button"
-                onClick={onToggleFollow}
-                disabled={!viewerId || followBusy}
-                aria-pressed={profile.isFollowing}
-                title={viewerId ? undefined : t("userProfile.followHint")}
-                className={buttonClass({
-                  size: "sm",
-                  variant: profile.isFollowing ? "outline" : "solid",
-                  className: "shrink-0 gap-1.5",
-                })}
-              >
-                {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
-                {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
-              </button>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {viewerId && (
+                  <Link
+                    href={{
+                      pathname: "/messages/new",
+                      query: { to: profile.id, name: author },
+                    }}
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "outline",
+                      className: "gap-1.5",
+                    })}
+                  >
+                    <Mail size={14} aria-hidden="true" />
+                    메시지
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={onToggleFollow}
+                  disabled={!viewerId || followBusy}
+                  aria-pressed={profile.isFollowing}
+                  title={viewerId ? undefined : t("userProfile.followHint")}
+                  className={buttonClass({
+                    size: "sm",
+                    variant: profile.isFollowing ? "outline" : "solid",
+                    className: "gap-1.5",
+                  })}
+                >
+                  {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
+                  {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
+                </button>
+              </div>
             )}
           </div>
 

@@ -22,12 +22,12 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); window.localStorage.clear(); 
 describe("StudioQuickStart", () => {
   it("does not create a project from mounting, rendering or focus", () => {
     mountQuickStart();
-    screen.getByRole("button", { name: "바로 그리기" }).focus();
+    screen.getByRole("button", { name: "그림 시작하기" }).focus();
     expect(readStudioProjectLibrary(window.localStorage).projects).toHaveLength(0);
   });
-  it("opens one recoverable canvas in a single click and ignores repeated clicks", () => {
+  it("opens one recoverable drawing in a single click and ignores repeated clicks", () => {
     mountQuickStart();
-    const button = screen.getByRole("button", { name: "바로 그리기" });
+    const button = screen.getByRole("button", { name: "그림 시작하기" });
     fireEvent.click(button);
     fireEvent.click(button);
     const projects = readStudioProjectLibrary(window.localStorage).projects;
@@ -38,30 +38,27 @@ describe("StudioQuickStart", () => {
     expect(screen.getByLabelText("location").textContent)
       .toBe(`/studio/p/${projects[0]!.id}/d/${document.id}?workspace=draw&uiMode=focus&startTool=draw`);
   });
-  it.each([
-    ["웹툰 바로 열기", "webtoon", "webtoon-vertical", "comic", "draw"],
-    ["디자인 바로 열기", "design", "design-social", "design", "select"],
-  ] as const)("creates a recoverable task project from %s", (label, kind, templateId, workspace, startTool) => {
+  it("creates a recoverable webtoon from the primary action", () => {
     mountQuickStart();
-    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(screen.getByRole("button", { name: "웹툰 시작하기" }));
     const projects = readStudioProjectLibrary(window.localStorage).projects;
     expect(projects).toHaveLength(1);
-    expect(projects[0]).toMatchObject({ kind, templateId });
+    expect(projects[0]).toMatchObject({ kind: "webtoon", templateId: "webtoon-vertical" });
     const document = readStudioProjectDocuments(window.localStorage, projects[0]!.id).documents[0]!;
-    expect(document.defaultWorkspace).toBe(workspace);
+    expect(document.defaultWorkspace).toBe("comic");
     expect(screen.getByLabelText("location").textContent)
-      .toBe(`/studio/p/${projects[0]!.id}/d/${document.id}?workspace=${workspace}&uiMode=basic&startTool=${startTool}`);
+      .toBe(`/studio/p/${projects[0]!.id}/d/${document.id}?workspace=comic&uiMode=basic&startTool=draw`);
   });
   it("shows a retryable error when storage is blocked without navigating", () => {
     mountQuickStart("en");
     const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("Blocked test storage", "QuotaExceededError");
     });
-    fireEvent.click(screen.getByRole("button", { name: "Draw now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start drawing" }));
     expect(screen.getByRole("alert").textContent).toContain("Existing work was not changed");
     expect(screen.getByLabelText("location").textContent).toBe("/studio");
     write.mockRestore();
-    fireEvent.click(screen.getByRole("button", { name: "Draw now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start drawing" }));
     expect(readStudioProjectLibrary(window.localStorage).projects).toHaveLength(1);
   });
 });
