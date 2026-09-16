@@ -712,6 +712,7 @@ import {
 } from "./studio-magic-wand";
 import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindings";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
+import { studioBrushLabHref } from "./studio-main-menu-items-brush";
 import { StudioFilterDialogIntentContext } from "./studio-filter-dialog-intent";
 import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
 import {
@@ -1878,7 +1879,6 @@ export function StudioCuttoonEditor({
     setCurrentPageIdState(nextPageId);
     return true;
   }, []);
-
   const {
     aiProvenance,
     animaticWorkspace,
@@ -2064,7 +2064,6 @@ export function StudioCuttoonEditor({
     !persistLeadershipAllowsDraw;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
-
   useLayoutEffect(() => {
     const observeSceneElements = (
       sceneElements: ReturnType<StudioCrdtDocument["getSceneElements"]>
@@ -25778,6 +25777,7 @@ function clearSelectionForEdit() {
           openLayerMask: studioMainMenuActions.openSelectedLayerMask,
           openBrushPresetBrowser: studioMainMenuActions.openBrushPresetBrowserFromMenu,
           openBrushStudio: studioMainMenuActions.openBrushStudioFromMenu,
+          openBrushLab: () => navigate(studioBrushLabHref(location.pathname)),
           openBrushLibrary: studioMainMenuActions.openBrushLibraryFromMenu,
           requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
           openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
@@ -25792,7 +25792,7 @@ function clearSelectionForEdit() {
       companionRuntimeRef, companionWindowRef, ensureStudioToolsCompanionRuntime,
       isFullscreen,
       lastStudioFilterDraft,
-      leftPanelOpen,
+      leftPanelOpen, location.pathname,
       presentationPanelsHidden,
       menuActiveToolCommandId,
       menuClippingMaskActive,
@@ -25814,7 +25814,7 @@ function clearSelectionForEdit() {
       studioFilterUnavailableReason,
       menuHasLocallyHiddenLayers,
       menuHasSavedView,
-      menuSharedNonOwnerSave,
+      menuSharedNonOwnerSave, navigate,
       pageSequenceOpen,
       perspectiveRulerActive,
       projectArchiveBusy,
