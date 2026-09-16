@@ -10,6 +10,7 @@ import { useRouteTitle } from "./route-titles";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { useUi } from "@/shared/lib/ui-store";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { SiteRouteExperienceBoundary } from "@/shared/components/SiteRouteExperienceBoundary";
 import {
   isStudioWorkspaceLocation,
   isStudioWorkspaceRoutePathname,
@@ -75,7 +76,11 @@ export function AppRouter() {
     INITIAL_DOCUMENT_PATHNAME ?? pathname,
   );
   const currentIsStudioEditor = isStudioWorkspaceLocation({ pathname, search });
-  const routeTree = <AppRouteTree pathname={pathname} search={search} title={routeTitle} />;
+  const routeTree = (
+    <SiteRouteExperienceBoundary>
+      <AppRouteTree pathname={pathname} search={search} title={routeTitle} />
+    </SiteRouteExperienceBoundary>
+  );
   const needsIsolationGate =
     currentIsStudioEditor
     || documentWasStudioEditor
