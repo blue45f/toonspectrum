@@ -69,7 +69,7 @@ export function WorkflowTrustBadge({
       data-workflow-trust-state={state}
     >
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 overflow-wrap-anywhere">{presentation.label}</span>
+      <span className="min-w-0 break-words">{presentation.label}</span>
       {!compact ? <span className="sr-only">. {presentation.description}</span> : null}
     </span>
   );
