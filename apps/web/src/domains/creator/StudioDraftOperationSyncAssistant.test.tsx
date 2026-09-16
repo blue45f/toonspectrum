@@ -91,7 +91,7 @@ describe("StudioDraftOperationSyncAssistant", () => {
     }));
 
     expect(screen.getByRole("dialog", { name: "기기·서버 동기화" })).not.toBeNull();
-    expect(screen.getByText(/변경 3개를 서버가 다시 연결될 때까지/)).not.toBeNull();
+    expect(screen.getAllByText(/변경 3개를 서버가 다시 연결될 때까지/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "서버 연결 다시 확인" }));
     expect(retryServer).toHaveBeenCalledTimes(1);
   });

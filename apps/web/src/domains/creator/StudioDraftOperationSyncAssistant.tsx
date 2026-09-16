@@ -354,10 +354,18 @@ export function StudioDraftOperationSyncAssistant({
             </button>
             <button
               type="button"
-              onClick={() => void Promise.resolve(onExportBackup()).catch((error: unknown) => {
-                setActionError(errorMessage(error));
-                setOpen(true);
-              })}
+              onClick={() => {
+                setActionError(null);
+                try {
+                  void Promise.resolve(onExportBackup()).catch((error: unknown) => {
+                    setActionError(errorMessage(error));
+                    setOpen(true);
+                  });
+                } catch (error) {
+                  setActionError(errorMessage(error));
+                  setOpen(true);
+                }
+              }}
               disabled={!model.canExportBackup}
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
             >
