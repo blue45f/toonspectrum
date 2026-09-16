@@ -55,7 +55,7 @@
     "test:cloudflare-apex-redirect": "vitest run deploy/cloudflare-apex-redirect/src/index.test.ts",
     "typecheck:cloudflare-apex-redirect": "tsc -p deploy/cloudflare-apex-redirect/tsconfig.json",
     "verify:cloudflare-apex-redirect": "pnpm run typecheck:cloudflare-apex-redirect && pnpm run test:cloudflare-apex-redirect && pnpm exec wrangler versions upload --dry-run --config deploy/cloudflare-apex-redirect/wrangler.jsonc",
-    "test:cloudflare-realtime": "vitest run --config deploy/cloudflare-realtime/vitest.config.mts",
+    "test:cloudflare-realtime": "vitest run deploy/cloudflare-realtime/src/wrangler-contract.test.ts && vitest run --config deploy/cloudflare-realtime/vitest.config.mts",
     "typecheck:cloudflare-realtime": "tsc -p deploy/cloudflare-realtime/tsconfig.json && tsc -p deploy/cloudflare-realtime/tsconfig.integration.json",
     "verify:cloudflare-realtime": "pnpm run test:cloudflare-realtime && pnpm run typecheck:cloudflare-realtime && pnpm exec wrangler deploy --dry-run --config deploy/cloudflare-realtime/wrangler.jsonc",
     "verify:backend-capability-worker": "node scripts/canary-backend-capability-worker.mjs",
