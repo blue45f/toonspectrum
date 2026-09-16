@@ -12,7 +12,7 @@ The earlier authoring-environment browser restriction remains a historical resul
 
 ## User entry points
 
-- `/offline-drawing.html`: independent basic editor, no login/API/React/model/CDN dependency.
+- `/offline-drawing` (built from `offline-drawing.html`): independent basic editor, no login/API/React/model/CDN dependency.
 - `/studio/generate`: actual native ComfyUI inference jobs for video, geometry and illustration.
 - `/read/spatial`: authored layered webtoon reader with 2D, VR and AR modes.
 

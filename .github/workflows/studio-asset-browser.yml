@@ -105,7 +105,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
           set -o pipefail
-          NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
+          NODE_OPTIONS=--max-old-space-size=12288 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
       - name: Production build and Studio bundle budget
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

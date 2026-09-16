@@ -246,7 +246,7 @@ async function initialize() {
   try {
     if (!('serviceWorker' in navigator)) throw new Error('이 브라우저는 오프라인 재실행을 지원하지 않아요.');
     await navigator.serviceWorker.register('/sw.js');
-    const paths = ['/offline-drawing.html', '/offline-drawing/app.js', '/offline-drawing/model.js', '/offline-drawing/style.css'];
+    const paths = ['/offline-drawing', '/offline-drawing/app.js', '/offline-drawing/model.js', '/offline-drawing/style.css'];
     const deadline = Date.now() + 12000;
     let ready = false;
     do {
