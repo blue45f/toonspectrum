@@ -20,7 +20,16 @@ try {
     page.on("request", (request) => { if (request.url().endsWith(".mp4")) requests.push(request.url()); });
     let release;
     const responseGate = new Promise((resolve) => { release = resolve; });
-    await page.route("**/brand/toonstudio-intro.mp4", async (route) => {
+    let markRequestStarted;
+    const requestStarted = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Creator film request did not reach the Playwright route within 10 seconds")), 10000);
+      markRequestStarted = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+    });
+    await page.route("**/brand/toonstudio-intro.mp4*", async (route) => {
+      markRequestStarted();
       await responseGate;
       await route.continue().catch(() => { /* A closed player can cancel its intercepted request. */ });
     });
@@ -29,9 +38,8 @@ try {
       await page.locator('[data-creator-home="studio-first"]').waitFor();
       assert.equal(requests.length, 0);
       assert.equal(await page.locator("video").count(), 0);
-      const requestedVideo = page.waitForRequest("**/brand/toonstudio-intro.mp4");
       await page.getByTestId("creator-film-play").click();
-      await requestedVideo;
+      await requestStarted;
       const video = page.locator("video");
       await expect(video).toBeFocused();
       assert.equal(await video.evaluate((element) => element.readyState), 0);
@@ -53,7 +61,7 @@ try {
       await expect(page.getByTestId("creator-film-play")).toBeFocused();
       assert.equal(await page.locator("video").count(), 0);
       release();
-      await page.unroute("**/brand/toonstudio-intro.mp4");
+      await page.unroute("**/brand/toonstudio-intro.mp4*");
       await page.locator(".ch-film-downloads summary").click();
       const links = page.locator(".ch-film-download-grid a[download]");
       assert.equal(await links.count(), 3);
