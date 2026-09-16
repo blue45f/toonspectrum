@@ -219,12 +219,17 @@ function validateNewAuthSecret(key, value) {
   }
 }
 
-export async function reconcileProductionEnvironment() {
+export async function reconcileProductionEnvironment({ referencedKeys } = {}) {
   const token = requireValue("VERCEL_TOKEN");
   const project = requireValue("VERCEL_PROJECT_ID", process.env.VERCEL_PROJECT_NAME || "toonspectrum");
   const teamId = process.env.VERCEL_ORG_ID?.trim() || process.env.VERCEL_TEAM_ID?.trim() || "";
   const auditOnly = process.argv.includes("--audit-only");
-  const referenced = await collectReferencedEnvironmentKeys();
+  const referenced = referencedKeys === undefined
+    ? await collectReferencedEnvironmentKeys()
+    : [...new Set(referencedKeys)].sort();
+  if (referenced.some((key) => !/^[A-Z][A-Z0-9_]*$/u.test(key))) {
+    throw new Error("Referenced environment keys must be uppercase identifiers");
+  }
   const listed = await vercelRequest(
     `/v9/projects/${encodeURIComponent(project)}/env`,
     { token, teamId },

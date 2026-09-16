@@ -349,7 +349,10 @@ pnpm exec wrangler deploy --dry-run \
   --outdir /tmp/toonspectrum-realtime-dry
 ```
 
-[`wrangler.jsonc`](./wrangler.jsonc) is the reviewed production scaffold.
+[`wrangler.jsonc`](./wrangler.jsonc) is the reviewed production scaffold. It
+declares `realtime.toonstudio.cloud` as a custom domain, keeps `workers.dev`
+enabled for an independent canary/rollback, and disables disposable preview
+URLs so a normal deploy cannot silently change those production triggers.
 [`wrangler.test.jsonc`](./wrangler.test.jsonc) contains a deterministic,
 explicitly local-only credential and must never be deployed. Production still
 requires `wrangler secret put REALTIME_TICKET_SECRET` and every item in

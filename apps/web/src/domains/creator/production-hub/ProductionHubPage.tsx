@@ -5,6 +5,7 @@ import {
   BookOpenText,
   Boxes,
   BriefcaseBusiness,
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
   CircleDot,
@@ -32,6 +33,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -49,6 +51,10 @@ import {
   type StoryToArtHandoffPackage,
 } from "@toonspectrum/core/production";
 
+import { ProductionCommandPalette } from "./ProductionCommandPalette";
+import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
+import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
+import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWorkspace";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import {
@@ -68,6 +74,7 @@ export type ProductionProjectSurface =
   | "planning"
   | "episodes"
   | "production"
+  | "schedule"
   | "handoff"
   | "review"
   | "procurement"
@@ -90,6 +97,7 @@ const SURFACES: readonly {
   { id: "planning", label: "기획", icon: BookOpenText },
   { id: "episodes", label: "회차", icon: PanelTopOpen },
   { id: "production", label: "제작", icon: Workflow },
+  { id: "schedule", label: "일정", icon: CalendarClock },
   { id: "handoff", label: "인수인계", icon: Handshake },
   { id: "review", label: "검수", icon: ClipboardCheck },
   { id: "procurement", label: "발주", icon: BriefcaseBusiness },
@@ -350,6 +358,12 @@ function useProductionProject(projectId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [notice, setNotice] = useState<string | null>(null);
+  const aggregateRef = useRef<ProductionProjectAggregate | null>(aggregate);
+  const commandQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    aggregateRef.current = aggregate;
+  }, [aggregate]);
 
   useEffect(() => {
     if (isDemo) {
@@ -374,24 +388,29 @@ function useProductionProject(projectId: string | undefined) {
     return () => { active = false; };
   }, [isDemo, projectId]);
 
-  const execute = useCallback(async (command: ProductionClientCommand, successMessage: string) => {
-    if (!aggregate) return;
-    setSaveState("saving");
-    setNotice(null);
-    try {
-      if (isDemo) {
-        setAggregate(reduceDemoCommand(aggregate, command));
-      } else {
-        const response = await executeProductionCommand(aggregate.projectId, aggregate.revision, command);
-        setAggregate(response.aggregate);
+  const execute = useCallback((command: ProductionClientCommand, successMessage: string): Promise<void> => {
+    const run = async () => {
+      const current = aggregateRef.current;
+      if (!current) return;
+      setSaveState("saving");
+      setNotice(null);
+      try {
+        const next = isDemo
+          ? reduceDemoCommand(current, command)
+          : (await executeProductionCommand(current.projectId, current.revision, command)).aggregate;
+        aggregateRef.current = next;
+        setAggregate(next);
+        setSaveState("saved");
+        setNotice(successMessage);
+      } catch (cause) {
+        setSaveState("error");
+        setNotice(await getApiErrorMessage(cause, "변경 내용을 저장하지 못했습니다."));
       }
-      setSaveState("saved");
-      setNotice(successMessage);
-    } catch (cause) {
-      setSaveState("error");
-      setNotice(await getApiErrorMessage(cause, "변경 내용을 저장하지 못했습니다."));
-    }
-  }, [aggregate, isDemo]);
+    };
+    const pending = commandQueueRef.current.then(run, run);
+    commandQueueRef.current = pending.catch(() => undefined);
+    return pending;
+  }, [isDemo]);
 
   return { aggregate, access, loading, error, saveState, notice, execute, isDemo };
 }
@@ -490,6 +509,7 @@ function ProjectHeader({
           <h1 className="mt-1 truncate text-xl font-black tracking-tight text-fg">{aggregate.title}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ProductionCommandPalette aggregate={aggregate} />
           <label className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2">
             <span>역할 관점</span>
             <select
@@ -628,18 +648,30 @@ function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: Producti
   );
 }
 
-function PlanningSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
+function PlanningSurface({
+  aggregate,
+  execute,
+  canEdit,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+}) {
   const charter = [...aggregate.charters].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const brief = [...aggregate.projectBriefs].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const seriesMaster = [...aggregate.seriesMasters].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const season = [...aggregate.seasonPlans].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const domains = ["canon", "dialogue", "layout", "visual-direction", "color", "publication", "rights"] as const;
   const openRisks = aggregate.risks.filter((risk) => !["resolved", "closed"].includes(risk.status));
+  const currentEpisodePlans = aggregate.episodePlans.filter((plan) => !aggregate.episodePlans.some((candidate) => candidate.episodeId === plan.episodeId && candidate.revision > plan.revision));
+  const currentScenePlans = aggregate.scenePlans.filter((plan) => !aggregate.scenePlans.some((candidate) => candidate.sceneId === plan.sceneId && candidate.revision > plan.revision));
+  const currentCutPlans = aggregate.cutPlans.filter((plan) => !aggregate.cutPlans.some((candidate) => candidate.cutId === plan.cutId && candidate.revision > plan.revision));
   return (
     <div className="space-y-4">
+      <ProductionVisualPlanningWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="기획 기준선" value={brief ? `r${brief.revision}` : "—"} detail={brief?.status ?? "Project Brief 없음"} icon={ScrollText} tone={brief?.status === "approved" ? "success" : "warning"} />
-        <Metric label="회차 계획" value={String(aggregate.episodePlans.length)} detail={`${aggregate.scenePlans.length} scenes · ${aggregate.cutPlans.length} cuts`} icon={PanelTopOpen} tone="accent" />
+        <Metric label="회차 계획" value={String(currentEpisodePlans.length)} detail={`${currentScenePlans.length} scenes · ${currentCutPlans.length} cuts`} icon={PanelTopOpen} tone="accent" />
         <Metric label="에셋 요구" value={String(aggregate.assetRequirements.length)} detail={`${aggregate.assetRequirements.filter((entry) => entry.status === "blocked").length}개 차단`} icon={Boxes} />
         <Metric label="열린 위험" value={String(openRisks.length)} detail={`${openRisks.filter((entry) => entry.probability * entry.impact >= 12).length}개 고위험`} icon={AlertTriangle} tone={openRisks.some((entry) => entry.probability * entry.impact >= 12) ? "danger" : "neutral"} />
       </div>
@@ -678,9 +710,9 @@ function PlanningSurface({ aggregate }: { readonly aggregate: ProductionProjectA
 
       <SectionCard title={season ? `시즌 · ${season.title}` : "시즌·회차 기획"} description={season?.goal ?? "시즌 목표와 회차별 리듬을 관리합니다."} action={season ? <Pill tone="success">{season.status} · {season.targetEpisodeCount}화</Pill> : undefined}>
         <div className="grid gap-3 lg:grid-cols-2">
-          {[...aggregate.episodePlans].sort((a, b) => a.episodeNumber - b.episodeNumber).map((plan) => {
-            const scenes = aggregate.scenePlans.filter((entry) => entry.episodeId === plan.episodeId);
-            const cuts = aggregate.cutPlans.filter((entry) => entry.episodeId === plan.episodeId);
+          {[...currentEpisodePlans].sort((a, b) => a.episodeNumber - b.episodeNumber).map((plan) => {
+            const scenes = currentScenePlans.filter((entry) => entry.episodeId === plan.episodeId);
+            const cuts = currentCutPlans.filter((entry) => entry.episodeId === plan.episodeId);
             return (
               <article key={plan.id} className="rounded-xl border border-line bg-panel p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">EP {plan.episodeNumber}</p><h3 className="mt-1 font-bold text-fg">{plan.title}</h3></div><Pill tone={plan.status === "locked" || plan.status === "approved" ? "success" : "warning"}>{plan.status} · r{plan.revision}</Pill></div>
@@ -795,14 +827,28 @@ function ProductionSurface({ aggregate }: { readonly aggregate: ProductionProjec
   );
 }
 
+function ScheduleSurface({
+  aggregate,
+  execute,
+  canEdit,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+}) {
+  return <ProductionScheduleWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
+}
+
 function HandoffSurface({
   aggregate,
   execute,
   roleLens,
+  canEdit,
 }: {
   readonly aggregate: ProductionProjectAggregate;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly roleLens: RoleLens;
+  readonly canEdit: boolean;
 }) {
   const handoff = aggregate.handoffs.find((entry) => !["superseded", "cancelled"].includes(entry.status));
   if (!handoff) return <EmptyState title="활성 인수인계가 없습니다" description="StoryLock 승인 후 회차 의도와 참조 revision을 묶어 작화팀에 전달하세요." />;
@@ -864,7 +910,7 @@ function HandoffSurface({
           title="질문·결정"
           description="차단 질문은 답변 또는 명시적인 위험 수락 전까지 다음 공정을 열지 않습니다."
           action={clarifications.some((entry) => entry.blocking && entry.status === "open") ? (
-            <button type="button" className={buttonClass({ size: "sm" })} onClick={() => void answerFirstBlocking()} disabled={roleLens === "art"}>첫 차단 질문 결정</button>
+            <button type="button" className={buttonClass({ size: "sm" })} onClick={() => void answerFirstBlocking()} disabled={!canEdit || roleLens === "art"}>첫 차단 질문 결정</button>
           ) : undefined}
         >
           <div className="space-y-2">
@@ -883,14 +929,30 @@ function HandoffSurface({
   );
 }
 
-function ReviewSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
+function ReviewSurface({
+  aggregate,
+  execute,
+  canEdit,
+  roleLens,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+  readonly roleLens: RoleLens;
+}) {
   const policy = aggregate.reviewPolicies[0];
-  if (!policy) return <EmptyState title="검수 정책이 없습니다" description="서사·시각·제작·권리 lane과 quorum을 설정하세요." />;
+  if (!policy) return (
+    <div className="space-y-4">
+      <ProductionReviewWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />
+      <EmptyState title="검수 정책이 없습니다" description="서사·시각·제작·권리 lane과 quorum을 설정하세요." />
+    </div>
+  );
   const roundId = aggregate.reviewDecisions[0]?.reviewRoundId ?? "active-round";
   const decisions = aggregate.reviewDecisions.filter((entry) => entry.reviewRoundId === roundId);
   const evaluation = evaluateReviewApproval(policy, decisions);
   return (
     <div className="space-y-4">
+      <ProductionReviewWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Metric label="검수 lane" value={String(policy.lanes.length)} detail="역할별 독립 승인" icon={Layers3} />
         <Metric label="승인 완료" value={String(evaluation.laneResults.filter((entry) => entry.approved).length)} detail={`${policy.lanes.length}개 중`} icon={BadgeCheck} tone={evaluation.approved ? "success" : "warning"} />
@@ -1077,19 +1139,22 @@ function SurfaceContent({
   aggregate,
   roleLens,
   execute,
+  canEdit,
 }: {
   readonly surface: ProductionProjectSurface;
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
 }) {
   switch (surface) {
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
-    case "planning": return <PlanningSurface aggregate={aggregate} />;
+    case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <EpisodesSurface aggregate={aggregate} />;
     case "production": return <ProductionSurface aggregate={aggregate} />;
-    case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} />;
-    case "review": return <ReviewSurface aggregate={aggregate} />;
+    case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
+    case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
+    case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;
     case "rights": return <RightsSurface aggregate={aggregate} />;
     case "settings": return <SettingsSurface aggregate={aggregate} />;
@@ -1113,7 +1178,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
-          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} />
+          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} />
         </div>
       </div>
     </main>
@@ -1234,24 +1299,21 @@ export function ProductionEpisodeRoomPage() {
         </div>
 
         <div className="space-y-4">
-          <SectionCard title="시각 작업대" description={`${artParty?.publicDisplayName ?? "그림 작가"} · ${episode.visualRevisionRef ? `r${episode.visualRevisionRef.revision}` : "visual branch 없음"}`} action={<Link className={buttonClass({ size: "sm" })} to={`/studio/work/${aggregate.workId}/comic`}>Studio 열기</Link>}>
-            <div className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-panel p-3 sm:grid-cols-4">
-              {Array.from({ length: 12 }, (_, index) => (
-                <div key={index} className={cn("relative aspect-[3/4] overflow-hidden rounded-lg border", index === 8 ? "border-accent bg-accent-soft" : "border-line bg-raised")}>
-                  <div className="absolute inset-x-2 top-2 h-1 rounded-full bg-line-strong/50" />
-                  <div className={cn("absolute inset-x-3 rounded-full bg-line-strong/40", index % 3 === 0 ? "bottom-5 h-12" : "bottom-3 h-7")} />
-                  <span className="absolute bottom-1 left-1.5 text-[0.625rem] font-bold text-fg-3">{index + 1}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">컷</p><p className="mt-1 font-bold text-fg">42 / 68</p></div>
-              <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">세로 길이</p><p className="mt-1 font-bold text-fg">18,420 px</p></div>
-              <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">대사 밀도</p><p className="mt-1 font-bold text-fg">중간</p></div>
-            </div>
-          </SectionCard>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-3">
+            <div><p className="text-xs font-black text-fg">시각 작업대</p><p className="mt-1 text-[0.6875rem] text-fg-3">{artParty?.publicDisplayName ?? "그림 작가"} · {episode.visualRevisionRef ? `visual r${episode.visualRevisionRef.revision}` : "visual branch 없음"}</p></div>
+            <Link className={buttonClass({ size: "sm" })} to={`/studio/work/${aggregate.workId}/comic`}>Studio 열기</Link>
+          </div>
+          <ProductionVisualPlanningWorkspace
+            aggregate={aggregate}
+            execute={project.execute}
+            canEdit={project.access.edit}
+            initialEpisodeId={episode.episodeId}
+            showEpisodeRail={false}
+            compact
+            defaultView="scroll"
+          />
 
-          <SectionCard title="공동 검수" description="콘티와 스토리 정본의 차이를 lane별로 검수합니다." action={<button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => void approveVisualLane()}>시각 lane 승인</button>}>
+          <SectionCard title="공동 검수" description="콘티와 스토리 정본의 차이를 lane별로 검수합니다." action={<button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => void approveVisualLane()} disabled={!project.access.edit}>시각 lane 승인</button>}>
             <div className="grid gap-2 sm:grid-cols-3">
               {[
                 ["Narrative", aggregate.reviewDecisions.some((entry) => entry.lane === "narrative")],
@@ -1270,7 +1332,7 @@ export function ProductionEpisodeRoomPage() {
                   <div className="flex flex-wrap gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? "BLOCKER" : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
                   <p className="mt-2 text-xs font-semibold leading-5 text-fg">{thread.question}</p>
                   {thread.answer ? <p className="mt-2 rounded-lg bg-raised p-2 text-xs leading-5 text-fg-2">{thread.answer}</p> : null}
-                  {thread.blocking && thread.status === "open" ? <button type="button" className={cn(buttonClass({ size: "sm" }), "mt-3 w-full")} onClick={() => void answerBlocker(thread)} disabled={(project.isDemo && roleLens !== "story") || (!project.isDemo && viewerAssignment?.id !== thread.answerOwnerAssignmentId)}>결정 기록</button> : null}
+                  {thread.blocking && thread.status === "open" ? <button type="button" className={cn(buttonClass({ size: "sm" }), "mt-3 w-full")} onClick={() => void answerBlocker(thread)} disabled={!project.access.edit || (project.isDemo && roleLens !== "story") || (!project.isDemo && viewerAssignment?.id !== thread.answerOwnerAssignmentId)}>결정 기록</button> : null}
                 </article>
               ))}
             </div>

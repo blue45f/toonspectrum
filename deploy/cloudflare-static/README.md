@@ -124,7 +124,7 @@ pnpm run cloudflare:static:deploy
 
 ## 커스텀 도메인 전환
 
-`workers_dev` URL은 배포 후 독립 canary로 유지한다. 이 Static Assets Worker는 Cloudflare 영역 라우트 `www.toonstudio.cloud/*`만 담당하며 실패 모드는 fail-open이다. apex `toonstudio.cloud/*`는 [`../cloudflare-apex-redirect`](../cloudflare-apex-redirect/)의 초소형 `308` Worker가 별도로 담당한다. 이 분리는 apex 정본화 때문에 모든 정적 파일 요청을 Worker 코드로 통과시키는 비용·장애 결합을 피한다. `origin.toonstudio.cloud`는 DNS-only Vercel 원본으로 남겨 API와 R2 fallback의 재귀 프록시를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
+`workers_dev` URL은 배포 후 독립 canary로 유지한다. 이 Static Assets Worker는 Cloudflare 영역 라우트 `www.toonstudio.cloud/*`만 담당하며 실패 모드는 fail-open이다. apex `toonstudio.cloud/*`는 [`../cloudflare-apex-redirect`](../cloudflare-apex-redirect/)의 초소형 `308` Worker가 별도로 담당한다. 이 분리는 apex 정본화 때문에 모든 정적 파일 요청을 Worker 코드로 통과시키는 비용·장애 결합을 피한다. `origin.toonstudio.cloud`는 정상 Worker 변수와 프록시 체인에서 제외한 DNS-only 수동 Vercel 재해복구 원본으로만 남겨 API와 R2 fallback의 재귀 프록시 및 자동 비용 경로를 방지한다. 도메인·라우트 변경은 Wrangler 토큰 권한과 별도로 Cloudflare Dashboard에서 검증한다.
 
 ## 헤더 계약
 

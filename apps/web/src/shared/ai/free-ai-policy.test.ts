@@ -85,6 +85,21 @@ describe("free-only AI connection policy", () => {
     }, "text")).not.toThrow();
     expect(() => assertFreeAiConnection({
       ...groq,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      textModel: "qwen3.7-flash",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      textModel: "qwen3.8-max",
+    }, "text")).not.toThrow();
+    expect(() => assertFreeAiConnection({
+      ...groq,
+      baseUrl: "https://workspace_123456.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      textModel: "qwen3.8-27b",
+    }, "text")).toThrow(/허용 모델/u);
+    expect(() => assertFreeAiConnection({
+      ...groq,
       baseUrl: "https://api.z.ai/api/paas/v4",
       textModel: "glm-4.7-flash",
     }, "text")).not.toThrow();

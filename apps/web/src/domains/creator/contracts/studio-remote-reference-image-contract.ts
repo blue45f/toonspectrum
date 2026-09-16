@@ -4,10 +4,10 @@ export const STUDIO_REMOTE_REFERENCE_IMAGE_CONTRACT_VERSION = 1 as const;
 export const STUDIO_REMOTE_REFERENCE_IMAGE_ENDPOINT =
   "/api/creator/reference-images/import" as const;
 export const STUDIO_REMOTE_REFERENCE_IMAGE_MAX_URL_LENGTH = 2_048;
-// Vercel Functions enforce a 4.5 MB request/response body limit:
-// https://vercel.com/docs/functions/limitations#request-body-size
-// A 3,000,000-byte image expands to exactly 4,000,000 base64 characters, leaving deterministic
-// room for the data-URL prefix and JSON metadata below the separate 4,200,000-byte ceiling.
+// Keep the portable API envelope below a conservative 4.2 MB application boundary across
+// the primary Render runtime and the optional disaster-recovery adapter. A 3,000,000-byte image
+// expands to exactly 4,000,000 base64 characters, leaving deterministic room for the data-URL
+// prefix and JSON metadata below the separate 4,200,000-byte ceiling.
 export const STUDIO_REMOTE_REFERENCE_IMAGE_MAX_BYTES = 3_000_000;
 export const STUDIO_REMOTE_REFERENCE_IMAGE_MAX_JSON_BYTES = 4_200_000;
 export const STUDIO_REMOTE_REFERENCE_IMAGE_MAX_AXIS = 16_384;

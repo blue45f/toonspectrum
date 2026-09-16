@@ -15,9 +15,9 @@ const LOCAL_CORS_ORIGINS = [
 /**
  * ToonSpectrum의 공개 웹 앱 Origin.
  *
- * `www`가 정본이고 apex는 Vercel에서 `www`로 리다이렉트하지만, 리다이렉트 전에
- * preflight/Socket.IO upgrade를 시작한 기존 클라이언트도 안전하게 전환할 수 있도록 두
- * Origin을 모두 정확히 허용한다. 와일드카드나 임의 Vercel preview Origin은 포함하지 않는다.
+ * `www`가 정본이고 apex도 같은 Cloudflare 엣지에서 제공된다. 기존 apex 클라이언트의
+ * preflight/Socket.IO 전환을 보존하기 위해 두 Origin을 모두 정확히 허용하며,
+ * 와일드카드나 임의 preview Origin은 포함하지 않는다.
  */
 export const PRODUCTION_CORS_ORIGINS = [
   "https://www.toonstudio.cloud",
@@ -76,7 +76,7 @@ export function createCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOpt
   };
 }
 
-/** 로컬 장기 실행 서버와 Vercel serverless가 반드시 같은 CORS 정책을 쓰게 하는 단일 진입점. */
+/** 장기 실행 API와 비상 serverless fallback이 같은 CORS 정책을 쓰게 하는 단일 진입점. */
 export function configureCors(app: INestApplication, env: NodeJS.ProcessEnv = process.env): void {
   app.enableCors(createCorsOptions(env));
 }

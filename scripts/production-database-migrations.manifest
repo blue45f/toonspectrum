@@ -58,4 +58,5 @@ apps/api/src/db/migrations/0057_community_threaded_comments.sql
 apps/api/src/db/migrations/0058_community_cafe_governance.sql
 apps/api/src/db/migrations/0059_member_messaging.sql
 apps/api/src/db/migrations/0060_studio_ai_free_provider_expansion.sql
-apps/api/src/db/migrations/0061_auth_identity_hardening.sql
+apps/api/src/db/migrations/0061_member_messaging_cutover_marker.sql
+apps/api/src/db/migrations/0062_auth_identity_hardening.sql

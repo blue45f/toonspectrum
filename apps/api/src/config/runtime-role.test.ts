@@ -7,7 +7,7 @@ import {
 } from "./runtime-role";
 
 describe("API runtime role", () => {
-  it("keeps the default Vercel/general API surface complete", () => {
+  it("keeps the default full API surface complete", () => {
     expect(resolveApiRuntimeRole({})).toBe("full");
     expect(isApiRuntimeRolePathAllowed("full", "/api/auth/providers")).toBe(
       true,

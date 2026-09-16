@@ -61,8 +61,8 @@ export const CREATOR_ASSET_TAG_LIMIT = 8;
 export const CREATOR_ASSET_TAG_LENGTH = 24;
 /**
  * Preview data is still embedded in JSON, so page sizes are a production response-body boundary.
- * Twenty worst-case 180k-character previews plus bounded metadata stay below the 4.5MB Vercel
- * Function response limit with a separate 4.0MB application ceiling.
+ * Twenty worst-case 180k-character previews plus bounded metadata stay below a conservative
+ * provider-neutral transport ceiling with a separate 4.0 MB application limit.
  */
 export const CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE = 20;
 export const CREATOR_ASSET_MODERATION_MAX_PAGE_SIZE = 20;

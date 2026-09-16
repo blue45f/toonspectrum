@@ -109,10 +109,20 @@ export function isCloudflareWorkersAiFreeModel(model: string): boolean {
 }
 
 const QWEN_BEIJING_FREE_QUOTA_MODELS = new Set([
+  "qwen3.8-max",
+  "qwen3.8-max-0902",
+  "qwen3.8-flash",
+  "qwen3.7-max",
+  "qwen3.7-max-2026-06-08",
+  "qwen3.7-max-2026-05-20",
+  "qwen3.7-max-preview",
   "qwen3.7-plus",
   "qwen3.7-plus-2026-05-26",
-  "qwen3.8-27b",
-  "qwen3.8-2.4t-a95b",
+  "qwen3.6-plus",
+  "qwen3.6-plus-2026-04-02",
+  "qwen3.7-flash",
+  "qwen3.7-flash-2026-07-15",
+  "qwen3.6-flash",
   "qwen3.6-flash-2026-04-16",
   "qwen-turbo",
 ]);
@@ -205,7 +215,9 @@ function freeProviderConfig(
     };
   }
   if (id === "zai") {
-    const apiKey = env.STUDIO_AI_FREE_ZAI_API_KEY?.trim() ?? "";
+    const apiKey = env.STUDIO_AI_FREE_ZAI_API_KEY?.trim()
+      || env.ZAI_API_KEY?.trim()
+      || "";
     const model = boundedText(env.STUDIO_AI_FREE_ZAI_MODEL, "glm-4.7-flash", 200);
     return {
       id,
@@ -278,7 +290,9 @@ function freeProviderConfig(
       freePool: true,
     };
   }
-  const apiKey = env.STUDIO_AI_FREE_OPENROUTER_API_KEY?.trim() ?? "";
+  const apiKey = env.STUDIO_AI_FREE_OPENROUTER_API_KEY?.trim()
+    || env.OPENROUTER_API_KEY?.trim()
+    || "";
   const model = boundedText(env.STUDIO_AI_FREE_OPENROUTER_MODEL, "openrouter/free", 200);
   return {
     id,

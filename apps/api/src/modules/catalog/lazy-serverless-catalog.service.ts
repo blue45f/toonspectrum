@@ -9,8 +9,8 @@ export class LazyServerlessCatalogService extends CatalogService {
   private initializationClosed = false;
   private deferInitialLoad = false;
 
-  // Only the serverless adapter opts in, before app.init(). A native HTTP server
-  // running on Vercel still keeps the ordinary eager lifecycle.
+  // Only the optional serverless fallback adapter opts in before app.init().
+  // The long-running Render HTTP server keeps the ordinary eager lifecycle.
   deferInitializationUntilRequest(): void {
     this.deferInitialLoad = process.env.CATALOG_EAGER_INIT !== "1";
   }

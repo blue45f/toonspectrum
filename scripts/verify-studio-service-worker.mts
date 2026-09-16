@@ -7,10 +7,10 @@
  * Expects a production build in dist/ (`pnpm exec vite build`).
  *
  * Why this serves `dist/` itself instead of `vite preview`: the production
- * header contract lives in `vercel.json`, which applies COOP/COEP/CORP by
- * *path*, while the preview middleware only attaches CORP to worker-shaped
- * requests. Replaying `vercel.json`'s own rules here means the check exercises
- * the headers that actually ship — and fails if that file regresses. It also
+ * header contract lives in `config/http-response-headers.json`, which applies
+ * COOP/COEP/CORP by *path*, while the preview middleware only attaches CORP to
+ * worker-shaped requests. Replaying the provider-neutral rules here means the
+ * check exercises the headers that actually ship — and fails if they regress. It also
  * lets the update flow be tested by swapping `sw.js` mid-session, which is the
  * only honest way to simulate a deploy landing under a live editor.
  *
@@ -26,10 +26,13 @@ import { chromium, type Browser, type Page } from "playwright";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const DIST = resolve(process.cwd(), "dist");
-const VERCEL_CONFIG = resolve(process.cwd(), "vercel.json");
+const RESPONSE_HEADER_POLICY = resolve(
+  process.cwd(),
+  "config/http-response-headers.json",
+);
 const RESET_QUERY = "__toonspectrumSwReset";
 
-interface VercelHeaderRule {
+interface StaticHeaderRule {
   readonly source: string;
   readonly headers: ReadonlyArray<{ readonly key: string; readonly value: string }>;
 }
@@ -54,19 +57,19 @@ const MIME: Record<string, string> = {
   ".xml": "application/xml",
 };
 
-function loadHeaderRules(): Array<{ pattern: RegExp; rule: VercelHeaderRule }> {
-  const config = JSON.parse(readFileSync(VERCEL_CONFIG, "utf8")) as {
-    headers?: VercelHeaderRule[];
+function loadHeaderRules(): Array<{ pattern: RegExp; rule: StaticHeaderRule }> {
+  const policy = JSON.parse(readFileSync(RESPONSE_HEADER_POLICY, "utf8")) as {
+    headers?: StaticHeaderRule[];
   };
-  return (config.headers ?? []).map((rule) => ({
-    // Vercel `source` is a path-to-regexp pattern; the ones this repo uses are
-    // plain prefixes plus `(.*)` groups, which map straight onto a RegExp.
+  return (policy.headers ?? []).map((rule) => ({
+    // The provider-neutral `source` patterns are plain prefixes plus `(.*)`
+    // groups, which map directly onto the local verification RegExp.
     pattern: new RegExp(`^${rule.source.replace(/\/$/u, "")}$`, "u"),
     rule,
   }));
 }
 
-/** Serves dist/ with vercel.json's real header rules and SPA rewrite. */
+/** Serves dist/ with the production header policy and SPA rewrite. */
 function startStaticServer(
   port: number,
   swOverride: () => string | null,
@@ -111,7 +114,7 @@ function startStaticServer(
     const candidate = join(DIST, normalize(pathname).replace(/^(\.\.[/\\])+/u, ""));
     const isFile = candidate.startsWith(DIST) && existsSync(candidate)
       && statSync(candidate).isFile();
-    // Mirrors vercel.json's `/(.*) -> /index.html` SPA rewrite.
+    // Mirrors the production Static Assets SPA fallback to /index.html.
     const file = isFile ? candidate : join(DIST, "index.html");
 
     response.setHeader("Content-Type", MIME[extname(file)] ?? "application/octet-stream");

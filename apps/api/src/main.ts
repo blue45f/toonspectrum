@@ -52,7 +52,7 @@ async function bootstrap() {
   if (runtimeRole !== "capability-worker") {
     configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   }
-  // Vercel/compatibility callers may tunnel the canonical API path through `?path=`. Rewrite it
+  // Compatibility adapters may tunnel the canonical API path through `?path=`. Rewrite it
   // before every role, authentication and CSRF boundary so those guards authorize the route that
   // Nest will actually dispatch, never the harmless-looking pre-rewrite path.
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -82,7 +82,7 @@ async function bootstrap() {
   let studioLiveAdapter: StudioLivePostgresIoAdapter | null = null;
   try {
     // 명시적으로 postgres 모드를 선택한 장기 실행 API에서만 클러스터 adapter를 장착한다.
-    // Vercel serverless 경로(serverless.ts)는 WebSocket 수명주기가 다르므로 이 factory를 호출하지 않는다.
+    // 비상 serverless 호환 경로(serverless.ts)는 WebSocket 수명주기가 다르므로 이 factory를 호출하지 않는다.
     studioLiveAdapter =
       runtimeRole === "capability-worker"
         ? null

@@ -107,11 +107,48 @@ services:
         sync: false
       - key: UPSTASH_COORDINATION_KEY_HASH_SECRET
         sync: false
+      # External real-time text APIs only. Local LLM, self-hosted and batch routes are excluded.
+      - key: STUDIO_AI_FREE_POOL_ENABLED
+        value: "true"
+      - key: STUDIO_AI_FREE_PROVIDER_ORDER
+        value: gemini,qwen,groq,sambanova,zai,mistral,cloudflare,openrouter,siliconflow
+      - key: STUDIO_AI_FREE_ZAI_CONFIRMED
+        value: "false"
+      - key: STUDIO_AI_FREE_ZAI_MODEL
+        value: glm-4.7-flash
+      - key: STUDIO_AI_FREE_OPENROUTER_CONFIRMED
+        value: "false"
+      - key: STUDIO_AI_FREE_OPENROUTER_MODEL
+        value: openrouter/free
+      - key: STUDIO_AI_FREE_GEMINI_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_QWEN_WORKSPACE_ID
+        sync: false
+      - key: STUDIO_AI_FREE_QWEN_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_GROQ_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_SAMBANOVA_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_ZAI_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_MISTRAL_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: STUDIO_AI_FREE_CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: STUDIO_AI_FREE_OPENROUTER_API_KEY
+        sync: false
+      - key: STUDIO_AI_FREE_SILICONFLOW_API_KEY
+        sync: false
       - key: STUDIO_AI_PROVIDER_ORDER
         sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: ZAI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
         sync: false
 
   - type: web

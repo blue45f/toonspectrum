@@ -111,7 +111,7 @@ describe("Vercel fallback workflow policy", () => {
       "      - name: Deploy prebuilt output to Vercel production\n        env:\n          VERCEL_PROJECT_ID: wrong-project\n",
     );
     expect(validateVercelFallbackWorkflow(override)).toContain(
-      "Vercel fallback step 10 must not override job-level VERCEL_PROJECT_ID",
+      "Vercel fallback step 11 must not override job-level VERCEL_PROJECT_ID",
     );
   });
 

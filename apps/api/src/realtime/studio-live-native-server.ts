@@ -6,7 +6,7 @@ export interface StudioLiveNativeRuntime {
   close(): Promise<void>;
 }
 
-/** Vercel may forward either the public rewrite path or the function destination. */
+/** A serverless fallback may forward either the public path or its function destination. */
 export function normalizeStudioLiveNativeRequestUrl(value: string): string | null {
   const queryStart = value.indexOf("?");
   const pathname = queryStart < 0 ? value : value.slice(0, queryStart);

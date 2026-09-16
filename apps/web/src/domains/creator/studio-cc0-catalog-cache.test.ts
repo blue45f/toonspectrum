@@ -29,7 +29,10 @@ describe("mutable CC0 catalog cache recovery", () => {
   });
 
   it("overrides immutable asset headers for the mutable catalog only", () => {
-    const config = JSON.parse(readFileSync(new URL("../../../../../vercel.json", import.meta.url), "utf8")) as {
+    const config = JSON.parse(readFileSync(
+      new URL("../../../../../config/http-response-headers.json", import.meta.url),
+      "utf8",
+    )) as {
       headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
     };
     const general = config.headers.findIndex(rule => rule.source === "/assets/(.*)");
@@ -39,7 +42,6 @@ describe("mutable CC0 catalog cache recovery", () => {
     const headers = Object.fromEntries(config.headers[catalog]!.headers.map(item => [item.key, item.value]));
     expect(headers["Cache-Control"]).toBe("public, max-age=0, must-revalidate");
     expect(headers["CDN-Cache-Control"]).toBe("no-cache");
-    expect(headers["Vercel-CDN-Cache-Control"]).toBe("no-cache");
     expect(config.headers[general]!.headers.find(item => item.key === "Cache-Control")?.value)
       .toContain("immutable");
   });

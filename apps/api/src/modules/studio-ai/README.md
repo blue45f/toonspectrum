@@ -31,7 +31,9 @@ and batch APIs are intentionally excluded from automatic routing.
 The confirmation flag is a deployment assertion that billing is disabled or a
 provider-side hard free-only boundary exists. It is not an automatic billing
 inspection. Credentials remain server-side and must never use a `VITE_`
-variable.
+variable. Existing `ZAI_API_KEY` and `OPENROUTER_API_KEY` secrets may be reused
+only when the matching free confirmation is enabled; requests still remain locked
+to the exact Z.AI free Flash or OpenRouter free-model allowlist.
 
 The server advances to the next shared provider only when `402`, `429`, Qwen
 `403/AllocationQuota.FreeTierOnly`, or Cloudflare `403/5035` definitively rejects

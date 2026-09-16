@@ -49,10 +49,11 @@ before routing production clients to the Worker.
       to the Durable Object storage/account maximum.
 - [ ] Keep the origin list explicit. Do not add `*`, HTTP origins, lookalike
       domains, or unrelated preview hosts.
-- [ ] Attach the intended custom hostname, preferably
-      `realtime.toonstudio.cloud`.
-- [ ] Verify DNS, TLS, account limits, Durable Object billing, and rollback
-      ownership.
+- [x] Attach the intended custom hostname `realtime.toonstudio.cloud` and
+      retain `workers.dev` as an independently probeable canary/rollback.
+- [x] Verify public DNS and TLS for `realtime.toonstudio.cloud` and the
+      retained `workers.dev` canary.
+- [ ] Review account limits, Durable Object billing, and rollback ownership.
 
 If the deployment toolchain predates declarative `exports`, upgrade it. A
 legacy one-time migration may use:
@@ -73,7 +74,7 @@ schema and the namespace's deployed history.
 
 ## 3. Browser and edge security
 
-- [ ] Add `wss://realtime.toonstudio.cloud` to the Studio page's CSP
+- [x] Add `wss://realtime.toonstudio.cloud` to the Studio page's CSP
       `connect-src`.
 - [ ] Send the ticket only as the `ts-ticket.*` WebSocket subprotocol.
 - [ ] Confirm query strings containing `ticket`, `token`, `jwt`,

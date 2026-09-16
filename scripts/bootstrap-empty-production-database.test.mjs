@@ -4,6 +4,7 @@ import {
   EMPTY_DATABASE_BOOTSTRAP_CONFIRMATION,
   assessBootstrapState,
   buildBootstrapDatabaseInspectionSql,
+  buildForwardMigrationBoundarySql,
   buildResetApplicationSchemasSql,
   buildRuntimeBootstrapAclSql,
   buildRuntimeLoginGateSql,
@@ -289,6 +290,14 @@ describe("bootstrap SQL and repository contract", () => {
     expect(sql).not.toMatch(/DROP DATABASE|DROP OWNED/u);
   });
 
+  test("recreates forward-owned relations before IF NOT EXISTS migrations run", () => {
+    const sql = buildForwardMigrationBoundarySql();
+    expect(sql).toContain("public.creator_draft_collaboration_room");
+    expect(sql).toContain("public.personal_cloud_connection");
+    expect(sql).toContain("DROP EXTENSION IF EXISTS pg_trgm");
+    expect(sql).not.toContain('public."user"');
+  });
+
   test("runtime ACL preserves migration and object-storage boundaries", () => {
     const sql = buildRuntimeBootstrapAclSql("toonspectrum_runtime");
     expect(sql).toContain("REVOKE ALL ON ALL TABLES IN SCHEMA public");
@@ -407,7 +416,8 @@ describe("bootstrap SQL and repository contract", () => {
       "0058_community_cafe_governance",
       "0059_member_messaging",
       "0060_studio_ai_free_provider_expansion",
-      "0061_auth_identity_hardening",
+      "0061_member_messaging_cutover_marker",
+      "0062_auth_identity_hardening",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

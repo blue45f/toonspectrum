@@ -15,6 +15,7 @@ export const productionRoutes = defineAppRoutes([
   { id: "production-project-planning", path: "/production/projects/:projectId/planning", element: <ProductionProjectPage surface="planning" /> },
   { id: "production-project-episodes", path: "/production/projects/:projectId/episodes", element: <ProductionProjectPage surface="episodes" /> },
   { id: "production-project-production", path: "/production/projects/:projectId/production", element: <ProductionProjectPage surface="production" /> },
+  { id: "production-project-schedule", path: "/production/projects/:projectId/schedule", element: <ProductionProjectPage surface="schedule" /> },
   { id: "production-project-handoff", path: "/production/projects/:projectId/handoff", element: <ProductionProjectPage surface="handoff" /> },
   { id: "production-project-review", path: "/production/projects/:projectId/review", element: <ProductionProjectPage surface="review" /> },
   { id: "production-project-procurement", path: "/production/projects/:projectId/procurement", element: <ProductionProjectPage surface="procurement" /> },

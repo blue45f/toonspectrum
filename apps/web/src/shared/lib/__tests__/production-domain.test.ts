@@ -32,48 +32,6 @@ describe("toonstudio.cloud production domain", () => {
     expect(read("apps/web/public/llms.txt")).toContain(`${CANONICAL_ORIGIN}/studio`);
   });
 
-  it("keeps host-scoped permanent redirects for apex and the legacy fallback hostname", () => {
-    const config = JSON.parse(read("vercel.json")) as {
-      redirects?: Array<{
-        destination?: string;
-        permanent?: boolean;
-        has?: Array<{ type?: string; value?: string }>;
-      }>;
-    };
-    const redirects = config.redirects ?? [];
-
-    for (const host of ["toonstudio.cloud", "toonspectrum.vercel.app"]) {
-      expect(redirects).toContainEqual(
-        expect.objectContaining({
-          destination: `${CANONICAL_ORIGIN}/:path*`,
-          permanent: true,
-          has: [{ type: "host", value: host }],
-        }),
-      );
-    }
-  });
-
-  it("keeps emergency fallback crawler rewrites compatible", () => {
-    const config = JSON.parse(read("vercel.json")) as {
-      rewrites?: Array<{ source?: string; destination?: string }>;
-    };
-
-    expect(config.rewrites).toEqual(expect.arrayContaining([
-      {
-        source: "/market",
-        destination: "/api/og?marketPage=home",
-      },
-      {
-        source: "/market/browse",
-        destination: "/api/og?marketPage=browse",
-      },
-      {
-        source: "/market/resource/:resourceId",
-        destination: "/api/og?marketResourceId=:resourceId",
-      },
-    ]));
-  });
-
   it("keeps the Render Core API canonical and the realtime fallback isolated", () => {
     const production = read(".env.production.example");
     const render = parse(read("render.yaml")) as {

@@ -7,7 +7,7 @@ type SecurityHeadersEnvironment = Readonly<{
 /**
  * API responses are JSON, binary assets, or explicit downloads—not HTML documents.  Keep their
  * policy deliberately narrow so an unexpected error page cannot load script, style, or a frame.
- * The SPA gets its broader, Studio-aware policy from Vercel's static header configuration.
+ * The SPA gets its broader, Studio-aware policy from the provider-neutral static header contract.
  */
 export const API_SECURITY_HEADERS = Object.freeze({
   "Content-Security-Policy":

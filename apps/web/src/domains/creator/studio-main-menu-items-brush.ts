@@ -33,14 +33,7 @@ export function studioBrushLabHref(pathname: string): string {
   if (work?.[1]) return `/studio/work/${work[1]}/brush-lab`;
   const remix = /^\/studio\/remix\/([^/]+)/u.exec(pathname);
   if (remix?.[1]) return `/studio/remix/${remix[1]}/brush-lab`;
-  return "/studio/assets/brushes/new";
-}
-
-/** Open the canonical Brush Editor in its guided creation mode. */
-function openGuidedBrushEditor(): void {
-  const location = globalThis.location;
-  if (!location) return;
-  location.assign(studioBrushLabHref(location.pathname));
+  return "/studio/brush-lab";
 }
 
 /** Build brush menu commands for the active Studio document and UI capabilities. */
@@ -119,7 +112,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "brush-studio",
       commandId: "brush.studio",
-      label: "현재 브러시 설정…",
+      label: "현재 브러시 세부 설정…",
       icon: SlidersHorizontal,
       onSelect: () => {
         ui.openBrushStudio();
@@ -129,9 +122,11 @@ export function buildStudioBrushMenuItems({
       id: "brush-lab",
       commandId: "brush.lab",
       searchActivation: "execute",
-      label: "새 브러시 만들기…",
+      label: "목적별 브러시 제작실…",
       icon: Sparkles,
-      onSelect: openGuidedBrushEditor,
+      onSelect: () => {
+        ui.openBrushLab();
+      },
     },
     {
       id: "natural-media",

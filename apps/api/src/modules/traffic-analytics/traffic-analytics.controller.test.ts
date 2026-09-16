@@ -17,7 +17,7 @@ describe("TrafficAnalyticsController", () => {
       host: "www.toonstudio.cloud",
       origin: "https://www.toonstudio.cloud",
       "user-agent": "Test Browser",
-      "x-vercel-ip-country": "KR",
+      "cf-ipcountry": "KR",
     },
   } as unknown as Request;
 

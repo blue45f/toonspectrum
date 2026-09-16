@@ -32,7 +32,7 @@ describe("creator asset marketplace contract", () => {
     expect(creatorAssetLicenseOf("bad").id).toBe("toonspectrum-standard");
   });
 
-  it("최대 catalog·moderation 페이지를 Vercel보다 낮은 4MB JSON 경계에 고정한다", () => {
+  it("최대 catalog·moderation 페이지를 공급자 중립 4 MB JSON 경계에 고정한다", () => {
     const previewDataUrl = `data:image/webp;base64,${"A".repeat(
       CREATOR_ASSET_PREVIEW_MAX_DATA_URL_CHARACTERS - "data:image/webp;base64,".length
     )}`;
