@@ -610,7 +610,7 @@ describe("studio project file", () => {
           view: referenceBoard.items[0]?.view,
         }],
       },
-    })).toThrow(/포즈 참고 보드/);
+    })).toThrow(/레퍼런스 캔버스/);
   });
 
   it("페이지와 마스터에 저장된 실제 schema-v1 3D 장면을 v2로 마이그레이션한다", () => {

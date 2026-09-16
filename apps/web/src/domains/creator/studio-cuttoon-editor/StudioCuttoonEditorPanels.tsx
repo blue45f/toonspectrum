@@ -98,6 +98,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     recentColors,
     referenceBoard,
     referencePanelOpen,
+    openReferenceCompanionWindow,
     releaseSchedule,
     scenarioApplyTarget,
     scenarioBusy,
@@ -303,6 +304,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           recentColors={recentColors}
           referencePanelOpen={referencePanelOpen}
           referenceBoard={referenceBoard}
+          onOpenReferenceWindow={openReferenceCompanionWindow}
           releaseSchedule={releaseSchedule}
           scenarioApplyTarget={scenarioApplyTarget}
           scenarioBusy={scenarioBusy}

@@ -321,7 +321,7 @@ describe("studio autosave", () => {
     })).toBe(false);
   });
 
-  it("포즈 참고 보드만 작성한 빈 문서도 해시 기반으로 왕복하고 복구한다", () => {
+  it("레퍼런스 캔버스만 작성한 빈 문서도 해시 기반으로 왕복하고 복구한다", () => {
     const referenceBoard = createStudioReferenceBoardDocument([{
       id: "pose-reference",
       asset: {

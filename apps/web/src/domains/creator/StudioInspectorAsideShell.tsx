@@ -9,7 +9,7 @@ import { Suspense, useState } from "react";
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { StudioLayerCompsPanel } from "./layer/StudioLayerCompsPanel";
 import { StudioLayerTonePanel } from "./layer/StudioLayerTonePanel";
-import { StudioSubViewPanel } from "./subview/StudioSubViewPanel";
+import { StudioReferenceCanvasCard } from "./StudioReferenceCanvasCard";
 import { CANVAS_W } from "./studio-assets";
 import { elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
@@ -114,6 +114,10 @@ export function StudioInspectorAsideShell({
     pageGradeActive,
     pageGradePanelOpen,
     panelGutter,
+    referenceBoardItemCount,
+    referencePanelOpen,
+    onOpenReferenceCanvas,
+    onOpenReferenceWindow,
     paperGrainKind,
     paperGrainVisible,
     patchEl,
@@ -571,7 +575,7 @@ export function StudioInspectorAsideShell({
                     />
                   </Suspense>
                 </div>
-                {/* CSP 경계 효과(fuchi) — 선택 이미지 레이어의 비파괴 테두리. 문서 커밋은
+                {/* 비파괴 경계 효과 — 선택 이미지 레이어의 비파괴 테두리. 문서 커밋은
                     다른 레이어 속성(불투명도 등)과 같은 patchEl 시임 하나만 쓴다(2026-08-20). */}
                 {selected?.type === "image" ? (
                   <StudioLayerBorderEffectPanel
@@ -580,7 +584,7 @@ export function StudioInspectorAsideShell({
                     onChange={(next) => patchEl(selected.id, { borderEffect: next } as Partial<El>)}
                   />
                 ) : null}
-                {/* CSP 톤화 (Tone / Screentone) — 선택 이미지 레이어의 망점화. */}
+                {/* 톤·스크린톤 효과 — 선택 이미지 레이어의 망점화. */}
                 {selected?.type === "image" ? (
                   <StudioLayerTonePanel
                     value={selected.halftone}
@@ -588,7 +592,7 @@ export function StudioInspectorAsideShell({
                     onChange={(next) => patchEl(selected.id, { halftone: next } as Partial<El>)}
                   />
                 ) : null}
-                {/* CSP 3.0 / 4.0 Layer Comps (레이어 콤프) */}
+                {/* 레이어 콤프 */}
                 <StudioLayerCompsPanel
                   key={currentPageId}
                   comps={model.layerComps ?? []}
@@ -691,9 +695,13 @@ export function StudioInspectorAsideShell({
               </div>
             </div>
 
-            {/* 참고 이미지 창 (CSP Sub View 호환) */}
             <div className="mt-3">
-              <StudioSubViewPanel onPickColor={(hex) => setColor(hex)} />
+              <StudioReferenceCanvasCard
+                itemCount={referenceBoardItemCount}
+                open={referencePanelOpen}
+                onOpenCanvas={onOpenReferenceCanvas}
+                onOpenWindow={onOpenReferenceWindow}
+              />
             </div>
           </div>
           <StudioInspectorPublishPanel
