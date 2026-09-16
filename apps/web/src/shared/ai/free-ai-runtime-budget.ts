@@ -195,7 +195,10 @@ function scopeKey(connection: UserAiConnection): string {
   } catch {
     // The free-connection policy validates the URL before this guard runs.
   }
-  return `${host}:${connection.id}`.slice(0, 220);
+  const routeId = "routeId" in connection && typeof connection.routeId === "string"
+    ? connection.routeId
+    : connection.id;
+  return `${host}:${routeId}`.slice(0, 220);
 }
 
 function freshEntry(now: number): FreeAiBudgetEntry {
@@ -261,7 +264,7 @@ function prepareManagedBody(
     typeof FormData !== "undefined"
     && body instanceof FormData
   ) {
-    throw new Error("외부 무료 티어에는 파일·이미지 폼 요청을 전송하지 않습니다. 로컬 AI를 사용하세요.");
+    throw new Error("자동 무료 텍스트 경로에는 파일·이미지 폼 요청을 전송하지 않습니다. 이미지용 클라우드 BYOK 경로를 구성하세요.");
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new Error("외부 무료 티어 텍스트 요청은 JSON 객체 형식이어야 합니다.");
@@ -302,7 +305,7 @@ function prepareManagedBody(
   }
   const bytes = new TextEncoder().encode(serialized).byteLength;
   if (bytes > MANAGED_FREE_MAX_REQUEST_BYTES) {
-    throw new Error("외부 무료 티어 요청이 256KiB 안전 한도를 초과했습니다. 로컬 AI 또는 작업 분할을 사용하세요.");
+    throw new Error("외부 무료 티어 요청이 256KiB 안전 한도를 초과했습니다. 작업을 나누거나 명시적 클라우드 BYOK 경로를 사용하세요.");
   }
 
   // UTF-8 bytes / 2 intentionally over-reserves for many Latin prompts and is
@@ -339,7 +342,7 @@ function assertManagedEndpoint(
 ): void {
   if (method === "GET" && path === "/models" && body === undefined) return;
   if (method === "POST" && path === "/chat/completions" && body !== undefined) return;
-  throw new Error("외부 무료 티어는 GET /models와 POST /chat/completions만 허용합니다. 다른 작업은 로컬 AI를 사용하세요.");
+  throw new Error("자동 무료 텍스트 경로는 GET /models와 POST /chat/completions만 허용합니다. 다른 작업은 기능별 클라우드 BYOK 경로를 사용하세요.");
 }
 
 export async function guardFreeAiRuntimeRequest(
@@ -359,7 +362,7 @@ export async function guardFreeAiRuntimeRequest(
     };
   }
   if (capability !== "text") {
-    throw new Error("외부 무료 티어는 텍스트 요청만 허용합니다. 이미지·영상·3D는 로컬 AI를 사용하세요.");
+    throw new Error("자동 무료 경로는 텍스트 요청만 허용합니다. 이미지·영상·3D는 기능별 클라우드 BYOK 경로를 사용하세요.");
   }
 
   const normalizedMethod = method.toUpperCase();

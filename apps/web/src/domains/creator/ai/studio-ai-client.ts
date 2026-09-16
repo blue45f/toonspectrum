@@ -29,6 +29,12 @@
  */
 
 import {
+  userAiLegacyForm,
+  userAiLegacyJson,
+  UserAiTransportError,
+} from "@/shared/ai/user-ai-transport";
+
+import {
   buildDialogueSuggestPrompt,
   parseDialogueSuggestResponse,
   type DialogueSuggestionCandidate,
@@ -443,6 +449,71 @@ async function postForm(
   return parseHttpResponse(res, signal);
 }
 
+
+function usesUnifiedCloudRouting(settings: StudioAiSettings): boolean {
+  return typeof (settings as StudioAiSettings & { routeId?: unknown }).routeId === "string";
+}
+
+function unifiedCloudFailure(error: unknown): StudioAiResult<never> {
+  if (error instanceof UserAiTransportError) {
+    if (error.code === "not-configured") {
+      return { ok: false, code: "not_configured", error: error.message };
+    }
+    if (error.code === "quota-exhausted" || error.code === "all-free-exhausted") {
+      return { ok: false, code: "free_exhausted", error: error.message };
+    }
+    return { ok: false, code: "http_error", error: error.message };
+  }
+  if (isAbortError(error)) {
+    return { ok: false, code: "network_error", error: "요청이 취소되었습니다." };
+  }
+  return {
+    ok: false,
+    code: "network_error",
+    error: error instanceof Error ? error.message : "클라우드 AI 요청에 실패했습니다.",
+  };
+}
+
+async function postImageJson(
+  settings: StudioAiSettings,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<StudioAiResult<unknown>> {
+  if (!usesUnifiedCloudRouting(settings)) {
+    return postJson(
+      buildUrl(settings.baseUrl, settings.imageGenerationPath),
+      settings.apiKey,
+      body,
+      signal,
+    );
+  }
+  try {
+    return { ok: true, data: await userAiLegacyJson("image", body, signal) };
+  } catch (error) {
+    return unifiedCloudFailure(error);
+  }
+}
+
+async function postImageForm(
+  settings: StudioAiSettings,
+  form: FormData,
+  signal?: AbortSignal,
+): Promise<StudioAiResult<unknown>> {
+  if (!usesUnifiedCloudRouting(settings)) {
+    return postForm(
+      buildUrl(settings.baseUrl, settings.imageEditPath),
+      settings.apiKey,
+      form,
+      signal,
+    );
+  }
+  try {
+    return { ok: true, data: await userAiLegacyForm(form, signal) };
+  } catch (error) {
+    return unifiedCloudFailure(error);
+  }
+}
+
 async function postTextCompletion(
   settings: StudioAiSettings,
   request: {
@@ -481,8 +552,7 @@ async function postTextCompletion(
       },
     };
   }
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  return postJson(url, settings.apiKey, {
+  const body = {
     model: settings.textModel,
     messages: [
       { role: "system", content: request.system },
@@ -490,7 +560,16 @@ async function postTextCompletion(
     ],
     temperature: request.temperature,
     max_tokens: request.maxTokens,
-  }, transport.signal);
+  };
+  if (usesUnifiedCloudRouting(settings)) {
+    try {
+      return { ok: true, data: await userAiLegacyJson("text", body, transport.signal) };
+    } catch (error) {
+      return unifiedCloudFailure(error);
+    }
+  }
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  return postJson(url, settings.apiKey, body, transport.signal);
 }
 
 function extractFirstB64Json(json: unknown): string | null {
@@ -934,8 +1013,7 @@ export async function generateBackgroundImage(
     return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
   }
   const size = opts.size ?? DEFAULT_STUDIO_AI_IMAGE_SIZE;
-  const url = buildUrl(settings.baseUrl, settings.imageGenerationPath);
-  const result = await postJson(url, settings.apiKey, {
+  const result = await postImageJson(settings, {
     model: settings.imageModel,
     prompt: trimmed,
     n: 1,
@@ -979,8 +1057,7 @@ export async function colorizeLineArt(
   form.set("model", settings.imageModel);
   form.set("n", "1");
   form.set("response_format", "b64_json");
-  const url = buildUrl(settings.baseUrl, settings.imageEditPath);
-  const result = await postForm(url, settings.apiKey, form);
+  const result = await postImageForm(settings, form);
   if (!result.ok) return result;
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
@@ -1048,8 +1125,7 @@ export async function generateConsistentCharacterImage(
   form.set("model", settings.imageModel);
   form.set("n", "1");
   form.set("response_format", "b64_json");
-  const url = buildUrl(settings.baseUrl, settings.imageEditPath);
-  const result = await postForm(url, settings.apiKey, form, opts.signal);
+  const result = await postImageForm(settings, form, opts.signal);
   if (!result.ok) return result;
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
@@ -1298,12 +1374,7 @@ export async function generateImageWithRoleReferences(
   form.set("model", settings.imageModel);
   form.set("n", "1");
   form.set("response_format", "b64_json");
-  const result = await postForm(
-    buildUrl(settings.baseUrl, settings.imageEditPath),
-    settings.apiKey,
-    form,
-    opts.signal,
-  );
+  const result = await postImageForm(settings, form, opts.signal);
   if (!result.ok) return result;
   const b64 = extractFirstB64Json(result.data);
   if (!b64) {
@@ -1629,13 +1700,25 @@ export async function testAiConnection(
   if (!isStudioAiConfigured(settings)) {
     return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
   }
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
   const startedAt = Date.now();
-  const result = await postJson(url, settings.apiKey, {
+  const body = {
     model: settings.textModel,
     messages: [{ role: "user", content: "ping" }],
     max_tokens: 1,
-  });
+  };
+  const result = usesUnifiedCloudRouting(settings)
+    ? await (async (): Promise<StudioAiResult<unknown>> => {
+        try {
+          return { ok: true, data: await userAiLegacyJson("text", body) };
+        } catch (error) {
+          return unifiedCloudFailure(error);
+        }
+      })()
+    : await postJson(
+        buildUrl(settings.baseUrl, settings.chatCompletionsPath),
+        settings.apiKey,
+        body,
+      );
   if (!result.ok) return result;
   return { ok: true, data: { latencyMs: Date.now() - startedAt } };
 }

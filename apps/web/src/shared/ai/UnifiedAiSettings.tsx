@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getFreeAiRuntimeBudgetSnapshot } from "./free-ai-runtime-budget";
 import { getFreeAiPoolStatus, type FreeAiPoolStatus } from "./free-ai-pool-status";
 import {
-  assertFreeAiConnection,
   connectionFromFreeAiPreset,
   FREE_AI_PRESETS,
   freeAiConnectionPolicyIssue,
@@ -33,24 +32,64 @@ import { userAiJson } from "./user-ai-transport";
 import {
   EMPTY_AI_CONNECTION,
   USER_AI_CAPABILITIES,
+  userAiConnectionApiKeys,
+  userAiConnectionModels,
+  userAiRoutingSettings,
   type UserAiCapability,
   type UserAiConfiguration,
   type UserAiConnection,
+  type UserAiRoutingMode,
+  type UserAiServerProviderId,
 } from "./user-ai-types";
 
 const INPUT = "min-h-11 w-full rounded-lg border border-line bg-panel p-2 text-sm text-fg focus-visible:outline-2 focus-visible:outline-accent";
 const BUTTON = "min-h-11 rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40";
 const LABELS: Record<UserAiCapability, string> = {
-  text: "텍스트·번역·운세·학습",
+  text: "텍스트·번역·기획",
   image: "이미지·배경·캐릭터·채색",
-  inference: "영상·3D 개인 추론 서버",
-  "three-d": "3D 생성",
+  inference: "영상·미디어 추론",
+  "three-d": "2D↔3D 생성",
+};
+const ROUTING_LABELS: Record<UserAiRoutingMode, string> = {
+  automatic: "자동 최적 선택",
+  priority: "내 우선순위",
+  manual: "수동 고정",
+};
+const SERVER_PROVIDER_LABELS: Record<UserAiServerProviderId, string> = {
+  gemini: "Gemini 무료",
+  qwen: "Qwen 무료 할당량",
+  groq: "Groq 무료",
+  sambanova: "SambaNova 무료",
+  zai: "Z.AI 무료 Flash",
+  mistral: "Mistral 무료",
+  cloudflare: "Cloudflare Workers AI 무료",
+  openrouter: "OpenRouter 무료",
+  siliconflow: "SiliconFlow 무료",
 };
 
 type PoolState =
   | { mode: "loading" }
   | { mode: "ready"; status: FreeAiPoolStatus }
   | { mode: "error" };
+
+type DraftStringField =
+  | "label"
+  | "baseUrl"
+  | "imageGenerationPath"
+  | "imageEditPath"
+  | "chatCompletionsPath";
+
+function routeOrderText(pool: PoolState): string {
+  if (pool.mode !== "ready") {
+    return "Gemini → Qwen → Groq → SambaNova → Z.AI → Mistral → Cloudflare → OpenRouter → SiliconFlow";
+  }
+  return pool.status.selection.order
+    .map((id) => {
+      const provider = pool.status.providers.find((item) => item.id === id);
+      return provider ? `${provider.label}${provider.configured ? "" : " (비활성)"}` : id;
+    })
+    .join(" → ") || "준비된 공용 무료 제공자 없음";
+}
 
 export function UnifiedAiSettings() {
   const snapshot = useUserAi();
@@ -67,17 +106,6 @@ export function UnifiedAiSettings() {
   }, []);
 
   const configuredPool = pool.mode === "ready" && pool.status.configured;
-  const providerOrder = pool.mode === "ready"
-    ? pool.status.selection.order
-        .map((id) => {
-          const provider = pool.status.providers.find((item) => item.id === id);
-          return provider
-            ? `${provider.label}${provider.configured ? "" : " (비활성)"}`
-            : id;
-        })
-        .join(" → ") || "준비된 공용 무료 제공자 없음"
-    : "Gemini 무료 → Groq 무료 → SambaNova 무료 → Mistral 무료 → Cloudflare Workers AI 무료 → OpenRouter 무료";
-
   return (
     <section
       aria-label="통합 AI 설정"
@@ -85,9 +113,9 @@ export function UnifiedAiSettings() {
       data-unified-ai-settings="true"
     >
       <header>
-        <h2 className="text-xl font-bold">통합 AI 설정</h2>
+        <h2 className="text-xl font-bold">통합 클라우드 AI 설정</h2>
         <p className="mt-2 text-sm leading-6 text-fg-2">
-          토큰 키를 입력하지 않아도 자동 무료 AI를 먼저 사용합니다. 무료 제공자가 한도 또는 요청 제한으로 추론 전에 거절한 경우에만 다음 무료 제공자와 등록한 개인 무료 키 순서로 이동합니다.
+          로컬 모델이나 자체 GPU 없이 관리형 클라우드 API만 사용합니다. 기본 자동 모드는 공용 무료 풀을 먼저 사용하고, 안전하게 거절된 경우에만 다음 무료 경로로 이동합니다.
         </p>
       </header>
 
@@ -99,7 +127,7 @@ export function UnifiedAiSettings() {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 id="automatic-free-ai-title" className="font-bold">자동 무료 AI · 키 입력 불필요</h3>
-            <p className="mt-1 text-sm leading-6 text-fg-2">{providerOrder}</p>
+            <p className="mt-1 text-sm leading-6 text-fg-2">{routeOrderText(pool)}</p>
           </div>
           <span className={`rounded-full px-2 py-1 text-xs font-bold ${configuredPool ? "bg-good/15 text-good" : "bg-raised text-fg-2"}`}>
             {pool.mode === "loading"
@@ -108,44 +136,47 @@ export function UnifiedAiSettings() {
                 ? "자동 사용 가능"
                 : pool.mode === "error"
                   ? "상태 확인 불가"
-                  : "공용 무료 풀 준비 중"}
+                  : "무료 풀 준비 중"}
           </span>
         </div>
         <p className="mt-2 text-xs leading-5 text-fg-3">
-          공급자가 402·429로 무료 한도 또는 요청 제한을 추론 전에 거절한 경우에만 다음 순서로 넘어갑니다. 네트워크 오류·타임아웃·5xx에는 중복 호출하지 않으며 유료 모델로 전환하지 않습니다.
+          402·429처럼 추론 전에 무료 한도 소진이 확정된 경우에만 다음 공급자로 이동합니다. 네트워크 오류·타임아웃·5xx에는 중복 생성을 막기 위해 자동 재전송하지 않습니다.
         </p>
-        {!configuredPool && pool.mode !== "loading" ? (
-          <p className="mt-2 text-xs font-semibold text-warn">
-            자동 무료 풀이 준비되지 않았거나 현재 무료 한도·요청 제한으로 사용할 수 없으면 아래 개인 무료 API 키 또는 로컬 AI 연결을 사용합니다. 둘 다 없으면 해당 AI 기능은 사용 불가 안내를 표시합니다.
-          </p>
-        ) : null}
       </section>
 
       <div className="rounded-lg border border-line bg-panel p-4 text-sm leading-6">
-        <strong>비용·개인정보 차단 원칙</strong>
+        <strong>클라우드 전용·비용 보호 원칙</strong>
         <p className="mt-1 text-fg-2">
-          결제수단이 없거나 결제가 비활성화된 공용 무료 풀, 로컬 AI, 직접 운영하는 무과금 서버, 본인의 무료 티어와 OpenRouter 무료 모델만 사용합니다.
+          localhost·사설망·Ollama·ComfyUI 로컬 서버는 등록할 수 없습니다. 자동 모드는 무료 경로만 사용하며, 유료 BYOK 폴백은 사용자가 별도로 켜야 합니다.
         </p>
         <p className="mt-2 text-xs leading-5 text-fg-3">
-          자동 무료 텍스트 기능을 실행하면 입력한 문장이 선택된 외부 무료 제공자에 전송됩니다. 공개 전 원고·개인정보처럼 외부 전송이 곤란한 내용은 로컬 AI 또는 직접 운영하는 개인 서버를 사용하세요.
+          프롬프트와 원고는 선택된 외부 공급자에 전송됩니다. 미공개 원고는 데이터 보존·학습 제외 조건이 확인된 공급자와 전용 계정만 사용하세요.
         </p>
       </div>
       <p className="text-sm text-fg-2" role="status">{snapshot.notice}</p>
       <AiSettingsEditor
         key={snapshot.revision}
         configuration={snapshot.configuration}
+        poolStatus={pool.mode === "ready" ? pool.status : null}
       />
     </section>
   );
 }
 
-function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguration }) {
+function AiSettingsEditor({
+  configuration,
+  poolStatus,
+}: {
+  configuration: UserAiConfiguration;
+  poolStatus: FreeAiPoolStatus | null;
+}) {
   const auxSnapshot = useUnifiedAiAuxSettings();
-  const [draft, setDraft] = useState<UserAiConnection>({ ...EMPTY_AI_CONNECTION });
+  const routing = userAiRoutingSettings(configuration);
+  const [draft, setDraft] = useState<UserAiConnection>(structuredClone(EMPTY_AI_CONNECTION));
   const [auxDraft, setAuxDraft] = useState(() => ({ ...auxSnapshot.settings }));
   const [showSecrets, setShowSecrets] = useState(false);
   const [trustConsent, setTrustConsent] = useState(false);
-  const [freeOnlyConsent, setFreeOnlyConsent] = useState(false);
+  const [costConsent, setCostConsent] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -159,12 +190,10 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
   const patch = (value: Partial<UserAiConnection>) => {
     setDraft((current) => ({ ...current, ...value }));
   };
-
   const resetConsents = () => {
     setTrustConsent(false);
-    setFreeOnlyConsent(false);
+    setCostConsent(false);
   };
-
   const run = async (action: () => unknown | Promise<unknown>) => {
     if (busy) return;
     setBusy(true);
@@ -180,69 +209,154 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
     }
   };
 
-  const applyPreset = (preset: FreeAiPreset) => {
-    const presetConnection = connectionFromFreeAiPreset(preset);
-    setDraft((current) => ({
-      ...EMPTY_AI_CONNECTION,
-      ...presetConnection,
-      id: current.id,
-      label: preset.label,
-    }));
-    resetConsents();
-    setError("");
-    setMessage(`${preset.label} 프리셋을 적용했습니다. 모델 ID와 필요한 경우 본인 키를 입력하세요.`);
-  };
+  const draftKeys = draft.apiKeys ?? [];
+  const draftModels = draft.models ?? [];
+  const previousConnection = configuration.connections.find((item) => item.id === draft.id);
 
   const resolvedDraftConnection = (id: string): UserAiConnection => {
-    const previous = configuration.connections.find((item) => item.id === draft.id);
-    const canKeepPreviousKey = Boolean(
-      previous
-      && previous.baseUrl.trim() === draft.baseUrl.trim()
-      && !draft.apiKey,
+    const canKeepPreviousKeys = Boolean(
+      previousConnection
+      && previousConnection.baseUrl.trim() === draft.baseUrl.trim(),
     );
+    const previousKeys = new Map(
+      (previousConnection?.apiKeys ?? []).map((item) => [item.id, item.apiKey]),
+    );
+    const apiKeys = draftKeys.map((item) => ({
+      ...item,
+      apiKey: item.apiKey || (canKeepPreviousKeys ? previousKeys.get(item.id) ?? "" : ""),
+    }));
+    const firstKey = [...apiKeys]
+      .filter((item) => item.enabled)
+      .sort((left, right) => left.priority - right.priority)[0];
+    const firstText = [...draftModels]
+      .filter((item) => item.enabled && item.capability === "text")
+      .sort((left, right) => left.priority - right.priority)[0];
+    const firstImage = [...draftModels]
+      .filter((item) => item.enabled && item.capability === "image")
+      .sort((left, right) => left.priority - right.priority)[0];
     return {
       ...draft,
-      apiKey: canKeepPreviousKey ? previous!.apiKey : draft.apiKey,
       id,
+      apiKeys,
+      models: draftModels,
+      apiKey: firstKey?.apiKey ?? "",
+      textModel: firstText?.model ?? "",
+      imageModel: firstImage?.model ?? "",
     };
   };
 
+  const draftPolicyIssue = (() => {
+    const connection = resolvedDraftConnection(draft.id || "draft-preview");
+    const key = connection.apiKeys?.find((item) => item.enabled)?.apiKey ?? "";
+    if (!key) return "활성 API 키를 하나 이상 입력하세요.";
+    const models = connection.models?.filter((item) => item.enabled) ?? [];
+    if (!models.length) return "활성 모델을 하나 이상 입력하세요.";
+    for (const model of models) {
+      if (!model.model.trim()) return "각 모델 프로필의 모델 ID를 입력하세요.";
+      const route = {
+        ...connection,
+        apiKey: key,
+        textModel: model.capability === "text" ? model.model : "",
+        imageModel: model.capability === "image" ? model.model : "",
+      };
+      const issue = freeAiConnectionPolicyIssue(route, model.capability);
+      if (issue) return `${model.label || model.model}: ${issue}`;
+    }
+    return null;
+  })();
+
+  const applyPreset = (preset: FreeAiPreset) => {
+    const base = connectionFromFreeAiPreset(preset);
+    const capability: UserAiCapability = preset.imageModel ? "image" : "text";
+    const model = preset.imageModel || preset.textModel;
+    setDraft({
+      ...EMPTY_AI_CONNECTION,
+      ...base,
+      id: draft.id,
+      label: preset.label,
+      apiKeys: [{ id: "key-1", label: "기본 키", apiKey: "", enabled: true, priority: 100 }],
+      models: [{
+        id: `${capability}-1`,
+        label: model || "모델 1",
+        model,
+        capability,
+        enabled: true,
+        priority: 100,
+      }],
+      priority: draft.priority ?? 100,
+    });
+    resetConsents();
+    setError("");
+    setMessage(`${preset.label} 프리셋을 적용했습니다. API 키와 모델 ID를 확인하세요.`);
+  };
+
   const saveConnection = () => {
-    if (!trustConsent) {
-      throw new Error("외부 전송 대상이 신뢰할 수 있는 주소인지 확인하세요.");
-    }
-    if (!freeOnlyConsent) {
-      throw new Error("결제 비활성·무료 전용 조건을 확인하세요.");
-    }
+    if (!trustConsent) throw new Error("외부 전송 대상이 신뢰할 수 있는 공식 클라우드 주소인지 확인하세요.");
+    if (!costConsent) throw new Error("무료 한도 또는 사용자 결제 조건을 확인하세요.");
+    if (draftPolicyIssue) throw new Error(draftPolicyIssue);
     const connection = resolvedDraftConnection(draft.id || crypto.randomUUID());
-    assertFreeAiConnection(connection);
     const connections = [
       ...configuration.connections.filter((item) => item.id !== connection.id),
       connection,
     ];
     const assignments = { ...configuration.assignments };
-    if (!assignments.text && connection.textModel) assignments.text = connection.id;
-    if (!assignments.image && connection.imageModel) assignments.image = connection.id;
-    setUserAiConfiguration({ version: 1, connections, assignments });
+    const routeAssignments = {
+      text: configuration.routeAssignments?.text ?? null,
+      image: configuration.routeAssignments?.image ?? null,
+      inference: configuration.routeAssignments?.inference ?? null,
+      "three-d": configuration.routeAssignments?.["three-d"] ?? null,
+    };
+    for (const capability of USER_AI_CAPABILITIES) {
+      if (!assignments[capability] && userAiConnectionModels(connection, capability).length) {
+        assignments[capability] = connection.id;
+        routeAssignments[capability] = { connectionId: connection.id, apiKeyId: null, modelId: null };
+      }
+    }
+    setUserAiConfiguration({
+      ...configuration,
+      connections,
+      assignments,
+      routeAssignments,
+    });
   };
 
   const removeConnection = (id: string) => {
     const assignments = { ...configuration.assignments };
+    const routeAssignments = {
+      text: configuration.routeAssignments?.text ?? null,
+      image: configuration.routeAssignments?.image ?? null,
+      inference: configuration.routeAssignments?.inference ?? null,
+      "three-d": configuration.routeAssignments?.["three-d"] ?? null,
+    };
     for (const capability of USER_AI_CAPABILITIES) {
       if (assignments[capability] === id) assignments[capability] = null;
+      if (routeAssignments[capability]?.connectionId === id) routeAssignments[capability] = null;
     }
     setUserAiConfiguration({
       ...configuration,
       connections: configuration.connections.filter((item) => item.id !== id),
       assignments,
+      routeAssignments,
     });
   };
 
-  const field = (
-    name: Exclude<keyof UserAiConnection, "costPolicy">,
-    label: string,
-    type = "text",
-  ) => (
+  const updateRouting = (value: Partial<typeof routing>) => {
+    setUserAiConfiguration({
+      ...configuration,
+      routing: { ...routing, ...value },
+    });
+  };
+
+  const moveServerProvider = (id: UserAiServerProviderId, direction: -1 | 1) => {
+    const order = [...routing.serverProviderOrder];
+    const index = order.indexOf(id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target]!, order[index]!];
+    updateRouting({ serverProviderOrder: order });
+  };
+
+  const field = (name: DraftStringField, label: string, type = "text") => (
     <label className="block space-y-1" key={name}>
       <span className="text-sm text-fg-2">{label}</span>
       <input
@@ -251,11 +365,16 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
         autoComplete="off"
         spellCheck={false}
         value={draft[name]}
-        maxLength={name === "apiKey" ? 4096 : 300}
+        maxLength={300}
         onChange={(event) => {
           const value = event.target.value;
           if (name === "baseUrl") {
-            patch({ baseUrl: value, apiKey: "", costPolicy: "unverified" });
+            patch({
+              baseUrl: value,
+              apiKey: "",
+              apiKeys: draftKeys.map((item) => ({ ...item, apiKey: "" })),
+              costPolicy: "unverified",
+            });
           } else {
             patch({ [name]: value });
           }
@@ -265,54 +384,95 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
     </label>
   );
 
-  const draftPolicyIssue = freeAiConnectionPolicyIssue(
-    resolvedDraftConnection(draft.id || "draft-preview"),
+  const orderedConnections = useMemo(
+    () => [...configuration.connections].sort((left, right) =>
+      (left.priority ?? 100) - (right.priority ?? 100) || left.label.localeCompare(right.label)),
+    [configuration.connections],
   );
-  const assignedTextConnection = configuration.connections.find(
-    (connection) => connection.id === configuration.assignments.text,
-  );
-  const assignedTextIssue = assignedTextConnection
-    ? freeAiConnectionPolicyIssue(assignedTextConnection, "text")
-    : "텍스트 연결이 선택되지 않았습니다.";
 
   return (
-    <div className="space-y-5">
-      <section className="space-y-3" aria-labelledby="free-ai-presets-title">
+    <div className="space-y-6">
+      {error && <p role="alert" className="rounded-lg border border-bad/40 p-3 text-sm text-bad">{error}</p>}
+      {message && <p role="status" className="rounded-lg border border-good/40 p-3 text-sm text-good">{message}</p>}
+
+      <section className="space-y-3 rounded-xl border border-line bg-panel p-4" aria-labelledby="routing-policy-title">
         <div>
-          <h3 id="free-ai-presets-title" className="font-semibold">선택 사항: 개인 무료 키·로컬 AI</h3>
+          <h3 id="routing-policy-title" className="font-semibold">라우팅 모드와 우선순위</h3>
           <p className="mt-1 text-sm leading-6 text-fg-2">
-            자동 무료 풀을 먼저 사용하고, 모든 공용 경로가 무료 한도 또는 요청 제한으로 거절된 경우에만 여기 등록한 개인 무료 연결을 사용합니다. 로컬 실행이 가장 확실한 무과금 방식입니다.
+            자동은 품질·가용성을 우선하고, 내 우선순위는 숫자가 작은 연결·모델·키부터 사용합니다. 수동 고정은 기능별로 선택한 정확한 경로만 사용합니다.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="block space-y-1">
+            <span className="text-sm text-fg-2">라우팅 모드</span>
+            <select
+              className={INPUT}
+              value={routing.mode}
+              onChange={(event) => updateRouting({ mode: event.target.value as UserAiRoutingMode })}
+            >
+              {Object.entries(ROUTING_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm text-fg-2">공용 무료 풀 우선순위</span>
+            <input
+              className={INPUT}
+              type="number"
+              min={1}
+              max={999}
+              value={routing.managedPoolPriority}
+              onChange={(event) => updateRouting({ managedPoolPriority: Number(event.target.value) })}
+            />
+          </label>
+          <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={routing.allowPaidFallback}
+              onChange={(event) => updateRouting({ allowPaidFallback: event.target.checked })}
+            />
+            무료 경로 소진 후 사용자 결제 BYOK 허용
+          </label>
+        </div>
+        <div className="space-y-2">
+          <strong className="text-sm">공용 무료 공급자 순서</strong>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {routing.serverProviderOrder.map((id, index) => {
+              const status = poolStatus?.providers.find((item) => item.id === id);
+              return (
+                <div key={id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
+                  <span className="text-sm">
+                    {index + 1}. {status?.label ?? SERVER_PROVIDER_LABELS[id]}
+                    {status && !status.configured ? " · 비활성" : ""}
+                  </span>
+                  <span className="flex gap-1">
+                    <button type="button" className={BUTTON} disabled={index === 0} onClick={() => moveServerProvider(id, -1)} aria-label={`${id} 위로`}>↑</button>
+                    <button type="button" className={BUTTON} disabled={index === routing.serverProviderOrder.length - 1} onClick={() => moveServerProvider(id, 1)} aria-label={`${id} 아래로`}>↓</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="cloud-ai-presets-title">
+        <div>
+          <h3 id="cloud-ai-presets-title" className="font-semibold">클라우드 공급자 프리셋</h3>
+          <p className="mt-1 text-sm leading-6 text-fg-2">
+            한 공급자에 여러 키와 여러 모델을 등록할 수 있습니다. 무료 자동 모드는 무료 정책으로 표시된 경로만 사용합니다.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {FREE_AI_PRESETS.map((preset) => (
             <article key={preset.id} className="rounded-lg border border-line bg-panel p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h4 className="font-semibold">{preset.label}</h4>
-                  <p className="mt-1 text-xs leading-5 text-fg-2">{preset.description}</p>
-                </div>
-                <span className="shrink-0 rounded-full border border-line px-2 py-1 text-[11px] text-fg-2">
-                  {preset.requiresApiKey ? "본인 키" : "키 불필요"}
-                </span>
-              </div>
+              <h4 className="font-semibold">{preset.label}</h4>
+              <p className="mt-1 text-xs leading-5 text-fg-2">{preset.description}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={BUTTON}
-                  onClick={() => applyPreset(preset)}
-                >
-                  적용
-                </button>
+                <button type="button" className={BUTTON} onClick={() => applyPreset(preset)}>적용</button>
                 {preset.docsUrl && (
-                  <a
-                    href={preset.docsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center text-sm text-accent"
-                  >
-                    공식 안내
-                  </a>
+                  <a href={preset.docsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm text-accent">공식 안내</a>
                 )}
               </div>
             </article>
@@ -320,368 +480,264 @@ function AiSettingsEditor({ configuration }: { configuration: UserAiConfiguratio
         </div>
       </section>
 
-      {error && <p role="alert" className="text-sm text-bad">{error}</p>}
-      {message && <p role="status" className="text-sm text-good">{message}</p>}
+      <section className="space-y-3" aria-labelledby="registered-cloud-routes-title">
+        <h3 id="registered-cloud-routes-title" className="font-semibold">등록된 클라우드 연결</h3>
+        <div className="divide-y divide-line rounded-xl border border-line px-4">
+          {orderedConnections.map((connection) => {
+            const issue = freeAiConnectionPolicyIssue(connection, connection.textModel ? "text" : undefined);
+            const budget = getFreeAiRuntimeBudgetSnapshot(connection);
+            const keyCount = userAiConnectionApiKeys(connection).length;
+            const modelCount = userAiConnectionModels(connection).length;
+            return (
+              <div key={connection.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong>{connection.label}</strong>
+                    <span className="rounded-full border border-line px-2 py-0.5 text-[11px]">우선순위 {connection.priority ?? 100}</span>
+                    {connection.enabled === false && <span className="text-xs text-warn">비활성</span>}
+                  </div>
+                  <p className="break-all text-xs text-fg-2">{connection.baseUrl}</p>
+                  <p className="mt-1 text-xs text-fg-3">키 {keyCount}개 · 모델 {modelCount}개 · {USER_AI_COST_POLICY_LABELS[connection.costPolicy]}</p>
+                  {issue && <p className="mt-1 text-xs text-bad">{issue}</p>}
+                  {budget.guarded && (
+                    <p className={`mt-1 text-xs ${budget.blockedReason ? "text-warn" : "text-fg-3"}`}>
+                      {budget.blockedReason
+                        ? "이 무료 경로는 한도 또는 보호 정책으로 현재 중지됨"
+                        : `오늘 남은 앱 안전 한도 ${budget.remainingRequests ?? 0}회`}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={BUTTON}
+                    onClick={() => {
+                      setDraft({
+                        ...structuredClone(connection),
+                        apiKey: "",
+                        apiKeys: (connection.apiKeys ?? []).map((item) => ({ ...item, apiKey: "" })),
+                      });
+                      resetConsents();
+                    }}
+                  >수정·키 교체</button>
+                  <button type="button" className={`${BUTTON} text-bad`} onClick={() => void run(() => removeConnection(connection.id))}>연결 해제</button>
+                </div>
+              </div>
+            );
+          })}
+          {!configuration.connections.length && (
+            <p className="py-4 text-sm text-fg-2">등록된 클라우드 연결이 없습니다. 공용 무료 AI가 준비된 기능은 키 없이 사용할 수 있습니다.</p>
+          )}
+        </div>
+      </section>
 
-      <div className="divide-y divide-line" aria-label="등록된 AI 연결">
-        {configuration.connections.map((connection) => {
-          const issue = freeAiConnectionPolicyIssue(connection);
-          const budget = getFreeAiRuntimeBudgetSnapshot(connection);
+      <section className="space-y-4 rounded-xl border border-line bg-panel p-4" aria-labelledby="connection-editor-title">
+        <div>
+          <h3 id="connection-editor-title" className="font-semibold">클라우드 연결 편집</h3>
+          <p className="mt-1 text-xs leading-5 text-fg-3">숫자가 작을수록 먼저 사용합니다. 같은 모델에 여러 키를 두면 무료 한도·인증 오류 시 다음 키로 안전하게 이동할 수 있습니다.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field("label", "연결 이름")}
+          {field("baseUrl", "공개 HTTPS API baseURL", "url")}
+          <label className="block space-y-1">
+            <span className="text-sm text-fg-2">연결 우선순위</span>
+            <input className={INPUT} type="number" min={1} max={999} value={draft.priority ?? 100} onChange={(event) => patch({ priority: Number(event.target.value) })} />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm text-fg-2">비용 정책</span>
+            <select className={INPUT} value={draft.costPolicy} onChange={(event) => { patch({ costPolicy: event.target.value as UserAiCostPolicy }); resetConsents(); }}>
+              {USER_AI_COST_POLICIES.map((policy) => (
+                <option key={policy} value={policy} disabled={policy === "unverified"}>{USER_AI_COST_POLICY_LABELS[policy]}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
+            <input type="checkbox" checked={draft.enabled !== false} onChange={(event) => patch({ enabled: event.target.checked })} />
+            이 연결 활성화
+          </label>
+        </div>
+
+        <fieldset className="space-y-3 border-t border-line pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <legend className="font-semibold">API 키 프로필</legend>
+            <button
+              type="button"
+              className={BUTTON}
+              onClick={() => patch({ apiKeys: [...draftKeys, { id: `key-${crypto.randomUUID().slice(0, 8)}`, label: `키 ${draftKeys.length + 1}`, apiKey: "", enabled: true, priority: (draftKeys.length + 1) * 100 }] })}
+            >키 추가</button>
+          </div>
+          {draftKeys.map((key, index) => (
+            <div key={key.id} className="grid gap-2 rounded-lg border border-line p-3 md:grid-cols-[1fr_2fr_8rem_auto_auto]">
+              <input className={INPUT} aria-label={`키 ${index + 1} 이름`} value={key.label} onChange={(event) => patch({ apiKeys: draftKeys.map((item) => item.id === key.id ? { ...item, label: event.target.value } : item) })} />
+              <input className={INPUT} aria-label={`키 ${index + 1} 값`} type={showSecrets ? "text" : "password"} autoComplete="off" placeholder={previousConnection ? "비워 두면 기존 키 유지" : "API 키"} value={key.apiKey} onChange={(event) => patch({ apiKeys: draftKeys.map((item) => item.id === key.id ? { ...item, apiKey: event.target.value } : item) })} />
+              <input className={INPUT} aria-label={`키 ${index + 1} 우선순위`} type="number" min={1} max={999} value={key.priority} onChange={(event) => patch({ apiKeys: draftKeys.map((item) => item.id === key.id ? { ...item, priority: Number(event.target.value) } : item) })} />
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={key.enabled} onChange={(event) => patch({ apiKeys: draftKeys.map((item) => item.id === key.id ? { ...item, enabled: event.target.checked } : item) })} />활성</label>
+              <button type="button" className={`${BUTTON} text-bad`} disabled={draftKeys.length <= 1} onClick={() => patch({ apiKeys: draftKeys.filter((item) => item.id !== key.id) })}>삭제</button>
+            </div>
+          ))}
+        </fieldset>
+
+        <fieldset className="space-y-3 border-t border-line pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <legend className="font-semibold">모델 프로필</legend>
+            <button
+              type="button"
+              className={BUTTON}
+              onClick={() => patch({ models: [...draftModels, { id: `model-${crypto.randomUUID().slice(0, 8)}`, label: `모델 ${draftModels.length + 1}`, model: "", capability: "text", enabled: true, priority: (draftModels.length + 1) * 100 }] })}
+            >모델 추가</button>
+          </div>
+          {draftModels.map((model, index) => (
+            <div key={model.id} className="grid gap-2 rounded-lg border border-line p-3 md:grid-cols-[1fr_2fr_10rem_8rem_auto_auto]">
+              <input className={INPUT} aria-label={`모델 ${index + 1} 이름`} value={model.label} onChange={(event) => patch({ models: draftModels.map((item) => item.id === model.id ? { ...item, label: event.target.value } : item) })} />
+              <input className={INPUT} aria-label={`모델 ${index + 1} ID`} value={model.model} onChange={(event) => patch({ models: draftModels.map((item) => item.id === model.id ? { ...item, model: event.target.value } : item) })} />
+              <select className={INPUT} aria-label={`모델 ${index + 1} 기능`} value={model.capability} onChange={(event) => patch({ models: draftModels.map((item) => item.id === model.id ? { ...item, capability: event.target.value as UserAiCapability } : item) })}>
+                {USER_AI_CAPABILITIES.map((capability) => <option key={capability} value={capability}>{LABELS[capability]}</option>)}
+              </select>
+              <input className={INPUT} aria-label={`모델 ${index + 1} 우선순위`} type="number" min={1} max={999} value={model.priority} onChange={(event) => patch({ models: draftModels.map((item) => item.id === model.id ? { ...item, priority: Number(event.target.value) } : item) })} />
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={model.enabled} onChange={(event) => patch({ models: draftModels.map((item) => item.id === model.id ? { ...item, enabled: event.target.checked } : item) })} />활성</label>
+              <button type="button" className={`${BUTTON} text-bad`} disabled={draftModels.length <= 1} onClick={() => patch({ models: draftModels.filter((item) => item.id !== model.id) })}>삭제</button>
+            </div>
+          ))}
+        </fieldset>
+
+        <details>
+          <summary className="min-h-11 cursor-pointer py-2 font-semibold">고급 API 경로</summary>
+          <div className="grid gap-3">
+            {field("chatCompletionsPath", "텍스트 요청 경로")}
+            {field("imageGenerationPath", "이미지 생성 경로")}
+            {field("imageEditPath", "이미지 편집 경로")}
+          </div>
+        </details>
+
+        {draftPolicyIssue && <p className="rounded-lg border border-bad/40 p-3 text-sm text-bad" role="alert">{draftPolicyIssue}</p>}
+        <div className="space-y-2">
+          <label className="flex min-h-11 items-start gap-2 text-sm leading-6">
+            <input type="checkbox" checked={trustConsent} onChange={(event) => setTrustConsent(event.target.checked)} className="mt-1.5 size-4" />
+            이 주소가 신뢰할 수 있는 공식 관리형 클라우드 API이며 입력 데이터가 외부로 전송됨을 확인했습니다.
+          </label>
+          <label className="flex min-h-11 items-start gap-2 text-sm leading-6">
+            <input type="checkbox" checked={costConsent} onChange={(event) => setCostConsent(event.target.checked)} className="mt-1.5 size-4" />
+            {draft.costPolicy === "user-funded-byok"
+              ? "이 BYOK 경로의 사용료가 내 공급자 계정에 청구될 수 있음을 확인했습니다."
+              : "무료 플랜·모델·자동 유료 전환 비활성 조건을 공급자 콘솔에서 확인했습니다."}
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={`${BUTTON} bg-accent text-on-accent`} disabled={busy || !trustConsent || !costConsent || Boolean(draftPolicyIssue)} onClick={() => void run(saveConnection)}>클라우드 연결 적용</button>
+          <button type="button" className={BUTTON} onClick={() => setShowSecrets((current) => !current)}>{showSecrets ? "비밀 값 숨기기" : "비밀 값 보기"}</button>
+          <button type="button" className={BUTTON} onClick={() => { setDraft(structuredClone(EMPTY_AI_CONNECTION)); resetConsents(); }}>새 연결 초기화</button>
+        </div>
+      </section>
+
+      <fieldset className="space-y-4 rounded-xl border border-line p-4">
+        <legend className="font-semibold">기능별 수동 경로</legend>
+        <p className="text-sm leading-6 text-fg-2">수동 고정 모드에서는 아래 공급자·키·모델만 사용합니다. 자동/우선순위 모드에서는 선택값을 동률 해소와 호환 경로로 사용합니다.</p>
+        {USER_AI_CAPABILITIES.map((capability) => {
+          const connectionId = configuration.routeAssignments?.[capability]?.connectionId
+            ?? configuration.assignments[capability]
+            ?? "";
+          const connection = configuration.connections.find((item) => item.id === connectionId);
+          const keys = connection ? userAiConnectionApiKeys(connection) : [];
+          const models = connection ? userAiConnectionModels(connection, capability) : [];
+          const assignment = configuration.routeAssignments?.[capability];
+          const setAssignment = (value: { connectionId: string; apiKeyId: string | null; modelId: string | null } | null) => {
+            setUserAiConfiguration({
+              ...configuration,
+              assignments: { ...configuration.assignments, [capability]: value?.connectionId ?? null },
+              routeAssignments: {
+                text: configuration.routeAssignments?.text ?? null,
+                image: configuration.routeAssignments?.image ?? null,
+                inference: configuration.routeAssignments?.inference ?? null,
+                "three-d": configuration.routeAssignments?.["three-d"] ?? null,
+                [capability]: value,
+              },
+            });
+          };
           return (
-            <div
-              key={connection.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-3"
-            >
-              <div>
-                <strong>{connection.label}</strong>
-                <p className="break-all text-xs text-fg-2">
-                  {connection.baseUrl} · {connection.apiKey ? "키 등록됨" : "키 없음"}
-                </p>
-                <p className={`mt-1 text-xs ${issue ? "text-bad" : "text-good"}`}>
-                  {issue ?? USER_AI_COST_POLICY_LABELS[connection.costPolicy]}
-                </p>
-                {budget.guarded ? (
-                  <p className={`mt-1 text-xs ${budget.blockedReason ? "text-warn" : "text-fg-3"}`}>
-                    {budget.blockedReason
-                      ? "이 연결은 무료 한도 또는 보호 정책으로 현재 중지됨"
-                      : `오늘 남은 앱 안전 한도 ${budget.remainingRequests ?? 0}회 · 예약 토큰 ${(budget.remainingReservedTokens ?? 0).toLocaleString("ko-KR")}`}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={BUTTON}
-                  onClick={() => {
-                    setDraft({ ...connection, apiKey: "" });
-                    resetConsents();
-                  }}
-                >
-                  수정·키 교체
-                </button>
-                <button
-                  type="button"
-                  className={BUTTON}
-                  onClick={() => void run(() => removeConnection(connection.id))}
-                >
-                  연결 해제
-                </button>
-              </div>
+            <div key={capability} className="grid gap-2 md:grid-cols-3">
+              <label className="block space-y-1">
+                <span className="text-sm">{LABELS[capability]} 공급자</span>
+                <select className={INPUT} value={connectionId} onChange={(event) => {
+                  const nextId = event.target.value;
+                  const next = configuration.connections.find((item) => item.id === nextId);
+                  const nextKey = next ? userAiConnectionApiKeys(next)[0] : undefined;
+                  const nextModel = next ? userAiConnectionModels(next, capability)[0] : undefined;
+                  setAssignment(next && nextKey && nextModel ? { connectionId: next.id, apiKeyId: nextKey.id, modelId: nextModel.id } : null);
+                }}>
+                  <option value="">개인 경로 사용 안 함</option>
+                  {configuration.connections.filter((item) => userAiConnectionModels(item, capability).length).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-sm">API 키</span>
+                <select className={INPUT} disabled={!connection} value={assignment?.apiKeyId ?? keys[0]?.id ?? ""} onChange={(event) => connection && setAssignment({ connectionId: connection.id, apiKeyId: event.target.value || null, modelId: assignment?.modelId ?? models[0]?.id ?? null })}>
+                  {keys.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.priority}</option>)}
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-sm">모델</span>
+                <select className={INPUT} disabled={!connection} value={assignment?.modelId ?? models[0]?.id ?? ""} onChange={(event) => connection && setAssignment({ connectionId: connection.id, apiKeyId: assignment?.apiKeyId ?? keys[0]?.id ?? null, modelId: event.target.value || null })}>
+                  {models.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.priority}</option>)}
+                </select>
+              </label>
             </div>
           );
         })}
-        {!configuration.connections.length && (
-          <p className="py-3 text-sm text-fg-2">
-            등록된 연결이 없습니다. AI 없이 사용하는 편집·학습·검수 기능은 계속 사용할 수 있습니다.
-          </p>
-        )}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {field("label", "연결 이름")}
-        {field("baseUrl", "제공자 API baseURL", "url")}
-        {field("apiKey", "개인 무료 API 키 (비워 두면 같은 주소의 기존 키 유지 · 로컬은 불필요)", showSecrets ? "text" : "password")}
-        {field("textModel", "텍스트 모델 ID")}
-        {field("imageModel", "이미지 모델 ID")}
-        <label className="block space-y-1 sm:col-span-2">
-          <span className="text-sm text-fg-2">무료 비용 정책</span>
-          <select
-            className={INPUT}
-            value={draft.costPolicy}
-            onChange={(event) => {
-              patch({ costPolicy: event.target.value as UserAiCostPolicy });
-              resetConsents();
-            }}
-          >
-            {USER_AI_COST_POLICIES.map((policy) => (
-              <option key={policy} value={policy} disabled={policy === "unverified"}>
-                {USER_AI_COST_POLICY_LABELS[policy]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {draftPolicyIssue && (
-        <p className="rounded-lg border border-bad/40 bg-panel p-3 text-sm text-bad" role="alert">
-          {draftPolicyIssue}
-        </p>
-      )}
-
-      <details>
-        <summary className="min-h-11 cursor-pointer py-2 font-semibold">고급 API 경로</summary>
-        <div className="grid gap-3">
-          {field("chatCompletionsPath", "텍스트 요청 경로")}
-          {field("imageGenerationPath", "이미지 생성 경로")}
-          {field("imageEditPath", "이미지 편집 경로")}
-        </div>
-      </details>
-
-      <div className="space-y-2">
-        <label className="flex min-h-11 items-start gap-2 text-sm leading-6">
-          <input
-            type="checkbox"
-            checked={trustConsent}
-            onChange={(event) => setTrustConsent(event.target.checked)}
-            className="mt-1.5 size-4"
-          />
-          이 주소가 내가 신뢰하는 제공자 또는 직접 운영하는 서버임을 확인했습니다.
-        </label>
-        <label className="flex min-h-11 items-start gap-2 text-sm leading-6">
-          <input
-            type="checkbox"
-            checked={freeOnlyConsent}
-            onChange={(event) => setFreeOnlyConsent(event.target.checked)}
-            className="mt-1.5 size-4"
-          />
-          결제수단·유료 폴백·유료 모델이 비활성화된 무료 전용 연결임을 확인했습니다. 무료 한도 또는 요청 제한 시 다음 무료 경로가 없으면 요청이 실패하는 데 동의합니다.
-        </label>
-      </div>
-
-      <button
-        type="button"
-        className={`${BUTTON} bg-accent text-on-accent`}
-        disabled={busy || !trustConsent || !freeOnlyConsent || Boolean(draftPolicyIssue)}
-        onClick={() => void run(saveConnection)}
-      >
-        무료 연결을 메모리에 적용
-      </button>
-
-      <fieldset className="space-y-3 border-t border-line pt-4">
-        <legend className="font-semibold">자동 무료 풀이 소진되거나 제한될 때 사용할 개인 연결</legend>
-        {USER_AI_CAPABILITIES.map((capability) => (
-          <label key={capability} className="block space-y-1">
-            <span className="text-sm">{LABELS[capability]}</span>
-            <select
-              className={INPUT}
-              value={configuration.assignments[capability] ?? ""}
-              onChange={(event) => void run(() => {
-                const id = event.target.value || null;
-                const connection = configuration.connections.find((item) => item.id === id);
-                if (connection) assertFreeAiConnection(connection, capability);
-                setUserAiConfiguration({
-                  ...configuration,
-                  assignments: {
-                    ...configuration.assignments,
-                    [capability]: id,
-                  },
-                });
-              })}
-            >
-              <option value="">개인 폴백 사용 안 함</option>
-              {configuration.connections.map((connection) => {
-                const issue = freeAiConnectionPolicyIssue(connection, capability);
-                return (
-                  <option
-                    key={connection.id}
-                    value={connection.id}
-                    disabled={Boolean(issue)}
-                  >
-                    {connection.label}{issue ? " (이 기능에 사용 불가)" : ""}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-        ))}
       </fieldset>
 
-      <p className="text-sm leading-6 text-fg-2">
-        자동 무료 풀은 외부 실시간 텍스트 API만 사용합니다. 무료 한도 또는 요청 제한이 추론 전에 확인될 때만 Gemini → Qwen → Groq → SambaNova → Z.AI → Mistral → Cloudflare Workers AI → OpenRouter → SiliconFlow 순으로 이동합니다. 로컬 LLM·직접 운영 서버·배치 API는 자동 호출하지 않으며, 수동으로 명시한 기능에서만 사용할 수 있습니다.
-      </p>
-
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy || !assignedTextConnection || Boolean(assignedTextIssue)}
-          onClick={() => void run(async () => {
-            await userAiJson("text", "/models", undefined, { maxBytes: 1024 * 1024 });
-            setMessage("무료 연결의 모델 목록 요청에 성공했습니다. 실제 생성 모델 작동 여부는 별도 확인이 필요합니다.");
-          })}
-        >
-          모델 목록 연결 확인
-        </button>
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy}
-          onClick={() => void run(() => {
-            if (!migrateLegacyUserAi()) {
-              setMessage("가져올 기존 Studio 키 설정이 없습니다.");
-            }
-          })}
-        >
-          기존 Studio 설정 가져오기
-        </button>
+        <button type="button" className={BUTTON} disabled={busy || !configuration.assignments.text} onClick={() => void run(async () => {
+          await userAiJson("text", "/models", undefined, { maxBytes: 1024 * 1024 });
+          setMessage("선택한 클라우드 텍스트 경로의 모델 목록 요청에 성공했습니다.");
+        })}>모델 목록 연결 확인</button>
+        <button type="button" className={BUTTON} disabled={busy} onClick={() => void run(() => {
+          if (!migrateLegacyUserAi()) setMessage("가져올 기존 Studio 클라우드 키 설정이 없습니다.");
+        })}>기존 Studio 설정 가져오기</button>
       </div>
 
-      <details className="border-t border-line pt-4">
-        <summary className="min-h-11 cursor-pointer py-2 font-semibold">고급 AI 토큰 · 3D와 개인 런타임</summary>
+      <details className="rounded-xl border border-line p-4">
+        <summary className="min-h-11 cursor-pointer py-2 font-semibold">고급 클라우드 AI 토큰 · 3D와 영상 런타임</summary>
         <div className="mt-3 grid gap-4">
-          <p className="text-sm leading-6 text-fg-2">
-            Hyper3D/Rodin과 영상·2D↔3D 개인 런타임 토큰도 이 통합 화면에서만 관리합니다. 자동 무료 텍스트 풀과는 별도이며 입력하지 않아도 기본 Studio 기능은 계속 사용할 수 있습니다.
-          </p>
+          <p className="text-sm leading-6 text-fg-2">Hyper3D/Rodin과 2D↔3D·영상용 관리형 클라우드 런타임 토큰을 현재 탭에서 관리합니다. localhost와 사설망 주소는 허용하지 않습니다.</p>
           <label className="block space-y-1">
-            <span className="text-sm text-fg-2">Hyper3D / Rodin 개인 API 키</span>
-            <input
-              className={INPUT}
-              type={showSecrets ? "text" : "password"}
-              autoComplete="off"
-              value={auxDraft.hyper3dApiKey}
-              maxLength={4096}
-              onChange={(event) => setAuxDraft((current) => ({
-                ...current,
-                hyper3dApiKey: event.target.value,
-              }))}
-            />
+            <span className="text-sm text-fg-2">Hyper3D / Rodin API 키</span>
+            <input className={INPUT} type={showSecrets ? "text" : "password"} autoComplete="off" value={auxDraft.hyper3dApiKey} maxLength={4096} onChange={(event) => setAuxDraft((current) => ({ ...current, hyper3dApiKey: event.target.value }))} />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm text-fg-2">개인 Creator Runtime 주소</span>
-            <input
-              className={INPUT}
-              type="url"
-              value={auxDraft.creatorRuntimeBaseUrl}
-              placeholder="https://my-runtime.example.com"
-              onChange={(event) => setAuxDraft((current) => ({
-                ...current,
-                creatorRuntimeBaseUrl: event.target.value,
-              }))}
-            />
+            <span className="text-sm text-fg-2">관리형 Creator Runtime HTTPS 주소</span>
+            <input className={INPUT} type="url" value={auxDraft.creatorRuntimeBaseUrl} placeholder="https://runtime.example.com" onChange={(event) => setAuxDraft((current) => ({ ...current, creatorRuntimeBaseUrl: event.target.value }))} />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm text-fg-2">개인 Runtime 토큰</span>
-            <input
-              className={INPUT}
-              type={showSecrets ? "text" : "password"}
-              autoComplete="off"
-              value={auxDraft.creatorRuntimeToken}
-              maxLength={4096}
-              onChange={(event) => setAuxDraft((current) => ({
-                ...current,
-                creatorRuntimeToken: event.target.value,
-              }))}
-            />
+            <span className="text-sm text-fg-2">클라우드 Runtime 토큰</span>
+            <input className={INPUT} type={showSecrets ? "text" : "password"} autoComplete="off" value={auxDraft.creatorRuntimeToken} maxLength={4096} onChange={(event) => setAuxDraft((current) => ({ ...current, creatorRuntimeToken: event.target.value }))} />
           </label>
           <label className="block space-y-1">
             <span className="text-sm text-fg-2">Runtime 작업 소유자 ID</span>
-            <input
-              className={INPUT}
-              value={auxDraft.creatorRuntimeOwner}
-              maxLength={128}
-              onChange={(event) => setAuxDraft((current) => ({
-                ...current,
-                creatorRuntimeOwner: event.target.value,
-              }))}
-            />
+            <input className={INPUT} value={auxDraft.creatorRuntimeOwner} maxLength={128} onChange={(event) => setAuxDraft((current) => ({ ...current, creatorRuntimeOwner: event.target.value }))} />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={BUTTON}
-              disabled={busy}
-              onClick={() => void run(() => {
-                saveUnifiedAiAuxSettings(auxDraft);
-                setMessage("3D 및 개인 런타임 토큰을 현재 탭에 적용했습니다.");
-              })}
-            >
-              보조 AI 연결 적용
-            </button>
-            <button
-              type="button"
-              className={BUTTON}
-              disabled={busy || !auxDraft.creatorRuntimeBaseUrl || !auxDraft.creatorRuntimeToken}
-              onClick={() => void run(async () => {
-                saveUnifiedAiAuxSettings(auxDraft);
-                const result = await testCreatorRuntime();
-                if (!result.ok) throw new Error(result.message);
-                setMessage(result.message);
-              })}
-            >
-              개인 런타임 연결 확인
-            </button>
-            <button
-              type="button"
-              className={BUTTON}
-              onClick={() => setShowSecrets((current) => !current)}
-            >
-              {showSecrets ? "모든 비밀 값 숨기기" : "모든 비밀 값 보기"}
-            </button>
-            <button
-              type="button"
-              className={`${BUTTON} text-bad`}
-              onClick={() => void run(() => {
-                clearUnifiedAiSecrets();
-                setAuxDraft({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS });
-                setMessage("현재 탭의 3D·개인 런타임 토큰을 삭제했습니다.");
-              })}
-            >
-              보조 토큰 삭제
-            </button>
+            <button type="button" className={BUTTON} disabled={busy} onClick={() => void run(() => { saveUnifiedAiAuxSettings(auxDraft); setMessage("3D·영상 클라우드 토큰을 현재 탭에 적용했습니다."); })}>보조 클라우드 연결 적용</button>
+            <button type="button" className={BUTTON} disabled={busy || !auxDraft.creatorRuntimeBaseUrl || !auxDraft.creatorRuntimeToken} onClick={() => void run(async () => { saveUnifiedAiAuxSettings(auxDraft); const result = await testCreatorRuntime(); if (!result.ok) throw new Error(result.message); setMessage(result.message); })}>클라우드 런타임 확인</button>
+            <button type="button" className={`${BUTTON} text-bad`} onClick={() => void run(() => { clearUnifiedAiSecrets(); setAuxDraft({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS }); setMessage("현재 탭의 3D·영상 클라우드 토큰을 삭제했습니다."); })}>보조 토큰 삭제</button>
           </div>
         </div>
       </details>
 
-      <fieldset className="space-y-3 border-t border-line pt-4">
+      <fieldset className="space-y-3 rounded-xl border border-line p-4">
         <legend className="font-semibold">선택 사항: 이 기기에 암호화 보관</legend>
-        <p className="text-sm leading-6 text-fg-2">
-          기본값은 메모리 전용입니다. 암호화 저장 시에도 비밀번호는 저장하지 않습니다. 브라우저 데이터 삭제 시 보관함이 사라지며 비밀번호 복구는 제공하지 않습니다. 잠금 해제 중 악성 확장 프로그램·사이트 스크립트에 의한 접근까지 막는 것은 아닙니다.
-        </p>
+        <p className="text-sm leading-6 text-fg-2">기본값은 메모리 전용입니다. 암호화 저장 시에도 비밀번호는 저장하지 않으며, 새 탭에서는 다시 잠금 해제해야 합니다.</p>
         <label className="block space-y-1">
           <span className="text-sm">보관함 비밀번호 (12자 이상)</span>
-          <input
-            type="password"
-            autoComplete="off"
-            className={INPUT}
-            value={password}
-            minLength={12}
-            maxLength={1024}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <input type="password" autoComplete="off" className={INPUT} value={password} minLength={12} maxLength={1024} onChange={(event) => setPassword(event.target.value)} />
         </label>
         {hasPersistedUserAiVault() && (
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={confirmDelete}
-              onChange={(event) => setConfirmDelete(event.target.checked)}
-            />
-            기존 암호화 보관함의 덮어쓰기 또는 삭제를 확인합니다.
-          </label>
+          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={confirmDelete} onChange={(event) => setConfirmDelete(event.target.checked)} />기존 암호화 보관함의 덮어쓰기 또는 삭제를 확인합니다.</label>
         )}
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={
-              busy
-              || !configuration.connections.length
-              || password.length < 12
-              || (hasPersistedUserAiVault() && !confirmDelete)
-            }
-            onClick={() => void run(() => persistUserAiVault(password))}
-          >
-            암호화 저장
-          </button>
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={busy || password.length < 12 || !hasPersistedUserAiVault()}
-            onClick={() => void run(() => unlockUserAiVault(password))}
-          >
-            잠금 해제
-          </button>
-          <button type="button" className={BUTTON} onClick={() => lockUserAi()}>
-            모든 연결 잠금
-          </button>
-          <button
-            type="button"
-            className={`${BUTTON} text-bad`}
-            disabled={busy || !confirmDelete}
-            onClick={() => void run(deleteUserAiVault)}
-          >
-            보관함 삭제
-          </button>
+          <button type="button" className={BUTTON} disabled={busy || !configuration.connections.length || password.length < 12 || (hasPersistedUserAiVault() && !confirmDelete)} onClick={() => void run(() => persistUserAiVault(password))}>암호화 저장</button>
+          <button type="button" className={BUTTON} disabled={busy || password.length < 12 || !hasPersistedUserAiVault()} onClick={() => void run(() => unlockUserAiVault(password))}>잠금 해제</button>
+          <button type="button" className={BUTTON} onClick={() => lockUserAi()}>모든 연결 잠금</button>
+          <button type="button" className={`${BUTTON} text-bad`} disabled={busy || !confirmDelete} onClick={() => void run(deleteUserAiVault)}>보관함 삭제</button>
         </div>
       </fieldset>
     </div>

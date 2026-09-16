@@ -138,7 +138,7 @@ describe("planStudioAiExecutionPreflight", () => {
 
   it("defines the complete approved cost vocabulary", () => {
     expect(STUDIO_AI_EXECUTION_COST_CATEGORIES).toEqual([
-      "로컬 0원",
+      "클라우드 무료",
       "제공자 과금 가능",
       "공용 무료 쿼터",
     ]);

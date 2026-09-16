@@ -545,6 +545,69 @@ describe("StudioCrdtRoomBinding", () => {
     peer.destroy();
   });
 
+  it("device-protects an authenticated local draft and keeps it queued for server replay", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const outbox = new DurableMemoryOutbox();
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(fake),
+      outbox,
+      outboxScope: "authenticated-draft",
+      recoveryVault: new MemoryRecoveryVault(),
+      onStatus: (status) => statuses.push(status),
+    });
+    await binding.start();
+
+    add(client, "device-first-draft", 27);
+    const protection = await binding.flushAndWaitForDraftProtection();
+    expect(protection).toMatchObject({
+      protection: "device",
+      serverSequence: null,
+      acknowledgedAt: null,
+    });
+    expect(protection.protectedUpdateIds).toHaveLength(1);
+    await vi.waitFor(() => expect(peer.getStroke("device-first-draft")).not.toBeNull());
+    expect(outbox.requests.size).toBe(1);
+    expect(statuses.at(-1)).toMatchObject({
+      pendingCount: 1,
+      lastAckAt: null,
+      lastAckServerSequence: null,
+    });
+    await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
+
+    await binding.acknowledgeDraftProtection(protection.protectedUpdateIds);
+    expect(outbox.requests.size).toBe(0);
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 0 });
+
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("uses the authoritative ACK when draft protection has a real server", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    add(client, "server-protected-draft", 28);
+
+    const result = await binding.flushAndWaitForDraftProtection();
+    expect(result).toMatchObject({
+      protection: "server",
+      serverSequence: "1",
+      protectedUpdateIds: [],
+    });
+    expect(server.getStroke("server-protected-draft")).not.toBeNull();
+
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
   it("flushes a sub-frame edit, waits for its authoritative ACK, then reconciles the final server frontier", async () => {
     const server = new StudioCrdtDocument();
     const client = new StudioCrdtDocument();

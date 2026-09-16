@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import { validateUserAiBaseUrl as validateCloudAiBaseUrl } from "./user-ai-types";
+
 import {
   completeUserAiTextDetailed,
   UserAiTransportError,
@@ -40,10 +42,10 @@ export const DEFAULT_UNIFIED_AI_AUX_SETTINGS: UnifiedAiAuxSettings = Object.free
  * paid provider, and all live text completion is delegated to the guarded free-only store.
  */
 export const DEFAULT_OPENAI_COMPATIBLE_SETTINGS: OpenAiCompatibleSettings = Object.freeze({
-  baseUrl: "http://localhost:8082/v1",
+  baseUrl: "https://openrouter.ai/api/v1",
   apiKey: "",
   imageModel: "",
-  textModel: "",
+  textModel: "openrouter/free",
   imageGenerationPath: "/images/generations",
   imageEditPath: "/images/edits",
   chatCompletionsPath: "/chat/completions",
@@ -71,25 +73,12 @@ function cleanSecret(value: unknown, maximum = 4096): string {
 }
 
 export function validateUserAiBaseUrl(value: string, allowPath = true): string {
-  const url = new URL(value.trim());
-  const loopback = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname);
-  if (
-    (url.protocol !== "https:" && !(url.protocol === "http:" && loopback))
-    || url.username
-    || url.password
-    || url.search
-    || url.hash
-    || (!allowPath && url.pathname !== "/")
-  ) {
-    throw new Error("AI 주소는 인증정보·쿼리 없는 HTTPS 주소여야 합니다. localhost만 HTTP를 허용합니다.");
+  const normalized = validateCloudAiBaseUrl(value);
+  const url = new URL(normalized);
+  if (!allowPath && url.pathname !== "/") {
+    throw new Error("관리형 클라우드 런타임 주소는 경로 없는 HTTPS origin이어야 합니다.");
   }
-  if (
-    typeof globalThis.location !== "undefined"
-    && url.origin === globalThis.location.origin
-  ) {
-    throw new Error("사이트 자체 주소를 AI 제공자 주소로 사용할 수 없습니다.");
-  }
-  return url.href.replace(/\/+$/u, "");
+  return normalized;
 }
 
 export function validateUserAiPath(value: string): string {
@@ -278,7 +267,7 @@ export async function testCreatorRuntime(
 ): Promise<{ ok: boolean; message: string }> {
   const settings = getUnifiedAiAuxSettings();
   if (!settings.creatorRuntimeBaseUrl || !settings.creatorRuntimeToken) {
-    return { ok: false, message: "개인 추론 서버 주소와 토큰을 입력하세요." };
+    return { ok: false, message: "관리형 클라우드 추론 런타임 주소와 토큰을 입력하세요." };
   }
   try {
     const response = await fetch(
@@ -298,18 +287,18 @@ export async function testCreatorRuntime(
     return response.ok
       ? {
         ok: true,
-        message: "개인 추론 서버가 응답했습니다. 모델별 실제 생성은 별도 검증이 필요합니다.",
+        message: "관리형 클라우드 추론 런타임이 응답했습니다. 모델별 실제 생성은 별도 검증이 필요합니다.",
       }
       : {
         ok: false,
-        message: `개인 추론 서버 응답 실패 (HTTP ${response.status})`,
+        message: `관리형 클라우드 런타임 응답 실패 (HTTP ${response.status})`,
       };
   } catch (error) {
     return {
       ok: false,
       message: error instanceof Error
         ? error.message
-        : "개인 추론 서버에 연결하지 못했습니다.",
+        : "관리형 클라우드 런타임에 연결하지 못했습니다.",
     };
   }
 }
