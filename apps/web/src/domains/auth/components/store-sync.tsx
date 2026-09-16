@@ -98,8 +98,11 @@ export function StoreSync() {
       retryTimer = undefined;
     };
 
+    const browserOffline = () =>
+      typeof navigator !== "undefined" && navigator.onLine === false;
+
     const scheduleRetry = () => {
-      if (controller.signal.aborted || retryTimer) return;
+      if (controller.signal.aborted || retryTimer || browserOffline()) return;
       retryTimer = setTimeout(() => {
         retryTimer = undefined;
         requestRun();
@@ -127,6 +130,9 @@ export function StoreSync() {
               (beforeIdentity.libraryMergeOwnerId === null ||
                 beforeIdentity.libraryMergeOwnerId === uid));
           setSessionIdentity(uid, token);
+          // Preserve the local projection and wait for the existing `online`
+          // listener instead of scheduling an endless series of failed fetches.
+          if (browserOffline()) return;
           const initialFence = captureCollectionHydrationFence();
           if (!initialFence) return;
 

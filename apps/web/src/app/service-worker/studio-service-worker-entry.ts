@@ -48,6 +48,9 @@ declare const __STUDIO_SERVICE_WORKER_MANIFEST__: StudioServiceWorkerManifest;
 const scope = self as unknown as ServiceWorkerGlobalScope;
 const manifest = __STUDIO_SERVICE_WORKER_MANIFEST__;
 const cacheNames = studioServiceWorkerCacheNames(manifest.buildId);
+const criticalPathnames = new Set(
+  manifest.criticalUrls.map((url) => new URL(url, scope.location.origin).pathname),
+);
 const RUNTIME_LIMIT_BY_BUCKET: Record<StudioServiceWorkerCacheBucket, number> = {
   precache: Number.POSITIVE_INFINITY,
   immutable: STUDIO_SERVICE_WORKER_RUNTIME_LIMITS.immutable,
@@ -96,6 +99,44 @@ async function readCached(
     await cache.delete(request);
   } catch { /* A restricted Cache API is a miss, not a failed network request. */ }
   return undefined;
+}
+
+function isPinnedCriticalRequest(request: Request): boolean {
+  if (request.method !== "GET" || request.headers.has("range")) return false;
+  const url = new URL(request.url);
+  return url.origin === scope.location.origin && criticalPathnames.has(url.pathname);
+}
+
+async function handlePinnedCritical(
+  request: Request,
+  pathname = new URL(request.url).pathname,
+): Promise<Response> {
+  const canonical = new Request(new URL(pathname, scope.location.origin), {
+    credentials: "same-origin",
+  });
+  const routeClass = classifyStudioServiceWorkerRequest({
+    url: canonical.url,
+    origin: scope.location.origin,
+    method: "GET",
+    destination: request.destination,
+  });
+  const cached = await readCached("precache", canonical, routeClass);
+  if (cached) return cached;
+  const runtimeBucket = studioServiceWorkerCacheBucket(routeClass);
+  if (runtimeBucket && runtimeBucket !== "precache") {
+    const runtimeCached = await readCached(runtimeBucket, canonical, routeClass);
+    if (runtimeCached) return runtimeCached;
+  }
+  try {
+    const response = await fetch(request);
+    await persist("precache", canonical, response);
+    return response;
+  } catch {
+    return new Response("Offline shell resource unavailable", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
 }
 
 async function handleCacheFirst(
@@ -295,7 +336,13 @@ scope.addEventListener("fetch", (event) => {
   const { request } = event;
   const emergencyPath = emergencyDrawingPath(request, scope.location.origin);
   if (emergencyPath) {
-    event.respondWith((async () => (await readEmergencyDrawing(emergencyPath)) ?? fetch(request))());
+    event.respondWith((async () =>
+      (await readEmergencyDrawing(emergencyPath))
+      ?? handlePinnedCritical(request, emergencyPath))());
+    return;
+  }
+  if (isPinnedCriticalRequest(request)) {
+    event.respondWith(handlePinnedCritical(request));
     return;
   }
   if (isLocalDrawingRequest(request, scope.location.origin)) {

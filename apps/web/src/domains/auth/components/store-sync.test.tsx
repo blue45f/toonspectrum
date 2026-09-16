@@ -74,6 +74,29 @@ describe("StoreSync collection reconciliation", () => {
     vi.useRealTimers();
   });
 
+  it("keeps local collection authority offline and resumes sync on reconnect", async () => {
+    let online = false;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    const fetchMock = vi.fn(async () => response({
+      ratings: {},
+      reads: {},
+      subscriptions: {},
+      reviews: {},
+      likedReviews: {},
+      collections: [],
+      collectionIdMap: {},
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StoreSync />);
+    await waitFor(() => expect(useApp.getState().userId).toBe("owner-store-sync"));
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    online = true;
+    act(() => window.dispatchEvent(new Event("online")));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+
   it("retries a failed guest merge on reconnect before replaying remapped edits", async () => {
     const guestId = "550e8400-e29b-41d4-a716-446655440000";
     const serverId = "server-existing-collection";
