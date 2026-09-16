@@ -101,7 +101,8 @@ describe("site directory experience contracts", () => {
   it("uses the same purpose-based navigation model as the global site chrome", () => {
     expect(sitemapSource).toContain("SITE_NAVIGATION_GROUPS");
     expect(sitemapSource).toContain("SITE_UTILITY_NAVIGATION");
-    expect(sitemapSource).toContain("SITE_NAVIGATION_ITEMS.me");
+    expect(navigationSource).toContain("SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me]");
+    expect(sitemapSource).not.toContain("SITE_NAVIGATION_ITEMS.me");
     expect(sitemapSource).toContain("siteNavigationText");
   });
 

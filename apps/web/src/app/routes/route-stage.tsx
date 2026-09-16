@@ -1,5 +1,5 @@
 import { AlertTriangle, Home, RefreshCw, Rows3 } from "lucide-react";
-import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
 import { hasMeaningfulRouteContent } from "./route-stage-content";
@@ -24,7 +24,7 @@ interface RouteStageProps {
  */
 export function RouteStage({ pathname, search, accessibleTitle, children }: RouteStageProps) {
   const [settled, setSettled] = useState(false);
-  const [needsHeading, setNeedsHeading] = useState(false);
+  const [needsHeading, setNeedsHeading] = useState(true);
   const [stalled, setStalled] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const language = useI18n((state) => state.lang);
@@ -39,7 +39,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
   const instantEntry = instantEditorEntry || instantAdminEntry;
   const stageKey = studioResolution?.lifecycleKey ?? studioRouteStageKey(location);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = stageRef.current;
     if (!root) return;
     const syncHeading = () => {
@@ -92,7 +92,16 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       )}
       onAnimationEnd={onAnimationEnd}
     >
-      {needsHeading ? <h1 className="sr-only" data-route-semantic-heading="">{accessibleTitle}</h1> : null}
+      {needsHeading ? (
+        <>
+          <h1 className="sr-only" data-route-semantic-heading="">{accessibleTitle}</h1>
+          <p className="sr-only" data-route-semantic-heading="">
+            {korean
+              ? `${accessibleTitle} 화면입니다. 도구와 상태 안내를 준비하는 동안 현재 주소와 작업 문맥을 유지합니다.`
+              : `${accessibleTitle} page. The current address and work context remain available while tools and status information load.`}
+          </p>
+        </>
+      ) : null}
       {stalled ? (
         <section
           data-route-recovery=""

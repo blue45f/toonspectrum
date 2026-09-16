@@ -51,7 +51,7 @@ function AppRouteTree({ pathname, search, title }: {
     <RouteStage pathname={pathname} search={search} accessibleTitle={title}>
       <ErrorBoundary resetKey={`${pathname}${search}`}>
         <CommandPaletteEventBridge />
-        <Suspense fallback={<RouteFallback />}>
+        <Suspense fallback={<RouteFallback accessibleTitle={title} />}>
           <Routes>
             {appRoutes.map(({ element, id, path }) => (
               <Route key={id} id={id} path={path} element={element} />
@@ -84,11 +84,11 @@ export function AppRouter() {
   if (!needsIsolationGate) return routeTree;
 
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<RouteFallback accessibleTitle={routeTitle} />}>
       <StudioCrossOriginIsolationGate
         pathname={pathname}
         documentWasStudio={documentWasStudioEditor}
-        pending={<RouteFallback />}
+        pending={<RouteFallback accessibleTitle={routeTitle} />}
       >
         {routeTree}
       </StudioCrossOriginIsolationGate>

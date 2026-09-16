@@ -16,6 +16,12 @@ describe("route title resolution", () => {
     expect(resolveRouteTitle("/brush-lab", translate)).toBe("route.studio");
   });
 
+  it("provides specific accessible labels for canvas-first studio workspaces", () => {
+    expect(resolveRouteTitle("/studio/3d/dcc/build", translate)).toBe("3D 공간 제작");
+    expect(resolveRouteTitle("/studio/3d/dcc/model", translate)).toBe("3D 모델링");
+    expect(resolveRouteTitle("/studio/ai-lab", translate)).toBe("AI 실험실");
+  });
+
   it("retains useful dynamic labels for creator pages", () => {
     expect(resolveRouteTitle("/author/%EA%B9%80%ED%9D%AC%EC%A4%80", translate)).toBe("김희준");
   });

@@ -9,7 +9,7 @@ import { useI18n, useT } from "@/shared/lib/i18n";
  * than a normal transition, it also explains what is happening instead of leaving an endless
  * silent skeleton. RouteStage owns the final recovery controls after the longer timeout.
  */
-export function RouteFallback() {
+export function RouteFallback({ accessibleTitle }: { readonly accessibleTitle?: string }) {
   const t = useT();
   const language = useI18n((state) => state.lang);
   const korean = language.toLowerCase().split(/[-_]/u)[0] === "ko";
@@ -28,8 +28,16 @@ export function RouteFallback() {
     };
   }, []);
 
+  const title = accessibleTitle?.trim() || (korean ? "화면 불러오기" : "Loading page");
+
   return (
     <div data-route-loading-fallback="" className="mx-auto w-full max-w-[1180px] px-4 py-10 sm:px-6">
+      <h1 className="sr-only">{title}</h1>
+      <p className="sr-only">
+        {korean
+          ? `${title} 화면의 도구와 상태 정보를 준비하고 있습니다.`
+          : `Preparing the tools and status information for ${title}.`}
+      </p>
       <LoadingState variant="cards" label={t("common.loading")} />
       {delayed ? (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-panel/75 p-4 text-sm text-fg-2" role="status" aria-live="polite">

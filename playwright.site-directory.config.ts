@@ -16,12 +16,15 @@ export default defineConfig({
     locale: "ko-KR",
     reducedMotion: "reduce",
     trace: "retain-on-failure",
+    serviceWorkers: "block",
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "pnpm exec vite --host 127.0.0.1 --port 5216 --strictPort",
+    command: "./node_modules/.bin/vite --host 127.0.0.1 --port 5216 --strictPort",
     url: "http://127.0.0.1:5216/sitemap",
     reuseExistingServer: false,
     timeout: 120_000,
+    stdout: "ignore",
+    stderr: "ignore",
   },
 });

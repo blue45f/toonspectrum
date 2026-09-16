@@ -18,7 +18,6 @@ import { SiteDirectorySearch } from "./SiteDirectorySearch";
 
 import {
   SITE_NAVIGATION_GROUPS,
-  SITE_NAVIGATION_ITEMS,
   SITE_UTILITY_NAVIGATION,
   siteNavigationLocale,
   siteNavigationText,
@@ -56,7 +55,6 @@ const destination = (
 });
 
 const PERSONAL_DESTINATIONS = [
-  SITE_NAVIGATION_ITEMS.me,
   {
     id: "profile-account",
     href: "/me",

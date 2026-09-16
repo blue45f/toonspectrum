@@ -17,7 +17,8 @@ describe("route stage semantic and recovery guarantees", () => {
         <div><p>Pose workspace loading</p></div>
       </RouteStage>,
     );
-    await waitFor(() => expect(document.querySelector("[data-route-semantic-heading]")?.textContent).toBe("Studio"));
+    await waitFor(() => expect(document.querySelector("h1[data-route-semantic-heading]")?.textContent).toBe("Studio"));
+    expect(document.querySelectorAll("[data-route-semantic-heading]")).toHaveLength(2);
 
     rerender(
       <RouteStage pathname="/studio/poser" search="" accessibleTitle="Studio">
