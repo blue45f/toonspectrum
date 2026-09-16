@@ -163,12 +163,12 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       gap("Crop/Trim", "레이어 자르기는 레이어 메뉴에 있고 캔버스 자르기는 없다."),
       part(
         "웹툰 세로 캔버스",
-        "네이버·카카오·WEBTOON Canvas·1080 고화질 새 작업과 현재 문서의 플랫폼 폭 가이드를 직접 연다. 기존 문서는 자동 리사이즈하지 않는다.",
+        "현재 드로잉에서 네이버·카카오·WEBTOON Canvas·1080 고화질 비율을 단일 Undo 커밋으로 적용하고 플랫폼 폭 가이드를 직접 켠다.",
         "canvas/webtoon-guides",
-        "canvas/new-webtoon-vertical",
-        "canvas/new-webtoon-naver",
-        "canvas/new-webtoon-kakao",
-        "canvas/new-webtoon-canvas",
+        "canvas/apply-webtoon-vertical",
+        "canvas/apply-webtoon-naver",
+        "canvas/apply-webtoon-kakao",
+        "canvas/apply-webtoon-canvas",
       ),
       gap("페이지/아트보드/슬라이드", "페이지 명령은 ‘만화’ 그룹의 Page Manager 로 묶었다."),
       part(

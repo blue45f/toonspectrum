@@ -725,6 +725,7 @@ import {
   type MagicResizePreset,
   type MagicResizeStrategy,
 } from "./studio-magic-resize";
+import { studioWebtoonCanvasMagicResizePresetForId } from "./studio-webtoon-canvas-presets";
 import {
   applyMagicWandRegionToSelection,
   flipNormalizedPoint,
@@ -25737,14 +25738,14 @@ function clearSelectionForEdit() {
       openProductionBible: () => setProductionBibleOpen(true),
       openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
       openAiSuperSuite: () => setAiSuperSuiteOpen(true),
-      openQuickStart: (presetId) => presetId ? navigate(`/studio/new?kind=webtoon&template=${encodeURIComponent(presetId)}`) : setQuickStartOpen(true),
+      openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
       openAssetRightsAudit: () => setAssetRightsAuditOpen(true),
       openAutoActions: () => void openAutoActions(),
-      openCanvasNavigatorRoute: () =>
-        openInspectorRoute({ primary: "document", document: "navigator" }),
+      openCanvasNavigatorRoute: () => openInspectorRoute({ primary: "document", document: "navigator" }),
       openCanvasSettingsRoute: () => openInspectorRoute({ primary: "document", document: "canvas" }),
+      applyWebtoonCanvasPreset: (presetId) => applyMagicResizePreset(studioWebtoonCanvasMagicResizePresetForId(presetId)),
       toggleCanvasGrid: () => setShowGrid((visible) => !visible),
       toggleWebtoonGuides: () => setShowWebtoonGuides((visible) => !visible),
       toggleEraseToIntersection: toggleEraseToIntersectionMode,
@@ -25786,8 +25787,7 @@ function clearSelectionForEdit() {
         ? "circle"
         : "ellipse"
       : pixelTool;
-  const menuCommandBarVisible =
-    workspacePersistence.state.liveLayout.commandBar?.visible !== false;
+  const menuCommandBarVisible = workspacePersistence.state.liveLayout.commandBar?.visible !== false;
   const studioMainMenuSurfaceState = useMemo<StudioMainMenuSurfaceState>(
     () => ({
       pixelSelectionTool: menuPixelSelectionTool,

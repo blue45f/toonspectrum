@@ -46,13 +46,14 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly openScrollPreview: () => unknown;
   readonly openContinuityCheck: () => unknown;
   readonly openProductionBible: () => unknown;
-  readonly openQuickStart: (presetId?: StudioWebtoonCanvasPresetId) => unknown;
+  readonly openQuickStart: () => unknown;
   readonly openPublishPackage: () => unknown;
   readonly openPublishPreflight: () => unknown;
   readonly openAssetRightsAudit: () => unknown;
   readonly openAutoActions: () => unknown;
   readonly openCanvasNavigatorRoute: () => unknown;
   readonly openCanvasSettingsRoute: () => unknown;
+  readonly applyWebtoonCanvasPreset: (presetId: StudioWebtoonCanvasPresetId) => unknown;
   readonly toggleCanvasGrid: () => unknown;
   readonly toggleWebtoonGuides: () => unknown;
   readonly toggleEraseToIntersection: () => unknown;
@@ -101,6 +102,7 @@ export function bindStudioMainMenuSurfaceActions(
     openAutoActions: actions.openAutoActions,
     openCanvasNavigator: actions.openCanvasNavigatorRoute,
     openCanvasSettings: actions.openCanvasSettingsRoute,
+    applyWebtoonCanvasPreset: actions.applyWebtoonCanvasPreset,
     toggleCanvasGrid: actions.toggleCanvasGrid,
     toggleWebtoonGuides: actions.toggleWebtoonGuides,
     toggleVectorEraseToIntersection: actions.toggleEraseToIntersection,
