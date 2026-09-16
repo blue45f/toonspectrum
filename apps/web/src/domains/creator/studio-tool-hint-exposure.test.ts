@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_TOOL_HINT_ACTIVATION_COOLDOWN_MS,
   STUDIO_TOOL_HINT_AUTOMATIC_RESET_MS,
+  STUDIO_TOOL_HINT_COMPACT_ACTIVATION_GUARD_MS,
   STUDIO_TOOL_HINT_GLOBAL_MAX_AUTOMATIC_REVEALS,
   STUDIO_TOOL_HINT_GLOBAL_REVEAL_WINDOW_MS,
   STUDIO_TOOL_HINT_HOVER_COOLDOWN_MS,
@@ -40,6 +41,20 @@ describe("studio tool hint exposure policy", () => {
         3_000 + STUDIO_TOOL_HINT_ACTIVATION_COOLDOWN_MS
       )
     ).toBe(true);
+  });
+
+  it("uses only a short activation guard for the always-available compact explanation", () => {
+    const exposure = createStudioToolHintExposureManager();
+    exposure.markActivated("brush/ink", 3_500);
+
+    expect(exposure.isCompactRevealGuarded("brush/ink", 3_501)).toBe(true);
+    expect(
+      exposure.isCompactRevealGuarded(
+        "brush/ink",
+        3_500 + STUDIO_TOOL_HINT_COMPACT_ACTIVATION_GUARD_MS,
+      ),
+    ).toBe(false);
+    expect(exposure.isCompactRevealGuarded("brush/pencil", 3_501)).toBe(false);
   });
 
   it("keeps explicit keyboard and long-press help available during suppression", () => {

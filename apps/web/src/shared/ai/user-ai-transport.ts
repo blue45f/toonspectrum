@@ -9,7 +9,7 @@ import {
   getUserAiSnapshot,
   registerUserAiRequest,
   requireUserAiConnection,
-  userAiConnectionsForCapability,
+  userAiAutomaticExternalConnectionsForCapability,
 } from "./user-ai-store";
 import {
   validateUserAiBaseUrl,
@@ -246,11 +246,11 @@ export async function completeUserAiTextDetailed(
   if (!user.trim() || user.length + system.length > 64_000) {
     throw new Error("프롬프트는 비어 있지 않은 64,000자 이하여야 합니다.");
   }
-  const candidates = userAiConnectionsForCapability("text");
+  const candidates = userAiAutomaticExternalConnectionsForCapability("text");
   if (candidates.length === 0) {
     throw new UserAiTransportError(
       "not-configured",
-      "통합 AI 설정에 사용할 수 있는 개인 무료 AI 연결이 없습니다.",
+      "통합 AI 설정에 사용할 수 있는 외부 개인 무료 AI 연결이 없습니다. 로컬 LLM과 배치 경로는 자동 풀에 포함되지 않습니다.",
     );
   }
 
@@ -298,7 +298,7 @@ export async function completeUserAiTextDetailed(
 
   throw new UserAiTransportError(
     "all-free-exhausted",
-    "등록된 개인 무료 AI 연결도 모두 무료 한도 또는 요청 제한 상태입니다.",
+    "등록된 외부 개인 무료 AI 연결도 모두 무료 한도 또는 요청 제한 상태입니다. 로컬 LLM과 배치 경로로 자동 전환하지 않습니다.",
     lastQuotaError instanceof UserAiTransportError ? lastQuotaError.status : undefined,
   );
 }

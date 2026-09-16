@@ -1,7 +1,6 @@
-/** Shared display contract. Bundled copies are not TermsDesk publication receipts. */
-export const TERMSDESK_BASE = "https://desk-platform.vercel.app/termsdesk";
-export const TERMSDESK_ORG_SLUG = "toonspectrum";
+/** Shared first-party legal policy contract. */
 export type PolicySlug = "terms-of-service" | "privacy-policy";
+
 export interface PolicyDocument {
   policySlug: string;
   name: string;
@@ -9,14 +8,15 @@ export interface PolicyDocument {
   contentHash: string;
   body: string;
   effectiveAt: string | null;
-  source?: "termsdesk" | "static";
+  /** `static` means reviewed content bundled with the first-party release. */
+  source?: "static";
 }
 
 export function isPolicySlug(slug: string): slug is PolicySlug {
   return slug === "terms-of-service" || slug === "privacy-policy";
 }
 
-// Moved verbatim from domains/legal/policy-content.ts. Do not change legal copy as an outage fix.
+// Reviewed legal copy. Do not change it as an infrastructure outage fix.
 const STATIC_POLICY_DOCUMENTS: Record<PolicySlug, PolicyDocument> = {
   "terms-of-service": {
     policySlug: "terms-of-service",
@@ -84,15 +84,19 @@ const STATIC_POLICY_DOCUMENTS: Record<PolicySlug, PolicyDocument> = {
     ].join("\n"),
   },
 };
+
 Object.values(STATIC_POLICY_DOCUMENTS).forEach(Object.freeze);
 Object.freeze(STATIC_POLICY_DOCUMENTS);
 
-/** Stable frozen identity is needed by the page's effect dependency. */
+/** Stable frozen identity is needed by consumers and integrity tests. */
 export function getStaticPolicyDocument(slug: PolicySlug): PolicyDocument {
   return STATIC_POLICY_DOCUMENTS[slug];
 }
 
-/** Only the same-origin proxy may label a bundled copy as static. */
+/**
+ * Decode only an exact copy of the reviewed first-party policy.
+ * Arbitrary remote payloads can no longer be promoted to policy authority.
+ */
 export function parsePolicyDocument(
   payload: unknown,
   slug: PolicySlug,
@@ -101,32 +105,20 @@ export function parsePolicyDocument(
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("policy_payload_malformed");
   }
+
   const doc = payload as Record<string, unknown>;
-  const required = [doc.body, doc.contentHash, doc.versionLabel];
-  if (required.some((value) => typeof value !== "string" || !value.trim())
-    || (doc.policySlug !== undefined && doc.policySlug !== slug)
-    || (doc.source !== undefined && doc.source !== "termsdesk" && doc.source !== "static")
-    || (doc.effectiveAt != null && (typeof doc.effectiveAt !== "string" || !Number.isFinite(Date.parse(doc.effectiveAt))))) {
+  const expected = getStaticPolicyDocument(slug);
+  if (
+    !allowStatic ||
+    doc.source !== "static" ||
+    doc.policySlug !== slug ||
+    doc.name !== expected.name ||
+    doc.versionLabel !== expected.versionLabel ||
+    doc.contentHash !== expected.contentHash ||
+    doc.body !== expected.body ||
+    doc.effectiveAt !== expected.effectiveAt
+  ) {
     throw new Error("policy_payload_malformed");
   }
-  if (doc.source === "static") {
-    const expected = getStaticPolicyDocument(slug);
-    if (!allowStatic || doc.body !== expected.body || doc.contentHash !== expected.contentHash
-      || doc.versionLabel !== expected.versionLabel || doc.effectiveAt !== expected.effectiveAt
-      || doc.name !== expected.name || doc.policySlug !== slug) {
-      throw new Error("policy_payload_malformed");
-    }
-    return expected;
-  }
-  // A bundled identifier must never masquerade as an upstream publication hash.
-  if (!/^[a-f0-9]{64}$/i.test(doc.contentHash as string)) throw new Error("policy_payload_malformed");
-  return {
-    policySlug: slug,
-    name: typeof doc.name === "string" ? doc.name : "",
-    versionLabel: doc.versionLabel as string,
-    contentHash: doc.contentHash as string,
-    body: doc.body as string,
-    effectiveAt: typeof doc.effectiveAt === "string" ? doc.effectiveAt : null,
-    source: "termsdesk",
-  };
+  return expected;
 }

@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { LoaderCircle, LogOut, Library, RotateCcw, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
+import { LoaderCircle, LogOut, Library, Mail, RotateCcw, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useState, useEffect, useId, useRef } from "react";
 
 import { AuthModal } from "./auth-modal";
@@ -10,6 +10,7 @@ import { cn, keepInlineText } from "@/shared/lib/utils";
 import { useSession, signOut } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { adminFetch, type AdminMe } from "@/domains/admin/components/admin-client";
+import { messagingClient } from "@/infrastructure/messaging-client";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -38,6 +39,7 @@ export function AuthMenu({
   const [modal, setModal] = useState(defaultOpen);
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(defaultMenuOpen);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
@@ -67,6 +69,36 @@ export function AuthMenu({
       });
     return () => {
       alive = false;
+    };
+  }, [status, uid]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !uid) {
+      setUnreadMessageCount(0);
+      return;
+    }
+    let alive = true;
+    const refreshUnreadCount = () => {
+      messagingClient.unreadCount()
+        .then((result) => {
+          if (alive) setUnreadMessageCount(result.total);
+        })
+        .catch(() => {
+          if (alive) setUnreadMessageCount(0);
+        });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshUnreadCount();
+    };
+    refreshUnreadCount();
+    const interval = window.setInterval(refreshWhenVisible, 60_000);
+    window.addEventListener("focus", refreshUnreadCount);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshUnreadCount);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [status, uid]);
 
@@ -139,10 +171,20 @@ export function AuthMenu({
   return (
     <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenu.Trigger
-        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
-        aria-label={t("auth.menu.triggerLabel")}
+        className="relative grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
+        aria-label={
+          unreadMessageCount > 0
+            ? `${t("auth.menu.triggerLabel")} · 읽지 않은 메시지 ${unreadMessageCount.toLocaleString("ko-KR")}개`
+            : t("auth.menu.triggerLabel")
+        }
       >
         {imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : initial}
+        {unreadMessageCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="absolute right-0.5 top-0.5 size-2.5 rounded-full border-2 border-panel bg-danger"
+          />
+        ) : null}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
@@ -169,6 +211,17 @@ export function AuthMenu({
           <DropdownMenu.Item asChild>
             <Link href="/library" className={ITEM_CLASS}>
               <Library size={15} /> {t("nav.library")}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/messages" className={ITEM_CLASS}>
+              <Mail size={15} />
+              <span>메시지</span>
+              {unreadMessageCount > 0 ? (
+                <span className="ml-auto min-w-5 rounded-full bg-accent px-1.5 py-0.5 text-center text-[0.65rem] font-bold text-on-accent">
+                  {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                </span>
+              ) : null}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>

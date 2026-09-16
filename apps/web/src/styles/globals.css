@@ -1617,3 +1617,127 @@ body[data-studio-app="true"] .route-stage::before,
     box-shadow: 0 16px 36px oklch(0.02 0.01 70 / 0.82);
   }
 }
+
+/* App-wide contextual tooltips: delegated coverage for icon-only and title controls. */
+[data-app-tooltip-layer="true"] {
+  --app-tooltip-enter-x: 0px;
+  --app-tooltip-enter-y: -5px;
+  --app-tooltip-exit-x: 0px;
+  --app-tooltip-exit-y: -3px;
+  isolation: isolate;
+  transform-origin: center top;
+  will-change: opacity, transform;
+}
+
+[data-app-tooltip-layer="true"][data-side="top"] {
+  --app-tooltip-enter-y: 5px;
+  --app-tooltip-exit-y: 3px;
+  transform-origin: center bottom;
+}
+
+[data-app-tooltip-layer="true"][data-positioned="false"] {
+  visibility: hidden;
+  opacity: 0;
+}
+
+[data-app-tooltip-layer="true"][data-positioned="true"][data-state="open"] {
+  animation: app-tooltip-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-app-tooltip-layer="true"][data-state="closing"] {
+  pointer-events: none;
+  animation: app-tooltip-exit 100ms ease-in both;
+}
+
+[data-app-tooltip-arrow="true"] {
+  position: absolute;
+  left: calc(var(--app-tooltip-arrow-offset) - 5px);
+  z-index: -1;
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-color: color-mix(in oklch, var(--color-line) 80%, transparent);
+  background: color-mix(in oklch, var(--color-panel) 98%, transparent);
+  transform: rotate(45deg);
+}
+
+[data-app-tooltip-layer="true"][data-side="bottom"] [data-app-tooltip-arrow="true"] {
+  top: -5px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+[data-app-tooltip-layer="true"][data-side="top"] [data-app-tooltip-arrow="true"] {
+  bottom: -5px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+[data-app-tooltip-accent="true"] {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--color-accent) 76%, transparent),
+    transparent
+  );
+  opacity: 0.72;
+}
+
+@keyframes app-tooltip-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(
+        var(--app-tooltip-enter-x),
+        var(--app-tooltip-enter-y),
+        0
+      )
+      scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes app-tooltip-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(
+        var(--app-tooltip-exit-x),
+        var(--app-tooltip-exit-y),
+        0
+      )
+      scale(0.98);
+  }
+}
+
+[data-app-tooltip-layer="true"][data-app-tooltip-reduced-motion="true"] {
+  animation: none !important;
+  transition: none !important;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-tooltip-layer="true"] {
+    animation: none !important;
+    transition: none !important;
+    will-change: auto;
+  }
+}
+
+@media (prefers-contrast: more) {
+  [data-app-tooltip-layer="true"] {
+    border-width: 2px;
+    backdrop-filter: none;
+  }
+}

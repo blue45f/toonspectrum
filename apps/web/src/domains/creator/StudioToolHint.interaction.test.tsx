@@ -178,7 +178,7 @@ describe("StudioToolHint touch intent", () => {
     expect(screen.getByRole("tooltip").textContent).toContain("다음 도구 동작을 설명합니다.");
   });
 
-  it("does not automatically repeat the same tooltip after it was shown", () => {
+  it("keeps the compact explanation available when the same control is revisited", () => {
     vi.useFakeTimers();
     renderHint("잉크 펜");
     const target = screen.getByRole("button", { name: "잉크 펜" });
@@ -193,7 +193,55 @@ describe("StudioToolHint touch intent", () => {
 
     fireEvent.mouseEnter(target);
     act(() => vi.advanceTimersByTime(320));
+    const repeatedTooltip = screen.getByRole("tooltip");
+    expect(repeatedTooltip.textContent).toContain("잉크 펜 동작을 설명합니다.");
+    expect(repeatedTooltip.getAttribute("data-studio-tool-hint-expanded")).toBe("false");
+  });
+
+  it("keeps repeated rich help compact while the animated coach cools down", async () => {
+    vi.useFakeTimers();
+    render(
+      <StudioToolHintPreferencesProvider
+        mode="rich"
+        touchHoldDelayMs={480}
+        reduceMotion
+      >
+        <StudioToolHintTarget
+          hint={{
+            id: "cooldown-ink",
+            title: "잉크 펜",
+            description: "매끄러운 잉크 선을 그립니다.",
+            preview: "ink",
+          }}
+        >
+          <button type="button">잉크 펜</button>
+        </StudioToolHintTarget>
+      </StudioToolHintPreferencesProvider>,
+    );
+    const target = screen.getByRole("button", { name: "잉크 펜" });
+
+    fireEvent.mouseEnter(target);
+    await act(async () => {
+      vi.advanceTimersByTime(280);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    fireEvent.mouseLeave(target, { clientX: 500, clientY: 500 });
+    act(() => vi.advanceTimersByTime(300));
     expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.mouseEnter(target);
+    await act(async () => {
+      vi.advanceTimersByTime(320);
+      await Promise.resolve();
+      vi.advanceTimersByTime(700);
+    });
+
+    const repeatedTooltip = screen.getByRole("tooltip");
+    expect(repeatedTooltip.getAttribute("data-studio-tool-hint-expanded")).toBe("false");
+    expect(repeatedTooltip.textContent).not.toContain("잠시 머물러 미리보기");
+    expect(repeatedTooltip.textContent).not.toContain("동작 미리보기");
   });
 
   it("keeps another tool discoverable while the previous tool is cooling down", () => {

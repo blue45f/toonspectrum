@@ -11,13 +11,14 @@ import { FortuneModule } from "../modules/fortune/fortune.module";
 import { HealthModule } from "../modules/health/health.module";
 import { LegalModule } from "../modules/legal/legal.module";
 import { MeModule } from "../modules/me/me.module";
+import { MessagingModule } from "../modules/messaging/messaging.module";
 import { TrafficAnalyticsModule } from "../modules/traffic-analytics/traffic-analytics.module";
 
 import { ApiHttpInfrastructureModule } from "./api-http-infrastructure.module";
 
 @Module({
   imports: [
-    ApiHttpInfrastructureModule, BackendCapabilitiesModule, MeModule, CommunityModule,
+    ApiHttpInfrastructureModule, BackendCapabilitiesModule, MeModule, MessagingModule, CommunityModule,
     CatalogModule, AdminModule, TrafficAnalyticsModule, FeedbackModule, HealthModule,
     LegalModule, FortuneModule,
   ],

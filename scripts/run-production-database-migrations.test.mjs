@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 
 import {
+  buildCommunityCafeCapabilitySql,
+  buildCommunityCafeRuntimeAclSql,
+} from "./community-cafe-database-contract.mjs";
+
+import {
   POST_BASELINE_RELATIONS,
   buildAuthRuntimeAclSql,
   buildCommunityCommentRuntimeAclSql,
@@ -13,6 +18,8 @@ import {
   buildCreatorMarketplaceRuntimeAclSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildHistoricalAdoptionVerificationSql,
+  buildMessagingRuntimeAclSql,
+  buildMessagingRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclSql,
@@ -31,12 +38,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(57);
+  expect(manifest).toHaveLength(60);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0057_community_threaded_comments",
+    "0060_studio_ai_free_provider_expansion",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(57);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(60);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
@@ -52,6 +59,27 @@ test("Studio AI free pool migration supports three reviewed provider attempts", 
     "'gemini', 'groq', 'openrouter', 'zai', 'deepseek'",
     'CHECK ("attemptCount" BETWEEN 1 AND 3)',
     'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("Studio AI provider expansion supports nine reviewed external free attempts", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0060_studio_ai_free_provider_expansion",
+  );
+  expect(migration?.id).toBe("0060_studio_ai_free_provider_expansion");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CHECK ("attemptCount" BETWEEN 0 AND 9)',
+    "'gemini', 'qwen', 'groq', 'sambanova', 'zai', 'mistral', 'cloudflare', 'openrouter', 'siliconflow', 'deepseek'",
+    'CHECK ("attemptCount" BETWEEN 1 AND 9)',
+    'VALIDATE CONSTRAINT "studio_ai_request_receipt_attempt_count_check"',
+    'VALIDATE CONSTRAINT "studio_ai_usage_provider_check"',
     'VALIDATE CONSTRAINT "studio_ai_usage_attempt_count_check"',
   ]) {
     expect(sql).toContain(requiredFragment);
@@ -83,6 +111,70 @@ test("creator community publishing migration separates immutable releases from d
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("community governance migration is additive and stores only invite hashes", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0058_community_cafe_governance",
+  );
+  expect(migration?.id).toBe("0058_community_cafe_governance");
+  const sql = migration?.contents ?? "";
+  for (const fragment of [
+    "ADD COLUMN IF NOT EXISTS kind",
+    "community_cafe_join_request",
+    "community_cafe_invite",
+    "community_cafe_ban",
+    "community_cafe_moderation_log",
+    '"codeHash" text NOT NULL UNIQUE',
+    "uq_community_cafe_single_owner",
+    "REVOKE ALL ON TABLE",
+  ]) {
+    expect(sql).toContain(fragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+  expect(sql).not.toMatch(/\bcode\s+text\b/iu);
+});
+
+test("community governance runtime ACL is bounded and capability checked", () => {
+  const grant = buildCommunityCafeRuntimeAclSql("toonspectrum_runtime");
+  const capability = buildCommunityCafeCapabilitySql("toonspectrum_runtime");
+  for (const relation of [
+    "community_cafe",
+    "community_cafe_member",
+    "community_cafe_join_request",
+    "community_cafe_invite",
+    "community_cafe_ban",
+    "community_cafe_moderation_log",
+  ]) {
+    expect(grant).toContain(`public.${relation}`);
+    expect(capability).toContain(relation);
+  }
+  expect(grant).toContain(
+    "GRANT SELECT, INSERT, UPDATE ON TABLE public.community_cafe",
+  );
+  expect(grant).toContain(
+    "GRANT SELECT, INSERT ON TABLE public.community_cafe_moderation_log",
+  );
+  expect(grant).not.toContain(
+    "UPDATE, DELETE ON TABLE public.community_cafe_moderation_log",
+  );
+  expect(grant).not.toContain("TRUNCATE");
+  expect(capability).toContain("community cafe runtime DML privileges are incomplete");
+  expect(capability).toContain("community cafe runtime role has unexpected privileges");
+  expect(capability).toContain("pg_catalog.aclexplode");
+  expect(capability).toContain("privilege.grantee = 0");
+  expect(capability).toContain("community cafe relations are exposed to PUBLIC");
+});
+
+test("community governance ACL rejects unsafe runtime role names", () => {
+  for (const role of ["PUBLIC", "public", "runtime-role", 'runtime"role', ""]) {
+    expect(() => buildCommunityCafeRuntimeAclSql(role)).toThrow(
+      "explicit safe community runtime role",
+    );
+    expect(() => buildCommunityCafeCapabilitySql(role)).toThrow(
+      "explicit safe community runtime role",
+    );
+  }
 });
 
 test("AI Comic Director migration provisions the complete durable workflow schema", () => {
@@ -141,8 +233,58 @@ test("community comments migration provisions threads, edit state, reactions, an
   expect(grant).toContain('public.creator_promotion_comment_like');
   expect(grant).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE');
   expect(grant).toContain('TO "toonspectrum_runtime"');
-  expect(buildCommunityCommentRuntimeAclViolationSql("toonspectrum_runtime"))
-    .toContain("has_table_privilege");
+  const violation = buildCommunityCommentRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(violation).toContain("has_table_privilege");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
+});
+
+test("member messaging migration provisions request-gated conversations", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0059_member_messaging",
+  );
+  expect(migration?.id).toBe("0059_member_messaging");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CREATE TABLE IF NOT EXISTS public."member_message_thread"',
+    'CREATE TABLE IF NOT EXISTS public."member_message_participant"',
+    'CREATE TABLE IF NOT EXISTS public."member_message"',
+    'CREATE TABLE IF NOT EXISTS public."member_message_block"',
+    'CREATE TABLE IF NOT EXISTS public."member_message_preference"',
+    'CREATE TABLE IF NOT EXISTS public."member_message_report"',
+    'member_message_thread_pair_unique',
+    'member_message_report_reporter_message_unique',
+    'REVOKE ALL ON TABLE public."member_message_thread" FROM PUBLIC',
+    'member messaging relations are incomplete',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("member messaging runtime ACL grants bounded DML without PUBLIC access", () => {
+  const grant = buildMessagingRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildMessagingRuntimeAclViolationSql("toonspectrum_runtime");
+
+  for (const relation of [
+    "member_message",
+    "member_message_block",
+    "member_message_participant",
+    "member_message_preference",
+    "member_message_report",
+    "member_message_thread",
+  ]) {
+    expect(grant).toContain(`public.${relation}`);
+    expect(violation).toContain(`public.${relation}`);
+  }
+  expect(grant).toContain("SELECT, INSERT, UPDATE, DELETE");
+  expect(grant).toContain("FROM PUBLIC");
+  expect(violation).toContain("TRUNCATE");
+  expect(violation).toContain("0::oid");
+  expect(violation).not.toContain("'PUBLIC'");
 });
 
 test("personal cloud runtime ACL grants only bounded credential DML", () => {
@@ -815,6 +957,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "admin_content_reports",
     "admin_promos",
     "admin_security_policies",
+    "community_cafe_ban",
+    "community_cafe_invite",
+    "community_cafe_join_request",
+    "community_cafe_moderation_log",
     "creator_asset_artifact",
     "creator_asset_artifact_set",
     "creator_asset_license_snapshot",
@@ -861,7 +1007,20 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_work_report",
     "creator_work_review_feedback",
     "creator_work_review_link",
+    "member_message",
+    "member_message_block",
+    "member_message_participant",
+    "member_message_preference",
+    "member_message_report",
+    "member_message_thread",
     "personal_cloud_connection",
+    "production_integration_connection",
+    "production_integration_oauth_state",
+    "production_integration_receipt",
+    "production_project",
+    "production_project_event",
+    "production_project_mutation_receipt",
+    "production_push_subscription",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",

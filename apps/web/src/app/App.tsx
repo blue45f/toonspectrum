@@ -7,6 +7,7 @@ import { ErrorBoundary } from "../components/error-boundary";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
+import { shouldPromptForBrowserCompatibility } from "./browser-compatibility-scope";
 import { dismissBrowserCompatibility, hasDismissedBrowserCompatibility } from "./public-site-storage";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
@@ -239,10 +240,15 @@ function AppRuntime() {
   useKmasEntryMerge(!adminChrome);
 
   useEffect(() => {
-    const result = checkBrowserCompatibility();
-    setCompatResult(result);
-    if (result.recommendUpdate && !hasDismissedBrowserCompatibility()) setShowCompatModal(true);
+    setCompatResult(checkBrowserCompatibility());
   }, []);
+
+  useEffect(() => {
+    if (!compatResult) return;
+    const shouldOpen = shouldPromptForBrowserCompatibility(pathname, compatResult)
+      && !hasDismissedBrowserCompatibility();
+    setShowCompatModal(shouldOpen);
+  }, [compatResult, pathname]);
 
   const handleCloseCompatModal = () => {
     setShowCompatModal(false);

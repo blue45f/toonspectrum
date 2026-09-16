@@ -16,7 +16,7 @@ interface SearchDependencies {
   timeoutMs?: number;
 }
 
-/** Bounded, per-process cache/coalescing. Not a distributed KMAS daily quota guarantee. */
+/** Per-process cache/coalescing with an operator-controlled local quota bypass. */
 export function createKmasReferenceSearch(dependencies: SearchDependencies = {}) {
   const env = dependencies.env ?? process.env;
   const fetcher = dependencies.fetcher ?? fetch;
@@ -36,7 +36,7 @@ export function createKmasReferenceSearch(dependencies: SearchDependencies = {})
 
   return async (raw: Record<string, unknown>): Promise<ReferenceResult> => {
     const query = parseReferenceQuery(raw);
-    const key = env.KMAS_PRV_KEY?.trim() ?? "";
+    const key = (env.KMAS_PRV_KEY || env.KMAS_API_KEY || env.KMAS_KEY || "").trim();
     const baseInput = env.KMAS_BASE_URL || "https://www.kmas.or.kr";
     const nextScope = JSON.stringify([key, baseInput]);
     // Invalidate before checking the key, including removal and A -> B -> A rotation.
@@ -66,9 +66,11 @@ export function createKmasReferenceSearch(dependencies: SearchDependencies = {})
     }
     const underway = pending.get(cacheKey);
     if (underway) return structuredClone(await underway);
-    misses = misses.filter((time) => timestamp - time < 60_000);
-    if (pending.size >= 4 || misses.length >= 30) throw new ReferenceError("KMAS_RATE_LIMITED", 429);
-    misses.push(timestamp);
+    if (env.KMAS_UNLIMITED !== "1") {
+      misses = misses.filter((time) => timestamp - time < 60_000);
+      if (pending.size >= 4 || misses.length >= 30) throw new ReferenceError("KMAS_RATE_LIMITED", 429);
+      misses.push(timestamp);
+    }
 
     const task = (async () => {
       const controller = new AbortController();
@@ -85,6 +87,7 @@ export function createKmasReferenceSearch(dependencies: SearchDependencies = {})
         const response = await fetcher(url, {
           headers: { Accept: "application/json" }, signal: controller.signal, redirect: "error",
         });
+        // Only an upstream-enforced limit can produce this error in KMAS_UNLIMITED mode.
         if (response.status === 429) throw new ReferenceError("KMAS_RATE_LIMITED", 429);
         if (!response.ok) throw new ReferenceError("KMAS_UNAVAILABLE", 502);
         if (Number(response.headers.get("content-length")) > MAX_RESPONSE_BYTES) {
