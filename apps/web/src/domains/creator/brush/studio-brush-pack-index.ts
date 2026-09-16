@@ -1,4 +1,5 @@
 import { STUDIO_MATERIAL_BRUSH_DEFINITIONS } from "./studio-material-brush-catalog";
+import { studioBrushDefaultStartWidth } from "./studio-brush-default-size-policy";
 
 import {
   STUDIO_BRUSH_PACK_CATALOG_IDS,
@@ -34,6 +35,8 @@ export interface StudioBrushPackDescriptor {
   shortName: string;
   hint: string;
   category: StudioBrushPackCategory;
+  /** Raw authored footprint before artist-facing perceived-size normalization. */
+  authoredWidth: number;
   defaultWidth: number;
   defaultOpacity: number;
   runtimeBrushId: StudioBrushPackRuntimeBrushId;
@@ -289,7 +292,11 @@ export const STUDIO_BRUSH_PACK_DESCRIPTORS: readonly StudioBrushPackDescriptor[]
       shortName: row[1],
       hint: row[2],
       category: row[3],
-      defaultWidth: row[4],
+      authoredWidth: row[4],
+      defaultWidth: studioBrushDefaultStartWidth(
+        studioBrushPackMaterialGroup(row[3], row[6]),
+        row[4],
+      ),
       defaultOpacity: row[5],
       runtimeBrushId: row[6],
       mediaGroup: studioBrushPackMaterialGroup(row[3], row[6]),
