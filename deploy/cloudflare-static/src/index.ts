@@ -76,6 +76,8 @@ const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 const MAX_PUBLIC_READ_ORIGINS = 8;
 const CORE_ORIGIN_AUTH_HEADER = "x-toonspectrum-origin-secret";
 const MINIMUM_CORE_ORIGIN_SECRET_BYTES = 32;
+const CRAWLER_USER_AGENT_PATTERN =
+  /bot|crawl|spider|facebookexternalhit|kakaotalk|slack|twitter|discord|whatsapp|telegram|line|pinterest|embedly|preview|naver|daum|skype|vkshare/iu;
 
 export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
@@ -186,16 +188,26 @@ function hasExactlyOneEncodedSegment(
   return segment.length > 0 && !segment.includes("/");
 }
 
+function isOgPagePath(pathname: string): boolean {
+  return hasExactlyOneEncodedSegment(pathname, "/title/")
+    || pathname === "/market"
+    || pathname === "/market/browse"
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+}
+
+function isCrawlerRequest(request: Request): boolean {
+  const method = request.method.toUpperCase();
+  return (method === "GET" || method === "HEAD")
+    && CRAWLER_USER_AGENT_PATTERN.test(request.headers.get("user-agent") ?? "");
+}
+
 function isDynamicPath(pathname: string): boolean {
   return isCloudflareOversizedAssetPath(pathname)
     || pathname === "/api"
     || pathname.startsWith("/api/")
     || pathname === "/socket.io"
     || pathname.startsWith("/socket.io/")
-    || hasExactlyOneEncodedSegment(pathname, "/title/")
-    || pathname === "/market"
-    || pathname === "/market/browse"
-    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+    || isOgPagePath(pathname);
 }
 
 function isWebSocketUpgrade(request: Request): boolean {
@@ -469,7 +481,7 @@ export function createUpstreamApiRequest(
   headers.delete("x-forwarded-for");
   headers.delete("x-real-ip");
   headers.delete(CORE_ORIGIN_AUTH_HEADER);
-  if (route === "public-read" || route === "large-asset") {
+  if (route === "public-read" || route === "large-asset" || ogQuery) {
     removePublicReadCredentials(headers);
   } else if (connectingIp) {
     headers.set("x-forwarded-for", connectingIp);
@@ -728,6 +740,11 @@ export function createCloudflareStaticGateway(
       return edgeLivenessResponse(request);
     }
     if (!isDynamicPath(requestUrl.pathname)) {
+      return env.ASSETS.fetch(request);
+    }
+    // Human navigation stays on Static Assets. Only recognized crawler traffic wakes the
+    // Core API for per-route Open Graph metadata.
+    if (isOgPagePath(requestUrl.pathname) && !isCrawlerRequest(request)) {
       return env.ASSETS.fetch(request);
     }
 
