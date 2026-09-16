@@ -151,8 +151,4 @@ BEGIN
 END
 $migration$;
 
-INSERT INTO public."toonspectrum_schema_migration" ("id", "appliedAt")
-VALUES ('0059_member_messaging', statement_timestamp())
-ON CONFLICT ("id") DO NOTHING;
-
 COMMIT;

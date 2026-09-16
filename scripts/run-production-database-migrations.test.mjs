@@ -257,11 +257,13 @@ test("member messaging migration provisions request-gated conversations", () => 
     'member_message_report_reporter_message_unique',
     'REVOKE ALL ON TABLE public."member_message_thread" FROM PUBLIC',
     'member messaging relations are incomplete',
-    'INSERT INTO public."toonspectrum_schema_migration"',
-    "VALUES ('0059_member_messaging', statement_timestamp())",
   ]) {
     expect(sql).toContain(requiredFragment);
   }
+  expect(migration?.checksum).toBe(
+    "a61d3478ce216bc700578854bc662c38020812f423253fe2d66273cb7e19fbbb",
+  );
+  expect(sql).not.toContain('INSERT INTO public."toonspectrum_schema_migration"');
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
