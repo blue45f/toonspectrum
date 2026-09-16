@@ -162,6 +162,63 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it("serves human title and marketplace navigation from Static Assets", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const env = environment();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    for (const pathname of [
+      "/title/a-title",
+      "/market",
+      "/market/browse",
+      "/market/resource/123e4567-e89b-42d3-a456-426614174000",
+    ]) {
+      const response = await gateway(new Request(
+        `https://www.toonstudio.cloud${pathname}`,
+        { headers: { "user-agent": "Mozilla/5.0" } },
+      ), env);
+      expect(await response.text()).toBe("static");
+    }
+
+    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(4);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("routes crawler title and marketplace requests to the Render OG endpoint", async () => {
+    const requests: Request[] = [];
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      requests.push(request as Request);
+      return new Response("crawler metadata", { status: 200 });
+    });
+    const env = environment();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+
+    for (const pathname of ["/title/a%20b", "/market/browse"]) {
+      const response = await gateway(new Request(
+        `https://www.toonstudio.cloud${pathname}`,
+        {
+          headers: {
+            "user-agent": "Googlebot/2.1",
+            authorization: "Bearer must-not-cross-public-og-boundary",
+            cookie: "session=must-not-cross-public-og-boundary",
+          },
+        },
+      ), env);
+      expect(await response.text()).toBe("crawler metadata");
+    }
+
+    expect(requests.map((request) => new URL(request.url).href)).toEqual([
+      "https://core.example.test/api/og?slug=a+b",
+      "https://core.example.test/api/og?marketPage=browse",
+    ]);
+    for (const request of requests) {
+      expect(request.headers.get("authorization")).toBeNull();
+      expect(request.headers.get("cookie")).toBeNull();
+      expect(request.headers.get("x-toonspectrum-edge-route")).toBe("core");
+    }
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
   it("keeps non-OG marketplace and nested crawler routes on Static Assets", async () => {
     const upstream = vi.fn<typeof fetch>();
     const env = environment();
@@ -617,7 +674,7 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it("maps crawler routes to the existing OG endpoint", () => {
+  it("maps crawler paths to the provider-neutral OG endpoint", () => {
     const origin = new URL("https://core.example.test");
     const title = createCoreApiRequest(
       new Request("https://www.toonstudio.cloud/title/a%20b"),

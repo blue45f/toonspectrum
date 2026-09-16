@@ -30,5 +30,6 @@ import { CreatorMarketplaceService } from "./creator-marketplace.service";
       useClass: CreatorMarketplaceSocialBoundaryGuard,
     },
   ],
+  exports: [CreatorMarketplaceService],
 })
 export class CreatorMarketplaceModule {}
