@@ -7,13 +7,22 @@ on:
       - 'apps/web/public/llms.txt'
       - 'apps/web/public/**/*.webmanifest'
       - 'apps/web/public/i18n/app/footer/**'
+      - 'apps/web/src/app/routes/AppRouter.tsx'
+      - 'apps/web/src/app/routes/route-fallback.tsx'
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/domains/creator-resources/**'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
+      - 'apps/web/src/shared/components/SiteRouteExperienceBoundary*'
+      - 'apps/web/src/shared/components/WorkflowTrustBadge*'
       - 'apps/web/src/shared/lib/product-identity*'
       - 'apps/web/src/shared/lib/site-route-ux*'
+      - 'apps/web/src/shared/lib/site-route-experience*'
+      - 'apps/web/src/shared/lib/workflow-trust*'
       - 'apps/api/src/modules/creator-resources/**'
+      - 'config/http-response-headers.json'
+      - 'scripts/cloudflare-static-rules.mjs'
+      - 'deploy/cloudflare-static/src/index.ts'
       - 'packages/core/**'
       - 'tests/creator-flagship-contracts.test.ts'
       - 'tools/verify-creator-flagship.mjs'
@@ -56,6 +65,10 @@ jobs:
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
           apps/web/src/shared/lib/product-identity.test.ts
           apps/web/src/shared/lib/site-route-ux.test.ts
+          apps/web/src/shared/lib/site-route-experience.test.ts
+          apps/web/src/shared/lib/workflow-trust.test.ts
+      - name: Response policy generation contract
+        run: node scripts/cloudflare-static-rules.mjs --check
       - name: Full application typecheck
         run: pnpm run typecheck
       - name: Production bundle and CSP
