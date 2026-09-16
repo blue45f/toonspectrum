@@ -6,6 +6,7 @@ import {
   RotateCcw,
   Save,
   Undo2,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -35,11 +36,13 @@ import { cn } from "@/shared/lib/utils";
 export interface StudioWorkspaceArrangementControlsProps {
   readonly disabled?: boolean;
   readonly initialSnapshot?: string;
+  readonly onClose?: () => void;
 }
 
 export function StudioWorkspaceArrangementControls({
   disabled = false,
   initialSnapshot,
+  onClose,
 }: StudioWorkspaceArrangementControlsProps) {
   const arranging = useSyncExternalStore(
     subscribeStudioWorkspaceArranging,
@@ -270,6 +273,17 @@ export function StudioWorkspaceArrangementControls({
           }}
         >
           <RotateCcw size={14} aria-hidden />전체 복원
+        </button>
+        <button
+          type="button"
+          aria-label="배치 도구 닫기"
+          className={cn(actionClass, "size-9 px-0")}
+          onClick={() => {
+            setStudioWorkspaceArranging(false);
+            onClose?.();
+          }}
+        >
+          <X size={15} aria-hidden />
         </button>
       </div>
       {arranging ? (
