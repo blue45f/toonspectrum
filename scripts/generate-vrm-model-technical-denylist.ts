@@ -5,6 +5,8 @@ import {
   classifyStudioVrmModelTechnicalRejection,
   isStudioVrmProductionModelUrl,
   STUDIO_VRM_MODEL_MAX_BYTES,
+  STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES,
+  summarizeStudioVrmValidatorErrors,
   type StudioVrmModelTechnicalMetrics,
   type StudioVrmModelTechnicalRejectionCode,
 } from "../apps/web/src/domains/creator/vrm/studio-vrm-model-quality";
@@ -33,8 +35,22 @@ type GltfJson = Readonly<{
   images?: readonly Readonly<{ uri?: string }>[];
 }>;
 
+type ValidatorMessage = Readonly<{
+  code: string;
+  message: string;
+  severity: number;
+  pointer?: string;
+}>;
+
 type ValidatorReport = Readonly<{
-  issues?: Readonly<{ numErrors?: number }>;
+  issues?: Readonly<{
+    numErrors?: number;
+    numWarnings?: number;
+    numInfos?: number;
+    numHints?: number;
+    messages?: readonly ValidatorMessage[];
+    truncated?: boolean;
+  }>;
 }>;
 
 type DetailedMetrics = StudioVrmModelTechnicalMetrics & Readonly<{
@@ -49,6 +65,11 @@ type Rejection = StudioVrmModelTechnicalRejectionCode | `scan-error:${string}`;
 const GLB_MAGIC = 0x46546c67;
 const GLB_JSON_CHUNK = 0x4e4f534a;
 const LFS_POINTER_PREFIX = "version https://git-lfs.github.com/spec/v1";
+const VALIDATOR_NOISE_CODES = Object.freeze([
+  "ACCESSOR_JOINTS_USED_ZERO_WEIGHT",
+  "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+  "UNUSED_OBJECT",
+] as const);
 
 function isGitLfsPointer(bytes: Buffer): boolean {
   return bytes.length < 4_096 && bytes.toString("utf8", 0, Math.min(bytes.length, 200))
@@ -100,8 +121,14 @@ function primitiveTriangleCount(
 function collectMetrics(
   json: GltfJson,
   bytes: Buffer,
-  validatorErrors: number,
+  validation: ValidatorReport,
 ): DetailedMetrics {
+  const validatorErrors = validation.issues?.numErrors ?? 0;
+  const validatorSummary = summarizeStudioVrmValidatorErrors(
+    validatorErrors,
+    validation.issues?.messages ?? [],
+    validation.issues?.truncated === true,
+  );
   const accessors = json.accessors ?? [];
   const primitives = (json.meshes ?? []).flatMap((mesh) => mesh.primitives ?? []);
   const trianglePrimitives = primitives.filter((primitive) => [4, 5, 6].includes(primitive.mode ?? 4));
@@ -140,6 +167,8 @@ function collectMetrics(
     skins: json.skins?.length ?? 0,
     hasVrmExtension: extensions.has("VRM") || extensions.has("VRMC_vrm"),
     validatorErrors,
+    blockingValidatorErrors: validatorSummary.blockingErrors,
+    repairableValidatorErrors: validatorSummary.repairableErrors,
     gltfVersion: json.asset?.version ?? null,
     primitivesWithoutPosition: primitives.filter(
       (primitive) => !Number.isSafeInteger(primitive.attributes?.POSITION),
@@ -149,6 +178,35 @@ function collectMetrics(
     ).length,
     unsafeExternalResources: Object.freeze(unsafeExternalResources),
   });
+}
+
+function summarizeValidatorDiagnostics(validation: ValidatorReport): Record<string, unknown> {
+  const issues = validation.issues;
+  const messages = issues?.messages ?? [];
+  const countCodes = (severity: number): Record<string, number> => {
+    const counts: Record<string, number> = {};
+    for (const message of messages) {
+      if (message.severity !== severity) continue;
+      counts[message.code] = (counts[message.code] ?? 0) + 1;
+    }
+    return counts;
+  };
+  const samples = new Map<string, ValidatorMessage>();
+  for (const message of messages) {
+    const key = `${message.severity}:${message.code}`;
+    if (!samples.has(key)) samples.set(key, message);
+  }
+  return {
+    numErrors: issues?.numErrors ?? 0,
+    numWarnings: issues?.numWarnings ?? 0,
+    numInfos: issues?.numInfos ?? 0,
+    numHints: issues?.numHints ?? 0,
+    truncated: issues?.truncated === true,
+    errorsByCode: countCodes(0),
+    warningsByCode: countCodes(1),
+    infosByCode: countCodes(2),
+    samples: [...samples.values()].slice(0, 80),
+  };
 }
 
 async function validateModel(
@@ -192,7 +250,8 @@ async function validateModel(
   const options = {
     uri: path.relative(publicRoot, filePath),
     externalResourceFunction,
-    maxIssues: 100,
+    maxIssues: 20_000,
+    ignoredIssues: VALIDATOR_NOISE_CODES,
   };
   if (filePath.toLowerCase().endsWith(".gltf")) {
     if (!validateString) throw new Error("gltf-validator-validateString-unavailable");
@@ -243,7 +302,10 @@ async function main(): Promise<void> {
       }
       const json = parseGltf(filePath, bytes);
       const validation = await validateModel(filePath, publicRoot, bytes);
-      const metrics = collectMetrics(json, bytes, validation.issues?.numErrors ?? 0);
+      const metrics = collectMetrics(json, bytes, validation);
+      const advisories = metrics.primitives > STUDIO_VRM_MODEL_RECOMMENDED_MAX_PRIMITIVES
+        ? ["primitives-above-recommended"] as const
+        : [] as const;
       let rejection: Rejection | null = classifyStudioVrmModelTechnicalRejection(metrics);
       if (!rejection && metrics.gltfVersion !== "2.0") rejection = "gltf-version";
       if (!rejection && metrics.primitivesWithoutPosition > 0) rejection = "position-missing";
@@ -252,7 +314,13 @@ async function main(): Promise<void> {
         rejection = "unsafe-external-resource";
       }
       if (rejection) rejected.set(sample.id, rejection);
-      reports[sample.id] = { url, metrics, rejection };
+      reports[sample.id] = {
+        url,
+        metrics,
+        advisories,
+        validation: summarizeValidatorDiagnostics(validation),
+        rejection,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const rejection = `scan-error:${message}` as const;
@@ -262,10 +330,12 @@ async function main(): Promise<void> {
   }
 
   const entries = [...rejected.entries()];
+  const generatedEntries = entries
+    .map(([id, reason]) => `  ${JSON.stringify(id)}: ${JSON.stringify(reason)},`)
+    .join("\n");
+  const generatedBody = generatedEntries ? `\n${generatedEntries}\n` : "";
   const generated = `/** Generated from deployment-owned glTF/VRM files. */\n`
-    + `export const STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS = Object.freeze({\n`
-    + `${entries.map(([id, reason]) => `  ${JSON.stringify(id)}: ${JSON.stringify(reason)},`).join("\n")}\n`
-    + `} as const);\n\n`
+    + `export const STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS = Object.freeze({${generatedBody}} as const);\n\n`
     + `const REJECTED_IDS = new Set<string>(Object.keys(STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS));\n\n`
     + `export function isStudioVrmTechnicallyAdmittedModel(id: string): boolean {\n`
     + `  return !REJECTED_IDS.has(id);\n}\n`;
@@ -277,7 +347,7 @@ async function main(): Promise<void> {
   );
   writeFileSync(
     "artifacts/studio-vrm-model-quality-report.json",
-    `${JSON.stringify({ schemaVersion: 1, scanned: Object.keys(reports).length, rejected: Object.fromEntries(entries), reports }, null, 2)}\n`,
+    `${JSON.stringify({ schemaVersion: 2, scanned: Object.keys(reports).length, rejected: Object.fromEntries(entries), reports }, null, 2)}\n`,
   );
   console.log(JSON.stringify({ scanned: Object.keys(reports).length, rejected: Object.fromEntries(entries) }, null, 2));
 }
