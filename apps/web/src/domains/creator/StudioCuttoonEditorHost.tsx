@@ -15691,9 +15691,7 @@ No text, logo, watermark, or copyrighted character.`;
             );
           },
           isCurrent: isCurrentOperation,
-          reportProgress: (progress) => {
-            if (isCurrentOperation()) setStatusNotice(progress.message);
-          },
+          reportProgress: (progress) => { if (isCurrentOperation()) setStatusNotice(progress.message); },
           loadDependencies: async () => {
             const [
               { getCreatorMarketplaceResource },
@@ -24097,10 +24095,8 @@ No text, logo, watermark, or copyrighted character.`;
       collaborationDocumentLocked,
       collaborationOperationSyncRequired,
       collaborationLockMessage,
-      studioCrdtAuthoritativeSaveBarrierRef,
-      studioCrdtSceneRuntimeRef,
-      studioCrdtDocumentRef,
-      sharedDocumentSaveAbortRef,
+      studioCrdtAuthoritativeSaveBarrierRef, studioCrdtSceneRuntimeRef,
+      studioCrdtDocumentRef, sharedDocumentSaveAbortRef,
       ownerDetailAbortRef,
       setSharedDocumentNotice,
       setFxPanelOpen,
