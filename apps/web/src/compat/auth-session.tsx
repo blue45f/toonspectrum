@@ -62,6 +62,14 @@ export function SessionProvider({ children, session = null }: { children: ReactN
       resetRetryBudget = true,
     ) {
       if (!active) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        retryAttempt = 0;
+        clearRetryTimer();
+        // The last verified public profile remains the honest offline authority.
+        // Do not flood DevTools with doomed session requests while disconnected.
+        setReady(true);
+        return;
+      }
       if (resetRetryBudget) {
         retryAttempt = 0;
         clearRetryTimer();

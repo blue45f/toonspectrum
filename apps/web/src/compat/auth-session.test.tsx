@@ -58,6 +58,7 @@ describe("SessionProvider server reconciliation", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     persistSession(null);
   });
 
@@ -74,6 +75,30 @@ describe("SessionProvider server reconciliation", () => {
 
     globalThis.dispatchEvent(new Event("focus"));
     await waitFor(() => expect(apiRaw).toHaveBeenCalledTimes(2));
+  });
+
+  it("실제 오프라인에서는 세션 요청을 생략하고 온라인 복귀 때 동기화한다", async () => {
+    let online = false;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    persistSession({ user: { id: "cached-user" }, token: null });
+
+    render(
+      <SessionProvider>
+        <SessionProbe />
+      </SessionProvider>,
+    );
+
+    expect(await screen.findByText("ready:authenticated:cached-user")).toBeTruthy();
+    expect(apiRaw).not.toHaveBeenCalled();
+
+    online = true;
+    await act(async () => {
+      globalThis.dispatchEvent(new Event("online"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(apiRaw).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("ready:authenticated:provider-user")).toBeTruthy();
   });
 
   it("명시적인 서버 미인증 응답만 준비된 로그아웃 상태로 확정한다", async () => {

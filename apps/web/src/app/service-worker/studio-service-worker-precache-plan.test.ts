@@ -38,6 +38,8 @@ const SIZES: Record<string, number> = {
   "/assets/index-jkl.css": 398_195,
   "/i18n/studio/mainMenu/ko.json": 92_000,
   "/i18n/studio/mainMenu/en.json": 89_363,
+  "/bootstrap-compat.js": 3_469,
+  "/offline-draw/bootstrap.js": 2_518,
 };
 
 const sizeOf = (url: string): number | null => SIZES[url] ?? null;
@@ -81,6 +83,37 @@ describe("planStudioServiceWorkerPrecache", () => {
     expect(plan.criticalBytes).toBe(825_622);
     expect(plan.warmUrls).toEqual(["/i18n/studio/mainMenu/ko.json", "/i18n/studio/mainMenu/en.json"]);
     expect(plan.warmBytes).toBe(181_363);
+  });
+
+  it("adds stable shell assets to the atomic critical set", () => {
+    const plan = planStudioServiceWorkerPrecache({
+      manifest: MANIFEST,
+      appEntryKey: "index.html",
+      staticCriticalUrls: ["/bootstrap-compat.js", "/offline-draw/bootstrap.js"],
+      sizeOf,
+      fingerprintOf: (url) => `sha256:${url}`,
+    });
+    expect(plan.violations).toEqual([]);
+    expect(plan.criticalUrls).toEqual(expect.arrayContaining([
+      "/bootstrap-compat.js",
+      "/offline-draw/bootstrap.js",
+    ]));
+    expect(plan.criticalBytes).toBe(831_609);
+    expect(plan.criticalFingerprints).toContain(
+      "/bootstrap-compat.js:sha256:/bootstrap-compat.js",
+    );
+  });
+
+  it("fails the build when an explicit stable critical asset is absent", () => {
+    const plan = planStudioServiceWorkerPrecache({
+      manifest: MANIFEST,
+      appEntryKey: "index.html",
+      staticCriticalUrls: ["/missing-bootstrap.js"],
+      sizeOf,
+    });
+    expect(plan.violations).toContain(
+      "critical precache target has no file on disk: /missing-bootstrap.js",
+    );
   });
 
   it("fails the build when the critical set outgrows its budget", () => {
@@ -154,6 +187,20 @@ describe("studioServiceWorkerBuildId", () => {
     const plan = { criticalUrls: ["/a.js", "/b.css"], warmUrls: ["/c.json"] };
     expect(studioServiceWorkerBuildId(plan, digest)).toBe(
       studioServiceWorkerBuildId({ ...plan }, digest),
+    );
+  });
+
+  it("changes when a stable critical URL keeps its name but changes bytes", () => {
+    const base = {
+      criticalUrls: ["/bootstrap-compat.js"],
+      warmUrls: [],
+      criticalFingerprints: ["/bootstrap-compat.js:old"],
+    };
+    expect(studioServiceWorkerBuildId(base, digest)).not.toBe(
+      studioServiceWorkerBuildId({
+        ...base,
+        criticalFingerprints: ["/bootstrap-compat.js:new"],
+      }, digest),
     );
   });
 
