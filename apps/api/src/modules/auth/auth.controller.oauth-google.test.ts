@@ -194,6 +194,32 @@ describe("AuthController Google GIS/code-flow boundary", () => {
     expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
+  it("keeps OAuth state and PKCE cookies Secure on localhost", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GITHUB_OAUTH_CLIENT_ID", "github-client-id");
+    vi.stubEnv("GITHUB_OAUTH_CLIENT_SECRET", "github-client-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv("OAUTH_REDIRECT_BASE_URL", "http://localhost:4001");
+    const res = response();
+
+    controller().oauthStart("github", res);
+
+    const oauthCookies = vi.mocked(res.cookie).mock.calls.filter(
+      ([name]) => String(name).startsWith("toonspectrum-oauth-"),
+    );
+    expect(oauthCookies).toHaveLength(2);
+    for (const [, , options] of oauthCookies) {
+      expect(options).toEqual(expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+      }));
+    }
+  });
+
   it("rejects a GitHub callback whose browser lost the PKCE verifier", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("GITHUB_OAUTH_CLIENT_ID", "github-client-id");

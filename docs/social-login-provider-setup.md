@@ -105,7 +105,7 @@ https://www.toonstudio.cloud/api/webhooks/kakao/unlink
 3. 서비스 환경은 **PC 웹**으로 등록하고 서비스 URL을 아래와 같이 설정한다.
 
 ```text
-https://www.toonstudio.cloud
+https://toonstudio.cloud
 ```
 
 4. 네이버 로그인 Callback URL에 아래 값을 정확히 등록한다.
@@ -114,12 +114,16 @@ https://www.toonstudio.cloud
 https://www.toonstudio.cloud/api/auth/oauth/naver/callback
 ```
 
-5. 제공 정보에서 서비스에 필요한 항목을 선택한다.
-   - 회원이름 또는 별명
-   - 프로필 이미지
-   - 이메일 주소
+5. 제공 정보는 추가 동의인 **별명**과 **프로필 이미지**만 선택한다. 이용자 식별자는 기본 제공되며,
+   이름·이메일·생일·성별·전화번호는 로그인 기능에 필요하지 않으므로 요청하지 않는다.
 6. 발급된 Client ID/Client Secret을 Core API secret store에 저장한다.
-7. 개발 계정으로 실제 로그인·동의 화면과 콜백을 검증한 뒤 **API 설정 → 네이버 로그인 검수**를
+7. 연결 해제 수신 코드가 배포된 뒤 **API 설정 → 연결 끊기 → Callback URL**에 아래 주소를 등록한다.
+
+```text
+https://www.toonstudio.cloud/api/webhooks/naver/unlink
+```
+
+8. 개발 계정으로 실제 로그인·동의 화면과 콜백을 검증한 뒤 **API 설정 → 네이버 로그인 검수**를
    요청한다. 검수 승인 전에는 등록된 개발 계정만 로그인할 수 있으므로 일반 사용자 공개 전에
    승인을 완료한다.
 
@@ -129,9 +133,14 @@ NAVER_OAUTH_CLIENT_SECRET=<Client Secret>
 ```
 
 ToonSpectrum은 콜백에서 검증한 `state`를 네이버 토큰 발급 요청에도 그대로 전달한다.
-네이버 프로필 응답에는 이메일 검증 여부를 보증하는 필드가 없으므로, 이메일이 제공되더라도 기존
-ToonSpectrum 계정과 자동 병합하지 않는다. 네이버의 애플리케이션별 사용자 ID로 별도 계정을 만들고,
-기존 계정 연결은 로그인된 사용자에게 두 계정의 재인증을 요구하는 명시적 계정 연결 흐름에서만 허용한다.
+네이버 프로필 응답은 애플리케이션별 사용자 ID를 정본으로 사용한다. 이메일은 요청하지 않으며,
+기존 ToonSpectrum 계정과 자동 병합하지 않는다. 기존 계정 연결은 로그인된 사용자에게 두 계정의
+재인증을 요구하는 명시적 계정 연결 흐름에서만 허용한다.
+
+연결 해제 콜백은 `application/x-www-form-urlencoded` 요청의 앱 ID와 10분 이내 timestamp를 확인하고,
+네이버 규격의 HMAC-SHA256 서명을 상수 시간 비교한 뒤 AES-128-CBC로 앱별 사용자 ID를 복호화한다.
+다른 로그인 수단이 남아 있으면 네이버 연동과 기존 세션만 제거하고, 네이버가 유일한 로그인 수단이면
+기존 탈퇴 경계를 통해 계정을 익명화한다. 정상·이미 처리된 알림은 본문 없는 `204 No Content`로 응답한다.
 
 ## GitHub 로그인
 
