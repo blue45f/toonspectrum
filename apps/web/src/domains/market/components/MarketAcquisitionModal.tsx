@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 
+import type { MarketStudioHandoff } from "../models/market-studio-handoff";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -21,6 +22,7 @@ interface MarketAcquisitionModalProps {
   open: boolean;
   onClose: () => void;
   record: CreatorMarketplaceResourceRecord;
+  studioHandoff: MarketStudioHandoff;
   onAcquiredSuccess?: () => void;
 }
 
@@ -28,6 +30,7 @@ export function MarketAcquisitionModal({
   open,
   onClose,
   record,
+  studioHandoff,
   onAcquiredSuccess,
 }: MarketAcquisitionModalProps) {
   const navigate = useNavigate();
@@ -67,7 +70,7 @@ export function MarketAcquisitionModal({
 
   const handleOpenInStudio = () => {
     onClose();
-    navigate(`/studio?installMarketResource=${record.id}&assetMarket=community`);
+    navigate(studioHandoff.href);
   };
 
   const handleGoToLibrary = () => {
@@ -106,7 +109,7 @@ export function MarketAcquisitionModal({
             <div>
               <h3 className="text-lg font-bold text-fg">내 에셋에 안전하게 보관했습니다</h3>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                계정 보관과 현재 기기 설치는 서로 다른 단계입니다. 지금 Studio에서 열면 이 기기에 설치하고 바로 시험할 수 있습니다.
+                계정 보관과 현재 기기 설치·적용은 서로 다른 단계입니다. {studioHandoff.summary}
               </p>
             </div>
 
@@ -130,7 +133,7 @@ export function MarketAcquisitionModal({
                 className={buttonClass({ variant: "solid", size: "md", className: "w-full gap-2" })}
               >
                 <Palette className="size-4" aria-hidden="true" />
-                <span>Studio에서 설치하고 시험하기</span>
+                <span>{studioHandoff.actionLabel}</span>
               </button>
               <button
                 type="button"

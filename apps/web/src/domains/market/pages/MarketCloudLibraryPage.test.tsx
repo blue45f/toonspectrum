@@ -8,6 +8,11 @@ import { MarketLibraryPage } from "./MarketCloudLibraryPage";
 
 import type { CreatorMarketplaceCloudLibraryItem, CreatorMarketplaceCloudLibraryPage } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 
+import {
+  CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+  writeCreatorMarketplaceInstallReceipt,
+} from "@/shared/lib/creator-marketplace-install-receipt";
+
 const api = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), archive: vi.fn() }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: api.session }));
 vi.mock("@/infrastructure/creator-marketplace-client", () => ({
@@ -55,7 +60,10 @@ beforeEach(() => {
   api.archive.mockResolvedValue({ changed: true });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem(CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY);
+});
 
 describe("account library page behavior", () => {
   it("waits for authentication and never loads a signed-out library", async () => {
@@ -91,11 +99,57 @@ describe("account library page behavior", () => {
     render(view());
     const heading = await screen.findByRole("heading", { name: "업데이트 에셋" });
     const card = within(heading.closest("li")!);
-    expect(card.getByText("계정 설치 확인 1.0.0 → 최신 2.0.0")).toBeTruthy();
-    expect(card.getByRole("link", { name: "Studio에서 v2.0.0 업데이트" }).getAttribute("href"))
+    expect(card.getByText("계정 이력 · 설치 확인 1.0.0 → 최신 2.0.0")).toBeTruthy();
+    expect(card.getByRole("link", { name: "3D 에셋 라이브러리 열기" }).getAttribute("href"))
       .toContain("123e4567-e89b-42d3-a456-426614174002");
-    expect(screen.getByText("이 계정에서 Studio v2.0.0 설치 확인")).toBeTruthy();
-    expect(screen.getByText("이 계정에서 확인된 Studio 설치 없음")).toBeTruthy();
+    expect(screen.getByText("계정 이력 · Studio v2.0.0 설치 확인")).toBeTruthy();
+    expect(screen.getByText("계정 이력 · 확인된 Studio 설치 없음")).toBeTruthy();
+    expect(card.queryByText(/이 기기·브라우저/u)).toBeNull();
+  });
+
+  it("separates account history from exact current-device install evidence", async () => {
+    const installed = item("설치된 브러시");
+    installed.logicalPackId = `community:${"b".repeat(64)}`;
+    installed.kind = "brush";
+    if (installed.catalog.state !== "available") throw new Error("expected catalog head");
+    installed.catalog.head.kind = "brush";
+
+    const update = item("업데이트 브러시");
+    update.logicalPackId = `community:${"c".repeat(64)}`;
+    update.kind = "brush";
+    if (update.catalog.state !== "available") throw new Error("expected catalog head");
+    update.catalog.head.kind = "brush";
+
+    expect(writeCreatorMarketplaceInstallReceipt({
+      logicalPackId: installed.logicalPackId,
+      packageVersion: installed.catalog.head.resourceVersion,
+      packageFingerprint: installed.catalog.head.manifestHash,
+      kind: "brush",
+      installedAt: Date.now(),
+    })).toBe(true);
+    expect(writeCreatorMarketplaceInstallReceipt({
+      logicalPackId: update.logicalPackId,
+      packageVersion: "1.0.0",
+      packageFingerprint: "1".repeat(64),
+      kind: "brush",
+      installedAt: Date.now(),
+    })).toBe(true);
+
+    api.list.mockResolvedValue(page([installed, update]));
+    render(view());
+
+    const installedCard = within(
+      (await screen.findByRole("heading", { name: "설치된 브러시" })).closest("li")!,
+    );
+    expect(installedCard.getByText("계정 이력 · 확인된 Studio 설치 없음")).toBeTruthy();
+    expect(installedCard.getByText("이 기기·브라우저에 v2.0.0 설치 확인됨")).toBeTruthy();
+    expect(installedCard.getByRole("link", { name: "Studio에서 설치 관리" })).toBeTruthy();
+
+    const updateCard = within(
+      screen.getByRole("heading", { name: "업데이트 브러시" }).closest("li")!,
+    );
+    expect(updateCard.getByText("업데이트 가능 · 설치 v1.0.0 → 마켓 v2.0.0")).toBeTruthy();
+    expect(updateCard.getByRole("link", { name: "Studio에서 v2.0.0 업데이트" })).toBeTruthy();
   });
 
   it.each([

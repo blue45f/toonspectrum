@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useMarketDeviceInstall } from "../hooks/use-market-device-install";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import {
@@ -31,6 +32,7 @@ import {
   recipePreviewData,
   templatePreviewData,
 } from "../models/market-preview";
+import { marketStudioHandoff } from "../models/market-studio-handoff";
 
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
@@ -41,8 +43,10 @@ import { MarketBrushPreview } from "./MarketBrushPreview";
 import { MarketCommentsSection } from "./MarketCommentsSection";
 import { MarketCompareToggle } from "./MarketCompareToggle";
 import { MarketDetailStickyBar } from "./MarketDetailStickyBar";
+import { MarketDeviceInstallStatus } from "./MarketDeviceInstallStatus";
 import { MarketEditResourceModal } from "./MarketEditResourceModal";
 import { MarketFilterPreview } from "./MarketFilterPreview";
+import { MarketInstallJourney } from "./MarketInstallJourney";
 import { MarketPalettePreview } from "./MarketPalettePreview";
 import { MarketResourceCard } from "./MarketResourceCard";
 import { MarketResourceReleaseHistory } from "./MarketResourceReleaseHistory";
@@ -53,18 +57,9 @@ import { MarketWebtoon3dViewerModal } from "./MarketWebtoon3dViewerModal";
 import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
 import { StaleNoticeBar } from "./StaleNoticeBar";
 
-import type { CreatorMarketplaceInstallReceipt } from "@/shared/lib/creator-marketplace-install-receipt";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import {
-  CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT,
-  CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
-  isCreatorMarketplaceInstallReceiptKind,
-  readCreatorMarketplaceInstallReceipt,
-  resolveCreatorMarketplaceInstallReceiptState,
-} from "@/shared/lib/creator-marketplace-install-receipt";
-import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 
@@ -137,68 +132,6 @@ function ShareLinkButton() {
   );
 }
 
-interface InstallReceiptSnapshot {
-  readonly logicalPackId: string;
-  readonly receipt: CreatorMarketplaceInstallReceipt | null;
-}
-
-function readInstallReceiptSnapshot(
-  record: CreatorMarketplaceResourceRecord,
-): InstallReceiptSnapshot {
-  const logicalPackId = creatorMarketplaceStudioPackId(record);
-  return {
-    logicalPackId,
-    receipt: isCreatorMarketplaceInstallReceiptKind(record.kind)
-      ? readCreatorMarketplaceInstallReceipt(logicalPackId)
-      : null,
-  };
-}
-
-function useInstallReceiptSnapshot(
-  record: CreatorMarketplaceResourceRecord,
-): InstallReceiptSnapshot {
-  const logicalPackId = creatorMarketplaceStudioPackId(record);
-  const [snapshot, setSnapshot] = useState<InstallReceiptSnapshot>(() =>
-    readInstallReceiptSnapshot(record));
-  const activeSnapshot = snapshot.logicalPackId === logicalPackId
-    ? snapshot
-    : readInstallReceiptSnapshot(record);
-
-  useEffect(() => {
-    if (!isCreatorMarketplaceInstallReceiptKind(record.kind)) return undefined;
-    const refresh = () => setSnapshot(readInstallReceiptSnapshot(record));
-    const onStorage = (event: StorageEvent) => {
-      if (
-        event.key === null
-        || event.key === CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY
-      ) refresh();
-    };
-    const onReceipt = (event: Event) => {
-      const eventPackId = (event as CustomEvent<{ logicalPackId?: unknown }>).detail
-        ?.logicalPackId;
-      if (eventPackId === undefined || eventPackId === logicalPackId) refresh();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT, onReceipt);
-    window.addEventListener("pageshow", refresh);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT, onReceipt);
-      window.removeEventListener("pageshow", refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [logicalPackId, record]);
-
-  return activeSnapshot;
-}
-
 function downloadMetadataSnapshot(record: CreatorMarketplaceResourceRecord): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -249,14 +182,11 @@ export function MarketResourceDetailArticle({
   const selectedFilter = filterPreviews?.[safePreviewIndex];
   const selectedTemplate = templatePreviews?.[safePreviewIndex];
   const selectedRecipe = recipePreviews?.[safePreviewIndex];
-  const installReceiptSnapshot = useInstallReceiptSnapshot(record);
-  const installReceiptState = resolveCreatorMarketplaceInstallReceiptState(
-    record,
-    installReceiptSnapshot.receipt,
-  );
+  const [currentRecord, setCurrentRecord] = useState(record);
+  const deviceInstall = useMarketDeviceInstall(currentRecord);
+  const studioHandoff = marketStudioHandoff(currentRecord, deviceInstall.state);
   const [viewer3dOpen, setViewer3dOpen] = useState(false);
 
-  const [currentRecord, setCurrentRecord] = useState(record);
   const [acquisitionModalOpen, setAcquisitionModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const { isAcquired } = useMarketLibrary();
@@ -271,29 +201,9 @@ export function MarketResourceDetailArticle({
   useEffect(() => {
     setSelectedPreviewIndex(0);
   }, [record.id]);
-  const isDirectAsset = record.kind === "asset";
-  const studioActionLabel = isDirectAsset
-    ? "스튜디오 캔버스에 에셋 삽입"
-    : record.kind === "template"
-      ? "장면 템플릿 카탈로그 열기"
-      : record.kind === "3d-preset"
-        ? "3D 배경 카탈로그 열기"
-        : record.kind === "3d-asset"
-          ? "3D 에셋 라이브러리 열기"
-          : installReceiptState === "update-available"
-            ? `스튜디오에서 v${record.resourceVersion}로 업데이트`
-            : installReceiptState === "installed-current"
-              ? "스튜디오에서 설치 상태 확인"
-              : "스튜디오에 리소스 팩 설치";
-  const studioActionSummary = isDirectAsset
-    ? "Studio 커뮤니티 마켓을 열고 지원되는 첫 에셋을 현재 캔버스에 삽입합니다."
-    : record.kind === "template"
-      ? "Studio 장면 템플릿 카탈로그와 참조된 템플릿 계열을 엽니다. 장면 카드를 눌러야 현재 컷에 적용됩니다."
-      : record.kind === "3d-preset"
-        ? "Studio 배경 3D 도형·절차형 카탈로그를 엽니다. 항목을 직접 선택해야 장면에 추가됩니다."
-        : record.kind === "3d-asset"
-          ? "Studio 3D 에셋 라이브러리를 엽니다. 3D 모델·소품을 장면에 직접 배치할 수 있습니다."
-          : "Studio 커뮤니티 마켓을 열고 이 리소스 팩을 로컬 도구 라이브러리에 설치합니다.";
+  const studioActionLabel = studioHandoff.actionLabel;
+  const studioActionSummary = studioHandoff.summary;
+
 
   return (
     <article className="mt-6">
@@ -733,32 +643,18 @@ export function MarketResourceDetailArticle({
         <div className="space-y-4 lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:self-start">
           <div className="flex flex-col gap-2 rounded-xl border border-line bg-card p-4">
             <CreatorMarketplaceCloudLibraryAction record={record} />
-            {isCreatorMarketplaceInstallReceiptKind(record.kind) ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="rounded-lg border border-line bg-panel px-3 py-2.5 text-left"
-              >
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
-                  <ShieldCheck
-                    className={installReceiptState === "installed-current"
-                      ? "h-3.5 w-3.5 text-good"
-                      : "h-3.5 w-3.5 text-fg-3"}
-                    aria-hidden="true"
-                  />
-                  {installReceiptState === "installed-current"
-                    ? `이 기기·브라우저에 v${record.resourceVersion} 설치 확인됨`
-                    : installReceiptState === "update-available"
-                      ? `업데이트 가능 · 설치 v${installReceiptSnapshot.receipt?.packageVersion} → 마켓 v${record.resourceVersion}`
-                      : "이 기기·브라우저에서 확인된 설치 영수증 없음"}
-                </p>
-                <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                  성공한 Studio 설치가 이 브라우저에 남긴 로컬 기록만 표시합니다. 계정 소유권이나 클라우드 동기화 상태가 아닙니다.
-                </p>
-              </div>
-            ) : null}
+            <MarketDeviceInstallStatus
+              record={currentRecord}
+              snapshot={deviceInstall}
+            />
+            <MarketInstallJourney
+              acquired={acquired}
+              handoff={studioHandoff}
+              record={currentRecord}
+              snapshot={deviceInstall}
+            />
             <Link
-              href={`/studio?installMarketResource=${record.id}&assetMarket=community`}
+              href={studioHandoff.href}
               className={buttonClass({ variant: "solid", size: "md", className: "w-full" })}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
@@ -966,6 +862,7 @@ export function MarketResourceDetailArticle({
 
       <MarketDetailStickyBar
         record={currentRecord}
+        studioHandoff={studioHandoff}
         onOpenAcquisition={() => setAcquisitionModalOpen(true)}
       />
 
@@ -973,6 +870,7 @@ export function MarketResourceDetailArticle({
         open={acquisitionModalOpen}
         onClose={() => setAcquisitionModalOpen(false)}
         record={currentRecord}
+        studioHandoff={studioHandoff}
       />
 
       <MarketEditResourceModal

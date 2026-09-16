@@ -183,6 +183,8 @@ describe("Studio marketplace deep link", () => {
       handler.indexOf("synchronizeInstalledPack:"),
     );
     expect(handler).toContain("setStudioMarketplaceCloudSyncRetry({ record, pack, issue })");
+    expect(handler).toContain("reportProgress: (progress) =>");
+    expect(handler).toContain("setStatusNotice(progress.message)");
     expect(studioPageSource).toContain("const retryStudioMarketplaceCloudSync = async () =>");
     expect(studioPageSource).toContain("retryStudioMarketplaceCloudSyncOperation(");
     expect(deepLinkOperationSource).toContain("inspectStudioCreatorPackInstallStateProduct(");
@@ -270,6 +272,23 @@ describe("Studio marketplace deep link", () => {
       }),
     );
     expect(deps.openBundledPackCatalog).not.toHaveBeenCalled();
+  });
+
+  it("reports download, validation, durable install, and account sync in execution order", async () => {
+    const deps = dependencies({ accountSync: "synchronized" });
+    const phases: string[] = [];
+
+    const result = await applyStudioMarketplaceDeepLink("resource-1", deps, {
+      reportProgress: (progress) => phases.push(progress.phase),
+    });
+
+    expect(result.status).toBe("success");
+    expect(phases).toEqual([
+      "downloading",
+      "validating",
+      "installing",
+      "synchronizing",
+    ]);
   });
 
   it("synchronizes the account library only after a durable local install", async () => {
@@ -546,6 +565,31 @@ describe("Studio marketplace deep link", () => {
       hash: "#canvas",
       state: routeState,
     });
+  });
+
+  it("reports preparation before lazy dependencies and then the real asset pipeline", async () => {
+    const deps = dependencies({ kind: "asset", assets: ["asset-record"] });
+    const phases: string[] = [];
+    const lifecycle = createStudioMarketplaceDeepLinkLifecycleState();
+    retainStudioMarketplaceDeepLinkLifecycle(lifecycle);
+    const operationGeneration = beginStudioMarketplaceDeepLinkOperation(lifecycle);
+
+    await expect(executeStudioMarketplaceDeepLinkOperation("asset-1", {
+      consumeInstallQuery: vi.fn(),
+      isCurrent: () => isStudioMarketplaceDeepLinkOperationCurrent(
+        lifecycle,
+        operationGeneration,
+      ),
+      reportProgress: (progress) => phases.push(progress.phase),
+      loadDependencies: async () => deps,
+    })).resolves.toMatchObject({ status: "success" });
+
+    expect(phases).toEqual([
+      "preparing",
+      "downloading",
+      "validating",
+      "applying",
+    ]);
   });
 
   it("consumes the URL before a deferred resource load and inserts an asset exactly once", async () => {

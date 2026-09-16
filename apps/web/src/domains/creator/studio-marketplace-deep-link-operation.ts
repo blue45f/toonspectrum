@@ -3,6 +3,7 @@ import type {
   StudioMarketplaceDeepLinkDependencies,
   StudioMarketplaceDeepLinkResult,
   StudioMarketplaceInstallGuard,
+  StudioMarketplaceInstallProgress,
 } from "./studio-marketplace-deep-link";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
@@ -52,10 +53,16 @@ class StudioMarketplaceStaleInstallError extends Error {
 export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
   resourceId: string,
   dependencies: StudioMarketplaceDeepLinkDependencies<TPack, TAsset>,
-  options: Readonly<{ isCurrent?: () => boolean }> = {},
+  options: Readonly<{
+    isCurrent?: () => boolean;
+    reportProgress?: (progress: StudioMarketplaceInstallProgress) => void;
+  }> = {},
 ): Promise<StudioMarketplaceDeepLinkResult> {
   const normalizedResourceId = resourceId.trim();
   const isCurrent = options.isCurrent ?? (() => true);
+  const reportProgress = (progress: StudioMarketplaceInstallProgress) => {
+    if (isCurrent()) options.reportProgress?.(progress);
+  };
   if (!normalizedResourceId) {
     return {
       status: "error",
@@ -67,6 +74,10 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
   if (!isCurrent()) return staleResult(normalizedResourceId);
 
   try {
+    reportProgress({
+      phase: "downloading",
+      message: "마켓에서 패키지와 매니페스트를 내려받고 있어요…",
+    });
     const record = await dependencies.loadResource(normalizedResourceId);
     if (!isCurrent()) return staleResult(normalizedResourceId);
     if (!record) {
@@ -76,6 +87,12 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
         resourceId: normalizedResourceId,
       };
     }
+
+    reportProgress({
+      phase: "validating",
+      message: `“${record.name}” 패키지의 무결성과 Studio 호환성을 확인하고 있어요…`,
+      resourceName: record.name,
+    });
 
     if (record.kind === "asset") {
       const projection = dependencies.projectAssets(record);
@@ -90,6 +107,11 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
         };
       }
       if (!isCurrent()) return staleResult(normalizedResourceId);
+      reportProgress({
+        phase: "applying",
+        message: `“${record.name}” 에셋을 현재 캔버스에 적용하고 있어요…`,
+        resourceName: record.name,
+      });
       const inserted = await dependencies.insertAsset(asset);
       if (!isCurrent()) return staleResult(normalizedResourceId);
       if (!inserted) {
@@ -122,6 +144,11 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
       },
     };
     installGuard.assertCurrent();
+    reportProgress({
+      phase: "installing",
+      message: `“${record.name}”을(를) 기기 Studio 저장소에 설치하고 있어요…`,
+      resourceName: record.name,
+    });
     const installResult = await dependencies.installPack(projection.pack, installGuard);
     if (!isCurrent()) return staleResult(normalizedResourceId);
     if (!SUCCESSFUL_INSTALL_STATUSES.has(installResult.status)) {
@@ -133,6 +160,11 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
     }
 
     if (installResult.status === "bundled") {
+      reportProgress({
+        phase: "opening-catalog",
+        message: `“${record.name}”의 Studio 카탈로그를 열고 있어요…`,
+        resourceName: record.name,
+      });
       const catalogResult = await dependencies.openBundledPackCatalog(
         projection.pack,
         record,
@@ -157,6 +189,11 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
       && isAccountConfirmableKind(record.kind)
     ) {
       try {
+        reportProgress({
+          phase: "synchronizing",
+          message: `“${record.name}” 설치를 계정 라이브러리와 동기화하고 있어요…`,
+          resourceName: record.name,
+        });
         const accountSync = await dependencies.synchronizeInstalledPack(
           record,
           projection.pack,
