@@ -871,7 +871,7 @@ describe("StudioLeftToolRail", () => {
     );
   });
 
-  it("groups additional tools and replaces the last slot at the nine-tool budget", () => {
+  it("groups additional tools and appends them beyond the nine-tool default", () => {
     stubAnimationFrame();
     const appSettings = defaultStudioAppSettings();
     const visible = new Set(appSettings.toolbar.visibleIds);
@@ -884,13 +884,13 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     expect(screen.getByText("선택·이동")).toBeTruthy();
-    expect(screen.getByText(/도구막대 9\/9/u)).toBeTruthy();
+    expect(screen.getByText(/도구막대 9개 표시/u)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
 
     expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
       ...appSettings,
       toolbar: {
-        visibleIds: [...appSettings.toolbar.visibleIds.slice(0, -1), "hand"],
+        visibleIds: [...appSettings.toolbar.visibleIds, "hand"],
       },
     });
   });

@@ -14,6 +14,7 @@
  * Pure types + delegation only — no React, no browser, no page state.
  */
 
+import type { StudioWebtoonCanvasPresetId } from "./studio-webtoon-canvas-presets";
 import type {
   StudioMainMenuSurfaceActions,
   StudioPixelSelectionToolId,
@@ -45,7 +46,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly openScrollPreview: () => unknown;
   readonly openContinuityCheck: () => unknown;
   readonly openProductionBible: () => unknown;
-  readonly openQuickStart: () => unknown;
+  readonly openQuickStart: (presetId?: StudioWebtoonCanvasPresetId) => unknown;
   readonly openPublishPackage: () => unknown;
   readonly openPublishPreflight: () => unknown;
   readonly openAssetRightsAudit: () => unknown;
@@ -53,6 +54,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly openCanvasNavigatorRoute: () => unknown;
   readonly openCanvasSettingsRoute: () => unknown;
   readonly toggleCanvasGrid: () => unknown;
+  readonly toggleWebtoonGuides: () => unknown;
   readonly toggleEraseToIntersection: () => unknown;
   readonly openDialogueBatch: () => unknown;
   readonly openDialogueTranslate: () => unknown;
@@ -100,6 +102,7 @@ export function bindStudioMainMenuSurfaceActions(
     openCanvasNavigator: actions.openCanvasNavigatorRoute,
     openCanvasSettings: actions.openCanvasSettingsRoute,
     toggleCanvasGrid: actions.toggleCanvasGrid,
+    toggleWebtoonGuides: actions.toggleWebtoonGuides,
     toggleVectorEraseToIntersection: actions.toggleEraseToIntersection,
     openDialogueBatch: actions.openDialogueBatch,
     openDialogueTranslate: actions.openDialogueTranslate,

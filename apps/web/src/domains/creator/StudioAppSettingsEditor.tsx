@@ -26,7 +26,6 @@ import { createPortal } from "react-dom";
 
 import {
   DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
-  STUDIO_RAIL_VISIBLE_LIMIT,
   formatStudioShortcutChord,
   hideStudioRailTool,
   listStudioShortcutConflicts,
@@ -605,7 +604,7 @@ export function StudioAppSettingsPanel({
                       </p>
                     </div>
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
-                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length}/${STUDIO_RAIL_VISIBLE_LIMIT} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
+                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
                     </span>
                   </div>
                   <label className="relative block">

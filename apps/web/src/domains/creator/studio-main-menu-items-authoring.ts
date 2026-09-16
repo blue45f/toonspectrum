@@ -19,18 +19,35 @@
 import {
   Compass,
   Eraser,
+  FilePlus2,
   Grid3x3,
   Languages,
   MessageSquare,
   Ruler,
   ScanText,
+  Smartphone,
   Stamp,
   StickyNote,
 } from "lucide-react";
 
+import { STUDIO_WEBTOON_CANVAS_PRESETS } from "./studio-webtoon-canvas-presets";
+
+import type { StudioWebtoonCanvasPresetId } from "./studio-webtoon-canvas-presets";
+
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 import { openStudioViewInspectionPanel } from "./studio-view-inspection-store";
+
+const STUDIO_PLATFORM_CANVAS_MENU_ITEMS = [
+  { id: "new-webtoon-vertical", commandId: "canvas.new-webtoon-vertical", presetId: "webtoon-vertical" },
+  { id: "new-webtoon-naver", commandId: "canvas.new-webtoon-naver", presetId: "webtoon-naver" },
+  { id: "new-webtoon-kakao", commandId: "canvas.new-webtoon-kakao", presetId: "webtoon-kakao" },
+  { id: "new-webtoon-canvas", commandId: "canvas.new-webtoon-canvas", presetId: "webtoon-canvas" },
+] as const satisfies readonly {
+  readonly id: string;
+  readonly commandId: string;
+  readonly presetId: StudioWebtoonCanvasPresetId;
+}[];
 
 /** View ▸ Navigator and View ▸ Reference Overlay (밑그림 underlay). */
 export function buildStudioViewSurfaceMenuItems({
@@ -64,31 +81,65 @@ export function buildStudioCanvasSurfaceMenuItems({
   state,
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
+  const platformCanvasItems: StudioMainMenuItem[] = STUDIO_PLATFORM_CANVAS_MENU_ITEMS.flatMap(
+    (item, index) => {
+      const preset = STUDIO_WEBTOON_CANVAS_PRESETS.find((candidate) => candidate.id === item.presetId);
+      if (!preset) return [];
+      return [{
+        id: item.id,
+        commandId: item.commandId,
+        label: `새 캔버스 · ${preset.labelKo}`,
+        labelEn: `New canvas · ${preset.labelEn}`,
+        icon: FilePlus2,
+        separatorAfter: index === STUDIO_PLATFORM_CANVAS_MENU_ITEMS.length - 1,
+        onSelect: () => {
+          ui.openQuickStart(preset.id);
+        },
+      }];
+    },
+  );
   return [
     {
       id: "canvas-settings",
       commandId: "canvas.document-settings",
       label: "캔버스 크기 · 문서 설정…",
+      labelEn: "Canvas size · document settings…",
       icon: Ruler,
       onSelect: () => {
         ui.openCanvasSettings();
       },
     },
     {
+      id: "webtoon-guides",
+      commandId: "canvas.webtoon-guides",
+      label: "웹툰 플랫폼 규격 가이드",
+      labelEn: "Webtoon platform width guides",
+      icon: Smartphone,
+      checked: state.webtoonGuidesVisible,
+      selectionRole: "checkbox",
+      onSelect: () => {
+        ui.toggleWebtoonGuides();
+      },
+    },
+    {
       id: "grid",
       commandId: "canvas.grid",
       label: "그리드",
+      labelEn: "Grid",
       icon: Grid3x3,
       checked: state.canvasGridVisible,
       selectionRole: "checkbox",
+      separatorAfter: true,
       onSelect: () => {
         ui.toggleCanvasGrid();
       },
     },
+    ...platformCanvasItems,
     {
       id: "sticky-note",
       commandId: "canvas.sticky-note",
       label: "스티키 노트",
+      labelEn: "Sticky note",
       icon: StickyNote,
       onSelect: () => {
         ui.insertDefaultStickyNote();

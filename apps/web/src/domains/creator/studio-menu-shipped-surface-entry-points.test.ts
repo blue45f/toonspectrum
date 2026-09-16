@@ -77,6 +77,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   onionSkinEnabled: false,
   documentCommentsOpen: false,
   canvasGridVisible: false,
+  webtoonGuidesVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
 };
@@ -125,6 +126,7 @@ const SURFACE_ROWS: readonly (readonly [string, string, string])[] = [
   ["edit", "auto-actions", "openAutoActions"],
   ["view", "navigator", "openCanvasNavigator"],
   ["canvas", "canvas-settings", "openCanvasSettings"],
+  ["canvas", "webtoon-guides", "toggleWebtoonGuides"],
   ["canvas", "grid", "toggleCanvasGrid"],
   ["vector", "erase-to-intersection", "toggleVectorEraseToIntersection"],
   ["text", "dialogue-batch", "openDialogueBatch"],
@@ -154,6 +156,20 @@ describe("§15.3 rows that open an already-shipped surface", () => {
     for (const [name, spy] of Object.entries(ui)) {
       if (name !== action) expect(spy, `${name} must not fire`).not.toHaveBeenCalled();
     }
+  });
+
+  it("opens every platform canvas through the existing new-work creator with the exact preset", () => {
+    const { groups, ui } = buildMenu();
+    const presets = [
+      "webtoon-vertical",
+      "webtoon-naver",
+      "webtoon-kakao",
+      "webtoon-canvas",
+    ] as const;
+
+    for (const preset of presets) item(groups, "canvas", `new-${preset}`).onSelect();
+
+    expect(ui.openQuickStart?.mock.calls).toEqual(presets.map((preset) => [preset]));
   });
 
   /** The tone library was always a valid `openStudioMenu` target; nothing used it. */
@@ -231,6 +247,7 @@ describe("§15.3 rows that must respect host state", () => {
       documentCommentsOpen: true,
       onionSkinEnabled: true,
       canvasGridVisible: true,
+      webtoonGuidesVisible: true,
       vectorEraseToIntersection: true,
     });
 
@@ -239,6 +256,7 @@ describe("§15.3 rows that must respect host state", () => {
     expect(item(open.groups, "collaboration", "comments").checked).toBe(true);
     expect(item(open.groups, "animation", "onion-skin").checked).toBe(true);
     expect(item(open.groups, "canvas", "grid").checked).toBe(true);
+    expect(item(open.groups, "canvas", "webtoon-guides").checked).toBe(true);
     expect(item(open.groups, "vector", "erase-to-intersection").checked).toBe(true);
   });
 });

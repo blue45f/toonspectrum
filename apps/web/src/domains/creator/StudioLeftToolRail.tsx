@@ -51,7 +51,6 @@ import {
 } from "./editor-client/studio-left-tool-rail-client";
 import { preloadStudioRasterRetouchRuntime } from "./render/studio-raster-retouch-preload";
 import {
-  STUDIO_RAIL_VISIBLE_LIMIT,
   formatStudioShortcutChord,
   showStudioRailTool,
   studioRailToolLabel,
@@ -618,8 +617,9 @@ function StudioLeftToolRailConnected() {
             추가 도구
           </p>
           <p className="px-2 pb-2 text-[0.6875rem] leading-relaxed text-fg-3">
-            도구막대 {Math.min(appSettings.toolbar.visibleIds.length, STUDIO_RAIL_VISIBLE_LIMIT)}/{STUDIO_RAIL_VISIBLE_LIMIT}
-            {" · 가득 차면 마지막 도구를 바꿉니다."}
+            {isKoreanUiLocale(railLang)
+              ? `도구막대 ${appSettings.toolbar.visibleIds.length}개 표시 · 필요한 도구를 원하는 만큼 추가할 수 있습니다.`
+              : `${appSettings.toolbar.visibleIds.length} tools shown · Add as many tools as you need.`}
           </p>
           {STUDIO_CHROME_RAIL_TOOL_GROUPS.map((group) => {
             const hiddenIds = group.toolIds.filter((id) => !isRailToolVisible(id));

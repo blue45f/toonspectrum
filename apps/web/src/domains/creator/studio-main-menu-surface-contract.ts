@@ -14,6 +14,8 @@
  * Pure types only — no React, no browser, no page state.
  */
 
+import type { StudioWebtoonCanvasPresetId } from "./studio-webtoon-canvas-presets";
+
 /**
  * Pixel-selection tools the host can arm. Mirrors the page's own activation
  * union (`SelectionToolKind | "circle" | "wand" | "color-range"`); it is restated
@@ -38,6 +40,7 @@ export interface StudioMainMenuSurfaceState {
   readonly onionSkinEnabled: boolean;
   readonly documentCommentsOpen: boolean;
   readonly canvasGridVisible: boolean;
+  readonly webtoonGuidesVisible: boolean;
   readonly vectorEraseToIntersection: boolean;
   /** Menubar command bar visibility, persisted on the authored workspace layout. */
   readonly commandBarVisible?: boolean;
@@ -87,8 +90,8 @@ export interface StudioMainMenuSurfaceActions {
   openContinuityCheck: () => unknown;
   /** §15.3 Comic ▸ Story Bible — production bible workspace. */
   openProductionBible: () => unknown;
-  /** §15.3 File ▸ 새 프로젝트 (approximate) — the quick-start / wizard surface. */
-  openQuickStart: () => unknown;
+  /** §15.3 File ▸ 새 프로젝트. With a preset, opens the exact platform canvas creator. */
+  openQuickStart: (presetId?: StudioWebtoonCanvasPresetId) => unknown;
   /** §15.3 File ▸ Publish Package. */
   openPublishPackage: () => unknown;
   openPublishPreflight: () => unknown;
@@ -102,6 +105,8 @@ export interface StudioMainMenuSurfaceActions {
   openCanvasSettings: () => unknown;
   /** §15.3 Canvas ▸ 그리드. */
   toggleCanvasGrid: () => unknown;
+  /** Canvas ▸ 웹툰 플랫폼 규격 가이드. */
+  toggleWebtoonGuides: () => unknown;
   /** §15.3 Vector ▸ Vector Eraser — erase-to-intersection on the eraser. */
   toggleVectorEraseToIntersection: () => unknown;
   /** §15.3 Text ▸ Dialogue Link — batch dialogue editing (split/merge/ruby). */
