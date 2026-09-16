@@ -11,7 +11,8 @@ import { describe, expect, it } from "vitest";
  * Every number is a ratchet: it may decrease as ownership moves behind adapters, but new coupling
  * must not silently raise it. The 2026-09-09 host ceiling records the exact tree produced by the
  * typed AI comic-composer handoff; the browser API owner assertion keeps its storage boundary from
- * spreading even while the call-count baseline remains frozen.
+ * spreading even while the call-count baseline remains frozen. The 2026-09-17 ceiling explicitly
+ * records the integrated first-save destination flow that landed before its first main CI run.
  */
 const CREATOR_DIR = fileURLToPath(new URL("./", import.meta.url));
 const SRC_DIR = path.resolve(CREATOR_DIR, "../..");
@@ -32,7 +33,7 @@ const SESSION_FILES = {
   ),
 } as const;
 
-const HOST_MAX_LINES = 29503;
+const HOST_MAX_LINES = 29696;
 const ROUTER_SEAM_MAX_LINES = 100;
 const STUDIO_RUNTIME_MODULE_MAX_LINES = 300;
 const APP_ROUTE_GROUP_MAX_LINES = 120;
