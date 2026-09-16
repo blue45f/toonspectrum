@@ -79,9 +79,9 @@ function routeTerminologyScope(pathname: string): SiteRouteTerminologyScope {
   if (pathname.startsWith("/studio/assets") || pathname.startsWith("/market")) return "assets";
   if (pathname.startsWith("/collaborate")) return "collaboration";
   if (pathname === "/studio/publish" || pathname.includes("/publish")) return "publishing";
+  if (pathname === "/studio" || pathname === "/studio/new" || pathname.startsWith("/studio/projects")) return "projects";
   if (pathname.startsWith("/studio")) return "studio";
   if (pathname.startsWith("/learn") || pathname.startsWith("/help")) return "learning";
-  if (pathname.startsWith("/projects")) return "projects";
   return "public";
 }
 
