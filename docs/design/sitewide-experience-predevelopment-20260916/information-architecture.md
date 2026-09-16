@@ -1,12 +1,16 @@
 # 정보 구조와 라우트 계약
 
+## 0. 2026-09-17 main 보정
+
+현재 main에는 `/production` 제작 관리와 first-save project library가 추가됐다. 최신 권위 구분과 route 수는 [`main-revalidation-20260917.md`](./main-revalidation-20260917.md)를 따른다. 특히 Production은 운영 authority, Studio Project Library는 작업 파일·복구 authority, Studio Editor는 문서 편집 authority를 가진다.
+
 ## 1. 사용자 목적 구조
 
 URL 디렉터리나 내부 조직이 아니라 사용자가 하려는 일을 기준으로 1차 내비게이션을 구성한다.
 
 | 목적 | 사용자 질문 | 대표 목적지 |
 | --- | --- | --- |
-| 만들기 | 무엇을 만들고 이어서 작업할까? | 내 작업, 새로 만들기, 소재, 배우기 |
+| 만들기 | 무엇을 만들고 이어서 작업할까? | 제작 관리, 프로젝트, 새 작품, 작품 재료, 검수·내보내기 |
 | 영감 찾기 | 어떤 작품·자료·기회가 필요할까? | 작품 찾기, 참고자료, 오늘의 영감, 기회·트렌드 |
 | 함께하기 | 누구와 보고 만들고 나눌까? | 갤러리, 커뮤니티, 구인·의뢰 |
 | 내 공간 | 내 작업·서재·에셋·설정을 어디서 관리할까? | 프로젝트, 서재, 에셋, 프로필, 설정 |
@@ -15,7 +19,7 @@ URL 디렉터리나 내부 조직이 아니라 사용자가 하려는 일을 기
 
 ## 2. 데스크톱 내비게이션
 
-- 1차 메뉴는 `내 작업`, `새로 만들기`, `소재`, `배우기` 또는 독자 문맥의 `찾기`, `랭킹`, `커뮤니티`, `내 서재`로 제한한다.
+- Studio 1차 메뉴는 `제작 관리`, `프로젝트`, `작품 재료`, `검수·내보내기`로 제한하고 `새 작품`을 독립 CTA로 둔다. 독자 문맥은 `찾기`, `랭킹`, `커뮤니티`, `내 서재`를 유지한다.
 - 제품 문맥은 URL이 아니라 Route Registry의 `product`와 `shell`로 판정한다.
 - 전체 기능은 `/sitemap`과 `⌘K` 명령 팔레트에서 제공한다.
 - 현재 위치는 링크 색상만이 아니라 텍스트·`aria-current`·하위 문맥 제목으로 표시한다.
@@ -65,12 +69,14 @@ export type MobileMode = "full" | "review" | "preview" | "unsupported";
 
 export interface SiteRouteDefinition {
   readonly id: string;
+  readonly kind: "static" | "family" | "alias";
   readonly path: string;
+  readonly pattern?: string;
   readonly canonicalPath: string;
   readonly aliases?: readonly string[];
   readonly titleKey: string;
-  readonly label: { readonly ko: string; readonly en: string };
-  readonly description: { readonly ko: string; readonly en: string };
+  readonly labelKey: string;
+  readonly descriptionKey: string;
   readonly keywords: readonly string[];
   readonly product: "studio" | "spectrum" | "docs";
   readonly shell: RouteShell;
@@ -81,6 +87,7 @@ export interface SiteRouteDefinition {
   readonly maturity: RouteMaturity;
   readonly device: DeviceMode;
   readonly mobileMode: MobileMode;
+  readonly readinessProfile: "document" | "collection" | "project" | "editor" | "capability";
   readonly primaryAction: RouteActionDefinition;
   readonly owner: RouteOwner;
 }
@@ -117,7 +124,7 @@ export interface RouteOwner {
 - alias는 다른 정식 경로와 충돌할 수 없다.
 - `access=project`이면 `projectContext=required`여야 한다.
 - `shell=creator`인 몰입형 편집기는 명시적인 `mobileMode`가 필요하다.
-- 모든 라우트는 한국어·영어 레이블, 설명, 문서 제목을 가진다.
+- 모든 라우트는 레이블·설명·문서 제목 번역 키와 한국어 source fallback을 가진다.
 - Primary action은 정확히 하나이며 분석 이벤트 이름을 가진다.
 ## 6. Canonical URL 정책
 

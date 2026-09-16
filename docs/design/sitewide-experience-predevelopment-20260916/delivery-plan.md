@@ -1,5 +1,21 @@
 # 구현·마이그레이션 계획
 
+## 0. 2026-09-17 main 재검토
+
+이 계획의 최신 실행 순서는 [`main-revalidation-20260917.md`](./main-revalidation-20260917.md)를 우선한다. 최초 단계표는 설계 이력을 보존하기 위해 남긴다.
+
+현재 main에는 route metadata·directory filter·fallback·support 분리·tags/ranking 개선이 부분 구현됐고, Production Hub와 first-save project restore가 추가됐다. 이에 따라 바로 다음 PR은 다음 순서로 변경한다.
+
+1. Production route authority parity
+2. single main landmark ownership
+3. route readiness health contract
+4. full Registry consolidation
+5. Production–Studio project bridge
+6. Browse·Creator·Docs shell rollout
+7. deployed-host direct-entry gate
+
+초기 `/market/browse`·`/reviews` blank/error는 local main에서 재현되지 않았으므로 구현 P0가 아니라 배포 회귀 검증 대상으로 이동한다. BG3D·Sculpt는 route blank보다 capability·warm-up readiness 문제로 재분류한다.
+
 ## 1. 전달 원칙
 
 - 빅뱅 전환을 금지한다.
@@ -23,7 +39,10 @@
 | 7 | 몰입형 Studio | 크롬·모바일 모드·능력 검사 |
 | 8 | AI·3D 복구 | 안전 모드·작업 큐·실행 계약 |
 | 9 | 정리·출시 | alias 제거, 구 코드 삭제, 전체 게이트 |
-## 3. 단계 0 — P0 안정성
+## 3. 단계 0 — 최초 P0 안정성 기록
+
+> 최신 우선순위는 `main-revalidation-20260917.md`의 P0를 따른다. 아래 항목은 2026-09-16 최초 감사에서 시작한 안정성 범위다.
+
 
 ### 대상
 
@@ -235,7 +254,7 @@
 - alias가 아닌 내부 링크 0개 확인
 - 사용되지 않는 route metadata·경로 배열 제거
 - 구 셸·후속 마케팅 자동 삽입 제거
-- 108개 route smoke·시각 회귀 재생성
+- directory 108개, static review set 112개, domain family sample route smoke·시각 회귀 재생성
 - 번들 그래프와 성능 예산 확인
 - 접근성 수동 점검
 - 기능 플래그별 롤백 리허설

@@ -2,11 +2,19 @@
 
 ## 상태
 
-제안 (2026-09-16)
+수용·부분 구현 중 (2026-09-17 main 재검토)
+
+수용 근거는 PR #1515의 설계 병합과 PR #1528의 sitewide route guidance 구현이다. 다만 현재 구현은 prefix 기반 metadata와 공통 RouteStage 수준이며 완전한 Registry·세 셸 전환은 아직 진행 중이다.
+
+현재 상태:
+
+- 구현: canonical alias, directory filter, canonical history/favorites, support 분리, policy document 구조
+- 부분 구현: route metadata, RouteStage/RouteFallback, route-health test, tags/ranking 개선
+- 미구현: 완전한 Registry, 세 셸, route-owned readiness, Production–Studio project authority 통합
 
 ## 맥락
 
-ToonStudio 공개 사이트와 Studio 생태계는 작품 탐색, 커뮤니티, 학습, 리서치, 마켓, 개인 공간, 2D·3D·AI 제작까지 확장됐다. `/sitemap` 기준 사용자 목적지는 108개이며, 경로 제목, 내비게이션, 공개 여부, 사이트맵, Studio 문맥 판정이 여러 파일과 배열에 분산돼 있다.
+ToonStudio 공개 사이트와 Studio 생태계는 작품 탐색, 커뮤니티, 학습, 리서치, 마켓, 개인 공간, 2D·3D·AI 제작까지 확장됐다. 최초 `/sitemap` 감사 기준 사용자 목적지는 108개였다. 2026-09-17 main에는 같은 수의 canonical directory 목적지 외에 `/production`, `/studio/new`, `/studio/assets`와 14개 Production route pattern이 추가됐으며, 경로 제목, 내비게이션, 공개 여부, 사이트맵, Studio 문맥 판정은 여전히 여러 파일과 배열에 분산돼 있다.
 
 운영 화면 감사에서 다음 구조적 문제가 확인됐다.
 
@@ -25,12 +33,12 @@ ToonStudio 공개 사이트와 Studio 생태계는 작품 탐색, 커뮤니티, 
 사용자에게 직접 노출되는 정식 목적지는 typed Route Registry에 다음 메타데이터를 가진다.
 
 - id, path, canonical path, aliases
-- 한국어·영어 이름, 설명, 검색 키워드
+- 이름·설명·주 행동의 번역 키, source locale 폴백, 검색 키워드
 - product, purpose, shell, page template
 - access, project context, maturity, device, mobile mode
 - primary action과 코드 소유자
 
-Registry는 page component나 icon을 import하지 않는 정적·순수 모듈이다. 실제 lazy element와 route ordering은 기존 `app/routes/groups`가 계속 소유하며 CI가 두 권위를 대조한다.
+Registry는 page component나 icon을 import하지 않는 정적·순수 projection이다. 실제 lazy element와 route ordering은 기존 `app/routes/groups`가 계속 소유한다. Studio path·runtime identity는 `STUDIO_ROUTE_REGISTRY`와 `STUDIO_ROUTE_MANIFEST`, Production pattern은 해당 domain catalog가 소유하며 전역 Registry는 typed adapter로 이를 소비한다. CI는 projection과 domain 권위를 대조한다.
 
 ### 2. 세 가지 셸
 
@@ -62,6 +70,20 @@ DCC·AI·외부 엔진 오류는 해당 surface 안에서 복구하며 문서, u
 ### 6. 단계적 도입
 
 Registry, RouteFrame, 셸, 고밀도 페이지, Creator 프로젝트, 몰입형 Studio 순으로 feature flag 아래에서 수직 슬라이스로 도입한다. 모든 페이지를 한 PR에서 변경하지 않는다.
+
+### 7. main landmark 단일 소유
+
+브라우저 document의 `main` landmark는 AppShell이 정확히 하나 소유한다. domain page와 Creator companion은 내부 root에 중첩 `main`을 만들지 않는다. 편집 surface는 `section`, named `region`, 필요한 경우 `application` 역할을 사용한다. 별도 popup browser document만 자체 main을 가진다.
+
+### 8. static route와 dynamic family를 함께 등록
+
+Registry는 directory에 노출되는 static destination뿐 아니라 `/production/projects/:projectId/...` 같은 dynamic route family를 포함한다. Dynamic family는 directory card를 직접 만들지 않지만 title, shell, access, readiness, analytics와 integrity test의 권위가 된다.
+
+Production의 project·episode 운영 authority는 Studio 문서·autosave·CRDT authority와 분리하고 명시적 relation으로 연결한다.
+
+### 9. domain catalog를 복제하지 않음
+
+전역 Registry는 Studio·Production route pattern의 새로운 원본이 아니다. 이미 존재하는 domain route catalog와 runtime manifest를 adapter로 조합한다. 전역 projection은 title key, shell, access, directory exposure, analytics와 health policy를 제공하고 domain resolver의 canonical·lifecycle 계산은 다시 구현하지 않는다.
 
 ## 결과
 
@@ -100,4 +122,4 @@ Registry, RouteFrame, 셸, 고밀도 페이지, Creator 프로젝트, 몰입형 
 
 ## 후속 작업
 
-구현 순서와 검증 기준은 `docs/design/sitewide-experience-predevelopment-20260916/` 패키지를 따른다. ADR 승인 전에는 대규모 route·셸 전환을 시작하지 않으며 P0 빈 화면 복구는 독립적으로 선행할 수 있다.
+구현 순서와 검증 기준은 `docs/design/sitewide-experience-predevelopment-20260916/` 패키지와 `main-revalidation-20260917.md`를 따른다. 다음 단계는 Production route parity, main landmark 단일화, readiness health contract 순서다. 완전한 Registry와 셸 전환은 이 세 기반을 작은 PR로 먼저 안정화한 뒤 진행한다.

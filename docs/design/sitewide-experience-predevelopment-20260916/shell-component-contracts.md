@@ -1,5 +1,11 @@
 # 셸·페이지·컴포넌트 계약
 
+## 0. 2026-09-17 main 보정
+
+현재 `RouteStage`와 `RouteFallback`은 이 문서의 일부 책임을 이미 수행한다. 신규 구현은 이를 제거하지 않고 explicit readiness와 Registry selector로 확장한다. browser document의 `main` landmark는 AppShell이 정확히 하나 소유하며 BrowseShell·CreatorShell·DocsShell과 domain page는 그 안에서 `section`·`article`·named region을 사용한다.
+
+Production은 CreatorShell 범위에 포함하고, Studio 문서 저장 authority를 복제하지 않는 운영 dashboard로 취급한다.
+
 ## 1. 공통 RouteFrame
 
 `RouteFrame`은 모든 사용자 라우트에 다음 품질 계약을 적용한다.
@@ -15,11 +21,11 @@ interface RouteFrameProps {
 ### 책임
 
 - 문서 제목과 canonical link 동기화
-- 실제 H1 하나 보장, 개발 환경에서 중복 경고
+- loading fallback과 page-owned visible H1을 구분하고, ready 상태에서는 실제 H1 또는 editor surface identity 하나를 보장
 - 라우트 전환 후 포커스·스크롤 정책 적용
 - lazy chunk·render·data 오류 경계
 - 의미 있는 콘텐츠가 없는 200 화면 감지
-- 8초, CreatorShell은 12초 이후 지연 복구 UI
+- route readiness profile별 8–20초 지연 복구 UI
 - route id 기반 page-view 이벤트
 - 인증·프로젝트·디바이스 정책과 셸 조합
 
