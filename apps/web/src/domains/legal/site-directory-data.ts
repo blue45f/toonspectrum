@@ -277,8 +277,8 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "/about/technology/story",
         "기술 제작 스토리",
         "Engineering story",
-        "문제 정의부터 검증까지 15개 기술 챕터",
-        "Follow 15 engineering chapters from problem definition to verification",
+        "문제 정의부터 검증까지 25개 기술 챕터",
+        "Follow 25 engineering chapters from problem definition to verification",
       ),
       destination(
         "/about/technology/guides",
@@ -286,6 +286,13 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "Implementation guides",
         "인증·저장·브러시·성능·AI를 다른 프로젝트에 적용",
         "Apply authentication, storage, brush, performance and AI patterns elsewhere",
+      ),
+      destination(
+        "/about/technology/references",
+        "기술 참고·장애 기록",
+        "Technical references & troubleshooting",
+        "사용·평가·참고 기술과 재현 가능한 장애 해결 기록",
+        "Used, evaluated and reference technologies with reproducible incident records",
       ),
       destination(
         "/about/technology/field-notes",

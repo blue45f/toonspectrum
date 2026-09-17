@@ -1,3 +1,8 @@
+import {
+  ENGINEERING_DEEP_DIVE_CHAPTERS,
+  ENGINEERING_DEEP_DIVE_GUIDES,
+} from "./engineering-story-deep-dive-content";
+
 export type EngineeringLocale = "ko" | "en";
 
 export interface LocalizedText {
@@ -1021,6 +1026,16 @@ export const ENGINEERING_LICENSE_GROUPS = [
     caution: { ko: "오픈소스 코드 라이선스만으로 모델이나 결과의 권리를 판단하지 않습니다.", en: "Do not infer model or output rights from the surrounding code license." },
   },
 ] as const satisfies readonly EngineeringLicenseGroup[];
+
+export const ALL_ENGINEERING_CHAPTERS = [
+  ...ENGINEERING_CHAPTERS,
+  ...ENGINEERING_DEEP_DIVE_CHAPTERS,
+] as const satisfies readonly EngineeringChapter[];
+
+export const ALL_ENGINEERING_GUIDES = [
+  ...ENGINEERING_GUIDES,
+  ...ENGINEERING_DEEP_DIVE_GUIDES,
+] as const satisfies readonly EngineeringGuide[];
 
 export const ENGINEERING_VIDEO_FORMATS = [
   {

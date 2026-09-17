@@ -5,6 +5,7 @@ import {
   CircleDot,
   Film,
   FlaskConical,
+  LibraryBig,
   Presentation,
   Scale,
   Wrench,
@@ -34,6 +35,12 @@ const NAV_ITEMS = [
     icon: Wrench,
     ko: "적용 가이드",
     en: "Guides",
+  },
+  {
+    href: "/about/technology/references",
+    icon: LibraryBig,
+    ko: "참고·장애 기록",
+    en: "References",
   },
   {
     href: "/about/technology/field-notes",
@@ -120,7 +127,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
         className,
       )}
     >
-      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AboutSectionNav } from "../AboutSectionNav";
 import { ENGINEERING_FIELD_NOTES } from "./engineering-field-notes-content";
 import {
-  ENGINEERING_CHAPTERS,
+  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   type EngineeringLocale,
   type EngineeringStatus,
 } from "./engineering-story-content";
@@ -33,8 +33,8 @@ import { cx } from "@/shared/lib/cx";
 
 const AUDIENCES = [
   { id: "investor", ko: "투자자 10장", en: "Investor · 10 slides" },
-  { id: "seminar", ko: "기술 세미나 · 20장", en: "Engineering seminar · 20 slides" },
-  { id: "study", ko: "스터디 심화 · 29장", en: "Study deep dive · 29 slides" },
+  { id: "seminar", ko: "기술 세미나 · 29장", en: "Engineering seminar · 29 slides" },
+  { id: "study", ko: "스터디 심화 · 39장", en: "Study deep dive · 39 slides" },
 ] as const;
 
 type Audience = (typeof AUDIENCES)[number]["id"];
@@ -134,11 +134,11 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       opening,
       chapterSlide("product-intent", locale),
       chapterSlide("architecture", locale),
-      chapterSlide("storage", locale),
-      chapterSlide("brush-engine", locale),
-      chapterSlide("ai-routing", locale),
+      chapterSlide("pwa-continuity", locale),
+      chapterSlide("web-3d-engine", locale),
+      chapterSlide("free-ai-routing", locale),
+      chapterSlide("cost-engineering", locale),
       chapterSlide("quality", locale),
-      chapterSlide("infrastructure", locale),
       chapterSlide("licenses", locale),
       {
         id: "investor-close",
@@ -165,11 +165,20 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       chapterSlide("open-source", locale),
       chapterSlide("authentication", locale),
       chapterSlide("storage", locale),
+      chapterSlide("worker-architecture", locale),
+      chapterSlide("pwa-continuity", locale),
+      chapterSlide("browser-local-compute", locale),
       chapterSlide("brush-engine", locale),
       chapterSlide("performance", locale),
+      chapterSlide("web-3d-engine", locale),
+      chapterSlide("blender-mcp-boundary", locale),
+      chapterSlide("free-ai-routing", locale),
+      chapterSlide("ai-assisted-engineering", locale),
+      chapterSlide("cost-engineering", locale),
+      chapterSlide("open-api-data", locale),
       chapterSlide("quality", locale),
-      chapterSlide("infrastructure", locale),
-      chapterSlide("ai-routing", locale),
+      chapterSlide("troubleshooting-evidence", locale),
+      chapterSlide("licenses", locale),
       fieldNoteSlide("worker-topology", locale),
       fieldNoteSlide("pwa-offline-lifecycle", locale),
       fieldNoteSlide("browser-local-ai", locale),
@@ -576,7 +585,7 @@ export function EngineeringDeckPage() {
           <StickyNote size={20} className="text-accent" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-black text-fg">{ko ? "스터디" : "Study"}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {ko ? "15개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다." : "Uses all 15 chapters and turns each boundary into a discussion for participants' systems."}
+            {ko ? `${ENGINEERING_CHAPTERS.length}개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다.` : `Uses all ${ENGINEERING_CHAPTERS.length} chapters and turns each boundary into a discussion for participants' systems.`}
           </p>
         </article>
       </section>

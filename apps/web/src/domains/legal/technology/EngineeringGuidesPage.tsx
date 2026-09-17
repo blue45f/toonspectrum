@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
 import {
-  ENGINEERING_GUIDES,
+  ALL_ENGINEERING_GUIDES as ENGINEERING_GUIDES,
   type EngineeringStatus,
 } from "./engineering-story-content";
 import {

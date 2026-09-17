@@ -3,21 +3,25 @@ import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  ENGINEERING_CHAPTERS,
-  ENGINEERING_GUIDES,
+  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
+  ALL_ENGINEERING_GUIDES as ENGINEERING_GUIDES,
   ENGINEERING_LICENSE_GROUPS,
   ENGINEERING_STATUS_META,
   ENGINEERING_VIDEO_FORMATS,
 } from "./engineering-story-content";
+import {
+  ENGINEERING_REFERENCES,
+  ENGINEERING_TROUBLESHOOTING_CASES,
+} from "./engineering-story-deep-dive-content";
 
 const unique = (values: readonly string[]): boolean => new Set(values).size === values.length;
 
 describe("engineering story content", () => {
-  it("keeps a complete, ordered and uniquely addressable 15-chapter story", () => {
-    expect(ENGINEERING_CHAPTERS).toHaveLength(15);
+  it("keeps a complete, ordered and uniquely addressable 25-chapter story", () => {
+    expect(ENGINEERING_CHAPTERS).toHaveLength(25);
     expect(unique(ENGINEERING_CHAPTERS.map((chapter) => chapter.id))).toBe(true);
     expect(ENGINEERING_CHAPTERS.map((chapter) => chapter.order)).toEqual(
-      Array.from({ length: 15 }, (_, index) => index + 1),
+      Array.from({ length: 25 }, (_, index) => index + 1),
     );
   });
 
@@ -53,6 +57,23 @@ describe("engineering story content", () => {
     expect(serialized).not.toMatch(/sk-[a-z0-9]{12,}/iu);
     expect(serialized).not.toMatch(/client_secret\s*[:=]\s*["'][^${]/iu);
     expect(serialized).not.toMatch(/api[_-]?key\s*[:=]\s*["'][^${]/iu);
+  });
+
+  it("separates used, evaluated and inspired references and publishes regression evidence", () => {
+    expect(unique(ENGINEERING_REFERENCES.map((reference) => reference.id))).toBe(true);
+    expect(new Set(ENGINEERING_REFERENCES.map((reference) => reference.relation))).toEqual(
+      new Set(["used", "evaluated", "inspired"]),
+    );
+    expect(unique(ENGINEERING_TROUBLESHOOTING_CASES.map((item) => item.id))).toBe(true);
+    expect(ENGINEERING_TROUBLESHOOTING_CASES.length).toBeGreaterThanOrEqual(8);
+
+    for (const entry of [...ENGINEERING_REFERENCES, ...ENGINEERING_TROUBLESHOOTING_CASES]) {
+      expect(entry.evidence.length, entry.id).toBeGreaterThan(0);
+      for (const item of entry.evidence) {
+        const [repositoryPath] = item.path.split("#", 1);
+        expect(existsSync(repositoryPath), `${entry.id}: missing evidence ${item.path}`).toBe(true);
+      }
+    }
   });
 
   it("keeps rights families and reviewable video compositions uniquely identified", () => {

@@ -50,7 +50,7 @@ const run = (args) => {
 
 const publicDirectory = `--public-dir=${resolve(cwd, "../../apps/web/public")}`;
 const manifest = {
-  version: 1,
+  version: 2,
   fps: 30,
   sourceCommit: process.env.GITHUB_SHA || "local",
   reviewed: false,
@@ -98,21 +98,25 @@ run([
 ]);
 
 const koCues = [
-  ["00:00:00.000", "00:00:12.000", "기획부터 연재까지 흩어진 제작 맥락을 하나의 프로젝트 흐름으로 연결합니다."],
-  ["00:00:12.000", "00:00:25.000", "Workspace, Project, Episode, Cut, Asset와 Approval을 제품 경계로 정렬합니다."],
-  ["00:00:25.000", "00:00:40.000", "브러시 반응성과 최종 문서 기록을 분리하고 OPFS와 복구 저널로 작업을 지킵니다."],
-  ["00:00:40.000", "00:00:55.000", "OAuth, 개인 클라우드와 AI를 제품 계약 뒤에 두고 동의와 권리를 보존합니다."],
-  ["00:00:55.000", "00:01:10.000", "운영, 설정, 실험과 문서 상태를 코드, 테스트와 workflow 근거에 연결합니다."],
-  ["00:01:10.000", "00:01:30.000", "다른 프로젝트에는 패키지 목록보다 데이터 권위, 실패, 대체 경로와 검증 순서를 재사용합니다."],
+  ["00:00:00.000", "00:00:11.250", "기획부터 연재까지 흩어진 제작 맥락을 하나의 프로젝트 흐름으로 연결합니다."],
+  ["00:00:11.250", "00:00:22.500", "Workspace, Project, Episode, Cut, Asset와 Approval을 제품 경계로 정렬합니다."],
+  ["00:00:22.500", "00:00:33.750", "Worker, PWA, OPFS와 SQLite WASM으로 UI, 앱 셸과 사용자 원본의 책임을 분리합니다."],
+  ["00:00:33.750", "00:00:45.000", "Three.js, VRM, 형상 WASM과 Blender QA를 연결하고 MCP는 검증된 host에서만 사용합니다."],
+  ["00:00:45.000", "00:00:56.250", "무료 AI, BYOK, quota ledger와 fail-closed 라우팅으로 자동 과금과 중복 추론을 막습니다."],
+  ["00:00:56.250", "00:01:07.500", "Open API 응답을 출처, 라이선스, 조회 시각이 포함된 내부 resource contract로 바꿉니다."],
+  ["00:01:07.500", "00:01:18.750", "PWA 캐시, Worker, DCC, AI와 API 장애를 원인, 수정과 회귀 검사로 남깁니다."],
+  ["00:01:18.750", "00:01:30.000", "다른 프로젝트에는 패키지 목록보다 데이터 권위, 실패, 비용과 검증 순서를 재사용합니다."],
 ];
 
 const enCues = [
-  ["00:00:00.000", "00:00:12.000", "Connect fragmented production context from planning through serialization into one project flow."],
-  ["00:00:12.000", "00:00:25.000", "Align Workspace, Project, Episode, Cut, Asset and Approval as product boundaries."],
-  ["00:00:25.000", "00:00:40.000", "Separate responsive brush presentation from durable document recording, protected by OPFS and recovery journals."],
-  ["00:00:40.000", "00:00:55.000", "Place OAuth, personal cloud and AI behind product contracts that preserve consent and rights."],
-  ["00:00:55.000", "00:01:10.000", "Connect live, configured, experimental and documented status to code, tests and workflow evidence."],
-  ["00:01:10.000", "00:01:30.000", "Reuse data authority, failure, fallback and verification order rather than a package list."],
+  ["00:00:00.000", "00:00:11.250", "Connect fragmented production context from planning through serialization into one project flow."],
+  ["00:00:11.250", "00:00:22.500", "Align Workspace, Project, Episode, Cut, Asset and Approval as product boundaries."],
+  ["00:00:22.500", "00:00:33.750", "Use Workers, PWA, OPFS and SQLite WASM to separate UI, app-shell and source-data responsibilities."],
+  ["00:00:33.750", "00:00:45.000", "Connect Three.js, VRM, geometry WASM and Blender QA, using MCP only with a verified host."],
+  ["00:00:45.000", "00:00:56.250", "Combine free-first AI, BYOK, quota ledgers and fail-closed routing to prevent billing and duplicate inference."],
+  ["00:00:56.250", "00:01:07.500", "Normalize Open API responses into internal resources with provenance, license and retrieval time."],
+  ["00:01:07.500", "00:01:18.750", "Record PWA, Worker, DCC, AI and API failures with causes, fixes and regression evidence."],
+  ["00:01:18.750", "00:01:30.000", "Reuse data authority, failure, cost and verification order rather than a package list."],
 ];
 
 const toVtt = (cues) => `WEBVTT\n\n${cues.map(([start, end, text], index) => `${index + 1}\n${start} --> ${end}\n${text}\n`).join("\n")}`;
