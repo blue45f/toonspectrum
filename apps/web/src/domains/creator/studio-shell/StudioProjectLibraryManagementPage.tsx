@@ -17,8 +17,8 @@ export function StudioProjectLibraryManagementPage() {
         {controller.view === "active" ? (
           <>
             <StudioRoleWorkspacePanel locale={controller.locale} />
-            <StudioRolePersonalizationCenter locale={controller.locale} />
             <StudioProjectStartPanel locale={controller.locale} />
+            <StudioRolePersonalizationCenter locale={controller.locale} />
           </>
         ) : null}
         <StudioProjectLibraryManagementContent controller={controller} />

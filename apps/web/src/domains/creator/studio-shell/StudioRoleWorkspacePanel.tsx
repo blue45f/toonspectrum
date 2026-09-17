@@ -20,6 +20,7 @@ import {
   type CreatorRoleId,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
+import { creatorRoleExperience } from "@/shared/lib/creator-role-experience";
 import { cn } from "@/shared/lib/utils";
 
 function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
@@ -122,6 +123,7 @@ export function StudioRoleWorkspacePanel({
   const activeDefinition = creatorRoleDefinition(activeRole);
   const selectedRoles = creatorRoleSelection(roleProfile);
   if (!activeDefinition) return null;
+  const experience = creatorRoleExperience(activeRole);
 
   const changeRole = async (role: CreatorRoleId) => {
     if (role === activeRole || savingRole) return;
@@ -206,23 +208,44 @@ export function StudioRoleWorkspacePanel({
           </p>
         ) : null}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {activeDefinition.actions.map((action, index) => (
-            <Link
-              key={`${activeDefinition.id}-${action.href}`}
-              href={action.href}
-              className="group flex min-h-28 flex-col rounded-2xl border border-line bg-panel p-4 transition-colors hover:border-accent/40 hover:bg-raised"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <span className="flex size-8 items-center justify-center rounded-xl bg-accent-soft text-xs font-black text-accent">
+        <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.65fr)]">
+          <Link
+            href={experience.primaryAction.href}
+            className="group flex min-h-44 flex-col justify-between rounded-2xl border border-accent/35 bg-accent-soft/45 p-5 transition-all hover:-translate-y-0.5 hover:border-accent/55 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
+          >
+            <div>
+              <p className="text-[0.66rem] font-black uppercase tracking-[0.15em] text-accent">TODAY · PRIMARY ACTION</p>
+              <h3 className="mt-3 text-lg font-black text-fg">
+                {localized(locale, experience.primaryAction.labelKo, experience.primaryAction.labelEn)}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-fg-2">
+                {localized(locale, experience.primaryAction.descriptionKo, experience.primaryAction.descriptionEn)}
+              </p>
+            </div>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-black text-accent">
+              {localized(locale, "바로 이어가기", "Resume now")}
+              <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </span>
+          </Link>
+
+          <nav aria-label={localized(locale, "직무별 주요 메뉴", "Role navigation")} className="grid gap-2 sm:grid-cols-2">
+            {experience.navigation.map((item, index) => (
+              <Link
+                key={`${experience.role}-${item.id}`}
+                href={item.href}
+                className="group flex min-h-20 items-start gap-3 rounded-2xl border border-line bg-panel p-3.5 transition-colors hover:border-accent/40 hover:bg-raised"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-card text-[0.68rem] font-black text-accent">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <ArrowRight size={15} className="text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden="true" />
-              </div>
-              <h3 className="mt-3 text-sm font-black text-fg">{creatorText(action.label, locale)}</h3>
-              <p className="mt-1 text-xs leading-5 text-fg-2">{creatorText(action.description, locale)}</p>
-            </Link>
-          ))}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black text-fg">{localized(locale, item.labelKo, item.labelEn)}</span>
+                  <span className="mt-1 block text-[0.7rem] leading-5 text-fg-3">{localized(locale, item.descriptionKo, item.descriptionEn)}</span>
+                </span>
+                <ArrowRight size={13} className="mt-1 shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden="true" />
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
     </section>
