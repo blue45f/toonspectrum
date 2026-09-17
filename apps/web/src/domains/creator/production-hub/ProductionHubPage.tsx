@@ -51,6 +51,7 @@ import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperati
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
+import { ProductionStudioRevisionBridgePanel } from "./ProductionStudioRevisionBridgePanel";
 import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWorkspace";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
@@ -610,13 +611,25 @@ function OverviewSurface({
   roleLens,
   execute,
   canEdit,
+  isDemo,
 }: {
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
+  readonly isDemo: boolean;
 }) {
-  return <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
+  return (
+    <div className="space-y-4">
+      <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />
+      <ProductionStudioRevisionBridgePanel
+        aggregate={aggregate}
+        execute={execute}
+        canEdit={canEdit}
+        enabled={!isDemo}
+      />
+    </div>
+  );
 }
 
 function PlanningSurface({
@@ -1056,15 +1069,17 @@ function SurfaceContent({
   roleLens,
   execute,
   canEdit,
+  isDemo,
 }: {
   readonly surface: ProductionProjectSurface;
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
+  readonly isDemo: boolean;
 }) {
   switch (surface) {
-    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
+    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} isDemo={isDemo} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
@@ -1094,7 +1109,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
-          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} />
+          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} isDemo={project.isDemo} />
         </div>
       </div>
     </div>

@@ -20,6 +20,7 @@ import { PersonalCloudModule } from "./modules/personal-cloud/personal-cloud.mod
 import { ProductionCollaborationModule } from "./modules/production-collaboration/production-collaboration.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
 import { StudioMusicModule } from "./modules/studio-music/studio-music.module";
+import { StudioProjectGraphModule } from "./modules/studio-project-graph/studio-project-graph.module";
 import { createStudioRealtimeTicketDynamicModule } from "./modules/studio-realtime-ticket/studio-realtime-ticket.integration";
 import { TrafficAnalyticsModule } from "./modules/traffic-analytics/traffic-analytics.module";
 
@@ -52,6 +53,7 @@ const studioRealtimeTicketModule =
     FortuneModule,
     StudioAiModule,
     StudioMusicModule,
+    StudioProjectGraphModule,
   ],
 })
 export class AppModule {}

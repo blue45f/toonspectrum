@@ -1,0 +1,553 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-17",
+  "program": [
+    {
+      "id": "PR-001",
+      "title": "ScopeRef / Artifact / Revision v3",
+      "track": "foundation",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/graph/scope-ref.ts",
+        "packages/studio-project-model/src/graph/artifact.ts"
+      ]
+    },
+    {
+      "id": "PR-002",
+      "title": "StudioTransaction / DocumentAuthority",
+      "track": "foundation",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/command/bus.ts",
+        "packages/studio-project-model/src/ir/project-state.ts"
+      ]
+    },
+    {
+      "id": "PR-003",
+      "title": "Revision semantics",
+      "track": "foundation",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/graph/revision.ts"
+      ]
+    },
+    {
+      "id": "PR-004",
+      "title": "Capability Ledger",
+      "track": "foundation",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/graph/capability-ledger.ts",
+        "docs/benchmarks/studio-competitor-registry.json"
+      ]
+    },
+    {
+      "id": "PR-005",
+      "title": "Project Shell / Context Bar",
+      "track": "workspace",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
+      ]
+    },
+    {
+      "id": "PR-006",
+      "title": "Workspace Layout v1",
+      "track": "workspace",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-workspace-layout-metrics.ts"
+      ]
+    },
+    {
+      "id": "PR-007",
+      "title": "WYSIWYG Layout Editor",
+      "track": "workspace",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.ts"
+      ]
+    },
+    {
+      "id": "PR-008",
+      "title": "Focus / Studio / Lettering / Review profiles",
+      "track": "workspace",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-workspace-authored-layout-boundary.test.ts"
+      ]
+    },
+    {
+      "id": "PR-009",
+      "title": "CAS Blob Store",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/api/src/db/schema/studio-project-graph.schema.ts",
+        "tests/visual/recovery-package-cas-contract.test.ts"
+      ]
+    },
+    {
+      "id": "PR-010",
+      "title": "Revision Local Store",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-autosave-opfs-session.ts"
+      ]
+    },
+    {
+      "id": "PR-011",
+      "title": "Sync Outbox",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/live/studio-crdt-outbox.ts"
+      ]
+    },
+    {
+      "id": "PR-012",
+      "title": "Cloud Revision API",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/api/src/modules/studio-project-graph/studio-project-graph.controller.ts",
+        "apps/web/src/domains/creator/project-graph/studio-project-graph-client.ts"
+      ]
+    },
+    {
+      "id": "PR-013",
+      "title": "FileSpace",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/StudioFileControlCenter.tsx"
+      ]
+    },
+    {
+      "id": "PR-014",
+      "title": "Version Stack / Restore",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-revision-compare-worker-client.ts"
+      ]
+    },
+    {
+      "id": "PR-015",
+      "title": "Share / Review Link",
+      "track": "storage",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-production/studio-review-link-url.ts"
+      ]
+    },
+    {
+      "id": "PR-016",
+      "title": "Sparse Tile Authority",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/sparse-tile-v3.ts",
+        "apps/web/src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts"
+      ]
+    },
+    {
+      "id": "PR-017",
+      "title": "Input Pipeline",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/canvas/studio-pointer-input.ts"
+      ]
+    },
+    {
+      "id": "PR-018",
+      "title": "Brush Graph / Studio",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/brush/StudioBrushStudio.tsx"
+      ]
+    },
+    {
+      "id": "PR-019",
+      "title": "Vector Ink",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/vector-stroke-v3.ts"
+      ]
+    },
+    {
+      "id": "PR-020",
+      "title": "Unified Layer Graph",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/layer-graph-v3.ts"
+      ]
+    },
+    {
+      "id": "PR-021",
+      "title": "Selection / Transform",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/selection/studio-selection-transform-controller.ts"
+      ]
+    },
+    {
+      "id": "PR-022",
+      "title": "Adjustment / Filter Graph",
+      "track": "2d-core",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts"
+      ]
+    },
+    {
+      "id": "PR-023",
+      "title": "Frame Graph",
+      "track": "comic",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/frame-graph.ts"
+      ]
+    },
+    {
+      "id": "PR-024",
+      "title": "Balloon / Text Engine",
+      "track": "comic",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/balloon-text-layout.ts"
+      ]
+    },
+    {
+      "id": "PR-025",
+      "title": "Tone / Effect / Ruler",
+      "track": "comic",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/StudioAdvancedRulerPanel.tsx"
+      ]
+    },
+    {
+      "id": "PR-026",
+      "title": "Episode / Page Manager",
+      "track": "comic",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/page/studio-page-management-controller.ts"
+      ]
+    },
+    {
+      "id": "PR-027",
+      "title": "Platform Export",
+      "track": "comic",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-publish-preflight.ts",
+        "apps/web/src/domains/creator/export/studio-publish-package-export.ts"
+      ]
+    },
+    {
+      "id": "PR-028",
+      "title": "Import Center / Compatibility Report",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-format-gateway/src/compatibility-report.ts",
+        "apps/web/src/domains/creator/studio-import-compatibility-report.ts"
+      ]
+    },
+    {
+      "id": "PR-029",
+      "title": "PNG Codec",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-interchange-capabilities.ts"
+      ]
+    },
+    {
+      "id": "PR-030",
+      "title": "PSD baseline",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-psd-import.ts"
+      ]
+    },
+    {
+      "id": "PR-031",
+      "title": "PSD advanced",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/export/studio-psd-export.ts",
+        "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts"
+      ]
+    },
+    {
+      "id": "PR-032",
+      "title": "PSB / large document",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-interchange-capabilities.ts",
+        "apps/web/src/domains/creator/studio-psd-import.test.ts"
+      ]
+    },
+    {
+      "id": "PR-033",
+      "title": "CLIP migration lane",
+      "track": "formats",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-format-gateway/src/csp-sut.ts",
+        "apps/web/src/domains/creator/studio-import-compatibility.ts"
+      ]
+    },
+    {
+      "id": "PR-034",
+      "title": "Scene Graph / Outliner",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/scene-3d-v3.ts"
+      ]
+    },
+    {
+      "id": "PR-035",
+      "title": "Inference / Modeling",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-workspace-edit-tools.test.ts"
+      ]
+    },
+    {
+      "id": "PR-036",
+      "title": "Parametric Webtoon Assets",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/scene-3d/studio-3d-room-builder-v2.ts"
+      ]
+    },
+    {
+      "id": "PR-037",
+      "title": "Camera / Scene Variant",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/scene-3d/studio-3d-camera-perspective-lens.ts"
+      ]
+    },
+    {
+      "id": "PR-038",
+      "title": "Render Passes",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/scene-3d/studio-3d-webtoon-multipass-exporter.ts"
+      ]
+    },
+    {
+      "id": "PR-039",
+      "title": "3D Live Layer",
+      "track": "3d",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/live/studio-live-2d3d-bridge.ts",
+        "packages/studio-project-model/src/ir/scene-3d-v3.ts"
+      ]
+    },
+    {
+      "id": "PR-040",
+      "title": "Unified Asset Library",
+      "track": "assets",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-unified-asset-library-projection.ts"
+      ]
+    },
+    {
+      "id": "PR-041",
+      "title": "Marketplace Search / Preview",
+      "track": "assets",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-marketplace-search.ts",
+        "apps/web/src/domains/creator/StudioUnifiedAssetPreviewSurface.tsx"
+      ]
+    },
+    {
+      "id": "PR-042",
+      "title": "License Ledger / Lockfile",
+      "track": "assets",
+      "state": "implemented",
+      "evidence": [
+        "packages/studio-project-model/src/ir/asset-metadata.ts",
+        "apps/web/src/domains/creator/studio-community-asset-license.test.ts"
+      ]
+    },
+    {
+      "id": "PR-043",
+      "title": "Seller Center",
+      "track": "assets",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.tsx"
+      ]
+    },
+    {
+      "id": "PR-044",
+      "title": "Realtime Presence",
+      "track": "collaboration",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/live/studio-live-socket-transport-presence.ts"
+      ]
+    },
+    {
+      "id": "PR-045",
+      "title": "Lease Service",
+      "track": "collaboration",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/render/studio-raster-source-lease.ts",
+        "apps/web/src/domains/creator/live/createStudioLiveResourceLeaseController.ts"
+      ]
+    },
+    {
+      "id": "PR-046",
+      "title": "Semantic Merge / Conflict Center",
+      "track": "collaboration",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-workspace-three-way-merge.ts"
+      ]
+    },
+    {
+      "id": "PR-047",
+      "title": "Review Workflow",
+      "track": "collaboration",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-review-workflow.ts"
+      ]
+    },
+    {
+      "id": "PR-048",
+      "title": "Production Bridge",
+      "track": "collaboration",
+      "state": "implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-shell/StudioProductionCocreatorBridgePanel.tsx"
+      ]
+    },
+    {
+      "id": "PR-049",
+      "title": "Desktop Sync Agent",
+      "track": "sync",
+      "state": "implemented",
+      "evidence": [
+        "apps/desktop-sync/src/runtime.ts",
+        "apps/desktop-sync/src/agent.ts"
+      ]
+    },
+    {
+      "id": "PR-050",
+      "title": "Local Folder Binding",
+      "track": "sync",
+      "state": "implemented",
+      "evidence": [
+        "apps/desktop-sync/src/path-policy.ts",
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+      ]
+    },
+    {
+      "id": "PR-051",
+      "title": "Google Drive Adapter",
+      "track": "sync",
+      "state": "implemented",
+      "evidence": [
+        "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts",
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+      ]
+    },
+    {
+      "id": "PR-052",
+      "title": "Dropbox Adapter",
+      "track": "sync",
+      "state": "implemented",
+      "evidence": [
+        "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts",
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+      ]
+    },
+    {
+      "id": "PR-053",
+      "title": "Performance Lab",
+      "track": "validation",
+      "state": "validation-harness-implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-performance-budget.ts",
+        "tests/benchmarks/harness/soak.ts"
+      ]
+    },
+    {
+      "id": "PR-054",
+      "title": "File Round-trip Lab",
+      "track": "validation",
+      "state": "validation-harness-implemented",
+      "evidence": [
+        "scripts/verify-studio-psd-original-quality.mjs",
+        "apps/web/src/domains/creator/studio-clip-selection-roundtrip.test.ts"
+      ]
+    },
+    {
+      "id": "PR-055",
+      "title": "Collaboration Fault Lab",
+      "track": "validation",
+      "state": "validation-harness-implemented",
+      "evidence": [
+        "tests/fault-injection/v12-runtime-fault-matrix.test.ts",
+        "packages/studio-project-model/src/testing/fault-injection.ts"
+      ]
+    },
+    {
+      "id": "PR-056",
+      "title": "Accessibility / Security Audit",
+      "track": "validation",
+      "state": "validation-harness-implemented",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-accessibility-audit.ts",
+        "scripts/verify-security-advisory-exceptions.mjs"
+      ]
+    },
+    {
+      "id": "PR-057",
+      "title": "Professional Creator Validation",
+      "track": "validation",
+      "state": "external-validation-required",
+      "evidence": [
+        "docs/validation/studio-professional-creator-validation-plan.md",
+        "docs/benchmarks/studio-reference-project-certification.json",
+        "scripts/verify-studio-reference-projects.mjs",
+        "scripts/verify-studio-reference-projects.test.mjs"
+      ]
+    }
+  ],
+  "summary": {
+    "plannedWorkstreams": 57,
+    "implementedWorkstreams": 52,
+    "validationHarnessesImplemented": 4,
+    "externalValidationRequired": 1,
+    "replacementClaimAllowed": false
+  },
+  "claimPolicy": "Replacement claims remain blocked until PR-057 has signed external evidence."
+}

@@ -61,3 +61,5 @@ apps/api/src/db/migrations/0060_studio_ai_free_provider_expansion.sql
 apps/api/src/db/migrations/0061_member_messaging_cutover_marker.sql
 apps/api/src/db/migrations/0062_auth_identity_hardening.sql
 apps/api/src/db/migrations/0063_creator_role_profile.sql
+apps/api/src/db/migrations/0064_studio_project_graph_v3.sql
+

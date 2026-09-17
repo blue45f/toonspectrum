@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "studio-reference-projects-v1",
+  "title": "ToonStudio automated reference-project certification",
+  "claimPolicy": {
+    "automatedReadinessAllowed": true,
+    "professionalReplacementClaimAllowed": false,
+    "externalValidationRequired": true,
+    "reason": "Automated evidence validates deterministic product contracts but does not replace signed professional creator evaluation."
+  },
+  "projects": [
+    {
+      "id": "A",
+      "title": "Solo vertical webtoon",
+      "outcome": "Create, recover, letter and package one vertical episode without leaving ToonStudio.",
+      "criteria": [
+        {
+          "id": "project-start",
+          "label": "Project and first document creation",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-project-creation.test.ts"
+          ]
+        },
+        {
+          "id": "durable-resume",
+          "label": "Autosave, close and durable project archive recovery",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts",
+            "apps/web/src/domains/creator/studio-workflow/studio-project-archive-v3.test.ts"
+          ]
+        },
+        {
+          "id": "lettering",
+          "label": "Lettering insertion and drag-placement workflow",
+          "evidence": [
+            "apps/web/src/domains/creator/lettering/studio-lettering-workflow-boundary.test.ts"
+          ]
+        },
+        {
+          "id": "publish-package",
+          "label": "Approved output package and manifest",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-publish-package.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "title": "Team production and review",
+      "outcome": "Assign roles, pin exact input revisions, review changes and preserve auditable decisions.",
+      "criteria": [
+        {
+          "id": "role-gates",
+          "label": "Department ownership and workflow gates",
+          "evidence": [
+            "packages/core/src/production/role-workflow.test.ts",
+            "apps/api/src/modules/production-collaboration/production-collaboration.service.test.ts"
+          ]
+        },
+        {
+          "id": "revision-authority",
+          "label": "Production tasks bind to Studio ProjectGraph revision digests",
+          "evidence": [
+            "apps/web/src/domains/creator/production-hub/production-studio-revision-bridge.test.ts"
+          ]
+        },
+        {
+          "id": "review-resolution",
+          "label": "Review requests resolve against a fixed revision",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.test.ts"
+          ]
+        },
+        {
+          "id": "comment-reanchor",
+          "label": "Positioned comments survive document migration",
+          "evidence": [
+            "apps/api/src/modules/creator/studio-team-comment-reanchor-migration.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "title": "PSD and CLIP interchange",
+      "outcome": "Preserve originals, expose losses and round-trip supported editable structures.",
+      "criteria": [
+        {
+          "id": "psd-import",
+          "label": "PSD import preserves supported structure and original evidence",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-psd-import.test.ts"
+          ]
+        },
+        {
+          "id": "psd-text-export",
+          "label": "Editable text export contract",
+          "evidence": [
+            "apps/web/src/domains/creator/export/studio-psd-export-text.test.ts"
+          ]
+        },
+        {
+          "id": "adjustment-graph",
+          "label": "Adjustment graph compatibility reporting",
+          "evidence": [
+            "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts"
+          ]
+        },
+        {
+          "id": "clip-selection-roundtrip",
+          "label": "CLIP selection and edit round-trip",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-clip-selection-roundtrip.test.ts"
+          ]
+        },
+        {
+          "id": "workspace-interchange",
+          "label": "Loss-aware workspace interchange",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-workspace-interchange.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "title": "Editable 3D production",
+      "outcome": "Create, reopen, modify and re-render a live 3D scene connected to a 2D document.",
+      "criteria": [
+        {
+          "id": "scene-document",
+          "label": "Editable 3D scene document authority",
+          "evidence": [
+            "apps/web/src/domains/creator/bg3d/studio-bg3d-scene-document.test.ts"
+          ]
+        },
+        {
+          "id": "project-archive",
+          "label": "Linked 3D pass survives project archive and restore",
+          "evidence": [
+            "apps/web/src/domains/creator/studio-linked-3d-pass-project-archive.test.ts"
+          ]
+        },
+        {
+          "id": "multi-pass",
+          "label": "Line, tone, mask and production pass regeneration",
+          "evidence": [
+            "apps/web/src/domains/creator/bg3d/studio-bg3d-production-multipass.test.ts"
+          ]
+        },
+        {
+          "id": "camera-application",
+          "label": "Camera state application and repeatability",
+          "evidence": [
+            "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-application.test.ts"
+          ]
+        },
+        {
+          "id": "character-scene",
+          "label": "VRM character remains editable in the scene document",
+          "evidence": [
+            "apps/web/src/domains/creator/vrm/studio-vrm-scene-document.test.ts"
+          ]
+        }
+      ]
+    }
+  ]
+}

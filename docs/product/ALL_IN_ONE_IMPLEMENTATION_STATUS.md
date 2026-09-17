@@ -48,11 +48,11 @@
 | 3D 배경 제작 | 부분 구현 | 배경 장면·카메라·재질·일부 편집 기능 | 직접 모델링, 컴포넌트, 정밀 치수, 선화·톤 패스의 전문 제작 완주 |
 | 소재 라이브러리 | 구현됨·검증 필요 | 내·프로젝트 소재, 검색·배치, 권리 메타데이터 기반 | 모든 소재 유형의 버전·사용 위치·권리 증빙 연결 |
 | 소재 마켓·판매자 센터 | 부분 구현 | 마켓·상품·라이선스 관련 화면과 API 기반 | 판매자 업로드, 검수, 결제, 정산, 업데이트, 환불과 권리 침해 운영 E2E |
-| 자체 파일 공간 | 부분 구현 | 프로젝트 파일, 로컬 저장, 일부 원격 저장·가져오기 경로 | 대용량 재개 업로드, 팀 소유권, 휴지통, 전체 복원, 검색과 스마트 보기 |
-| Google Drive·Dropbox 등 | 부분 구현 | 연결·가져오기·내보내기 경로 | 외부 서비스가 없어도 완주 가능함을 유지하면서 선택적 이전·백업 검증 |
+| 자체 파일 공간 | 구현됨·검증 필요 | ProjectGraph v3, append-only revision, blob·외부 파일 binding, 로컬 캐시와 복구 경로 | 대용량 재개 업로드, 팀 소유권, 휴지통 전체 복원, 검색·스마트 보기의 운영 E2E |
+| Google Drive·Dropbox 등 | 구현됨·검증 필요 | provider-neutral 외부 파일 binding, import/export/backup sync mode와 revision 영수증 | 실제 계정별 중단 재개·충돌·삭제 복구와 선택적 이전·백업 운영 검증 |
 | 실시간 협업 | 부분 구현 | 역할·초대·일부 실시간 상태와 동시 편집 기반 | 래스터 영역 충돌, 객체 잠금, 오프라인 병합, 장시간 공동 편집 검증 |
-| 제작 일정·분업 | 구현됨·검증 필요 | 회차, 역할별 작업, 인수인계, 검토, 계약·권리 기반 | 실제 문서 Revision을 입력·산출물로 강제하는 전 공정 E2E |
-| 검수·승인 | 부분 구현 | 검수 화면, 댓글·결정·승인 관련 기반 | 고정 검수본, 위치 보존, 수정 버전 연결, 승인 후 잠금의 전 구간 검증 |
+| 제작 일정·분업 | 구현됨·검증 필요 | 회차·역할별 작업·인수인계와 Studio ProjectGraph 정본 revision·digest 자동 대조·고정 | 다중 회차·권한·충돌 상황에서 입력 revision부터 승인 제출본까지 전 공정 E2E |
+| 검수·승인 | 구현됨·검증 필요 | revision 고정 review snapshot, 위치 기반 댓글, 승인 pointer, 수정·복원 API와 Production 제출본 불일치 차단 | 실제 다중 사용자 검수에서 수정 버전 연결·승인 잠금·재개방까지 전 구간 E2E |
 | 자체 연재 | 부분 구현 | 작품·회차·게시 관련 서비스 기반 | 승인본에서 예약 공개, 독자 화면, 교체·휴재·통계까지 실제 운영 검증 |
 | 외부 플랫폼 패키지 | 부분 구현 | 게시 사전 검사·내보내기 관련 기반 | 플랫폼별 규격·권리·크레딧·다국어 패키지의 Golden File 검사 |
 | 접근성·반응형 | 구현됨·검증 필요 | 터치 크기, 화면 폭 회귀, 긴 문구 줄바꿈, 전체 폭 모바일 행동, 라우트별 모바일 정책 | 편집기·3D·간트·캔버스의 키보드·스크린리더·200% 확대 실기기 검사 |
@@ -89,6 +89,56 @@
 - 공통 카드·헤더·행동 영역에 `min-width: 0`, 줄바꿈, 모바일 전체 폭 동작을 적용해 긴 한국어·영문 문구와 좁은 화면 잘림을 방지한다.
 - `StudioTaskFlow`, `DisabledReason`, `RecoverableActionNotice`, `StudioTaskSummary`, `StudioIntentLauncher`를 공통 컴포넌트로 제공한다.
 - 소스 계약 테스트로 시작 경로, 저장 신뢰, 비활성 이유, 오류 복구, 원본 보존, 반응형 문구 정책을 회귀 방지한다.
+
+## 2026-09-17 ProjectGraph v3·실제 revision 연결 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 작품을 단일 문서가 아니라 story·storyboard·2D canvas·3D scene·asset·audio·localization·review·deliverable·release artifact graph로 저장한다.
+- artifact head, approved revision, immutable parent graph와 append-only operation journal을 서버 권위로 제공한다.
+- 2D layer graph, sparse raster tile, vector stroke, 3D scene/live layer의 정규화된 v3 IR과 검증 계약을 추가했다.
+- 원본 blob, revision blob, 외부 파일 binding, 호환성 보고서와 provenance 연결을 PostgreSQL migration으로 영속화했다.
+- Google Drive·Dropbox·OneDrive·로컬 파일을 import-only, export-only, bidirectional, backup-mirror 모드로 revision에 연결한다.
+- 브라우저 로컬 cache와 서버 ProjectGraph를 함께 사용하고, stale response가 최신 project state를 덮지 않도록 방어한다.
+- Studio 프로젝트 화면에서 정본 상태, 버전 stack, 복원, 호환성·손실 보고와 승인 상태를 확인한다.
+- Production 작업의 입력 revision을 실제 Studio artifact ID·SHA-256 digest·lineage와 대조한다.
+- 공정과 episode scope에 맞는 승인 revision을 우선 추천하고, 명시적 사용자 행동으로 작업 입력에 고정한다.
+- 이미 제출된 revision의 digest가 다르면 자동 교체하지 않고 새 제출을 요구해 기존 검수 증거를 보존한다.
+- 기능 미리보기 데이터에서는 서버 정본을 변경하지 않으며 실제 프로젝트에서만 연결 명령을 제공한다.
+
+남은 검증은 대용량 업로드 재개, 실제 외부 계정, 다중 사용자 충돌, Safari OPFS·GPU 조합과 기준 프로젝트 A–D의 전체 E2E다.
+
+## 2026-09-17 데스크톱 폴더 동기화·대체 증거 게이트 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- Windows·macOS·Linux 호스트가 사용할 수 있는 provider-neutral 로컬 폴더 동기화 엔진을 별도 workspace로 추가했다.
+- 파일을 SHA-256, 크기, 수정 시각과 정규화된 상대 경로로 스캔하고 `.toonstudio`, `.git`, `node_modules`와 루트 밖 경로를 제외한다.
+- 심볼릭 링크와 `..` 경로를 통한 작업 폴더 탈출을 차단한다.
+- 마지막 동기화 journal과 현재 로컬·원격 snapshot을 비교해 upload, download, delete-local, delete-remote, no-op, conflict 계획을 결정한다.
+- 양쪽이 동시에 바뀐 파일은 자동 덮어쓰지 않고 conflict로 중단한다.
+- upload·download는 임시 파일과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
+- 한 번에 하나의 cycle만 실행하며 중복 trigger를 병합하고 중지 가능한 polling agent를 제공한다.
+- 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
+- 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
+- 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
+
+이 엔진은 동기화 transport의 안전한 로컬 실행 기반이다. 실제 운영 계정 연결, OS 백그라운드 서비스 설치, 대용량 재개 전송과 충돌 UI는 별도 release gate로 유지한다.
+
+## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 기준 프로젝트 A(1인 세로 웹툰), B(팀 제작·검수), C(PSD·CLIP 왕복), D(재편집 가능한 3D 제작)를 실행 가능한 인증 manifest로 고정했다.
+- 18개 완료 기준을 실제 20개 테스트 파일에 연결하고 evidence 파일의 SHA-256과 크기를 receipt에 기록한다.
+- 기준 프로젝트 A: 생성·자동 저장·프로젝트 archive·말풍선·게시 package 87개 테스트를 통과했다.
+- 기준 프로젝트 B: 역할 게이트·Production↔Studio revision digest·검수·댓글 재앵커 33개 테스트를 통과했다.
+- 기준 프로젝트 C: PSD import·텍스트·조정 그래프·CLIP 선택·workspace interchange 110개 테스트를 통과했다.
+- 기준 프로젝트 D: 3D scene document·camera·multi-pass·linked archive·VRM scene 109개 테스트를 통과했다.
+- 네 기준 프로젝트 전체는 20 files / 339 tests를 통과하며 root CI의 필수 게이트로 실행된다.
+- 자동 인증 receipt가 통과해도 전문 창작자 대체 완료 문구는 열리지 않도록 claim policy를 별도로 차단한다.
+
+자동 인증은 코드·저장·복구·왕복 계약의 결정론적 근거다. 실제 장시간 창작 경험, 펜·GPU·파일 편차와 도구 대체 평가는 12명 외부 전문 창작자 서명 검증을 통과해야 한다.
 
 ## 올인원 공개 문구 사용 게이트
 

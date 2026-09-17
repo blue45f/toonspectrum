@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
@@ -24,6 +25,31 @@ import {
 } from "./StudioProjectShellPage";
 
 type Locale = "ko" | "en";
+
+const StudioCompatibilityReportsPanel = lazy(async () => {
+  const module = await import("../project-graph/StudioCompatibilityReportsPanel");
+  return { default: module.StudioCompatibilityReportsPanel };
+});
+
+const StudioProjectGraphContextBar = lazy(async () => {
+  const module = await import("../project-graph/StudioProjectGraphContextBar");
+  return { default: module.StudioProjectGraphContextBar };
+});
+
+const StudioProjectVersionStackPanel = lazy(async () => {
+  const module = await import("../project-graph/StudioProjectVersionStackPanel");
+  return { default: module.StudioProjectVersionStackPanel };
+});
+
+function ProjectGraphPanelFallback({ locale }: { readonly locale: Locale }) {
+  return (
+    <div
+      className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
+      role="status"
+      aria-label={locale === "ko" ? "작품 버전 정보를 불러오는 중" : "Loading project version data"}
+    />
+  );
+}
 
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
@@ -76,9 +102,20 @@ function SectionWorkflow({
       {section === "assets" && view === "series" ? (
         <StudioSeriesKitPanel projectId={projectId} locale={locale} />
       ) : null}
+      {section === "review" && view === "versions" ? (
+        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+          <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
+        </Suspense>
+      ) : null}
       {section === "review" ? (
         <StudioReviewPanel projectId={projectId} locale={locale} />
       ) : null}
+      {(section === "assets" && (view === "missing" || view === "rights"))
+        || (section === "export" && view === "preflight") ? (
+          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+            <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
+          </Suspense>
+        ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
       ) : null}
@@ -123,6 +160,10 @@ export function StudioProjectIntegratedPage({
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
           <StudioWebtoonOnboardingPanel projectId={decodedProjectId} locale={locale} />
+          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+            <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
+          </Suspense>
+
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}
