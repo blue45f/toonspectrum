@@ -126,7 +126,7 @@ export function StudioProjectLibraryManagementHeader({
               <select
                 value={sort}
                 onChange={(event: ChangeEvent<HTMLSelectElement>) => setSort(event.target.value as StudioProjectLibrarySortMode)}
-                className="min-h-10 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg outline-none focus:border-accent"
+                className="min-h-[44px] rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg outline-none focus:border-accent"
               >
                 <option value="recent">{locale === "ko" ? "최근 작업순" : "Recently opened"}</option>
                 <option value="name">{locale === "ko" ? "이름순" : "Name"}</option>
@@ -137,7 +137,7 @@ export function StudioProjectLibraryManagementHeader({
               type="button"
               disabled={visibleProjects.length === 0}
               onClick={toggleVisibleSelection}
-              className={buttonClass({ variant: "outline", size: "sm" })}
+              className={buttonClass({ variant: "outline", size: "sm", className: "min-h-[44px]" })}
             >
               {allVisibleSelected
                 ? locale === "ko" ? "선택 해제" : "Clear selection"

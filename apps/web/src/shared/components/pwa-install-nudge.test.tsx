@@ -56,7 +56,7 @@ describe("PwaInstallNudge", () => {
     const { PwaInstallNudge } = await import("./pwa-install-nudge");
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/discover"]}>
         <PwaInstallNudge />
       </MemoryRouter>,
     );
@@ -66,6 +66,10 @@ describe("PwaInstallNudge", () => {
     const nudge = await screen.findByRole("status", {
       name: "툰스튜디오를 앱처럼 열어보세요",
     });
+    expect(nudge.getAttribute("data-pwa-install-nudge")).toBe("true");
+    expect(nudge.getAttribute("aria-describedby")).toBe("pwa-install-nudge-description");
+    expect(screen.getByRole("button", { name: "설치" })).not.toBeNull();
+    expect(screen.getByText("홈 화면과 앱 목록에서 더 빠르게 창작을 시작할 수 있습니다.")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "설치 안내 닫기" }));
     expect(nudge.isConnected).toBe(false);
     expect(sessionStorage.getItem(SESSION_KEY)).toBe("1");
@@ -75,7 +79,7 @@ describe("PwaInstallNudge", () => {
     installBrowserStubs();
     const { PwaInstallNudge: RemountedNudge } = await import("./pwa-install-nudge");
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/discover"]}>
         <RemountedNudge />
       </MemoryRouter>,
     );
@@ -84,17 +88,37 @@ describe("PwaInstallNudge", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("hides on market routes even when installable", async () => {
+  it("keeps the home prompt and marks it for mobile bottom-safe positioning", async () => {
     const { useI18n } = await import("@/shared/lib/i18n");
     useI18n.getState().setLang("ko");
     const { PwaInstallNudge } = await import("./pwa-install-nudge");
 
     render(
-      <MemoryRouter initialEntries={["/market"]}>
+      <MemoryRouter initialEntries={["/"]}>
         <PwaInstallNudge />
       </MemoryRouter>,
     );
     act(dispatchInstallability);
-    expect(screen.queryByRole("status")).toBeNull();
+    const nudge = await screen.findByRole("status", {
+      name: "툰스튜디오를 앱처럼 열어보세요",
+    });
+    expect(nudge.getAttribute("data-surface")).toBe("home");
   });
+
+  it.each(["/market", "/market/assets"])(
+    "hides on market route %s even when installable",
+    async (path) => {
+      const { useI18n } = await import("@/shared/lib/i18n");
+      useI18n.getState().setLang("ko");
+      const { PwaInstallNudge } = await import("./pwa-install-nudge");
+
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <PwaInstallNudge />
+        </MemoryRouter>,
+      );
+      act(dispatchInstallability);
+      expect(screen.queryByRole("status")).toBeNull();
+    },
+  );
 });

@@ -19,8 +19,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { CreatorHomeNavigation } from "./CreatorHomeNavigation";
-
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import {
@@ -36,6 +34,7 @@ import "./creator-home-experience.css";
 import "./creator-prism.css";
 import "./creator-flagship.css";
 import "./creator-all-in-one.css";
+import "./creator-home-spacing.css";
 
 interface LocalizedText {
   readonly ko: string;
@@ -230,9 +229,6 @@ export function CreatorHomeExperience() {
       data-product-direction="planning-to-publishing"
       lang={locale}
     >
-      <CreatorHomeNavigation locale={locale} />
-      <div className="cf-shell"><ProductIntentStart /></div>
-
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
         <div className="cf-hero-copy">
           <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{identity.category}</p>
@@ -254,7 +250,8 @@ export function CreatorHomeExperience() {
         </figure>
       </section>
 
-      <div className="cf-shell">
+      <div className="cf-shell cf-home-wayfinding">
+        <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
           <a href="#creator-start">{copy.jumpStart}</a>
           <a href="#creator-flow">{copy.jumpFlow}</a>

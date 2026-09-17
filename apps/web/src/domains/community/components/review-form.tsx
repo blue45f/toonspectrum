@@ -143,7 +143,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
                     onClick={() => toggleTag(t)}
                     aria-pressed={on}
                     className={cn(
-                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                      "min-h-[44px] min-w-[44px] rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                       on
                         ? "border-accent/60 bg-accent-soft text-accent"
                         : "border-line bg-raised/50 text-fg-3 hover:text-fg"

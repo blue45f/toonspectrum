@@ -64,6 +64,8 @@
     "lint:ci": "pnpm run lint:strict",
     "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --audit-level low",
     "audit:studio-brush-mark-distance": "tsx scripts/audit-studio-brush-mark-distance.mts",
+    "audit:sitewide-visual-ux": "node scripts/audit-sitewide-visual-ux.mjs",
+    "audit:auth-modal-visual-ux": "node scripts/audit-auth-modal-visual-ux.mjs",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
     "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
