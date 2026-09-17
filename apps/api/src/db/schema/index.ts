@@ -11,3 +11,4 @@ export * from "./personal-cloud.schema";
 export * from "./production.schema";
 export * from "./messaging.schema";
 export * from "./studio-project-graph.schema";
+export * from "./business.schema";
