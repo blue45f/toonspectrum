@@ -51,6 +51,23 @@ export const DICT: DictByLocale = {
   en: { ...builtinAppDictionaries.en },
 };
 
+// Runtime machine translation must not blindly treat every DICT.en entry as a source. Tests and
+// feature modules can register diagnostic/reference dictionaries that are not currently rendered.
+// Start with the app-shell surface, then let lazy Admin/Studio loaders explicitly opt their English
+// dictionaries in when those routes are actually loaded.
+const runtimeTranslationSourceKeys = new Set<string>(Object.keys(DICT.en));
+
+export function registerI18nEnglishSourceEntries(
+  entries: Readonly<Record<string, string>>,
+): void {
+  registerI18nLocaleEntries("en", entries);
+  for (const key of Object.keys(entries)) runtimeTranslationSourceKeys.add(key);
+}
+
+export function getI18nRuntimeTranslationSourceKeys(): readonly string[] {
+  return [...runtimeTranslationSourceKeys];
+}
+
 export interface I18nState {
   lang: Lang;
   translationBundleRevision: number;
