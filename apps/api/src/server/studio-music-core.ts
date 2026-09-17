@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { buildMusicPrompt, isMp3, MUSIC_MAX_BYTES, parseMusicBrief } from "../../../../packages/core/src/studio-music";
+import { buildMusicCompositionPlan, buildMusicPrompt, isMp3, MUSIC_MAX_BYTES, parseMusicBrief } from "../../../../packages/core/src/studio-music";
 
 import type { MusicBrief, MusicStatus } from "../../../../packages/core/src/studio-music";
 
@@ -106,9 +106,12 @@ export async function composeMusic(
   await admit(env, userId, idempotencyKey.toLowerCase(), brief, transport, signal);
   try {
     signal.throwIfAborted();
+    const providerBody = brief.vocals
+      ? { composition_plan: buildMusicCompositionPlan(brief), model_id: "music_v2_5", store_for_inpainting: false }
+      : { prompt: buildMusicPrompt(brief), music_length_ms: brief.seconds * 1000, model_id: "music_v2_5", force_instrumental: true, store_for_inpainting: false };
     const response = await transport("https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128", {
       method: "POST", headers: { "xi-api-key": env.ELEVENLABS_API_KEY!, "Content-Type": "application/json", Accept: "audio/mpeg" },
-      body: JSON.stringify({ prompt: buildMusicPrompt(brief), music_length_ms: brief.seconds * 1000, model_id: "music_v2_5", force_instrumental: !brief.vocals, store_for_inpainting: false }),
+      body: JSON.stringify(providerBody),
       signal, redirect: "error",
     });
     if (!response.ok) {

@@ -1,23 +1,41 @@
 {
   "tracks": [
     {
+      "id": "reference-anime-opening",
       "src": "/audio/toonspectrum-anime-vocal-opening.mp3",
-      "title": "별빛 페이지 · Vocal Opening",
+      "title": "Anime Opening Reference",
       "artist": "PuyoPuyoMegaFan1234",
+      "role": "opening",
+      "origin": "licensed-reference",
+      "vocalMode": "unknown",
+      "language": "unknown",
+      "summary": "애니 오프닝의 속도감과 전개를 확인하기 위한 임시 레퍼런스 음원",
       "license": "Pixabay Content License",
       "creditUrl": "https://pixabay.com/music/upbeat-anime-239882/"
     },
     {
+      "id": "reference-youth-vocal",
       "src": "/audio/boom-goes-my-heart-kpop.mp3",
-      "title": "Boom! Goes My Heart (Kpop Version)",
+      "title": "Youth Vocal Reference",
       "artist": "Sekuora",
+      "role": "action",
+      "origin": "licensed-reference",
+      "vocalMode": "vocal",
+      "language": "unknown",
+      "summary": "빠른 전개와 보컬 존재감을 비교하기 위한 임시 레퍼런스 음원",
       "license": "Pixabay Content License",
       "creditUrl": "https://pixabay.com/music/pop-boom-goes-my-heart-kpop-version-242507/"
     },
     {
+      "id": "reference-romance-vocal",
       "src": "/audio/seollenayo.mp3",
-      "title": "설레나요",
+      "title": "Romance Vocal Reference",
       "artist": "옴택",
+      "role": "romance",
+      "origin": "licensed-reference",
+      "vocalMode": "vocal",
+      "language": "ko",
+      "summary": "로맨스 장면의 보컬 밀도와 감정선을 비교하기 위한 임시 레퍼런스 음원",
       "license": "Pixabay Content License",
       "creditUrl": "https://pixabay.com/music/pop-설레나요-227248/"
     }

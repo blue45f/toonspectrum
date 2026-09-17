@@ -6,6 +6,7 @@ import {
   parseSiteBgmManifest,
   readSiteBgmPreferences,
   resolveSiteBgmExperience,
+  resolveSiteOstTrackIndex,
   writeSiteBgmExpanded,
   writeSiteBgmFollowRoute,
   writeSiteBgmSource,
@@ -63,55 +64,61 @@ describe("site background music policy", () => {
     expect(experience.suspensionReason.length).toBeGreaterThan(10);
   });
 
+  it("prefers a same-role original OST over licensed references", () => {
+    const experience = resolveSiteBgmExperience("/");
+    const tracks = [
+      { id: "ref-opening", src: "/audio/ref.mp3", title: "Reference", artist: "Artist", role: "opening" as const, origin: "licensed-reference" as const, vocalMode: "vocal" as const, language: "ko", summary: "ref", license: "license", creditUrl: "https://example.com/ref" },
+      { id: "original-ending", src: "/audio/end.mp3", title: "Ending", artist: "ToonSpectrum", role: "ending" as const, origin: "original" as const, vocalMode: "vocal" as const, language: "ko", summary: "ending", license: "original", creditUrl: "https://example.com/end" },
+      { id: "original-opening", src: "/audio/open.mp3", title: "Opening", artist: "ToonSpectrum", role: "opening" as const, origin: "original" as const, vocalMode: "vocal" as const, language: "ko", summary: "opening", license: "original", creditUrl: "https://example.com/open" },
+    ];
+    expect(resolveSiteOstTrackIndex(tracks, experience)).toBe(2);
+  });
+
   it("persists source, automatic page following and panel state", () => {
     expect(readSiteBgmPreferences()).toEqual({
-      source: "page-theme",
+      source: "original-ost",
       followRoute: true,
       expanded: false,
     });
-    writeSiteBgmSource("vocal-ost");
+    writeSiteBgmSource("focus-instrumental");
     writeSiteBgmFollowRoute(false);
     writeSiteBgmExpanded(true);
     expect(readSiteBgmPreferences()).toEqual({
-      source: "vocal-ost",
+      source: "focus-instrumental",
       followRoute: false,
       expanded: true,
     });
+    localStorage.setItem("ts_site_bgm_source", "page-theme");
+    expect(readSiteBgmPreferences().source).toBe("focus-instrumental");
+    localStorage.setItem("ts_site_bgm_source", "vocal-ost");
+    expect(readSiteBgmPreferences().source).toBe("original-ost");
   });
 
   it("accepts only bounded same-origin audio entries with explicit provenance", () => {
     const tracks = parseSiteBgmManifest({
       tracks: [
         {
-          src: "/audio/theme.mp3",
-          title: "Theme",
-          artist: "Artist",
-          license: "Approved license",
-          creditUrl: "https://example.com/credit",
+          id: "theme-original", src: "/audio/theme.mp3", title: "Theme", artist: "ToonSpectrum",
+          role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
+          summary: "오리지널 오프닝", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
         },
         {
-          src: "https://untrusted.example/theme.mp3",
-          title: "External",
-          artist: "Artist",
-          license: "Unknown",
-          creditUrl: "https://example.com/credit",
+          id: "external", src: "https://untrusted.example/theme.mp3", title: "External", artist: "Artist",
+          role: "opening", origin: "licensed-reference", vocalMode: "vocal", language: "en",
+          summary: "External", license: "Unknown", creditUrl: "https://example.com/credit",
         },
         {
-          src: "/audio/missing-credit.mp3",
-          title: "No credit",
-          artist: "Artist",
-          license: "License",
-          creditUrl: "javascript:alert(1)",
+          id: "bad-credit", src: "/audio/missing-credit.mp3", title: "No credit", artist: "Artist",
+          role: "romance", origin: "licensed-reference", vocalMode: "vocal", language: "ko",
+          summary: "Bad credit", license: "License", creditUrl: "javascript:alert(1)",
         },
       ],
     });
     expect(tracks).toEqual([
       {
-        src: "/audio/theme.mp3",
-        title: "Theme",
-        artist: "Artist",
-        license: "Approved license",
-        creditUrl: "https://example.com/credit",
+        id: "theme-original", src: "/audio/theme.mp3", title: "Theme", artist: "ToonSpectrum",
+        role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
+        summary: "오리지널 오프닝", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
       },
     ]);
   });
