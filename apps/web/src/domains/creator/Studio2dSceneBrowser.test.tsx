@@ -85,6 +85,31 @@ describe("2D scene browser", () => {
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect(document.querySelectorAll("[data-studio-2d-asset]").length).toBeGreaterThan(0);
   });
+  it("teaches loading, error, and empty states with visual context", () => {
+    const props = {
+      groups, query: "", onQueryChange: vi.fn(), genre: "all", onGenreChange: vi.fn(), disabled: false, onPick: vi.fn(),
+    };
+    const { rerender } = render(<Studio2dSceneBrowser {...props} loading error={null} />);
+    expect(document.querySelector('[data-studio-surface-state="loading"] img')?.getAttribute("src")).toBe(
+      "/brand/theme-scenes/starlight-studio.svg",
+    );
+
+    rerender(<Studio2dSceneBrowser {...props} loading={false} error="네트워크 연결을 확인해 주세요." />);
+    expect(screen.getByRole("alert").textContent).toContain("배경 목록을 불러오지 못했어요");
+    expect(document.querySelector('[data-studio-surface-state="error"] img')?.getAttribute("src")).toBe(
+      "/brand/theme-scenes/graphite-studio.svg",
+    );
+
+    rerender(<Studio2dSceneBrowser {...props} groups={[]} loading={false} error={null} />);
+    expect(screen.getByText("조건에 맞는 배경이 없습니다.")).toBeTruthy();
+    expect(document.querySelector('[data-studio-surface-state="empty"] img')?.getAttribute("src")).toBe(
+      "/brand/theme-scenes/ink-studio.svg",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "모든 장면 보기" }));
+    expect(props.onQueryChange).toHaveBeenCalledWith("");
+    expect(props.onGenreChange).toHaveBeenCalledWith("all");
+  });
+
   it("blocks insertion until browser image decoding succeeds and passes the exact original scene", () => {
     const onPick = vi.fn(); render(<Harness onPick={onPick} />);
     const insert = screen.getByRole("button", { name: `${title} 삽입` });
