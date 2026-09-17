@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "cli": "pnpm run build && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
