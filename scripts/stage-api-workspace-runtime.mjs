@@ -1,5 +1,5 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
@@ -10,6 +10,12 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       ".": "./index.js",
       "./production": "./production/index.js",
     },
+    subpathEntries: [
+      {
+        target: "production/index.js",
+        compiledEntry: "packages/core/src/production/index.js",
+      },
+    ],
   },
   {
     name: "@toonspectrum/studio-project-model",
@@ -48,6 +54,20 @@ export async function stageApiWorkspaceRuntime(
       `"use strict";\nmodule.exports = require(${JSON.stringify(shimTarget)});\n`,
       "utf8",
     );
+    for (const subpath of definition.subpathEntries ?? []) {
+      const compiledSubpathEntry = resolve(root, subpath.compiledEntry);
+      await access(compiledSubpathEntry);
+      const target = resolve(targetDirectory, subpath.target);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(
+        target,
+        `"use strict";\nmodule.exports = require(${JSON.stringify(
+          requirePath(dirname(target), compiledSubpathEntry),
+        )});\n`,
+        "utf8",
+      );
+    }
+
     await writeFile(
       resolve(targetDirectory, "package.json"),
       `${JSON.stringify({

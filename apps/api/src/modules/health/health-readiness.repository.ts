@@ -73,6 +73,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_promotion_comment_like",
   "creator_promotion_post",
   "creator_promotion_report",
+  "creator_role_workspace_preference",
   "creator_series",
   "creator_studio_personal_kit",
   "creator_work",
@@ -163,6 +164,9 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "studio_revision_parent",
   "subscription",
   "toonspectrum_schema_migration",
+  "traffic_page_view",
+  "traffic_session",
+  "traffic_share_event",
   "user",
   "verificationToken",
 ] as const;
@@ -187,6 +191,8 @@ export const REQUIRED_DATABASE_MIGRATIONS = [
   "0051_personal_cloud_connections",
   "0059_member_messaging",
   "0065_creator_series_lifecycle",
+  "0066_share_analytics_events",
+  "0067_creator_role_workspace_personalization",
 ] as const;
 
 interface DatabasePingRow {
