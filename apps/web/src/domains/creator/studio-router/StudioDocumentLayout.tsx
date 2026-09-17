@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import {
@@ -9,8 +9,6 @@ import {
 } from "../live/studio-live-jam-session";
 import { StudioDocumentWorkspaceDock } from "../studio-shell/StudioDocumentWorkspaceDock";
 import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
-import { StudioShellFloatingLayoutProvider } from "../studio-shell/StudioShellFloatingLayoutProvider";
-import { StudioShellFloatingLayoutManager } from "../studio-shell/StudioShellFloatingLayoutManager";
 import { startStudioConnectivityRuntime } from "../offline/studio-connectivity";
 
 import {
@@ -21,8 +19,16 @@ import { useStudioDocumentRuntime } from "./studio-document-runtime-context";
 import { useStudioLocalDraftOwner } from "./useStudioLocalDraftOwner";
 
 import { useSession } from "@/compat/auth-session-store";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import type { StudioWorkspaceRoute } from "../studio-workspace-route";
+
+const StudioShellFloatingLayoutHost = lazyRetry(
+  () => import("../studio-shell/StudioShellFloatingLayoutHost").then((module) => ({
+    default: module.StudioShellFloatingLayoutHost,
+  })),
+  "StudioShellFloatingLayoutHost",
+);
 
 interface StudioDocumentLayoutProps {
   readonly children: ReactNode;
@@ -109,12 +115,12 @@ export function StudioDocumentLayout({
 
   return (
     <StudioDocumentLayoutContext value={runtime}>
-      <StudioShellFloatingLayoutProvider>
-        <StudioDocumentWorkspaceSwitcher />
-        <StudioDocumentWorkspaceDock />
-        {children}
-        <StudioShellFloatingLayoutManager />
-      </StudioShellFloatingLayoutProvider>
+      <StudioDocumentWorkspaceSwitcher />
+      <StudioDocumentWorkspaceDock />
+      {children}
+      <Suspense fallback={null}>
+        <StudioShellFloatingLayoutHost />
+      </Suspense>
     </StudioDocumentLayoutContext>
   );
 }

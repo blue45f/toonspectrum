@@ -31,7 +31,6 @@ import {
   subscribeStudioWorkspaceArranging,
 } from "../studio-workspace-arrangement";
 import { useStudioShellFloatingLayout } from "./studio-shell-floating-layout-context";
-import { STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT } from "./studio-shell-floating-layout-events";
 import { StudioShellFloatingTarget } from "./StudioShellFloatingTarget";
 import {
   STUDIO_SHELL_FLOATING_SURFACES,
@@ -42,6 +41,9 @@ import {
 } from "./studio-shell-floating-layout";
 
 import { cn } from "@/shared/lib/utils";
+
+const STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT =
+  "toonspectrum:studio-shell-floating-layout-open";
 
 const PRESETS: readonly {
   readonly id: StudioShellFloatingPresetId;

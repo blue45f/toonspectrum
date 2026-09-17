@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
-import { buildStudioViewSurfaceMenuItems } from "./studio-main-menu-items-authoring";
-import { STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT } from "./studio-shell/studio-shell-floating-layout-events";
+import {
+  STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT,
+  buildStudioViewSurfaceMenuItems,
+} from "./studio-main-menu-items-authoring";
 import {
   getStudioViewInspectionSnapshot,
   resetStudioViewInspectionStateForTests,

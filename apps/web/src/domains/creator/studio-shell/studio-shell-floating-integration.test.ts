@@ -35,14 +35,15 @@ describe("studio shell floating integration", () => {
       .toContain('data-studio-shell-force-visible={arranging ? "true" : undefined}');
   });
 
-  it("mounts the durable manager inside the document lifetime boundary", () => {
+  it("lazy-loads the durable manager inside the document lifetime boundary", () => {
     const layout = source("studio-router/StudioDocumentLayout.tsx");
-    expect(layout).toContain("<StudioShellFloatingLayoutProvider>");
-    expect(layout).toContain("<StudioShellFloatingLayoutManager />");
-    expect(layout.indexOf("<StudioShellFloatingLayoutProvider>"))
-      .toBeLessThan(layout.indexOf("{children}"));
+    const host = source("studio-shell/StudioShellFloatingLayoutHost.tsx");
+    expect(layout).toContain('import("../studio-shell/StudioShellFloatingLayoutHost")');
+    expect(layout).toContain("<StudioShellFloatingLayoutHost />");
     expect(layout.indexOf("{children}"))
-      .toBeLessThan(layout.indexOf("<StudioShellFloatingLayoutManager />"));
+      .toBeLessThan(layout.indexOf("<StudioShellFloatingLayoutHost />"));
+    expect(host).toContain("<StudioShellFloatingLayoutProvider>");
+    expect(host).toContain("<StudioShellFloatingLayoutManager />");
   });
 
   it("keeps WYSIWYG movement keyboard-accessible, lockable and below modal chrome", () => {
@@ -55,6 +56,10 @@ describe("studio shell floating integration", () => {
     expect(target).not.toContain('node.style.removeProperty("width")');
     expect(target).toContain('node.style.setProperty("translate", "none")');
     expect(target).toContain('"translate",');
+    expect(target).toContain('typeof ResizeObserver === "undefined"');
+
+    const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
+    expect(provider).not.toContain("navigator.storage");
 
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');

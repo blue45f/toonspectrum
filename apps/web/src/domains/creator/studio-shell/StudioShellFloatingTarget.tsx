@@ -313,6 +313,7 @@ export function StudioShellFloatingTarget({
       setScreenRect(rect.width > 0 && rect.height > 0 ? rect : null);
     };
     update();
+    if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();

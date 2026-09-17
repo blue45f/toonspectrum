@@ -43,11 +43,9 @@ const StudioCrossOriginIsolationGate = lazyRetry(
 );
 
 /** Render the registered application routes inside their loading and error boundaries. */
-function AppRouteTree({ pathname, search, title }: {
-  readonly pathname: string;
-  readonly search: string;
-  readonly title: string;
-}) {
+function AppRouteTree({
+  pathname, search, title,
+}: Readonly<{ pathname: string; search: string; title: string }>) {
   return (
     <RouteStage pathname={pathname} search={search} accessibleTitle={title}>
       <ErrorBoundary resetKey={`${pathname}${search}`}>
@@ -81,9 +79,7 @@ export function AppRouter() {
       <AppRouteTree pathname={pathname} search={search} title={routeTitle} />
     </SiteRouteExperienceBoundary>
   );
-  const needsIsolationGate =
-    currentIsStudioEditor
-    || documentWasStudioEditor
+  const needsIsolationGate = currentIsStudioEditor || documentWasStudioEditor
     || globalThis.crossOriginIsolated === true;
 
   if (!needsIsolationGate) return routeTree;
