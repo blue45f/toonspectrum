@@ -311,6 +311,207 @@ const ProductionTaskSchema = z.object({
   sourceAgreementMilestoneId: IdentitySchema.nullable(),
 }).strict();
 
+const ResourceCalendarExceptionSchema = z.object({
+  id: IdentitySchema,
+  type: z.enum(["time-off", "holiday", "overtime", "capacity-override"]),
+  startsAt: IsoDateTimeSchema,
+  endsAt: IsoDateTimeSchema,
+  availableHours: z.number().min(0).max(10_000),
+  reason: z.string().trim().max(1_000),
+}).strict();
+
+const ResourceCalendarSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  assignmentId: IdentitySchema,
+  timezone: z.string().trim().min(1).max(120),
+  weeklyHours: z.number().positive().max(168),
+  dailyHours: z.number().positive().max(24),
+  workingWeekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  exceptions: z.array(ResourceCalendarExceptionSchema).max(10_000),
+  revision: z.number().int().min(1).max(2_147_483_647),
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ScheduleBaselineItemSchema = z.object({
+  taskId: IdentitySchema,
+  dueAt: NullableIsoDateTimeSchema,
+  assignmentIds: z.array(IdentitySchema).max(100),
+  estimateLikelyHours: z.number().min(0).max(100_000).nullable(),
+}).strict();
+const ScheduleBaselineSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  name: z.string().trim().min(1).max(240),
+  createdByAssignmentId: IdentitySchema,
+  releaseAt: NullableIsoDateTimeSchema,
+  items: z.array(ScheduleBaselineItemSchema).max(100_000),
+  active: z.boolean(),
+  createdAt: IsoDateTimeSchema,
+}).strict();
+
+const EpisodeReleasePlanSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  episodeId: IdentitySchema,
+  platformKey: z.string().trim().min(1).max(120),
+  locale: z.string().trim().min(2).max(35),
+  timezone: z.string().trim().min(1).max(120),
+  scheduledAt: NullableIsoDateTimeSchema,
+  status: z.enum(["draft", "preflight", "ready", "scheduled", "published", "failed", "withdrawn"]),
+  title: z.string().trim().max(240),
+  description: z.string().trim().max(4_000),
+  thumbnailRevisionRef: IdentitySchema.nullable(),
+  sourceSubmissionIds: z.array(IdentitySchema).max(10_000),
+  requiredCheckKeys: z.array(z.string().trim().min(1).max(120)).max(1_000),
+  passedCheckKeys: z.array(z.string().trim().min(1).max(120)).max(1_000),
+  blockers: z.array(HumanTextSchema).max(1_000),
+  warnings: z.array(HumanTextSchema).max(1_000),
+  externalReleaseId: z.string().trim().max(240).nullable(),
+  externalUrl: z.url().max(2_000).nullable(),
+  revision: z.number().int().min(1).max(2_147_483_647),
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ExternalReviewResponseSchema = z.object({
+  id: IdentitySchema,
+  reviewerName: z.string().trim().min(1).max(120),
+  decision: z.enum(["comment", "approve", "request-changes"]),
+  note: z.string().trim().max(4_000),
+  createdAt: IsoDateTimeSchema,
+}).strict();
+
+const ExternalReviewAccessSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  scope: ProductionScopeRefSchema,
+  label: z.string().trim().min(1).max(240),
+  tokenDigest: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+  submissionIds: z.array(IdentitySchema).min(1).max(10_000),
+  permissions: z.array(z.enum(["view", "comment", "approve", "download"])).min(1).max(4),
+  watermark: z.boolean(),
+  expiresAt: IsoDateTimeSchema,
+  status: z.enum(["active", "revoked", "expired"]),
+  createdByAssignmentId: IdentitySchema,
+  createdAt: IsoDateTimeSchema,
+  lastAccessedAt: NullableIsoDateTimeSchema,
+  responses: z.array(ExternalReviewResponseSchema).max(100_000),
+}).strict();
+const ProductionAutomationConditionSchema = z.object({
+  field: z.enum([
+    "task-status",
+    "process-key",
+    "days-to-due",
+    "episode-state",
+    "load-percent",
+    "release-status",
+  ]),
+  operator: z.enum(["equals", "not-equals", "contains", "gte", "lte"]),
+  value: z.union([z.string().trim().max(240), z.number()]),
+}).strict();
+
+const ProductionAutomationActionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("notify"),
+    assignmentIds: z.array(IdentitySchema).max(100),
+    urgency: z.enum(["info", "warning", "critical"]),
+    message: HumanTextSchema,
+  }).strict(),
+  z.object({
+    type: z.literal("create-task"),
+    title: z.string().trim().min(1).max(240),
+    processKey: z.string().trim().min(1).max(120),
+    assignmentIds: z.array(IdentitySchema).max(100),
+    dueInHours: z.number().int().min(1).max(8_760),
+  }).strict(),
+  z.object({
+    type: z.literal("request-status-transition"),
+    taskStatus: z.enum(["draft", "needs-input", "ready", "in-progress", "internal-review", "external-review", "changes-requested", "conditionally-approved", "approved", "done", "blocked", "paused", "cancelled", "out-of-scope"]),
+  }).strict(),
+]);
+const ProductionAutomationRuleSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  name: z.string().trim().min(1).max(240),
+  trigger: z.enum([
+    "task-status-changed",
+    "due-soon",
+    "due-passed",
+    "capacity-exceeded",
+    "release-preflight-failed",
+    "review-opened",
+    "manual",
+  ]),
+  conditions: z.array(ProductionAutomationConditionSchema).max(100),
+  actions: z.array(ProductionAutomationActionSchema).min(1).max(100),
+  failurePolicy: z.enum(["continue", "stop", "require-review"]),
+  enabled: z.boolean(),
+  revision: z.number().int().min(1).max(2_147_483_647),
+  lastEvaluatedAt: NullableIsoDateTimeSchema,
+  createdByAssignmentId: IdentitySchema,
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ProductionNotificationPolicySchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  assignmentId: IdentitySchema,
+  channels: z.array(z.enum(["in-app", "email", "push", "webhook"])).min(1).max(4),
+  digest: z.enum(["immediate", "daily", "weekly"]),
+  quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u).nullable(),
+  quietHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u).nullable(),
+  dueSoonHours: z.number().int().min(1).max(8_760),
+  escalationHours: z.number().int().min(1).max(8_760),
+  enabled: z.boolean(),
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ProductionNotificationSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  assignmentId: IdentitySchema.nullable(),
+  type: z.enum(["assignment", "mention", "review", "due-soon", "overdue", "blocker", "release", "automation"]),
+  title: z.string().trim().min(1).max(240),
+  body: z.string().trim().max(4_000),
+  href: z.string().trim().min(1).max(2_000),
+  urgency: z.enum(["info", "warning", "critical"]),
+  sourceType: z.string().trim().min(1).max(120),
+  sourceId: IdentitySchema,
+  status: z.enum(["unread", "read", "dismissed"]),
+  createdAt: IsoDateTimeSchema,
+  readAt: NullableIsoDateTimeSchema,
+}).strict();
+
+const ProductionSavedViewSortSchema = z.object({
+  field: z.string().trim().min(1).max(120),
+  direction: z.enum(["asc", "desc"]),
+}).strict();
+const ProductionSavedViewSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  ownerAssignmentId: IdentitySchema.nullable(),
+  name: z.string().trim().min(1).max(240),
+  resource: z.enum(["tasks", "episodes", "reviews", "schedule", "portfolio"]),
+  filters: z.record(z.string().trim().min(1).max(120), z.string().trim().max(1_000)),
+  sort: z.array(ProductionSavedViewSortSchema).max(100),
+  columns: z.array(z.string().trim().min(1).max(120)).max(100),
+  density: z.enum(["comfortable", "compact"]),
+  shared: z.boolean(),
+  dashboardWidgets: z.array(z.string().trim().min(1).max(120)).max(100),
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ProductionOperationsRecordSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("resource-calendar"), value: ResourceCalendarSchema }).strict(),
+  z.object({ kind: z.literal("schedule-baseline"), value: ScheduleBaselineSchema }).strict(),
+  z.object({ kind: z.literal("release-plan"), value: EpisodeReleasePlanSchema }).strict(),
+  z.object({ kind: z.literal("external-review-access"), value: ExternalReviewAccessSchema }).strict(),
+  z.object({ kind: z.literal("automation-rule"), value: ProductionAutomationRuleSchema }).strict(),
+  z.object({ kind: z.literal("notification-policy"), value: ProductionNotificationPolicySchema }).strict(),
+  z.object({ kind: z.literal("notification"), value: ProductionNotificationSchema }).strict(),
+  z.object({ kind: z.literal("saved-view"), value: ProductionSavedViewSchema }).strict(),
+]);
+
 const ChangeRequestSchema = z.object({
   id: IdentitySchema,
   projectId: IdentitySchema,
@@ -808,12 +1009,25 @@ const UpsertSubmissionCommandSchema = z.object({ type: z.literal("upsert-submiss
 const UpsertReviewPolicyCommandSchema = z.object({ type: z.literal("upsert-review-policy"), policy: ReviewPolicySchema }).strict();
 const RecordReviewDecisionCommandSchema = z.object({ type: z.literal("record-review-decision"), policyId: IdentitySchema, decision: ReviewDecisionSchema }).strict();
 const UpsertTaskCommandSchema = z.object({ type: z.literal("upsert-task"), task: ProductionTaskSchema }).strict();
+const UpsertTaskBatchCommandSchema = z.object({
+  type: z.literal("upsert-task-batch"),
+  tasks: z.array(ProductionTaskSchema).min(1).max(10_000),
+}).strict();
 const UpsertEpisodeOperationsCommandSchema = z.object({
   type: z.literal("upsert-episode-operations"),
   episodeId: IdentitySchema,
   episode: EpisodeCollaborationSchema.optional(),
   episodePlan: EpisodePlanSchema.optional(),
   tasks: z.array(ProductionTaskSchema).max(64).default([]),
+}).strict();
+const UpsertOperationsRecordCommandSchema = z.object({
+  type: z.literal("upsert-operations-record"),
+  record: ProductionOperationsRecordSchema,
+}).strict();
+const ApplyScheduleScenarioCommandSchema = z.object({
+  type: z.literal("apply-schedule-scenario"),
+  baseline: ScheduleBaselineSchema,
+  tasks: z.array(ProductionTaskSchema).min(1).max(10_000),
 }).strict();
 const UpsertChangeRequestCommandSchema = z.object({
   type: z.literal("upsert-change-request"),
@@ -880,7 +1094,10 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertReviewPolicyCommandSchema,
   RecordReviewDecisionCommandSchema,
   UpsertTaskCommandSchema,
+  UpsertTaskBatchCommandSchema,
   UpsertEpisodeOperationsCommandSchema,
+  UpsertOperationsRecordCommandSchema,
+  ApplyScheduleScenarioCommandSchema,
   UpsertChangeRequestCommandSchema,
   PublishScopePackageCommandSchema,
   AmendScopePackageCommandSchema,
@@ -896,10 +1113,30 @@ export const ExecuteProductionCommandSchema = z.object({
   command: ProductionCommandSchema,
 }).strict();
 
+export const ProductionExternalReviewParamsSchema = z.object({
+  projectId: IdentitySchema,
+  reviewId: IdentitySchema,
+}).strict();
+
+export const ProductionExternalReviewQuerySchema = z.object({
+  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
+}).strict();
+
+export const SubmitProductionExternalReviewSchema = z.object({
+  responseId: z.string().uuid(),
+  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
+  reviewerName: z.string().trim().min(1).max(120),
+  decision: z.enum(["comment", "approve", "request-changes"]),
+  note: z.string().trim().max(4_000),
+}).strict();
+
 export class CreateProductionProjectDto extends createZodDto(CreateProductionProjectSchema) {}
 export class ProductionProjectParamsDto extends createZodDto(ProductionProjectParamsSchema) {}
 export class ProductionProjectByWorkParamsDto extends createZodDto(ProductionProjectByWorkParamsSchema) {}
 export class ExecuteProductionCommandDto extends createZodDto(ExecuteProductionCommandSchema) {}
+export class ProductionExternalReviewParamsDto extends createZodDto(ProductionExternalReviewParamsSchema) {}
+export class ProductionExternalReviewQueryDto extends createZodDto(ProductionExternalReviewQuerySchema) {}
+export class SubmitProductionExternalReviewDto extends createZodDto(SubmitProductionExternalReviewSchema) {}
 
 export type ProductionCommand = z.infer<typeof ProductionCommandSchema>;
 export type ExecuteProductionCommand = z.infer<typeof ExecuteProductionCommandSchema>;

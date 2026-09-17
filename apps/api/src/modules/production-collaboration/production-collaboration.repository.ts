@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { Injectable } from "@nestjs/common";
 
 import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
@@ -181,6 +181,56 @@ export class ProductionCollaborationRepository {
     return { aggregate: row.aggregate, access };
   }
 
+  async listProjects(actorUserId: string): Promise<readonly ProductionProjectRecord[]> {
+    const rows = await db
+      .select({
+        id: productionProjects.id,
+        workId: productionProjects.workId,
+        revision: productionProjects.revision,
+        aggregate: productionProjects.aggregate,
+        ownerUserId: creatorWorks.userId,
+        membershipRole: creatorWorkCollaborators.role,
+        membershipStatus: creatorWorkCollaborators.status,
+      })
+      .from(productionProjects)
+      .innerJoin(creatorWorks, eq(creatorWorks.id, productionProjects.workId))
+      .leftJoin(
+        creatorWorkCollaborators,
+        and(
+          eq(creatorWorkCollaborators.workId, creatorWorks.id),
+          eq(creatorWorkCollaborators.userId, actorUserId),
+        ),
+      )
+      .where(or(
+        eq(creatorWorks.userId, actorUserId),
+        eq(creatorWorkCollaborators.userId, actorUserId),
+      ));
+
+    return Object.freeze(rows.flatMap((row) => {
+      const projectRow: ProjectRow = {
+        id: row.id,
+        workId: row.workId,
+        revision: row.revision,
+        aggregate: row.aggregate,
+      };
+      assertAggregateRow(projectRow);
+      const access = accessProjection({
+        actorUserId,
+        ownerUserId: row.ownerUserId,
+        membershipRole: row.membershipRole,
+        membershipStatus: row.membershipStatus,
+      });
+      return access.view ? [{ aggregate: row.aggregate, access }] : [];
+    }));
+  }
+
+  async getPublicProject(projectId: string): Promise<ProductionProjectAggregate> {
+    const row = await loadProjectRow(db, projectId, false);
+    if (!row) throw new ProductionProjectNotFoundError("project");
+    assertAggregateRow(row);
+    return row.aggregate;
+  }
+
   async getProjectByWork(
     actorUserId: string,
     workId: string,
@@ -290,6 +340,67 @@ export class ProductionCollaborationRepository {
         requestDigest: input.requestDigest,
         resultRevision: input.aggregate.revision,
         response,
+      });
+      return response;
+    });
+  }
+
+  async mutatePublicReview(input: {
+    readonly projectId: string;
+    readonly mutate: (aggregate: ProductionProjectAggregate) => ProductionMutationResponse;
+  }): Promise<ProductionMutationResponse> {
+    return db.transaction(async (transaction) => {
+      const row = await loadProjectRow(transaction, input.projectId, true);
+      if (!row) throw new ProductionProjectNotFoundError("project");
+      assertAggregateRow(row);
+      const response = input.mutate(row.aggregate);
+      const aggregate = response.aggregate;
+      if (
+        aggregate.projectId !== row.id
+        || aggregate.workId !== row.workId
+        || aggregate.modelVersion !== 1
+      ) {
+        throw new Error("public production mutation returned an invalid aggregate identity");
+      }
+      if (aggregate.revision === row.revision) return response;
+      if (aggregate.revision !== row.revision + 1) {
+        throw new Error("public production mutation returned an invalid aggregate revision");
+      }
+      const event = aggregate.auditEvents.at(-1);
+      if (!event || event.aggregateRevision !== aggregate.revision) {
+        throw new Error("public production mutation requires a matching audit event");
+      }
+      const updated = await transaction
+        .update(productionProjects)
+        .set({
+          title: aggregate.title,
+          organizationId: aggregate.organizationId,
+          collaborationModel: aggregate.collaborationModel,
+          revision: aggregate.revision,
+          aggregate,
+          updatedAt: new Date(aggregate.updatedAt),
+        })
+        .where(and(
+          eq(productionProjects.id, row.id),
+          eq(productionProjects.revision, row.revision),
+        ))
+        .returning({ revision: productionProjects.revision });
+      if (updated[0]?.revision !== aggregate.revision) {
+        throw new ProductionProjectRevisionConflictError(row.revision);
+      }
+      await transaction.insert(productionProjectEvents).values({
+        id: event.id,
+        projectId: event.projectId,
+        aggregateRevision: event.aggregateRevision,
+        actorUserId: null,
+        actorPartyId: event.actorPartyId,
+        action: event.action,
+        targetType: event.targetType,
+        targetId: event.targetId,
+        beforeDigest: event.beforeDigest,
+        afterDigest: event.afterDigest,
+        reason: event.reason,
+        occurredAt: new Date(event.occurredAt),
       });
       return response;
     });

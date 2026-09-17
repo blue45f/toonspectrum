@@ -1134,6 +1134,225 @@ export interface ProductionDispute {
   readonly resolvedAt: string | null;
 }
 
+export type ResourceCalendarExceptionType =
+  | "time-off"
+  | "holiday"
+  | "overtime"
+  | "capacity-override";
+
+export interface ResourceCalendarException {
+  readonly id: string;
+  readonly type: ResourceCalendarExceptionType;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly availableHours: number;
+  readonly reason: string;
+}
+
+export interface ResourceCalendar {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string;
+  readonly timezone: string;
+  readonly weeklyHours: number;
+  readonly dailyHours: number;
+  readonly workingWeekdays: readonly number[];
+  readonly exceptions: readonly ResourceCalendarException[];
+  readonly revision: number;
+  readonly updatedAt: string;
+}
+
+export interface ScheduleBaselineItem {
+  readonly taskId: string;
+  readonly dueAt: string | null;
+  readonly assignmentIds: readonly string[];
+  readonly estimateLikelyHours: number | null;
+}
+
+export interface ScheduleBaseline {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly createdByAssignmentId: string;
+  readonly releaseAt: string | null;
+  readonly items: readonly ScheduleBaselineItem[];
+  readonly active: boolean;
+  readonly createdAt: string;
+}
+
+export type ReleasePlanStatus =
+  | "draft"
+  | "preflight"
+  | "ready"
+  | "scheduled"
+  | "published"
+  | "failed"
+  | "withdrawn";
+
+export interface EpisodeReleasePlan {
+  readonly id: string;
+  readonly projectId: string;
+  readonly episodeId: string;
+  readonly platformKey: string;
+  readonly locale: string;
+  readonly timezone: string;
+  readonly scheduledAt: string | null;
+  readonly status: ReleasePlanStatus;
+  readonly title: string;
+  readonly description: string;
+  readonly thumbnailRevisionRef: string | null;
+  readonly sourceSubmissionIds: readonly string[];
+  readonly requiredCheckKeys: readonly string[];
+  readonly passedCheckKeys: readonly string[];
+  readonly blockers: readonly string[];
+  readonly warnings: readonly string[];
+  readonly externalReleaseId: string | null;
+  readonly externalUrl: string | null;
+  readonly revision: number;
+  readonly updatedAt: string;
+}
+
+export type ExternalReviewPermission = "view" | "comment" | "approve" | "download";
+export type ExternalReviewDecision = "comment" | "approve" | "request-changes";
+
+export interface ExternalReviewResponse {
+  readonly id: string;
+  readonly reviewerName: string;
+  readonly decision: ExternalReviewDecision;
+  readonly note: string;
+  readonly createdAt: string;
+}
+
+export interface ExternalReviewAccess {
+  readonly id: string;
+  readonly projectId: string;
+  readonly scope: ScopeRef;
+  readonly label: string;
+  readonly tokenDigest: string;
+  readonly submissionIds: readonly string[];
+  readonly permissions: readonly ExternalReviewPermission[];
+  readonly watermark: boolean;
+  readonly expiresAt: string;
+  readonly status: "active" | "revoked" | "expired";
+  readonly createdByAssignmentId: string;
+  readonly createdAt: string;
+  readonly lastAccessedAt: string | null;
+  readonly responses: readonly ExternalReviewResponse[];
+}
+
+export type ProductionAutomationTrigger =
+  | "task-status-changed"
+  | "due-soon"
+  | "due-passed"
+  | "capacity-exceeded"
+  | "release-preflight-failed"
+  | "review-opened"
+  | "manual";
+
+export interface ProductionAutomationCondition {
+  readonly field:
+    | "task-status"
+    | "process-key"
+    | "days-to-due"
+    | "episode-state"
+    | "load-percent"
+    | "release-status";
+  readonly operator: "equals" | "not-equals" | "contains" | "gte" | "lte";
+  readonly value: string | number;
+}
+
+export type ProductionAutomationAction =
+  | {
+      readonly type: "notify";
+      readonly assignmentIds: readonly string[];
+      readonly urgency: "info" | "warning" | "critical";
+      readonly message: string;
+    }
+  | {
+      readonly type: "create-task";
+      readonly title: string;
+      readonly processKey: string;
+      readonly assignmentIds: readonly string[];
+      readonly dueInHours: number;
+    }
+  | {
+      readonly type: "request-status-transition";
+      readonly taskStatus: ProductionTaskStatus;
+    };
+
+export interface ProductionAutomationRule {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly trigger: ProductionAutomationTrigger;
+  readonly conditions: readonly ProductionAutomationCondition[];
+  readonly actions: readonly ProductionAutomationAction[];
+  readonly failurePolicy: "continue" | "stop" | "require-review";
+  readonly enabled: boolean;
+  readonly revision: number;
+  readonly lastEvaluatedAt: string | null;
+  readonly createdByAssignmentId: string;
+  readonly updatedAt: string;
+}
+
+export interface ProductionNotificationPolicy {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string;
+  readonly channels: readonly ("in-app" | "email" | "push" | "webhook")[];
+  readonly digest: "immediate" | "daily" | "weekly";
+  readonly quietHoursStart: string | null;
+  readonly quietHoursEnd: string | null;
+  readonly dueSoonHours: number;
+  readonly escalationHours: number;
+  readonly enabled: boolean;
+  readonly updatedAt: string;
+}
+
+export interface ProductionNotification {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string | null;
+  readonly type:
+    | "assignment"
+    | "mention"
+    | "review"
+    | "due-soon"
+    | "overdue"
+    | "blocker"
+    | "release"
+    | "automation";
+  readonly title: string;
+  readonly body: string;
+  readonly href: string;
+  readonly urgency: "info" | "warning" | "critical";
+  readonly sourceType: string;
+  readonly sourceId: string;
+  readonly status: "unread" | "read" | "dismissed";
+  readonly createdAt: string;
+  readonly readAt: string | null;
+}
+
+export interface ProductionSavedViewSort {
+  readonly field: string;
+  readonly direction: "asc" | "desc";
+}
+
+export interface ProductionSavedView {
+  readonly id: string;
+  readonly projectId: string;
+  readonly ownerAssignmentId: string | null;
+  readonly name: string;
+  readonly resource: "tasks" | "episodes" | "reviews" | "schedule" | "portfolio";
+  readonly filters: Readonly<Record<string, string>>;
+  readonly sort: readonly ProductionSavedViewSort[];
+  readonly columns: readonly string[];
+  readonly density: "comfortable" | "compact";
+  readonly shared: boolean;
+  readonly dashboardWidgets: readonly string[];
+  readonly updatedAt: string;
+}
+
 export interface ProductionAuditEvent {
   readonly id: string;
   readonly projectId: string;
@@ -1196,6 +1415,14 @@ export interface ProductionProjectAggregate {
   readonly invoices: readonly ProductionInvoice[];
   readonly paymentRecords: readonly PaymentRecord[];
   readonly disputes: readonly ProductionDispute[];
+  readonly resourceCalendars?: readonly ResourceCalendar[];
+  readonly scheduleBaselines?: readonly ScheduleBaseline[];
+  readonly releasePlans?: readonly EpisodeReleasePlan[];
+  readonly externalReviewAccesses?: readonly ExternalReviewAccess[];
+  readonly automationRules?: readonly ProductionAutomationRule[];
+  readonly notificationPolicies?: readonly ProductionNotificationPolicy[];
+  readonly notifications?: readonly ProductionNotification[];
+  readonly savedViews?: readonly ProductionSavedView[];
   readonly auditEvents: readonly ProductionAuditEvent[];
   readonly createdAt: string;
   readonly updatedAt: string;
