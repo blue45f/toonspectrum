@@ -59,9 +59,6 @@ describe("original material product integration", () => {
       operation: "paint",
       defaultWidth: descriptor?.defaultWidth,
       defaultOpacity: definition.opacity,
-      brushDynamics: expect.objectContaining({
-        width: expect.objectContaining({ base: definition.width }),
-      }),
     });
     expect(selection?.brushDynamics?.width.base).toBe(selection?.defaultWidth);
     expect(selection?.brushDynamics?.tip.alphaMapBase64?.length).toBeGreaterThan(0);

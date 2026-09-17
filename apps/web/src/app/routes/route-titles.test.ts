@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { PRODUCT_IDENTITY } from "@/shared/lib/product-identity";
+
 import { resolveRouteTitle } from "./route-titles";
 
 const translate = ((key: string) => key) as unknown as Parameters<typeof resolveRouteTitle>[1];
