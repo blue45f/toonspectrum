@@ -132,6 +132,12 @@ export const BusinessPage = lazyRetry(
   })),
   "BusinessPage",
 );
+export const SupportUsPage = lazyRetry(
+  () => import("@/domains/legal/SupportUsPage").then((module) => ({
+    default: module.SupportUsPage,
+  })),
+  "SupportUsPage",
+);
 export const SupportPage = lazyRetry(
   () => import("@/domains/legal/SupportPage").then((module) => ({
     default: module.SupportPage,
