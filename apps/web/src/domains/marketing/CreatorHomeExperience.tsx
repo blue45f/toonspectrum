@@ -1,6 +1,8 @@
 import {
+  Accessibility,
   ArrowRight,
   BookOpen,
+  Bot,
   Boxes,
   Brush,
   Check,
@@ -10,6 +12,7 @@ import {
   Handshake,
   PackageCheck,
   PanelsTopLeft,
+  ShieldCheck,
   Sparkles,
   Users,
   Workflow,
@@ -97,6 +100,7 @@ const COPY = {
     previewBadge: "기능 설명용 제품 콘셉트 화면",
     jumpStart: "바로 시작",
     jumpFlow: "전체 제작 흐름",
+    jumpPrinciples: "제품 원칙",
     jumpSupport: "소재·협업·도움",
     toolkitEyebrow: "하려는 일에서 시작",
     toolkitTitle: "기능 이름을 몰라도,\n바로 만들 수 있습니다.",
@@ -123,6 +127,16 @@ const COPY = {
       { icon: ClipboardCheck, title: "검토·승인", body: "고정된 검수본에 의견을 남기고 수정본과 승인본을 정확히 구분합니다.", href: "/production/projects/sample-project/review", action: "검토 화면 보기" },
       { icon: FileOutput, title: "연재·배포", body: "규격과 권리를 검사하고 모바일 미리보기와 게시본을 준비합니다.", href: "/studio/publish", action: "연재 준비" },
     ] satisfies FlowStep[],
+    principlesEyebrow: "창작자를 중심에 둔 제품 원칙",
+    principlesTitle: "연결하되 가두지 않고,\n도와주되 대신하지 않습니다.",
+    principlesBody: "툰스튜디오는 작품 완성과 창작자의 통제권을 함께 지키는 방향으로 기능을 설계합니다. 중요한 저장·공개·AI·권리 선택은 사용자가 이해하고 결정할 수 있어야 합니다.",
+    principlesAction: "12가지 제품 원칙 보기",
+    principlesItems: [
+      { icon: ShieldCheck, title: "작품과 결정권은 창작자에게", body: "게시·공유·외부 연결은 선택이며 원고와 프로젝트의 통제권을 우선합니다." },
+      { icon: Bot, title: "AI는 보조 도구로", body: "아이디어와 반복 작업을 돕되 결과 적용과 최종 판단은 창작자가 결정합니다." },
+      { icon: FileOutput, title: "가져오고 내보낼 수 있게", body: "이미지·PSD·로컬 저장과 백업을 확장해 서비스 안에 결과물을 가두지 않습니다." },
+      { icon: Accessibility, title: "누구나 핵심 작업을 완료하도록", body: "키보드, 스크린 리더, 고대비, 모션 감소와 작은 화면을 기본 품질로 봅니다." },
+    ],
     supportEyebrow: "필요한 모든 재료와 사람",
     supportTitle: "작품 밖으로 나가지 않고,\n찾고 배우고 함께 만드세요.",
     support: [
@@ -146,6 +160,7 @@ const COPY = {
     previewBadge: "Product concept screen for explaining features",
     jumpStart: "Start here",
     jumpFlow: "Full workflow",
+    jumpPrinciples: "Product principles",
     jumpSupport: "Assets, people and help",
     toolkitEyebrow: "Start from your task",
     toolkitTitle: "Create right away,\neven before you know every feature name.",
@@ -172,6 +187,16 @@ const COPY = {
       { icon: ClipboardCheck, title: "Review and approve", body: "Comment on a fixed review version and keep revisions, approvals and releases distinct.", href: "/production/projects/sample-project/review", action: "See review" },
       { icon: FileOutput, title: "Publish and deliver", body: "Check format and rights, preview mobile reading and prepare a release.", href: "/studio/publish", action: "Prepare to publish" },
     ] satisfies FlowStep[],
+    principlesEyebrow: "Creator-first product principles",
+    principlesTitle: "Connected without lock-in,\nassisted without replacement.",
+    principlesBody: "ToonStudio is designed to help creators finish work while retaining control. Important choices about storage, publishing, AI and rights should remain understandable and user-controlled.",
+    principlesAction: "See all 12 product principles",
+    principlesItems: [
+      { icon: ShieldCheck, title: "The creator controls the work", body: "Publishing, sharing and external connections remain choices, with control of artwork and projects prioritised." },
+      { icon: Bot, title: "AI remains an assistant", body: "AI can help with ideas and repetitive work, while the creator decides what is applied and what is final." },
+      { icon: FileOutput, title: "Import, export and keep a copy", body: "Image, PSD, local storage and backup paths expand so results are not locked inside one service." },
+      { icon: Accessibility, title: "Core work should remain reachable", body: "Keyboard use, screen readers, high contrast, reduced motion and small screens are baseline quality." },
+    ],
     supportEyebrow: "Every asset, person and answer you need",
     supportTitle: "Find, learn and collaborate\nwithout leaving the work.",
     support: [
@@ -233,6 +258,7 @@ export function CreatorHomeExperience() {
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
           <a href="#creator-start">{copy.jumpStart}</a>
           <a href="#creator-flow">{copy.jumpFlow}</a>
+          <a href="#creator-principles">{copy.jumpPrinciples}</a>
           <a href="#creator-support">{copy.jumpSupport}</a>
         </nav>
       </div>
@@ -291,6 +317,24 @@ export function CreatorHomeExperience() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section id="creator-principles" className="cf-principles cf-shell" aria-labelledby="creator-principles-title">
+        <div className="cf-section-heading">
+          <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.principlesEyebrow}</p><h2 id="creator-principles-title" tabIndex={-1}>{copy.principlesTitle}</h2></div>
+          <div className="cf-principles-intro">
+            <p>{copy.principlesBody}</p>
+            <Link href="/about/principles">{copy.principlesAction}<ArrowRight size={15} aria-hidden="true" /></Link>
+          </div>
+        </div>
+        <div className="cf-principles-grid">
+          {copy.principlesItems.map(({ icon: Icon, title, body }, index) => (
+            <article key={title}>
+              <div><span>{String(index + 1).padStart(2, "0")}</span><Icon size={20} aria-hidden="true" /></div>
+              <h3>{title}</h3><p>{body}</p>
+            </article>
+          ))}
         </div>
       </section>
 

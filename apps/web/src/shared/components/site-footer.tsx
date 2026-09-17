@@ -192,6 +192,9 @@ export function SiteFooter() {
         <div className="mx-auto max-w-[1320px] px-4 py-6 text-[0.7rem] text-fg-3 sm:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <Link href="/about/principles" className="font-semibold text-fg-2 transition-colors hover:text-accent">
+                {locale === "ko" ? "제품 원칙" : "Product principles"}
+              </Link>
               {META_LINKS.map((link) => (
                 <Link key={link.href} href={link.href} className="transition-colors hover:text-fg">
                   {navigationLabel(link.key)}

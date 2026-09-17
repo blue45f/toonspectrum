@@ -19,6 +19,12 @@ const TechnologyPage = lazyRetry(
   })),
   "TechnologyPage",
 );
+const ProductPrinciplesPage = lazyRetry(
+  () => import("@/domains/legal/ProductPrinciplesPage").then((module) => ({
+    default: module.ProductPrinciplesPage,
+  })),
+  "ProductPrinciplesPage",
+);
 const HelpCenterPage = lazyRetry(
   () => import("@/domains/legal/HelpCenterPage").then((module) => ({
     default: module.HelpCenterPage,
@@ -103,6 +109,11 @@ export const legalRoutes = defineAppRoutes([
     id: "legal-about-technology",
     path: "/about/technology",
     element: <TechnologyPage />,
+  },
+  {
+    id: "legal-about-principles",
+    path: "/about/principles",
+    element: <ProductPrinciplesPage />,
   },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-accessibility", path: "/accessibility", element: <AccessibilityPage /> },

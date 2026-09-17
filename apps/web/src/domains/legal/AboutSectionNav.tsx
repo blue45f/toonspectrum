@@ -1,4 +1,4 @@
-import { Layers, Sparkles, Wrench } from "lucide-react";
+import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
 import Link from "@/compat/router-link";
 import { usePathname } from "@/compat/navigation";
@@ -42,13 +42,25 @@ const ABOUT_ITEMS = [
       description: "Technology behind the browser studio",
     },
   },
+  {
+    href: "/about/principles",
+    icon: Scale,
+    ko: {
+      label: "제품 원칙",
+      description: "창작 흐름·권리·AI·접근성 기준",
+    },
+    en: {
+      label: "Product principles",
+      description: "Creative flow, rights, AI and accessibility",
+    },
+  },
 ] as const;
 
 interface AboutSectionNavProps {
   readonly className?: string;
 }
 
-/** Keep the service, workflow and technology introductions discoverable as one product story. */
+/** Keep service, workflow, technology and product principles discoverable as one product story. */
 export function AboutSectionNav({ className }: AboutSectionNavProps) {
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
@@ -62,7 +74,7 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
         className,
       )}
     >
-      <div className="grid gap-1 md:grid-cols-3">
+      <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
         {ABOUT_ITEMS.map((item) => {
           const Icon = item.icon;
           const copy = item[locale];
