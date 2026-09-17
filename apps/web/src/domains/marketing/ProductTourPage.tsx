@@ -21,6 +21,7 @@ import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } fr
 import { useI18n } from "@/shared/lib/i18n";
 
 import { creatorHomeLocale } from "./creator-home-content";
+import { CreatorFeatureReels } from "./CreatorFeatureReels";
 import { ProductTourPlayer } from "./ProductTourPlayer";
 import { PRODUCT_ADVANTAGES, PRODUCT_CAPABILITIES, PRODUCT_ROLES, PRODUCT_TOUR, PRODUCT_TOUR_COPY } from "./product-tour-content";
 
@@ -102,6 +103,15 @@ export function ProductTourPage() {
       </header>
 
       <ProductTourPlayer locale={locale} />
+
+      <section className="product-tour-page__interactive" aria-labelledby="product-tour-interactive-title">
+        <div className="product-tour-page__interactive-heading">
+          <p className="ch-eyebrow">{locale === "ko" ? "INTERACTIVE QUICK LOOK" : "INTERACTIVE QUICK LOOK"}</p>
+          <h2 id="product-tour-interactive-title">{locale === "ko" ? "영상에서 본 기능을, 직접 골라 비교해보세요." : "Pick and compare the capabilities you just saw."}</h2>
+          <p>{locale === "ko" ? "긴 영상은 전체 흐름을 설명하고, 이 인터랙티브 워크스루는 2D·3D·소재·저장·협업·게시의 핵심 결과를 즉시 비교할 수 있게 합니다." : "The long film explains the full journey; this interactive walkthrough lets you compare the outcomes of 2D, 3D, assets, continuity, collaboration and publishing immediately."}</p>
+        </div>
+        <CreatorFeatureReels showFilm={false} embedded />
+      </section>
 
       <section className="product-tour-page__journey" aria-labelledby="product-tour-journey-title">
         <header>
