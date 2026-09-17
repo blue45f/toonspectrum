@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10182d">
+  <meta name="application-name" content="툰스튜디오 드로잉">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="툰드로잉">
+  <title>ToonStudio Draw 설치</title>
+  <link rel="manifest" href="/draw-app/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/brand/spectrum-ribbon-v2/apple-touch-icon.png">
+  <link rel="stylesheet" href="/draw-app/install.css">
+</head>
+<body>
+  <main class="install-shell">
+    <a class="install-brand" href="/studio">TOON<span>STUDIO</span></a>
+    <section class="install-card" aria-labelledby="draw-app-title">
+      <p class="install-eyebrow">TOONSTUDIO DRAW</p>
+      <h1 id="draw-app-title">같은 엔진,<br>더 드로잉답게.</h1>
+      <p class="install-lead">
+        별도의 간이 편집기가 아닙니다. 서비스 안에서 쓰는 동일한 Studio 문서·브러시·레이어·저장 엔진을
+        캔버스 중심 UI로 실행합니다. 설치해 앱처럼 열어도, 사이트 안에서 순수 드로잉으로 전환해도
+        기능과 작업 데이터는 그대로 이어집니다.
+      </p>
+      <ul class="install-features">
+        <li><strong>전문 브러시 엔진</strong><br>필압·기울기·안정화·브러시 라이브러리·즐겨찾기/최근 브러시</li>
+        <li><strong>레이어·선택·변형</strong><br>레이어, 마스크, 블렌딩, 선택·변형·퀵마스크와 편집 도구</li>
+        <li><strong>프로 작업 흐름</strong><br>PSD/프로젝트 입출력, 히스토리, 자동 저장, 백업과 복구</li>
+        <li><strong>캔버스 우선 UX</strong><br>퀵 액세스, 컬러 휠, 플로팅 팔레트, 캔버스만 보기와 멀티터치 제스처</li>
+      </ul>
+      <p class="install-note">
+        순수 드로잉은 제품 분기가 아니라 UI 프레젠테이션입니다. 언제든 “전체 스튜디오”로 돌아가도
+        같은 문서가 열리고, 다시 드로잉 프레젠테이션으로 전환해도 별도 변환이나 복사가 필요 없습니다.
+      </p>
+      <button id="install-app" type="button">드로잉 앱 설치 준비 중…</button>
+      <p id="install-status" role="status" aria-live="polite">브라우저 설치 가능 여부를 확인하고 있습니다.</p>
+      <div class="install-links">
+        <a href="/studio?drawingShell=app&uiMode=focus&startTool=draw">설치 없이 드로잉 UI 열기</a>
+        <a href="/studio?drawingShell=integrated">전체 툰스튜디오 열기</a>
+      </div>
+    </section>
+  </main>
+  <script src="/draw-app/install.js"></script>
+</body>
+</html>
