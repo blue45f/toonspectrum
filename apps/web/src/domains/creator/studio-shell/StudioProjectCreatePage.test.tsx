@@ -7,6 +7,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { readStudioProjectDocuments } from "../studio-project-document-store";
 import { readStudioProjectLibrary } from "../studio-project-library-store";
 import { readStudioSaveProfiles } from "../save-first/studio-save-profile";
+import { readStudioWebtoonOnboardingProfile } from "@/shared/lib/webtoon-production-onboarding";
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 
 function LocationProbe() {
@@ -55,6 +56,46 @@ describe("StudioProjectCreatePage", () => {
       title: "EP01 원고",
       kind: "webtoon",
       defaultWorkspace: "comic",
+    });
+  });
+
+  it("creates a production-onboarded webtoon and opens the recommended project workspace", async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        "/studio/new?kind=webtoon&onboarding=production&start=script&goal=pitch&team=small-team&cadence=weekly",
+      ]}>
+        <StudioProjectCreatePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/실제 제작 단계에 맞춰 시작|Start from your real production stage/u)).toBeTruthy();
+    expect((screen.getByRole("combobox", { name: /현재 가지고 있는 자료|What you already have/u }) as HTMLSelectElement).value)
+      .toBe("script");
+    expect(screen.getByRole("heading", { name: /대본 잠금 트랙|Script lock track/u })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }), {
+      target: { value: "연재 준비 프로젝트" },
+    });
+    fireEvent.click(screen.getByRole("button", {
+      name: /프로젝트와 제작 계획 만들기|Create project and production plan/u,
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toMatch(
+        /^\/studio\/p\/[^/]+\/story\?view=script$/u,
+      );
+    });
+
+    const project = readStudioProjectLibrary(window.localStorage).projects[0]!;
+    expect(readStudioWebtoonOnboardingProfile(window.localStorage, project.id)).toMatchObject({
+      projectId: project.id,
+      startingPoint: "script",
+      goal: "pitch",
+      teamModel: "small-team",
+      cadence: "weekly",
+      completedTaskIds: [],
+      completedAt: null,
     });
   });
 
