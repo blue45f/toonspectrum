@@ -50,6 +50,7 @@ const DOC_ROUTES = [
 const STUDIO_PUBLIC_ROUTES = [
   "/",
   "/brand-film",
+  "/product-tour",
   "/collaborate",
   "/learn",
   "/market",

@@ -5,6 +5,7 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/my": "내 공간",
   "/help": "도움말 센터",
   "/brand-film": "툰스튜디오 브랜드 필름",
+  "/product-tour": "툰스튜디오 전체 제품 투어",
   "/accessibility": "접근성",
   "/now": "오늘의 영감",
   "/research": "창작 리서치 데스크",

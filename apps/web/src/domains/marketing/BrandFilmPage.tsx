@@ -231,6 +231,9 @@ export function BrandFilmPage() {
           <Link href="/showcase/promo" className="ch-button ch-button--quiet">
             {copy.promo}
           </Link>
+          <Link href="/product-tour" className="ch-button ch-button--quiet">
+            {locale === "ko" ? "8분 전체 제품 투어" : "8-minute full product tour"}
+          </Link>
         </div>
       </section>
     </div>

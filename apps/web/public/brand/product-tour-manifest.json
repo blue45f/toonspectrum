@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "composition": "ToonStudioProductTour",
+  "duration": 504,
+  "fps": 30,
+  "src": "/brand/toonstudio-product-tour.mp4",
+  "poster": "/brand/toonstudio-product-tour-poster.jpg",
+  "bytes": 35347422,
+  "sha256": "2cc214c6b631f21fd10f9752b0f5fee251dfd19a2680c1fa6c4ccebb84d214db",
+  "sourceCommit": "local"
+}
