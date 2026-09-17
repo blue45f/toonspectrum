@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, readdir } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname, join, relative, sep } from "node:path";
 
 import { isReservedSyncPath, normalizeRelativeSyncPath } from "./path-policy.js";
 
@@ -45,8 +45,10 @@ export async function scanSyncFolder(
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const absolutePath = join(directory, entry.name);
+      const lexicalRelativePath = relative(root, absolutePath).split(sep).join("/");
+      if (isReservedSyncPath(lexicalRelativePath)) continue;
       const relativePath = normalizeRelativeSyncPath(root, absolutePath);
-      if (!relativePath || isReservedSyncPath(relativePath)) continue;
+      if (!relativePath) continue;
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
         await visit(absolutePath);

@@ -189,7 +189,8 @@
     "test:toonbridge": "node --test tools/toonbridge/test/*.test.mjs",
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
     "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
-    "verify:studio-reference-projects": "node scripts/verify-studio-reference-projects.mjs --run && node --test scripts/verify-studio-reference-projects.test.mjs"
+    "verify:studio-reference-projects": "node scripts/verify-studio-reference-projects.mjs --run && node --test scripts/verify-studio-reference-projects.test.mjs",
+    "desktop:sync": "pnpm --filter @toonspectrum/desktop-sync-agent run cli"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

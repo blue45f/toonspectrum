@@ -112,18 +112,20 @@
 
 이번 증분에서 완료한 범위는 다음과 같다.
 
-- Windows·macOS·Linux 호스트가 사용할 수 있는 provider-neutral 로컬 폴더 동기화 엔진을 별도 workspace로 추가했다.
+- Windows·macOS·Linux 호스트가 사용할 수 있는 provider-neutral 로컬 폴더 동기화 엔진과 실행 가능한 `toonstudio-sync` CLI를 별도 workspace로 제공한다.
+- `--dry-run`, `--once`, `--watch`, JSON 출력, 파일 크기 제한과 알려지지 않은 확장자 opt-in을 지원한다.
 - 파일을 SHA-256, 크기, 수정 시각과 정규화된 상대 경로로 스캔하고 `.toonstudio`, `.git`, `node_modules`와 루트 밖 경로를 제외한다.
-- 심볼릭 링크와 `..` 경로를 통한 작업 폴더 탈출을 차단한다.
+- 심볼릭 링크와 `..` 경로를 통한 로컬·원격 폴더 탈출을 차단하고 로컬과 원격이 같은 실제 디렉터리인 경우 시작하지 않는다.
 - 마지막 동기화 journal과 현재 로컬·원격 snapshot을 비교해 upload, download, delete-local, delete-remote, no-op, conflict 계획을 결정한다.
-- 양쪽이 동시에 바뀐 파일은 자동 덮어쓰지 않고 conflict로 중단한다.
-- upload·download는 임시 파일과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
-- 한 번에 하나의 cycle만 실행하며 중복 trigger를 병합하고 중지 가능한 polling agent를 제공한다.
+- 양쪽이 동시에 바뀐 파일은 자동 덮어쓰지 않고 conflict 종료 코드 2로 중단한다.
+- 원격 쓰기·삭제는 마지막으로 확인한 version을 compare-and-swap 조건으로 사용해 스캔 뒤 변경된 파일을 덮어쓰지 않는다.
+- upload·download는 임시 파일, digest 재검증과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
+- 로컬 삭제는 `.toonstudio/trash`로 이동하며 감시 모드는 중복 trigger를 병합하고 SIGINT·SIGTERM에서 안전하게 중지한다.
 - 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
 - 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
 - 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
 
-이 엔진은 동기화 transport의 안전한 로컬 실행 기반이다. 실제 운영 계정 연결, OS 백그라운드 서비스 설치, 대용량 재개 전송과 충돌 UI는 별도 release gate로 유지한다.
+이 증분의 완료 범위는 파일시스템·마운트 폴더 transport와 CLI다. 실제 Google Drive·Dropbox·OneDrive OAuth transport, OS 서명 설치 패키지, 네트워크 multipart 재개 전송과 충돌 GUI는 별도 release gate로 유지한다.
 
 ## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
 
