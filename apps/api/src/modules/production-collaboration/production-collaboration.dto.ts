@@ -6,6 +6,7 @@ import {
   DECISION_DOMAINS,
   PRODUCTION_ROLE_TYPES,
   PRODUCTION_SCOPE_KINDS,
+  PRODUCTION_STUDIO_DOCUMENT_ROLES,
   REVIEW_LANES,
 } from "../../../../../packages/core/src/production";
 
@@ -193,6 +194,22 @@ const ClarificationThreadSchema = z.object({
   decisionRecordId: IdentitySchema.nullable(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ProductionStudioRevisionLinkSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  workId: IdentitySchema,
+  episodeId: IdentitySchema.nullable(),
+  studioDocumentRef: z.string().trim().min(1).max(500),
+  documentRole: z.enum(PRODUCTION_STUDIO_DOCUMENT_ROLES),
+  studioRevisionRef: ProductionRevisionRefSchema,
+  deliverableId: IdentitySchema,
+  submissionId: IdentitySchema,
+  linkedByAssignmentId: IdentitySchema,
+  status: z.enum(["submitted", "approved", "superseded"]),
+  linkedAt: IsoDateTimeSchema,
+  approvedAt: NullableIsoDateTimeSchema,
 }).strict();
 
 const ReviewPolicyLaneSchema = z.object({
@@ -805,6 +822,10 @@ const UpsertBranchCommandSchema = z.object({ type: z.literal("upsert-branch"), b
 const UpsertMergeRequestCommandSchema = z.object({ type: z.literal("upsert-merge-request"), mergeRequest: CreativeMergeRequestSchema }).strict();
 const UpsertDeliverableCommandSchema = z.object({ type: z.literal("upsert-deliverable"), deliverable: DeliverableSchema }).strict();
 const UpsertSubmissionCommandSchema = z.object({ type: z.literal("upsert-submission"), submission: SubmissionSchema }).strict();
+const UpsertStudioRevisionLinkCommandSchema = z.object({
+  type: z.literal("upsert-studio-revision-link"),
+  link: ProductionStudioRevisionLinkSchema,
+}).strict();
 const UpsertReviewPolicyCommandSchema = z.object({ type: z.literal("upsert-review-policy"), policy: ReviewPolicySchema }).strict();
 const RecordReviewDecisionCommandSchema = z.object({ type: z.literal("record-review-decision"), policyId: IdentitySchema, decision: ReviewDecisionSchema }).strict();
 const UpsertTaskCommandSchema = z.object({ type: z.literal("upsert-task"), task: ProductionTaskSchema }).strict();
@@ -877,6 +898,7 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertMergeRequestCommandSchema,
   UpsertDeliverableCommandSchema,
   UpsertSubmissionCommandSchema,
+  UpsertStudioRevisionLinkCommandSchema,
   UpsertReviewPolicyCommandSchema,
   RecordReviewDecisionCommandSchema,
   UpsertTaskCommandSchema,

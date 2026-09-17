@@ -300,6 +300,106 @@ describe("ProductionCollaborationService", () => {
     expect(submissionResult.aggregate.auditEvents.at(-1)?.action).toBe("upsert-submission");
   });
 
+  it("binds an approved Studio revision to the production deliverable and episode", async () => {
+    const visualRevision = {
+      id: "studio-thumbnail-r2",
+      lineage: "visual" as const,
+      revision: 2,
+      digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      createdAt: at,
+    };
+    const ownerAssignmentId = "assignment:party-owner:producer";
+    const current: ProductionProjectAggregate = {
+      ...aggregate(),
+      episodes: [{
+        id: "episode-collaboration-12",
+        projectId: "project-1",
+        episodeId: "episode-12",
+        revision: 0,
+        state: "thumbnail-joint-review",
+        narrativeRevisionRef: null,
+        visualRevisionRef: null,
+        integratedRevisionRef: null,
+        activeHandoffId: null,
+        openBlockerCount: 0,
+        storyLockApproved: true,
+        thumbnailLockApproved: false,
+        jointProofApproved: false,
+        creditPreflightPassed: false,
+        publicationPreflightPassed: false,
+        updatedAt: at,
+      }],
+      deliverables: [{
+        id: "deliverable-thumbnail-12",
+        projectId: "project-1",
+        scope: episodeScope("project-1", "episode-12"),
+        type: "thumbnail",
+        expectedFormat: "studio-document",
+        completionCriteria: ["전체 컷 배치"],
+        currentSubmissionId: "submission-thumbnail-12-r2",
+        approvedSubmissionId: "submission-thumbnail-12-r2",
+      }],
+      submissions: [{
+        id: "submission-thumbnail-12-r2",
+        projectId: "project-1",
+        deliverableId: "deliverable-thumbnail-12",
+        revisionRef: visualRevision,
+        submittedByAssignmentId: ownerAssignmentId,
+        submittedAt: at,
+        status: "approved",
+        inputRevisionRefs: [],
+        evidenceRefs: ["approval-thumbnail-12-r2"],
+      }],
+      studioRevisionLinks: [],
+    };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "99999999-9999-4999-8999-999999999999",
+      command: {
+        type: "upsert-studio-revision-link",
+        link: {
+          id: "studio-link-thumbnail-12-r2",
+          projectId: "project-1",
+          workId: "work-1",
+          episodeId: "episode-12",
+          studioDocumentRef: "document-thumbnail-12",
+          documentRole: "thumbnail",
+          studioRevisionRef: visualRevision,
+          deliverableId: "deliverable-thumbnail-12",
+          submissionId: "submission-thumbnail-12-r2",
+          linkedByAssignmentId: ownerAssignmentId,
+          status: "approved",
+          linkedAt: at,
+          approvedAt: at,
+        },
+      },
+    });
+
+    expect(result.aggregate.studioRevisionLinks).toHaveLength(1);
+    expect(result.aggregate.episodes[0]?.visualRevisionRef).toEqual(visualRevision);
+    expect(result.derived).toMatchObject({
+      coverage: {
+        approvedRoles: ["thumbnail"],
+        pendingRoles: [],
+        missingRoles: [],
+      },
+    });
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "upsert-studio-revision-link",
+      targetType: "studio-revision-link",
+      targetId: "studio-link-thumbnail-12-r2",
+    });
+  });
+
   it("archives immutable procurement scope revisions behind an Addendum", async () => {
     const revision = {
       id: "story-r1",
