@@ -907,7 +907,7 @@ export function StudioHudPill({
       className={cn(
         // 밝은 원고 위에서도 읽히도록 프로스트 글라스(blur+saturate) 위에 얹는다 — 반투명
         // 캔버스색 단독으로는 흰 배경에서 대비가 무너졌다.
-        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-line/50 bg-panel/70 px-2 py-0.5",
+        "inline-flex min-w-max shrink-0 items-center gap-1 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] rounded-lg border border-line/50 bg-panel/70 px-2 py-0.5",
         "backdrop-blur-md backdrop-saturate-150 shadow-[0_1px_2px_oklch(0.08_0.01_70/0.35),inset_0_1px_0_oklch(0.95_0.02_85/0.06)]",
         "text-[0.65rem] font-semibold tabular-nums tracking-tight text-fg-2",
         accent && "border-accent/40 bg-accent-soft/60 text-accent",
@@ -1154,11 +1154,12 @@ export function StudioStatusBar({
       data-studio-status-bar="true"
       tabIndex={-1}
       style={style}
+      onWheel={handleStudioHorizontalWheel}
       className={cn(
-        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
-        "touch-pan-x scroll-px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex min-w-0 max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
+        "touch-pan-x scroll-px-3 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden",
         "sm:max-w-[min(100%,44rem)]",
-        "rounded-2xl px-3 py-2 text-[0.68rem] font-semibold tracking-tight text-fg-2",
+        "rounded-2xl px-2.5 py-1.5 text-[0.68rem] font-semibold tracking-tight text-fg-2",
         className
       )}
     >
