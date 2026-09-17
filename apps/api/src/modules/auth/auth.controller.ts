@@ -352,22 +352,41 @@ export class AuthController {
     const browserPkceVerifier = provider === "github"
       ? resolveOAuthPkceVerifierCookieValue(request.headers.cookie, provider)
       : null;
-    clearOAuthStateCookie(res, provider);
-    if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
 
     if (!isAuthorizationCodeFlowConfigured(provider)) {
+      clearOAuthStateCookie(res, provider);
+      if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
       return res.redirect(`${web}/auth/callback#error=oauth_unavailable`);
     }
+
+    const stateContext = readOAuthStateContext(provider, state);
     if (
       typeof state !== "string"
+      || !stateContext
       || !verifyBrowserBoundState(provider, state, browserState)
     ) {
+      const isRepeatedLoginCallback = stateContext?.purpose === "login"
+        && error === undefined
+        && typeof code === "string"
+        && code.length > 0
+        && code.length <= OAUTH_AUTHORIZATION_CODE_MAX_LENGTH;
+      const existingSession = isRepeatedLoginCallback
+        ? verifySessionToken(resolveSessionCookieValue(request.headers.cookie))
+        : null;
+      if (existingSession) {
+        this.logger.log({
+          event: "auth.oauth.duplicate_callback_recovered",
+          provider,
+        });
+        return res.redirect(`${web}/auth/callback#session=1`);
+      }
       return res.redirect(`${web}/auth/callback#error=bad_state`);
     }
-    const stateContext = readOAuthStateContext(provider, state);
-    if (!stateContext) {
-      return res.redirect(`${web}/auth/callback#error=bad_state`);
-    }
+
+    // Consume browser-bound material only after the callback proves it owns the
+    // current flow. A stale callback must not erase a newer tab's valid state.
+    clearOAuthStateCookie(res, provider);
+    if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
     let linkToUserId: string | undefined;
     if (stateContext.purpose === "link") {
       const principal = verifySessionToken(

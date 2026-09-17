@@ -5,6 +5,11 @@ import { resolveRouteTitle } from "./route-titles";
 const translate = ((key: string) => key) as unknown as Parameters<typeof resolveRouteTitle>[1];
 
 describe("route title resolution", () => {
+  it("uses the product identity registry for the all-in-one homepage title", () => {
+    expect(resolveRouteTitle("/", translate, "ko")).toContain("기획부터 연재까지");
+    expect(resolveRouteTitle("/", translate, "en")).toContain("planning to publishing");
+  });
+
   it("keeps legacy and canonical showcase URLs on the same browser title", () => {
     expect(resolveRouteTitle("/create", translate)).toBe("route.create");
     expect(resolveRouteTitle("/showcase", translate)).toBe("route.create");
