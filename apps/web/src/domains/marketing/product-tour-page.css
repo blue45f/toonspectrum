@@ -616,3 +616,20 @@
   .product-tour-page__journey-grid figure img { transition: none; }
   .product-tour-page__journey-grid article:hover figure img { transform: none; }
 }
+
+.product-tour-page__interactive {
+  width: min(100%, 1320px);
+  margin-inline: auto;
+  padding: clamp(72px, 9vw, 124px) 40px;
+}
+.product-tour-page__interactive-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .72fr);
+  gap: 18px 72px;
+  align-items: end;
+  margin-bottom: 34px;
+}
+.product-tour-page__interactive-heading .ch-eyebrow { grid-column: 1 / -1; color: #6e8d52; }
+.product-tour-page__interactive-heading > p:last-child { color: var(--ch-muted); font-size: 15px; line-height: 1.85; }
+@media (max-width: 900px) { .product-tour-page__interactive-heading { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .product-tour-page__interactive { padding: 56px 18px; } }

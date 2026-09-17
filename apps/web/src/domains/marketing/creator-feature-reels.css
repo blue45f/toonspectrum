@@ -366,3 +366,14 @@
   .creator-feature-reels__closing > a,
   .creator-feature-reels__film-copy button { color: ButtonText; background: ButtonFace; }
 }
+
+.creator-feature-reels--embedded {
+  overflow: visible;
+  background: transparent;
+}
+
+.creator-feature-reels--embedded::before { display: none; }
+.creator-feature-reels--embedded .creator-feature-reels__shell {
+  width: 100%;
+  padding: 0;
+}

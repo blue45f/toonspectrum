@@ -37,6 +37,8 @@ describe("long-form product tour contracts", () => {
     expect(pageSource).toContain('"@type": "VideoObject"');
     expect(pageSource).toContain('duration: "PT8M24S"');
     expect(pageSource).toContain("product-tour-page__journey-grid");
+    expect(pageSource).toContain("<CreatorFeatureReels showFilm={false} embedded />");
+    expect(playerSource).toContain("mounted ? (");
     expect(playerSource).toContain('preload="metadata"');
     expect(playerSource).toContain('kind="captions"');
     expect(playerSource).toContain("PRODUCT_TOUR.chapters.map");

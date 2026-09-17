@@ -1,5 +1,5 @@
 import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "@/compat/router-link";
 
@@ -18,28 +18,49 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
   const copy = PRODUCT_TOUR_COPY[locale];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeChapter, setActiveChapter] = useState(0);
-  const [started, setStarted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const requestedStartRef = useRef(0);
+  const autoplayRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const seekTo = (seconds: number, autoplay = true) => {
+  useEffect(() => {
+    if (!mounted) return;
     const video = videoRef.current;
     if (!video) return;
+    video.currentTime = requestedStartRef.current;
+    setLoading(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
+    if (autoplayRef.current) void video.play().catch(() => setLoading(false));
+    autoplayRef.current = false;
+  }, [mounted]);
+
+  const seekTo = (seconds: number, autoplay = true) => {
+    requestedStartRef.current = seconds;
+    autoplayRef.current = autoplay;
     setFailed(false);
-    setStarted(true);
+    setActiveChapter(creatorFilmChapterAt(seconds, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)));
+    if (!mounted) {
+      setMounted(true);
+      setLoading(true);
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) return;
     setLoading(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
     video.currentTime = seconds;
-    setActiveChapter(creatorFilmChapterAt(seconds, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)));
     if (autoplay) void video.play().catch(() => setLoading(false));
   };
 
   const retry = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    requestedStartRef.current = PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
+    autoplayRef.current = true;
     setFailed(false);
     setLoading(true);
+    if (!mounted) { setMounted(true); return; }
+    const video = videoRef.current;
+    if (!video) return;
     video.load();
-    video.currentTime = PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
+    video.currentTime = requestedStartRef.current;
     void video.play().catch(() => setLoading(false));
   };
 
@@ -57,28 +78,31 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
       </header>
 
       <div className="product-tour-player__screen" aria-busy={loading}>
-        <video
-          ref={videoRef}
-          src={PRODUCT_TOUR.src}
-          poster={PRODUCT_TOUR.poster}
-          controls
-          playsInline
-          preload="metadata"
-          aria-label={copy.videoTitle}
-          onPlay={() => { setStarted(true); setFailed(false); }}
-          onPlaying={() => setLoading(false)}
-          onCanPlay={() => setLoading(false)}
-          onWaiting={() => setLoading(true)}
-          onSeeked={() => setLoading(false)}
-          onError={() => { setLoading(false); setFailed(true); }}
-          onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)))}
-        >
-          <track kind="captions" src={locale === "ko" ? PRODUCT_TOUR.captionsKo : PRODUCT_TOUR.captionsEn} srcLang={locale} label={locale === "ko" ? "한국어" : "English"} default />
-        </video>
-        {!started && !failed && (
-          <button type="button" className="product-tour-player__play" onClick={() => seekTo(0)}>
+        {mounted ? (
+          <video
+            ref={videoRef}
+            src={PRODUCT_TOUR.src}
+            poster={PRODUCT_TOUR.poster}
+            controls
+            playsInline
+            preload="metadata"
+            aria-label={copy.videoTitle}
+            onPlay={() => setFailed(false)}
+            onPlaying={() => setLoading(false)}
+            onCanPlay={() => setLoading(false)}
+            onWaiting={() => setLoading(true)}
+            onSeeked={() => setLoading(false)}
+            onError={() => { setLoading(false); setFailed(true); }}
+            onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)))}
+          >
+            <track kind="captions" src={locale === "ko" ? PRODUCT_TOUR.captionsKo : PRODUCT_TOUR.captionsEn} srcLang={locale} label={locale === "ko" ? "한국어" : "English"} default />
+          </video>
+        ) : (
+          <button type="button" className="product-tour-player__poster" onClick={() => seekTo(0)} aria-label={copy.watch}>
+            <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
             <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
-            {copy.watch}
+            <strong>{copy.watch}</strong>
+            <small>{locale === "ko" ? "클릭할 때만 35MB 본편을 불러옵니다" : "The 35 MB film loads only after you press play"}</small>
           </button>
         )}
         {loading && !failed && <div className="product-tour-player__status" role="status"><LoaderCircle size={22} aria-hidden="true" />{locale === "ko" ? "제품 투어를 불러오는 중" : "Loading product tour"}</div>}
