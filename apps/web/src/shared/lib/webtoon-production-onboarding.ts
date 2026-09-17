@@ -1,4 +1,24 @@
-export const WEBTOON_STARTING_POINTS = [
+export type WebtoonStartingPointId =
+  | "idea"
+  | "synopsis"
+  | "source-ip"
+  | "script"
+  | "storyboard"
+  | "finished-art"
+  | "serializing";
+export type WebtoonOnboardingGoalId = "independent" | "pitch" | "contracted" | "team" | "migration";
+export type WebtoonTeamModelId = "solo" | "assistant" | "small-team" | "studio";
+export type WebtoonCadenceId = "weekly" | "biweekly" | "monthly" | "undecided";
+
+export interface WebtoonOnboardingChoice<TId extends string> {
+  readonly id: TId;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly descriptionKo?: string;
+  readonly descriptionEn?: string;
+}
+
+export const WEBTOON_STARTING_POINTS: readonly WebtoonOnboardingChoice<WebtoonStartingPointId>[] = [
   {
     id: "idea",
     labelKo: "아이디어만 있어요",
@@ -48,34 +68,29 @@ export const WEBTOON_STARTING_POINTS = [
     descriptionKo: "기존 회차·버퍼·팀 일정을 가져와 운영합니다.",
     descriptionEn: "Migrate episodes, buffer and the live schedule.",
   },
-] as const;
+];
 
-export const WEBTOON_ONBOARDING_GOALS = [
+export const WEBTOON_ONBOARDING_GOALS: readonly WebtoonOnboardingChoice<WebtoonOnboardingGoalId>[] = [
   { id: "independent", labelKo: "독립 연재", labelEn: "Independent publishing" },
   { id: "pitch", labelKo: "공모전·플랫폼 피칭", labelEn: "Contest or platform pitch" },
   { id: "contracted", labelKo: "계약 작품 제작", labelEn: "Contracted production" },
   { id: "team", labelKo: "팀 제작 운영", labelEn: "Team production" },
   { id: "migration", labelKo: "기존 연재 이전", labelEn: "Migrate a live series" },
-] as const;
+];
 
-export const WEBTOON_TEAM_MODELS = [
+export const WEBTOON_TEAM_MODELS: readonly WebtoonOnboardingChoice<WebtoonTeamModelId>[] = [
   { id: "solo", labelKo: "혼자 제작", labelEn: "Solo creator" },
   { id: "assistant", labelKo: "작가 + 어시스턴트", labelEn: "Creator + assistants" },
   { id: "small-team", labelKo: "3~5명 제작팀", labelEn: "3–5 person team" },
   { id: "studio", labelKo: "공정별 스튜디오", labelEn: "Studio pipeline" },
-] as const;
+];
 
-export const WEBTOON_CADENCES = [
+export const WEBTOON_CADENCES: readonly WebtoonOnboardingChoice<WebtoonCadenceId>[] = [
   { id: "weekly", labelKo: "주간", labelEn: "Weekly" },
   { id: "biweekly", labelKo: "격주", labelEn: "Biweekly" },
   { id: "monthly", labelKo: "월간", labelEn: "Monthly" },
   { id: "undecided", labelKo: "아직 미정", labelEn: "Not decided" },
-] as const;
-
-export type WebtoonStartingPointId = (typeof WEBTOON_STARTING_POINTS)[number]["id"];
-export type WebtoonOnboardingGoalId = (typeof WEBTOON_ONBOARDING_GOALS)[number]["id"];
-export type WebtoonTeamModelId = (typeof WEBTOON_TEAM_MODELS)[number]["id"];
-export type WebtoonCadenceId = (typeof WEBTOON_CADENCES)[number]["id"];
+];
 
 export interface WebtoonOnboardingSelection {
   readonly startingPoint: WebtoonStartingPointId;
