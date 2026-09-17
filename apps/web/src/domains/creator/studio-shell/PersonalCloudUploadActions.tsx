@@ -17,7 +17,7 @@ interface ActiveUpload extends PersonalCloudUploadProgress {
 
 function phaseLabel(
   phase: PersonalCloudUploadProgress["phase"],
-  locale: Locale,
+  bt: (ko: string, en: string) => string,
 ): string {
   const labels = {
     preparing: { ko: "프로젝트 준비 중", en: "Preparing project" },
@@ -25,7 +25,8 @@ function phaseLabel(
     uploading: { ko: "업로드 중", en: "Uploading" },
     finalizing: { ko: "저장 확인 중", en: "Finalizing" },
   } as const;
-  return labels[phase][locale];
+  const label = labels[phase];
+  return bt(label.ko, label.en);
 }
 
 function percentage(progress: PersonalCloudUploadProgress): number {
@@ -85,7 +86,7 @@ export function PersonalCloudUploadActions({
       {progress ? (
         <div className="mt-3 rounded-xl border border-accent/25 bg-accent-soft/15 px-3 py-2.5">
           <div className="flex items-center justify-between gap-3 text-[0.68rem] font-bold text-fg-2">
-            <span>{phaseLabel(progress.phase, locale)}</span>
+            <span>{phaseLabel(progress.phase, bt)}</span>
             <span>{percentage(progress)}%</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel">
