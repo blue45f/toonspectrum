@@ -8,6 +8,7 @@ import { LibraryBackupImport } from "./LibraryBackupImport";
 import { AppearanceSettings } from "@/shared/components/appearance/AppearanceSettings";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
+import { Switch } from "@/shared/components/ui/switch";
 import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
@@ -229,22 +230,12 @@ export function SettingsPage() {
           title={t("settings.filters.remember")}
           desc={t("settings.filters.remember.desc")}
         >
-          <button
-            type="button"
-            onClick={toggleRemember}
-            role="switch"
-            aria-checked={hydrated && remember}
+          <Switch
+            checked={hydrated && remember}
             aria-label={t("settings.filters.remember")}
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              hydrated && remember ? "bg-accent" : "bg-line-strong"
-            }`}
-          >
-            <span
-              className={`inline-block size-5 rounded-full bg-canvas transition-transform ${
-                hydrated && remember ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
+            onCheckedChange={toggleRemember}
+            disabled={!hydrated}
+          />
         </Row>
         <Row
           icon={Trash2}

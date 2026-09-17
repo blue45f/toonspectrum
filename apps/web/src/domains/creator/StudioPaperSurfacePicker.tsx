@@ -12,6 +12,7 @@ import { getStudioPaperSurfacePreviewTile } from "./brush/studio-paper-surface-p
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 
 import { useT } from "@/shared/lib/i18n";
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioPaperSurfacePickerProps {
@@ -256,9 +257,9 @@ export function StudioPaperSurfacePicker({
             disabled={controlsDisabled}
             onChange={(event) => onPaperGrainVisibleChange(event.currentTarget.checked)}
           />
-          <span
-            aria-hidden
-            className="relative h-5 w-9 shrink-0 rounded-full border border-line bg-raised transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:bg-fg-3 after:transition-transform peer-checked:border-accent/70 peer-checked:bg-accent/25 peer-checked:after:translate-x-4 peer-checked:after:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60 motion-reduce:transition-none motion-reduce:after:transition-none"
+          <SwitchIndicator
+            checked={paperGrainVisible}
+            className="peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60"
           />
         </label>
         <button

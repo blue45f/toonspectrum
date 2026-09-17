@@ -541,7 +541,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                       aria-label="중립 데생 인형 보기"
                       disabled={!vrm}
                       className={cx(
-                        "min-h-9 shrink-0 rounded-lg border px-2.5 text-[0.68rem] font-bold disabled:opacity-45",
+                        "min-h-9 shrink-0 rounded-lg border px-2.5 text-[0.68rem] font-bold disabled:opacity-45 pointer-coarse:min-h-11",
                         mannequinMode
                           ? "border-accent/55 bg-accent text-on-accent"
                           : "border-line bg-card text-fg-2 hover:bg-raised"
