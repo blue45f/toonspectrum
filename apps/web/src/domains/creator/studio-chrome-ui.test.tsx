@@ -335,7 +335,7 @@ describe("studio chrome UI", () => {
     expect(statusBar.className).toContain("whitespace-nowrap");
     expect(statusBar.className).toContain("[word-break:keep-all]");
     expect(statusBar.className).toContain("[&>*]:shrink-0");
-    expect(pill?.className).toContain("min-w-max");
+    expect(pill?.className).toContain("shrink-0");
     expect(pill?.className).toContain("whitespace-nowrap");
     expect(pill?.textContent).toBe("필압 민감");
   });
