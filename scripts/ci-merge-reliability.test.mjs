@@ -66,7 +66,7 @@ test("lint, typecheck and regressions run as independent installed lanes", () =>
   const expectations = [
     ["lint", "pnpm run lint:strict"],
     ["typecheck", "pnpm run typecheck"],
-    ["static", "pnpm exec vitest run"],
+    ["static", "node scripts/run-core-vitest.mjs"],
   ];
   for (const [name, command] of expectations) {
     const block = job(name);
