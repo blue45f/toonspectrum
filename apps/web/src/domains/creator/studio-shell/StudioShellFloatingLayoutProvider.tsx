@@ -15,6 +15,7 @@ import {
   hideAllStudioShellFloatingSurfaces,
   isStudioShellFloatingSurfaceVisible,
   normalizeStudioShellFloatingVisibility,
+  setStudioShellFloatingAutoHideDuringStroke,
   setStudioShellFloatingSurfaceVisible,
   studioShellFloatingVisibilityEqual,
   type StudioShellFloatingPresetId,
