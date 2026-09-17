@@ -60,9 +60,8 @@ export const users = pgTable(
       .default(EMPTY_CREATOR_ROLE_PROFILE),
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
-  (u) => [index("idx_user_status_created").on(u.status, u.createdAt)]
+  (u) => [index("idx_user_status_created").on(u.status, u.createdAt)],
 );
-
 
 export const accounts = pgTable(
   "account",
@@ -85,9 +84,8 @@ export const accounts = pgTable(
     primaryKey({ columns: [a.provider, a.providerAccountId] }),
     index("idx_account_user").on(a.userId),
     uniqueIndex("idx_account_user_provider_unique").on(a.userId, a.provider),
-  ]
+  ],
 );
-
 
 export const accountMerges = pgTable(
   "account_merge",
@@ -98,8 +96,9 @@ export const accountMerges = pgTable(
     sourceUserId: text("sourceUserId")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    targetUserId: text("targetUserId")
-      .references(() => users.id, { onDelete: "set null" }),
+    targetUserId: text("targetUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
     tokenHash: text("tokenHash").notNull(),
     status: text("status").notNull().default("issued"),
     expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
@@ -112,8 +111,15 @@ export const accountMerges = pgTable(
   },
   (m) => [
     uniqueIndex("account_merge_token_hash_unique").on(m.tokenHash),
-    index("idx_account_merge_source_status").on(m.sourceUserId, m.status, m.createdAt),
-    index("idx_account_merge_target_completed").on(m.targetUserId, m.completedAt),
+    index("idx_account_merge_source_status").on(
+      m.sourceUserId,
+      m.status,
+      m.createdAt,
+    ),
+    index("idx_account_merge_target_completed").on(
+      m.targetUserId,
+      m.completedAt,
+    ),
     index("idx_account_merge_expiry").on(m.status, m.expiresAt),
     check(
       "account_merge_status_check",
@@ -125,38 +131,7 @@ export const accountMerges = pgTable(
     ),
     check(
       "account_merge_token_hash_check",
-      sql`${m.tokenHash} ~ '^sha256:[0-9a-f]{64}
-  ],
-);
-
-
-export const sessions = pgTable(
-  "session",
-  {
-    sessionToken: text("sessionToken").primaryKey(),
-    userId: text("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    expires: timestamp("expires", { mode: "date" }).notNull(),
-  },
-  (s) => [index("idx_session_user").on(s.userId)]
-);
-
-
-export const verificationTokens = pgTable(
-  "verificationToken",
-  {
-    identifier: text("identifier").notNull(),
-    token: text("token").notNull(),
-    expires: timestamp("expires", { mode: "date" }).notNull(),
-  },
-  (vt) => [
-    primaryKey({ columns: [vt.identifier, vt.token] }),
-    index("idx_verification_token_token").on(vt.token),
-    index("idx_verification_token_expires").on(vt.expires),
-  ]
-);
-`,
+      sql`${m.tokenHash} ~ '^sha256:[0-9a-f]{64}$'`,
     ),
     check(
       "account_merge_expiry_check",
@@ -165,7 +140,6 @@ export const verificationTokens = pgTable(
   ],
 );
 
-
 export const sessions = pgTable(
   "session",
   {
@@ -175,9 +149,8 @@ export const sessions = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     expires: timestamp("expires", { mode: "date" }).notNull(),
   },
-  (s) => [index("idx_session_user").on(s.userId)]
+  (s) => [index("idx_session_user").on(s.userId)],
 );
-
 
 export const verificationTokens = pgTable(
   "verificationToken",
@@ -190,5 +163,5 @@ export const verificationTokens = pgTable(
     primaryKey({ columns: [vt.identifier, vt.token] }),
     index("idx_verification_token_token").on(vt.token),
     index("idx_verification_token_expires").on(vt.expires),
-  ]
+  ],
 );
