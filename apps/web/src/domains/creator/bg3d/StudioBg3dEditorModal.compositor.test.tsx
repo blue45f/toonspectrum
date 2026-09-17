@@ -5,12 +5,41 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBg3dEditorModal } from "./StudioBg3dEditorModal";
 
+import type { StudioBg3dEditorModalHost } from "./StudioBg3dEditorModal";
+import type { StudioBg3dSceneOutlinerController } from "./studio-bg3d-scene-outliner-controller";
+
 vi.mock("./studio-bg3d-editor-runtime-bindings", () => ({}));
 vi.mock("./StudioBg3dEditorViewport", () => ({ StudioBg3dEditorViewport: () => null }));
 vi.mock("./StudioBg3dEditorSidebar", () => ({ StudioBg3dEditorSidebar: () => null }));
 afterEach(() => cleanup());
 
-function host(overrides: Record<string, unknown> = {}) {
+function emptyOutlinerController(): StudioBg3dSceneOutlinerController {
+  return {
+    query: "",
+    items: [],
+    filteredItems: [],
+    hierarchy: {
+      roots: [],
+      childrenByParent: new Map(),
+      parentById: new Map(),
+      repairedOrphans: 0,
+      repairedSelfParents: 0,
+      repairedCycles: 0,
+    },
+    selectedIds: new Set(),
+    setQuery: vi.fn(),
+    select: vi.fn(),
+    rename: vi.fn(),
+    toggleVisibility: vi.fn(),
+    toggleLock: vi.fn(),
+    duplicate: vi.fn(),
+    remove: vi.fn(),
+  };
+}
+
+function host(
+  overrides: Partial<StudioBg3dEditorModalHost> = {},
+): StudioBg3dEditorModalHost {
   return {
     Boxes: () => null,
     X: () => null,
@@ -27,6 +56,7 @@ function host(overrides: Record<string, unknown> = {}) {
     deletingModelId: null,
     webXrSessionState: { status: "idle" },
     requestUserClose: vi.fn(),
+    outlinerController: emptyOutlinerController(),
     ...overrides,
   };
 }
