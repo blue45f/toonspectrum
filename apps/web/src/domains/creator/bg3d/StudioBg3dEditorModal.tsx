@@ -36,6 +36,7 @@ export interface StudioBg3dEditorModalHost {
   readonly webXrSessionState: StudioWebXrSessionState;
   readonly requestUserClose: () => void;
   readonly outlinerController: StudioBg3dSceneOutlinerController;
+  readonly sharedStageSessionScopeKey?: string;
   readonly [key: string]: unknown;
 }
 
@@ -65,7 +66,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       aria-modal={open ? "true" : undefined}
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
-      data-studio-bg3d-workspace="professional-v1"
+      data-studio-bg3d-workspace="professional-v2"
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
@@ -138,6 +139,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
           className="flex min-h-0 flex-1"
         >
           <StudioBg3dProfessionalWorkspace
+            scopeKey={h.sharedStageSessionScopeKey ?? null}
             outliner={<StudioBg3dSceneOutliner controller={h.outlinerController} variant="dock" />}
             viewport={<StudioBg3dEditorViewport h={h} />}
             inspector={<StudioBg3dEditorSidebar h={h} />}

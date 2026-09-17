@@ -11,11 +11,14 @@ describe("Studio BG3D professional workspace boundary", () => {
   it("keeps the modal shell typed and exposes the three-panel desktop workspace", () => {
     const source = readSibling("./StudioBg3dEditorModal.tsx");
     expect(source).not.toContain("@ts-nocheck");
-    expect(source).toContain('data-studio-bg3d-workspace="professional-v1"');
+    expect(source).toContain('data-studio-bg3d-workspace="professional-v2"');
     expect(source).toContain("<StudioBg3dProfessionalWorkspace");
     const workspace = readSibling("./StudioBg3dProfessionalWorkspace.tsx");
-    expect(workspace).toContain('data-studio-bg3d-workspace-layout="resizable-v1"');
-    expect(workspace).toContain("--studio-bg3d-workspace-columns");
+    expect(workspace).toContain('data-studio-bg3d-workspace-layout="dockable-v2"');
+    expect(workspace).toContain("--studio-bg3d-outliner-order");
+    expect(workspace).toContain("applyStudioBg3dWorkspacePreset");
+    expect(workspace).toContain("swapStudioBg3dWorkspaceDockOrder");
+    expect(source).toContain("scopeKey={h.sharedStageSessionScopeKey ?? null}");
     expect(source).toContain("<StudioBg3dSceneOutliner");
   });
 
@@ -44,6 +47,7 @@ describe("Studio BG3D professional workspace boundary", () => {
     expect(editor).toContain("commandId: plan.command.id");
     expect(editor).not.toContain("h.renameBgObject(item.id, item.kind)");
     expect(editor).not.toContain("h.togglePrimitiveFlag(item.id");
+    expect(editor).toContain("h.replaceCanonicalDocumentState({");
     expect(mutation).not.toMatch(/from ["']three/);
     expect(mutation).not.toContain("studio-bg3d-editor-runtime-bindings");
   });
