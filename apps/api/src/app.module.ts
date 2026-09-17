@@ -4,6 +4,7 @@ import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { BusinessInquiryModule } from "./modules/business-inquiry/business-inquiry.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CreatorModule } from "./modules/creator/creator.module";
@@ -41,6 +42,7 @@ const studioRealtimeTicketModule =
     AdminModule,
     TrafficAnalyticsModule,
     FeedbackModule,
+    BusinessInquiryModule,
     CreatorMarketplaceModule,
     CreatorModule,
     ProductionCollaborationModule,

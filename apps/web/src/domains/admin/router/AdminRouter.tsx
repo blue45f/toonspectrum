@@ -53,6 +53,13 @@ const AdminRevenue = lazyRetry(
     })),
   "AdminRevenueV2",
 );
+const AdminBusinessInquiries = lazyRetry(
+  () =>
+    import("../components/AdminBusinessInquiries").then((module) => ({
+      default: module.AdminBusinessInquiries,
+    })),
+  "AdminBusinessInquiriesV1",
+);
 const AdminPromos = lazyRetry(
   () =>
     import("../components/AdminPromos").then((module) => ({
@@ -170,6 +177,8 @@ function AdminRouteSurface({
       return <AdminRevenue uid={uid} />;
     case "campaigns":
       return <AdminCampaigns uid={uid} />;
+    case "inquiries":
+      return <AdminBusinessInquiries />;
     case "promos":
       return <AdminPromos userId={uid} />;
     case "announcements":

@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(67);
+  expect(manifest).toHaveLength(68);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0067_creator_role_workspace_personalization");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(67);
+  expect(manifest.at(-1).id).toBe("0068_business_inquiries");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(68);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -719,7 +719,7 @@ test("cloud-save intent migration widens and validates the existing room check",
     "CHECK (\"provisionIntent\" IN ('share-link', 'invite-member', 'cloud-save'))",
   );
   expect(sql).toContain(
-    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_provision_intent_check"',
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_state_check"',
   );
   expect(sql).toContain("0026_creator_draft_cloud_save_intent");
   expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');

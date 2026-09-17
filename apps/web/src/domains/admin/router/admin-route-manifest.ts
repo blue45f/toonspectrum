@@ -7,6 +7,7 @@ export const ADMIN_ROUTE_IDS = [
   "plans",
   "revenue",
   "campaigns",
+  "inquiries",
   "promos",
   "announcements",
   "ops",
@@ -48,6 +49,7 @@ export const ADMIN_ROUTES: readonly AdminRouteDescriptor[] = [
   { id: "plans", path: "/admin/monetization/plans", labelKey: "admin.tabs.plans", icon: "plans", keywords: ["plan", "pricing", "플랜", "요금제"] },
   { id: "revenue", path: "/admin/monetization/revenue", labelKey: "admin.tabs.revenue", icon: "revenue", keywords: ["revenue", "settlement", "정산"] },
   { id: "campaigns", path: "/admin/monetization/funding", labelKey: "admin.tabs.campaigns", icon: "funding", keywords: ["campaign", "funding", "후원"] },
+  { id: "inquiries", path: "/admin/growth/inquiries", labelKey: "admin.tabs.inquiries", icon: "funding", keywords: ["inquiry", "IR", "partnership", "sponsor", "투자", "제휴", "후원"] },
   { id: "promos", path: "/admin/growth/promotions", labelKey: "admin.tabs.promos", icon: "promotions", keywords: ["promotion", "coupon", "프로모션"] },
   { id: "announcements", path: "/admin/engagement/announcements", labelKey: "admin.tabs.announcements", icon: "announcement", keywords: ["announcement", "notice", "공지"] },
   { id: "ops", path: "/admin/platform/operations", labelKey: "admin.tabs.ops", icon: "operations", keywords: ["operations", "health", "운영", "시스템"] },
@@ -71,7 +73,7 @@ export const ADMIN_NAVIGATION_GROUPS: readonly AdminNavigationGroup[] = [
   { id: "overview", routeIds: ["overview", "traffic"] },
   { id: "users-trust", routeIds: ["members", "reports", "community"] },
   { id: "monetization", routeIds: ["plans", "revenue", "campaigns"] },
-  { id: "growth", routeIds: ["promos", "announcements"] },
+  { id: "growth", routeIds: ["inquiries", "promos", "announcements"] },
   { id: "platform-security", routeIds: ["ops", "security", "audit"] },
 ] as const;
 

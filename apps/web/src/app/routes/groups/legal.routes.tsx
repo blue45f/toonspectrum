@@ -2,6 +2,7 @@ import { defineAppRoutes } from "../app-route-definition";
 import {
   AboutPage,
   AccessibilityPage,
+  BusinessPage,
   ContactPage,
   CopyrightPage,
   CrawlerPolicyPage,
@@ -87,6 +88,7 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-privacy", path: "/privacy", element: <PrivacyPage /> },
   { id: "legal-copyright", path: "/copyright", element: <CopyrightPage /> },
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
+  { id: "legal-business", path: "/business", element: <BusinessPage /> },
   { id: "legal-support", path: "/support", element: <SupportPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);
