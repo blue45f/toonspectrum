@@ -25,6 +25,7 @@ import {
   CLOUDFLARE_STATIC_MAX_FILE_BYTES,
   cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "../deploy/cloudflare-static/src/large-static-assets";
 
@@ -111,6 +112,7 @@ export async function prepareCloudflareStaticAssets(
   }
 
   for (const file of oversizedFiles) {
+    if (!supportsCloudflareStaticSidecar(`/${file.relativePath}`)) continue;
     for (const encoding of CLOUDFLARE_LARGE_ASSET_ENCODINGS) {
       const sidecarRelativePath = cloudflareLargeAssetSidecarPath(
         `/${file.relativePath}`,
