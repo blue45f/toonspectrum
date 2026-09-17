@@ -108,8 +108,12 @@ export const MUSIC_THEME_PACKS: readonly MusicThemePack[] = [
 ] as const;
 
 export const MUSIC_DURATIONS = [15, 30, 45, 60] as const;
-export const MUSIC_MAX_BYTES = 1_500_000;
+export const MUSIC_MAX_BYTES = 2_500_000;
 export const MUSIC_TERMS_URL = "https://elevenlabs.io/eleven-music-model-specific-terms";
+export const MUSIC_OUTPUT_FORMAT_REQUEST = "auto" as const;
+export const MUSIC_OUTPUT_FORMAT = "mp3_48000_192" as const;
+export const MUSIC_LEGACY_OUTPUT_FORMAT = "mp3_44100_128" as const;
+export type MusicOutputFormat = typeof MUSIC_OUTPUT_FORMAT | typeof MUSIC_LEGACY_OUTPUT_FORMAT;
 export type MusicProviderModel = "music_v1" | "music_v2_5";
 
 export interface MusicBrief {
@@ -146,7 +150,9 @@ export interface MusicTrackMetadata {
   createdAt: string;
   provider: "elevenlabs";
   model: MusicProviderModel;
-  format: "mp3_44100_128";
+  format: MusicOutputFormat;
+  c2paRequested?: boolean;
+  storeForInpainting?: boolean;
   songId?: string;
   brief: MusicBrief;
   termsUrl: string;
