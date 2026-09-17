@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: core-v2-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: core-v3-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -193,7 +193,7 @@ jobs:
 
   core:
     name: core
-    if: ${{ always() }}
+    if: ${{ always() && !cancelled() }}
     needs: [lint, typecheck, static, serial, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -222,7 +222,7 @@ jobs:
   verify:
     name: verify
     needs: core
-    if: ${{ always() }}
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
