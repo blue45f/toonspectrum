@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["atelier-public-polish.spec.ts", "non-studio-experience.spec.ts", "non-studio-controls.spec.ts", "non-studio-search-layout.spec.ts", "creator-flagship.spec.ts", "open-creation.spec.ts", "production-risk-intelligence.spec.ts", "learn.spec.ts", "learn-resilience.spec.ts", "learn-guided-lessons.spec.ts"],
+  testMatch: ["atelier-public-polish.spec.ts", "non-studio-experience.spec.ts", "non-studio-controls.spec.ts", "non-studio-search-layout.spec.ts", "creator-flagship.spec.ts", "open-creation.spec.ts", "engineering-story.spec.ts", "production-risk-intelligence.spec.ts", "learn.spec.ts", "learn-resilience.spec.ts", "learn-guided-lessons.spec.ts"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

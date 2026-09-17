@@ -78,13 +78,15 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
         {ABOUT_ITEMS.map((item) => {
           const Icon = item.icon;
           const copy = item[locale];
-          const active = pathname === item.href;
+          const exact = pathname === item.href;
+          const descendant = item.href === "/about/technology" && pathname.startsWith("/about/technology/");
+          const active = exact || descendant;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={exact ? "page" : descendant ? "location" : undefined}
               className={cx(
                 "group flex min-h-20 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 active

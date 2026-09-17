@@ -7,6 +7,11 @@ import {
   CrawlerPolicyPage,
   DataSourcesPage,
   DesignSystemPage,
+  EngineeringDeckPage,
+  EngineeringGuidesPage,
+  EngineeringLicensesPage,
+  EngineeringStoryPage,
+  EngineeringVideosPage,
   FeedbackPage,
   HelpCenterPage,
   PrivacyPage,
@@ -29,6 +34,31 @@ export const legalRoutes = defineAppRoutes([
     id: "legal-about-technology",
     path: "/about/technology",
     element: <TechnologyPage />,
+  },
+  {
+    id: "legal-about-technology-story",
+    path: "/about/technology/story",
+    element: <EngineeringStoryPage />,
+  },
+  {
+    id: "legal-about-technology-guides",
+    path: "/about/technology/guides",
+    element: <EngineeringGuidesPage />,
+  },
+  {
+    id: "legal-about-technology-deck",
+    path: "/about/technology/deck",
+    element: <EngineeringDeckPage />,
+  },
+  {
+    id: "legal-about-technology-videos",
+    path: "/about/technology/videos",
+    element: <EngineeringVideosPage />,
+  },
+  {
+    id: "legal-about-technology-licenses",
+    path: "/about/technology/licenses",
+    element: <EngineeringLicensesPage />,
   },
   {
     id: "legal-about-principles",
