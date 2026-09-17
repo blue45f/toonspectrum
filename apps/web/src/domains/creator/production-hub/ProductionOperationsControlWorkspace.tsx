@@ -29,7 +29,6 @@ import {
   deriveProductionFinancialForecast,
   deriveProductionFlowAnalytics,
   deriveScheduleRecoveryScenarios,
-  evaluateAutomationRule,
   evaluateReleaseReadiness,
   type EpisodeReleasePlan,
   type ExternalReviewAccess,
@@ -45,6 +44,7 @@ import {
 } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";
 
 import { downloadBlob } from "../export/studio-export";
 
@@ -523,7 +523,7 @@ export function ProductionOperationsControlWorkspace({
       responses: [],
     };
     await saveRecord({ kind: "external-review-access", value: access }, "외부 검수 링크를 만들었습니다.");
-    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}?token=${encodeURIComponent(token)}`;
+    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}#token=${encodeURIComponent(token)}`;
     setGeneratedReviewLink(link);
     setNotice("원문 토큰은 다시 표시되지 않습니다. 지금 링크를 복사해 전달해 주세요.");
   });
@@ -565,89 +565,22 @@ export function ProductionOperationsControlWorkspace({
   const runAutomations = () => run("automation-run", async () => {
     if (!canManage) return;
     const rules = (aggregate.automationRules ?? []).filter((entry) => entry.enabled);
-    const notifications: ProductionNotification[] = [];
-    const generatedTasks: ProductionTask[] = [];
-    for (const rule of rules) {
-      const matches = evaluateAutomationRule(aggregate, rule, now);
-      for (const match of matches) {
-        for (const action of rule.actions) {
-          if (action.type === "notify") {
-            const targets = action.assignmentIds.length > 0 ? action.assignmentIds : [null];
-            for (const assignmentId of targets) {
-              notifications.push({
-                id: id("notification"),
-                projectId: aggregate.projectId,
-                assignmentId,
-                type: "automation",
-                title: rule.name,
-                body: `${action.message} · ${match.explanation.join(" · ")}`,
-                href: `/production/projects/${encodeURIComponent(aggregate.projectId)}/control`,
-                urgency: action.urgency,
-                sourceType: match.sourceType,
-                sourceId: match.sourceId,
-                status: "unread",
-                createdAt: new Date().toISOString(),
-                readAt: null,
-              });
-          }
-          } else if (action.type === "create-task") {
-            const sourceTask = aggregate.tasks.find((entry) => entry.id === match.sourceId);
-            generatedTasks.push({
-              id: id("automation-task"),
-              projectId: aggregate.projectId,
-              scope: sourceTask?.scope ?? { kind: "project", id: aggregate.projectId, ancestors: [] },
-              processKey: action.processKey,
-              title: action.title,
-              status: "ready",
-              assignmentIds: action.assignmentIds,
-              reviewerAssignmentIds: [],
-              inputRevisionRefs: sourceTask?.inputRevisionRefs ?? [],
-              outputDeliverableIds: [],
-              dependencyTaskIds: sourceTask ? [sourceTask.id] : [],
-              dueAt: new Date(now.getTime() + action.dueInHours * 3_600_000).toISOString(),
-              estimateHours: { optimistic: 1, likely: 2, pessimistic: 4 },
-              completionCriteria: ["자동화가 생성한 조치 항목을 확인합니다."],
-              sourceAgreementMilestoneId: null,
-            });
-          } else {
-            const sourceTask = aggregate.tasks.find((entry) => entry.id === match.sourceId);
-            for (const assignmentId of sourceTask?.assignmentIds ?? []) {
-              notifications.push({
-                id: id("notification"),
-                projectId: aggregate.projectId,
-                assignmentId,
-                type: "automation",
-                title: `${sourceTask?.title ?? match.sourceId} 상태 변경 검토`,
-                body: `${action.taskStatus} 상태 전환은 사람 확인 후 수행해야 합니다.`,
-                href: `/production/projects/${encodeURIComponent(aggregate.projectId)}/production`,
-                urgency: "warning",
-                sourceType: "task",
-                sourceId: match.sourceId,
-                status: "unread",
-                createdAt: new Date().toISOString(),
-                readAt: null,
-              });
-            }
-          }
-        }
-      }
-      await saveRecord({
-        kind: "automation-rule",
-        value: {
-          ...rule,
-          revision: rule.revision + 1,
-          lastEvaluatedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      }, `${rule.name} 실행 시간을 기록했습니다.`);
+    const executionTime = new Date();
+    const plan = deriveProductionAutomationExecutionPlan(aggregate, rules, executionTime);
+    if (plan.tasks.length > 0) {
+      await execute({ type: "upsert-task-batch", tasks: plan.tasks }, "자동화 조치 업무를 원자적으로 만들었습니다.");
     }
-    if (generatedTasks.length > 0) {
-      await execute({ type: "upsert-task-batch", tasks: generatedTasks }, "자동화 조치 업무를 만들었습니다.");
-    }
-    for (const notification of notifications) {
+    for (const notification of plan.notifications) {
       await saveRecord({ kind: "notification", value: notification }, "자동화 알림을 만들었습니다.");
     }
-    setNotice(`자동화 결과: 업무 ${generatedTasks.length}개 · 알림 ${notifications.length}개`);
+    for (const rule of plan.evaluatedRules) {
+      await saveRecord({ kind: "automation-rule", value: rule }, `${rule.name} 실행 시간을 기록했습니다.`);
+    }
+    const suppressed = plan.suppressedTaskCount + plan.suppressedNotificationCount;
+    setNotice(
+      `자동화 결과: 조건 ${plan.matchedSourceCount}건 · 업무 ${plan.tasks.length}개 · 알림 ${plan.notifications.length}개`
+      + (suppressed > 0 ? ` · 중복 ${suppressed}건 억제` : ""),
+    );
   });
 
   const saveNotificationPolicy = () => run("notification-policy", async () => {

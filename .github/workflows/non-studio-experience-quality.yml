@@ -88,7 +88,11 @@ jobs:
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/production-hub/production-risk-intelligence.test.ts
+          apps/web/src/domains/creator/production-hub/production-risk-scenarios.test.ts
+          apps/web/src/domains/creator/production-hub/production-automation-execution.test.ts
           apps/web/src/domains/creator/production-hub/production-management-overview.test.ts
+          apps/web/src/domains/creator/production-hub/ProductionRecoveryScenarioPanel.test.tsx
+          apps/web/src/domains/creator/production-hub/ProductionExternalReviewPage.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionManagementWorkspace.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionScheduleWorkspace.test.tsx
       - name: Production bundle

@@ -1275,13 +1275,15 @@ export const ProductionExternalReviewParamsSchema = z.object({
   reviewId: IdentitySchema,
 }).strict();
 
+const ExternalReviewTokenSchema = z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u);
+
 export const ProductionExternalReviewQuerySchema = z.object({
-  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
+  token: ExternalReviewTokenSchema.optional(),
 }).strict();
 
 export const SubmitProductionExternalReviewSchema = z.object({
   responseId: z.string().uuid(),
-  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
+  token: ExternalReviewTokenSchema.optional(),
   reviewerName: z.string().trim().min(1).max(120),
   decision: z.enum(["comment", "approve", "request-changes"]),
   note: z.string().trim().max(4_000),

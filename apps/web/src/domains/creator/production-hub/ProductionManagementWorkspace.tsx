@@ -36,6 +36,7 @@ import {
   type ProductionManagementLens,
 } from "./production-management-overview";
 import type { ProductionClientCommand } from "./production-api";
+import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -520,6 +521,14 @@ export function ProductionManagementWorkspace({
         projectId={aggregate.projectId}
         execute={execute}
         canEdit={canEdit}
+      />
+
+      <ProductionRecoveryScenarioPanel
+        aggregate={aggregate}
+        intelligence={overview.riskIntelligence}
+        execute={execute}
+        canEdit={canEdit}
+        now={now}
       />
 
       <Section

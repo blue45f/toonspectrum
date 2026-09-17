@@ -77,3 +77,35 @@ test("schedule workspace exposes predicted risk as a distinct operational filter
   await capturePageEvidence(page, testInfo, "production-risk-schedule-mobile");
   expect(pageErrors).toEqual([]);
 });
+
+test("recovery scenarios compare outcomes and apply only an explicit reversible change", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/production/projects/sample-project/overview", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "복구 시나리오 비교" })).toBeVisible();
+  await expect(page.getByText(/원본 데이터에 적용하지 않고/u)).toBeVisible();
+  const selector = page.getByLabel("시나리오를 비교할 위험");
+  await selector.selectOption("blocker:task-episode-12-background");
+  await expect(page.getByText("마감 2일 재조정", { exact: true })).toBeVisible();
+  await expect(page.getByText("차단 입력 즉시 확정", { exact: true })).toBeVisible();
+  await expect(page.getByText("미리보기 전용").first()).toBeVisible();
+  await expect(page.getByText("위험 점수").first()).toBeVisible();
+  await expect(page.getByText("예상 개선").first()).toBeVisible();
+
+  const apply = page.getByRole("button", { name: "마감 2일 재조정 복구 시나리오 적용" });
+  await expect(apply).toBeEnabled();
+  await apply.click();
+  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 원자적으로 적용했습니다" })).toBeVisible();
+  const undo = page.getByRole("button", { name: "마감 2일 재조정 복구 시나리오 되돌리기" });
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 원자적으로 되돌렸습니다" })).toBeVisible();
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await capturePageEvidence(page, testInfo, "production-recovery-scenario-mobile");
+  expect(pageErrors).toEqual([]);
+});

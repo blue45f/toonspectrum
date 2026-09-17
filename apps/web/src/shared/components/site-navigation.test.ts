@@ -81,6 +81,7 @@ describe("site navigation information architecture", () => {
     expect(siteNavigationContextForPath("/")).toBe("studio");
     expect(siteNavigationContextForPath("/studio")).toBe("studio");
     expect(siteNavigationContextForPath("/production")).toBe("studio");
+    expect(siteNavigationContextForPath("/brand-film")).toBe("studio");
     expect(siteNavigationContextForPath("/production/projects/sample-project/overview")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
