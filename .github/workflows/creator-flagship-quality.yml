@@ -15,6 +15,8 @@ on:
       - 'apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage*'
       - 'apps/web/src/domains/creator/studio-shell/StudioFrontDoorPages*'
       - 'apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioProjectLibraryManagementPage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioProjectStartPanel*'
       - 'apps/web/src/domains/creator/studio-shell/StudioTaskFlow*'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
