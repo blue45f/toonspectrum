@@ -258,6 +258,55 @@ async function discoverUserReferences(client: PoolClient): Promise<UserReference
   return result.rows.filter(shouldTransferUserReference);
 }
 
+async function canUpdateReference(
+  client: PoolClient,
+  reference: UserReference,
+): Promise<boolean> {
+  const result = await client.query<{ allowed: boolean }>(
+    `SELECT pg_catalog.has_column_privilege(
+       current_user,
+       child_table.oid,
+       child_attribute.attnum,
+       'UPDATE'
+     ) AS allowed
+     FROM pg_catalog.pg_class AS child_table
+     JOIN pg_catalog.pg_namespace AS child_namespace
+       ON child_namespace.oid = child_table.relnamespace
+     JOIN pg_catalog.pg_attribute AS child_attribute
+       ON child_attribute.attrelid = child_table.oid
+     WHERE child_namespace.nspname = $1
+       AND child_table.relname = $2
+       AND child_attribute.attname = $3
+       AND child_attribute.attnum > 0
+       AND NOT child_attribute.attisdropped`,
+    [reference.schemaName, reference.tableName, reference.columnName],
+  );
+  return result.rows[0]?.allowed === true;
+}
+
+async function assertTransferPermissions(
+  client: PoolClient,
+  sourceUserId: string,
+  references: readonly UserReference[],
+): Promise<void> {
+  for (const reference of references) {
+    const countResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM ${quoteIdentifier(reference.schemaName)}.${quoteIdentifier(reference.tableName)}
+       WHERE ${quoteIdentifier(reference.columnName)} = $1`,
+      [sourceUserId],
+    );
+    if (Number(countResult.rows[0]?.count ?? 0) === 0) continue;
+    if (!(await canUpdateReference(client, reference))) {
+      throw new AccountMergeError(
+        "ACCOUNT_MERGE_MANUAL_REQUIRED",
+        "이 계정에는 자동 이전할 수 없는 보호 데이터가 있어요. 데이터는 변경되지 않았습니다. 운영팀을 통해 안전하게 통합해 주세요.",
+        409,
+      );
+    }
+  }
+}
+
 async function countTransferableRecords(
   client: PoolClient,
   sourceUserId: string,
@@ -412,6 +461,7 @@ export async function previewAccountMerge(
   try {
     const prepared = await prepareMerge(client, targetUserId, token);
     const references = await discoverUserReferences(client);
+    await assertTransferPermissions(client, prepared.source.id, references);
     const affectedRecordCount = await countTransferableRecords(
       client,
       prepared.source.id,
@@ -459,6 +509,7 @@ export async function confirmAccountMerge(
     await client.query("BEGIN");
     const prepared = await prepareMerge(client, targetUserId, token, { lock: true });
     const references = await discoverUserReferences(client);
+    await assertTransferPermissions(client, prepared.source.id, references);
 
     let transferredRecordCount: number;
     try {
