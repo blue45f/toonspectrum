@@ -552,13 +552,20 @@ describe("useCharacterShaperBinding", () => {
     expect(result.current.history.recentLabels[0]).toBe("색: 눈동자");
   });
 
-  it("reports no capability profile and a load hint before a model is ready", () => {
-    const fake = createFakeHost({ status: "empty" });
-    const { result } = renderBinding(fake);
+  it("reports model lifecycle hints without contradicting the viewport loading state", () => {
+    const empty = renderBinding(createFakeHost({ status: "empty" }));
+    expect(empty.result.current.busyReason).toBe("VRM 캐릭터를 먼저 불러오세요.");
+    expect(empty.result.current.profile.status).toBe("empty");
+    expect(empty.result.current.recipe.slots.eyes).toBeNull();
+    empty.unmount();
 
-    expect(result.current.busyReason).toBe("VRM 캐릭터를 먼저 불러오세요.");
-    expect(result.current.profile.status).toBe("empty");
-    expect(result.current.recipe.slots.eyes).toBeNull();
+    const loading = renderBinding(createFakeHost({ status: "loading" }));
+    expect(loading.result.current.busyReason).toBe("VRM 캐릭터를 불러오는 중입니다.");
+    loading.unmount();
+
+    const failed = renderBinding(createFakeHost({ status: "error" }));
+    expect(failed.result.current.busyReason).toContain("VRM 캐릭터를 불러오지 못했습니다.");
+    failed.unmount();
   });
 });
 
