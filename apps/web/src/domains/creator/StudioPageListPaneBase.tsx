@@ -483,9 +483,9 @@ export const StudioPageListPane = memo(function StudioPageListPane({
         surfaceId="page-list"
         label="페이지 목록"
         defaultLayout={DEFAULT_STUDIO_PAGE_LIST_FLOATING_LAYOUT}
-        minWidth={320}
-        minHeight={420}
-        maxWidth={720}
+        minWidth={336}
+        minHeight={440}
+        maxWidth={760}
         maxHeight={1_100}
         allowedDockEdges={["left", "right"]}
         onClose={() => setLeftPanelOpen(false)}
