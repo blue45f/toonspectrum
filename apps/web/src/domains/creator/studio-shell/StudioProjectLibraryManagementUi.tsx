@@ -172,6 +172,8 @@ export function StudioProjectLibraryCard({
   localFileSaved,
   busy,
   continueHref,
+  resumeSummary,
+  resumeExact,
   overviewHref,
   storageHref,
   onToggle,
@@ -191,6 +193,8 @@ export function StudioProjectLibraryCard({
   readonly localFileSaved: boolean;
   readonly busy: boolean;
   readonly continueHref: string;
+  readonly resumeSummary: string | null;
+  readonly resumeExact: boolean;
   readonly overviewHref: string;
   readonly storageHref: string;
   readonly onToggle: () => void;
@@ -232,6 +236,21 @@ export function StudioProjectLibraryCard({
             {locale === "ko" ? "마지막 작업" : "Last opened"}{" "}
             {studioProjectLibraryDateLabel(project.lastOpenedAt, locale)}
           </p>
+          {resumeSummary ? (
+            <div className={cn(
+              "mt-2 rounded-xl border px-3 py-2 text-[0.68rem] leading-5",
+              resumeExact
+                ? "border-accent/30 bg-accent-soft/20 text-fg-2"
+                : "border-line bg-panel/55 text-fg-3",
+            )}>
+              <p className="font-black text-fg">
+                {resumeExact
+                  ? locale === "ko" ? "최근 위치 기억됨" : "Recent position remembered"
+                  : locale === "ko" ? "최근 문서로 이동" : "Continue in recent document"}
+              </p>
+              <p className="mt-0.5 break-words">{resumeSummary}</p>
+            </div>
+          ) : null}
         </div>
       </div>
 

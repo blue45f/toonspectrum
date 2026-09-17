@@ -904,6 +904,8 @@ import {
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
 import { createPalette } from "./studio-palette-library";
+import { studioExactResumeRequested } from "./studio-exact-resume-context";
+import { useStudioExactResumeContext } from "./useStudioExactResumeContext";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
   normalizeStudioPaperSurfaceSettings,
@@ -7175,10 +7177,12 @@ export function StudioCuttoonEditor({
     mobileImmersive,
   ]);
 
+  const exactResumeRequested = studioExactResumeRequested(location.search);
+
   useStudioResumeCheckpoint({
     activePageId: activePage.id,
     documentKey: studioWorkspaceDocumentIdentity(studioRoute),
-    hydrated: workHydrated && autosaveChecked && !hasAutosave,
+    hydrated: workHydrated && autosaveChecked && !hasAutosave && !exactResumeRequested,
     layoutKey: JSON.stringify([
       activePage.id,
       canvasH,
@@ -7201,6 +7205,42 @@ export function StudioCuttoonEditor({
     viewport: scrollPos,
     wrapRef,
     zoom,
+  });
+
+  useStudioExactResumeContext({
+    projectId: studioRoute.projectId,
+    documentId: studioRoute.documentId,
+    workspace: studioRoute.documentWorkspace,
+    focus: params.get("focus"),
+    language: params.get("language") ?? studioLanguage,
+    sourceVersion: params.get("version"),
+    resumeRequested: exactResumeRequested,
+    hydrated: workHydrated,
+    pages,
+    currentPageId,
+    setCurrentPageId,
+    selectedId,
+    marqueeIds,
+    setSelectedId,
+    setMarqueeIds,
+    zoom,
+    setZoom,
+    scrollLeft: scrollPos.left,
+    scrollTop: scrollPos.top,
+    viewportRef: wrapRef,
+    updateViewport: updateScrollPos,
+    tool,
+    setTool: (nextTool) => {
+      primaryToolActivatedRef.current = true;
+      setTool(nextTool);
+    },
+    drawMode,
+    setDrawMode,
+    onRestored: (context) => {
+      setStatusNotice(
+        `최근 작업 위치를 복원했어요. ${context.pageId ?? "최근 페이지"} · 확대 ${Math.round(context.zoom * 100)}%`,
+      );
+    },
   });
 
   // Hydration establishes the clean baseline for this document scope. Lifecycle persistence only
