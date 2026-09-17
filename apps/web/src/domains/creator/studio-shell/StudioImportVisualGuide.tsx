@@ -1,9 +1,10 @@
 import { ArrowDown, Cloud, FileImage, FolderOpen, Layers3, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import "./studio-import-visual-guide.css";
+import { useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+import "./studio-import-visual-guide.css";
 
 const COPY = {
   ko: {
@@ -45,8 +46,9 @@ const COPY = {
 const SOURCE_ICONS = [FileImage, Cloud, FolderOpen] as const;
 const STEP_ICONS = [FolderOpen, Layers3, ShieldCheck] as const;
 
-export function StudioImportVisualGuide({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+export function StudioImportVisualGuide({ locale }: { readonly locale: string }) {
+  const t = useT();
+  const copy = translateParallelBilingualCopy(t, "StudioImportVisualGuide", COPY);
   const reducedMotion = useReducedMotion();
 
   return (
