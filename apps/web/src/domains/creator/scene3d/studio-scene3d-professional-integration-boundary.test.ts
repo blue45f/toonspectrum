@@ -35,7 +35,9 @@ describe("Studio Scene3D professional integration boundary", () => {
     const proSuite = source(
       "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx",
     );
+    expect(sidebar).toContain('import("./studio-bg3d-professional-runtime-readiness")');
     expect(sidebar).toContain("resolveStudioBg3dProfessionalRuntimeReadiness");
+    expect(sidebar).not.toContain('from "./studio-bg3d-professional-runtime-readiness"');
     expect(sidebar).toContain("attachmentByStorageModelId: attachmentByStorageModelIdRef.current");
     expect(sidebar).toContain("sharedSceneSession");
     expect(sidebar).toContain("professionalReadiness={professionalRuntimeReadiness}");
@@ -44,8 +46,9 @@ describe("Studio Scene3D professional integration boundary", () => {
     const editorHost = source(
       "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
     );
-    expect(editorHost).toContain("resolveStudioScene3dLinkedLayerRoundTrip");
-    expect(editorHost).toContain("linkedRoundTrip.authority.bg3d");
+    expect(editorHost).toContain("resolveStudioScene3dLinkedLayerEditSource");
+    expect(editorHost).not.toContain("studio-scene3d-linked-layer-bridge");
+    expect(editorHost).toContain("return { scene: linkedScene }");
   });
 
   it("routes canonical document replacement through one atomic state owner", () => {
