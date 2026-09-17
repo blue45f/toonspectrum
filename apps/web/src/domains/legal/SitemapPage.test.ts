@@ -23,6 +23,7 @@ const PUBLIC_ROUTE_SOURCE_FILES = [
   "apps/web/src/app/routes/groups/experience.routes.tsx",
   "apps/web/src/app/routes/groups/legal.routes.tsx",
   "apps/web/src/app/routes/groups/market.routes.tsx",
+  "apps/web/src/app/routes/groups/marketing.routes.tsx",
   "apps/web/src/app/routes/groups/production.routes.tsx",
   "apps/web/src/app/routes/groups/reference.routes.tsx",
 ] as const;

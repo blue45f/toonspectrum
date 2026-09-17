@@ -269,7 +269,7 @@ function writeSitemap(): void {
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
     "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/about/technology", "/about/technology/story", "/about/technology/guides",
+    "/about", "/brand-film", "/about/technology", "/about/technology/story", "/about/technology/guides",
     "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses",
     "/guide", "/news", "/create", "/shaper", "/market", "/market/browse", "/contact",
   ];

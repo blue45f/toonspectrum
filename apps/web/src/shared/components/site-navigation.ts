@@ -407,6 +407,7 @@ export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 
 const STUDIO_CONTEXT_PREFIXES = [
   "/",
+  "/brand-film",
   "/studio",
   "/production",
   "/make",

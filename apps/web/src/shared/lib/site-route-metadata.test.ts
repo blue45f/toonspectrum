@@ -57,6 +57,7 @@ describe("site route metadata", () => {
   it("classifies policy and discovery destinations independently", () => {
     expect(resolveSiteRouteMetadata("/privacy")).toMatchObject({ product: "docs", purpose: "trust", maturity: "stable" });
     expect(resolveSiteRouteMetadata("/ranking")).toMatchObject({ product: "spectrum", purpose: "discover", access: "public" });
+    expect(resolveSiteRouteMetadata("/brand-film")).toMatchObject({ product: "studio", purpose: "discover", access: "public", device: "responsive" });
   });
 
   it("marks heavy and emerging workspaces before users enter them", () => {
