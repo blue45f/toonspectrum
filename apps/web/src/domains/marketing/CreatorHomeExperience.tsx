@@ -19,6 +19,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { CreatorSectionLink, useCreatorHomeNavigation } from "./CreatorHomeNavigation";
+
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import {
@@ -225,6 +227,7 @@ export function CreatorHomeExperience() {
   const locale = resolveProductLocale(language);
   const identity = PRODUCT_IDENTITY[locale];
   const copy = COPY[locale];
+  useCreatorHomeNavigation();
 
   return (
     <div
@@ -262,10 +265,10 @@ export function CreatorHomeExperience() {
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          <a href="#creator-start">{copy.jumpStart}</a>
-          <a href="#creator-flow">{copy.jumpFlow}</a>
-          <a href="#creator-principles">{copy.jumpPrinciples}</a>
-          <a href="#creator-support">{copy.jumpSupport}</a>
+          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
 

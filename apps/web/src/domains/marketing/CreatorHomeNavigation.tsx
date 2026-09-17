@@ -21,7 +21,7 @@ export function CreatorSectionLink({ sectionId, className, children }: {
   );
 }
 
-export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
+export function useCreatorHomeNavigation(): void {
   useEffect(() => bindCreatorSectionNavigation({
     getHash: () => window.location.hash,
     findTarget: (id) => document.getElementById(id),
@@ -32,7 +32,10 @@ export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
       return () => window.removeEventListener("hashchange", callback);
     },
   }), []);
+}
 
+export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
+  useCreatorHomeNavigation();
   const label = locale === "ko" ? "툰스튜디오 소개 바로가기" : "Explore the ToonStudio introduction";
   return (
     <nav className="ch-jump-nav" aria-label={label}>
