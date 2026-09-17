@@ -148,7 +148,7 @@ test("new project flow explains a disabled start action and preserves the chosen
   await projectName.fill("별빛 식당 1화");
   await expect(startButton).toHaveCount(0);
   await expect(page.getByText(/별빛 식당 1화/u)).toBeVisible();
-  await expect(page.getByText("이 기기에 저장됨", { exact: true })).toBeVisible();
+  await expect(page.getByText("이 기기에 저장됨", { exact: true }).first()).toBeVisible();
 
   const hasNoHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,
