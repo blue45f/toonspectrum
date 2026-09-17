@@ -7,6 +7,7 @@ export const CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL =
 export const CLOUDFLARE_OVERSIZED_ASSET_IGNORE_PATTERNS = [
   "assets/opencascade.wasm-*.wasm",
   "assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
+  "brand/toonstudio-product-tour.mp4",
 ] as const;
 
 export const CLOUDFLARE_LARGE_ASSET_ENCODINGS = ["br", "gzip"] as const;
@@ -19,6 +20,7 @@ export interface CloudflareLargeAssetDescriptor {
 
 const MODULAR_STREET_SEATING_PATH =
   "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb";
+const PRODUCT_TOUR_PATH = "/brand/toonstudio-product-tour.mp4";
 const OPENCASCADE_PATH_PATTERN =
   /^\/assets\/opencascade\.wasm-[A-Za-z0-9_-]+\.wasm$/u;
 
@@ -27,6 +29,9 @@ export function cloudflareLargeAssetDescriptor(
 ): CloudflareLargeAssetDescriptor | null {
   if (pathname === MODULAR_STREET_SEATING_PATH) {
     return { contentType: "model/gltf-binary" };
+  }
+  if (pathname === PRODUCT_TOUR_PATH) {
+    return { contentType: "video/mp4" };
   }
   if (OPENCASCADE_PATH_PATTERN.test(pathname)) {
     return { contentType: "application/wasm" };
