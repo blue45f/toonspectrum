@@ -60,11 +60,22 @@ function parseArgs(argv) {
   return options;
 }
 
+const ESCAPE_CHARACTER = String.fromCodePoint(27);
+const BELL_CHARACTER = String.fromCodePoint(7);
+const ANSI_CSI_PATTERN = new RegExp(`${ESCAPE_CHARACTER}\\[[0-?]*[ -/]*[@-~]`, 'gu');
+const ANSI_OSC_PATTERN = new RegExp(
+  `${ESCAPE_CHARACTER}\\][^${BELL_CHARACTER}]*(?:${BELL_CHARACTER}|${ESCAPE_CHARACTER}\\\\)`,
+  'gu',
+);
+
 export function stripAnsi(value) {
-  return String(value ?? '')
-    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/gu, '')
-    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/gu, '')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/gu, '');
+  const withoutAnsi = String(value ?? '')
+    .replace(ANSI_CSI_PATTERN, '')
+    .replace(ANSI_OSC_PATTERN, '');
+  return [...withoutAnsi].filter((character) => {
+    const codePoint = character.codePointAt(0);
+    return [9, 10, 13].includes(codePoint) || (codePoint > 31 && codePoint !== 127);
+  }).join('');
 }
 
 export function normalizeDiagnostic(value) {
@@ -577,10 +588,9 @@ async function mapLimit(items, concurrency, mapper) {
   const results = new Array(items.length);
   let nextIndex = 0;
   async function worker() {
-    while (true) {
+    while (nextIndex < items.length) {
       const index = nextIndex;
       nextIndex += 1;
-      if (index >= items.length) return;
       results[index] = await mapper(items[index], index);
     }
   }
