@@ -5,6 +5,7 @@ const { test } = process.env.VITEST ? await import("vitest") : await import("nod
 
 const index = readFileSync("media/brand-film/src/index.tsx", "utf8");
 const renderer = readFileSync("media/brand-film/render-technology.mjs", "utf8");
+const composition = readFileSync("media/brand-film/src/TechnologyStoryFilm.tsx", "utf8");
 const workflow = readFileSync(".github/workflows/technology-story-film.yml", "utf8");
 
 test("technology film compositions and renderer share the published identifiers", () => {
@@ -32,4 +33,11 @@ test("renderer emits review metadata, captions and transcripts", () => {
   assert(renderer.includes("technology-overview.en.vtt"));
   assert(renderer.includes("technology-transcript.ko.md"));
   assert(renderer.includes("technology-film-manifest.json"));
+});
+
+
+test("overview film keeps browser execution in sync with the field notes", () => {
+  assert(composition.includes('kicker: "04 · BROWSER EXECUTION"'));
+  assert(composition.includes('points: ["Workers", "PWA", "ONNX", "MediaPipe"]'));
+  assert(composition.includes('kicker: "07 · REUSABLE ENGINEERING"'));
 });

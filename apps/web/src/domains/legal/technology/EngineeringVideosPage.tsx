@@ -34,22 +34,27 @@ const STORYBOARD = [
     body: { ko: "Workspace, Project, Episode, Cut, Asset와 Approval이 하나의 흐름으로 정렬됩니다.", en: "Workspace, Project, Episode, Cut, Asset and Approval align into one flow." },
   },
   {
-    time: "00:25–00:40",
+    time: "00:25–00:38",
     title: { ko: "브러시와 로컬 우선 데이터", en: "Brushes and local-first data" },
     body: { ko: "입력에서 문서 commit까지의 파이프라인과 OPFS·복구 저널을 시각화합니다.", en: "Visualizes the input-to-document pipeline and OPFS recovery journal." },
   },
   {
-    time: "00:40–00:55",
+    time: "00:38–00:51",
+    title: { ko: "Worker·PWA·브라우저 로컬 AI", en: "Workers, PWA and browser-local AI" },
+    body: { ko: "59개 전용 Worker와 버전 있는 Service Worker, ONNX WebGPU/WASM·MediaPipe의 요청·취소·메모리 경계를 설명합니다.", en: "Explains request, cancellation and memory boundaries across 59 dedicated workers, versioned service workers, ONNX WebGPU/WASM and MediaPipe." },
+  },
+  {
+    time: "00:51–01:04",
     title: { ko: "협업·AI·개인 클라우드", en: "Collaboration, AI and personal cloud" },
     body: { ko: "외부 공급자를 제품 계약 뒤에 두고 사용자 승인과 권리 정보를 보존합니다.", en: "Places external providers behind product contracts while preserving approval and rights metadata." },
   },
   {
-    time: "00:55–01:10",
+    time: "01:04–01:17",
     title: { ko: "검증 가능한 상태", en: "Verifiable status" },
     body: { ko: "운영, 설정, 실험과 문서 상태를 코드·테스트·워크플로 근거와 연결합니다.", en: "Connects live, configured, experimental and documented states to code, tests and workflows." },
   },
   {
-    time: "01:10–01:30",
+    time: "01:17–01:30",
     title: { ko: "다른 프로젝트에 재사용", en: "Reuse in another project" },
     body: { ko: "패키지 목록이 아니라 경계, 실패, 대체 경로와 검증 순서를 가져가도록 마무리합니다.", en: "Closes by reusing boundaries, failure, fallback and verification order rather than a package list." },
   },
@@ -133,15 +138,15 @@ export function EngineeringVideosPage() {
               </h2>
               <p className="mt-4 max-w-lg text-xs leading-6 text-[#c6d8bf] sm:text-sm sm:leading-7">
                 {ko
-                  ? "문제 → 도메인 경계 → 전문 엔진 → 데이터 → 검증 → 재사용"
-                  : "Problem → domain boundary → specialist engines → data → verification → reuse"
+                  ? "문제 → 도메인 경계 → 로컬 실행 → 전문 엔진 → 데이터 → 검증 → 재사용"
+                  : "Problem → domain boundary → local execution → specialist engines → data → verification → reuse"
                 }
               </p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
               <div className="flex items-center justify-between text-[0.58rem] text-[#c6d8bf]">
                 <span>ARCHITECTURE MAP</span>
-                <span>01 / 06</span>
+                <span>01 / 07</span>
               </div>
               <div className="mt-4 space-y-2">
                 {["Creative experience", "Domain contracts", "Specialist engines", "Data & infrastructure", "Verification"].map((label, index) => (
