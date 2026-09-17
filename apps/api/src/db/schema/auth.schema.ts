@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
+  check,
   index,
   integer,
   jsonb,
@@ -38,7 +41,11 @@ export const users = pgTable(
     emailVerified: timestamp("emailVerified", { mode: "date" }),
     image: text("image"),
     role: text("role").notNull().default("user"),
-    status: text("status").notNull().default("active"), // active | suspended | deleted
+    status: text("status").notNull().default("active"), // active | suspended | deleted | merged
+    mergedIntoUserId: text("mergedIntoUserId").references(
+      (): AnyPgColumn => users.id,
+      { onDelete: "set null" },
+    ),
     sessionVersion: integer("sessionVersion").notNull().default(1), // 서버 로그아웃·정지·탈퇴 시 증가해 기존 토큰 무효화
     suspendedAt: timestamp("suspendedAt", { mode: "date" }),
     suspensionReason: text("suspensionReason"),
@@ -79,6 +86,83 @@ export const accounts = pgTable(
     index("idx_account_user").on(a.userId),
     uniqueIndex("idx_account_user_provider_unique").on(a.userId, a.provider),
   ]
+);
+
+
+export const accountMerges = pgTable(
+  "account_merge",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceUserId: text("sourceUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    targetUserId: text("targetUserId")
+      .references(() => users.id, { onDelete: "set null" }),
+    tokenHash: text("tokenHash").notNull(),
+    status: text("status").notNull().default("issued"),
+    expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
+    completedAt: timestamp("completedAt", { mode: "date" }),
+    summary: jsonb("summary")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (m) => [
+    uniqueIndex("account_merge_token_hash_unique").on(m.tokenHash),
+    index("idx_account_merge_source_status").on(m.sourceUserId, m.status, m.createdAt),
+    index("idx_account_merge_target_completed").on(m.targetUserId, m.completedAt),
+    index("idx_account_merge_expiry").on(m.status, m.expiresAt),
+    check(
+      "account_merge_status_check",
+      sql`${m.status} in ('issued', 'completed', 'cancelled')`,
+    ),
+    check(
+      "account_merge_distinct_accounts_check",
+      sql`${m.targetUserId} is null or ${m.sourceUserId} <> ${m.targetUserId}`,
+    ),
+    check(
+      "account_merge_token_hash_check",
+      sql`${m.tokenHash} ~ '^sha256:[0-9a-f]{64}
+  ],
+);
+
+
+export const sessions = pgTable(
+  "session",
+  {
+    sessionToken: text("sessionToken").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (s) => [index("idx_session_user").on(s.userId)]
+);
+
+
+export const verificationTokens = pgTable(
+  "verificationToken",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (vt) => [
+    primaryKey({ columns: [vt.identifier, vt.token] }),
+    index("idx_verification_token_token").on(vt.token),
+    index("idx_verification_token_expires").on(vt.expires),
+  ]
+);
+`,
+    ),
+    check(
+      "account_merge_expiry_check",
+      sql`${m.expiresAt} > ${m.createdAt}`,
+    ),
+  ],
 );
 
 
