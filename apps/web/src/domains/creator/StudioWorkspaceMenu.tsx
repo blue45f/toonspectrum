@@ -88,6 +88,8 @@ import {
 } from "./studio-workspaces";
 import { StudioWorkspaceRecommendation } from "./StudioWorkspaceRecommendation";
 
+import { getMyProfile, subscribeMyProfile } from "@/infrastructure/me-client";
+import { resolveCreatorActiveRole, type CreatorRoleId } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioWorkspaceMenuProps {
@@ -508,6 +510,29 @@ export function StudioWorkspaceMenu({
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeTone, setNoticeTone] = useState<"neutral" | "success" | "warning">("neutral");
   const [error, setError] = useState<string | null>(null);
+  const [creatorRole, setCreatorRole] = useState<CreatorRoleId | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const applyProfile = (
+      profile: Awaited<ReturnType<typeof getMyProfile>> | null,
+    ) => {
+      if (!alive) return;
+      setCreatorRole(profile
+        ? resolveCreatorActiveRole(profile.creatorRoleProfile)
+        : null);
+    };
+    const unsubscribe = subscribeMyProfile(applyProfile);
+    getMyProfile(controller.signal).then(applyProfile).catch(() => {
+      if (alive) setCreatorRole(null);
+    });
+    return () => {
+      alive = false;
+      controller.abort();
+      unsubscribe();
+    };
+  }, []);
 
   // Studio controls are authoritative. Fold them into the pure model before every action so an
   // autosaved catalog can never overwrite a more recent panel or quick-action change.
@@ -562,7 +587,8 @@ export function StudioWorkspaceMenu({
   const workspaceRecommendation = query.trim().length === 0
     ? resolveStudioWorkspaceRecommendation(
         STUDIO_DEFAULT_WORKSPACES,
-        syncedState.activeWorkspaceId
+        syncedState.activeWorkspaceId,
+        creatorRole,
       )
     : null;
   const builtinListExpanded = query.trim().length > 0 || builtinsExpanded;

@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  getMyProfile,
+  clearMyProfileCache,
   invalidateMyProfileCache,
+  getCachedMyProfile,
+  getMyProfile,
+  subscribeMyProfile,
   updateMyProfile,
 } from "./me-client";
 
@@ -26,21 +29,41 @@ vi.mock("@/infrastructure/api", () => ({
 }));
 
 const creatorRoleProfile = {
-  version: 1 as const,
+  version: 2 as const,
   primaryRole: "line-art" as const,
   secondaryRoles: ["assistant" as const],
   specialties: ["line-art" as const, "inking" as const],
   experienceLevel: "professional" as const,
   collaborationStatus: "limited" as const,
-  roleVisibility: true,
+  visibility: {
+    roles: true,
+    specialties: true,
+    experienceLevel: false,
+    collaborationStatus: true,
+  },
   activeRole: "assistant" as const,
+  usagePurposes: ["team-production" as const],
+  roleAliases: [],
+  workCapacity: {
+    weeklyHours: null,
+    maxConcurrentTasks: null,
+    availabilityNote: "",
+  },
+  defaultNotificationLevel: "standard" as const,
+  onboarding: {
+    status: "completed" as const,
+    step: 4 as const,
+    completedAt: "2026-09-17T10:00:00.000Z",
+    updatedAt: "2026-09-17T10:00:00.000Z",
+  },
+  projectRolePreferences: [],
 };
 
 describe("me profile client", () => {
   beforeEach(() => {
     apiGet.mockReset();
     apiPatch.mockReset();
-    invalidateMyProfileCache({ broadcast: false });
+    clearMyProfileCache();
     persistSession({
       user: { id: "profile-user", name: "이전 이름", role: "creator" },
       token: "profile-session-token",
@@ -48,7 +71,7 @@ describe("me profile client", () => {
   });
 
   afterEach(() => {
-    invalidateMyProfileCache({ broadcast: false });
+    clearMyProfileCache();
     persistSession(null);
   });
 
@@ -100,20 +123,31 @@ describe("me profile client", () => {
     await expect(getMyProfile()).resolves.toMatchObject({
       id: "profile-user",
       creatorRoleProfile: {
-        version: 1,
+        version: 2,
         primaryRole: null,
         secondaryRoles: [],
         specialties: [],
         experienceLevel: null,
         collaborationStatus: null,
-        roleVisibility: true,
+        visibility: {
+          roles: false,
+          specialties: false,
+          experienceLevel: false,
+          collaborationStatus: false,
+        },
         activeRole: null,
+        usagePurposes: [],
+        onboarding: {
+          status: "not-started",
+          step: 1,
+        },
+        projectRolePreferences: [],
       },
     });
   });
 
-  it("동일 세션 프로필 조회를 캐시하고 강제 새로고침을 지원한다", async () => {
-    const response = {
+  it("TTL 캐시를 사용하면서 기존 boolean 강제 새로고침 호출도 지원한다", async () => {
+    apiGet.mockResolvedValue({
       profile: {
         id: "profile-user",
         name: "캐시 사용자",
@@ -123,14 +157,54 @@ describe("me profile client", () => {
         bio: null,
         creatorRoleProfile,
       },
-    };
-    apiGet.mockResolvedValue(response);
+    });
 
     await getMyProfile();
     await getMyProfile();
     expect(apiGet).toHaveBeenCalledTimes(1);
 
     await getMyProfile(undefined, true);
-    expect(apiGet).toHaveBeenCalledTimes(2);
+    await getMyProfile(undefined, { force: true });
+    expect(apiGet).toHaveBeenCalledTimes(3);
+    invalidateMyProfileCache({ broadcast: false });
+  });
+
+  it("중복 조회를 합치고 저장된 프로필을 같은 탭의 구독자에게 즉시 전달한다", async () => {
+    let resolveProfile!: (value: unknown) => void;
+    apiGet.mockImplementation(() => new Promise((resolve) => {
+      resolveProfile = resolve;
+    }));
+    const first = getMyProfile();
+    const second = getMyProfile();
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    resolveProfile?.({
+      profile: {
+        id: "profile-user",
+        name: "캐시 사용자",
+        image: null,
+        avatar: null,
+        email: "profile@example.com",
+        bio: null,
+        creatorRoleProfile,
+      },
+    });
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(getCachedMyProfile()?.name).toBe("캐시 사용자");
+
+    const received: string[] = [];
+    const unsubscribe = subscribeMyProfile((profile) => {
+      if (profile?.name) received.push(profile.name);
+    });
+    apiPatch.mockResolvedValue({
+      profile: {
+        ...getCachedMyProfile(),
+        name: "동기화 사용자",
+      },
+    });
+    await updateMyProfile({ name: "동기화 사용자" });
+    unsubscribe();
+
+    expect(received).toEqual(["캐시 사용자", "동기화 사용자"]);
   });
 });

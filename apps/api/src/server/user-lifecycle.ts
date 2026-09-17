@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 
-import { EMPTY_CREATOR_ROLE_PROFILE } from "../../../web/src/shared/lib/creator-role-contract";
+import { EMPTY_CREATOR_ROLE_PROFILE } from "@toonspectrum/core/creator-role";
 import { accounts, db, dbClient, sessions, users } from "../db";
 
 import { getSessionUserCached, invalidateSessionUser } from "./session";

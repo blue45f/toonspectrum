@@ -423,6 +423,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0065_creator_series_lifecycle",
       "0066_share_analytics_events",
       "0067_creator_role_workspace_personalization",
+      "0068_creator_role_profile_v2",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

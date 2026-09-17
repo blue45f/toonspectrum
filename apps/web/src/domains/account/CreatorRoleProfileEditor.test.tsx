@@ -54,14 +54,24 @@ describe("CreatorRoleProfileEditor", () => {
     fireEvent.change(screen.getByLabelText("현재 작업 모드"), {
       target: { value: "assistant" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: /공개 프로필에 직무와 전문 분야 표시/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "사용 목적" }))
+      .getByRole("button", { name: /팀 프로젝트 참여/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "대표·보조 직무" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "전문 분야" }));
 
     expect(readProfile()).toMatchObject({
+      version: 2,
       primaryRole: "story",
       secondaryRoles: ["assistant"],
       specialties: ["dialogue"],
       activeRole: "assistant",
-      roleVisibility: false,
+      usagePurposes: ["team-production"],
+      visibility: {
+        roles: true,
+        specialties: true,
+        experienceLevel: false,
+        collaborationStatus: false,
+      },
     });
   });
 });

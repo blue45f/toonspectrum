@@ -12,7 +12,7 @@ import {
 import {
   EMPTY_CREATOR_ROLE_PROFILE,
   type CreatorRoleProfile,
-} from "../../../../web/src/shared/lib/creator-role-contract";
+} from "@toonspectrum/core/creator-role";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)

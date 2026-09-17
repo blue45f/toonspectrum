@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(67);
+  expect(manifest).toHaveLength(68);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0067_creator_role_workspace_personalization");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(67);
+  expect(manifest.at(-1).id).toBe("0068_creator_role_profile_v2");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(68);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -153,6 +153,39 @@ test("creator role workspace migration preserves opt-in privacy and bounded proj
     'idx_creator_role_workspace_preference_updated',
     'idx_user_creator_role_primary_public',
     'idx_user_creator_role_specialties_gin',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+});
+
+test("creator role profile v2 migration preserves legacy consent and adds private project preferences", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0068_creator_role_profile_v2",
+  );
+  expect(migration?.id).toBe("0068_creator_role_profile_v2");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "'version', 2",
+    "'visibility', CASE",
+    "ELSE jsonb_build_object(",
+    "'roles', COALESCE((\"creatorRoleProfile\" ->> 'roleVisibility')::boolean, false)",
+    "'usagePurposes', CASE",
+    "'roleAliases', CASE",
+    "'workCapacity', CASE",
+    "'defaultNotificationLevel', CASE",
+    "'projectRolePreferences', CASE",
+    "'status', 'not-started'",
+    '"version":2',
+    '"roles":false',
+    "'visibility'",
+    "'usagePurposes'",
+    "'onboarding'",
+    "'projectRolePreferences'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'visibility') = 'object'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'projectRolePreferences') = 'array'",
   ]) {
     expect(sql).toContain(requiredFragment);
   }

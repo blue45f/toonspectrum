@@ -50,6 +50,11 @@
       "types": "./src/infrastructure-fabric.ts",
       "import": "./src/infrastructure-fabric.ts",
       "default": "./src/infrastructure-fabric.ts"
+    },
+    "./creator-role": {
+      "types": "./src/creator-role.ts",
+      "import": "./src/creator-role.ts",
+      "default": "./src/creator-role.ts"
     }
   }
 }

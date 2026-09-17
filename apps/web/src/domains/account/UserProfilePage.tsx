@@ -23,6 +23,7 @@ import { Stars } from "@/shared/components/ui/stars";
 import {
   CREATOR_COLLABORATION_LABELS,
   CREATOR_EXPERIENCE_LABELS,
+  creatorRoleAlias,
   creatorRoleDefinition,
   creatorSpecialtyDefinition,
   creatorText,
@@ -214,6 +215,10 @@ export function UserProfilePage() {
   const avatar = profile?.avatar ?? feed[0]?.avatar ?? "#7c5cfc";
   const roleProfile = profile?.creatorRoleProfile ?? null;
   const primaryRole = creatorRoleDefinition(roleProfile?.primaryRole);
+  const primaryRoleLabel = roleProfile?.primaryRole
+    ? creatorRoleAlias(roleProfile, roleProfile.primaryRole)
+      ?? (primaryRole ? creatorText(primaryRole.label, locale) : null)
+    : null;
   const secondaryRoles = (roleProfile?.secondaryRoles ?? [])
     .map((role) => creatorRoleDefinition(role))
     .filter((role): role is NonNullable<typeof role> => Boolean(role));
@@ -294,13 +299,15 @@ export function UserProfilePage() {
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
-              {primaryRole && roleProfile ? (
+              {roleProfile ? (
                 <div className="mt-3 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
-                      <BriefcaseBusiness size={12} aria-hidden="true" />
-                      {creatorText(primaryRole.label, locale)}
-                    </span>
+                    {primaryRole ? (
+                      <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
+                        <BriefcaseBusiness size={12} aria-hidden="true" />
+                        {primaryRoleLabel}
+                      </span>
+                    ) : null}
                     {secondaryRoles.map((role) => (
                       <span key={role.id} className="inline-flex min-h-7 items-center rounded-full border border-line bg-card px-2.5 text-xs font-semibold text-fg-2">
                         {creatorText(role.shortLabel, locale)}

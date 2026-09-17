@@ -5,7 +5,7 @@ import { CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX } from "../../../web/src/share
 import {
   normalizeCreatorRoleProfile,
   type CreatorRoleProfile,
-} from "../../../web/src/shared/lib/creator-role-contract";
+} from "@toonspectrum/core/creator-role";
 import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
 import {
   db,

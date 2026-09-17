@@ -1,7 +1,7 @@
 // 내 정보(/api/me) 조회·프로필 갱신 전용 ky 헬퍼.
 // 공유 클라이언트가 HttpOnly 세션 쿠키와 CSRF 헤더를 처리한다.
 import {
-  getAuthSession,
+  getAuthUserId,
   mergeCurrentSessionProfile,
 } from "@/compat/auth-session-state";
 import {
@@ -30,14 +30,15 @@ export interface UpdateProfilePayload {
 type MeProfileResponse = Omit<MeProfile, "creatorRoleProfile"> & {
   creatorRoleProfile?: unknown;
 };
+
 type ProfileListener = (profile: MeProfile | null) => void;
 
+const PROFILE_CACHE_TTL_MS = 30_000;
 const PROFILE_CHANNEL_NAME = "toonspectrum:me-profile:v1";
-let cachedProfile: MeProfile | null = null;
-let inFlightProfile: Promise<MeProfile> | null = null;
-let profileChannel: BroadcastChannel | null = null;
-let channelInitialized = false;
 const profileListeners = new Set<ProfileListener>();
+let cachedProfile: { readonly value: MeProfile; readonly cachedAt: number } | null = null;
+let inFlightProfile: { readonly userId: string | null; readonly promise: Promise<MeProfile> } | null = null;
+let profileChannel: BroadcastChannel | null = null;
 
 function normalizeMeProfile(profile: MeProfileResponse): MeProfile {
   return {
@@ -46,67 +47,71 @@ function normalizeMeProfile(profile: MeProfileResponse): MeProfile {
   };
 }
 
-function currentSessionUserId(): string | null {
-  return getAuthSession()?.user.id ?? null;
+function currentCacheMatchesUser(): boolean {
+  const authUserId = getAuthUserId();
+  return Boolean(cachedProfile && (!authUserId || cachedProfile.value.id === authUserId));
 }
 
-function notifyProfileListeners(profile: MeProfile | null): void {
+function emitProfile(profile: MeProfile | null): void {
   for (const listener of profileListeners) listener(profile);
 }
 
-function ensureProfileChannel(): void {
-  if (channelInitialized || typeof BroadcastChannel === "undefined") return;
-  channelInitialized = true;
-  profileChannel = new BroadcastChannel(PROFILE_CHANNEL_NAME);
-  profileChannel.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const value = event.data;
-    if (!value || typeof value !== "object" || Array.isArray(value)) return;
-    const record = value as Record<string, unknown>;
-    if (record.type === "invalidate") {
-      cachedProfile = null;
-      inFlightProfile = null;
-      notifyProfileListeners(null);
-      return;
-    }
-    if (record.type !== "profile") return;
-    const candidate = record.profile;
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
-    const normalized = normalizeMeProfile(candidate as MeProfileResponse);
-    const sessionUserId = currentSessionUserId();
-    if (sessionUserId && normalized.id !== sessionUserId) return;
-    cachedProfile = normalized;
-    mergeCurrentSessionProfile(normalized);
-    notifyProfileListeners(normalized);
-  });
+function ensureProfileChannel(): BroadcastChannel | null {
+  if (profileChannel || typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
+    return profileChannel;
+  }
+  try {
+    profileChannel = new BroadcastChannel(PROFILE_CHANNEL_NAME);
+    profileChannel.onmessage = (event: MessageEvent<unknown>) => {
+      const payload = event.data;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+      const record = payload as Record<string, unknown>;
+      if (record.type === "profile-invalidated") {
+        cachedProfile = null;
+        inFlightProfile = null;
+        emitProfile(null);
+        return;
+      }
+      if (record.type !== "profile-updated" || !record.profile || typeof record.profile !== "object") {
+        return;
+      }
+      const profile = normalizeMeProfile(record.profile as MeProfileResponse);
+      const authUserId = getAuthUserId();
+      if (authUserId && profile.id !== authUserId) return;
+      cachedProfile = { value: profile, cachedAt: Date.now() };
+      mergeCurrentSessionProfile(profile);
+      emitProfile(profile);
+    };
+  } catch {
+    profileChannel = null;
+  }
+  return profileChannel;
 }
 
 function commitProfile(profile: MeProfile, broadcast: boolean): MeProfile {
-  cachedProfile = profile;
+  cachedProfile = { value: profile, cachedAt: Date.now() };
   mergeCurrentSessionProfile(profile);
-  notifyProfileListeners(profile);
+  emitProfile(profile);
   if (broadcast) {
-    ensureProfileChannel();
     try {
-      profileChannel?.postMessage({ type: "profile", profile });
+      ensureProfileChannel()?.postMessage({ type: "profile-updated", profile });
     } catch {
-      // Profile cache synchronization is an optimization; the server remains authoritative.
+      // Cross-tab delivery is best effort; the successful server update remains authoritative.
     }
   }
   return profile;
 }
 
-export function subscribeMyProfile(listener: ProfileListener): () => void {
-  ensureProfileChannel();
-  profileListeners.add(listener);
-  return () => profileListeners.delete(listener);
+export function getCachedMyProfile(): MeProfile | null {
+  return currentCacheMatchesUser() ? cachedProfile?.value ?? null : null;
 }
 
-export function getCachedMyProfile(): MeProfile | null {
-  const sessionUserId = currentSessionUserId();
-  if (cachedProfile && sessionUserId && cachedProfile.id !== sessionUserId) {
-    cachedProfile = null;
-  }
-  return cachedProfile;
+export function subscribeMyProfile(listener: ProfileListener): () => void {
+  profileListeners.add(listener);
+  ensureProfileChannel();
+  const cached = getCachedMyProfile();
+  if (cached) listener(cached);
+  return () => profileListeners.delete(listener);
 }
 
 export function invalidateMyProfileCache(options?: {
@@ -114,27 +119,42 @@ export function invalidateMyProfileCache(options?: {
 }): void {
   cachedProfile = null;
   inFlightProfile = null;
-  notifyProfileListeners(null);
-  if (options?.broadcast !== false) {
-    ensureProfileChannel();
-    try {
-      profileChannel?.postMessage({ type: "invalidate" });
-    } catch {
-      // Other tabs will refresh naturally on their next profile request.
-    }
+  emitProfile(null);
+  if (options?.broadcast === false) return;
+  try {
+    ensureProfileChannel()?.postMessage({ type: "profile-invalidated" });
+  } catch {
+    // Other tabs will refresh naturally on their next profile request.
   }
+}
+
+export function clearMyProfileCache(): void {
+  invalidateMyProfileCache({ broadcast: false });
 }
 
 export async function getMyProfile(
   signal?: AbortSignal,
-  force = false,
+  forceOrOptions: boolean | { readonly force?: boolean } = {},
 ): Promise<MeProfile> {
-  ensureProfileChannel();
+  const force = typeof forceOrOptions === "boolean"
+    ? forceOrOptions
+    : Boolean(forceOrOptions.force);
+  const userId = getAuthUserId();
   const cached = getCachedMyProfile();
-  if (!force && cached) return cached;
-  if (!force && !signal && inFlightProfile) return inFlightProfile;
+  if (
+    !force
+    && !signal
+    && cached
+    && cachedProfile
+    && Date.now() - cachedProfile.cachedAt < PROFILE_CACHE_TTL_MS
+  ) {
+    return cached;
+  }
+  if (!force && !signal && inFlightProfile?.userId === userId) {
+    return inFlightProfile.promise;
+  }
 
-  const request = (async () => {
+  const load = async (): Promise<MeProfile> => {
     let data: { profile?: MeProfileResponse } | undefined;
     try {
       data = await api.get<{ profile?: MeProfileResponse }>("/me", { signal });
@@ -143,13 +163,14 @@ export async function getMyProfile(
     }
     if (!data?.profile?.id) throw new Error("프로필을 불러오지 못했어요.");
     return commitProfile(normalizeMeProfile(data.profile), false);
-  })();
+  };
 
-  if (!signal) inFlightProfile = request;
+  const promise = load();
+  if (!signal) inFlightProfile = { userId, promise };
   try {
-    return await request;
+    return await promise;
   } finally {
-    if (!signal && inFlightProfile === request) inFlightProfile = null;
+    if (inFlightProfile?.promise === promise) inFlightProfile = null;
   }
 }
 

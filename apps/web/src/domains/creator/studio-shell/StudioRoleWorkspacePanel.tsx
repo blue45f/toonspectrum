@@ -10,7 +10,12 @@ import { useEffect, useState } from "react";
 
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
-import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import {
+  getMyProfile,
+  subscribeMyProfile,
+  updateMyProfile,
+  type MeProfile,
+} from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   creatorRoleDefinition,
@@ -21,6 +26,8 @@ import {
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
+
+import { CreatorRoleOnboarding } from "./CreatorRoleOnboarding";
 
 function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
   return locale === "ko" ? ko : en;
@@ -36,6 +43,7 @@ export function StudioRoleWorkspacePanel({
   const [loading, setLoading] = useState(false);
   const [savingRole, setSavingRole] = useState<CreatorRoleId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -64,6 +72,10 @@ export function StudioRoleWorkspacePanel({
     };
   }, [locale, status]);
 
+  useEffect(() => subscribeMyProfile((nextProfile) => {
+    if (nextProfile) setProfile(nextProfile);
+  }), []);
+
   if (status !== "authenticated") return null;
 
   if (loading) {
@@ -82,6 +94,21 @@ export function StudioRoleWorkspacePanel({
           ))}
         </div>
       </section>
+    );
+  }
+
+  if (
+    profile
+    && !profile.creatorRoleProfile.primaryRole
+    && (profile.creatorRoleProfile.onboarding.status !== "skipped" || showOnboarding)
+  ) {
+    return (
+      <CreatorRoleOnboarding
+        profile={profile}
+        locale={locale}
+        onProfileChange={setProfile}
+        onDismiss={() => setShowOnboarding(false)}
+      />
     );
   }
 
@@ -108,10 +135,22 @@ export function StudioRoleWorkspacePanel({
               {error ? <p className="mt-2 text-xs font-semibold text-bad">{error}</p> : null}
             </div>
           </div>
-          <Link href="/me?tab=profile" className={buttonClass({ className: "shrink-0 gap-2" })}>
-            <Settings2 size={15} aria-hidden="true" />
-            {localized(locale, "직무 설정", "Set roles")}
-          </Link>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {profile ? (
+              <button
+                type="button"
+                className={buttonClass({ className: "gap-2" })}
+                onClick={() => setShowOnboarding(true)}
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                {localized(locale, "빠른 설정", "Quick setup")}
+              </button>
+            ) : null}
+            <Link href="/me?tab=profile" className={buttonClass({ variant: "outline", className: "gap-2" })}>
+              <Settings2 size={15} aria-hidden="true" />
+              {localized(locale, "상세 설정", "Detailed settings")}
+            </Link>
+          </div>
         </div>
       </section>
     );
@@ -163,10 +202,16 @@ export function StudioRoleWorkspacePanel({
               {creatorText(activeDefinition.workspaceSummary, locale)}
             </p>
           </div>
-          <Link href="/me?tab=profile" className={buttonClass({ variant: "quiet", size: "sm", className: "shrink-0 gap-1.5" })}>
-            <Settings2 size={14} aria-hidden="true" />
-            {localized(locale, "직무 편집", "Edit roles")}
-          </Link>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Link href="/creators" className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5" })}>
+              <BriefcaseBusiness size={14} aria-hidden="true" />
+              {localized(locale, "창작자 찾기", "Find creators")}
+            </Link>
+            <Link href="/me?tab=profile" className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5" })}>
+              <Settings2 size={14} aria-hidden="true" />
+              {localized(locale, "직무 편집", "Edit roles")}
+            </Link>
+          </div>
         </div>
 
         {selectedRoles.length > 1 ? (

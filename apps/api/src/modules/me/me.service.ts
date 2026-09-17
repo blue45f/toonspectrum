@@ -6,7 +6,7 @@ import {
   normalizeCollectionEmoji,
   normalizeCollectionName,
 } from "../../../../web/src/shared/lib/collection-contract";
-import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/creator-role-contract";
+import { parseCreatorRoleProfileInput } from "@toonspectrum/core/creator-role";
 import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 

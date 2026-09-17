@@ -46,7 +46,15 @@ import {
   type ProductionWorkspace,
   type StudioProductionWorkspaceMode,
 } from "./studio-production-workspace";
-import { creatorProfileProductionRoleRecommendations } from "./creator-role-production-bridge";
+import {
+  creatorProfileProductionRoleRecommendations,
+  publicCreatorProfileProductionRoleRecommendations,
+} from "./creator-role-production-bridge";
+import { CreatorProjectRoleSwitcher } from "./CreatorProjectRoleSwitcher";
+import { CreatorRoleTaskInbox } from "./CreatorRoleTaskInbox";
+import { CreatorRoleNotificationCenter } from "./CreatorRoleNotificationCenter";
+import { CreatorRoleToolkit } from "./CreatorRoleToolkit";
+import { CreatorRoleWorkloadPanel } from "./CreatorRoleWorkloadPanel";
 import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
 import {
   StudioProductionOperationsPanel,
@@ -64,8 +72,13 @@ import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
-import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import {
+  getMyProfile,
+  subscribeMyProfile,
+  type MeProfile,
+} from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { resolveCreatorNotificationLevel } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 
@@ -410,6 +423,10 @@ function StudioProductionHubWorkspace({
     };
   }, []);
 
+  useEffect(() => subscribeMyProfile((profile) => {
+    if (profile) setMyProfile(profile);
+  }), []);
+
   useEffect(() => {
     if (mode !== "server-work" || !serverWorkId) {
       setTeamSnapshot(null);
@@ -430,10 +447,19 @@ function StudioProductionHubWorkspace({
     };
   }, [mode, serverWorkId]);
 
-  const roleCandidates = useMemo<readonly StudioProductionRoleCandidate[]>(() => {
-    const recommendations = creatorProfileProductionRoleRecommendations(
+  const activeProductionRoles = useMemo(
+    () => creatorProfileProductionRoleRecommendations(
       myProfile?.creatorRoleProfile,
-    );
+      scope.key,
+    ),
+    [myProfile?.creatorRoleProfile, scope.key],
+  );
+  const roleNotificationLevel = myProfile
+    ? resolveCreatorNotificationLevel(myProfile.creatorRoleProfile, scope.key)
+    : "standard";
+
+  const roleCandidates = useMemo<readonly StudioProductionRoleCandidate[]>(() => {
+    const recommendations = activeProductionRoles;
     if (teamSnapshot) {
       const candidates = teamSnapshot.members
         .filter((member) => member.status === "active")
@@ -442,7 +468,9 @@ function StudioProductionHubWorkspace({
           displayName: member.name,
           accessRole: member.role,
           isCurrentUser: member.userId === myProfile?.id,
-          recommendedRoles: member.userId === myProfile?.id ? recommendations : [],
+          recommendedRoles: member.userId === myProfile?.id
+            ? recommendations
+            : publicCreatorProfileProductionRoleRecommendations(member.creatorRoleProfile),
         }));
       if (
         myProfile
@@ -469,7 +497,7 @@ function StudioProductionHubWorkspace({
       }];
     }
     return [];
-  }, [mode, myProfile, teamSnapshot]);
+  }, [activeProductionRoles, mode, myProfile, teamSnapshot]);
 
   useEffect(() => {
     if (!capabilities.canPersistLocally || typeof BroadcastChannel === "undefined") return;
@@ -778,6 +806,14 @@ function StudioProductionHubWorkspace({
       <div className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         <ModeNotice mode={mode} />
 
+        {myProfile?.creatorRoleProfile.primaryRole ? (
+          <CreatorProjectRoleSwitcher
+            profile={myProfile}
+            projectKey={scope.key}
+            onProfileChange={setMyProfile}
+          />
+        ) : null}
+
         {loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm" role="alert">
             <p className="font-bold">저장된 제작 운영 데이터를 안전하게 열지 못했습니다.</p>
@@ -835,6 +871,36 @@ function StudioProductionHubWorkspace({
 
         {surface === "projects" ? (
           <div className="space-y-4">
+            {myProfile && activeProductionRoles.length > 0 ? (
+              <>
+                <CreatorRoleTaskInbox
+                  workspace={workspace}
+                  currentUserId={myProfile.id}
+                  activeRoles={activeProductionRoles}
+                />
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <CreatorRoleNotificationCenter
+                    workspace={workspace}
+                    currentUserId={myProfile.id}
+                    activeRoles={activeProductionRoles}
+                    level={roleNotificationLevel}
+                  />
+                  <CreatorRoleWorkloadPanel
+                    workspace={workspace}
+                    currentUserId={myProfile.id}
+                    capacity={myProfile.creatorRoleProfile.workCapacity}
+                  />
+                </div>
+                <CreatorRoleToolkit
+                  workspace={workspace}
+                  activeRoles={activeProductionRoles}
+                  currentUserId={myProfile.id}
+                  currentUserName={myProfile.name ?? myProfile.email ?? "나"}
+                  canEdit={capabilities.canEdit && !loadError}
+                  onCommit={(update, message) => { void commit(update, message); }}
+                />
+              </>
+            ) : null}
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <Card
               title="다음 할 일"

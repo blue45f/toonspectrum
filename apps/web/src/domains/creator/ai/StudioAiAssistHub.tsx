@@ -19,7 +19,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
@@ -32,9 +32,12 @@ import {
 } from "./studio-ai-assist-ux";
 import { planStudioAiExecutionPreflight } from "./studio-ai-execution-preflight";
 import { StudioAiProductionLaunchpad } from "./StudioAiProductionLaunchpad";
+import { creatorRoleAiRecommendations } from "./creator-role-ai-recommendations";
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 
+import { getMyProfile, subscribeMyProfile } from "@/infrastructure/me-client";
+import { resolveCreatorActiveRole, type CreatorRoleId } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 
 const TOOL_ICONS: Record<StudioAiAssistToolId, LucideIcon> = {
@@ -101,6 +104,31 @@ export function StudioAiAssistHub({
   const toolMeta = STUDIO_AI_ASSIST_TOOLS.find((t) => t.id === activeTool) ?? STUDIO_AI_ASSIST_TOOLS[0]!;
   const presets = presetsForAssistTool(activeTool);
   const recents = recentPromptsForTool(recentState, activeTool, 3);
+  const [creatorRole, setCreatorRole] = useState<CreatorRoleId | null>(null);
+  const roleRecommendations = creatorRoleAiRecommendations(creatorRole);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const applyProfile = (
+      profile: Awaited<ReturnType<typeof getMyProfile>> | null,
+    ) => {
+      if (!alive) return;
+      setCreatorRole(profile
+        ? resolveCreatorActiveRole(profile.creatorRoleProfile)
+        : null);
+    };
+    const unsubscribe = subscribeMyProfile(applyProfile);
+    getMyProfile(controller.signal).then(applyProfile).catch(() => {
+      if (alive) setCreatorRole(null);
+    });
+    return () => {
+      alive = false;
+      controller.abort();
+      unsubscribe();
+    };
+  }, []);
+
   const executionPreflight = planStudioAiExecutionPreflight({
     activeTool,
     imageConfigured,
@@ -111,6 +139,17 @@ export function StudioAiAssistHub({
 
   const applyPromptAndRevealToolPanel = (prompt: string) => {
     onApplyPresetPrompt(activeTool, prompt);
+    globalThis.requestAnimationFrame(() => {
+      toolPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+
+  const applyRoleRecommendation = (
+    tool: StudioAiAssistToolId,
+    prompt: string,
+  ) => {
+    onToolChange(tool);
+    onApplyPresetPrompt(tool, prompt);
     globalThis.requestAnimationFrame(() => {
       toolPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
@@ -226,6 +265,35 @@ export function StudioAiAssistHub({
       />
 
       {providerSlot ? <div className="shrink-0">{providerSlot}</div> : null}
+
+      {roleRecommendations.length > 0 ? (
+        <section className="shrink-0 rounded-xl border border-accent/30 bg-accent-soft/35 p-3" aria-label="현재 직무 AI 추천">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[0.67rem] font-black text-fg">현재 직무에 맞는 AI 시작점</p>
+            <span className="text-[0.58rem] font-semibold text-fg-3">자동 실행 안 함</span>
+          </div>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5">
+            {roleRecommendations.map((recommendation) => (
+              <button
+                key={recommendation.id}
+                type="button"
+                onClick={() => applyRoleRecommendation(recommendation.tool, recommendation.prompt)}
+                className={cn(
+                  "min-w-[11rem] flex-1 rounded-lg border border-line bg-card px-3 py-2 text-left hover:border-accent/45 hover:bg-raised",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                )}
+              >
+                <span className="block text-[0.67rem] font-black text-fg">{recommendation.label}</span>
+                <span className="mt-1 block text-[0.58rem] leading-relaxed text-fg-3">{recommendation.reason}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[0.57rem] leading-relaxed text-fg-3">
+            추천 프롬프트만 입력하며 프로젝트 문서나 비공개 원고를 자동 전송하지 않습니다.
+          </p>
+        </section>
+      ) : null}
 
       {/* Tool tabs — sticky within hub scroll is not needed; kept fixed above body */}
       <div

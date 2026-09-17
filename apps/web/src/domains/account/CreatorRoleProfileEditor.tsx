@@ -11,10 +11,14 @@ import { useMemo } from "react";
 import {
   CREATOR_COLLABORATION_LABELS,
   CREATOR_EXPERIENCE_LABELS,
+  CREATOR_ROLE_ALIAS_MAX_LENGTH,
+  CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH,
   CREATOR_ROLE_DEFINITIONS,
   CREATOR_ROLE_MAX_SECONDARY,
   CREATOR_ROLE_MAX_SPECIALTIES,
+  CREATOR_ROLE_NOTIFICATION_LABELS,
   CREATOR_SPECIALTY_DEFINITIONS,
+  CREATOR_USAGE_PURPOSE_DEFINITIONS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
@@ -25,8 +29,11 @@ import {
   type CreatorRoleGroup,
   type CreatorRoleId,
   type CreatorRoleLocale,
+  type CreatorRoleNotificationLevel,
   type CreatorRoleProfile,
+  type CreatorRoleVisibility,
   type CreatorSpecialtyId,
+  type CreatorUsagePurposeId,
 } from "@/shared/lib/creator-role-contract";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -109,6 +116,46 @@ export function CreatorRoleProfileEditor({
       specialties: selected
         ? value.specialties.filter((entry) => entry !== specialty)
         : [...value.specialties, specialty],
+    }));
+  };
+
+
+  const toggleUsagePurpose = (purpose: CreatorUsagePurposeId) => {
+    const selected = value.usagePurposes.includes(purpose);
+    onChange(withProfilePatch(value, {
+      usagePurposes: selected
+        ? value.usagePurposes.filter((entry) => entry !== purpose)
+        : [...value.usagePurposes, purpose],
+    }));
+  };
+
+  const setVisibility = (field: keyof CreatorRoleVisibility, checked: boolean) => {
+    onChange(withProfilePatch(value, {
+      visibility: { ...value.visibility, [field]: checked },
+    }));
+  };
+
+  const setPrimaryRoleAlias = (label: string) => {
+    if (!value.primaryRole) return;
+    const trimmed = label.trim().slice(0, CREATOR_ROLE_ALIAS_MAX_LENGTH);
+    onChange(withProfilePatch(value, {
+      roleAliases: [
+        ...(trimmed ? [{ role: value.primaryRole, label: trimmed }] : []),
+        ...value.roleAliases.filter((entry) => entry.role !== value.primaryRole),
+      ],
+    }));
+  };
+
+  const setCapacityNumber = (
+    field: "weeklyHours" | "maxConcurrentTasks",
+    rawValue: string,
+  ) => {
+    const number = rawValue ? Number(rawValue) : null;
+    onChange(withProfilePatch(value, {
+      workCapacity: {
+        ...value.workCapacity,
+        [field]: Number.isFinite(number) ? number : null,
+      },
     }));
   };
 
@@ -335,24 +382,175 @@ export function CreatorRoleProfileEditor({
         </div>
       ) : null}
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-card p-3">
-        <input
-          type="checkbox"
-          checked={value.roleVisibility}
-          disabled={disabled}
-          onChange={(event) => onChange(withProfilePatch(value, { roleVisibility: event.target.checked }))}
-          className="mt-0.5 size-4 rounded border-line accent-[var(--accent)]"
-        />
-        {value.roleVisibility ? <Eye size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /> : <EyeOff size={16} className="mt-0.5 shrink-0 text-fg-3" aria-hidden="true" />}
-        <span>
-          <span className="block text-xs font-bold text-fg">
-            {localized(locale, "공개 프로필에 직무와 전문 분야 표시", "Show roles and specialties on my public profile")}
-          </span>
-          <span className="mt-1 block text-[0.7rem] leading-5 text-fg-3">
-            {localized(locale, "끄면 개인화는 유지되지만 다른 사용자에게는 직무 정보가 보이지 않습니다.", "When disabled, personalization remains active but role information is hidden from other users.")}
-          </span>
-        </span>
-      </label>
+      <fieldset disabled={disabled || !value.primaryRole} className="rounded-2xl border border-line bg-card p-4">
+        <legend className="px-1 text-xs font-black text-fg">
+          {localized(locale, "직무 표시와 업무 가능량", "Role label and capacity")}
+        </legend>
+        <p className="mt-1 text-[0.72rem] leading-5 text-fg-3">
+          {localized(
+            locale,
+            "표시 직무명은 시스템 역할을 바꾸지 않습니다. 작업 가능량은 내 업무함의 과부하 안내에만 사용됩니다.",
+            "A display title never changes permissions. Capacity is used only for workload guidance.",
+          )}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-semibold text-fg">
+            {localized(locale, "표시 직무명", "Display role title")}
+            <input
+              value={value.primaryRole
+                ? value.roleAliases.find((entry) => entry.role === value.primaryRole)?.label ?? ""
+                : ""}
+              onChange={(event) => setPrimaryRoleAlias(event.currentTarget.value)}
+              maxLength={CREATOR_ROLE_ALIAS_MAX_LENGTH}
+              placeholder={localized(locale, "예: 연출 PD, 메인 어시", "e.g. Art director, lead assistant")}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
+            />
+          </label>
+          <label className="text-xs font-semibold text-fg">
+            {localized(locale, "기본 알림 강도", "Default notification level")}
+            <select
+              value={value.defaultNotificationLevel}
+              onChange={(event) => onChange(withProfilePatch(value, {
+                defaultNotificationLevel: event.currentTarget.value as CreatorRoleNotificationLevel,
+              }))}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
+            >
+              {Object.entries(CREATOR_ROLE_NOTIFICATION_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>{creatorText(label, locale)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-fg">
+            {localized(locale, "주당 작업 가능 시간", "Weekly available hours")}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={168}
+              value={value.workCapacity.weeklyHours ?? ""}
+              onChange={(event) => setCapacityNumber("weeklyHours", event.currentTarget.value)}
+              placeholder={localized(locale, "예: 20", "e.g. 20")}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
+            />
+          </label>
+          <label className="text-xs font-semibold text-fg">
+            {localized(locale, "동시 진행 작업 한도", "Concurrent task limit")}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={50}
+              value={value.workCapacity.maxConcurrentTasks ?? ""}
+              onChange={(event) => setCapacityNumber("maxConcurrentTasks", event.currentTarget.value)}
+              placeholder={localized(locale, "예: 4", "e.g. 4")}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
+            />
+          </label>
+        </div>
+        <label className="mt-3 block text-xs font-semibold text-fg">
+          {localized(locale, "작업 가능 상태 메모", "Availability note")}
+          <textarea
+            value={value.workCapacity.availabilityNote}
+            onChange={(event) => onChange(withProfilePatch(value, {
+              workCapacity: {
+                ...value.workCapacity,
+                availabilityNote: event.currentTarget.value.slice(
+                  0,
+                  CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH,
+                ),
+              },
+            }))}
+            maxLength={CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH}
+            rows={2}
+            placeholder={localized(locale, "예: 평일 저녁 가능, 배경 외주 우선", "e.g. Weekday evenings, background work preferred")}
+            className="mt-1.5 w-full resize-y rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset disabled={disabled || !value.primaryRole}>
+        <legend className="text-xs font-black text-fg">
+          {localized(locale, "사용 목적", "How you use ToonStudio")}
+        </legend>
+        <p className="mt-1 text-[0.72rem] leading-5 text-fg-3">
+          {localized(
+            locale,
+            "선택한 목적에 맞춰 첫 화면과 체크리스트를 우선 구성합니다.",
+            "Your selections prioritize the right starting paths and checklists.",
+          )}
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {CREATOR_USAGE_PURPOSE_DEFINITIONS.map((entry) => {
+            const selected = value.usagePurposes.includes(entry.id);
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleUsagePurpose(entry.id)}
+                className={cn(
+                  "min-h-20 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                  selected
+                    ? "border-accent/50 bg-accent-soft"
+                    : "border-line bg-card hover:border-accent/35 hover:bg-raised",
+                )}
+              >
+                <span className={cn("flex items-center gap-1.5 text-xs font-black", selected ? "text-accent" : "text-fg")}>
+                  {selected ? <Check size={12} aria-hidden="true" /> : null}
+                  {creatorText(entry.label, locale)}
+                </span>
+                <span className="mt-1.5 block text-[0.7rem] leading-5 text-fg-3">
+                  {creatorText(entry.description, locale)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      <fieldset disabled={disabled || !value.primaryRole} className="rounded-2xl border border-line bg-card p-4">
+        <legend className="px-1 text-xs font-black text-fg">
+          {localized(locale, "공개 프로필 범위", "Public profile visibility")}
+        </legend>
+        <p className="mt-1 text-[0.72rem] leading-5 text-fg-3">
+          {localized(
+            locale,
+            "새 항목은 기본적으로 비공개입니다. 공개할 정보만 각각 선택하세요.",
+            "New fields are private by default. Select only the information you want to publish.",
+          )}
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {([
+            ["roles", localized(locale, "대표·보조 직무", "Primary and secondary roles")],
+            ["specialties", localized(locale, "전문 분야", "Specialties")],
+            ["experienceLevel", localized(locale, "경력 수준", "Experience level")],
+            ["collaborationStatus", localized(locale, "협업 가능 상태", "Collaboration status")],
+          ] as const).map(([field, label]) => {
+            const visible = value.visibility[field];
+            return (
+              <label key={field} className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  onChange={(event) => setVisibility(field, event.target.checked)}
+                  className="size-4 rounded border-line accent-[var(--accent)]"
+                />
+                {visible
+                  ? <Eye size={14} className="shrink-0 text-accent" aria-hidden="true" />
+                  : <EyeOff size={14} className="shrink-0 text-fg-3" aria-hidden="true" />}
+                <span className="text-xs font-semibold text-fg">{label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[0.68rem] leading-5 text-fg-3">
+          {localized(
+            locale,
+            "공개 여부와 관계없이 직무별 개인화와 프로젝트 작업 모드는 유지됩니다.",
+            "Workspace personalization and project role modes remain active regardless of public visibility.",
+          )}
+        </p>
+      </fieldset>
 
       {activeDefinition ? (
         <aside className="overflow-hidden rounded-2xl border border-accent/30 bg-accent-soft/45 p-4" aria-label={localized(locale, "직무별 작업 화면 미리보기", "Role workspace preview") }>

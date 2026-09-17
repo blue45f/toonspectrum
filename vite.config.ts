@@ -483,7 +483,10 @@ export default defineConfig(({ mode }) => ({
   root: webRoot,
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
-    alias: { "@": path.resolve(webRoot, "src") },
+    alias: {
+      "@": path.resolve(webRoot, "src"),
+      "@toonspectrum/core/creator-role": path.resolve(repositoryRoot, "packages/core/src/creator-role.ts"),
+    },
     // Workspace hooks and their auto-installed peers must share the app renderer's dispatcher.
     dedupe: ["react", "react-dom"],
   },

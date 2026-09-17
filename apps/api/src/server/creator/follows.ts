@@ -1,10 +1,13 @@
 // 팔로우/공개 프로필 — 토글, 통계, 창작 활동 요약.
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import {
   publicCreatorRoleProfile,
+  type CreatorCollaborationStatus,
+  type CreatorRoleId,
+  type CreatorSpecialtyId,
   type PublicCreatorRoleProfile,
-} from "../../../../web/src/shared/lib/creator-role-contract";
+} from "@toonspectrum/core/creator-role";
 import { creatorFollows, creatorSeries, creatorWorks, db, users } from "../../db";
 
 import { validateFollowPair } from "./community-contract";
@@ -29,6 +32,29 @@ export interface CreatorPublicProfile {
   works: number; // 공개 창작 작품 수
   series: number; // 시리즈 수
   creatorRoleProfile: PublicCreatorRoleProfile | null;
+}
+
+export interface CreatorDirectoryQuery {
+  readonly q?: string;
+  readonly role?: CreatorRoleId;
+  readonly specialty?: CreatorSpecialtyId;
+  readonly collaborationStatus?: CreatorCollaborationStatus;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface CreatorDirectoryEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly avatar: string;
+  readonly bio: string;
+  readonly createdAt: string | null;
+  readonly creatorRoleProfile: PublicCreatorRoleProfile;
+}
+
+export interface CreatorDirectoryResult {
+  readonly items: readonly CreatorDirectoryEntry[];
+  readonly nextOffset: number | null;
 }
 
 async function countFollowers(creatorId: string): Promise<number> {
@@ -95,6 +121,69 @@ export async function getFollowStats(creatorId: string, viewerId?: string): Prom
   } catch {
     return { followers: 0, following: 0, isFollowing: false };
   }
+}
+
+export async function searchCreatorDirectory(
+  query: CreatorDirectoryQuery,
+): Promise<CreatorDirectoryResult> {
+  const q = query.q?.trim();
+  const limit = Math.min(50, Math.max(1, query.limit ?? 24));
+  const offset = Math.min(10_000, Math.max(0, query.offset ?? 0));
+  const visibility = users.creatorRoleProfile;
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatar: users.avatar,
+      bio: users.bio,
+      createdAt: users.createdAt,
+      creatorRoleProfile: users.creatorRoleProfile,
+    })
+    .from(users)
+    .where(and(
+      eq(users.status, "active"),
+      excludeTestUserId(users.id),
+      or(
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'roles')::boolean = true`,
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'specialties')::boolean = true`,
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'experienceLevel')::boolean = true`,
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'collaborationStatus')::boolean = true`,
+      ),
+      q ? or(ilike(users.name, `%${q}%`), ilike(users.bio, `%${q}%`)) : undefined,
+      query.role ? and(
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'roles')::boolean = true`,
+        sql<boolean>`(
+          ${visibility} ->> 'primaryRole' = ${query.role}
+          OR ${visibility} -> 'secondaryRoles' @> ${JSON.stringify([query.role])}::jsonb
+        )`,
+      ) : undefined,
+      query.specialty ? and(
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'specialties')::boolean = true`,
+        sql<boolean>`${visibility} -> 'specialties' @> ${JSON.stringify([query.specialty])}::jsonb`,
+      ) : undefined,
+      query.collaborationStatus ? and(
+        sql<boolean>`(${visibility} -> 'visibility' ->> 'collaborationStatus')::boolean = true`,
+        sql<boolean>`${visibility} ->> 'collaborationStatus' = ${query.collaborationStatus}`,
+      ) : undefined,
+    ))
+    .orderBy(desc(users.createdAt), desc(users.id))
+    .limit(limit + 1)
+    .offset(offset);
+  const items = rows.slice(0, limit).flatMap((row) => {
+    const creatorRoleProfile = publicCreatorRoleProfile(row.creatorRoleProfile);
+    return creatorRoleProfile ? [{
+      id: row.id,
+      name: row.name ?? "익명",
+      avatar: row.avatar ?? "#7c5cfc",
+      bio: row.bio ?? "",
+      createdAt: row.createdAt ? safeDate(row.createdAt) : null,
+      creatorRoleProfile,
+    }] : [];
+  });
+  return {
+    items,
+    nextOffset: rows.length > limit ? offset + limit : null,
+  };
 }
 
 // ── 공개 프로필 — 회원 기본 정보 + 팔로우 통계 + 창작 활동 수 ─────────
