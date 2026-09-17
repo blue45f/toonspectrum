@@ -37,6 +37,8 @@ describe("creator home experience contracts", () => {
     expect(source).toContain("AI는 보조 도구로");
     expect(source).toContain('id="creator-toolkit-title"');
     expect(source).toContain('id="creator-process-title"');
+    expect(source).toContain('import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation"');
+    expect(source).toContain("useCreatorHomeSectionNavigation();");
     expect(source).toContain('data-creator-home="production-first"');
     expect(source).toContain('data-creator-experience="all-in-one-studio-v3"');
     expect(source).toContain("data-theme-art={resolvedTheme}");
