@@ -1,17 +1,13 @@
-# Site OST assets
+# ToonSpectrum Original OST assets
 
-The global player is now designed around a **ToonSpectrum original anime OST** experience:
-opening, ending, creator, story, action, and character-song roles. The default listener source
-is `original-ost`; the procedural Web Audio engine remains available as `focus-instrumental`.
+This directory is reserved for reviewed **ToonSpectrum original** soundtrack releases.
 
-`playlist.json` contains role-aware metadata (`id`, `src`, `title`, `artist`, `role`, `origin`,
-`vocalMode`, `language`, `summary`, `license`, `creditUrl`). Runtime selection always prefers an
-`origin: "original"` track for the current page role before using a licensed reference fallback.
+- `playlist.json` contains only provenance-backed, approved originals.
+- Generated masters live under `original/` and are not published merely because generation succeeded.
+- The previous licensed reference demos were removed on 2026-09-18.
+- The global player does not fall back to those references or to browser-synthesized placeholder music.
+- Until a reviewed original exists, the site intentionally remains silent.
 
-The three audio files currently checked into this directory are **licensed reference demos**, not
-ToonSpectrum-authored songs. The UI labels them `REFERENCE DEMO` and preserves their actual artist,
-license, and source. Do not rename or present them as ToonSpectrum originals.
-
-A generated or commissioned ToonSpectrum song should be published with `origin: "original"` only
-after its creation provenance and commercial-use rights have been reviewed. See
-`docs/AUDIO-ASSETS.md` for provenance and release notes.
+Production briefs and original lyrics live in `config/site-original-ost.production.json`.
+Use `scripts/generate-site-original-ost.mjs` to dry-run, generate, review and publish Eleven Music v2.5 assets.
+See `docs/AUDIO-ASSETS.md` for the release gate, provenance schema and adaptive playback policy.
