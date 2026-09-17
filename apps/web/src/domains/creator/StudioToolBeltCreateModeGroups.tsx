@@ -69,7 +69,7 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
 
 const TOOL_POPOVER_LAYOUTS = {
   asset: {
-    version: 2, xRatio: 0.02, yRatio: 0.08, width: 420, height: 680,
+    version: 2, xRatio: 0.02, yRatio: 0.08, width: 1080, height: 760,
     dock: "free", positionLocked: false, sizeLocked: false,
   },
   scene: {
@@ -223,11 +223,11 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 surfaceId: "toolbar-assets",
                 defaultLayout: TOOL_POPOVER_LAYOUTS.asset,
                 onClose: () => setMenu(null),
-                minWidth: 320,
+                minWidth: 360,
                 minHeight: 300,
-                maxWidth: 860,
+                maxWidth: 1320,
                 maxHeight: 1100,
-                contentClassName: "overflow-y-auto",
+                contentClassName: "overflow-y-auto overflow-x-hidden",
               }}
             >
               <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>
