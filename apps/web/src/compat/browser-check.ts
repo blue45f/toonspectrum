@@ -7,6 +7,12 @@ import {
   diagnoseStudioInAppBrowserFromGlobals,
   type StudioInAppBrowserDiagnosis,
 } from "./in-app-browser";
+import {
+  classifyRuntimeError,
+  type ErrorAnalysis,
+} from "./runtime-error-classification";
+
+export type { ErrorAnalysis, ErrorClassificationType } from "./runtime-error-classification";
 
 export interface BrowserCompatibilityResult {
   isSupported: boolean;
@@ -24,17 +30,6 @@ export interface BrowserCompatibilityResult {
    * 설정 화면이 없는 브라우저에 "업데이트하세요"는 실행할 수 없는 지시다.
    */
   inAppBrowser: StudioInAppBrowserDiagnosis;
-}
-
-export type ErrorClassificationType = "compatibility" | "network" | "chunk_load" | "general";
-
-export interface ErrorAnalysis {
-  type: ErrorClassificationType;
-  title: string;
-  message: string;
-  details?: string;
-  isCompatibilityIssue: boolean;
-  missingFeatures?: string[];
 }
 
 /**
@@ -146,84 +141,23 @@ export function checkBrowserCompatibility(): BrowserCompatibilityResult {
  * 런타임 에러를 정밀 분석하여 브라우저 호환성 문제인지 일반 오류인지 분류합니다.
  */
 export function classifyError(error: unknown): ErrorAnalysis {
+  const baseAnalysis = classifyRuntimeError(error);
+  if (baseAnalysis.type === "chunk_load" || baseAnalysis.type === "network") {
+    return baseAnalysis;
+  }
+
   const compatResult = checkBrowserCompatibility();
-  const errObj = error instanceof Error ? error : new Error(String(error));
-  const errName = errObj.name || "";
-  const errMessage = errObj.message || String(error) || "";
-  const stack = errObj.stack || "";
-
-  const lowerMsg = errMessage.toLowerCase();
-  const lowerName = errName.toLowerCase();
-  const lowerStack = stack.toLowerCase();
-
-  // A. 동적 청크 로딩 오류 (Vite/배포 업데이트 관련 네트워크 청크 오류)
   if (
-    lowerMsg.includes("failed to fetch dynamically imported module") ||
-    lowerMsg.includes("loading chunk") ||
-    lowerMsg.includes("error loading dynamically imported module") ||
-    lowerName.includes("chunkloaderror")
+    baseAnalysis.type === "compatibility" ||
+    compatResult.missingFeatures.length > 0 ||
+    compatResult.isLegacy
   ) {
-    return {
-      type: "chunk_load",
-      title: "앱 업데이트 및 모듈 로딩 오류",
-      message: "새로운 버전이 배포되었거나 네트워크 연결이 불안정하여 모듈을 불러오지 못했습니다.",
-      details: errMessage,
-      isCompatibilityIssue: false,
-    };
-  }
-
-  // B. 순수 네트워크 에러 (Failed to fetch, NetworkError 등)
-  if (
-    lowerMsg.includes("networkerror") ||
-    lowerMsg.includes("failed to fetch") ||
-    (lowerMsg.includes("fetch") && lowerMsg.includes("failed")) ||
-    lowerName.includes("networkerror")
-  ) {
-    return {
-      type: "network",
-      title: "네트워크 연결 오류",
-      message: "인터넷 연결 상태가 불안정하거나 서버와 통신할 수 없습니다.",
-      details: errMessage,
-      isCompatibilityIssue: false,
-    };
-  }
-
-  // C. 브라우저 호환성 — 앱 내부 메서드 누락(target.park is not a function)을
-  // 브라우저 미지원으로 오인하면 스튜디오 전체가 호환성 모달에 막힌다.
-  const browserApiKeywords = [
-    "webgpu",
-    "webgl",
-    "offscreencanvas",
-    "sharedarraybuffer",
-    "wasm",
-    "webassembly",
-    "gpuadapter",
-    "gpudevice",
-    "not supported",
-    "unsupported",
-    "illegal invocation",
-    "object doesn't support property or method",
-  ];
-  const hasBrowserApiKeyword = browserApiKeywords.some(
-    (kw) => lowerMsg.includes(kw) || lowerName.includes(kw) || lowerStack.includes(kw)
-  );
-
-  if (
-    compatResult.missingFeatures.length > 0
-    || compatResult.isLegacy
-    || (hasBrowserApiKeyword && (
-      errName === "TypeError"
-      || errName === "ReferenceError"
-      || errName === "NotSupportedError"
-    ))
-  ) {
+    const errObj = error instanceof Error ? error : new Error(String(error));
     const missingInfo = compatResult.missingFeatures.length > 0
       ? `미지원 주요 기능: ${compatResult.missingFeatures.join(", ")}`
       : `${compatResult.browserInfo.name} ${compatResult.browserInfo.version} 환경`;
-
-    // 인앱 브라우저에는 업데이트할 브라우저도, 설정 화면도 없다. 같은 진단이라도 실행할 수
-    // 있는 행동은 하나뿐이다 — 기본 브라우저로 열기.
     const inApp = compatResult.inAppBrowser;
+
     return {
       type: "compatibility",
       title: inApp.inApp ? "인앱 브라우저 제한" : "브라우저 호환성 경고",
@@ -231,18 +165,11 @@ export function classifyError(error: unknown): ErrorAnalysis {
         ? `${inApp.name ?? "인앱"} 브라우저에서는 이 기능을 쓸 수 없어요. ` +
           `${inApp.escapeHint ?? "주소를 복사해 기본 브라우저에서 열어 주세요."}`
         : "사용 중인 브라우저가 최신 웹 표준 또는 그래픽 기능을 지원하지 않아 사이트가 정상 작동하지 않을 수 있습니다.",
-      details: `${missingInfo} (${errMessage})`,
+      details: `${missingInfo} (${errObj.message || String(error) || ""})`,
       isCompatibilityIssue: true,
       missingFeatures: compatResult.missingFeatures,
     };
   }
 
-  // D. 일반 애플리케이션 런타임 오류
-  return {
-    type: "general",
-    title: "시스템 실행 오류",
-    message: "화면을 표시하는 중 예상치 못한 문제가 발생했습니다.",
-    details: errMessage,
-    isCompatibilityIssue: false,
-  };
+  return baseAnalysis;
 }
