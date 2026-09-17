@@ -17,32 +17,38 @@ function fixture() {
   ) {
     throw new Error("Linked 3D fixture is incomplete.");
   }
-  return { page, element };
+  return {
+    page,
+    element,
+    bundleId: element.bg3dLtBundleId,
+    linked3dRender: page.linked3dRender,
+    shared3dStage: page.shared3dStage,
+  };
 }
 
 describe("Studio Scene3D lightweight linked source", () => {
   it("restores the canonical BG3D scene without constructing Scene3D authority", () => {
-    const { page, element } = fixture();
+    const { page, element, bundleId, linked3dRender, shared3dStage } = fixture();
     const scene = resolveStudioScene3dLinkedLayerEditSource({
-      bundleId: element.bg3dLtBundleId,
-      linked3dRender: page.linked3dRender,
-      shared3dStage: page.shared3dStage,
+      bundleId,
+      linked3dRender,
+      shared3dStage,
       elements: page.elements,
     });
     expect(scene).toEqual(element.bg3dScene);
   });
 
   it("fails closed when the linked shot and canonical scene diverge", () => {
-    const { page, element } = fixture();
+    const { element, bundleId, linked3dRender, shared3dStage } = fixture();
     const divergedScene = captureStudioBg3dShot(element.bg3dScene, {
       id: "other-shot",
       name: "Other shot",
     });
     if (!divergedScene) throw new Error("Diverged shot fixture could not be created.");
     const scene = resolveStudioScene3dLinkedLayerEditSource({
-      bundleId: element.bg3dLtBundleId,
-      linked3dRender: page.linked3dRender,
-      shared3dStage: page.shared3dStage,
+      bundleId,
+      linked3dRender,
+      shared3dStage,
       elements: [{ ...element, bg3dScene: divergedScene }],
     });
     expect(scene).toBeNull();
