@@ -6539,6 +6539,21 @@ export function StudioCuttoonEditor({
   useRoutedSurfacePanelSync("bg3d", bg3dOpen);
   useRoutedSurfacePanelSync("poser", poserVrmOpen);
   useRoutedSurfacePanelSync("character", characterShaperOpen);
+
+  const normalizeMannequinRoute = useEffectEvent(() => {
+    if (
+      studioRoute.surface === "bg3d"
+      || studioRoute.surface === "poser"
+      || studioRoute.surface === "character"
+    ) {
+      // Mannequin is intentionally a route-less modal. Returning URL ownership to canvas lets
+      // the old routed 3D surface retire before the mannequin becomes the sole renderer.
+      navigateStudio2dSurface("canvas");
+    }
+  });
+  useEffect(() => {
+    if (mannequinPoserOpen) normalizeMannequinRoute();
+  }, [mannequinPoserOpen]);
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
