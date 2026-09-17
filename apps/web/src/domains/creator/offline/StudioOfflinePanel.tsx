@@ -8,6 +8,8 @@ import {
 } from "./studio-offline-client";
 import { useStudioConnectivity } from "./use-studio-connectivity";
 
+import { cn } from "@/shared/lib/utils";
+
 function dataSaverEnabled(): boolean {
   try {
     return Boolean((navigator as Navigator & {
@@ -137,6 +139,8 @@ export function StudioOfflinePanel() {
     ? Math.round(device.usage / device.quota * 100)
     : null;
   const ready = prepared || device?.offlineReady === true;
+  const attentionRequired = connectivity.localOnly
+    || (storagePercent !== null && storagePercent >= 90);
   const summary = connectivity.mode === "offline"
     ? ready ? "오프라인 모드 · 로컬 작업 중" : "오프라인 모드 · 준비된 기능만 사용"
     : connectivity.mode === "server-unavailable"
@@ -153,14 +157,13 @@ export function StudioOfflinePanel() {
 
   return (
     <aside
-      className="fixed bottom-24 right-3 z-40 max-w-[min(25rem,calc(100vw-1.5rem))]"
+      className={cn(
+        "fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+7.5rem)] right-3 z-40 max-w-[min(25rem,calc(100vw-1.5rem))]",
+        !attentionRequired && "max-lg:hidden",
+      )}
       aria-label="스튜디오 연결 및 오프라인 작업 안내"
       data-studio-shell-floating-target="offline-readiness"
-      data-studio-shell-force-visible={
-        connectivity.localOnly || (storagePercent !== null && storagePercent >= 90)
-          ? "true"
-          : undefined
-      }
+      data-studio-shell-force-visible={attentionRequired ? "true" : undefined}
     >
       <details
         className="rounded-xl border border-line bg-panel p-3 text-xs text-fg shadow-lg"

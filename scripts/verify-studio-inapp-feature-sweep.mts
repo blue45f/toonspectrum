@@ -887,7 +887,7 @@ async function sweepProfile(
   }
 
   const outcomes: StudioInAppStepOutcome[] = [];
-  await page.goto(`${baseUrl}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.goto(`${baseUrl}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
   for (const step of steps) {
     currentStep = step.id;
@@ -960,7 +960,7 @@ async function main(): Promise<void> {
   const browser = await launchStudioInAppBrowser();
   const reports: ProfileReport[] = [];
   try {
-    await waitForServer(`${baseUrl}/studio`);
+    await waitForServer(`${baseUrl}/studio/canvas`);
     for (const profile of profiles) {
       reports.push(await sweepProfile(profile, baseUrl, browser, steps));
     }

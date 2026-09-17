@@ -287,13 +287,16 @@ export function StudioRolePersonalizationCenter({
   const [directoryLoading, setDirectoryLoading] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
 
+  const workspaceSyncEnabled = status === "authenticated";
   const globalWorkspace = useCreatorRoleWorkspace(
     GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
     profile?.creatorRoleProfile,
+    workspaceSyncEnabled,
   );
   const projectWorkspace = useCreatorRoleWorkspace(
     projectKey,
     profile?.creatorRoleProfile,
+    workspaceSyncEnabled,
   );
 
   useEffect(() => {

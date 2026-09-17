@@ -179,7 +179,7 @@ export function StudioShellFloatingLayoutManager() {
         aria-hidden={drawingAutoHideRunning ? true : undefined}
         inert={drawingAutoHideRunning ? true : undefined}
         className={cn(
-          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+env(safe-area-inset-bottom)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
+          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
           "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
           drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
         )}
@@ -567,9 +567,12 @@ export function StudioShellFloatingLayoutManager() {
             : shell.focusModeActive
               ? <Focus size={16} aria-hidden />
               : <SlidersHorizontal size={16} aria-hidden />}
-          {arranging ? "배치 편집 중" : shell.focusModeActive ? "집중 보기" : "보기"}
-          <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] text-fg-3">
-            {visibleCount}
+          {arranging ? "배치 편집 중" : shell.focusModeActive ? "집중 보기" : "보기 설정"}
+          <span
+            className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] text-fg-3"
+            aria-label={`현재 플로팅 UI ${visibleCount}개 표시`}
+          >
+            {visibleCount}개
           </span>
           {shell.failure ? (
             <MessageCircle size={13} aria-label="설정 저장 제한" />
