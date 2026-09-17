@@ -41,6 +41,7 @@ import {
   evaluateReviewApproval,
   preflightCreditManifest,
   transitionProductionRisk,
+  transitionProductionRiskResponse,
   type ClarificationThread,
   type EpisodeCollaboration,
   type ProductionProjectAggregate,
@@ -437,6 +438,15 @@ function reduceDemoCommand(
     }
     case "upsert-risk-response":
       return { ...base, riskResponses: replaceById(aggregate.riskResponses, command.response) };
+    case "transition-risk-response": {
+      const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
+      if (!response) return aggregate;
+      const next = transitionProductionRiskResponse(response, command.toStatus, {
+        at: new Date().toISOString(),
+        actualEffect: command.actualEffect,
+      });
+      return { ...base, riskResponses: replaceById(aggregate.riskResponses, next) };
+    }
     case "suppress-risk-signal":
       return { ...base, riskSignals: aggregate.riskSignals.map((signal) => signal.id === command.signalId ? { ...signal, state: "suppressed" as const, suppression: { reason: command.reason, suppressedByAssignmentId: command.suppressedByAssignmentId, suppressedAt: new Date().toISOString(), expiresAt: command.expiresAt } } : signal) };
     case "update-risk-policy":

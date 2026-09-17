@@ -27,6 +27,7 @@ import type {
   ProductionRisk,
   ProductionRiskPolicy,
   ProductionRiskResponse,
+  ProductionRiskResponseStatus,
   ProductionRiskSignal,
   ProductionRiskAssessment,
   ProductionRiskStatus,
@@ -195,6 +196,7 @@ export type ProductionClientCommand =
   | { readonly type: "upsert-risk"; readonly risk: ProductionRisk }
   | { readonly type: "transition-risk"; readonly riskId: string; readonly toStatus: ProductionRiskStatus; readonly reason: string; readonly expectedRiskRevision: number }
   | { readonly type: "upsert-risk-response"; readonly response: ProductionRiskResponse }
+  | { readonly type: "transition-risk-response"; readonly responseId: string; readonly toStatus: ProductionRiskResponseStatus; readonly actualEffect: string | null }
   | { readonly type: "suppress-risk-signal"; readonly signalId: string; readonly reason: string; readonly suppressedByAssignmentId: string; readonly expiresAt: string | null }
   | { readonly type: "update-risk-policy"; readonly policy: ProductionRiskPolicy }
   | { readonly type: "evaluate-risks" }

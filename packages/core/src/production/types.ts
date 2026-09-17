@@ -933,6 +933,7 @@ export type ProductionRiskCategory =
   | "technical";
 
 export type ProductionRiskSeverity = "watch" | "warning" | "high" | "critical";
+export type ProductionRiskResponseStatus = "proposed" | "approved" | "in-progress" | "completed" | "cancelled";
 export type ProductionRiskStatus =
   | "open"
   | "monitoring"
@@ -1040,7 +1041,7 @@ export interface ProductionRiskResponse {
   readonly linkedChangeOrderId: string | null;
   readonly expectedEffect: string;
   readonly actualEffect: string | null;
-  readonly status: "proposed" | "approved" | "in-progress" | "completed" | "cancelled";
+  readonly status: ProductionRiskResponseStatus;
   readonly createdAt: string;
   readonly completedAt: string | null;
 }

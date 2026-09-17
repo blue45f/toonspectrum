@@ -30,6 +30,7 @@ import {
   transitionEpisodeCollaboration,
   transitionHandoff,
   transitionProductionRisk,
+  transitionProductionRiskResponse,
   validateCollaborationGraph,
   validateAssetRequirement,
   validateContractChangeOrder,
@@ -190,6 +191,8 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "risk", id: command.riskId };
     case "upsert-risk-response":
       return { type: "risk-response", id: command.response.id };
+    case "transition-risk-response":
+      return { type: "risk-response", id: command.responseId };
     case "suppress-risk-signal":
       return { type: "risk-signal", id: command.signalId };
     case "update-risk-policy":
@@ -216,6 +219,7 @@ function commandCapability(command: ProductionCommand): "comment" | "edit" | "ma
     || command.type === "rebaseline-task"
     || command.type === "suppress-risk-signal"
     || (command.type === "transition-risk" && ["accepted", "dismissed", "closed"].includes(command.toStatus))
+    || (command.type === "transition-risk-response" && command.toStatus === "approved")
     || (command.type === "upsert-risk" && ["accepted", "dismissed", "closed"].includes(command.risk.status))
   ) return "manage";
   if (command.type === "upsert-commercial-record") {
@@ -1311,8 +1315,15 @@ function applyCommand(
     case "upsert-risk-response": {
       const response = command.response;
       assertProjectIdentity(aggregate, response);
+      const current = aggregate.riskResponses.find((entry) => entry.id === response.id) ?? null;
       if (!aggregate.risks.some((risk) => risk.id === response.riskId)) {
         throw new BadRequestException("대응을 연결할 위험 항목을 찾을 수 없습니다.");
+      }
+      if (current && current.riskId !== response.riskId) {
+        throw new BadRequestException("위험 대응의 연결 대상은 변경할 수 없습니다.");
+      }
+      if ((!current && response.status !== "proposed") || (current && response.status !== current.status)) {
+        throw new BadRequestException("위험 대응 상태 변경은 전용 상태 전이 명령을 사용해야 합니다.");
       }
       if (response.ownerAssignmentId) {
         const owner = aggregate.assignments.find((entry) => entry.id === response.ownerAssignmentId);
@@ -1320,8 +1331,8 @@ function applyCommand(
           throw new BadRequestException("위험 대응 담당자는 활성 역할 배정이어야 합니다.");
         }
       }
-      if (response.status === "completed" && !response.completedAt) {
-        throw new BadRequestException("완료된 대응에는 완료 시각이 필요합니다.");
+      if (response.linkedTaskId && !aggregate.tasks.some((task) => task.id === response.linkedTaskId)) {
+        throw new BadRequestException("위험 대응에 연결할 작업을 찾을 수 없습니다.");
       }
       return {
         aggregate: {
@@ -1330,7 +1341,24 @@ function applyCommand(
         },
       };
     }
-
+    case "transition-risk-response": {
+      const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
+      if (!response) throw new BadRequestException("상태를 변경할 위험 대응을 찾을 수 없습니다.");
+      try {
+        const next = transitionProductionRiskResponse(response, command.toStatus, {
+          at,
+          actualEffect: command.actualEffect,
+        });
+        return {
+          aggregate: {
+            ...aggregate,
+            riskResponses: upsertById(aggregate.riskResponses, next),
+          },
+        };
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : "위험 대응 상태를 변경할 수 없습니다.");
+      }
+    }
 
     case "suppress-risk-signal": {
       const signal = aggregate.riskSignals.find((entry) => entry.id === command.signalId);

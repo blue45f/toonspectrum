@@ -785,6 +785,7 @@ const ProductionRiskCategorySchema = z.enum([
   "rights", "contract", "platform", "health", "security", "communication", "technical",
 ]);
 const ProductionRiskSeveritySchema = z.enum(["watch", "warning", "high", "critical"]);
+const ProductionRiskResponseStatusSchema = z.enum(["proposed", "approved", "in-progress", "completed", "cancelled"]);
 const ProductionRiskStatusSchema = z.enum([
   "open", "monitoring", "mitigating", "occurred", "accepted", "resolved", "dismissed", "closed",
 ]);
@@ -870,8 +871,8 @@ const ProductionRiskResponseSchema = z.object({
   linkedChangeRequestId: IdentitySchema.nullable(),
   linkedChangeOrderId: IdentitySchema.nullable(),
   expectedEffect: z.string().trim().max(4_000),
-  actualEffect: z.string().trim().max(4_000).nullable(),
-  status: z.enum(["proposed", "approved", "in-progress", "completed", "cancelled"]),
+  actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+  status: ProductionRiskResponseStatusSchema,
   createdAt: IsoDateTimeSchema,
   completedAt: NullableIsoDateTimeSchema,
 }).strict();
@@ -1186,6 +1187,12 @@ const UpsertRiskResponseCommandSchema = z.object({
   type: z.literal("upsert-risk-response"),
   response: ProductionRiskResponseSchema,
 }).strict();
+const TransitionRiskResponseCommandSchema = z.object({
+  type: z.literal("transition-risk-response"),
+  responseId: IdentitySchema,
+  toStatus: ProductionRiskResponseStatusSchema,
+  actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+}).strict();
 const SuppressRiskSignalCommandSchema = z.object({
   type: z.literal("suppress-risk-signal"),
   signalId: IdentitySchema,
@@ -1250,6 +1257,7 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertRiskCommandSchema,
   TransitionRiskCommandSchema,
   UpsertRiskResponseCommandSchema,
+  TransitionRiskResponseCommandSchema,
   SuppressRiskSignalCommandSchema,
   UpdateRiskPolicyCommandSchema,
   EvaluateRisksCommandSchema,

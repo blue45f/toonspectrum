@@ -9,6 +9,7 @@ import {
   Clock3,
   Filter,
   ListChecks,
+  Pencil,
   Plus,
   RefreshCw,
   ShieldAlert,
@@ -31,6 +32,8 @@ import {
 } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";
+import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
@@ -53,7 +56,9 @@ type NumericRiskPolicyKey =
   | "capacityWarningPercent"
   | "capacityCriticalPercent"
   | "defaultReviewSlaHours"
-  | "minimumReadyBufferEpisodes";
+  | "minimumReadyBufferEpisodes"
+  | "notificationCooldownHours"
+  | "autoResolveStableHours";
 
 const DATE_TIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 const CATEGORY_LABELS: Readonly<Record<ProductionRiskCategory, string>> = Object.freeze({
@@ -245,6 +250,24 @@ function taskLabel(aggregate: ProductionProjectAggregate, taskId: string): strin
   return aggregate.tasks.find((task) => task.id === taskId)?.title ?? taskId;
 }
 
+function validateRiskPolicy(policy: ProductionRiskPolicy): string | null {
+  if (policy.blockedWarningHours > policy.blockedCriticalHours) {
+    return "차단 주의 기준은 차단 긴급 기준보다 클 수 없습니다.";
+  }
+  if (policy.capacityWarningPercent > policy.capacityCriticalPercent) {
+    return "작업량 주의 기준은 작업량 긴급 기준보다 클 수 없습니다.";
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/u.test(policy.workdayEndLocal)) {
+    return "업무 종료 시각은 00:00부터 23:59 사이여야 합니다.";
+  }
+  try {
+    new Intl.DateTimeFormat("ko-KR", { timeZone: policy.timezone }).format(new Date());
+  } catch {
+    return "유효한 IANA 시간대 이름을 입력해 주세요. 예: Asia/Seoul";
+  }
+  return null;
+}
+
 function RiskDetail({
   aggregate,
   risk,
@@ -255,6 +278,7 @@ function RiskDetail({
   canEdit,
   canManage,
   actorAssignmentId,
+  onEditRisk,
   onBack,
 }: {
   readonly aggregate: ProductionProjectAggregate;
@@ -266,6 +290,7 @@ function RiskDetail({
   readonly canEdit: boolean;
   readonly canManage: boolean;
   readonly actorAssignmentId: string | null;
+  readonly onEditRisk: () => void;
   readonly onBack: () => void;
 }) {
   const [reason, setReason] = useState("");
@@ -373,10 +398,20 @@ function RiskDetail({
           <h2 className="mt-3 text-xl font-black tracking-tight text-fg">{risk.title}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">{risk.description}</p>
         </div>
-        <div className="text-right text-xs leading-5 text-fg-3">
-          <p>우선순위 <strong className="text-fg">{Math.round(risk.priorityScore)}</strong></p>
-          <p>노출도 P{risk.probability} × I{risk.impact} = {risk.exposureScore}</p>
-          <p>{riskOwnerName(aggregate, risk)}</p>
+        <div className="flex flex-col items-end gap-3">
+          <div className="text-right text-xs leading-5 text-fg-3">
+            <p>우선순위 <strong className="text-fg">{Math.round(risk.priorityScore)}</strong></p>
+            <p>노출도 P{risk.probability} × I{risk.impact} = {risk.exposureScore}</p>
+            <p>{riskOwnerName(aggregate, risk)}</p>
+          </div>
+          <button
+            type="button"
+            className={buttonClass({ variant: "outline", size: "sm" })}
+            disabled={!canEdit || busy}
+            onClick={onEditRisk}
+          >
+            <Pencil className="size-4" aria-hidden="true" /> 위험 편집
+          </button>
         </div>
       </div>
 
@@ -497,11 +532,14 @@ function RiskDetail({
           </div>
           <div className="space-y-2">
             {responses.map((response) => (
-              <div key={response.id} className="rounded-xl border border-line bg-panel p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black text-fg">{response.title}</p><Pill tone={response.status === "completed" ? "success" : response.status === "in-progress" ? "warning" : "accent"}>{response.status}</Pill></div>
-                <p className="mt-2 text-xs leading-5 text-fg-2">{response.description}</p>
-                <p className="mt-2 text-[0.6875rem] text-fg-3">기대 효과 · {response.expectedEffect}</p>
-              </div>
+              <ProductionRiskResponseCard
+                key={response.id}
+                aggregate={aggregate}
+                response={response}
+                execute={execute}
+                canEdit={canEdit}
+                canManage={canManage}
+              />
             ))}
             {responses.length === 0 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-fg-3">등록된 대응 항목이 없습니다.</div> : null}
           </div>
@@ -541,7 +579,12 @@ function RiskPolicyPanel({
 }) {
   const [draft, setDraft] = useState(policy);
   const [saving, setSaving] = useState(false);
-  useEffect(() => setDraft(policy), [policy]);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const validationError = validateRiskPolicy(draft);
+  useEffect(() => {
+    setDraft(policy);
+    setSaveError(null);
+  }, [policy]);
 
   const setNumber = (key: NumericRiskPolicyKey, value: string) => {
     const parsed = Number(value);
@@ -551,7 +594,12 @@ function RiskPolicyPanel({
 
   const save = async () => {
     if (!canManage || saving) return;
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
     try {
       await execute({
         type: "update-risk-policy",
@@ -561,6 +609,8 @@ function RiskPolicyPanel({
           updatedAt: new Date().toISOString(),
         },
       }, "위험 감지 정책을 저장했습니다.");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "위험 감지 정책을 저장하지 못했습니다.");
     } finally {
       setSaving(false);
     }
@@ -574,14 +624,51 @@ function RiskPolicyPanel({
     { key: "capacityCriticalPercent", label: "작업량 긴급", suffix: "%" },
     { key: "defaultReviewSlaHours", label: "기본 검수 응답", suffix: "시간" },
     { key: "minimumReadyBufferEpisodes", label: "최소 준비 버퍼", suffix: "회" },
+    { key: "notificationCooldownHours", label: "알림 재전송 간격", suffix: "시간" },
+    { key: "autoResolveStableHours", label: "자동 해결 안정화", suffix: "시간" },
   ];
 
   return (
     <Section
       title="자동 감지 정책"
-      description="프로젝트 상황에 맞게 차단·작업량·검수·연재 버퍼 임계값을 조정합니다."
-      action={<button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || saving} onClick={() => void save()}><SlidersHorizontal className="size-4" aria-hidden="true" /> 정책 저장</button>}
+      description="자동 오픈 기준, 안정화 시간, 알림 주기와 차단·작업량·검수·연재 버퍼 임계값을 조정합니다."
+      action={<button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || saving || Boolean(validationError)} onClick={() => void save()}><SlidersHorizontal className="size-4" aria-hidden="true" /> 정책 저장</button>}
     >
+      <div className="mb-3 grid gap-3 sm:grid-cols-3">
+        <label className="rounded-xl border border-line bg-panel p-3">
+          <span className="text-xs font-bold text-fg">프로젝트 시간대</span>
+          <input
+            value={draft.timezone}
+            onChange={(event) => setDraft((current) => ({ ...current, timezone: event.target.value }))}
+            disabled={!canManage}
+            className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg outline-none focus:border-accent"
+            placeholder="Asia/Seoul"
+          />
+        </label>
+        <label className="rounded-xl border border-line bg-panel p-3">
+          <span className="text-xs font-bold text-fg">업무 종료 시각</span>
+          <input
+            type="time"
+            value={draft.workdayEndLocal}
+            onChange={(event) => setDraft((current) => ({ ...current, workdayEndLocal: event.target.value }))}
+            disabled={!canManage}
+            className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg outline-none focus:border-accent"
+          />
+        </label>
+        <label className="rounded-xl border border-line bg-panel p-3">
+          <span className="text-xs font-bold text-fg">자동 위험 생성 기준</span>
+          <select
+            value={draft.autoOpenSeverity}
+            onChange={(event) => setDraft((current) => ({ ...current, autoOpenSeverity: event.target.value as ProductionRiskPolicy["autoOpenSeverity"] }))}
+            disabled={!canManage}
+            className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg"
+          >
+            <option value="warning">주의 이상</option>
+            <option value="high">높음 이상</option>
+            <option value="critical">긴급만</option>
+          </select>
+        </label>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {fields.map((field) => (
           <label key={field.key} className="rounded-xl border border-line bg-panel p-3">
@@ -600,6 +687,11 @@ function RiskPolicyPanel({
           </label>
         ))}
       </div>
+      {validationError || saveError ? (
+        <div role="alert" className="mt-3 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad">
+          {saveError ?? validationError}
+        </div>
+      ) : null}
     </Section>
   );
 }
@@ -619,7 +711,8 @@ export function ProductionRiskWorkspace({
   const [searchParams, setSearchParams] = useSearchParams();
   const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingRisk, setEditingRisk] = useState<ProductionRisk | null>(null);
   const userId = useApp((state) => state.userId);
   const actorPartyId = aggregate.parties.find((party) => party.accountUserId === userId)?.id ?? null;
   const actorAssignment = aggregate.assignments.find((assignment) =>
@@ -670,61 +763,25 @@ export function ProductionRiskWorkspace({
     await execute({ type: "evaluate-risks" }, "제작 데이터를 다시 평가했습니다.");
   };
 
-  const createManualRisk = async () => {
-    if (!canEdit || creating) return;
-    setCreating(true);
-    try {
-      const createdAt = new Date().toISOString();
-      const id = `risk:manual:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
-      await execute({
-        type: "upsert-risk",
-        risk: {
-          id,
-          projectId: aggregate.projectId,
-          revision: 1,
-          scope: { kind: "project", id: aggregate.projectId, ancestors: [] },
-          category: "schedule",
-          source: "manual",
-          signalIds: [],
-          title: "새 제작 위험",
-          description: "위험의 원인과 예상 영향을 구체적으로 기록해 주세요.",
-          probability: 3,
-          impact: 3,
-          exposureScore: 9,
-          severity: "warning",
-          priorityScore: 45,
-          ownerAssignmentId: actorAssignment?.id ?? null,
-          causeCodes: ["manual"],
-          earlySignals: [],
-          mitigation: "담당자와 대응 방법을 확인합니다.",
-          contingency: "필요하면 일정·범위·인력 조정을 검토합니다.",
-          trigger: "직접 등록",
-          affectedTaskIds: [],
-          affectedEpisodeIds: [],
-          affectedMilestoneIds: [],
-          baselineDueAt: null,
-          forecastDueAt: null,
-          varianceHours: null,
-          status: "open",
-          dueAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
-          responseDueAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
-          nextReviewAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
-          acceptedReason: null,
-          dismissedReason: null,
-          resolutionSummary: null,
-          detectedAt: createdAt,
-          lastEvaluatedAt: createdAt,
-          occurredAt: null,
-          resolvedAt: null,
-          closedAt: null,
-          createdAt,
-          updatedAt: createdAt,
-        },
-      }, "새 위험 항목을 등록했습니다.");
-      selectRisk(id);
-    } finally {
-      setCreating(false);
-    }
+  const openCreateRisk = () => {
+    if (!canEdit) return;
+    setEditingRisk(null);
+    setEditorOpen(true);
+  };
+
+  const openEditRisk = (risk: ProductionRisk) => {
+    if (!canEdit) return;
+    setEditingRisk(risk);
+    setEditorOpen(true);
+  };
+
+  const saveRisk = async (risk: ProductionRisk) => {
+    const editing = Boolean(editingRisk);
+    await execute(
+      { type: "upsert-risk", risk },
+      editing ? "위험 항목 변경을 저장했습니다." : "새 위험 항목을 등록했습니다.",
+    );
+    selectRisk(risk.id);
   };
 
   const nextDeadlineRisk = evaluation.risks.find((risk) =>
@@ -749,7 +806,7 @@ export function ProductionRiskWorkspace({
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit} onClick={() => void refresh()}><RefreshCw className="size-4" aria-hidden="true" /> 다시 평가</button>
-            <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || creating} onClick={() => void createManualRisk()}><Plus className="size-4" aria-hidden="true" /> 위험 직접 등록</button>
+            <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit} onClick={openCreateRisk}><Plus className="size-4" aria-hidden="true" /> 위험 직접 등록</button>
           </div>
         </div>
       </section>
@@ -816,6 +873,7 @@ export function ProductionRiskWorkspace({
               canEdit={canEdit}
               canManage={canManage}
               actorAssignmentId={actorAssignment?.id ?? null}
+              onEditRisk={() => openEditRisk(selectedRisk)}
               onBack={() => setMobileDetailOpen(false)}
             />
           ) : (
@@ -828,6 +886,14 @@ export function ProductionRiskWorkspace({
       </div>
 
       <RiskPolicyPanel policy={aggregate.riskPolicy} execute={execute} canManage={canManage} />
+      <ProductionRiskEditorDialog
+        open={editorOpen}
+        aggregate={aggregate}
+        risk={editingRisk}
+        defaultOwnerAssignmentId={actorAssignment?.id ?? null}
+        onClose={() => setEditorOpen(false)}
+        onSave={saveRisk}
+      />
     </div>
   );
 }

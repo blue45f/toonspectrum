@@ -15,6 +15,8 @@ import type {
   ProductionRiskConfidence,
   ProductionRiskEvidence,
   ProductionRiskPolicy,
+  ProductionRiskResponse,
+  ProductionRiskResponseStatus,
   ProductionRiskSeverity,
   ProductionRiskSignal,
   ProductionRiskStatus,
@@ -83,6 +85,13 @@ export function productionRiskSeverity(priorityScore: number): ProductionRiskSev
   if (priorityScore >= 70) return "high";
   if (priorityScore >= 30) return "warning";
   return "watch";
+}
+
+export function productionRiskPriorityScore(
+  probability: 1 | 2 | 3 | 4 | 5,
+  impact: 1 | 2 | 3 | 4 | 5,
+): number {
+  return Math.min(100, probability * impact * 4);
 }
 
 function episodeIdForScope(scope: ScopeRef): string | null {
@@ -662,13 +671,21 @@ function synchronizeAutomaticRisks(
   const resolved = [...automatic.values()]
     .filter((risk) => !touchedRiskIds.has(risk.id))
     .map((risk): ProductionRisk => {
-      if (!ACTIVE_RISK_STATUSES.has(risk.status)) return risk;
+      if (!ACTIVE_RISK_STATUSES.has(risk.status) || risk.status === "occurred") return risk;
+      const relatedSignals = signals.filter((signal) => risk.signalIds.includes(signal.id));
+      const stableSinceClear = relatedSignals.length > 0 && relatedSignals.every((signal) => {
+        if (signal.state !== "cleared" || !signal.clearedAt) return false;
+        const clearedAt = Date.parse(signal.clearedAt);
+        return Number.isFinite(clearedAt)
+          && now.getTime() - clearedAt >= policy.autoResolveStableHours * HOUR_MS;
+      });
+      if (!stableSinceClear) return risk;
       const nowIso = now.toISOString();
       return Object.freeze({
         ...risk,
         revision: risk.revision,
         status: "resolved",
-        resolutionSummary: risk.resolutionSummary ?? "자동 감지 조건이 더 이상 충족되지 않습니다.",
+        resolutionSummary: risk.resolutionSummary ?? "자동 감지 조건이 안정화 기간 동안 다시 나타나지 않았습니다.",
         resolvedAt: nowIso,
         lastEvaluatedAt: nowIso,
         updatedAt: nowIso,
@@ -795,5 +812,36 @@ export function transitionProductionRisk(
     closedAt: target === "closed" ? input.at : target === "open" ? null : risk.closedAt,
     updatedAt: input.at,
     lastEvaluatedAt: input.at,
+  });
+}
+
+const RISK_RESPONSE_TRANSITIONS: Readonly<Record<ProductionRiskResponseStatus, readonly ProductionRiskResponseStatus[]>> = Object.freeze({
+  proposed: ["approved", "in-progress", "cancelled"],
+  approved: ["in-progress", "cancelled"],
+  "in-progress": ["completed", "cancelled"],
+  completed: [],
+  cancelled: ["proposed"],
+});
+
+export function transitionProductionRiskResponse(
+  response: ProductionRiskResponse,
+  target: ProductionRiskResponseStatus,
+  input: { readonly at: string; readonly actualEffect?: string | null },
+): ProductionRiskResponse {
+  if (response.status === target) return response;
+  if (!RISK_RESPONSE_TRANSITIONS[response.status].includes(target)) {
+    throw new Error(`Illegal production risk response transition: ${response.status} -> ${target}`);
+  }
+  const actualEffect = input.actualEffect?.trim() || null;
+  if (["completed", "cancelled"].includes(target) && !actualEffect) {
+    throw new Error(`${target === "completed" ? "Completed" : "Cancelled"} production risk response requires an actual effect.`);
+  }
+  return Object.freeze({
+    ...response,
+    status: target,
+    actualEffect: target === "completed" || target === "cancelled"
+      ? actualEffect
+      : target === "proposed" ? null : response.actualEffect,
+    completedAt: target === "completed" ? input.at : target === "proposed" ? null : response.completedAt,
   });
 }

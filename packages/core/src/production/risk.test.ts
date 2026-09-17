@@ -5,10 +5,12 @@ import { migrateProductionProjectAggregate } from "./migration";
 import {
   evaluateProductionRisks,
   transitionProductionRisk,
+  transitionProductionRiskResponse,
 } from "./risk";
 
 import type {
   ProductionProjectAggregate,
+  ProductionRiskResponse,
   ProductionTask,
 } from "./types";
 
@@ -100,7 +102,7 @@ describe("production risk management", () => {
     expect(result.summary.actualOverdue).toBe(1);
   });
 
-  it("clears signals and resolves automatic risks after completion", () => {
+  it("waits for the stable clear window before resolving automatic risks", () => {
     const first = evaluateProductionRisks(aggregate(), NOW);
     const completed = task({
       status: "done",
@@ -114,10 +116,19 @@ describe("production risk management", () => {
       risks: first.risks,
       riskAssessments: first.assessments,
     };
-    const second = evaluateProductionRisks(current, new Date("2026-09-16T09:00:00.000Z"));
+    const cleared = evaluateProductionRisks(current, new Date("2026-09-16T09:00:00.000Z"));
 
-    expect(second.signals.filter((signal) => signal.state === "active")).toHaveLength(0);
-    expect(second.risks.filter((risk) => risk.source === "automatic").every((risk) => risk.status === "resolved")).toBe(true);
+    expect(cleared.signals.filter((signal) => signal.state === "active")).toHaveLength(0);
+    expect(cleared.risks.filter((risk) => risk.source === "automatic").every((risk) => risk.status !== "resolved")).toBe(true);
+
+    const stabilized = evaluateProductionRisks({
+      ...current,
+      riskSignals: cleared.signals,
+      risks: cleared.risks,
+      riskAssessments: cleared.assessments,
+    }, new Date("2026-09-17T10:00:00.000Z"));
+
+    expect(stabilized.risks.filter((risk) => risk.source === "automatic").every((risk) => risk.status === "resolved")).toBe(true);
   });
 
   it("migrates a version 1 aggregate without inventing completion data", () => {
@@ -179,5 +190,60 @@ describe("production risk management", () => {
     expect(accepted.status).toBe("accepted");
     expect(accepted.acceptedReason).toContain("영향을 확인");
     expect(accepted.revision).toBe(risk.revision + 1);
+  });
+
+  it("enforces the risk response lifecycle and records completion evidence", () => {
+    const response: ProductionRiskResponse = {
+      id: "risk-response:test",
+      projectId: PROJECT_ID,
+      riskId: "risk:test",
+      strategy: "mitigate",
+      actionType: "split-task",
+      title: "작업 분할",
+      description: "선화 작업을 두 묶음으로 나눕니다.",
+      ownerAssignmentId: OWNER_ASSIGNMENT_ID,
+      dueAt: "2026-09-16T12:00:00.000Z",
+      linkedTaskId: "task-line-art-12",
+      linkedChangeRequestId: null,
+      linkedChangeOrderId: null,
+      expectedEffect: "예상 지연 8시간 감소",
+      actualEffect: null,
+      status: "proposed",
+      createdAt: "2026-09-16T01:00:00.000Z",
+      completedAt: null,
+    };
+    const started = transitionProductionRiskResponse(response, "in-progress", {
+      at: "2026-09-16T02:00:00.000Z",
+    });
+
+    expect(() => transitionProductionRiskResponse(started, "completed", {
+      at: "2026-09-16T05:00:00.000Z",
+    })).toThrow(/actual effect/u);
+
+    const completed = transitionProductionRiskResponse(started, "completed", {
+      at: "2026-09-16T05:00:00.000Z",
+      actualEffect: "실제 지연을 6시간 줄였습니다.",
+    });
+    expect(completed.status).toBe("completed");
+    expect(completed.actualEffect).toContain("6시간");
+    expect(completed.completedAt).toBe("2026-09-16T05:00:00.000Z");
+    expect(transitionProductionRiskResponse(completed, "completed", {
+      at: "2026-09-16T06:00:00.000Z",
+      actualEffect: "중복 완료 요청",
+    })).toBe(completed);
+    expect(() => transitionProductionRiskResponse(completed, "in-progress", {
+      at: "2026-09-16T06:00:00.000Z",
+    })).toThrow(/Illegal/u);
+
+    expect(() => transitionProductionRiskResponse(response, "cancelled", {
+      at: "2026-09-16T03:00:00.000Z",
+    })).toThrow(/actual effect/u);
+    const cancelled = transitionProductionRiskResponse(response, "cancelled", {
+      at: "2026-09-16T03:00:00.000Z",
+      actualEffect: "일정 재기준화로 대응이 불필요해졌습니다.",
+    });
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.actualEffect).toContain("재기준화");
+    expect(cancelled.completedAt).toBeNull();
   });
 });
