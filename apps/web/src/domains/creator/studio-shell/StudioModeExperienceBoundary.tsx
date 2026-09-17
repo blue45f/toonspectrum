@@ -60,6 +60,43 @@ const AI_ACTION_LABELS: Readonly<Record<string, { ko: string; en: string }>> = {
   "music-cue": { ko: "음악 큐", en: "Music cue" },
 };
 
+const AI_ACTION_TOOL: Readonly<Record<string, "배경" | "캐릭터" | "구도" | "대사" | "팔레트">> = {
+  "panel-direction": "구도",
+  "bubble-layout": "대사",
+  "rough-to-line": "캐릭터",
+  "pose-reference": "캐릭터",
+  "inpaint-selection": "배경",
+  colorize: "팔레트",
+  "lighting-pass": "팔레트",
+  "cover-layout": "구도",
+  "promo-variants": "구도",
+  "copy-suggest": "대사",
+  "smart-resize": "구도",
+  "pitch-outline": "구도",
+  "slide-layout": "구도",
+  "speaker-notes": "대사",
+  "script-to-scenes": "구도",
+  "scene-to-shots": "구도",
+  "camera-suggest": "구도",
+  "shot-duration": "구도",
+  "object-remove": "배경",
+  "generative-fill": "배경",
+  "expand-image": "배경",
+  cleanup: "배경",
+  "pose-from-text": "캐릭터",
+  "composition-suggest": "구도",
+  "lighting-preset": "팔레트",
+  "scene-layout": "구도",
+  "panel-to-motion": "구도",
+  "auto-keyframe": "구도",
+  "camera-motion": "구도",
+  "lip-sync": "대사",
+  "caption-align": "대사",
+  "music-cue": "구도",
+};
+
+const EPISODE_AI_ACTIONS = new Set(["script-to-panels", "continuity-check"]);
+
 const EXPORT_LABELS: Readonly<Record<string, string>> = {
   "webtoon-long-image": "Long image",
   "episode-package": "Episode package",
@@ -86,13 +123,34 @@ const EXPORT_LABELS: Readonly<Record<string, string>> = {
   "vertical-short": "Vertical short",
 };
 
-function clickStudioAiSurface(actionId: string): boolean {
+function applyStudioAiAction(actionId: string): boolean {
   const root = document.querySelector<HTMLElement>("[data-studio-ai-assist-hub='true']");
-  if (root) {
-    root.scrollIntoView({ block: "nearest" });
-    window.dispatchEvent(new CustomEvent("toonspectrum:studio-mode-ai-action", { detail: { actionId } }));
-    return true;
+  if (!root) return false;
+  root.scrollIntoView({ block: "nearest" });
+
+  if (EPISODE_AI_ACTIONS.has(actionId)) {
+    const production = root.querySelector<HTMLButtonElement>(
+      "[data-studio-ai-episode-production-launcher='true']",
+    );
+    if (production) {
+      production.click();
+      return true;
+    }
   }
+
+  const toolLabel = AI_ACTION_TOOL[actionId];
+  if (!toolLabel) return true;
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>("[role='tab']"));
+  const tab = tabs.find((candidate) => (candidate.textContent ?? "").includes(toolLabel));
+  if (!tab) return true;
+  tab.click();
+  tab.focus();
+  return true;
+}
+
+function clickStudioAiSurface(actionId: string): boolean {
+  if (applyStudioAiAction(actionId)) return true;
+
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(
     "[data-studio-tool-rail='true'] button, [data-studio-app-menubar='true'] button, [data-studio-main-menu='true'] button",
   ));
@@ -100,9 +158,14 @@ function clickStudioAiSurface(actionId: string): boolean {
     const label = `${button.getAttribute("aria-label") ?? ""} ${button.textContent ?? ""}`;
     return /(?:\bAI\b|AI 어시스트|AI 도구)/iu.test(label);
   });
-  trigger?.click();
-  window.dispatchEvent(new CustomEvent("toonspectrum:studio-mode-ai-action", { detail: { actionId } }));
-  return Boolean(trigger);
+  if (!trigger) return false;
+  trigger.click();
+  globalThis.requestAnimationFrame(() => {
+    if (!applyStudioAiAction(actionId)) {
+      globalThis.setTimeout(() => applyStudioAiAction(actionId), 0);
+    }
+  });
+  return true;
 }
 
 function clickStudioExportSurface(): boolean {
@@ -244,7 +307,7 @@ export function StudioModeExperienceBoundary({
                     onClick={() => {
                       const opened = clickStudioAiSurface(actionId);
                       setNotice(opened
-                        ? (locale === "ko" ? "AI 작업 패널을 열었습니다." : "Opened the AI work panel.")
+                        ? (locale === "ko" ? "이 작업에 맞는 AI 도구를 열었습니다." : "Opened the AI tool for this task.")
                         : (locale === "ko" ? "AI 메뉴에서 해당 작업을 이어서 선택하세요." : "Continue from the AI menu and choose the matching action."));
                     }}
                     className="min-h-8 rounded-full border border-line bg-panel px-2.5 text-[0.68rem] font-bold text-fg-2 hover:border-accent/45 hover:bg-accent-soft/50"
@@ -294,7 +357,7 @@ export function StudioModeExperienceBoundary({
                             context.project.id,
                             handoff,
                             locale,
-                            { target: window },
+                            { target: window, sourceDocumentId: context.document.id },
                           );
                           navigate(result.href);
                         } catch (error) {
