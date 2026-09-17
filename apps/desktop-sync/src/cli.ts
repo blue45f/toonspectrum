@@ -5,6 +5,10 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  openDesktopConflictResolverBrowser,
+  startDesktopSyncConflictServer,
+} from "./conflict-server.js";
+import {
   SystemDesktopCredentialVault,
 } from "./credential-vault.js";
 import { loadSyncJournal } from "./journal.js";
@@ -49,6 +53,11 @@ export interface DesktopSyncCliIo {
   readonly stderr: { write(value: string): unknown };
 }
 
+export interface DesktopSyncCliDependencies extends DesktopSyncRemoteDependencies {
+  readonly openConflictResolverBrowser?: typeof openDesktopConflictResolverBrowser;
+  readonly startConflictServer?: typeof startDesktopSyncConflictServer;
+}
+
 export interface DesktopSyncCliSummary {
   readonly mode: DesktopSyncCliMode;
   readonly status: "ready" | "conflict" | "watching";
@@ -79,6 +88,7 @@ Usage:
   toonstudio-sync login --cloud-provider <provider> [options]
   toonstudio-sync auth-status --cloud-provider <provider> [options]
   toonstudio-sync logout --cloud-provider <provider> [options]
+  toonstudio-sync resolve --local <folder> <remote-target> [options]
 
 Remote targets:
   --remote-folder <path>       Local disk, external disk, NAS or mounted folder
@@ -90,6 +100,10 @@ Remote targets:
 OAuth account commands:
   --oauth-client-id-env <name> Environment variable containing the public OAuth client id
   --onedrive-tenant <tenant>   common, consumers, organizations or tenant UUID
+
+Conflict resolver:
+  --no-browser           Print the protected loopback URL without opening a browser
+  --port <port>          Fixed loopback port; 0 chooses an available port (default 0)
 
 Modes:
   --once                 Run one conflict-safe sync cycle (default)
@@ -282,6 +296,43 @@ export function parseDesktopSyncCliArguments(
   };
 }
 
+export interface DesktopSyncResolveCliOptions {
+  readonly sync: DesktopSyncCliOptions;
+  readonly noBrowser: boolean;
+  readonly port: number;
+}
+
+export function parseDesktopSyncResolveArguments(
+  arguments_: readonly string[],
+): DesktopSyncResolveCliOptions {
+  const forwarded: string[] = [];
+  let noBrowser = false;
+  let port = 0;
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const argument = arguments_[index];
+    if (argument === "--no-browser") {
+      noBrowser = true;
+      continue;
+    }
+    if (argument === "--port") {
+      const value = requiredValue(arguments_, index, argument);
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 65_535) {
+        throw new TypeError("--port must be an integer between 0 and 65535");
+      }
+      port = parsed;
+      index += 1;
+      continue;
+    }
+    forwarded.push(argument);
+  }
+  const sync = parseDesktopSyncCliArguments(forwarded);
+  if (!sync.help && sync.mode !== "once") {
+    throw new TypeError("resolve does not accept --dry-run or --watch");
+  }
+  return { sync, noBrowser, port };
+}
+
 export type DesktopSyncAuthCommand =
   | "login"
   | "logout"
@@ -470,7 +521,7 @@ function formatHumanSummary(summary: DesktopSyncCliSummary): string {
   if (!counts) return `No sync result for ${summary.localRoot}`;
   const headline = summary.status === "conflict"
     ? `${counts.conflict} conflict(s) require review; no changes were applied.`
-    : `Sync ready: ${counts.upload} upload, ${counts.download} download, ${counts["delete-local"]} local delete, ${counts["delete-remote"]} remote delete, ${counts.record} unchanged.`;
+    : `Sync ready: ${counts.upload} upload, ${counts.download} download, ${counts["delete-local"]} local delete, ${counts["delete-remote"]} remote delete, ${counts.record} unchanged, ${counts.forget} removed tombstone.`;
   const details = summary.plan
     .filter((item) => item.action !== "record")
     .map((item) => `  ${item.action.padEnd(13)} ${item.relativePath} (${item.reason})`)
@@ -534,6 +585,85 @@ export async function executeDesktopSyncCli(
   return summarize(options, result);
 }
 
+async function runDesktopSyncConflictCommand(
+  arguments_: readonly string[],
+  io: DesktopSyncCliIo,
+  dependencies: DesktopSyncCliDependencies,
+): Promise<number> {
+  const options = parseDesktopSyncResolveArguments(arguments_);
+  if (options.sync.help) {
+    io.stdout.write(DESKTOP_SYNC_CLI_HELP);
+    return 0;
+  }
+  await assertLocalRoot(options.sync.localRoot);
+  const remote = await createRemote(options.sync, dependencies);
+  const startServer = dependencies.startConflictServer
+    ?? startDesktopSyncConflictServer;
+  const resolver = await startServer(
+    options.sync.localRoot,
+    remote,
+    {
+      includeUnknownFiles: options.sync.includeUnknownFiles,
+      maximumFileBytes: options.sync.maximumFileBytes,
+      port: options.port,
+      remoteLabel: options.sync.remoteRoot,
+    },
+  );
+  try {
+    if (resolver.report.conflicts.length === 0) {
+      io.stdout.write(options.sync.json
+        ? `${JSON.stringify({
+            event: "complete",
+            status: "ready",
+            conflictCount: 0,
+          })}\n`
+        : "No desktop sync conflicts require review.\n");
+      return 0;
+    }
+
+    io.stdout.write(options.sync.json
+      ? `${JSON.stringify({
+          event: "review-required",
+          status: "conflict",
+          conflictCount: resolver.report.conflicts.length,
+          reportId: resolver.report.reportId,
+          url: resolver.url,
+        })}\n`
+      : `Review ${resolver.report.conflicts.length} conflict(s) at:\n${resolver.url}\n`);
+    if (!options.noBrowser) {
+      const openBrowser = dependencies.openConflictResolverBrowser
+        ?? openDesktopConflictResolverBrowser;
+      try {
+        await openBrowser(resolver.url);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        io.stderr.write(
+          `Could not open the conflict resolver browser: ${message}\nUse the printed loopback URL instead.\n`,
+        );
+      }
+    }
+
+    const result = await resolver.completion;
+    if (result === null) {
+      io.stderr.write("Conflict resolver closed before every decision was applied.\n");
+      return 2;
+    }
+    io.stdout.write(options.sync.json
+      ? `${JSON.stringify({
+          event: "complete",
+          status: "resolved",
+          receiptSha256: result.receipt.receiptSha256,
+          sessionId: result.receipt.sessionId,
+          receiptPath: result.receiptPath,
+          counts: result.finalCycle.counts,
+        })}\n`
+      : `Conflict resolution completed. Receipt ${result.receipt.receiptSha256}\n${result.receiptPath}\n`);
+    return 0;
+  } finally {
+    await resolver.close();
+  }
+}
+
 function waitForShutdown(): Promise<NodeJS.Signals> {
   return new Promise((resolveShutdown) => {
     const finish = (signal: NodeJS.Signals): void => {
@@ -551,9 +681,16 @@ function waitForShutdown(): Promise<NodeJS.Signals> {
 export async function runDesktopSyncCli(
   arguments_: readonly string[],
   io: DesktopSyncCliIo = process,
-  dependencies: DesktopSyncRemoteDependencies = {},
+  dependencies: DesktopSyncCliDependencies = {},
 ): Promise<number> {
   const command = arguments_[0];
+  if (command === "resolve") {
+    return runDesktopSyncConflictCommand(
+      arguments_.slice(1),
+      io,
+      dependencies,
+    );
+  }
   if (command === "login"
     || command === "logout"
     || command === "auth-status") {
