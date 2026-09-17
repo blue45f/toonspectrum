@@ -2,6 +2,7 @@ import { Controller, Get, Headers, Query, Res } from "@nestjs/common";
 
 import { CreatorMarketplaceService } from "../creator-marketplace/creator-marketplace.service";
 import { renderOgPage } from "./og-page";
+import { PUBLIC_SHARE_OG_READERS } from "./og-readers";
 
 import type { Response } from "express";
 
@@ -20,6 +21,7 @@ export class OgController {
       userAgent,
       canonicalHost: process.env.CANONICAL_HOST,
       readers: {
+        ...PUBLIC_SHARE_OG_READERS,
         readMarketResource: (identifier) => this.marketplace.getById(identifier),
       },
     });

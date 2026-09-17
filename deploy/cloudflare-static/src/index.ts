@@ -188,11 +188,42 @@ function hasExactlyOneEncodedSegment(
   return segment.length > 0 && !segment.includes("/");
 }
 
+function isCreatorWorkOgPath(pathname: string): boolean {
+  if (!hasExactlyOneEncodedSegment(pathname, "/create/")) return false;
+  const segment = pathname.slice("/create/".length);
+  return segment !== "challenges" && segment !== "promo";
+}
+
+function isCollaborationOgPath(pathname: string): boolean {
+  if (!hasExactlyOneEncodedSegment(pathname, "/collaborate/")) return false;
+  const segment = pathname.slice("/collaborate/".length);
+  return segment !== "new" && segment !== "moderation";
+}
+
+function isPromotionOgPath(pathname: string): boolean {
+  if (!hasExactlyOneEncodedSegment(pathname, "/community/promote/")) return false;
+  const segment = pathname.slice("/community/promote/".length);
+  return segment !== "new" && segment !== "moderation";
+}
+
 function isOgPagePath(pathname: string): boolean {
   return hasExactlyOneEncodedSegment(pathname, "/title/")
     || pathname === "/market"
     || pathname === "/market/browse"
-    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/")
+    || isCreatorWorkOgPath(pathname)
+    || hasExactlyOneEncodedSegment(pathname, "/create/series/")
+    || hasExactlyOneEncodedSegment(pathname, "/showcase/work/")
+    || hasExactlyOneEncodedSegment(pathname, "/showcase/series/")
+    || hasExactlyOneEncodedSegment(pathname, "/u/")
+    || hasExactlyOneEncodedSegment(pathname, "/author/")
+    || hasExactlyOneEncodedSegment(pathname, "/community/post/")
+    || hasExactlyOneEncodedSegment(pathname, "/community/cafes/")
+    || hasExactlyOneEncodedSegment(pathname, "/pencafe/")
+    || isCollaborationOgPath(pathname)
+    || isPromotionOgPath(pathname)
+    || pathname === "/ranking"
+    || pathname === "/play";
 }
 
 function isCrawlerRequest(request: Request): boolean {
@@ -222,24 +253,65 @@ function decodePathSegment(value: string): string | null {
   }
 }
 
+function mappedSegment(
+  pathname: string,
+  prefix: string,
+  key: string,
+): URLSearchParams | null {
+  if (!hasExactlyOneEncodedSegment(pathname, prefix)) return null;
+  const value = decodePathSegment(pathname.slice(prefix.length));
+  return value ? new URLSearchParams({ [key]: value }) : null;
+}
+
 function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
-  if (requestUrl.pathname === "/market") {
+  const { pathname } = requestUrl;
+  if (pathname === "/market") {
     return new URLSearchParams({ marketPage: "home" });
   }
-  if (requestUrl.pathname === "/market/browse") {
+  if (pathname === "/market/browse") {
     return new URLSearchParams({ marketPage: "browse" });
   }
-  if (requestUrl.pathname.startsWith("/market/resource/")) {
-    const resourceId = decodePathSegment(
-      requestUrl.pathname.slice("/market/resource/".length),
-    );
-    if (!resourceId) return null;
-    return new URLSearchParams({ marketResourceId: resourceId });
+  if (pathname === "/ranking" || pathname === "/play") {
+    return new URLSearchParams({ staticPage: pathname.slice(1) });
   }
-  if (requestUrl.pathname.startsWith("/title/")) {
-    const slug = decodePathSegment(requestUrl.pathname.slice("/title/".length));
-    if (!slug) return null;
-    return new URLSearchParams({ slug });
+  if (pathname.startsWith("/market/resource/")) {
+    return mappedSegment(pathname, "/market/resource/", "marketResourceId");
+  }
+  if (pathname.startsWith("/title/")) {
+    return mappedSegment(pathname, "/title/", "slug");
+  }
+  if (pathname.startsWith("/create/series/")) {
+    return mappedSegment(pathname, "/create/series/", "creatorSeriesId");
+  }
+  if (pathname.startsWith("/showcase/series/")) {
+    return mappedSegment(pathname, "/showcase/series/", "creatorSeriesId");
+  }
+  if (pathname.startsWith("/showcase/work/")) {
+    return mappedSegment(pathname, "/showcase/work/", "creatorWorkId");
+  }
+  if (isCreatorWorkOgPath(pathname)) {
+    return mappedSegment(pathname, "/create/", "creatorWorkId");
+  }
+  if (pathname.startsWith("/u/")) {
+    return mappedSegment(pathname, "/u/", "profileUserId");
+  }
+  if (pathname.startsWith("/author/")) {
+    return mappedSegment(pathname, "/author/", "authorName");
+  }
+  if (pathname.startsWith("/community/post/")) {
+    return mappedSegment(pathname, "/community/post/", "communityPostId");
+  }
+  if (pathname.startsWith("/community/cafes/")) {
+    return mappedSegment(pathname, "/community/cafes/", "communityCafeSlug");
+  }
+  if (pathname.startsWith("/pencafe/")) {
+    return mappedSegment(pathname, "/pencafe/", "pencafeName");
+  }
+  if (isCollaborationOgPath(pathname)) {
+    return mappedSegment(pathname, "/collaborate/", "collaborationPostId");
+  }
+  if (isPromotionOgPath(pathname)) {
+    return mappedSegment(pathname, "/community/promote/", "promotionPostId");
   }
   return null;
 }
