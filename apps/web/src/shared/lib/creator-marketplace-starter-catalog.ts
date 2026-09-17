@@ -6,6 +6,7 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "./creator-marketplace-resource-contract";
 import { sha256HexPortable } from "./sha256-portable";
+import { CREATOR_MARKETPLACE_CC0_STARTER_RECORDS } from "./creator-marketplace-cc0-starter.generated";
 
 import type {
   CreatorMarketplaceJsonValue,
@@ -691,8 +692,13 @@ function buildStarterRecord(def: StarterItemDef): CreatorMarketplaceResourceReco
 /**
  * 사전 검증된 공식 스타터 리소스 레코드 목록 (3D 에셋, 3D 프리셋, 브러시, 팔레트, 필터, 템플릿, 에셋 전 7종 구비).
  */
+const OFFICIAL_STARTER_RECORDS = RAW_STARTER_DEFS.map(buildStarterRecord);
+
 export const CREATOR_MARKETPLACE_STARTER_RECORDS: readonly CreatorMarketplaceResourceRecord[] =
-  Object.freeze(RAW_STARTER_DEFS.map(buildStarterRecord));
+  Object.freeze([
+    ...CREATOR_MARKETPLACE_CC0_STARTER_RECORDS,
+    ...OFFICIAL_STARTER_RECORDS,
+  ]);
 
 /**
  * ID로 공식 스타터 리소스 단건 검색
