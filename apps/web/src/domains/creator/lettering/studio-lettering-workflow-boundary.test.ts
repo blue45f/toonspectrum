@@ -27,16 +27,20 @@ describe("Studio lettering workflow boundary", () => {
 
   it("starts inline editing from click insertion but leaves drag-and-drop placement uninterrupted", () => {
     const bubblePopover = read("./StudioBubbleToolPopoverBody.tsx");
+    const bubbleLibrary = read("./StudioBubbleLibraryPanel.tsx");
     const rail = read("../StudioLeftToolRail.tsx");
 
-    expect(bubblePopover).toContain("addBubble(v.id, undefined, true)");
+    expect(bubblePopover).toContain("const insertBubble = (id: BubbleVariant) => {");
+    expect(bubblePopover).toContain("addBubble(id, undefined, true)");
     expect(bubblePopover).toContain('data-studio-shortcut-boundary="true"');
     expect(bubblePopover).toContain('(event.metaKey || event.ctrlKey) && event.key === "Enter"');
-    expect(bubblePopover).toContain("writeStudioInsertDragPayload(event.dataTransfer");
+    expect(bubbleLibrary).toContain("writeStudioInsertDragPayload(event.dataTransfer");
+    expect(bubbleLibrary).toContain('aria-describedby="studio-bubble-placement-help"');
     expect(bubblePopover).toContain('id="studio-bubble-placement-help"');
     expect(bubblePopover.indexOf('id="studio-bubble-placement-help"')).toBeLessThan(
-      bubblePopover.indexOf('role="menu" aria-label={localizeText(')
+      bubblePopover.indexOf("<StudioBubbleLibraryPanel")
     );
+    expect(bubbleLibrary).toContain('role="list"');
     expect(bubblePopover.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(4);
     expect(rail).toContain('addBubble("speech", undefined, true)');
     expect(rail).toContain("addText(undefined, true)");
