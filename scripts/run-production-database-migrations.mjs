@@ -252,6 +252,31 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 `;
 }
 
+export function buildTrafficAnalyticsRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.traffic_page_view,
+  public.traffic_session,
+  public.traffic_share_event
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.traffic_page_view,
+  public.traffic_session,
+  public.traffic_share_event
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, DELETE
+  ON TABLE public.traffic_page_view, public.traffic_share_event
+  TO ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.traffic_session
+  TO ${quotedRole};
+`;
+}
+
 /**
  * A true result means the runtime role is missing one of the authentication
  * lifecycle DML capabilities or has gained a privilege outside that contract.
@@ -3113,6 +3138,7 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildTrafficAnalyticsRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildMessagingRuntimeAclSql(runtimeDatabaseRole));

@@ -11,6 +11,7 @@ import {
   POST_BASELINE_RELATIONS,
   buildAuthRuntimeAclSql,
   buildCommunityCommentRuntimeAclSql,
+  buildTrafficAnalyticsRuntimeAclSql,
   buildCommunityCommentRuntimeAclViolationSql,
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
@@ -40,10 +41,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(65);
+  expect(manifest).toHaveLength(66);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0065_creator_series_lifecycle");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(65);
+  expect(manifest.at(-1).id).toBe("0066_share_analytics_events");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(66);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -54,6 +55,29 @@ test("applied studio media inference migration remains checksum-immutable", () =
   expect(migration?.checksum).toBe(
     "319baddddcd1f478477ea1175c27b773b0f29cf3baf920816b7263e6a3d3fd38",
   );
+});
+
+test("share analytics migration stores bounded privacy-preserving events", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0066_share_analytics_events",
+  );
+  expect(migration?.id).toBe("0066_share_analytics_events");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "CREATE TABLE IF NOT EXISTS public.traffic_share_event",
+    "visitor_hash text NOT NULL",
+    "session_hash text NOT NULL",
+    "traffic_share_event_channel",
+    "traffic_share_event_outcome",
+    "'opened', 'completed', 'cancelled', 'failed'",
+    "traffic_share_event_occurred_at_idx",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/\b(?:ip_address|query_string|message_body)\b/iu);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("auth identity hardening migration preserves legacy access and enforces normalized ownership", () => {
@@ -725,6 +749,27 @@ test("auth runtime ACL is normalized to the exact DML contract", () => {
   for (const elevatedPrivilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
     expect(violation).toContain(`'${elevatedPrivilege}'`);
   }
+});
+
+test("traffic analytics runtime ACL is private and least-privilege", () => {
+  const sql = buildTrafficAnalyticsRuntimeAclSql("toonspectrum_runtime");
+
+  for (const relation of [
+    "public.traffic_page_view",
+    "public.traffic_session",
+    "public.traffic_share_event",
+  ]) {
+    expect(sql).toContain(relation);
+  }
+  expect(sql).toContain("FROM PUBLIC;");
+  expect(sql).toContain('FROM "toonspectrum_runtime";');
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, DELETE\n  ON TABLE public.traffic_page_view, public.traffic_share_event",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.traffic_session",
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
 });
 
 test("creator object storage runtime ACL is least-privilege and preserves immutable identity", () => {
