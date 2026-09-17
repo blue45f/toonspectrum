@@ -10,9 +10,9 @@ import {
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
 
-export type StudioProjectStartLocale = "ko" | "en";
+export type StudioProjectStartLocale = string;
 
-function projectStartActions(locale: StudioProjectStartLocale): readonly StudioIntentAction[] {
+function projectStartActions(bt: (ko: string, en: string) => string): readonly StudioIntentAction[] {
   return [
     {
       href: "/studio/new?kind=webtoon&template=webtoon-vertical",
@@ -54,30 +54,32 @@ function projectStartActions(locale: StudioProjectStartLocale): readonly StudioI
   ];
 }
 
-function projectFlow(locale: StudioProjectStartLocale): readonly StudioTaskFlowStep[] {
-  const labels: readonly (readonly [string, string, string])[] = locale === "ko"
-    ? [
-      ["plan", "기획", "작품·캐릭터·회차 기준"],
-      ["storyboard", "콘티", "대본을 컷과 스크롤로 구성"],
-      ["create", "2D·3D 제작", "선화·채색·배경·식자"],
-      ["collaborate", "협업", "작업 배정·넘기기·버전"],
-      ["review", "검토", "수정 요청·승인본 고정"],
-      ["publish", "연재", "규격 검사·예약 공개"],
-    ]
-    : [
-      ["plan", "Plan", "Series, character and episode foundation"],
-      ["storyboard", "Storyboard", "Turn the script into panels and scroll rhythm"],
-      ["create", "Create in 2D & 3D", "Line art, color, backgrounds and lettering"],
-      ["collaborate", "Collaborate", "Assignments, handoffs and versions"],
-      ["review", "Review", "Change requests and approved revisions"],
-      ["publish", "Publish", "Preflight checks and scheduled release"],
-    ];
-  return labels.map(([id, label, description], index) => ({
-    id,
-    label,
-    description,
-    state: index === 0 ? "current" : "upcoming",
-  }));
+function projectFlow(bt: (ko: string, en: string) => string): readonly StudioTaskFlowStep[] {
+  const ko: readonly (readonly [string, string, string])[] = [
+    ["plan", "기획", "작품·캐릭터·회차 기준"],
+    ["storyboard", "콘티", "대본을 컷과 스크롤로 구성"],
+    ["create", "2D·3D 제작", "선화·채색·배경·식자"],
+    ["collaborate", "협업", "작업 배정·넘기기·버전"],
+    ["review", "검토", "수정 요청·승인본 고정"],
+    ["publish", "연재", "규격 검사·예약 공개"],
+  ];
+  const en: readonly (readonly [string, string, string])[] = [
+    ["plan", "Plan", "Series, character and episode foundation"],
+    ["storyboard", "Storyboard", "Turn the script into panels and scroll rhythm"],
+    ["create", "Create in 2D & 3D", "Line art, color, backgrounds and lettering"],
+    ["collaborate", "Collaborate", "Assignments, handoffs and versions"],
+    ["review", "Review", "Change requests and approved revisions"],
+    ["publish", "Publish", "Preflight checks and scheduled release"],
+  ];
+  return ko.map(([id, labelKo, descriptionKo], index) => {
+    const [, labelEn, descriptionEn] = en[index] ?? [id, labelKo, descriptionKo];
+    return {
+      id,
+      label: bt(labelKo, labelEn),
+      description: bt(descriptionKo, descriptionEn),
+      state: index === 0 ? "current" : "upcoming",
+    };
+  });
 }
 
 /** Keep the existing project library as the canonical home while making first actions obvious. */
@@ -99,7 +101,7 @@ export function StudioProjectStartPanel({ locale }: { readonly locale: StudioPro
       </div>
 
       <StudioIntentLauncher
-        actions={projectStartActions(locale)}
+        actions={projectStartActions(bt)}
         ariaLabel={bt("현재 재료별 시작 경로", "Starting paths by current material")}
         actionLabel={bt("시작", "Start")}
         className="mt-5"
@@ -110,7 +112,7 @@ export function StudioProjectStartPanel({ locale }: { readonly locale: StudioPro
           {bt("한 프로젝트에서 이어지는 전체 제작 흐름", "The complete flow inside one project")}
         </p>
         <StudioTaskFlow
-          steps={projectFlow(locale)}
+          steps={projectFlow(bt)}
           ariaLabel={bt("웹툰 제작 전체 흐름", "Complete webtoon production flow")}
         />
       </div>
