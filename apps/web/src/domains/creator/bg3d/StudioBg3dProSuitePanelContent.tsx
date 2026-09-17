@@ -4,6 +4,7 @@ import { lazy, Suspense, useId, useState } from "react";
 import { STUDIO_BG3D_CONTROL_BUTTON, studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dCompositionLensPanel } from "./StudioBg3dCompositionLensPanel";
+import { StudioBg3dProfessionalReadinessPanel } from "./StudioBg3dProfessionalReadinessPanel";
 
 const Director = lazy(() => import("./StudioBg3dCinematicDirectorPanel").then((module) => ({ default: module.StudioBg3dCinematicDirectorPanel })));
 const MultiPass = lazy(() => import("./StudioBg3dMultiPassExporterPanel").then((module) => ({ default: module.StudioBg3dMultiPassExporterPanel })));
@@ -43,6 +44,9 @@ export function StudioBg3dProSuitePanel({
         <p className="mt-1 text-xs leading-relaxed text-fg-2">구도를 잡고, 여러 컷으로 저장한 뒤, 레이어가 나뉜 원고로 출력합니다.</p>
       </div>
       {!runtime && <p role="status" className="rounded-lg border border-line p-3 text-xs text-fg-2">3D 장면을 연 뒤 사용할 수 있습니다.</p>}
+      {runtime ? (
+        <StudioBg3dProfessionalReadinessPanel readiness={runtime.professionalReadiness} />
+      ) : null}
       <section
         aria-labelledby={`${id}-precision-modeler-title`}
         className="rounded-xl border border-accent/35 bg-accent-soft/35 p-3 shadow-sm"
