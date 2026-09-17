@@ -10,20 +10,16 @@ import {
   ClipboardCheck,
   Coins,
   FileKey2,
-  FolderKanban,
   GitBranch,
   Handshake,
   Layers3,
   LayoutDashboard,
   LockKeyhole,
-  MessageCircleQuestion,
   MessagesSquare,
-  PackageCheck,
   PanelTopOpen,
   Scale,
   ScrollText,
   ShieldCheck,
-  Sparkles,
   Users,
   Workflow,
 } from "lucide-react";
@@ -58,6 +54,7 @@ import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
 import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWorkspace";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
+import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
 import {
   executeProductionCommand,
   getProductionProject,
@@ -86,7 +83,6 @@ type RoleLens = "story" | "art" | "producer";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const SAMPLE_PROJECT_ID = "sample-project";
-const DATE_TIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
 
 const SURFACES: readonly {
@@ -128,12 +124,6 @@ const EPISODE_STATE_LABELS: Readonly<Record<EpisodeCollaboration["state"], strin
   "creator-replacement": "창작자 교체",
   cancelled: "취소",
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return "미정";
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? DATE_TIME.format(date) : "미정";
-}
 
 function formatDay(value: string | null): string {
   if (!value) return "미정";
@@ -576,95 +566,18 @@ function ProjectNav({ projectId, surface }: { readonly projectId: string; readon
   );
 }
 
-function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: ProductionProjectAggregate; readonly roleLens: RoleLens }) {
-  const openQuestions = aggregate.clarifications.filter((entry) => entry.status === "open" || entry.status === "answered");
-  const blockers = openQuestions.filter((entry) => entry.blocking);
-  const activeEpisodes = aggregate.episodes.filter((entry) => !["published", "cancelled"].includes(entry.state));
-  const dueTasks = [...aggregate.tasks].filter((task) => task.dueAt && !["done", "cancelled", "out-of-scope"].includes(task.status));
-  const nextEpisode = activeEpisodes[0];
-  const roleCopy = {
-    story: "그림 작업에서 온 질문과 스토리 확인 요청을 먼저 보여 줍니다.",
-    art: "승인된 작업 버전과 막힌 질문, 내가 맡은 결과물을 먼저 보여 줍니다.",
-    producer: "일정·승인·외주·계약에서 확인할 일을 먼저 보여 줍니다.",
-  }[roleLens];
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="진행 회차" value={String(activeEpisodes.length)} detail={nextEpisode ? `${nextEpisode.episodeId} · ${EPISODE_STATE_LABELS[nextEpisode.state]}` : "진행 회차 없음"} icon={PanelTopOpen} tone="accent" />
-        <Metric label="막힌 질문" value={String(blockers.length)} detail={blockers.length > 0 ? "답변 전 다음 작업 진행 불가" : "막힌 질문 없음"} icon={MessageCircleQuestion} tone={blockers.length > 0 ? "danger" : "success"} />
-        <Metric label="열린 작업" value={String(dueTasks.length)} detail={`${dueTasks.filter((task) => task.status === "blocked").length}개 차단`} icon={FolderKanban} tone="warning" />
-        <Metric label="외주 요청" value={String(aggregate.scopePackages.length)} detail="의뢰 범위·완료 기준 포함" icon={PackageCheck} />
-      </div>
-
-      <div className="rounded-2xl border border-accent/30 bg-accent-soft p-4">
-        <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-bold text-fg">{roleLens === "story" ? "스토리 작가 홈" : roleLens === "art" ? "그림 작가 홈" : "프로듀서 홈"}</p>
-            <p className="mt-1 text-xs leading-6 text-fg-2">{roleCopy}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard title="회차 흐름" description="확정된 작업과 함께 확인할 상태를 회차별로 봅니다.">
-          <div className="space-y-2">
-            {aggregate.episodes.map((episode) => (
-              <Link
-                key={episode.id}
-                to={`/production/projects/${aggregate.projectId}/episodes/${episode.episodeId}`}
-                className="group flex items-center gap-3 rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/40 hover:bg-raised"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-raised text-sm font-black text-accent">
-                  {episode.episodeId.replace(/\D+/gu, "") || "·"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-fg">{episode.episodeId}</p>
-                    <Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>
-                    {episode.openBlockerCount > 0 ? <Pill tone="danger">막힘 {episode.openBlockerCount}</Pill> : null}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-[0.6875rem] text-fg-3">
-                    <span>스토리 {episode.storyLockApproved ? "✓" : "—"}</span>
-                    <span>·</span>
-                    <span>콘티 {episode.thumbnailLockApproved ? "✓" : "—"}</span>
-                    <span>·</span>
-                    <span>최종 검수 {episode.jointProofApproved ? "✓" : "—"}</span>
-                  </div>
-                </div>
-                <ChevronRight className="size-4 text-fg-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="다음 확인" description="내 역할과 필수 승인 순서에 따라 지금 확인할 일을 보여 줍니다.">
-          <div className="space-y-3">
-            {blockers.map((thread) => (
-              <div key={thread.id} className="rounded-xl border border-bad/30 bg-bad/10 p-3">
-                <div className="flex items-center gap-2"><AlertTriangle className="size-4 text-bad" aria-hidden="true" /><Pill tone="danger">작화 차단</Pill></div>
-                <p className="mt-2 text-sm font-semibold text-fg">{thread.question}</p>
-                <p className="mt-1 text-xs text-fg-2">담당 {assignmentLabel(aggregate, thread.answerOwnerAssignmentId)} · {formatDate(thread.dueAt)}</p>
-              </div>
-            ))}
-            {blockers.length === 0 ? <EmptyState title="차단 결정이 없습니다" description="새 질문이나 검수 요청이 생기면 이곳에 표시됩니다." /> : null}
-          </div>
-        </SectionCard>
-      </div>
-
-      <SectionCard title="최근 프로젝트 활동" description="승인·권리·보상의 중요한 변경은 수정할 수 없는 기록으로 남깁니다.">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {[...aggregate.auditEvents].reverse().slice(0, 6).map((event) => (
-            <div key={event.id} className="rounded-xl border border-line bg-panel p-3">
-              <p className="text-xs font-bold text-fg">{event.action}</p>
-              <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{event.targetType} · {event.targetId}</p>
-              <p className="mt-2 text-[0.6875rem] text-fg-3">r{event.aggregateRevision} · {formatDate(event.occurredAt)}</p>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-    </div>
-  );
+function OverviewSurface({
+  aggregate,
+  roleLens,
+  execute,
+  canEdit,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly roleLens: RoleLens;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+}) {
+  return <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
 }
 
 function PlanningSurface({
@@ -1112,7 +1025,7 @@ function SurfaceContent({
   readonly canEdit: boolean;
 }) {
   switch (surface) {
-    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
+    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
