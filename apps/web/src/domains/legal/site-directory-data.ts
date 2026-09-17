@@ -288,6 +288,13 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "Apply authentication, storage, brush, performance and AI patterns elsewhere",
       ),
       destination(
+        "/about/technology/field-notes",
+        "기술 심화 노트",
+        "Engineering field notes",
+        "Worker·PWA·무료 AI·Blender·3D·Open API와 트러블슈팅",
+        "Workers, PWA, free AI, Blender, 3D, Open APIs and troubleshooting",
+      ),
+      destination(
         "/about/technology/deck",
         "기술 발표 모드",
         "Engineering deck",

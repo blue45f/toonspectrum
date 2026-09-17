@@ -84,6 +84,9 @@ jobs:
           apps/web/src/domains/legal/site-directory-search.test.ts
           apps/web/src/domains/legal/SiteDirectorySearch.test.tsx
           apps/web/src/domains/legal/SitemapPage.test.ts
+          apps/web/src/domains/legal/technology/engineering-story-content.test.ts
+          apps/web/src/domains/legal/technology/engineering-field-notes-content.test.ts
+          apps/web/src/domains/legal/technology/EngineeringStoryPage.test.tsx
       - name: Production management prediction contracts
         run: >-
           pnpm exec vitest run

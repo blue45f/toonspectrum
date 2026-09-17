@@ -6,6 +6,7 @@ import {
   Film,
   Gauge,
   Layers3,
+  NotebookTabs,
   Presentation,
   Scale,
   ShieldCheck,
@@ -90,6 +91,15 @@ const HUB_LINKS = [
     body: {
       ko: "OAuth, 클라우드 저장, 브러시, 성능, 크롤링, QA, 인프라와 AI 가이드를 제공합니다.",
       en: "Use implementation guides for OAuth, cloud storage, brushes, performance, acquisition, QA, infrastructure and AI.",
+    },
+  },
+  {
+    href: "/about/technology/field-notes",
+    icon: NotebookTabs,
+    title: { ko: "기술 심화 노트", en: "Engineering field notes" },
+    body: {
+      ko: "Worker·PWA·무료 AI·인프라·Blender MCP·3D·Open API와 장애 해결 사례를 살펴봅니다.",
+      en: "Study workers, PWA, free-first AI and infrastructure, Blender MCP, 3D, Open APIs and troubleshooting.",
     },
   },
   {
@@ -285,9 +295,9 @@ export function TechnologyPage() {
       <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
         <p className="eyebrow text-accent">REUSE THE STORY</p>
         <h2 id="engineering-hub-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-          {ko ? "하나의 기술 원본을 다섯 가지 방식으로 사용합니다." : "Use one engineering source in five different ways."}
+          {ko ? "하나의 기술 원본을 여섯 가지 방식으로 사용합니다." : "Use one engineering source in six different ways."}
         </h2>
-        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {HUB_LINKS.map((item) => {
             const Icon = item.icon;
             return (
