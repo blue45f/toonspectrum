@@ -11,6 +11,13 @@ describe("public shell integration", () => {
     expect(app).not.toMatch(/<StudioBg3dRetainedOwnerHost[^>]*\bkey=/u);
   });
 
+  it("keeps the soundtrack controller mounted while hiding and suspending it on isolated routes", () => {
+    expect(app).toContain("const SiteBackgroundMusicPlayer = lazy(");
+    expect(app).not.toContain('import { SiteBackgroundMusicPlayer }');
+    expect(app).toContain("<SiteBackgroundMusicPlayer suspended={isolatedChrome} />");
+    expect(app.indexOf("<SiteBackgroundMusicPlayer suspended={isolatedChrome} />")).toBeLessThan(app.indexOf("{!isolatedChrome ? ("));
+  });
+
   it("does not make footer links wait for a user scroll", () => {
     const footer = app.split("function DeferredFooter(")[1].split("function DeferredBackToTop")[0];
     expect(footer).toContain("<SiteFooter />");
