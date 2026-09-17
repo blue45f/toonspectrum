@@ -283,8 +283,8 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
     href: "/studio/bg3d",
     icon: Boxes,
-    title: { ko: "3D 배경·소품", en: "3D backgrounds & props" },
-    description: { ko: "카메라·조명·선화 출력까지 웹툰 배경 작업을 연결합니다.", en: "Connect cameras, lighting and line-art output for webtoon backgrounds." },
+    title: { ko: "3D 장면 연출", en: "3D scene direction" },
+    description: { ko: "배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 적용합니다.", en: "Block backgrounds, poses and composition, then apply line and tone guides to artwork." },
   },
   {
     href: "/studio/assets/audio",

@@ -1290,8 +1290,8 @@ function StudioLeftToolRailConnected() {
               data-studio-rail-tool-id="bg3d"
               launcher
               icon={Boxes}
-              label="3D 배경"
-              description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
+              label="3D 장면"
+              description="배경·포즈·구도를 3D로 먼저 잡고 선화·톤 가이드로 작화에 바로 적용합니다."
               active={bg3dOpen}
               accented
               onClick={toggleBg3dEditor}
