@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
@@ -29,7 +30,7 @@ import {
 import { planStudioTemplateApplication } from "../studio-template-system";
 import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 const CATEGORY_LABELS: Readonly<
   Record<StudioTemplateCategory, Readonly<Record<Locale, string>>>
@@ -99,7 +100,7 @@ function TemplatePreview({
           type="button"
           onClick={onToggleFavorite}
           aria-pressed={favorite}
-          aria-label={locale === "ko" ? "즐겨찾기 전환" : "Toggle favorite"}
+          aria-label={bt("즐겨찾기 전환", "Toggle favorite")}
           className={cn(
             "grid size-11 place-items-center rounded-xl border transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -137,25 +138,25 @@ function TemplatePreview({
       <dl className="mt-5 grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "페이지" : "Pages"}
+            {bt("페이지", "Pages")}
           </dt>
           <dd className="mt-1 text-sm font-black text-fg">{pageCount}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "컷·구성 영역" : "Panels"}
+            {bt("컷·구성 영역", "Panels")}
           </dt>
           <dd className="mt-1 text-sm font-black text-fg">{panelCount}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "편집 슬롯" : "Editable slots"}
+            {bt("편집 슬롯", "Editable slots")}
           </dt>
           <dd className="mt-1 text-sm font-black text-fg">{template.definition.slots.length}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
           <dt className="text-[0.65rem] font-semibold text-fg-3">
-            {locale === "ko" ? "레이어" : "Layers"}
+            {bt("레이어", "Layers")}
           </dt>
           <dd className="mt-1 text-sm font-black text-fg">{composition?.layerLabels.length ?? 0}</dd>
         </div>
@@ -164,15 +165,13 @@ function TemplatePreview({
       {composition ? (
         <div className="mt-4 rounded-xl border border-line bg-panel p-3">
           <p className="text-[0.65rem] font-bold uppercase tracking-wide text-fg-3">
-            {locale === "ko" ? "출력·구조" : "Output & structure"}
+            {bt("출력·구조", "Output & structure")}
           </p>
           <p className="mt-1 text-sm font-black text-fg">
             {locale === "ko" ? composition.canvasLabelKo : composition.canvasLabelEn}
           </p>
           <p className="mt-1 text-xs text-fg-3">
-            {locale === "ko"
-              ? `새 프로젝트 · 포함 에셋 ${composition.includedAssetCount}개`
-              : `New project · ${composition.includedAssetCount} included assets`}
+            {bt(`새 프로젝트 · 포함 에셋 ${composition.includedAssetCount}개`, `New project · ${composition.includedAssetCount} included assets`)}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {composition.layerLabels.slice(0, 8).map((label) => (
@@ -197,13 +196,11 @@ function TemplatePreview({
         <div>
           <p className="text-sm font-black text-fg">
             {statusReady
-              ? (locale === "ko" ? "안전한 기본값으로 바로 시작할 수 있어요" : "Ready with safe defaults")
-              : (locale === "ko" ? "이미지 사용 조건을 시작 전에 확인해요" : "Review image rights before starting")}
+              ? (bt("안전한 기본값으로 바로 시작할 수 있어요", "Ready with safe defaults"))
+              : (bt("이미지 사용 조건을 시작 전에 확인해요", "Review image rights before starting"))}
           </p>
           <p className="mt-1 text-xs leading-5 text-fg-3">
-            {locale === "ko"
-              ? "미리보기와 같은 페이지·컷·레이어 구조를 새 프로젝트에 전달합니다. 원본 프로젝트는 변경하지 않습니다."
-              : "The previewed pages, panels and layer structure are handed to a new project without changing originals."}
+            {bt("미리보기와 같은 페이지·컷·레이어 구조를 새 프로젝트에 전달합니다. 원본 프로젝트는 변경하지 않습니다.", "The previewed pages, panels and layer structure are handed to a new project without changing originals.")}
           </p>
         </div>
       </div>
@@ -216,7 +213,7 @@ function TemplatePreview({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2",
         )}
       >
-        {locale === "ko" ? "이 템플릿으로 시작" : "Start with this template"}
+        {bt("이 템플릿으로 시작", "Start with this template")}
         <ArrowRight size={17} aria-hidden="true" />
       </Link>
     </aside>
@@ -225,6 +222,7 @@ function TemplatePreview({
 
 /** One canonical, searchable template destination for novice and professional creation flows. */
 export function StudioTemplatesPage() {
+  const bt = useBilingual("StudioTemplatesPage");
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const [query, setQuery] = useState("");
@@ -270,24 +268,22 @@ export function StudioTemplatesPage() {
             <Sparkles size={15} aria-hidden="true" /> TOONSTUDIO TEMPLATES
           </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-fg sm:text-5xl">
-            {locale === "ko" ? "무엇을 만들지만 고르세요" : "Choose what you want to make"}
+            {bt("무엇을 만들지만 고르세요", "Choose what you want to make")}
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-            {locale === "ko"
-              ? "웹툰, 일러스트, 홍보물, 발표 자료와 콘티의 전문 구조를 미리 준비했습니다. 복잡한 규격과 기본 레이어는 ToonStudio가 정하고, 필요할 때만 세부 설정을 바꿀 수 있습니다."
-              : "Professional structures for webtoons, illustration, promotion, presentations and storyboards are prepared in advance. ToonStudio chooses safe defaults while keeping expert controls available."}
+            {bt("웹툰, 일러스트, 홍보물, 발표 자료와 콘티의 전문 구조를 미리 준비했습니다. 복잡한 규격과 기본 레이어는 ToonStudio가 정하고, 필요할 때만 세부 설정을 바꿀 수 있습니다.", "Professional structures for webtoons, illustration, promotion, presentations and storyboards are prepared in advance. ToonStudio chooses safe defaults while keeping expert controls available.")}
           </p>
         </header>
 
-        <section className="mt-7 rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-5" aria-label={locale === "ko" ? "템플릿 찾기" : "Find templates"}>
+        <section className="mt-7 rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-5" aria-label={bt("템플릿 찾기", "Find templates")}>
           <label className="relative block">
             <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden="true" />
-            <span className="sr-only">{locale === "ko" ? "템플릿 검색" : "Search templates"}</span>
+            <span className="sr-only">{bt("템플릿 검색", "Search templates")}</span>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={locale === "ko" ? "웹툰, 피칭, 캐릭터 시트처럼 검색" : "Search webtoon, pitch, character sheet…"}
+              placeholder={bt("웹툰, 피칭, 캐릭터 시트처럼 검색", "Search webtoon, pitch, character sheet…")}
               className="min-h-12 w-full rounded-xl border border-line bg-panel pl-10 pr-4 text-sm text-fg outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>
@@ -321,7 +317,7 @@ export function StudioTemplatesPage() {
               )}
             >
               <Heart size={14} fill={favoritesOnly ? "currentColor" : "none"} aria-hidden="true" />
-              {locale === "ko" ? "즐겨찾기" : "Favorites"}
+              {bt("즐겨찾기", "Favorites")}
             </button>
           </div>
         </section>
@@ -329,7 +325,7 @@ export function StudioTemplatesPage() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <section aria-live="polite">
             <p className="mb-3 text-xs font-bold text-fg-3">
-              {locale === "ko" ? `${templates.length}개 템플릿` : `${templates.length} templates`}
+              {bt(`${templates.length}개 템플릿`, `${templates.length} templates`)}
             </p>
             {templates.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -347,7 +343,7 @@ export function StudioTemplatesPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedId(template.id)}
-                        aria-label={`${templateTitle(template, locale)} ${locale === "ko" ? "시각 미리보기" : "visual preview"}`}
+                        aria-label={`${templateTitle(template, locale)} ${bt("시각 미리보기", "visual preview")}`}
                         className="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                       >
                         <StudioTemplateVisualPreview
@@ -373,7 +369,7 @@ export function StudioTemplatesPage() {
                           type="button"
                           onClick={() => toggleFavorite(template.id)}
                           aria-pressed={favorite}
-                          aria-label={locale === "ko" ? "즐겨찾기 전환" : "Toggle favorite"}
+                          aria-label={bt("즐겨찾기 전환", "Toggle favorite")}
                           className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-accent"
                         >
                           <Heart size={15} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
@@ -384,9 +380,7 @@ export function StudioTemplatesPage() {
                       </p>
                       {template.definition.composition ? (
                         <p className="mt-3 text-[0.68rem] font-semibold text-fg-3">
-                          {locale === "ko"
-                            ? `${template.definition.composition.pages.length}페이지 · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)}컷·영역 · 편집 슬롯 ${template.definition.slots.length}`
-                            : `${template.definition.composition.pages.length} pages · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)} panels · ${template.definition.slots.length} slots`}
+                          {bt(`${template.definition.composition.pages.length}페이지 · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)}컷·영역 · 편집 슬롯 ${template.definition.slots.length}`, `${template.definition.composition.pages.length} pages · ${template.definition.composition.pages.reduce((total, page) => total + page.panelCount, 0)} panels · ${template.definition.slots.length} slots`)}
                         </p>
                       ) : null}
                       <button
@@ -394,7 +388,7 @@ export function StudioTemplatesPage() {
                         onClick={() => setSelectedId(template.id)}
                         className="mt-4 min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:border-accent/40 hover:text-fg"
                       >
-                        {locale === "ko" ? "구성 보기" : "View structure"}
+                        {bt("구성 보기", "View structure")}
                       </button>
                     </article>
                   );
@@ -404,7 +398,7 @@ export function StudioTemplatesPage() {
               <div className="rounded-3xl border border-dashed border-line bg-card p-10 text-center">
                 <LayoutTemplate size={28} className="mx-auto text-fg-3" aria-hidden="true" />
                 <h2 className="mt-3 text-lg font-black text-fg">
-                  {locale === "ko" ? "조건에 맞는 템플릿이 없어요" : "No matching templates"}
+                  {bt("조건에 맞는 템플릿이 없어요", "No matching templates")}
                 </h2>
                 <button
                   type="button"
@@ -415,7 +409,7 @@ export function StudioTemplatesPage() {
                   }}
                   className="mt-4 min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent"
                 >
-                  {locale === "ko" ? "전체 템플릿 보기" : "Show all templates"}
+                  {bt("전체 템플릿 보기", "Show all templates")}
                 </button>
               </div>
             )}
