@@ -3,27 +3,41 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
 
+import {
+  defineBilingualMap,
+  defineBilingualText,
+  formatI18nTemplate,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { useT } from "@/shared/lib/i18n";
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
 import type { SiteRouteVisualProfile } from "@/shared/lib/site-route-visual";
 
 import "./route-purpose-scene.css";
 
-type Locale = "ko" | "en";
-
-const CONTEXT_LABELS: Record<SiteRouteExperience["contextLevel"], { ko: string; en: string }> = {
+const CONTEXT_LABELS = defineBilingualMap("routePurposeScene.context", {
   global: { ko: "전체 서비스", en: "Global" },
   project: { ko: "작품 단위", en: "Project" },
   episode: { ko: "회차 단위", en: "Episode" },
   scene: { ko: "장면 단위", en: "Scene" },
   cut: { ko: "컷 단위", en: "Panel" },
-};
+});
 
-const MOBILE_LABELS: Record<SiteRouteExperience["mobilePolicy"], { ko: string; en: string }> = {
+const MOBILE_LABELS = defineBilingualMap("routePurposeScene.mobile", {
   full: { ko: "모바일 전체 지원", en: "Mobile ready" },
   review: { ko: "모바일 검토 지원", en: "Mobile review" },
   preview: { ko: "모바일 미리보기", en: "Mobile preview" },
   "desktop-required": { ko: "큰 화면 권장", en: "Large screen" },
-};
+});
+
+const COPY = {
+  pageGuide: defineBilingualText("routePurposeScene", "pageGuide", "{title} 화면 안내", "{title} page guide"),
+  pageScope: defineBilingualText("routePurposeScene", "pageScope", "페이지 사용 범위", "Page scope"),
+  nextAction: defineBilingualText("routePurposeScene", "nextAction", "다음: {action}", "Next: {action}"),
+  playMotion: defineBilingualText("routePurposeScene", "playMotion", "페이지 모션 재생", "Play page motion"),
+  pauseMotion: defineBilingualText("routePurposeScene", "pauseMotion", "페이지 모션 일시정지", "Pause page motion"),
+  play: defineBilingualText("routePurposeScene", "play", "재생", "Play"),
+  pause: defineBilingualText("routePurposeScene", "pause", "정지", "Pause"),
+} as const;
 
 function responsiveAtelierSrcSet(image: string): string | undefined {
   const match = image.match(/^(\/brand\/atelier-[^/.]+)\.webp$/u);
@@ -33,7 +47,6 @@ function responsiveAtelierSrcSet(image: string): string | undefined {
 
 interface RoutePurposeSceneProps {
   readonly title: string;
-  readonly locale: Locale;
   readonly experience: SiteRouteExperience;
   readonly profile: SiteRouteVisualProfile;
 }
@@ -44,18 +57,18 @@ interface RoutePurposeSceneProps {
  */
 export function RoutePurposeScene({
   title,
-  locale,
   experience,
   profile,
 }: RoutePurposeSceneProps) {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const { hostRef, motionAllowed, paused, running, setPaused } = useAtelierMotion();
-  const context = CONTEXT_LABELS[experience.contextLevel][locale];
-  const mobile = MOBILE_LABELS[experience.mobilePolicy][locale];
-  const purpose = experience.pagePurpose[locale];
-  const action = experience.primaryAction?.[locale] ?? null;
+  const context = t(CONTEXT_LABELS[experience.contextLevel]);
+  const mobile = t(MOBILE_LABELS[experience.mobilePolicy]);
+  const purpose = t(experience.pagePurpose);
+  const action = experience.primaryAction ? t(experience.primaryAction) : null;
   const imageSrcSet = responsiveAtelierSrcSet(profile.image);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
@@ -118,19 +131,19 @@ export function RoutePurposeScene({
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
         data-route-visual-running={running ? "true" : "false"}
-        aria-label={locale === "ko" ? `${title} 화면 안내` : `${title} page guide`}
+        aria-label={formatI18nTemplate(t(COPY.pageGuide), { title })}
       >
         <div className="route-purpose-scene__copy">
           <p className="route-purpose-scene__eyebrow">
             <Sparkles size={14} aria-hidden="true" />
-            {profile.eyebrow[locale]}
+            {t(profile.eyebrow)}
           </p>
           <h2>{title}</h2>
           <p className="route-purpose-scene__purpose">{purpose}</p>
-          <div className="route-purpose-scene__meta" aria-label={locale === "ko" ? "페이지 사용 범위" : "Page scope"}>
+          <div className="route-purpose-scene__meta" aria-label={t(COPY.pageScope)}>
             <span>{context}</span>
             <span>{mobile}</span>
-            {action ? <strong>{locale === "ko" ? "다음: " : "Next: "}{action}</strong> : null}
+            {action ? <strong>{formatI18nTemplate(t(COPY.nextAction), { action })}</strong> : null}
           </div>
         </div>
 
@@ -172,9 +185,9 @@ export function RoutePurposeScene({
           <span className="route-purpose-scene__focus-ring"><Sparkles size={24} /></span>
           <div className="route-purpose-scene__cards">
             {profile.layers.map((layer, index) => (
-              <span className="route-purpose-scene__card" data-card={index + 1} key={layer.en}>
+              <span className="route-purpose-scene__card" data-card={index + 1} key={layer}>
                 <i />
-                <b>{layer[locale]}</b>
+                <b>{t(layer)}</b>
               </span>
             ))}
           </div>
@@ -186,18 +199,12 @@ export function RoutePurposeScene({
             type="button"
             className="route-purpose-scene__motion-toggle"
             aria-pressed={paused}
-            aria-label={paused
-              ? locale === "ko" ? "페이지 모션 재생" : "Play page motion"
-              : locale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
+            aria-label={t(paused ? COPY.playMotion : COPY.pauseMotion)}
             onClick={() => setPaused(!paused)}
-            title={paused
-              ? locale === "ko" ? "페이지 모션 재생" : "Play page motion"
-              : locale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
+            title={t(paused ? COPY.playMotion : COPY.pauseMotion)}
           >
             {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
-            <span>{paused
-              ? locale === "ko" ? "재생" : "Play"
-              : locale === "ko" ? "정지" : "Pause"}</span>
+            <span>{t(paused ? COPY.play : COPY.pause)}</span>
           </button>
         ) : null}
       </section>

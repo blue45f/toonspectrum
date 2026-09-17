@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoutePurposeScene } from "./RoutePurposeScene";
 import { SiteRouteExperienceBoundary } from "./SiteRouteExperienceBoundary";
 
+import { useI18n } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
@@ -15,6 +16,7 @@ let reducedMotion = false;
 
 beforeEach(() => {
   reducedMotion = false;
+  useI18n.setState({ lang: "ko" });
   vi.stubGlobal("IntersectionObserver", class {
     constructor(callback: IntersectionObserverCallback) {
       intersection = (visible) => callback(
@@ -47,7 +49,6 @@ function scene(pathname: string) {
   return render(
     <RoutePurposeScene
       title="페이지 제목"
-      locale="ko"
       experience={resolveSiteRouteExperience(pathname)}
       profile={resolveSiteRouteVisual(pathname)}
     />,
