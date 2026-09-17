@@ -108,6 +108,38 @@
 
 남은 검증은 대용량 업로드 재개, 실제 외부 계정, 다중 사용자 충돌, Safari OPFS·GPU 조합과 기준 프로젝트 A–D의 전체 E2E다.
 
+## 2026-09-17 데스크톱 폴더 동기화·대체 증거 게이트 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- Windows·macOS·Linux 호스트가 사용할 수 있는 provider-neutral 로컬 폴더 동기화 엔진을 별도 workspace로 추가했다.
+- 파일을 SHA-256, 크기, 수정 시각과 정규화된 상대 경로로 스캔하고 `.toonstudio`, `.git`, `node_modules`와 루트 밖 경로를 제외한다.
+- 심볼릭 링크와 `..` 경로를 통한 작업 폴더 탈출을 차단한다.
+- 마지막 동기화 journal과 현재 로컬·원격 snapshot을 비교해 upload, download, delete-local, delete-remote, no-op, conflict 계획을 결정한다.
+- 양쪽이 동시에 바뀐 파일은 자동 덮어쓰지 않고 conflict로 중단한다.
+- upload·download는 임시 파일과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
+- 한 번에 하나의 cycle만 실행하며 중복 trigger를 병합하고 중지 가능한 polling agent를 제공한다.
+- 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
+- 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
+- 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
+
+이 엔진은 동기화 transport의 안전한 로컬 실행 기반이다. 실제 운영 계정 연결, OS 백그라운드 서비스 설치, 대용량 재개 전송과 충돌 UI는 별도 release gate로 유지한다.
+
+## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 기준 프로젝트 A(1인 세로 웹툰), B(팀 제작·검수), C(PSD·CLIP 왕복), D(재편집 가능한 3D 제작)를 실행 가능한 인증 manifest로 고정했다.
+- 18개 완료 기준을 실제 20개 테스트 파일에 연결하고 evidence 파일의 SHA-256과 크기를 receipt에 기록한다.
+- 기준 프로젝트 A: 생성·자동 저장·프로젝트 archive·말풍선·게시 package 87개 테스트를 통과했다.
+- 기준 프로젝트 B: 역할 게이트·Production↔Studio revision digest·검수·댓글 재앵커 33개 테스트를 통과했다.
+- 기준 프로젝트 C: PSD import·텍스트·조정 그래프·CLIP 선택·workspace interchange 110개 테스트를 통과했다.
+- 기준 프로젝트 D: 3D scene document·camera·multi-pass·linked archive·VRM scene 109개 테스트를 통과했다.
+- 네 기준 프로젝트 전체는 20 files / 339 tests를 통과하며 root CI의 필수 게이트로 실행된다.
+- 자동 인증 receipt가 통과해도 전문 창작자 대체 완료 문구는 열리지 않도록 claim policy를 별도로 차단한다.
+
+자동 인증은 코드·저장·복구·왕복 계약의 결정론적 근거다. 실제 장시간 창작 경험, 펜·GPU·파일 편차와 도구 대체 평가는 12명 외부 전문 창작자 서명 검증을 통과해야 한다.
+
 ## 올인원 공개 문구 사용 게이트
 
 다음 기준 프로젝트가 모두 통과하기 전에는 `Clip Studio·Photoshop·SketchUp·Drive를 완전히 대체했다`거나 `모든 전문 기능이 완성됐다`고 표시하지 않는다.
