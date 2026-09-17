@@ -1,6 +1,7 @@
 import { BrushStudioV6MaterialPaletteCache } from "./brush-studio-v6-material-palette-cache";
 import { brushStudioV6MaterialExecutionForNode } from "./brush-studio-v6-license-profile";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
+import { isBrushStudioV7AdvancedSurface, sampleBrushStudioV7SurfaceContact } from "./brush-studio-v7-surface-library";
 import { createBrushStudioV6TopologyStroke } from "./brush-studio-v6-topology-engine";
 import { brushStudioV6TopologyActiveTuning, brushStudioV6TopologyStep, paintBrushStudioV6TopologyPrimitive } from "./brush-studio-v6-topology-material";
 import {
@@ -158,31 +159,9 @@ function noise(x: number, y: number, seed: number): number {
   return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Document-anchored paper height; no view scale, stroke index, or mutable RNG. */
+/** Document-anchored paper height; legacy IDs preserve their previous scalar tooth. */
 export function sampleBrushStudioV6PaperContact(surface: string, x: number, y: number, seed: number): number {
-  const field = (scaleX: number, scaleY: number, salt: number): number => {
-    const px = x / scaleX;
-    const py = y / scaleY;
-    const ix = Math.floor(px);
-    const iy = Math.floor(py);
-    const tx = px - ix;
-    const ty = py - iy;
-    const sx = tx * tx * (3 - 2 * tx);
-    const sy = ty * ty * (3 - 2 * ty);
-    const top = noise(ix, iy, seed ^ salt) * (1 - sx) + noise(ix + 1, iy, seed ^ salt) * sx;
-    const bottom = noise(ix, iy + 1, seed ^ salt) * (1 - sx) + noise(ix + 1, iy + 1, seed ^ salt) * sx;
-    return top * (1 - sy) + bottom * sy;
-  };
-  if (surface === "surface-smooth") return 0.08;
-  if (surface === "surface-linen") {
-    const warp = Math.pow(0.5 + Math.sin(x * TAU / 7) * 0.5, 4);
-    const weft = Math.pow(0.5 + Math.sin(y * TAU / 6) * 0.5, 4);
-    return unit(0.1 + Math.max(warp, weft) * 0.7 + field(1, 1, 13) * 0.2);
-  }
-  if (surface === "surface-coldpress") return unit(field(9, 9, 17) * 0.75 + field(1.3, 1.3, 29) * 0.25);
-  if (surface === "surface-porous") return unit(field(14, 1.4, 37) * 0.8 + field(2, 2, 41) * 0.2);
-  if (surface === "surface-printmaking") return unit(field(3, 5, 43) * 0.55 + field(0.65, 0.65, 47) * 0.45);
-  return unit(0.15 + field(1.4, 1.4, 53) * 0.6 + field(11, 0.8, 59) * 0.2);
+  return sampleBrushStudioV7SurfaceContact(surface, x, y, seed).tooth;
 }
 
 export type BrushStudioV6MaterialNodeExecution = "native" | "adapter" | "unavailable";
@@ -449,10 +428,20 @@ export function createBrushStudioV6MaterialStroke(
         const x = point.x + Math.cos(turn) * distance;
         const y = point.y + Math.sin(turn) * distance * (1 - tilt * 0.55);
         // The same paper position always has the same tooth, independent of dab seed.
-        const tooth = sampleBrushStudioV6PaperContact(program.slots.surface, Math.floor(x / cellSize) * cellSize, Math.floor(y / cellSize) * cellSize, seed);
+        const surfaceContact = sampleBrushStudioV7SurfaceContact(program.slots.surface,
+          Math.floor(x / cellSize) * cellSize, Math.floor(y / cellSize) * cellSize, seed);
+        const tooth = surfaceContact.tooth;
         const contact = unit((pressure - tooth * t.surfaceTooth * 0.85) * 2);
         const charcoal = program.slots.pickup !== "pickup-none";
-        emit("grain", x, y, cellSize * (charcoal ? 1.4 : 0.7), cellSize * (charcoal ? 0.65 : 0.32), angle, alpha * contact * (charcoal ? 1.8 : 1.2), 0);
+        const advancedSurface = isBrushStudioV7AdvancedSurface(program.slots.surface);
+        const grainAngle = advancedSurface
+          ? angle + Math.sin(surfaceContact.fiberAngle - angle) * surfaceContact.anisotropy * 0.72
+          : angle;
+        const major = advancedSurface ? 1 + surfaceContact.anisotropy * 0.9 : 1;
+        const minor = advancedSurface ? 1 - surfaceContact.anisotropy * 0.42 : 1;
+        emit("grain", x, y, cellSize * (charcoal ? 1.4 : 0.7) * major,
+          cellSize * (charcoal ? 0.65 : 0.32) * minor, grainAngle,
+          alpha * contact * (charcoal ? 1.8 : 1.2), 0);
       }
       return;
     }
@@ -471,21 +460,49 @@ export function createBrushStudioV6MaterialStroke(
 
     if (knife) {
       const load = Math.exp(-index * step * (1 - t.reservoir) / (size * 35));
-      emit("relief", point.x, point.y, radius, radius * (0.16 + t.plasticity * 0.24), angle, alpha * load, 0, t.relief * load, "rect");
+      const advancedSurface = isBrushStudioV7AdvancedSurface(program.slots.surface);
+      const surfaceContact = sampleBrushStudioV7SurfaceContact(program.slots.surface, point.x, point.y, seed);
+      const ridgeAngle = advancedSurface
+        ? angle + Math.sin(surfaceContact.fiberAngle - angle) * surfaceContact.anisotropy * 0.34
+        : angle;
+      const drag = advancedSurface ? 0.78 + (1 - surfaceContact.tooth) * 0.32 : 1;
+      const reliefGain = advancedSurface ? 0.82 + surfaceContact.tooth * 0.36 : 1;
+      emit("relief", point.x, point.y, radius * drag, radius * (0.16 + t.plasticity * 0.24),
+        ridgeAngle, alpha * load * reliefGain, 0, t.relief * load * reliefGain, "rect");
       for (let lane = -2; lane <= 2; lane++) {
         const offset = lane * radius * 0.13;
-        emit("relief", point.x - Math.sin(angle) * offset, point.y + Math.cos(angle) * offset, radius * 0.9, Math.max(0.2, radius * 0.025), angle, alpha * t.relief * (lane % 2 ? 0.8 : 0.3), lane % 2 ? 0.4 : 0.1, t.relief, "rect");
+        emit("relief", point.x - Math.sin(ridgeAngle) * offset, point.y + Math.cos(ridgeAngle) * offset,
+          radius * 0.9 * drag, Math.max(0.2, radius * 0.025), ridgeAngle,
+          alpha * t.relief * (lane % 2 ? 0.8 : 0.3) * reliefGain, lane % 2 ? 0.4 : 0.1, t.relief, "rect");
       }
       return;
     }
 
     if (wet) {
+      const advancedSurface = isBrushStudioV7AdvancedSurface(program.slots.surface);
+      const surfaceContact = sampleBrushStudioV7SurfaceContact(program.slots.surface,
+        Math.floor(point.x / 2) * 2, Math.floor(point.y / 2) * 2, seed);
       const absorbency = unit(t.absorbency);
-      const spread = 1 + t.diffusion * t.wetness * (0.3 + absorbency * 0.8);
-      emit("wet", point.x, point.y, radius * spread, radius * spread, angle, alpha * t.wetness * 0.24, 0.25);
-      const tooth = sampleBrushStudioV6PaperContact(program.slots.surface, Math.floor(point.x / 2) * 2, Math.floor(point.y / 2) * 2, seed);
+      const effectiveAbsorbency = advancedSurface
+        ? unit(absorbency * (0.58 + surfaceContact.localAbsorbency * 0.72))
+        : absorbency;
+      const spread = 1 + t.diffusion * t.wetness * (0.3 + effectiveAbsorbency * 0.8);
+      if (advancedSurface) {
+        const capillary = surfaceContact.anisotropy * t.diffusion * t.wetness * 0.34;
+        emit("wet", point.x, point.y, radius * spread * (1 + capillary),
+          radius * spread * (1 - capillary * 0.58), surfaceContact.fiberAngle,
+          alpha * t.wetness * 0.24, 0.25);
+      } else {
+        emit("wet", point.x, point.y, radius * spread, radius * spread, angle, alpha * t.wetness * 0.24, 0.25);
+      }
+      const tooth = surfaceContact.tooth;
       const resist = physics.has("physics-dry-contact") ? unit((tooth - t.surfaceTooth * 0.5) * 3) : 1;
-      emit("wet", point.x, point.y, radius, radius * (chisel ? 0.38 : 1), angle, alpha * (0.55 + tooth * t.granulation * 0.5) * resist, t.granulation * tooth * 0.35);
+      const bodyAngle = advancedSurface
+        ? angle + Math.sin(surfaceContact.fiberAngle - angle) * surfaceContact.anisotropy * 0.48
+        : angle;
+      const bodyAspect = chisel ? 0.38 : advancedSurface ? 1 - surfaceContact.anisotropy * 0.16 : 1;
+      emit("wet", point.x, point.y, radius, radius * bodyAspect, bodyAngle,
+        alpha * (0.55 + tooth * t.granulation * 0.5) * resist, t.granulation * tooth * 0.35);
       const normalX = -Math.sin(direction);
       const normalY = Math.cos(direction);
       if (wetSheen) {
@@ -554,8 +571,24 @@ export function createBrushStudioV6MaterialStroke(
     }
 
     const marker = program.slots.deposition === "deposit-marker";
-    emit("ink", point.x, point.y, radius, radius * (chisel ? 0.28 + tilt * 0.2 : 1), angle, alpha * (marker ? 0.65 : 1), 0, 0, chisel ? "rect" : "ellipse");
-    if (marker && t.edgeDarkening > 0) emit("ink", point.x, point.y, radius, radius * 0.42, angle, alpha * t.edgeDarkening, 0, 0, "ring");
+    const advancedSurface = isBrushStudioV7AdvancedSurface(program.slots.surface);
+    if (advancedSurface) {
+      const surfaceContact = sampleBrushStudioV7SurfaceContact(program.slots.surface, point.x, point.y, seed);
+      const fiberInfluence = surfaceContact.anisotropy * (marker ? 0.24 : 0.1);
+      const contactAngle = angle + Math.sin(surfaceContact.fiberAngle - angle) * fiberInfluence;
+      const bleed = marker ? 1 + surfaceContact.localAbsorbency * unit(t.absorbency) * 0.2 : 1;
+      const toothGain = 1 - surfaceContact.tooth * unit(t.surfaceTooth) * 0.14;
+      const aspect = chisel ? 0.28 + tilt * 0.2 : 1 - surfaceContact.anisotropy * 0.09;
+      emit("ink", point.x, point.y, radius * bleed, radius * aspect, contactAngle,
+        alpha * (marker ? 0.65 : 1) * toothGain, 0, 0, chisel ? "rect" : "ellipse");
+      if (marker && t.edgeDarkening > 0) {
+        emit("ink", point.x, point.y, radius * bleed, radius * 0.42, contactAngle,
+          alpha * t.edgeDarkening * (0.82 + surfaceContact.localAbsorbency * 0.24), 0, 0, "ring");
+      }
+    } else {
+      emit("ink", point.x, point.y, radius, radius * (chisel ? 0.28 + tilt * 0.2 : 1), angle, alpha * (marker ? 0.65 : 1), 0, 0, chisel ? "rect" : "ellipse");
+      if (marker && t.edgeDarkening > 0) emit("ink", point.x, point.y, radius, radius * 0.42, angle, alpha * t.edgeDarkening, 0, 0, "ring");
+    }
   }
 
   return {
