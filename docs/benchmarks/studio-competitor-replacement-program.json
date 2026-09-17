@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "asOf": "2026-09-17",
+  "asOf": "2026-09-18",
   "program": [
     {
       "id": "PR-001",
@@ -459,7 +459,16 @@
         "apps/desktop-sync/src/agent.ts",
         "apps/desktop-sync/src/cli.ts",
         "apps/desktop-sync/src/remote-target.ts",
-        "apps/desktop-sync/src/cloud/indexed-remote.ts"
+        "apps/desktop-sync/src/cloud/indexed-remote.ts",
+        "apps/desktop-sync/src/credential-vault.ts",
+        "apps/desktop-sync/src/oauth.ts",
+        "apps/desktop-sync/src/upload-session-store.ts",
+        "apps/desktop-sync/src/conflict-server.ts",
+        "scripts/package-desktop-sync-release.mjs",
+        "scripts/sign-desktop-sync-release.mjs",
+        "scripts/verify-desktop-sync-release.mjs",
+        "scripts/desktop-sync-release.test.mjs",
+        ".github/workflows/desktop-sync-release.yml"
       ]
     },
     {
@@ -482,7 +491,10 @@
         "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts",
         "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts",
         "apps/desktop-sync/src/cloud/google-drive.ts",
-        "apps/desktop-sync/src/cloud/indexed-remote.test.ts"
+        "apps/desktop-sync/src/cloud/indexed-remote.test.ts",
+        "apps/desktop-sync/src/oauth.ts",
+        "apps/desktop-sync/src/upload-session-store.ts",
+        "apps/desktop-sync/src/cloud/resumable-upload.test.ts"
       ]
     },
     {
@@ -495,7 +507,11 @@
         "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts",
         "apps/desktop-sync/src/cloud/dropbox.ts",
         "apps/desktop-sync/src/cloud/onedrive.ts",
-        "apps/desktop-sync/src/cloud/providers.test.ts"
+        "apps/desktop-sync/src/cloud/providers.test.ts",
+        "apps/desktop-sync/src/oauth.ts",
+        "apps/desktop-sync/src/upload-session-store.ts",
+        "apps/desktop-sync/src/conflict-resolution.ts",
+        "apps/desktop-sync/src/conflict-server.ts"
       ]
     },
     {

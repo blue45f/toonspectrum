@@ -1,6 +1,6 @@
 # ToonStudio 올인원 구현 상태 원장
 
-- 기준일: 2026-09-17
+- 기준일: 2026-09-18
 - 제품 정의: **기획부터 연재까지 외부 제작 도구 없이 완결하는 올인원 웹툰 제작 스튜디오**
 - 사용자 문장: **기획부터 연재까지, 웹툰 제작의 모든 것을 한곳에서.**
 
@@ -132,7 +132,23 @@
 - 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
 - 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
 
-이 증분의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport다. 브라우저 OAuth 로그인·refresh token·OS Keychain, 프로세스 재시작 이후 upload session 재개, OS 서명 설치 패키지와 충돌 GUI는 별도 release gate로 유지한다.
+이 시점의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport였다. 당시 후속 release gate였던 브라우저 OAuth 로그인·refresh token·OS 자격 증명 보관, 프로세스 재시작 이후 upload session 재개, 검증 가능한 서명 배포 패키지와 충돌 검토 UI는 아래 2026-09-18 증분에서 코드 경로와 자동 검증을 완료했다.
+
+## 2026-09-18 데스크톱 동기화 릴리스 게이트 완료 증분
+
+이번 증분에서 다음 코드 경로와 자동 검증을 완료했다.
+
+- Google Drive·Dropbox·OneDrive의 public-client PKCE 브라우저 OAuth, loopback callback state 검증, 계정 확인, access token 갱신과 refresh token rotation을 구현했다.
+- OAuth 자격 증명을 macOS Keychain, Windows Credential Manager, Linux Secret Service에 저장하며 토큰을 명령행·로그·journal·sidecar index에 남기지 않는다.
+- 공급자별 대용량 upload session을 OS credential vault에 보존해 프로세스 재시작 뒤 이어서 전송하고, 원본 digest·크기·원격 version이 달라지면 폐기 후 안전하게 다시 시작한다.
+- 충돌 파일의 양쪽 메타데이터·지원 형식 미리보기를 loopback 전용 UI에서 비교하고 로컬 유지·원격 유지·둘 다 보존을 파일별로 결정하며, 적용 영수증을 남긴다.
+- Dropbox는 조건부 삭제 API가 없는 한계를 영구 삭제로 우회하지 않고 revision 확인 후 `.toonstudio-trash`로 이동한다. 이동 중 revision이 바뀌면 원래 경로로 복원하거나 보존 위치를 포함한 충돌로 중단한다.
+- 심볼릭 링크 경로로 실행된 배포 CLI가 아무 작업 없이 종료되던 entrypoint 판정 오류를 realpath 기준으로 수정하고 회귀 테스트에 고정했다.
+- Linux·macOS·Windows별 독립 Node runtime, production dependency, 라이선스, CycloneDX SBOM, SHA-256 manifest·영수증을 포함하는 결정론적 배포 패키지를 생성한다.
+- 동일 소스·버전의 두 패키지가 byte-for-byte 같은 archive hash를 내는지, 경로 탈출 signing evidence·파일 변조·서명 누락을 차단하는지 자동 검증한다.
+- 태그 릴리스는 macOS codesign, Windows Authenticode, Linux GPG 서명과 native verification을 통과하지 못하면 산출물을 업로드하지 않는 3-OS CI를 사용한다.
+
+실제 배포 인증서로 만든 서명·공증 산출물, 실제 공급자 계정의 장시간 장애·권한 회수 시험, 현 커밋의 실기기 soak와 12명 전문 창작자 서명 검증은 저장소가 자체 생성할 수 없는 운영 증거로 계속 분리한다.
 
 ## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
 
