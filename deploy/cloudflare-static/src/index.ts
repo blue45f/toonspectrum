@@ -2,6 +2,7 @@ import {
   getStaticPolicyDocument,
   isPolicySlug,
 } from "../../../packages/core/src/legal-policy";
+import { parsePublicSharePath } from "../../../packages/core/src/public-share-path";
 
 import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
@@ -192,7 +193,8 @@ function isOgPagePath(pathname: string): boolean {
   return hasExactlyOneEncodedSegment(pathname, "/title/")
     || pathname === "/market"
     || pathname === "/market/browse"
-    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/")
+    || parsePublicSharePath(pathname) !== null;
 }
 
 function isCrawlerRequest(request: Request): boolean {
@@ -240,6 +242,9 @@ function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
     const slug = decodePathSegment(requestUrl.pathname.slice("/title/".length));
     if (!slug) return null;
     return new URLSearchParams({ slug });
+  }
+  if (parsePublicSharePath(requestUrl.pathname)) {
+    return new URLSearchParams({ publicPath: requestUrl.pathname });
   }
   return null;
 }

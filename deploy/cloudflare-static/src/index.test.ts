@@ -88,6 +88,18 @@ describe("Cloudflare static gateway", () => {
       "/market",
       "/market/browse",
       "/market/resource/*",
+      "/ranking",
+      "/play",
+      "/author/*",
+      "/u/*",
+      "/create/*",
+      "/showcase/work/*",
+      "/showcase/series/*",
+      "/community/post/*",
+      "/community/cafes/*",
+      "/community/promote/*",
+      "/pencafe/*",
+      "/collaborate/*",
       "/assets/opencascade.wasm-*.wasm",
       "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
     ]);
@@ -165,7 +177,7 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it("serves human title and marketplace navigation from Static Assets", async () => {
+  it("serves human shareable navigation from Static Assets", async () => {
     const upstream = vi.fn<typeof fetch>();
     const env = environment();
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
@@ -175,6 +187,11 @@ describe("Cloudflare static gateway", () => {
       "/market",
       "/market/browse",
       "/market/resource/123e4567-e89b-42d3-a456-426614174000",
+      "/ranking",
+      "/author/%EA%B9%80%EC%9E%91%EA%B0%80",
+      "/create/work-1",
+      "/community/post/post-1",
+      "/collaborate/job-1",
     ]) {
       const response = await gateway(new Request(
         `https://www.toonstudio.cloud${pathname}`,
@@ -183,11 +200,11 @@ describe("Cloudflare static gateway", () => {
       expect(await response.text()).toBe("static");
     }
 
-    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(4);
+    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(9);
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it("routes crawler title and marketplace requests to the Render OG endpoint", async () => {
+  it("routes crawler shareable requests to the Render OG endpoint", async () => {
     const requests: Request[] = [];
     const upstream = vi.fn<typeof fetch>(async (request) => {
       requests.push(request as Request);
@@ -196,7 +213,12 @@ describe("Cloudflare static gateway", () => {
     const env = environment();
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
 
-    for (const pathname of ["/title/a%20b", "/market/browse"]) {
+    for (const pathname of [
+      "/title/a%20b",
+      "/market/browse",
+      "/ranking",
+      "/create/work-1",
+    ]) {
       const response = await gateway(new Request(
         `https://www.toonstudio.cloud${pathname}`,
         {
@@ -213,6 +235,8 @@ describe("Cloudflare static gateway", () => {
     expect(requests.map((request) => new URL(request.url).href)).toEqual([
       "https://core.example.test/api/og?slug=a+b",
       "https://core.example.test/api/og?marketPage=browse",
+      "https://core.example.test/api/og?publicPath=%2Franking",
+      "https://core.example.test/api/og?publicPath=%2Fcreate%2Fwork-1",
     ]);
     for (const request of requests) {
       expect(request.headers.get("authorization")).toBeNull();
@@ -236,6 +260,10 @@ describe("Cloudflare static gateway", () => {
       "/market/compare",
       "/market/resource/nested/path",
       "/title/nested/path",
+      "/create/challenges",
+      "/create/nested/path",
+      "/community/post/nested/path",
+      "/author/nested/path",
     ]) {
       const response = await gateway(
         new Request(`https://www.toonstudio.cloud${pathname}`),
@@ -244,7 +272,7 @@ describe("Cloudflare static gateway", () => {
       expect(await response.text()).toBe("static");
     }
 
-    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(8);
+    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(12);
     expect(upstream).not.toHaveBeenCalled();
   });
 
