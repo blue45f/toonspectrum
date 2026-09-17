@@ -71,7 +71,7 @@ function tone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function statusLabel(status: string, locale: Locale): string {
+function statusLabel(status: string, bt: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     ready: "사용 가능",
     allowed: "사용 가능",
@@ -90,7 +90,7 @@ function statusLabel(status: string, locale: Locale): string {
     confirmation: "Confirmation needed",
     blocked: "Blocked",
   };
-  return (locale === "ko" ? ko[status] : en[status]) ?? status;
+  return ko[status] && en[status] ? bt(ko[status]!, en[status]!) : status;
 }
 
 function StatusCard({
@@ -113,7 +113,7 @@ function StatusCard({
           <Icon size={17} aria-hidden="true" />
         </span>
         <span className={cn("rounded-full border px-2.5 py-1 text-[0.65rem] font-black", tone(status))}>
-          {statusLabel(status, locale)}
+          {statusLabel(status, bt)}
         </span>
       </div>
       <h3 className="mt-3 text-sm font-black text-fg">{label}</h3>
@@ -312,14 +312,14 @@ export function StudioAssetGovernancePanel({
               icon={FileCheck2}
               label={bt("파일 품질·호환성", "File quality & compatibility")}
               status={report.usage.status}
-              description={locale === "ko" ? report.usage.summaryKo : report.usage.summaryEn}
+              description={bt(report.usage.summaryKo, report.usage.summaryEn)}
               locale={locale}
             />
             <StatusCard
               icon={Cloud}
               label={bt("구매·설치 확인", "Purchase & installation")}
               status={report.entitlement.status === "active" ? report.provider.status : report.entitlement.status}
-              description={locale === "ko" ? report.provider.messageKo : report.provider.messageEn}
+              description={bt(report.provider.messageKo, report.provider.messageEn)}
               locale={locale}
             />
             <StatusCard
