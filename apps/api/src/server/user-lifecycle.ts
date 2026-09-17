@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 import { EMPTY_CREATOR_ROLE_PROFILE } from "../../../web/src/shared/lib/creator-role-contract";
 import { accounts, db, dbClient, sessions, users } from "../db";
@@ -6,6 +6,7 @@ import { accounts, db, dbClient, sessions, users } from "../db";
 import { getSessionUserCached, invalidateSessionUser } from "./session";
 
 export type UserAccountStatus = "active" | "suspended" | "deleted" | "merged";
+export type MutableUserAccountStatus = Exclude<UserAccountStatus, "merged">;
 
 export interface UserLifecycleRow {
   id: string;
@@ -150,7 +151,7 @@ export async function softDeleteUserAccount(
       bio: null,
       creatorRoleProfile: EMPTY_CREATOR_ROLE_PROFILE,
     })
-    .where(eq(users.id, userId))
+    .where(and(eq(users.id, userId), ne(users.status, "merged")))
     .returning({
       id: users.id,
       status: users.status,
@@ -171,7 +172,7 @@ export async function softDeleteUserAccount(
 
 export async function setUserLifecycleStatus(
   userId: string,
-  status: UserAccountStatus,
+  status: MutableUserAccountStatus,
   reason: string = ""
 ): Promise<UserLifecycleRow | null> {
   if (status === "deleted") return softDeleteUserAccount(userId, reason);
@@ -195,7 +196,7 @@ export async function setUserLifecycleStatus(
   const [row] = await db
     .update(users)
     .set(patch)
-    .where(eq(users.id, userId))
+    .where(and(eq(users.id, userId), ne(users.status, "merged")))
     .returning({
       id: users.id,
       status: users.status,
