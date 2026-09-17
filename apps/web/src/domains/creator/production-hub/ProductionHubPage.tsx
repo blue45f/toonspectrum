@@ -19,6 +19,7 @@ import {
   PanelTopOpen,
   Scale,
   ScrollText,
+  ShieldAlert,
   ShieldCheck,
   Users,
   Workflow,
@@ -36,8 +37,10 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import {
   createPlanningSnapshot,
   evaluateHandoffReadiness,
+  evaluateProductionRisks,
   evaluateReviewApproval,
   preflightCreditManifest,
+  transitionProductionRisk,
   type ClarificationThread,
   type EpisodeCollaboration,
   type ProductionProjectAggregate,
@@ -49,6 +52,7 @@ import {
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
+import { ProductionRiskWorkspace } from "./ProductionRiskWorkspace";
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
 import { ProductionStudioRevisionBridgePanel } from "./ProductionStudioRevisionBridgePanel";
@@ -85,6 +89,7 @@ export type ProductionProjectSurface =
   | "production"
   | "schedule"
   | "control"
+  | "risks"
   | "handoff"
   | "review"
   | "procurement"
@@ -143,6 +148,7 @@ const SURFACES: readonly {
   { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
   { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
   { id: "control", label: "운영 제어", description: "임계경로·연재·자동화", icon: GitBranch },
+  { id: "risks", label: "위험·병목", description: "초과 예측과 대응", icon: ShieldAlert },
   { id: "handoff", label: "작업 넘기기", description: "꼭 지킬 내용과 질문", icon: Handshake },
   { id: "review", label: "검수·수정", description: "수정 요청과 승인", icon: ClipboardCheck },
   { id: "procurement", label: "외주·발주", description: "의뢰 범위와 납품", icon: BriefcaseBusiness },
@@ -421,6 +427,24 @@ function reduceDemoCommand(
       return { ...base, rightsInterests: replaceById(aggregate.rightsInterests, command.interest) };
     case "upsert-compensation-plan":
       return { ...base, compensationPlans: replaceById(aggregate.compensationPlans, command.plan) };
+    case "upsert-risk":
+      return { ...base, risks: replaceById(aggregate.risks, command.risk) };
+    case "transition-risk": {
+      const risk = aggregate.risks.find((entry) => entry.id === command.riskId);
+      if (!risk) return aggregate;
+      const next = transitionProductionRisk(risk, command.toStatus, { reason: command.reason, at: new Date().toISOString() });
+      return { ...base, risks: replaceById(aggregate.risks, next) };
+    }
+    case "upsert-risk-response":
+      return { ...base, riskResponses: replaceById(aggregate.riskResponses, command.response) };
+    case "suppress-risk-signal":
+      return { ...base, riskSignals: aggregate.riskSignals.map((signal) => signal.id === command.signalId ? { ...signal, state: "suppressed" as const, suppression: { reason: command.reason, suppressedByAssignmentId: command.suppressedByAssignmentId, suppressedAt: new Date().toISOString(), expiresAt: command.expiresAt } } : signal) };
+    case "update-risk-policy":
+      return { ...base, riskPolicy: command.policy };
+    case "evaluate-risks":
+      return base;
+    case "rebaseline-task":
+      return { ...base, tasks: aggregate.tasks.map((task) => task.id === command.taskId ? { ...task, baselineDueAt: command.newDueAt, dueAt: command.newDueAt, statusChangedAt: new Date().toISOString() } : task) };
     case "upsert-review-policy":
       return { ...base, reviewPolicies: replaceById(aggregate.reviewPolicies, command.policy) };
     case "configure-collaboration":
@@ -437,10 +461,30 @@ function reduceDemoCommand(
   }
 }
 
+function evaluateDemoRiskState(aggregate: ProductionProjectAggregate): ProductionProjectAggregate {
+  const evaluation = evaluateProductionRisks(aggregate);
+  const riskIdsByTask = new Map<string, string[]>();
+  for (const risk of evaluation.risks) {
+    if (["resolved", "dismissed", "closed"].includes(risk.status)) continue;
+    for (const taskId of risk.affectedTaskIds) {
+      const values = riskIdsByTask.get(taskId) ?? [];
+      values.push(risk.id);
+      riskIdsByTask.set(taskId, values);
+    }
+  }
+  return {
+    ...aggregate,
+    tasks: aggregate.tasks.map((task) => ({ ...task, linkedRiskIds: riskIdsByTask.get(task.id) ?? [] })),
+    riskSignals: evaluation.signals,
+    risks: evaluation.risks,
+    riskAssessments: evaluation.assessments,
+  };
+}
+
 function useProductionProject(projectId: string | undefined) {
   const isDemo = !projectId || projectId === SAMPLE_PROJECT_ID;
   const [aggregate, setAggregate] = useState<ProductionProjectAggregate | null>(
-    isDemo ? createProductionDemoProject() : null,
+    isDemo ? evaluateDemoRiskState(createProductionDemoProject()) : null,
   );
   const [access, setAccess] = useState<ProductionProjectAccess>({
     view: true,
@@ -463,7 +507,7 @@ function useProductionProject(projectId: string | undefined) {
 
   useEffect(() => {
     if (isDemo) {
-      setAggregate(createProductionDemoProject());
+      setAggregate(evaluateDemoRiskState(createProductionDemoProject()));
       setLoading(false);
       setError(null);
       return;
@@ -492,7 +536,7 @@ function useProductionProject(projectId: string | undefined) {
       setNotice(null);
       try {
         const next = isDemo
-          ? reduceDemoCommand(current, command)
+          ? evaluateDemoRiskState(reduceDemoCommand(current, command))
           : (await executeProductionCommand(current.projectId, current.revision, command)).aggregate;
         aggregateRef.current = next;
         setAggregate(next);
@@ -817,7 +861,7 @@ function PlanningSurface({
   const seriesMaster = [...aggregate.seriesMasters].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const season = [...aggregate.seasonPlans].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const domains = ["canon", "dialogue", "layout", "visual-direction", "color", "publication", "rights"] as const;
-  const openRisks = aggregate.risks.filter((risk) => !["resolved", "closed"].includes(risk.status));
+  const openRisks = aggregate.risks.filter((risk) => ["open", "monitoring", "mitigating", "occurred"].includes(risk.status));
   const currentEpisodePlans = aggregate.episodePlans.filter((plan) => !aggregate.episodePlans.some((candidate) => candidate.episodeId === plan.episodeId && candidate.revision > plan.revision));
   const currentScenePlans = aggregate.scenePlans.filter((plan) => !aggregate.scenePlans.some((candidate) => candidate.sceneId === plan.sceneId && candidate.revision > plan.revision));
   const currentCutPlans = aggregate.cutPlans.filter((plan) => !aggregate.cutPlans.some((candidate) => candidate.cutId === plan.cutId && candidate.revision > plan.revision));
@@ -1258,6 +1302,7 @@ function SurfaceContent({
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
+    case "risks": return <ProductionRiskWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;

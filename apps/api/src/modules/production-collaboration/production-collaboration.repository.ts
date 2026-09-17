@@ -1,7 +1,10 @@
 import { and, eq, or } from "drizzle-orm";
 import { Injectable } from "@nestjs/common";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import {
+  migrateProductionProjectAggregate,
+  type ProductionProjectAggregate,
+} from "@toonspectrum/core/production";
 
 import {
   creatorWorkCollaborators,
@@ -155,16 +158,17 @@ async function loadProjectRow(
   return rows[0] ?? null;
 }
 
-function assertAggregateRow(row: ProjectRow): void {
+function assertAggregateRow(row: ProjectRow): ProductionProjectAggregate {
+  const aggregate = migrateProductionProjectAggregate(row.aggregate);
   if (
-    !row.aggregate
-    || row.aggregate.projectId !== row.id
-    || row.aggregate.workId !== row.workId
-    || row.aggregate.revision !== row.revision
-    || row.aggregate.modelVersion !== 1
+    aggregate.projectId !== row.id
+    || aggregate.workId !== row.workId
+    || aggregate.revision !== row.revision
+    || aggregate.modelVersion !== 2
   ) {
     throw new Error("production project aggregate row is inconsistent");
   }
+  return aggregate;
 }
 
 @Injectable()
@@ -175,10 +179,10 @@ export class ProductionCollaborationRepository {
   ): Promise<ProductionProjectRecord> {
     const row = await loadProjectRow(db, projectId, false);
     if (!row) throw new ProductionProjectNotFoundError("project");
-    assertAggregateRow(row);
+    const aggregate = assertAggregateRow(row);
     const access = await loadAccess(db, actorUserId, row.workId);
     if (!access?.view) throw new ProductionProjectForbiddenError("view");
-    return { aggregate: row.aggregate, access };
+    return { aggregate, access };
   }
 
   async listProjects(actorUserId: string): Promise<readonly ProductionProjectRecord[]> {
@@ -247,10 +251,10 @@ export class ProductionCollaborationRepository {
       .limit(1);
     const row = rows[0];
     if (!row) throw new ProductionProjectNotFoundError("project");
-    assertAggregateRow(row);
+    const aggregate = assertAggregateRow(row);
     const access = await loadAccess(db, actorUserId, workId);
     if (!access?.view) throw new ProductionProjectForbiddenError("view");
-    return { aggregate: row.aggregate, access };
+    return { aggregate, access };
   }
 
   async createProject(input: {
@@ -421,7 +425,7 @@ export class ProductionCollaborationRepository {
     return db.transaction(async (transaction) => {
       const row = await loadProjectRow(transaction, input.projectId, true);
       if (!row) throw new ProductionProjectNotFoundError("project");
-      assertAggregateRow(row);
+      const currentAggregate = assertAggregateRow(row);
       const access = await loadAccess(transaction, input.actorUserId, row.workId);
       const requiredCapability = input.requiredCapability ?? "edit";
       if (!access || (requiredCapability === "comment" && !access.comment)) {
@@ -457,13 +461,13 @@ export class ProductionCollaborationRepository {
         throw new ProductionProjectRevisionConflictError(row.revision);
       }
 
-      const response = input.mutate(row.aggregate, access);
+      const response = input.mutate(currentAggregate, access);
       const aggregate = response.aggregate;
       if (
         aggregate.projectId !== row.id
         || aggregate.workId !== row.workId
         || aggregate.revision !== row.revision + 1
-        || aggregate.modelVersion !== 1
+        || aggregate.modelVersion !== 2
       ) {
         throw new Error("production mutation returned an invalid aggregate revision");
       }
@@ -478,6 +482,7 @@ export class ProductionCollaborationRepository {
           title: aggregate.title,
           organizationId: aggregate.organizationId,
           collaborationModel: aggregate.collaborationModel,
+          modelVersion: aggregate.modelVersion,
           revision: aggregate.revision,
           aggregate,
           updatedAt: new Date(aggregate.updatedAt),

@@ -177,10 +177,16 @@ export function validateProductionRisk(risk: ProductionRisk): readonly string[] 
   const issues: string[] = [];
   if (!risk.title.trim()) issues.push("risk-title-missing");
   if (!risk.description.trim()) issues.push("risk-description-missing");
-  if (!risk.mitigation.trim() && risk.status !== "accepted" && risk.status !== "closed") {
+  if (!Number.isInteger(risk.revision) || risk.revision < 1) issues.push("risk-revision-invalid");
+  if (risk.exposureScore !== risk.probability * risk.impact) issues.push("risk-exposure-mismatch");
+  if (risk.priorityScore < 0 || risk.priorityScore > 100) issues.push("risk-priority-invalid");
+  if (!risk.mitigation.trim() && ["open", "monitoring", "mitigating", "occurred"].includes(risk.status)) {
     issues.push("risk-mitigation-missing");
   }
-  if (risk.status === "accepted" && !risk.trigger.trim()) issues.push("accepted-risk-trigger-missing");
+  if (risk.status === "accepted" && !risk.acceptedReason?.trim()) issues.push("accepted-risk-reason-missing");
+  if (risk.status === "dismissed" && !risk.dismissedReason?.trim()) issues.push("dismissed-risk-reason-missing");
+  if (["resolved", "closed"].includes(risk.status) && !risk.resolutionSummary?.trim()) issues.push("resolved-risk-summary-missing");
+  if (risk.source === "automatic" && risk.signalIds.length === 0) issues.push("automatic-risk-signal-missing");
   return Object.freeze(issues);
 }
 

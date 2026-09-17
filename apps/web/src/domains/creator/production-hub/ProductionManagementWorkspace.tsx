@@ -481,7 +481,7 @@ export function ProductionManagementWorkspace({
                 label: "열린 제작 위험",
                 value: overview.activeRiskCount,
                 detail: "대응 중이거나 아직 닫히지 않은 위험",
-                href: `${projectBase}/planning`,
+                href: `${projectBase}/risks`,
                 icon: ShieldAlert,
                 tone: overview.activeRiskCount > 0 ? "warning" : "success" as Tone,
               },
