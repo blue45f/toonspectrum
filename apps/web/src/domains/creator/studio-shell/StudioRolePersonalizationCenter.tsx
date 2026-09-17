@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Bell,
   Bot,
   BriefcaseBusiness,
@@ -19,6 +20,8 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
+
+import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
 
 import {
   batchPublicCreatorRoleProfiles,
@@ -61,6 +64,7 @@ import {
   type PublicCreatorRoleCandidate,
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
+import { creatorWorkItemLaunch } from "@/shared/lib/creator-role-experience";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -68,6 +72,12 @@ import {
   type ProductionWorkspace,
 } from "../studio-production/studio-production-workspace";
 import { loadStudioServerProductionWorkspace } from "../studio-production/studio-production-server-client";
+import {
+  creatorProductionAssignmentIdsForUser,
+  creatorRequiredProductionRoles,
+  rankCreatorProductionWork,
+} from "../production-hub/creator-role-production-work";
+import { getProductionProjectByWork } from "../production-hub/production-api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
 const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
@@ -263,6 +273,8 @@ export function StudioRolePersonalizationCenter({
   });
   const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [productionWorkspace, setProductionWorkspace] = useState<ProductionWorkspace | null>(null);
+  const [productionAggregate, setProductionAggregate] = useState<ProductionProjectAggregate | null>(null);
+  const [productionProjectId, setProductionProjectId] = useState<string | null>(null);
   const [productionLoading, setProductionLoading] = useState(false);
   const [productionError, setProductionError] = useState<string | null>(null);
   const [team, setTeam] = useState<StudioTeamSnapshot | null>(null);
@@ -321,31 +333,55 @@ export function StudioRolePersonalizationCenter({
   }, [locale, status]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      setProductionWorkspace(null);
+      setProductionAggregate(null);
+      setProductionProjectId(null);
+      setProductionLoading(false);
+      setProductionError(null);
+      return;
+    }
     let alive = true;
     const controller = new AbortController();
     setProductionLoading(true);
     setProductionError(null);
-    const request = projectKey.startsWith("work:")
-      ? loadStudioServerProductionWorkspace(projectKey.slice(5), controller.signal)
-        .then((snapshot) => snapshot.document)
-      : projectKey === "draft" || projectKey.startsWith("remix:")
-        ? loadStudioProductionWorkspace(projectKey)
-        : Promise.resolve(null);
-    request
-      .then((workspace) => {
+    setProductionWorkspace(null);
+    setProductionAggregate(null);
+    setProductionProjectId(null);
+    void (async () => {
+      try {
+        if (projectKey.startsWith("work:")) {
+          const workId = projectKey.slice(5);
+          try {
+            const record = await getProductionProjectByWork(workId);
+            if (!alive) return;
+            setProductionAggregate(record.aggregate);
+            setProductionProjectId(record.aggregate.projectId);
+            setProductionWorkspace(null);
+            return;
+          } catch {
+            const snapshot = await loadStudioServerProductionWorkspace(workId, controller.signal);
+            if (!alive) return;
+            setProductionWorkspace(snapshot.document);
+            return;
+          }
+        }
+        const workspace = projectKey === "draft" || projectKey.startsWith("remix:")
+          ? await loadStudioProductionWorkspace(projectKey)
+          : null;
         if (alive) setProductionWorkspace(workspace);
-      })
-      .catch((cause: unknown) => {
+      } catch (cause: unknown) {
         if (!alive || controller.signal.aborted) return;
         setProductionWorkspace(null);
+        setProductionAggregate(null);
+        setProductionProjectId(null);
         setProductionError(cause instanceof Error
           ? cause.message
           : localized(locale, "제작 업무를 불러오지 못했습니다.", "Could not load production work."));
-      })
-      .finally(() => {
+      } finally {
         if (alive) setProductionLoading(false);
-      });
+      }
+    })();
     return () => {
       alive = false;
       controller.abort();
@@ -422,33 +458,57 @@ export function StudioRolePersonalizationCenter({
   const checklist = creatorRoleChecklist(activeRole);
   const aiTools = creatorRoleAiTools(activeRole);
   const notifications = creatorRoleNotificationSettings(activeRole, projectDocument);
-  const workQueue = productionWorkspace
-    ? rankCreatorRoleWork(productionWorkspace, {
+  const workQueue = productionAggregate
+    ? rankCreatorProductionWork(productionAggregate, {
         userId: profile.id,
-        displayName: profile.name,
         activeRole,
         limit: 12,
       })
-    : [];
+    : productionWorkspace
+      ? rankCreatorRoleWork(productionWorkspace, {
+          userId: profile.id,
+          displayName: profile.name,
+          activeRole,
+          limit: 12,
+        })
+      : [];
+  const modernAssignmentIds = productionAggregate
+    ? creatorProductionAssignmentIdsForUser(productionAggregate, profile.id)
+    : new Set<string>();
   const currentAssignments = productionWorkspace?.roleAssignments.filter((assignment) => (
     assignment.memberId === profile.id
     || assignment.displayName.trim().toLocaleLowerCase()
       === (profile.name ?? "").trim().toLocaleLowerCase()
   )) ?? [];
   const currentAssignmentIds = new Set(currentAssignments.map((assignment) => assignment.id));
-  const assignedOpenTasks = productionWorkspace?.tasks.filter((task) => (
-    task.status !== "done"
-    && (task.assigneeIds ?? []).some((id) => currentAssignmentIds.has(id))
-  )).length ?? 0;
-  const unassignedTasks = productionWorkspace?.tasks.filter((task) => (
-    task.status !== "done" && (task.assigneeIds ?? []).length === 0
-  )).length ?? 0;
-  const requiredRoles = productionWorkspace
-    ? [...new Set(productionWorkspace.tasks
-        .filter((task) => task.status !== "done" && (task.assigneeIds ?? []).length === 0)
-        .map((task) => task.role)
-        .filter((role): role is CreatorProductionRole => role !== null))]
-    : [];
+  const assignedOpenTasks = productionAggregate
+    ? productionAggregate.tasks.filter((task) => (
+        !["done", "cancelled", "out-of-scope"].includes(task.status)
+        && (
+          task.assignmentIds.some((id) => modernAssignmentIds.has(id))
+          || task.reviewerAssignmentIds.some((id) => modernAssignmentIds.has(id))
+        )
+      )).length
+    : productionWorkspace?.tasks.filter((task) => (
+        task.status !== "done"
+        && (task.assigneeIds ?? []).some((id) => currentAssignmentIds.has(id))
+      )).length ?? 0;
+  const unassignedTasks = productionAggregate
+    ? productionAggregate.tasks.filter((task) => (
+        !["done", "cancelled", "out-of-scope"].includes(task.status)
+        && task.assignmentIds.length === 0
+      )).length
+    : productionWorkspace?.tasks.filter((task) => (
+        task.status !== "done" && (task.assigneeIds ?? []).length === 0
+      )).length ?? 0;
+  const requiredRoles = productionAggregate
+    ? creatorRequiredProductionRoles(productionAggregate)
+    : productionWorkspace
+      ? [...new Set(productionWorkspace.tasks
+          .filter((task) => task.status !== "done" && (task.assigneeIds ?? []).length === 0)
+          .map((task) => task.role)
+          .filter((role): role is CreatorProductionRole => role !== null))]
+      : [];
   const teamRecommendations = recommendCreatorTeamRoles(
     teamProfiles,
     requiredRoles.length > 0 ? requiredRoles : undefined,
@@ -961,11 +1021,24 @@ export function StudioRolePersonalizationCenter({
                       {item.productionRole ? PRODUCTION_ROLE_LABELS[item.productionRole] : item.kind}
                     </span>
                   </div>
-                  {item.due ? (
-                    <p className="mt-2 flex items-center gap-1 text-[0.7rem] text-fg-3">
-                      <Clock3 size={12} aria-hidden="true" /> {item.due}
-                    </p>
-                  ) : null}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                    {item.due ? (
+                      <p className="flex items-center gap-1 text-[0.7rem] text-fg-3">
+                        <Clock3 size={12} aria-hidden="true" /> {item.due}
+                      </p>
+                    ) : <span />}
+                    <Link
+                      href={creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).href}
+                      className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5" })}
+                    >
+                      {localized(
+                        locale,
+                        creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).labelKo,
+                        creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).labelEn,
+                      )}
+                      <ArrowRight size={13} aria-hidden="true" />
+                    </Link>
+                  </div>
                 </article>
               ))}
             </div>
