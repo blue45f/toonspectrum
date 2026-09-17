@@ -2,10 +2,15 @@
 
 ## User entry points
 
-- `/offline-draw/`: independent emergency drawing editor, no authentication, API,
-  React bundle, localization fetch or external fonts. New drawing, four genuinely
-  different brush mechanisms, pressure-aware pointer input, eraser, undo/redo,
-  eight layers, zoom/fit, image import, PNG and editable `.toonlocal` export.
+- `/offline-draw/`: independent drawing-only editor and Studio emergency fallback,
+  with no authentication, API, React bundle, localization fetch or external fonts.
+  New drawing, four genuinely different brush mechanisms, pressure-aware pointer
+  input, eraser, undo/redo, eight layers, zoom/fit, image import, PNG and editable
+  `.toonlocal` export.
+- `/offline-draw/install.html`: dedicated install surface for the drawing-only PWA.
+  Its manifest uses the distinct `/offline-draw/` app id and scope, so it can coexist
+  with the full ToonStudio PWA. Chromium install prompts are captured on this page;
+  browsers without that API receive manual Add to Home Screen / app-install guidance.
 - `/offline-draw/portable.html`: downloadable single-file version. After it has
   been saved locally, it does not need the origin, a service worker, CDN or API.
   Automatic storage under `file://` varies by browser; the UI never claims it saved
@@ -19,8 +24,9 @@
 
 Existing studio library, readiness card and promo page link to these flows. The
 original drawing engine, OPFS project storage and cloud sync are not replaced.
-The emergency editor is deliberately a separate basic editor, not a promise that
-all advanced Studio/AI/3D functions work without a server.
+The drawing-only editor is deliberately a separate local editor, not a promise that
+all advanced Studio/AI/3D functions work without a server. It also remains the safe
+fallback offered when the full Studio shell cannot mount.
 
 ## Server outage behavior
 
@@ -35,8 +41,8 @@ First use still requires successful installation/caching or possession of the
 portable HTML file. A browser that has never received the application cannot
 magically open it while its origin is unavailable. Clearing browser storage,
 private mode or quota pressure can remove automatic saves; keep exported backups.
-The emergency cache is separate and contains no artwork. Its ready marker is written
-only after every required asset has passed HTTP/MIME/size checks.
+The drawing shell cache is separate and contains no artwork. Its ready marker is
+written only after every required asset has passed HTTP/MIME/size checks.
 
 No worker uses skipWaiting or clients.claim to replace a running editor mid-stroke.
 Prepared v1 shell assets remain coherent and sticky: a future code update should use
