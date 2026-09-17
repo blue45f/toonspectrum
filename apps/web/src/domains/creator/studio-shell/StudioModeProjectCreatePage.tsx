@@ -19,7 +19,6 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-
 import {
   DEFAULT_WEBTOON_ONBOARDING_SELECTION,
   WEBTOON_CADENCES,
@@ -49,15 +48,18 @@ import {
 } from "../save-first/studio-project-create-options";
 import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
 import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
+import {
+  DisabledReason,
+  StudioTaskFlow,
+  StudioTaskSummary,
+  type StudioTaskFlowStep,
+} from "./StudioTaskFlow";
 
 type Locale = "ko" | "en";
-
-type WebtoonChoiceOption<T extends string> = {
+type Choice<T extends string> = {
   readonly id: T;
   readonly labelKo: string;
   readonly labelEn: string;
-  readonly descriptionKo?: string;
-  readonly descriptionEn?: string;
 };
 
 const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
@@ -71,11 +73,13 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   animation: Images,
 };
 
+const CREATE_DISABLED_REASON_ID = "studio-create-disabled-reason";
+
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
-function projectTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
+function localized(option: StudioProjectCreateKindOption, locale: Locale): string {
   return locale === "ko" ? option.titleKo : option.titleEn;
 }
 
@@ -83,13 +87,7 @@ function defaultTitle(option: StudioProjectCreateKindOption, locale: Locale): st
   return locale === "ko" ? option.defaultTitleKo : option.defaultTitleEn;
 }
 
-function initialDocumentTitle(kind: StudioProjectKind, projectTitle: string): string {
-  if (kind === "webtoon") return "EP01 원고";
-  if (kind === "slides") return "발표 자료";
-  return `${projectTitle} 작업 문서`;
-}
-
-function requestedProjectKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
+function requestedKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
   const explicit = STUDIO_PROJECT_CREATE_KINDS.find((option) => option.id === kind)?.id;
   if (explicit) return explicit;
   if (!templateId) return null;
@@ -98,33 +96,39 @@ function requestedProjectKind(kind: string | null, templateId: string | null): S
   )?.id ?? null;
 }
 
-function WebtoonOnboardingSelect<T extends string>({
+function documentTitle(kind: StudioProjectKind, title: string): string {
+  if (kind === "webtoon") return "EP01 원고";
+  if (kind === "slides") return "발표 자료";
+  return `${title} 작업 문서`;
+}
+
+function OnboardingSelect<T extends string>({
   id,
   label,
   value,
-  options,
+  choices,
   locale,
   onChange,
 }: {
   readonly id: string;
   readonly label: string;
   readonly value: T;
-  readonly options: readonly WebtoonChoiceOption<T>[];
+  readonly choices: readonly Choice<T>[];
   readonly locale: Locale;
-  readonly onChange: (value: T) => void;
+  readonly onChange: (next: T) => void;
 }) {
   return (
-    <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor={id}>
+    <label className="text-xs font-bold text-fg-2" htmlFor={id}>
       {label}
       <select
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+        className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
       >
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {locale === "ko" ? option.labelKo : option.labelEn}
+        {choices.map((choice) => (
+          <option key={choice.id} value={choice.id}>
+            {locale === "ko" ? choice.labelKo : choice.labelEn}
           </option>
         ))}
       </select>
@@ -135,11 +139,10 @@ function WebtoonOnboardingSelect<T extends string>({
 export function StudioModeProjectCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  const locale = localeFromLanguage(useI18n((state) => state.lang));
   const requestedTemplateId = searchParams.get("template");
-  const requestedWebtoonSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
-  const requestedKindId = requestedProjectKind(searchParams.get("kind"), requestedTemplateId);
+  const requestedSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
+  const requestedKindId = requestedKind(searchParams.get("kind"), requestedTemplateId);
   const initialKind = STUDIO_PROJECT_CREATE_KINDS.find((option) => option.id === requestedKindId)
     ?? STUDIO_PROJECT_CREATE_KINDS[0]!;
   const initialTemplateId = STUDIO_PROJECT_CREATE_TEMPLATES[initialKind.id]
@@ -152,46 +155,78 @@ export function StudioModeProjectCreatePage() {
   const [title, setTitle] = useState(() => defaultTitle(initialKind, locale));
   const [titleEdited, setTitleEdited] = useState(false);
   const [showMoreKinds, setShowMoreKinds] = useState(false);
-  const [webtoonOnboardingEnabled, setWebtoonOnboardingEnabled] = useState(Boolean(requestedWebtoonSelection));
-  const [webtoonSelection, setWebtoonSelection] = useState<WebtoonOnboardingSelection>(
-    requestedWebtoonSelection ?? DEFAULT_WEBTOON_ONBOARDING_SELECTION,
+  const [onboardingEnabled, setOnboardingEnabled] = useState(Boolean(requestedSelection));
+  const [selection, setSelection] = useState<WebtoonOnboardingSelection>(
+    requestedSelection ?? DEFAULT_WEBTOON_ONBOARDING_SELECTION,
   );
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selected = STUDIO_PROJECT_CREATE_KINDS.find((option) => option.id === kind) ?? initialKind;
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((template) => template.id === templateId) ?? templates[0]!;
-  const modePlan = useMemo(() => resolveStudioModeCreationPlan(kind, selectedTemplate?.id), [kind, selectedTemplate?.id]);
-  const onboardingPlan = useMemo(() => buildWebtoonOnboardingPlan(webtoonSelection), [webtoonSelection]);
-  const structuredWebtoonFlow = kind === "webtoon" && webtoonOnboardingEnabled;
+  const selectedTemplateLabel = locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn;
+  const modePlan = useMemo(
+    () => resolveStudioModeCreationPlan(kind, selectedTemplate.id),
+    [kind, selectedTemplate.id],
+  );
+  const onboardingPlan = useMemo(() => buildWebtoonOnboardingPlan(selection), [selection]);
+  const structuredWebtoon = kind === "webtoon" && onboardingEnabled;
   const visibleKinds = useMemo(
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
     [showMoreKinds],
   );
+  const titleReady = title.trim().length > 0;
+  const modeName = studioModeLabel(modePlan.profile, locale);
+  const steps: readonly StudioTaskFlowStep[] = [
+    {
+      id: "kind",
+      label: locale === "ko" ? "만들 작업 선택" : "Choose work type",
+      description: modeName,
+      state: "complete",
+    },
+    {
+      id: "details",
+      label: locale === "ko" ? "이름과 시작 형식" : "Name and format",
+      description: selectedTemplateLabel,
+      state: titleReady ? "complete" : "current",
+    },
+    ...(structuredWebtoon ? [{
+      id: "production-track",
+      label: locale === "ko" ? "제작 트랙 확인" : "Confirm production track",
+      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      state: "complete" as const,
+    }] : []),
+    {
+      id: "start",
+      label: locale === "ko" ? "자동 저장하며 시작" : "Start with autosave",
+      description: locale === "ko"
+        ? "이 기기에 복구 저장 후 작업 시작"
+        : "Start after creating device recovery storage",
+      state: titleReady ? "current" : "upcoming",
+    },
+  ];
 
-  function selectKind(option: StudioProjectCreateKindOption) {
-    const firstTemplate = STUDIO_PROJECT_CREATE_TEMPLATES[option.id][0];
+  function chooseKind(option: StudioProjectCreateKindOption) {
     setKind(option.id);
-    setTemplateId(firstTemplate?.id ?? `${option.id}-blank`);
+    setTemplateId(STUDIO_PROJECT_CREATE_TEMPLATES[option.id][0]?.id ?? `${option.id}-blank`);
     if (!titleEdited) setTitle(defaultTitle(option, locale));
-    if (option.id !== "webtoon") setWebtoonOnboardingEnabled(false);
+    if (option.id !== "webtoon") setOnboardingEnabled(false);
     setError(null);
   }
 
   function create() {
-    if (creating || !title.trim()) return;
+    const normalizedTitle = title.trim();
+    if (creating || !normalizedTitle) return;
     setCreating(true);
     setError(null);
     try {
-      const normalizedTitle = title.trim();
       const result = createStudioProjectWithInitialDocument(window.localStorage, {
         title: normalizedTitle,
         kind,
         templateId: selectedTemplate.id,
         primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
         document: {
-          title: initialDocumentTitle(kind, normalizedTitle),
+          title: documentTitle(kind, normalizedTitle),
           kind: modePlan.document.kind,
           defaultWorkspace: modePlan.document.workspace,
           width: modePlan.document.width,
@@ -206,31 +241,28 @@ export function StudioModeProjectCreatePage() {
         target: window,
       });
 
-      if (structuredWebtoonFlow) {
-        const onboarding = createStudioWebtoonOnboardingProfile(
-          result.project.id,
-          webtoonSelection,
-          result.project.createdAt,
+      if (structuredWebtoon) {
+        writeStudioWebtoonOnboardingProfile(
+          window.localStorage,
+          createStudioWebtoonOnboardingProfile(result.project.id, selection, result.project.createdAt),
         );
-        writeStudioWebtoonOnboardingProfile(window.localStorage, onboarding);
-        navigate(webtoonOnboardingProjectHref(result.project.id, webtoonSelection), { replace: true });
+        navigate(webtoonOnboardingProjectHref(result.project.id, selection), { replace: true });
         return;
       }
-
       navigate(buildStudioModeLaunchHref(result, modePlan), { replace: true });
     } catch (cause) {
       setCreating(false);
       setError(cause instanceof Error
         ? cause.message
         : locale === "ko"
-          ? "새 작업을 만들지 못했습니다. 저장 공간과 브라우저 설정을 확인해 주세요."
-          : "The new work could not be created. Check storage and browser settings.");
+          ? "새 작업을 만들지 못했습니다."
+          : "The new work could not be created.");
     }
   }
 
-  const startLabel = structuredWebtoonFlow
+  const startLabel = structuredWebtoon
     ? (locale === "ko" ? "프로젝트와 제작 계획 만들기" : "Create project and production plan")
-    : `${studioModeLabel(modePlan.profile, locale)} ${locale === "ko" ? "시작" : "Start"}`;
+    : locale === "ko" ? `${modeName} 시작` : `Start ${modeName}`;
 
   return (
     <div data-route-ready="studio-new" data-studio-mode-create="true" className="min-h-[calc(100vh-4rem)] bg-bg">
@@ -247,26 +279,25 @@ export function StudioModeProjectCreatePage() {
               <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
                 {locale === "ko"
                   ? "작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 종류마다 패널·도구·AI 추천·제작 흐름과 내보내기 목표가 달라집니다."
-                  : "Choose the work type and starting format. Recovery storage begins on this device immediately, while panels, tools, AI recommendations, workflow and delivery targets adapt to the work."}
+                  : "Choose the work type and starting format. Recovery storage begins on this device immediately, and each mode adapts panels, tools, AI, workflow and delivery."}
               </p>
             </div>
-            <Link href="/studio/import" className={buttonClass({ variant: "outline", className: "min-h-11" })}>
+            <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
               {locale === "ko" ? "기존 파일 가져오기" : "Import existing files"}
             </Link>
           </header>
 
+          <StudioTaskFlow
+            steps={steps}
+            ariaLabel={locale === "ko" ? "새 프로젝트 시작 단계" : "New project start steps"}
+            className="mt-5"
+          />
+
           <section className="mt-7" aria-labelledby="studio-mode-kind-title">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-black text-accent">01</p>
-                <h2 id="studio-mode-kind-title" className="mt-1 text-lg font-black text-fg">
-                  {locale === "ko" ? "만들 작업" : "What are you making?"}
-                </h2>
-              </div>
-              <span className="hidden text-xs text-fg-3 sm:inline">
-                {locale === "ko" ? "선택 즉시 아래 작업공간 미리보기가 바뀝니다" : "The workspace preview updates immediately"}
-              </span>
-            </div>
+            <p className="text-xs font-black text-accent">01</p>
+            <h2 id="studio-mode-kind-title" className="mt-1 text-lg font-black text-fg">
+              {locale === "ko" ? "만들 작업" : "What are you making?"}
+            </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {visibleKinds.map((option) => {
                 const active = option.id === kind;
@@ -276,21 +307,16 @@ export function StudioModeProjectCreatePage() {
                     key={option.id}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => selectKind(option)}
+                    onClick={() => chooseKind(option)}
                     className={cn(
                       "min-h-36 rounded-2xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
-                      active
-                        ? "border-accent bg-accent-soft/50 shadow-sm"
-                        : "border-line bg-card hover:border-accent/40 hover:bg-raised",
+                      active ? "border-accent bg-accent-soft/50 shadow-sm" : "border-line bg-card hover:bg-raised",
                     )}
                   >
-                    <span className={cn(
-                      "grid size-10 place-items-center rounded-xl",
-                      active ? "bg-accent text-on-accent" : "bg-panel text-fg-2",
-                    )}>
+                    <span className={cn("grid size-10 place-items-center rounded-xl", active ? "bg-accent text-on-accent" : "bg-panel text-fg-2")}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block text-sm text-fg">{projectTitle(option, locale)}</b>
+                    <b className="mt-3 block text-sm text-fg">{localized(option, locale)}</b>
                     <span className="mt-1 block text-xs leading-5 text-fg-3">
                       {locale === "ko" ? option.descriptionKo : option.descriptionEn}
                     </span>
@@ -299,17 +325,13 @@ export function StudioModeProjectCreatePage() {
               })}
             </div>
             {!showMoreKinds ? (
-              <button
-                type="button"
-                onClick={() => setShowMoreKinds(true)}
-                className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2" })}
-              >
+              <button type="button" onClick={() => setShowMoreKinds(true)} className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2" })}>
                 {locale === "ko" ? "다른 작업 종류 보기" : "Show more project types"}
               </button>
             ) : null}
           </section>
 
-          <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]" aria-label={locale === "ko" ? "선택한 작업공간과 시작 설정" : "Selected workspace and start settings"}>
+          <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
             <div className="min-w-0 space-y-4">
               <StudioModeWorkspacePreview profile={modePlan.profile} locale={locale} />
 
@@ -322,23 +344,23 @@ export function StudioModeProjectCreatePage() {
                       </p>
                       <p className="mt-1 text-xs leading-5 text-fg-3">
                         {locale === "ko"
-                          ? "대본·콘티·팀 구성과 연재 주기를 알려주면 첫 제작 계획까지 함께 준비합니다."
-                          : "Tell us what you already have, your goal, team and cadence to prepare the first production plan."}
+                          ? "대본·콘티·팀 구성과 연재 주기를 알려주면 첫 제작 계획까지 준비합니다."
+                          : "Use your current material, goal, team and cadence to prepare the first production plan."}
                       </p>
                     </div>
                     <button
                       type="button"
-                      aria-pressed={webtoonOnboardingEnabled}
-                      onClick={() => setWebtoonOnboardingEnabled((value) => !value)}
-                      className={buttonClass({ variant: webtoonOnboardingEnabled ? "solid" : "outline", size: "sm" })}
+                      aria-pressed={onboardingEnabled}
+                      onClick={() => setOnboardingEnabled((value) => !value)}
+                      className={buttonClass({ variant: onboardingEnabled ? "solid" : "outline", size: "sm" })}
                     >
-                      {webtoonOnboardingEnabled
+                      {onboardingEnabled
                         ? (locale === "ko" ? "제작 계획 사용 중" : "Production plan on")
                         : (locale === "ko" ? "제작 단계 설정하기" : "Configure production")}
                     </button>
                   </div>
 
-                  {webtoonOnboardingEnabled ? (
+                  {onboardingEnabled ? (
                     <div className="mt-4">
                       <h3 className="text-base font-black text-fg">
                         {locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn}
@@ -347,37 +369,37 @@ export function StudioModeProjectCreatePage() {
                         {locale === "ko" ? onboardingPlan.summaryKo : onboardingPlan.summaryEn}
                       </p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <WebtoonOnboardingSelect<WebtoonStartingPointId>
+                        <OnboardingSelect<WebtoonStartingPointId>
                           id="studio-webtoon-starting-point"
                           label={locale === "ko" ? "현재 가지고 있는 자료" : "What you already have"}
-                          value={webtoonSelection.startingPoint}
-                          options={WEBTOON_STARTING_POINTS}
+                          value={selection.startingPoint}
+                          choices={WEBTOON_STARTING_POINTS}
                           locale={locale}
-                          onChange={(startingPoint) => setWebtoonSelection((current) => ({ ...current, startingPoint }))}
+                          onChange={(startingPoint) => setSelection((current) => ({ ...current, startingPoint }))}
                         />
-                        <WebtoonOnboardingSelect<WebtoonOnboardingGoalId>
+                        <OnboardingSelect<WebtoonOnboardingGoalId>
                           id="studio-webtoon-goal"
                           label={locale === "ko" ? "이번 프로젝트 목표" : "Project goal"}
-                          value={webtoonSelection.goal}
-                          options={WEBTOON_ONBOARDING_GOALS}
+                          value={selection.goal}
+                          choices={WEBTOON_ONBOARDING_GOALS}
                           locale={locale}
-                          onChange={(goal) => setWebtoonSelection((current) => ({ ...current, goal }))}
+                          onChange={(goal) => setSelection((current) => ({ ...current, goal }))}
                         />
-                        <WebtoonOnboardingSelect<WebtoonTeamModelId>
+                        <OnboardingSelect<WebtoonTeamModelId>
                           id="studio-webtoon-team"
                           label={locale === "ko" ? "제작 인원" : "Team model"}
-                          value={webtoonSelection.teamModel}
-                          options={WEBTOON_TEAM_MODELS}
+                          value={selection.teamModel}
+                          choices={WEBTOON_TEAM_MODELS}
                           locale={locale}
-                          onChange={(teamModel) => setWebtoonSelection((current) => ({ ...current, teamModel }))}
+                          onChange={(teamModel) => setSelection((current) => ({ ...current, teamModel }))}
                         />
-                        <WebtoonOnboardingSelect<WebtoonCadenceId>
+                        <OnboardingSelect<WebtoonCadenceId>
                           id="studio-webtoon-cadence"
                           label={locale === "ko" ? "제작 주기" : "Cadence"}
-                          value={webtoonSelection.cadence}
-                          options={WEBTOON_CADENCES}
+                          value={selection.cadence}
+                          choices={WEBTOON_CADENCES}
                           locale={locale}
-                          onChange={(cadence) => setWebtoonSelection((current) => ({ ...current, cadence }))}
+                          onChange={(cadence) => setSelection((current) => ({ ...current, cadence }))}
                         />
                       </div>
                     </div>
@@ -388,10 +410,7 @@ export function StudioModeProjectCreatePage() {
 
             <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
               <p className="text-xs font-black text-accent">02</p>
-              <h2 className="mt-1 text-lg font-black text-fg">
-                {locale === "ko" ? "시작 형식" : "Starting format"}
-              </h2>
-
+              <h2 className="mt-1 text-lg font-black text-fg">{locale === "ko" ? "시작 형식" : "Starting format"}</h2>
               <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-project-title">
                 {locale === "ko" ? "프로젝트 이름" : "Project name"}
                 <input
@@ -402,17 +421,16 @@ export function StudioModeProjectCreatePage() {
                     setTitle(event.target.value);
                     setTitleEdited(true);
                   }}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
                 />
               </label>
-
               <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-template">
                 {locale === "ko" ? "시작 템플릿" : "Starting template"}
                 <select
                   id="studio-mode-template"
                   value={selectedTemplate.id}
                   onChange={(event) => setTemplateId(event.target.value)}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
                 >
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>
@@ -422,25 +440,34 @@ export function StudioModeProjectCreatePage() {
                 </select>
               </label>
 
-              <div className="mt-4 rounded-xl border border-line bg-panel/60 p-3">
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <span className="font-bold text-fg-2">{locale === "ko" ? "첫 작업공간" : "First workspace"}</span>
-                  <span className="font-black text-fg">{modePlan.document.workspace}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-bold text-fg-2">{locale === "ko" ? "캔버스" : "Canvas"}</span>
-                  <span className="font-black text-fg">{modePlan.document.width} × {modePlan.document.height}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-bold text-fg-2">{locale === "ko" ? "시작 도구" : "Start tool"}</span>
-                  <span className="font-black text-fg">{modePlan.launch.startTool}</span>
-                </div>
-              </div>
+              <StudioTaskSummary
+                eyebrow={locale === "ko" ? "선택한 시작 설정" : "Selected setup"}
+                title={title.trim() || (locale === "ko" ? "프로젝트 이름 없음" : "Untitled project")}
+                description={`${modeName} · ${selectedTemplateLabel}`}
+                className="mt-4"
+                meta={(
+                  <>
+                    <span className="rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.65rem] font-bold text-fg-2">
+                      {locale === "ko" ? "이 기기에 저장됨" : "Saved on this device"}
+                    </span>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg-3">
+                      {modePlan.document.workspace} · {modePlan.document.width} × {modePlan.document.height}
+                    </span>
+                  </>
+                )}
+              />
+
+              <DisabledReason id={CREATE_DISABLED_REASON_ID} visible={!titleReady} className="mt-3">
+                {locale === "ko"
+                  ? "프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다."
+                  : "Enter a project name to start an autosaved workspace."}
+              </DisabledReason>
 
               <button
                 type="button"
+                disabled={creating || !titleReady}
+                aria-describedby={!titleReady ? CREATE_DISABLED_REASON_ID : undefined}
                 onClick={create}
-                disabled={creating || !title.trim()}
                 className={buttonClass({ variant: "solid", size: "lg", className: "mt-5 min-h-12 w-full gap-2" })}
               >
                 {creating ? (locale === "ko" ? "작업공간 만드는 중…" : "Creating workspace…") : startLabel}

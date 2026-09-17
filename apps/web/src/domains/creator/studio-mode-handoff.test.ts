@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { executeStudioModeHandoff, studioModeHandoffsFor } from "./studio-mode-handoff";
+import {
+  executeStudioModeHandoff,
+  readStudioModeHandoffRecords,
+  studioModeHandoffsFor,
+} from "./studio-mode-handoff";
 import { readStudioProjectDocuments } from "./studio-project-document-store";
 
 class MemoryStorage {
@@ -10,16 +14,29 @@ class MemoryStorage {
 }
 
 describe("studio mode handoff", () => {
-  it("creates the derived document inside the same project and opens its target workspace", () => {
+  it("creates a derived document in the same project and records its source provenance", () => {
     const storage = new MemoryStorage();
     const handoff = studioModeHandoffsFor("storyboard").find((item) => item.id === "storyboard-to-webtoon");
     expect(handoff).toBeDefined();
-    const result = executeStudioModeHandoff(storage, "project-1", handoff!, "ko");
+    const result = executeStudioModeHandoff(storage, "project-1", handoff!, "ko", {
+      sourceDocumentId: "storyboard-1",
+      at: "2026-09-18T00:00:00.000Z",
+    });
     const documents = readStudioProjectDocuments(storage, "project-1").documents;
     expect(documents).toHaveLength(1);
     expect(documents[0]).toMatchObject({ kind: "webtoon", defaultWorkspace: "comic" });
     expect(result.href).toContain("workspace=comic");
     expect(result.href).toContain("startTool=draw");
+    expect(result.href).toContain("handoff=storyboard-to-webtoon");
+    expect(result.href).toContain("handoffSource=storyboard-1");
+    expect(readStudioModeHandoffRecords(storage, "project-1")).toEqual([
+      expect.objectContaining({
+        sourceDocumentId: "storyboard-1",
+        targetDocumentId: result.documentId,
+        handoffId: "storyboard-to-webtoon",
+        transfer: "derive",
+      }),
+    ]);
   });
 
   it("exposes production continuations by source mode", () => {
