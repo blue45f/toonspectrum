@@ -23,7 +23,7 @@ interface HandPoseDefinition {
 const NAMES = ["Index", "Middle", "Ring", "Little"] as const;
 const SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
 const FOLDED: FingerJoints = [[62, 88, 52], [68, 94, 58], [72, 96, 60], [74, 92, 56]];
-const FOLDED_THUMB: HandPoseDefinition["thumb"] = [[0, 14, 8], [0, 25, 28], [0, 0, 20]];
+const FOLDED_THUMB: HandPoseDefinition["thumb"] = [[12, 28, 16], [7, 32, 34], [0, 4, 24]];
 const STRAIGHT: Triple = [0, 0, 0];
 const DEG = Math.PI / 180;
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
@@ -32,11 +32,11 @@ const DEFINITIONS: Readonly<Record<StudioVrmHandPoseType, HandPoseDefinition>> =
   fist: { fingers: FOLDED, spread: [0, 0, 0, 0], thumb: FOLDED_THUMB },
   open: {
     fingers: [STRAIGHT, STRAIGHT, STRAIGHT, STRAIGHT], spread: [10, 3, -4, -10],
-    thumb: [[0, -12, -8], [0, -6, 0], STRAIGHT],
+    thumb: [[9, -22, -14], [4, -10, -2], STRAIGHT],
   },
   point: {
     fingers: [[0, 4, 0], FOLDED[1], FOLDED[2], FOLDED[3]], spread: [3, 0, 0, 0],
-    thumb: [[0, 8, 4], [0, 16, 18], [0, 0, 12]],
+    thumb: [[10, 18, 10], [6, 24, 24], [0, 3, 14]],
   },
   peace: {
     fingers: [[2, 3, 0], [2, 4, 0], FOLDED[2], FOLDED[3]], spread: [13, -8, 0, 0],
@@ -44,27 +44,27 @@ const DEFINITIONS: Readonly<Record<StudioVrmHandPoseType, HandPoseDefinition>> =
   },
   thumbsUp: {
     fingers: FOLDED, spread: [0, 0, 0, 0],
-    thumb: [[0, -14, -15], STRAIGHT, STRAIGHT],
+    thumb: [[12, -22, -18], [3, -5, -2], STRAIGHT],
   },
   holding: {
     fingers: [[50, 74, 40], [54, 80, 44], [58, 82, 46], [60, 78, 44]], spread: [0, 0, 0, 0],
-    thumb: [[0, 12, 6], [0, 22, 24], [0, 0, 18]],
+    thumb: [[10, 24, 14], [6, 30, 28], [0, 3, 20]],
   },
   phoneGrip: {
     fingers: [[18, 34, 16], [38, 60, 28], [44, 64, 32], [52, 62, 30]], spread: [3, 0, -2, -4],
-    thumb: [[0, 6, 3], [0, 12, 14], [0, 0, 8]],
+    thumb: [[8, 14, 8], [4, 18, 18], [0, 2, 10]],
   },
   penGrip: {
     fingers: [[34, 60, 30], [40, 65, 32], [50, 72, 40], [56, 76, 44]], spread: [3, 0, -2, -3],
-    thumb: [[0, 14, 5], [0, 20, 20], [0, 0, 14]],
+    thumb: [[11, 26, 13], [7, 30, 25], [0, 3, 16]],
   },
   fingerHeart: {
     fingers: [[30, 52, 22], FOLDED[1], FOLDED[2], FOLDED[3]], spread: [10, 0, 0, 0],
-    thumb: [[0, -12, 8], [0, -10, 24], [0, 0, 18]],
+    thumb: [[12, -16, 10], [8, -12, 28], [0, 2, 20]],
   },
   cupGrip: {
     fingers: [[32, 52, 26], [36, 56, 28], [40, 58, 30], [44, 56, 28]], spread: [2, 0, -2, -3],
-    thumb: [[0, 8, 4], [0, 14, 18], [0, 0, 10]],
+    thumb: [[9, 18, 10], [5, 22, 22], [0, 2, 12]],
   },
   rockRoll: {
     fingers: [[0, 3, 0], FOLDED[1], FOLDED[2], [0, 4, 0]], spread: [10, 0, 0, -12],
@@ -72,11 +72,11 @@ const DEFINITIONS: Readonly<Record<StudioVrmHandPoseType, HandPoseDefinition>> =
   },
   okSign: {
     fingers: [[45, 66, 30], [6, 10, 4], [10, 14, 6], [14, 18, 8]], spread: [4, 3, -5, -12],
-    thumb: [[0, 14, 6], [0, 24, 22], [0, 0, 16]],
+    thumb: [[13, 30, 16], [7, 34, 27], [0, 3, 18]],
   },
   relaxed: {
     fingers: [[8, 14, 6], [12, 20, 10], [18, 26, 14], [24, 32, 18]], spread: [4, 1, -2, -5],
-    thumb: [[0, 4, 2], [0, 8, 10], [0, 0, 6]],
+    thumb: [[7, 10, 6], [4, 13, 13], [0, 2, 8]],
   },
 };
 
@@ -127,17 +127,29 @@ export function createStudioVrmFingerCurlPose(
   if (!Number.isFinite(degrees) || (side !== "left" && side !== "right")) return {};
   const curl = clamp(degrees, 0, 90);
   const result: StudioVrmHandRotations = {};
-  NAMES.forEach((name) => {
+  const cascade = [1, 1.04, 1.08, 1.12] as const;
+  NAMES.forEach((name, index) => {
     if (finger && finger !== name.toLowerCase()) return;
-    const joints = [curl, Math.min(100, curl * 1.15), curl * 0.65];
+    const gain = cascade[index];
+    const joints = [
+      Math.min(90, curl * gain),
+      Math.min(100, curl * 1.15 * gain),
+      Math.min(72, curl * 0.65 * gain),
+    ];
     SEGMENTS.forEach((segment, joint) => {
       result[`${side}${name}${segment}`] = mirroredRadians([0, 0, joints[joint]], side);
     });
   });
   if (!finger || finger === "thumb") {
-    result[`${side}ThumbMetacarpal`] = mirroredRadians([0, curl * 0.2, curl * 0.12], side);
-    result[`${side}ThumbProximal`] = mirroredRadians([0, curl * 0.6, curl * 0.3], side);
-    result[`${side}ThumbDistal`] = mirroredRadians([0, 0, curl * 0.32], side);
+    // CMC opposition is part of a curl, not an optional extra. Distributing it over all three
+    // thumb bones avoids the flat "robot thumb" that only hinges at MCP/IP.
+    result[`${side}ThumbMetacarpal`] = mirroredRadians(
+      [curl * 0.12, curl * 0.28, curl * 0.18], side,
+    );
+    result[`${side}ThumbProximal`] = mirroredRadians(
+      [curl * 0.08, curl * 0.6, curl * 0.38], side,
+    );
+    result[`${side}ThumbDistal`] = mirroredRadians([0, curl * 0.08, curl * 0.38], side);
   }
   return result;
 }

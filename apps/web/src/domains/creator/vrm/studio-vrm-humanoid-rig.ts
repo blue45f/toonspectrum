@@ -280,7 +280,10 @@ function uniform(value: number): StudioVrmRigVec3 {
 type FingerSegments = {
   readonly thumbBase: StudioVrmRigVec3;
   readonly thumb: (index: 0 | 1) => StudioVrmRigVec3;
-  readonly knuckle: (lane: number) => StudioVrmRigVec3;
+  readonly knuckle: (
+    finger: "index" | "middle" | "ring" | "little",
+    lane: number,
+  ) => StudioVrmRigVec3;
   readonly straight: (
     finger: "index" | "middle" | "ring" | "little",
     index: 0 | 1,
@@ -319,8 +322,19 @@ function fingerSegments(side: 1 | -1, height: number, hand: number): FingerSegme
       0,
       lengths.thumb[index] * scale * splayZ,
     ],
-    knuckle: (lane) => [palm * side, 0, spread * lane],
-    straight: (finger, index) => [lengths[finger][index] * scale * side, 0, 0],
+    knuckle: (finger, lane) => {
+      // Human MCP joints form an arc rather than a ruler-straight front edge. The little-finger
+      // knuckle sits noticeably farther back; this also stops all four fingertips ending on one
+      // mechanically perfect plane in the neutral pose.
+      const reach = { index: 0.985, middle: 1, ring: 0.972, little: 0.915 }[finger];
+      return [palm * reach * side, 0, spread * lane];
+    },
+    straight: (finger, index) => {
+      const convergence = index === 0
+        ? { index: -0.0011, middle: -0.00025, ring: 0.00035, little: 0.00115 }[finger] * scale
+        : 0;
+      return [lengths[finger][index] * scale * side, 0, convergence];
+    },
   };
 }
 
@@ -330,16 +344,16 @@ function leftFingerLocalTranslations(height: number, hand: number) {
     leftThumbMetacarpal: f.thumbBase,
     leftThumbProximal: f.thumb(0),
     leftThumbDistal: f.thumb(1),
-    leftIndexProximal: f.knuckle(1.5),
+    leftIndexProximal: f.knuckle("index", 1.5),
     leftIndexIntermediate: f.straight("index", 0),
     leftIndexDistal: f.straight("index", 1),
-    leftMiddleProximal: f.knuckle(0.5),
+    leftMiddleProximal: f.knuckle("middle", 0.5),
     leftMiddleIntermediate: f.straight("middle", 0),
     leftMiddleDistal: f.straight("middle", 1),
-    leftRingProximal: f.knuckle(-0.5),
+    leftRingProximal: f.knuckle("ring", -0.5),
     leftRingIntermediate: f.straight("ring", 0),
     leftRingDistal: f.straight("ring", 1),
-    leftLittleProximal: f.knuckle(-1.5),
+    leftLittleProximal: f.knuckle("little", -1.5),
     leftLittleIntermediate: f.straight("little", 0),
     leftLittleDistal: f.straight("little", 1),
   };
@@ -351,16 +365,16 @@ function rightFingerLocalTranslations(height: number, hand: number) {
     rightThumbMetacarpal: f.thumbBase,
     rightThumbProximal: f.thumb(0),
     rightThumbDistal: f.thumb(1),
-    rightIndexProximal: f.knuckle(1.5),
+    rightIndexProximal: f.knuckle("index", 1.5),
     rightIndexIntermediate: f.straight("index", 0),
     rightIndexDistal: f.straight("index", 1),
-    rightMiddleProximal: f.knuckle(0.5),
+    rightMiddleProximal: f.knuckle("middle", 0.5),
     rightMiddleIntermediate: f.straight("middle", 0),
     rightMiddleDistal: f.straight("middle", 1),
-    rightRingProximal: f.knuckle(-0.5),
+    rightRingProximal: f.knuckle("ring", -0.5),
     rightRingIntermediate: f.straight("ring", 0),
     rightRingDistal: f.straight("ring", 1),
-    rightLittleProximal: f.knuckle(-1.5),
+    rightLittleProximal: f.knuckle("little", -1.5),
     rightLittleIntermediate: f.straight("little", 0),
     rightLittleDistal: f.straight("little", 1),
   };
