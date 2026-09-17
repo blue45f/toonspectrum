@@ -556,7 +556,13 @@
         "scripts/verify-studio-publish-package-goldens.mts",
         "scripts/verify-studio-publish-package-goldens.test.ts",
         "scripts/verify-studio-publishing-lifecycle.mjs",
-        "scripts/verify-studio-publishing-lifecycle.test.mjs"
+        "scripts/verify-studio-publishing-lifecycle.test.mjs",
+        "docs/benchmarks/studio-operational-validation-certification.json",
+        "scripts/verify-studio-operational-validation.mjs",
+        "scripts/verify-studio-operational-validation.test.mjs",
+        "tests/benchmarks/results/soak.json",
+        "tests/benchmarks/results/soak-leak-regression-2026-08-08.json",
+        "tests/benchmarks/results/v12-runtime-fault-matrix.json"
       ]
     }
   ],

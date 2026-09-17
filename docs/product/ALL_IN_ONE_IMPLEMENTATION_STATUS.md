@@ -41,8 +41,8 @@
 | 새 프로젝트 시작 | 구현됨·검증 필요 | 작업 종류·템플릿·프로젝트 이름, 3단계 진행 표시, 비활성 이유, 입력 보존 재시도, 기기 복구 저장 | 계정 로그인 후 클라우드 승격과 다중 기기 재개 E2E |
 | 저장·동기화 상태 언어 | 검증 완료 | 기기 저장, 동기화, 오프라인, 재시도, 충돌, 검수본, 승인본, 게시본의 분리된 계약 | 각 편집·검토·연재 화면이 공통 상태를 실제 저장 엔진과 연결 |
 | 2D 드로잉 엔진 | 부분 구현 | 캔버스, 브러시, 레이어, 선택, 웹툰 원고 작업공간 | 대형 세로 원고, 비파괴 그래프, 전문 브러시, 장시간 펜 입력 실기기 검증 |
-| 웹툰 특화 도구 | 부분 구현 | 컷·말풍선·식자·세로 원고·출력 관련 화면과 유틸리티 | 회차 전체를 외부 앱 없이 완성하는 기준 프로젝트 통과 |
-| PSD·PSB 호환 | 부분 구현 | PSD 입출력 관련 코드와 호환 경로 | 텍스트·마스크·블렌드·조정 레이어·연결 객체의 항목별 왕복 보고서 |
+| 웹툰 특화 도구 | 구현됨·검증 필요 | 컷·말풍선·식자·세로 원고·출력과 기준 프로젝트 A 자동 인증 87개 테스트 | 실제 펜 장치·대형 회차·장시간 사용에서 외부 앱 없이 완주하는 전문 창작자 검증 |
+| PSD·PSB 호환 | 구현됨·검증 필요 | 원본 보존, 텍스트·조정 그래프·손실 보고, 기준 프로젝트 C와 round-trip 자동 인증 | 승인된 실제 PSD·PSB corpus의 앱 간 구조·픽셀 비교와 전문 사용자 확인 |
 | CLIP·CMC 호환 | 부분 구현 | 원본 보관·가져오기 경로 중심 | 공개·허용된 범위에서 편집 가능한 객체 변환, 손실 보고와 왕복 증거 |
 | 3D 캐릭터·포즈 | 부분 구현 | VRM, 포즈, 손·표정, 카메라, 일부 출력 경로 | 모델별 기능 편차 제거, 저장 후 재편집, 컷 라이브 연결 검증 |
 | 3D 배경 제작 | 부분 구현 | 배경 장면·카메라·재질·일부 편집 기능 | 직접 모델링, 컴포넌트, 정밀 치수, 선화·톤 패스의 전문 제작 완주 |
@@ -50,13 +50,13 @@
 | 소재 마켓·판매자 센터 | 부분 구현 | 마켓·상품·라이선스 관련 화면과 API 기반 | 판매자 업로드, 검수, 결제, 정산, 업데이트, 환불과 권리 침해 운영 E2E |
 | 자체 파일 공간 | 구현됨·검증 필요 | ProjectGraph v3, append-only revision, blob·외부 파일 binding, 로컬 캐시와 복구 경로 | 대용량 재개 업로드, 팀 소유권, 휴지통 전체 복원, 검색·스마트 보기의 운영 E2E |
 | Google Drive·Dropbox 등 | 구현됨·검증 필요 | provider-neutral 외부 파일 binding, import/export/backup sync mode와 revision 영수증 | 실제 계정별 중단 재개·충돌·삭제 복구와 선택적 이전·백업 운영 검증 |
-| 실시간 협업 | 부분 구현 | 역할·초대·일부 실시간 상태와 동시 편집 기반 | 래스터 영역 충돌, 객체 잠금, 오프라인 병합, 장시간 공동 편집 검증 |
+| 실시간 협업 | 부분 구현 | 역할·초대·동시 편집 기반, durable outbox·오프라인 retry·중복 commit 방지 fault matrix | 래스터 영역 충돌, 객체 잠금과 실제 Socket.IO·PostgreSQL 장시간 다중 사용자 분할 복구 |
 | 제작 일정·분업 | 구현됨·검증 필요 | 회차·역할별 작업·인수인계, Studio ProjectGraph 정본 revision·digest 자동 대조·고정, 운영 조종석, 설명 가능한 업무 배정, 예측형 마감·의존성·용량 리스크와 사용자 확인 위험 등록 | 다중 회차·권한·충돌 상황에서 입력 revision부터 승인 제출본까지 전 공정 E2E, 실프로젝트 공수·가용량 보정과 장기 예측 정확도 검증 |
 | 검수·승인 | 구현됨·검증 필요 | revision 고정 review snapshot, 위치 기반 댓글, 승인 pointer, 수정·복원 API와 Production 제출본 불일치 차단 | 실제 다중 사용자 검수에서 수정 버전 연결·승인 잠금·재개방까지 전 구간 E2E |
 | 자체 연재 | 구현됨·전체 검증 필요 | 승인 릴리스, 즉시·예약 공개, 독자 정책, 회차 교체·공개 취소, 휴재·재개, 로컬 통계와 5-lane 자동 인증 | 실DB scheduler·대량 연재·실사용자 알림·장시간 운영 E2E |
 | 외부 플랫폼 패키지 | 검증 완료 | 범용·WEBTOON·Tapas 규격, 권리·크레딧·AI 공개, 공개 manifest, artifact hash·크기 finalization, 3-destination Golden corpus | 직접 외부 계정 게시가 아닌 전달 패키지 범위이며 최신 플랫폼 정책은 게시 전 수동 확인 |
-| 접근성·반응형 | 구현됨·검증 필요 | 터치 크기, 화면 폭 회귀, 긴 문구 줄바꿈, 전체 폭 모바일 행동, 라우트별 모바일 정책 | 편집기·3D·간트·캔버스의 키보드·스크린리더·200% 확대 실기기 검사 |
-| 성능·안정성 | 구현됨·검증 필요 | 지연 로딩, Worker·WASM, 로컬 저장, 프로덕션 번들 검사 | 대형 프로젝트 장시간 작업, 메모리 압력, 강제 종료와 복구 기준 통과 |
+| 접근성·반응형 | 구현됨·검증 필요 | 대비·대체 텍스트·키보드·터치 타깃·읽기 순서 audit와 모바일 focus isolation 등 74개 자동 검사 | 편집기·3D·간트·캔버스의 실제 스크린리더·키보드 전용·200% 확대·펜 장치 검사 |
+| 성능·안정성 | 구현됨·검증 필요 | 리소스 예산·프록시 계획, 8시간 historical soak 2,910만 command·145만 render·오류 0, 7종 fault matrix와 negative leak control | 현재 release commit의 8시간 soak, 실제 GPU·Worker·OPFS·네트워크 장애와 저사양 장치 검증 |
 
 ## 2026-09-17 UX·저장 신뢰 증분
 
@@ -182,6 +182,23 @@
 - 자동 인증이 통과해도 WEBTOON·Tapas 계정에 직접 게시했다고 주장하지 않도록 claim policy를 분리했다.
 
 직접 외부 플랫폼 계정 게시, 플랫폼 정책의 최신성, 대량 예약 연재와 실제 알림 전달은 별도 운영 release gate로 유지한다.
+
+## 2026-09-17 운영 안정성 자동 인증 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- performance-and-soak, file-roundtrip-integrity, fault-and-collaboration-recovery, accessibility-and-security의 4개 operational lane을 저장소 CI에 추가했다.
+- 18개 실행 테스트 파일에서 총 215개 테스트를 통과하며, 각 파일과 bounded artifact의 SHA-256을 receipt에 기록한다.
+- 리소스 예산 초과 시 원본을 평탄화하거나 삭제하지 않고 proxy·LOD·미리보기 품질 저하·live effect 일시 정지를 제안하는 계약을 검증한다.
+- 2026-08-07 Apple M2 Max 역사적 8시간 soak는 727,739 cycle, 29,109,560 command, 1,455,478 render, 오류 0과 최대 RSS 증가 167.6 MiB를 기록한다.
+- 동일 8시간 leak negative control은 RSS 1,628.1 MiB 증가와 11개 allocation failure를 보존해 검증기가 정상·비정상을 구분하는지 확인한다.
+- PSD·텍스트·조정 그래프·CLIP selection·workspace interchange의 5개 round-trip 파일에서 110개 테스트를 통과한다.
+- GPU device loss, Worker termination, queue completion inversion, torn journal, corrupt snapshot·blob, quota reject, offline retry의 7종 deterministic fault를 검증한다.
+- device loss 100회, Worker 종료 1,000회, reverse queue completion 64회와 crash reopen 64회에서 lost command·duplicate commit·stale apply가 0인지 확인한다.
+- 대비·대체 텍스트·읽기 순서·키보드·터치 타깃·모바일 focus isolation과 CSP·dependency advisory 예외 금지를 같은 lane에서 검증한다.
+- historical soak와 deterministic fault를 현재 commit의 실제 장치 인증으로 오인하지 않도록 currentCommitEightHourSoakCertified, realHardwareBrowserCertificationAllowed, professionalReplacementClaimAllowed를 false로 고정한다.
+
+현재 release commit의 8시간 soak, 물리 GPU·브라우저 process crash·OPFS quota, 실제 네트워크 분할, 실기기 스크린리더·펜 장치와 외부 전문 창작자 서명은 저장소 자동화가 대체하지 않는 release gate다.
 
 ## 올인원 공개 문구 사용 게이트
 
