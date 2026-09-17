@@ -6,8 +6,20 @@ const source = readFileSync(
   new URL("./StudioFrontDoorPages.tsx", import.meta.url),
   "utf8",
 );
+const routePages = readFileSync(
+  new URL("../../../app/routes/groups/creator-route-pages.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Studio front door UX contract", () => {
+  it("is the canonical exact /studio home while projects remain a separate destination", () => {
+    expect(routePages).toContain("@/domains/creator/studio-shell/StudioFrontDoorPages");
+    expect(routePages).toContain("default: module.StudioHomePage");
+    expect(routePages).toContain('"StudioHomePage"');
+    expect(routePages).not.toContain("default: module.StudioProjectLibraryPage");
+    expect(source).toContain('href: "/studio/projects"');
+  });
+
   it("starts from what the user currently has instead of asking for expertise", () => {
     expect(source).toContain("지금 무엇을 가지고 있나요?");
     expect(source).toContain("아이디어만 있어요");
