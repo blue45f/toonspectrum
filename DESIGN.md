@@ -66,6 +66,7 @@
 ## 컴포넌트(필수 상태: 기본/호버/포커스/활성/비활성/로딩/오류)
 
 - 버튼: solid(accent, on-accent 텍스트) / ghost(line 보더) / quiet(텍스트). radius 0.625rem. focus ring = accent.
+- **스위치/토글(재발 방지 규칙)**: 새 이진 제어는 `@/shared/components/ui/switch`의 `Switch`를 우선 사용한다. 직접 구현해야 한다면 44×24px 트랙, 20px thumb, `left/top` 2px의 **명시적 절대 위치 기준점**, ON 이동 20px, 최소 44×44px hit target을 동일하게 지킨다. `position:absolute` thumb에 `left`/`right` 없이 브라우저 static-position에 기대거나, 트랙 폭과 맞지 않는 임의 `translate-x-*`, `bg-white/#fff` 하드코딩을 사용하지 않는다. `role="switch"` + `aria-checked` + 접근 가능한 이름, focus ring, `prefers-reduced-motion`을 필수로 제공한다.
 - 칩/태그: 장르=스펙트럼 틴트, 일반 태그=raised. 토글 가능.
 - 작품 카드: 타이포그래픽 커버 + 제목 + 메타 + 미니 평점. hover 시 미세 lift + 커버 디테일.
 - 별점: 가변 스케일(반쪽별/10점/100점) 입력 + 0.5단위 hover.
