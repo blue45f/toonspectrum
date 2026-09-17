@@ -1,53 +1,14 @@
-import {
-  BadgeCheck,
-  Box,
-  Boxes,
-  Brush,
-  CalendarClock,
-  Compass,
-  FolderKanban,
-  Gamepad2,
-  GraduationCap,
-  Layers3,
-  MessageCircleMore,
-  Pause,
-  Play,
-  ScanSearch,
-  ShieldCheck,
-  Sparkles,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
+import { Pause, Play, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
 
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
-import type {
-  SiteRouteVisualKind,
-  SiteRouteVisualProfile,
-} from "@/shared/lib/site-route-visual";
+import type { SiteRouteVisualProfile } from "@/shared/lib/site-route-visual";
 
 import "./route-purpose-scene.css";
 
 type Locale = "ko" | "en";
-
-const ICONS: Record<SiteRouteVisualKind, LucideIcon> = {
-  workflow: Workflow,
-  discover: Compass,
-  create: Brush,
-  planning: Layers3,
-  spatial: Box,
-  assets: Boxes,
-  production: CalendarClock,
-  review: ScanSearch,
-  publish: BadgeCheck,
-  learn: GraduationCap,
-  connect: MessageCircleMore,
-  manage: FolderKanban,
-  trust: ShieldCheck,
-  play: Gamepad2,
-};
 
 const CONTEXT_LABELS: Record<SiteRouteExperience["contextLevel"], { ko: string; en: string }> = {
   global: { ko: "전체 서비스", en: "Global" },
@@ -87,7 +48,6 @@ export function RoutePurposeScene({
   experience,
   profile,
 }: RoutePurposeSceneProps) {
-  const Icon = ICONS[profile.kind];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
@@ -209,7 +169,7 @@ export function RoutePurposeScene({
             ) : null}
             <span className="route-purpose-scene__scan" />
           </div>
-          <span className="route-purpose-scene__focus-ring"><Icon size={24} /></span>
+          <span className="route-purpose-scene__focus-ring"><Sparkles size={24} /></span>
           <div className="route-purpose-scene__cards">
             {profile.layers.map((layer, index) => (
               <span className="route-purpose-scene__card" data-card={index + 1} key={layer.en}>

@@ -78,13 +78,29 @@ export function stripAnsi(value) {
   }).join('');
 }
 
-export function normalizeDiagnostic(value) {
+const ACTIONS_LOG_COLUMNS_PATTERN = /^(?:[^\t]*\t){2}(?=\uFEFF?\d{4}-\d{2}-\d{2}T[^Z\s]+Z(?:\s|$))/u;
+const ACTIONS_TIMESTAMP_PATTERN = /^\uFEFF?\d{4}-\d{2}-\d{2}T[^Z\s]+Z\s*/u;
+const POSTGRES_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+[A-Z]{2,5}\s+\[\d+\]\s*/u;
+
+function cleanLogLine(value) {
   return stripAnsi(value)
+    .replace(ACTIONS_LOG_COLUMNS_PATTERN, '')
+    .replace(/^\uFEFF/u, '')
+    .replace(ACTIONS_TIMESTAMP_PATTERN, '')
+    .replace(POSTGRES_TIMESTAMP_PATTERN, '')
+    .trim();
+}
+
+export function normalizeDiagnostic(value) {
+  return cleanLogLine(value)
+    .replace(/^##\[(?:error|warning)\]\s*/u, '')
     .replaceAll('\\', '/')
     .replace(/(?:[A-Za-z]:)?\/(?:home|Users)\/[^\s]+?\/work\/[^\s/]+\/[^\s/]+\//gu, '')
     .replace(/\/github\/workspace\//gu, '')
     .replace(/\b[0-9a-f]{40}\b/giu, '<sha>')
     .replace(/\b(run|job|artifact)[-_ ]?id\s*[:=]?\s*\d+\b/giu, '$1 id <id>')
+    .replace(/\bTimeout\s+\d+(?:\.\d+)?ms\b/giu, 'Timeout <duration>')
+    .replace(/\btimed out after\s+\d+(?:\.\d+)?(?:ms|s|m)\b/giu, 'timed out after <duration>')
     .replace(/\s+/gu, ' ')
     .trim()
     .slice(0, 500);
@@ -105,89 +121,127 @@ function addSignature(target, category, signature, line) {
 
 function fallbackCategory(stepName = '') {
   const step = stepName.toLowerCase();
+  if (/^build\b|production build|bundle|compile/u.test(step)) return 'build';
   if (/typecheck|typescript|\btsc\b/u.test(step)) return 'typescript';
   if (/lint|eslint/u.test(step)) return 'lint';
   if (/test|vitest|jest|playwright|cypress|regression|contract/u.test(step)) return 'test';
-  if (/build|bundle|compile/u.test(step)) return 'build';
+  if (/build/u.test(step)) return 'build';
   if (/install|dependenc|setup|lockfile/u.test(step)) return 'dependency';
   if (/deploy|release|publish/u.test(step)) return 'deploy';
   if (/security|codeql|scan|audit/u.test(step)) return 'security';
   if (/upload|artifact/u.test(step)) return 'artifact';
   if (/generated|reproduce|drift|git diff/u.test(step)) return 'generated-drift';
+  if (/database|postgres|schema|migration/u.test(step)) return 'database';
+  if (/\bgit\b|checkout|clone|fetch|merge/u.test(step)) return 'git';
   return 'unknown';
 }
 
 export function extractFailureSignatures(logText, failedStepName = '') {
   const signatures = new Map();
-  const clean = stripAnsi(logText);
-  const lines = clean.split(/\r?\n/u);
+  const lines = stripAnsi(logText).split(/\r?\n/u);
 
   for (const rawLine of lines) {
-    const line = rawLine.replace(/^\d{4}-\d{2}-\d{2}T[^Z\s]+Z\s*/u, '').trim();
+    const line = cleanLogLine(rawLine);
     if (!line) continue;
+    const annotatedError = /^##\[error\]/u.test(line);
+    const diagnosticLine = line.replace(/^##\[error\]\s*/u, '').trim();
+    if (/^[✔✓]\s/u.test(diagnosticLine)) continue;
 
-    const typeScript = line.match(/(?:^|\s)([^\s:()]+\.(?:[cm]?tsx?|d\.ts))\((\d+),(\d+)\):\s*error\s+(TS\d+):\s*(.+)$/iu);
+    const typeScript = diagnosticLine.match(/(?:^|\s)([^\s:()]+\.(?:[cm]?tsx?|d\.ts))\((\d+),(\d+)\):\s*error\s+(TS\d+):\s*(.+)$/iu);
     if (typeScript) {
       addSignature(signatures, 'typescript', `${typeScript[4]}: ${typeScript[5]}`, line);
       continue;
     }
 
-    const eslint = line.match(/^\s*(\d+):(\d+)\s+error\s+(.+?)\s+([@\w./-]+)$/u);
+    const eslint = diagnosticLine.match(/^\s*(\d+):(\d+)\s+error\s+(.+?)\s+([@\w./-]+)$/u);
     if (eslint) {
       addSignature(signatures, 'lint', `${eslint[4]}: ${eslint[3]}`, line);
       continue;
     }
 
-    const assertion = line.match(/(?:AssertionError|JestAssertionError):\s*(.+)$/iu);
+    const assertion = diagnosticLine.match(/(?:AssertionError|JestAssertionError)(?: \[[A-Z0-9_]+\])?:\s*(.+)$/iu);
     if (assertion) {
       addSignature(signatures, 'test', `AssertionError: ${assertion[1]}`, line);
       continue;
     }
 
-    const playwright = line.match(/(?:Error:\s*)?(?:expect\([^)]*\)|locator\.[\w]+|page\.[\w]+).*?(?:failed|timed out|timeout|received|expected).*/iu);
-    if (playwright && /error|failed|timed out|timeout|expected|received/iu.test(line)) {
-      addSignature(signatures, 'test', line.replace(/^.*?##\[error\]/u, ''), line);
+    const testingLibrary = diagnosticLine.match(/^(TestingLibraryElementError):\s*(.+)$/iu);
+    if (testingLibrary) {
+      addSignature(signatures, 'test', `${testingLibrary[1]}: ${testingLibrary[2]}`, line);
       continue;
     }
 
-    if (/FATAL ERROR:.*(?:heap|allocation)|JavaScript heap out of memory|Reached heap limit/iu.test(line)) {
+    if (!/^message:/iu.test(diagnosticLine)) {
+      const playwright = diagnosticLine.match(
+        /^(?:.*?\b(?:FAIL|FATAL)\s+[^:]+:\s*)?(?:(?:ExpectError|TimeoutError|Error):\s*)?((?:expect\([^)]*\)\.[\w]+\([^)]*\)|(?:locator|page)\.[\w]+).*?(?:failed|timed out|timeout|received|expected).*)$/iu,
+      );
+      if (playwright) {
+        addSignature(signatures, 'test', playwright[1], line);
+        continue;
+      }
+    }
+
+    const bundleRatchet = diagnosticLine.match(/^studio bundle check failed:\s*(.+?)\s+regressed to\b/iu);
+    if (bundleRatchet) {
+      addSignature(signatures, 'build', `Studio bundle budget regressed: ${bundleRatchet[1]}`, line);
+      continue;
+    }
+
+    if (/FATAL ERROR:.*(?:heap|allocation)|JavaScript heap out of memory|Reached heap limit/iu.test(diagnosticLine)) {
       addSignature(signatures, 'resource', 'JavaScript heap out of memory', line);
       continue;
     }
 
-    if (/No space left on device|ENOSPC/iu.test(line)) {
+    if (/No space left on device|ENOSPC/iu.test(diagnosticLine)) {
       addSignature(signatures, 'resource', 'Runner disk space exhausted', line);
       continue;
     }
 
-    const packageManager = line.match(/(?:ERR_PNPM_[A-Z0-9_]+|npm ERR!|YN\d{4}|error An unexpected error occurred).*$/u);
+    if (/^(?:FATAL|ERROR|PANIC):\s+(?:role\b|database\b|relation\b|column\b|permission denied\b|password authentication\b|could not connect\b|remaining connection slots\b|the database system\b)/iu.test(diagnosticLine)) {
+      addSignature(signatures, 'database', diagnosticLine, line);
+      continue;
+    }
+
+    const packageManager = diagnosticLine.match(/(?:ERR_PNPM_[A-Z0-9_]+|npm ERR!|YN\d{4}|error An unexpected error occurred).*$/u);
     if (packageManager) {
       addSignature(signatures, 'dependency', packageManager[0], line);
       continue;
     }
 
-    if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|network.*(?:error|failure)|TLS.*(?:error|failure)/iu.test(line)) {
-      addSignature(signatures, 'network', line, line);
+    if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|network.*(?:error|failure)|TLS.*(?:error|failure)/iu.test(diagnosticLine)) {
+      addSignature(signatures, 'network', diagnosticLine, line);
       continue;
     }
 
-    if (/Resource not accessible by integration|Bad credentials|Permission denied|HTTP (?:401|403)|status code (?:401|403)/iu.test(line)) {
-      addSignature(signatures, 'permission', line, line);
+    if (/Resource not accessible by integration|Bad credentials|Permission denied|HTTP (?:401|403)|status code (?:401|403)/iu.test(diagnosticLine)) {
+      addSignature(signatures, 'permission', diagnosticLine, line);
       continue;
     }
 
-    if (/timed out after|The operation was canceled|The job running on runner.*exceeded|cancell?ed because/iu.test(line)) {
-      addSignature(signatures, 'timeout', line, line);
+    if (/timed out after|The operation was canceled|The job running on runner.*exceeded|cancell?ed because/iu.test(diagnosticLine)) {
+      addSignature(signatures, 'timeout', diagnosticLine, line);
       continue;
     }
 
-    if (/fatal:.*|remote:.*(?:error|fatal)|merge conflict|CONFLICT \(/iu.test(line)) {
-      addSignature(signatures, 'git', line, line);
+    if (
+      /^remote:\s.*(?:error|fatal)/iu.test(diagnosticLine)
+      || /^CONFLICT \([^)]+\):/u.test(diagnosticLine)
+      || /merge conflict/iu.test(diagnosticLine)
+      || /^fatal:\s+(?:not a git repository|unable to access|could not read|ambiguous argument|bad object|reference is not a tree|couldn't find remote ref|refusing to merge|failed to write|cannot lock ref)/iu.test(diagnosticLine)
+    ) {
+      addSignature(signatures, 'git', diagnosticLine, line);
       continue;
     }
 
-    if (/##\[error\]/u.test(line) && !/Process completed with exit code/iu.test(line)) {
-      addSignature(signatures, fallbackCategory(failedStepName), line.replace(/^.*?##\[error\]\s*/u, ''), line);
+    const runtimeError = diagnosticLine.match(/^(TypeError|ReferenceError|RangeError|SyntaxError|Error):\s*(.+)$/u);
+    if (runtimeError) {
+      const category = fallbackCategory(failedStepName);
+      addSignature(signatures, category === 'unknown' ? 'runtime' : category, `${runtimeError[1]}: ${runtimeError[2]}`, line);
+      continue;
+    }
+
+    if (annotatedError && !/Process completed with exit code/iu.test(diagnosticLine)) {
+      addSignature(signatures, fallbackCategory(failedStepName), diagnosticLine, line);
     }
   }
 
