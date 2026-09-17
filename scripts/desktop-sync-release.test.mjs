@@ -4,7 +4,10 @@ import os from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { packageDesktopSyncRelease } from "./package-desktop-sync-release.mjs";
+import {
+  packageDesktopSyncRelease,
+  resolveReleaseCommand,
+} from "./package-desktop-sync-release.mjs";
 import { signDesktopSyncReleaseStage } from "./sign-desktop-sync-release.mjs";
 import { verifyDesktopSyncRelease } from "./verify-desktop-sync-release.mjs";
 
@@ -24,6 +27,25 @@ function expectedSigningKind() {
   if (process.platform === "win32") return "authenticode";
   return "gpg";
 }
+
+test("wraps Windows command shims through cmd.exe", () => {
+  assert.deepEqual(
+    resolveReleaseCommand(
+      "npm.cmd",
+      ["install", "--omit=dev"],
+      "win32",
+      { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
+    ),
+    {
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", "npm.cmd", "install", "--omit=dev"],
+    },
+  );
+  assert.deepEqual(
+    resolveReleaseCommand("npm", ["install"], "darwin", {}),
+    { command: "npm", args: ["install"] },
+  );
+});
 test("packages a reproducible, self-contained desktop sync release", {
   timeout: 180_000,
 }, async (context) => {
