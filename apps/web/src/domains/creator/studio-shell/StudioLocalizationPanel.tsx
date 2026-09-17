@@ -449,7 +449,7 @@ export function StudioLocalizationPanel({
                     "shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-bold",
                     statusTone(unit.status),
                   )}>
-                    {STATUS_LABELS[unit.status][locale]}
+                    {bt(STATUS_LABELS[unit.status].ko, STATUS_LABELS[unit.status].en)}
                   </span>
                 </span>
                 <span className="mt-1 block truncate text-[0.65rem] text-fg-3">
@@ -465,7 +465,7 @@ export function StudioLocalizationPanel({
               <input aria-label={bt("번역 언어", "Target locale")} value={targetLocale} onChange={(event) => setTargetLocale(event.target.value)} className="min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg" />
             </div>
             <select aria-label={bt("문구 종류", "Unit kind")} value={kind} onChange={(event) => setKind(event.target.value as StudioLocalizationUnitKind)} className="mt-2 min-h-10 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg">
-              {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label[locale]}</option>)}
+              {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{bt(label.ko, label.en)}</option>)}
             </select>
             <textarea aria-label={bt("새 원문", "New source text")} value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-line bg-card px-3 py-2 text-xs leading-5 text-fg" placeholder={bt("번역할 대사나 문구", "Source dialogue or text")} />
             <button type="button" onClick={addUnit} className={buttonClass({ size: "sm", className: "mt-2 w-full gap-1.5" })}>
@@ -484,12 +484,12 @@ export function StudioLocalizationPanel({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-accent">
-                    {KIND_LABELS[selected.kind][locale]} · {selected.sourceLocale} → {selected.targetLocale}
+                    {bt(KIND_LABELS[selected.kind].ko, KIND_LABELS[selected.kind].en)} · {selected.sourceLocale} → {selected.targetLocale}
                   </p>
                   <h3 className="mt-1 text-lg font-black text-fg">{selected.sourceText}</h3>
                 </div>
                 <span className={cn("rounded-full border px-3 py-1 text-xs font-bold", statusTone(selected.status))}>
-                  {STATUS_LABELS[selected.status][locale]}
+                  {bt(STATUS_LABELS[selected.status].ko, STATUS_LABELS[selected.status].en)}
                 </span>
               </div>
 
