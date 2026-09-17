@@ -274,7 +274,7 @@ export function StudioExportPanel({
             <h3 className="flex items-center gap-2 text-sm font-black text-fg">
               {displayedResult?.status === "pass" ? <CheckCircle2 size={17} className="text-success" aria-hidden="true" /> : <ShieldAlert size={17} className={displayedResult?.status === "blocked" ? "text-danger" : "text-warning"} aria-hidden="true" />}
               {displayedResult
-                ? (locale === "ko" ? displayedResult.summaryKo : displayedResult.summaryEn)
+                ? bt(displayedResult.summaryKo, displayedResult.summaryEn)
                 : (bt("현재 설정으로 검사해 보세요", "Run preflight for these settings"))}
             </h3>
             {displayedResult ? <p className="mt-1 text-xs text-fg-3">{bt(`차단 ${displayedResult.blockingCount} · 확인 ${displayedResult.warningCount}`, `${displayedResult.blockingCount} blocking · ${displayedResult.warningCount} warnings`)}</p> : null}
