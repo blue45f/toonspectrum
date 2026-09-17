@@ -809,6 +809,10 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
   const upperLegLen = legSpan * 0.52;
   const lowerLegLen = legSpan * 0.48;
 
+  const faceWidth = params.faceWidth ?? 1;
+  const chinLength = params.chinLength ?? 1;
+  const eyeScale = params.eyeScale ?? 1;
+  const noseHeight = params.noseHeight ?? 1;
   const torsoDepth = params.torsoDepth ?? 1;
   const chestWidth = params.chestWidth ?? 1;
   const pelvisDepth = params.pelvisDepth ?? 1;
@@ -914,20 +918,32 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "head",
       center: vec3(0, headLen * 0.5, 0),
       radius: headLen * 0.5,
-      scale: vec3(0.78, 1, 0.85),
+      scale: vec3(0.78 * faceWidth, 1, 0.85),
+    },
+    // 턱/하악 볼륨 — 머리 높이는 보존하면서 얼굴 너비와 턱 길이가 실제 실루엣에 반영된다.
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(
+        0,
+        headLen * (0.24 - 0.035 * (chinLength - 1)),
+        headLen * 0.16,
+      ),
+      radius: 0.2 * hu,
+      scale: vec3(1.42 * faceWidth, 0.72 * chinLength, 0.72),
     },
     // 코·귀 방향 가이드 — 별도 얼굴 골격 없이도 +Z 시선과 머리 회전을 즉시 읽을 수 있다.
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0, headLen * 0.52, headLen * 0.43),
+      center: vec3(0, headLen * 0.52, headLen * (0.43 + 0.025 * (noseHeight - 1))),
       radius: 0.06 * hu,
-      scale: vec3(0.55, 0.72, 1.15),
+      scale: vec3(0.55, 0.72, 1.15 * noseHeight),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0.4 * hu, headLen * 0.52, 0),
+      center: vec3(0.4 * hu * faceWidth, headLen * 0.52, 0),
       radius: 0.065 * hu,
       scale: vec3(0.45, 0.8, 0.55),
     },
@@ -935,21 +951,21 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0.17 * hu, headLen * 0.59, headLen * 0.395),
-      radius: 0.055 * hu,
+      center: vec3(0.17 * hu * faceWidth, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu * eyeScale,
       scale: vec3(1, 0.72, 0.38),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(-0.17 * hu, headLen * 0.59, headLen * 0.395),
-      radius: 0.055 * hu,
+      center: vec3(-0.17 * hu * faceWidth, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu * eyeScale,
       scale: vec3(1, 0.72, 0.38),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(-0.4 * hu, headLen * 0.52, 0),
+      center: vec3(-0.4 * hu * faceWidth, headLen * 0.52, 0),
       radius: 0.065 * hu,
       scale: vec3(0.45, 0.8, 0.55),
     },
