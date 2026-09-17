@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import {
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
@@ -96,7 +98,10 @@ export function translateBilingual(
 /** React bridge for incrementally migrating legacy inline bilingual copy. */
 export function useBilingual(scope: string): (ko: string, en: string) => string {
   const t = useT();
-  return (ko, en) => translateBilingual(t, scope, ko, en);
+  return useCallback(
+    (ko: string, en: string) => translateBilingual(t, scope, ko, en),
+    [scope, t],
+  );
 }
 
 function translateParallelNode(
