@@ -39,7 +39,7 @@ type AccountMergeUserRow = {
   mergedIntoUserId: string | null;
 };
 
-type UserReference = {
+export type UserReference = {
   schemaName: string;
   tableName: string;
   columnName: string;
