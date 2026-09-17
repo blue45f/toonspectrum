@@ -7,7 +7,7 @@ import {
   CREATOR_COMMUNITY_KIND_LABEL,
   CREATOR_COMMUNITY_PROVENANCE_LABEL,
 } from "./creator-community-labels";
-import { FORMAT_LABEL, SERIES_STATUS_LABEL } from "./creator-community-utils";
+import { FORMAT_LABEL, SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creator-community-utils";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -183,9 +183,7 @@ export function SeriesCard({ series }: { series: SeriesSummary }) {
           <span
             className={cn(
               "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.72rem] font-medium leading-none",
-              series.status === "completed"
-                ? "border-line bg-raised text-fg-2"
-                : "border-[color:oklch(0.8_0.15_150/0.3)] bg-[oklch(0.8_0.15_150/0.12)] text-good"
+              SERIES_STATUS_CLASS[series.status]
             )}
           >
             {SERIES_STATUS_LABEL[series.status]}
@@ -280,7 +278,7 @@ export function SeriesForm({
           className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="연재 상태">
-          {(["ongoing", "completed"] as const).map((value) => (
+          {(["ongoing", "hiatus", "completed"] as const).map((value) => (
             <button
               key={value}
               type="button"

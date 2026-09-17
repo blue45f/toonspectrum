@@ -18,6 +18,7 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-reader";
 import { useCreatorPublicationPageMeta } from "./creator-publication-page-meta";
 import {
@@ -640,7 +641,11 @@ export function CreateWorkPage() {
             <Layers size={12} />
             {work.series.title}
             {work.episodeNo != null && <span className="numeral">· {work.episodeNo}화</span>}
-            {work.series.status === "completed" && <span className="text-[0.7rem] opacity-80">(완결)</span>}
+            {work.series.status !== "ongoing" && (
+              <span className="text-[0.7rem] opacity-80">
+                ({SERIES_STATUS_LABEL[work.series.status]})
+              </span>
+            )}
           </Link>
         )}
         <h1 className="text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">

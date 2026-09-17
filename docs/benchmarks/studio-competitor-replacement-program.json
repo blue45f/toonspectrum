@@ -551,7 +551,12 @@
         "docs/validation/studio-professional-creator-validation-protocol.json",
         "docs/validation/studio-professional-creator-validation-template.json",
         "scripts/verify-studio-professional-validation.mjs",
-        "scripts/verify-studio-professional-validation.test.mjs"
+        "scripts/verify-studio-professional-validation.test.mjs",
+        "docs/benchmarks/studio-publishing-lifecycle-certification.json",
+        "scripts/verify-studio-publish-package-goldens.mts",
+        "scripts/verify-studio-publish-package-goldens.test.ts",
+        "scripts/verify-studio-publishing-lifecycle.mjs",
+        "scripts/verify-studio-publishing-lifecycle.test.mjs"
       ]
     }
   ],
