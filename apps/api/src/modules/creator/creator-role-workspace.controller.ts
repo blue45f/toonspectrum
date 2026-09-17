@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Header,
+  Inject,
   Headers,
   Param,
   Post,
@@ -27,7 +28,10 @@ function authenticatedUserId(userId: string | undefined): string {
 
 @Controller()
 export class CreatorRoleWorkspaceController {
-  constructor(private readonly service: CreatorRoleWorkspaceService) {}
+  constructor(
+    @Inject(CreatorRoleWorkspaceService)
+    private readonly service: CreatorRoleWorkspaceService,
+  ) {}
 
   @Get("/creator/role-workspaces/:projectKey")
   @Header("Cache-Control", "private, no-store, max-age=0")

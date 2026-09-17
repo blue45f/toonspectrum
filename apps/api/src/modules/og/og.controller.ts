@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Query, Res } from "@nestjs/common";
+import { Controller, Get, Headers, Inject, Query, Res } from "@nestjs/common";
 
 import { getAuthorData } from "../../../../../packages/core/src/server";
 import { getFanPost } from "../../server/community";
@@ -20,7 +20,10 @@ export class OgController {
   private readonly collaboration = new CollaborationRepository();
   private readonly promotion = new PromotionService();
 
-  constructor(private readonly marketplace: CreatorMarketplaceService) {}
+  constructor(
+    @Inject(CreatorMarketplaceService)
+    private readonly marketplace: CreatorMarketplaceService,
+  ) {}
 
   @Get("og")
   async render(

@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -44,7 +45,10 @@ function externalReviewToken(authorization: string | undefined, fallback: string
 
 @Controller("/production")
 export class ProductionCollaborationController {
-  constructor(private readonly service: ProductionCollaborationService) {}
+  constructor(
+    @Inject(ProductionCollaborationService)
+    private readonly service: ProductionCollaborationService,
+  ) {}
 
   @Post("/projects")
   @Header("Cache-Control", "private, no-store, max-age=0")
