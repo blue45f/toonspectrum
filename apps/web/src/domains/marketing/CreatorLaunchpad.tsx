@@ -133,6 +133,10 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
+  const drawingInstallLabel = locale === "ko" ? "순수 드로잉 앱 설치" : "Install drawing-only app";
+  const drawingInstallBody = locale === "ko"
+    ? "전체 앱과 별도로 설치됩니다. 로그인·협업·AI 없이 브러시·레이어·로컬 저장과 오프라인 드로잉에 집중합니다."
+    : "Installs separately from the full app, focused on brushes, layers, local storage and offline drawing without sign-in, collaboration or AI.";
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
@@ -246,6 +250,14 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
               <Download size={17} aria-hidden="true" />{installLabel}
             </button>
             {showInstallHelp && <p className="clp-install-help" role="status">{copy.installUnavailable}</p>}
+            <button
+              type="button"
+              className="clp-install-button"
+              onClick={() => window.location.assign("/offline-draw/install.html?source=site")}
+            >
+              <Brush size={17} aria-hidden="true" />{drawingInstallLabel}
+            </button>
+            <p className="clp-install-help">{drawingInstallBody}</p>
           </section>
         </aside>
       </div>

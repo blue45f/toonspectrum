@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171823">
+  <meta name="robots" content="noindex">
+  <meta name="application-name" content="툰드로잉">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="툰드로잉">
+  <title>툰스튜디오 · 순수 드로잉 앱 설치</title>
+  <link rel="manifest" href="/offline-draw/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/brand/spectrum-ribbon-v2/apple-touch-icon.png">
+  <link rel="stylesheet" href="/offline-draw/install.css">
+  <script src="/offline-draw/install.js" defer></script>
+</head>
+<body>
+  <main class="install-shell">
+    <a class="install-brand" href="/">TOON<span>STUDIO</span></a>
+    <section class="install-card" aria-labelledby="drawing-install-title">
+      <p class="install-eyebrow">DRAW ONLY PWA</p>
+      <h1 id="drawing-install-title">그리기만 빠르게.<br>툰드로잉을 단독 앱으로.</h1>
+      <p class="install-lead">전체 툰스튜디오와 별도로 설치되는 로컬 드로잉 앱입니다. 로그인·협업·AI 없이 브러시, 레이어, 필압 입력, 로컬 저장과 오프라인 재실행에 집중합니다.</p>
+      <ul class="install-features">
+        <li>펜·연필·마커·지우개, 필압 입력, 실행 취소/다시 실행</li>
+        <li>최대 8개 레이어, 이미지 가져오기, PNG 내보내기</li>
+        <li>브라우저 로컬 저장, 편집 가능한 <code>.toonlocal</code> 백업</li>
+      </ul>
+      <div class="install-warning">작업은 이 브라우저에 저장되며 전체 스튜디오 프로젝트와 자동 동기화하지 않습니다. 중요한 작업은 복구 파일도 별도로 보관하세요.</div>
+      <button id="install-app" type="button" disabled>설치 준비 중…</button>
+      <p id="install-status" role="status" aria-live="polite">드로잉 앱 설치 가능 여부와 오프라인 실행 파일을 확인하고 있습니다.</p>
+      <div class="install-links">
+        <a href="/offline-draw/">설치하지 않고 드로잉 시작</a>
+        <a href="/studio">전체 툰스튜디오 열기</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
