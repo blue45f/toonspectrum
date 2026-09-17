@@ -20,6 +20,8 @@ export type StudioShellFloatingVisibilityAuthority =
 
 export interface StudioShellFloatingLayoutRuntime {
   readonly visibility: StudioShellFloatingVisibilityState;
+  readonly autoHideWhileDrawing: boolean;
+  readonly drawingAutoHideActive: boolean;
   readonly authority: StudioShellFloatingVisibilityAuthority;
   readonly failure:
     | StudioShellFloatingVisibilityPersistenceFailure
@@ -29,6 +31,7 @@ export interface StudioShellFloatingLayoutRuntime {
   readonly isVisible: (id: StudioShellFloatingVisibilityId) => boolean;
   readonly setVisible: (id: StudioShellFloatingVisibilityId, visible: boolean) => void;
   readonly toggleVisible: (id: StudioShellFloatingVisibilityId) => void;
+  readonly setAutoHideWhileDrawing: (enabled: boolean) => void;
   readonly applyPreset: (preset: StudioShellFloatingPresetId) => void;
   readonly showAll: () => void;
   readonly hideAll: () => void;
@@ -45,12 +48,15 @@ export function createStudioShellFloatingResetRevisions(
 
 const FALLBACK_RUNTIME: StudioShellFloatingLayoutRuntime = Object.freeze({
   visibility: DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+  autoHideWhileDrawing: false,
+  drawingAutoHideActive: false,
   authority: "session-only" as const,
   failure: null,
   resetRevisions: Object.freeze(createStudioShellFloatingResetRevisions()),
   isVisible: () => true,
   setVisible: () => undefined,
   toggleVisible: () => undefined,
+  setAutoHideWhileDrawing: () => undefined,
   applyPreset: () => undefined,
   showAll: () => undefined,
   hideAll: () => undefined,

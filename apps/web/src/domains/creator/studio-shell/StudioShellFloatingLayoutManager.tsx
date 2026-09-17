@@ -6,6 +6,7 @@ import {
   MessageCircle,
   MonitorCog,
   Move,
+  PenTool,
   RotateCcw,
   Rows3,
   Save,
@@ -92,6 +93,8 @@ export function StudioShellFloatingLayoutManager() {
     () => STUDIO_SHELL_FLOATING_VISIBILITY_IDS.filter(shell.isVisible).length,
     [shell],
   );
+  const drawingAutoHideRunning = shell.autoHideWhileDrawing
+    && shell.drawingAutoHideActive;
 
   useEffect(() => {
     const openManager = (): void => setOpen(true);
@@ -120,6 +123,12 @@ export function StudioShellFloatingLayoutManager() {
       preventScroll: true,
     });
   }, [open]);
+
+  useEffect(() => {
+    if (!drawingAutoHideRunning) return;
+    if (open) setOpen(false);
+    if (arranging) setStudioWorkspaceArranging(false);
+  }, [arranging, drawingAutoHideRunning, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +161,12 @@ export function StudioShellFloatingLayoutManager() {
 
   return (
     <>
-      <style>{`[data-studio-shell-layout-hidden="true"]{display:none!important}`}</style>
+      <style>{`
+        [data-studio-shell-layout-hidden="true"][data-studio-shell-drawing-auto-hidden="false"]{display:none!important}
+        [data-studio-shell-layout-managed="true"]{transition:opacity 140ms ease,visibility 0s linear 0s}
+        [data-studio-shell-drawing-auto-hidden="true"]{opacity:0!important;pointer-events:none!important;visibility:hidden!important;transition:opacity 140ms ease,visibility 0s linear 140ms}
+        @media (prefers-reduced-motion:reduce){[data-studio-shell-layout-managed="true"]{transition:none}}
+      `}</style>
       {STUDIO_SHELL_FLOATING_SURFACES.map((definition) => (
         <StudioShellFloatingTarget
           key={definition.id}
@@ -162,7 +176,14 @@ export function StudioShellFloatingLayoutManager() {
 
       <div
         data-studio-shell-view-options="true"
-        className="pointer-events-auto fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden"
+        data-studio-shell-drawing-auto-hide-active={drawingAutoHideRunning ? "true" : "false"}
+        aria-hidden={drawingAutoHideRunning ? true : undefined}
+        inert={drawingAutoHideRunning ? true : undefined}
+        className={cn(
+          "pointer-events-auto fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden",
+          "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
+          drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
+        )}
       >
         {open ? (
           <div
@@ -315,6 +336,48 @@ export function StudioShellFloatingLayoutManager() {
                     </button>
                   ))}
                 </div>
+              </section>
+
+              <section aria-labelledby="studio-shell-floating-auto-hide-heading">
+                <h3 id="studio-shell-floating-auto-hide-heading" className="text-xs font-black">
+                  드로잉 방해 최소화
+                </h3>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={shell.autoHideWhileDrawing}
+                  className={cn(
+                    "mt-2 flex w-full items-start gap-3 rounded-xl border p-3 text-left",
+                    shell.autoHideWhileDrawing
+                      ? "border-accent/60 bg-accent-soft/35"
+                      : "border-line bg-card",
+                    STUDIO_FOCUS_RING,
+                  )}
+                  onClick={() => {
+                    shell.setAutoHideWhileDrawing(!shell.autoHideWhileDrawing);
+                    setNotice(shell.autoHideWhileDrawing
+                      ? "펜 드로잉 자동 숨김을 껐어요."
+                      : "펜으로 그리는 동안 플로팅 UI를 자동으로 숨깁니다.");
+                  }}
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-raised text-accent">
+                    <PenTool size={16} aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-black text-fg">
+                      펜으로 그리는 동안 자동 숨김
+                    </span>
+                    <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">
+                      캔버스에서 펜 스트로크가 시작되면 상시 플로팅 UI와 보기 버튼을 잠시 숨기고, 마지막 스트로크가 끝난 뒤 자동으로 복원합니다.
+                    </span>
+                    <span className="mt-1 block text-[0.65rem] leading-5 text-accent">
+                      저장 오류·오프라인 경고·참여 중인 통화처럼 안전상 필요한 제어는 계속 표시됩니다.
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-raised px-2 py-1 text-[0.65rem] font-black text-fg-2">
+                    {shell.autoHideWhileDrawing ? "켜짐" : "꺼짐"}
+                  </span>
+                </button>
               </section>
 
               <section aria-labelledby="studio-shell-floating-arrangement-heading">

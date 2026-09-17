@@ -48,10 +48,15 @@ describe("studio shell floating integration", () => {
 
   it("keeps WYSIWYG movement keyboard-accessible, lockable and below modal chrome", () => {
     const target = source("studio-shell/StudioShellFloatingTarget.tsx");
+    expect(target).toContain("setStudioFloatingSurfaceDock");
     expect(target).toContain("setStudioFloatingSurfaceLock");
     expect(target).toContain("disabled={layout.positionLocked}");
     expect(target).toContain("disabled={layout.sizeLocked}");
     expect(target).toContain('data-studio-shell-floating-handle={surfaceId}');
+    expect(target).toContain('data-studio-shell-floating-dock-guide={surfaceId}');
+    expect(target).toContain('aria-label={`${definition.label} 도킹 위치`}');
+    expect(target).toContain("const managedVisible = preferredVisible || forceVisible");
+    expect(target).toContain("if (!node || !managedVisible || !positionEnabled)");
     expect(target).toContain("zIndex: 119");
     expect(target).not.toContain('node.style.removeProperty("width")');
     expect(target).toContain('node.style.setProperty("translate", "none")');
@@ -60,10 +65,15 @@ describe("studio shell floating integration", () => {
 
     const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
     expect(provider).not.toContain("navigator.storage");
+    expect(provider).toContain('event.pointerType !== "pen"');
+    const drawingAutoHide = source("studio-shell/studio-shell-drawing-auto-hide.ts");
+    expect(drawingAutoHide).toContain('[data-studio-canvas-viewport]');
 
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
     expect(manager).toContain("플랫폼 규격");
+    expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
+    expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");
   });
 });

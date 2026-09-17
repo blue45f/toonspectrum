@@ -1083,7 +1083,35 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
         failures.push("그리기 옵션 위치 잠금 미적용");
       }
       await handle.getByRole("button", { name: "그리기 옵션 위치 잠금 해제" }).click();
+      const dockSelect = handle.getByRole("combobox", { name: "그리기 옵션 도킹 위치" });
+      await dockSelect.selectOption("top");
+      if (await dockSelect.inputValue() !== "top") {
+        failures.push("그리기 옵션 직접 도킹 선택 미적용");
+      }
+      await dockSelect.selectOption("bottom");
       await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
+
+      const autoHide = dialog.getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/ });
+      if (await autoHide.getAttribute("aria-checked") !== "true") await autoHide.click();
+      const canvas = page.locator('[data-studio-canvas-viewport] canvas').first();
+      if (await canvas.count() === 0) {
+        failures.push("펜 자동 숨김을 검증할 캔버스를 찾지 못함");
+      } else {
+        await canvas.dispatchEvent("pointerdown", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "true"
+        );
+        await canvas.dispatchEvent("pointerup", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "false"
+        , undefined, { timeout: 2500 });
+      }
 
       await dialog.getByRole("button", { name: "모두 숨김" }).click();
       await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
