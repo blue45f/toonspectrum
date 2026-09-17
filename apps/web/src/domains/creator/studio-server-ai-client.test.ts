@@ -103,6 +103,24 @@ describe("studio automatic free AI client", () => {
     expect(urlOf(fetchMock.mock.calls[0]![0]).pathname).toBe("/api/studio-ai/status");
   });
 
+  it("normalizes a partial rolling-deployment status without exposing undefined collections", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ configured: true })));
+
+    await expect(getStudioServerAiStatus()).resolves.toMatchObject({
+      configured: true,
+      provider: "none",
+      model: "",
+      providers: [],
+      capabilities: [],
+      requiresAuth: true,
+      selection: {
+        default: "auto",
+        order: [],
+        fallback: false,
+      },
+    });
+  });
+
   it("accepts only canonical bounded operation identifiers", () => {
     expect(canonicalStudioServerAiOperationId(OPERATION_ID)).toBe(OPERATION_ID);
     expect(canonicalStudioServerAiOperationId(`  ${OPERATION_ID}  `)).toBeNull();
