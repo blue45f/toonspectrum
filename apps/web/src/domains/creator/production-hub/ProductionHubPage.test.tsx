@@ -33,8 +33,12 @@ describe("webtoon production collaboration UI", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("밤의 우편배달부");
+    expect(screen.getByRole("heading", { name: "프로젝트 운영 조종석" })).toBeTruthy();
     expect(screen.getByText("막힌 질문")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /episode-12/u }).getAttribute("href"))
+    expect(screen.getByRole("heading", { name: "오늘의 운영 판단" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "회차 공정 매트릭스" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "팀 작업량" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /12화.*돌아온 봉투/u }).getAttribute("href"))
       .toBe("/production/projects/sample-project/episodes/episode-12");
     expect(screen.getByText(/수정할 수 없는 기록/u)).toBeTruthy();
   });
