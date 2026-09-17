@@ -145,6 +145,13 @@ const ROLE_EXPERIENCES: Readonly<Record<CreatorRoleId, CreatorRoleExperience>> =
     emptyStateKo: "3D 요청이 없으면 재사용 장면과 카메라 프리셋을 정리하세요.",
     emptyStateEn: "Organize reusable scenes and camera presets when no 3D task is assigned.",
   },
+  educator: {
+    role: "educator",
+    primaryAction: primary("classroom", "/learn/classroom", "수업 이어가기", "Resume teaching", "최근 수업과 학생 실습 흐름을 바로 확인합니다.", "Open the latest class and student practice flow.", "quick-sketch"),
+    navigation: [nav("classroom", "/learn/classroom", "수업·과제", "Classes & assignments", "수업 흐름과 학생 과제를 관리합니다.", "Manage lessons and assignments."), nav("learn", "/learn", "교육 자료", "Learning resources", "웹툰 제작 교육 자료를 찾습니다.", "Find webtoon production resources."), nav("practice", "/studio/projects", "학생 실습", "Student practice", "실습 프로젝트와 작품을 확인합니다.", "Review practice projects and student work."), nav("review", "/production", "피드백·검수", "Feedback & review", "피드백과 수정 요청을 확인합니다.", "Review feedback and revisions."), ASSETS],
+    emptyStateKo: "진행 중인 수업이 없으면 새 실습 과제를 준비해 보세요.",
+    emptyStateEn: "Prepare a new practice assignment when no class is active.",
+  },
   assistant: {
     role: "assistant",
     primaryAction: primary("next-task", "/production", "다음 작업 시작", "Start next task", "우선순위가 가장 높은 배정 업무부터 시작합니다.", "Start with the highest-priority assigned task.", "lineart"),

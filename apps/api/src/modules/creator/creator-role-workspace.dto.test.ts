@@ -19,6 +19,7 @@ const validDocument = {
     "deadline-risk": false,
   },
   usageGoals: ["team-production" as const],
+  workspaceMode: "creator" as const,
   capacity: {
     weeklyCapacityHours: 20,
     currentAssignedHours: 8,

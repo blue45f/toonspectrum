@@ -30,6 +30,7 @@ const creatorRoleProfile = {
   primaryRole: "line-art" as const,
   secondaryRoles: ["assistant" as const],
   specialties: ["line-art" as const, "inking" as const],
+  creatorStage: "professional" as const,
   experienceLevel: "professional" as const,
   collaborationStatus: "limited" as const,
   roleVisibility: true,
