@@ -53,7 +53,7 @@ function writeProgress(projectId: string, stageId: string, values: readonly numb
 }
 
 function localizedStageTitle(stage: WebtoonProductionStageSupport, locale: Locale): string {
-  return locale === "ko" ? stage.titleKo : stage.titleEn;
+  return bt(stage.titleKo, stage.titleEn);
 }
 
 export function StudioWebtoonProductionCompanion({
@@ -201,7 +201,7 @@ export function StudioWebtoonProductionCompanion({
                       className: "gap-1.5",
                     })}
                   >
-                    {locale === "ko" ? action.labelKo : action.labelEn}
+                    {bt(action.labelKo, action.labelEn)}
                     <ArrowRight size={13} aria-hidden="true" />
                   </Link>
                 ))}
