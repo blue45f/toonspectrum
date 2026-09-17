@@ -492,7 +492,8 @@ export type StudioMannequinMaterialStyle =
   | "magma"
   | "stencil"
   | "bronze"
-  | "porcelain";
+  | "porcelain"
+  | "skin";
 
 export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   id: StudioMannequinMaterialStyle;
@@ -507,6 +508,7 @@ export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   { id: "stencil", label: "흑백 실루엣", desc: "외곽 형태 선명 추출용 스텐실 모드" },
   { id: "bronze", label: "청동 조각상", desc: "금속 하이라이트로 면 전환을 읽는 고전 조각 모드" },
   { id: "porcelain", label: "백자 인형", desc: "부드러운 반사와 밝은 명암을 보는 유광 백자 모드" },
+  { id: "skin", label: "PBR 피부톤", desc: "거친 플라스틱 대신 피부에 가까운 roughness·sheen 응답으로 면과 볼륨을 확인" },
 ]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
