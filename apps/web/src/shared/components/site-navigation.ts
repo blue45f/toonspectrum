@@ -28,6 +28,7 @@ import {
   primarySiteRouteAuthority,
   type SitePrimaryRouteId,
 } from "@/shared/lib/site-route-authority";
+import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
 
 export type SiteNavigationLocale = "ko" | "en";
 export type SiteNavigationContext = "studio" | "spectrum";
@@ -414,35 +415,9 @@ export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
 
 export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 
-const STUDIO_CONTEXT_PREFIXES = [
-  "/",
-  "/brand-film",
-  "/about/technology",
-  "/studio",
-  "/production",
-  "/make",
-  "/brush-lab",
-  "/shaper",
-  "/music",
-  "/story-lab",
-  "/publishing",
-  "/research",
-  "/opportunities",
-  "/market",
-  "/learn",
-  "/help",
-] as const;
-
-/** Match a pathname against an exact route prefix or one of its descendants. */
-function matchesPathPrefix(pathname: string, prefix: string): boolean {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-/** Select the Studio or Spectrum navigation context for a pathname. */
+/** Select the Studio or Spectrum navigation context from the canonical route metadata projection. */
 export function siteNavigationContextForPath(pathname: string): SiteNavigationContext {
-  return STUDIO_CONTEXT_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix))
-    ? "studio"
-    : "spectrum";
+  return resolveSiteRouteNavigationContext(pathname);
 }
 
 /** Return the primary navigation destinations for the pathname's product context. */

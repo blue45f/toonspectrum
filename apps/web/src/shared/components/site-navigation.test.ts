@@ -106,6 +106,15 @@ describe("site navigation information architecture", () => {
     expect(siteNavigationContextForPath("/help")).toBe("studio");
     expect(siteNavigationContextForPath("/help/getting-started")).toBe("studio");
     expect(siteNavigationContextForPath("/market")).toBe("studio");
+    expect(siteNavigationContextForPath("/showcase")).toBe("studio");
+    expect(siteNavigationContextForPath("/collaborate")).toBe("studio");
+    expect(siteNavigationContextForPath("/now")).toBe("studio");
+    expect(siteNavigationContextForPath("/references")).toBe("studio");
+    expect(siteNavigationContextForPath("/make")).toBe("studio");
+    expect(siteNavigationContextForPath("/publishing")).toBe("studio");
+    expect(siteNavigationContextForPath("/shaper")).toBe("studio");
+    expect(siteNavigationContextForPath("/music")).toBe("studio");
+    expect(siteNavigationContextForPath("/brush-lab")).toBe("studio");
     expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
     expect(siteNavigationContextForPath("/community")).toBe("spectrum");
     expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");
