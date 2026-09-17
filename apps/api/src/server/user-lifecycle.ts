@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 
+import { EMPTY_CREATOR_ROLE_PROFILE } from "../../../web/src/shared/lib/creator-role-contract";
 import { accounts, db, dbClient, sessions, users } from "../db";
 
 import { getSessionUserCached, invalidateSessionUser } from "./session";
@@ -37,6 +38,7 @@ async function assertUserLifecycleSchema(): Promise<void> {
       "passwordHash",
       "avatar",
       "bio",
+      "creatorRoleProfile",
       "createdAt"
     FROM "user"
     WHERE FALSE
@@ -139,6 +141,7 @@ export async function softDeleteUserAccount(
       image: null,
       avatar: "#5b5751",
       bio: null,
+      creatorRoleProfile: EMPTY_CREATOR_ROLE_PROFILE,
     })
     .where(eq(users.id, userId))
     .returning({

@@ -1,4 +1,13 @@
-import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
+import {
+  BookOpen,
+  BriefcaseBusiness,
+  Mail,
+  PenLine,
+  RefreshCw,
+  Sparkles,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -12,7 +21,15 @@ import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
-import { useT } from "@/shared/lib/i18n";
+import {
+  CREATOR_COLLABORATION_LABELS,
+  CREATOR_EXPERIENCE_LABELS,
+  creatorRoleDefinition,
+  creatorSpecialtyDefinition,
+  creatorText,
+  type CreatorRoleLocale,
+} from "@/shared/lib/creator-role-contract";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
@@ -155,6 +172,7 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 
 export function UserProfilePage() {
   const t = useT();
+  const locale: CreatorRoleLocale = useI18n((state) => state.lang) === "ko" ? "ko" : "en";
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -190,6 +208,14 @@ export function UserProfilePage() {
   const feed = data?.feed ?? [];
   const author = profile?.name ?? feed[0]?.author ?? t("userProfile.authorFallback");
   const avatar = profile?.avatar ?? feed[0]?.avatar ?? "#7c5cfc";
+  const roleProfile = profile?.creatorRoleProfile ?? null;
+  const primaryRole = creatorRoleDefinition(roleProfile?.primaryRole);
+  const secondaryRoles = (roleProfile?.secondaryRoles ?? [])
+    .map((role) => creatorRoleDefinition(role))
+    .filter((role): role is NonNullable<typeof role> => Boolean(role));
+  const specialtyLabels = (roleProfile?.specialties ?? [])
+    .map((specialty) => creatorSpecialtyDefinition(specialty))
+    .filter((specialty): specialty is NonNullable<typeof specialty> => Boolean(specialty));
   const total = data?.stats.total ?? 0;
   const avg = data?.stats.avg ?? 0;
   const distinctTitles = data?.stats.distinctTitles ?? 0;
@@ -264,6 +290,39 @@ export function UserProfilePage() {
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
+              {primaryRole && roleProfile ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
+                      <BriefcaseBusiness size={12} aria-hidden="true" />
+                      {creatorText(primaryRole.label, locale)}
+                    </span>
+                    {secondaryRoles.map((role) => (
+                      <span key={role.id} className="inline-flex min-h-7 items-center rounded-full border border-line bg-card px-2.5 text-xs font-semibold text-fg-2">
+                        {creatorText(role.shortLabel, locale)}
+                      </span>
+                    ))}
+                    {roleProfile.experienceLevel ? (
+                      <span className="text-[0.7rem] font-semibold text-fg-3">
+                        {creatorText(CREATOR_EXPERIENCE_LABELS[roleProfile.experienceLevel], locale)}
+                      </span>
+                    ) : null}
+                    {roleProfile.collaborationStatus ? (
+                      <span className="text-[0.7rem] font-semibold text-accent">
+                        {creatorText(CREATOR_COLLABORATION_LABELS[roleProfile.collaborationStatus], locale)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {specialtyLabels.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.7rem] text-fg-3">
+                      <Sparkles size={12} className="text-accent" aria-hidden="true" />
+                      {specialtyLabels.slice(0, 8).map((specialty) => (
+                        <span key={specialty.id}>{creatorText(specialty.label, locale)}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {(profile || data) && (

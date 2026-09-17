@@ -2,6 +2,10 @@ import { and, eq, inArray, notLike } from "drizzle-orm";
 
 import { fromDb } from "../../../web/src/shared/lib/api-helpers";
 import { CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX } from "../../../web/src/shared/lib/creator-marketplace-social-namespace";
+import {
+  normalizeCreatorRoleProfile,
+  type CreatorRoleProfile,
+} from "../../../web/src/shared/lib/creator-role-contract";
 import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
 import {
   db,
@@ -27,7 +31,11 @@ export async function loadMe(uid: string) {
     const [me] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     if (me && normalizeUserAccountStatus(me.status) !== "active") {
       return {
-        profile: { id: uid, status: normalizeUserAccountStatus(me.status) },
+        profile: {
+          id: uid,
+          status: normalizeUserAccountStatus(me.status),
+          creatorRoleProfile: normalizeCreatorRoleProfile(me.creatorRoleProfile),
+        },
         ratings: {},
         reads: {},
         subscriptions: {},
@@ -86,6 +94,7 @@ export async function loadMe(uid: string) {
         email: me?.email,
         bio: me?.bio,
         status: me?.status,
+        creatorRoleProfile: normalizeCreatorRoleProfile(me?.creatorRoleProfile),
       },
       ratings: Object.fromEntries(rt.map((row) => [row.titleId, fromDb(row.value)])),
       reads: Object.fromEntries(rd.map((row) => [row.titleId, row.state])),
@@ -133,6 +142,7 @@ export interface UpdateProfileInput {
   name?: string;
   bio?: string;
   image?: string | null; // dataURL 또는 빈 문자열/ null(제거)
+  creatorRoleProfile?: CreatorRoleProfile;
 }
 
 export interface ProfileUpdateError {
@@ -150,13 +160,28 @@ function validateProfileImage(value: string): string | null | ProfileUpdateError
   return raw;
 }
 
-// 프로필(name·bio·image) 갱신. image 가 dataURL 이면 검증 후 users.image 에 저장.
+// 프로필(name·bio·image·직무) 갱신. image 가 dataURL 이면 검증 후 users.image 에 저장.
 // 반환은 갱신 후 프로필. 형식 오류 시 ProfileUpdateError 를 반환(컨트롤러가 400 매핑).
 export async function updateProfile(
   uid: string,
   input: UpdateProfileInput
-): Promise<{ profile: { id: string; name: string | null; image: string | null; avatar: string | null; email: string | null; bio: string | null } } | ProfileUpdateError> {
-  const patch: { name?: string | null; bio?: string | null; image?: string | null } = {};
+): Promise<{
+  profile: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    avatar: string | null;
+    email: string | null;
+    bio: string | null;
+    creatorRoleProfile: CreatorRoleProfile;
+  };
+} | ProfileUpdateError> {
+  const patch: {
+    name?: string | null;
+    bio?: string | null;
+    image?: string | null;
+    creatorRoleProfile?: CreatorRoleProfile;
+  } = {};
 
   if (typeof input.name === "string") {
     const name = input.name.trim().slice(0, 60);
@@ -175,6 +200,9 @@ export async function updateProfile(
       patch.image = checked;
     }
   }
+  if (input.creatorRoleProfile !== undefined) {
+    patch.creatorRoleProfile = normalizeCreatorRoleProfile(input.creatorRoleProfile);
+  }
 
   if (Object.keys(patch).length === 0) return { error: "변경할 내용이 없어요." };
 
@@ -185,9 +213,15 @@ export async function updateProfile(
     avatar: users.avatar,
     email: users.email,
     bio: users.bio,
+    creatorRoleProfile: users.creatorRoleProfile,
   });
   if (!row) return { error: "사용자를 찾을 수 없어요." };
   // 프로필 변경 즉시 세션 마이크로캐시 무효화 — 다음 요청부터 새 값을 읽는다.
   invalidateSessionUser(uid);
-  return { profile: row };
+  return {
+    profile: {
+      ...row,
+      creatorRoleProfile: normalizeCreatorRoleProfile(row.creatorRoleProfile),
+    },
+  };
 }

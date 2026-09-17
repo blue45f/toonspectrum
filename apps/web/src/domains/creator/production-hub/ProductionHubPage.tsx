@@ -63,9 +63,14 @@ import {
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  creatorRoleLens,
+  type CreatorRoleLens,
+} from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
 import { getApiErrorMessage } from "@/infrastructure/api";
+import { getMyProfile } from "@/infrastructure/me-client";
 
 export type ProductionProjectSurface =
   | "overview"
@@ -79,11 +84,45 @@ export type ProductionProjectSurface =
   | "rights"
   | "settings";
 
-type RoleLens = "story" | "art" | "producer";
+type RoleLens = CreatorRoleLens;
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const SAMPLE_PROJECT_ID = "sample-project";
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
+
+function usePreferredRoleLens(fallback: RoleLens): readonly [RoleLens, (next: RoleLens) => void] {
+  const userId = useApp((state) => state.userId);
+  const [roleLens, setRoleLens] = useState<RoleLens>(fallback);
+  const manuallyChanged = useRef(false);
+
+  useEffect(() => {
+    manuallyChanged.current = false;
+    if (!userId) {
+      setRoleLens(fallback);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    getMyProfile(controller.signal)
+      .then((profile) => {
+        if (!alive || manuallyChanged.current) return;
+        const role = profile.creatorRoleProfile.activeRole ?? profile.creatorRoleProfile.primaryRole;
+        setRoleLens(creatorRoleLens(role));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [fallback, userId]);
+
+  const changeRoleLens = useCallback((next: RoleLens) => {
+    manuallyChanged.current = true;
+    setRoleLens(next);
+  }, []);
+
+  return [roleLens, changeRoleLens];
+}
 
 const SURFACES: readonly {
   readonly id: ProductionProjectSurface;
@@ -1042,7 +1081,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
   const project = useProductionProject(projectId);
-  const [roleLens, setRoleLens] = useState<RoleLens>("producer");
+  const [roleLens, setRoleLens] = usePreferredRoleLens("producer");
 
   if (!projectId) return <Navigate to="/production" replace />;
   if (project.loading) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></div>;
@@ -1082,7 +1121,7 @@ function TimelineStep({
 export function ProductionEpisodeRoomPage() {
   const params = useParams<{ projectId: string; episodeId: string }>();
   const project = useProductionProject(params.projectId);
-  const [roleLens, setRoleLens] = useState<RoleLens>("art");
+  const [roleLens, setRoleLens] = usePreferredRoleLens("art");
   const userId = useApp((state) => state.userId);
 
   if (!params.projectId || !params.episodeId) return <Navigate to="/production" replace />;
