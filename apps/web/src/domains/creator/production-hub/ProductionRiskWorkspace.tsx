@@ -34,6 +34,12 @@ import {
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";
 import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";
+import {
+  ProductionRiskEpisodeView,
+  ProductionRiskMatrixView,
+  ProductionRiskViewSwitcher,
+  type ProductionRiskViewMode,
+} from "./ProductionRiskViews";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
@@ -190,10 +196,29 @@ function splitFilter(value: string | null): readonly string[] {
   return value?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
 }
 
-function riskOwnerName(aggregate: ProductionProjectAggregate, risk: ProductionRisk): string {
-  const assignment = aggregate.assignments.find((entry) => entry.id === risk.ownerAssignmentId);
+function riskViewMode(value: string | null): ProductionRiskViewMode {
+  return value === "episode" || value === "matrix" ? value : "priority";
+}
+
+function productionEpisodeLabel(
+  aggregate: ProductionProjectAggregate,
+  episodeId: string,
+): string {
+  const plan = aggregate.episodePlans.find((entry) => entry.episodeId === episodeId);
+  if (plan) return `${plan.episodeNumber}화 · ${plan.title}`;
+  const index = aggregate.episodes.findIndex((entry) => entry.episodeId === episodeId);
+  return index >= 0 ? `${index + 1}화 · ${episodeId}` : episodeId;
+}
+
+function assignmentName(aggregate: ProductionProjectAggregate, assignmentId: string | null): string {
+  if (!assignmentId) return "담당자 미정";
+  const assignment = aggregate.assignments.find((entry) => entry.id === assignmentId);
   const party = assignment ? aggregate.parties.find((entry) => entry.id === assignment.partyId) : null;
-  return party?.publicDisplayName ?? "담당자 미정";
+  return party?.publicDisplayName ?? assignment?.publicCreditRole ?? assignmentId;
+}
+
+function riskOwnerName(aggregate: ProductionProjectAggregate, risk: ProductionRisk): string {
+  return assignmentName(aggregate, risk.ownerAssignmentId);
 }
 
 function sourceSignal(
@@ -725,31 +750,63 @@ export function ProductionRiskWorkspace({
   const statusFilters = splitFilter(searchParams.get("status")) as readonly ProductionRiskStatus[];
   const categoryFilters = splitFilter(searchParams.get("category")) as readonly ProductionRiskCategory[];
   const sourceFilter = searchParams.get("source");
+  const episodeFilter = searchParams.get("episode");
+  const ownerFilter = searchParams.get("owner");
+  const viewMode = riskViewMode(searchParams.get("view"));
   const search = searchParams.get("q")?.trim().toLocaleLowerCase("ko-KR") ?? "";
   const selectedRiskId = searchParams.get("risk");
+
+  const episodeOptions = useMemo(() => {
+    const ordered = aggregate.episodePlans
+      .slice()
+      .sort((left, right) => left.episodeNumber - right.episodeNumber)
+      .map((plan) => plan.episodeId);
+    for (const episode of aggregate.episodes) {
+      if (!ordered.includes(episode.episodeId)) ordered.push(episode.episodeId);
+    }
+    return ordered;
+  }, [aggregate.episodePlans, aggregate.episodes]);
+  const ownerOptions = useMemo(() => aggregate.assignments
+    .filter((assignment) => assignment.status === "active")
+    .slice()
+    .sort((left, right) => assignmentName(aggregate, left.id).localeCompare(assignmentName(aggregate, right.id), "ko-KR")), [aggregate]);
 
   const filteredRisks = evaluation.risks.filter((risk) => {
     const signal = sourceSignal(evaluation.signals, risk);
     const statusMatch = statusFilters.length > 0
       ? statusFilters.includes(risk.status)
       : ACTIVE_STATUSES.has(risk.status) && signal?.state !== "suppressed";
+    const episodeMatch = !episodeFilter
+      || episodeFilter === "all"
+      || (episodeFilter === "project" ? risk.affectedEpisodeIds.length === 0 : risk.affectedEpisodeIds.includes(episodeFilter));
+    const ownerMatch = !ownerFilter
+      || ownerFilter === "all"
+      || (ownerFilter === "unassigned" ? !risk.ownerAssignmentId : risk.ownerAssignmentId === ownerFilter);
     return statusMatch
+      && episodeMatch
+      && ownerMatch
       && (severityFilters.length === 0 || severityFilters.includes(risk.severity))
       && (categoryFilters.length === 0 || categoryFilters.includes(risk.category))
       && (!sourceFilter || sourceFilter === "all" || sourceFilter === risk.source)
       && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
   });
-  const selectedRisk = evaluation.risks.find((risk) => risk.id === selectedRiskId)
+  const selectedRisk = filteredRisks.find((risk) => risk.id === selectedRiskId)
     ?? filteredRisks[0]
     ?? null;
   const selectedSignal = selectedRisk ? sourceSignal(evaluation.signals, selectedRisk) : null;
 
   const updateParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);
-    if (!value || value === "all") next.delete(key);
+    const shouldDelete = !value || value === "all" || (key === "view" && value === "priority");
+    if (shouldDelete) next.delete(key);
     else next.set(key, value);
     if (key !== "risk") next.delete("risk");
     setSearchParams(next, { replace: true });
+  };
+
+  const selectView = (nextView: ProductionRiskViewMode) => {
+    updateParam("view", nextView);
+    setMobileDetailOpen(false);
   };
 
   const selectRisk = (riskId: string) => {
@@ -786,6 +843,14 @@ export function ProductionRiskWorkspace({
 
   const nextDeadlineRisk = evaluation.risks.find((risk) =>
     ACTIVE_STATUSES.has(risk.status) && risk.category === "schedule");
+  const viewTitle = viewMode === "episode"
+    ? "회차별 위험"
+    : viewMode === "matrix" ? "위험 매트릭스" : "위험 목록";
+  const viewDetail = viewMode === "episode"
+    ? `${filteredRisks.length}건 · 영향을 받는 회차별 그룹`
+    : viewMode === "matrix"
+      ? `${filteredRisks.length}건 · 발생 가능성 × 영향도`
+      : `${filteredRisks.length}건 · 운영 우선순위순`;
 
   return (
     <div className="space-y-4">
@@ -825,23 +890,38 @@ export function ProductionRiskWorkspace({
         description="기본값은 현재 대응이 필요한 위험만 보여 줍니다. 종료된 항목은 상태 필터에서 선택합니다."
         action={<Filter className="size-4 text-fg-3" aria-hidden="true" />}
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">검색</span><input value={searchParams.get("q") ?? ""} onChange={(event) => updateParam("q", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg outline-none focus:border-accent" placeholder="제목·원인 검색" /></label>
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">위험도</span><select value={searchParams.get("severity") ?? "all"} onChange={(event) => updateParam("severity", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="critical">긴급</option><option value="high">높음</option><option value="warning">주의</option><option value="watch">관찰</option></select></label>
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">상태</span><select value={searchParams.get("status") ?? "all"} onChange={(event) => updateParam("status", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">활성 위험</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">유형</span><select value={searchParams.get("category") ?? "all"} onChange={(event) => updateParam("category", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">등록 방식</span><select value={searchParams.get("source") ?? "all"} onChange={(event) => updateParam("source", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="automatic">자동 감지</option><option value="manual">직접 등록</option></select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">회차</span><select aria-label="회차 필터" value={episodeFilter ?? "all"} onChange={(event) => updateParam("episode", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체 회차</option><option value="project">프로젝트 공통</option>{episodeOptions.map((episodeId) => <option key={episodeId} value={episodeId}>{productionEpisodeLabel(aggregate, episodeId)}</option>)}</select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">담당자</span><select aria-label="위험 담당자 필터" value={ownerFilter ?? "all"} onChange={(event) => updateParam("owner", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체 담당자</option><option value="unassigned">담당자 미정</option>{ownerOptions.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignmentName(aggregate, assignment.id)}</option>)}</select></label>
         </div>
       </Section>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.4fr)]">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-3 sm:p-4">
+        <div>
+          <h2 className="text-sm font-black text-fg">위험 보기</h2>
+          <p className="mt-1 text-xs text-fg-3">우선순위, 회차 영향, 확률×영향도를 같은 필터 조건으로 비교합니다.</p>
+        </div>
+        <ProductionRiskViewSwitcher value={viewMode} onChange={selectView} />
+      </section>
+
+      <div className={cn(
+        "grid gap-4",
+        viewMode === "matrix"
+          ? "xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.9fr)]"
+          : "xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.4fr)]",
+      )}>
         <section className={cn("rounded-2xl border border-line bg-card p-4", mobileDetailOpen && "hidden xl:block")}>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div><h2 className="text-sm font-black text-fg">위험 목록</h2><p className="mt-1 text-xs text-fg-3">{filteredRisks.length}건 · 운영 우선순위순</p></div>
+            <div><h2 className="text-sm font-black text-fg">{viewTitle}</h2><p className="mt-1 text-xs text-fg-3">{viewDetail}</p></div>
             <Pill>{evaluation.risks.filter((risk) => ACTIVE_STATUSES.has(risk.status)).length} 활성</Pill>
           </div>
-          <div className="space-y-2">
-            {filteredRisks.map((risk) => (
+          <div className={cn(viewMode === "priority" && "space-y-2")}>
+            {viewMode === "priority" ? filteredRisks.map((risk) => (
               <RiskListRow
                 key={risk.id}
                 aggregate={aggregate}
@@ -850,7 +930,23 @@ export function ProductionRiskWorkspace({
                 selected={selectedRisk?.id === risk.id}
                 onSelect={() => selectRisk(risk.id)}
               />
-            ))}
+            )) : null}
+            {viewMode === "episode" ? (
+              <ProductionRiskEpisodeView
+                aggregate={aggregate}
+                risks={filteredRisks}
+                selectedRiskId={selectedRisk?.id ?? null}
+                onSelect={selectRisk}
+              />
+            ) : null}
+            {viewMode === "matrix" ? (
+              <ProductionRiskMatrixView
+                aggregate={aggregate}
+                risks={filteredRisks}
+                selectedRiskId={selectedRisk?.id ?? null}
+                onSelect={selectRisk}
+              />
+            ) : null}
             {filteredRisks.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line p-8 text-center">
                 <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />

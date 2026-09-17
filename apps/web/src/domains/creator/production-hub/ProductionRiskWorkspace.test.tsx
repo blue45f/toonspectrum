@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionRiskWorkspace } from "./ProductionRiskWorkspace";
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
 
 afterEach(cleanup);
 
@@ -63,5 +68,31 @@ describe("ProductionRiskWorkspace", () => {
     );
 
     expect((screen.getByRole("button", { name: /정책 저장/u }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps matrix, episode and owner filters in shareable URL state", () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/risks?view=matrix&episode=project&owner=unassigned"]}>
+        <ProductionRiskWorkspace
+          aggregate={createProductionDemoProject()}
+          execute={vi.fn(async () => undefined)}
+          canEdit
+          canManage
+          now={new Date("2026-09-17T09:00:00.000Z")}
+        />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("tab", { name: "위험 매트릭스" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("grid", { name: "위험 확률 영향도 매트릭스" })).toBeTruthy();
+    expect((screen.getByLabelText("회차 필터") as HTMLSelectElement).value).toBe("project");
+    expect((screen.getByLabelText("위험 담당자 필터") as HTMLSelectElement).value).toBe("unassigned");
+
+    fireEvent.click(screen.getByRole("tab", { name: "회차별" }));
+    expect(screen.getByTestId("location-search").textContent).toContain("view=episode");
+    expect(screen.getByTestId("location-search").textContent).toContain("episode=project");
+    expect(screen.getByTestId("location-search").textContent).toContain("owner=unassigned");
+    expect(screen.getByText("회차별 위험")).toBeTruthy();
   });
 });
