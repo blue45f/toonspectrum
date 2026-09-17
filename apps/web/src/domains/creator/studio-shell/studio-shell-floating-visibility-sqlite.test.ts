@@ -28,10 +28,12 @@ describe("studio shell floating visibility SQLite preferences", () => {
     await expect(repository.save({
       version: 1,
       hidden: ["collaboration", "document-tools", "collaboration"] as never,
+      autoHideWhileDrawing: true,
     })).resolves.toEqual({
       state: {
         version: 1,
         hidden: ["document-tools", "collaboration"],
+        autoHideWhileDrawing: true,
       },
       status: "persisted",
       failure: null,
@@ -40,6 +42,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       state: {
         version: 1,
         hidden: ["document-tools", "collaboration"],
+        autoHideWhileDrawing: true,
       },
       persisted: true,
       failure: null,
@@ -47,6 +50,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
     expect(JSON.parse(store.values.get("snapshot")!)).toEqual({
       version: 1,
       hidden: ["document-tools", "collaboration"],
+      autoHideWhileDrawing: true,
     });
   });
 
@@ -62,14 +66,15 @@ describe("studio shell floating visibility SQLite preferences", () => {
       },
     });
 
-    const first = repository.save({ version: 1, hidden: ["collaboration"] });
-    const second = repository.save({ version: 1, hidden: ["offline-readiness"] });
+    const first = repository.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false });
+    const second = repository.save({ version: 1, hidden: ["offline-readiness"], autoHideWhileDrawing: true });
     await Promise.all([first, second]);
 
     expect(writes).toHaveLength(2);
     expect(JSON.parse(writes.at(-1)!)).toEqual({
       version: 1,
       hidden: ["offline-readiness"],
+      autoHideWhileDrawing: true,
     });
     await expect(repository.load()).resolves.toMatchObject({
       state: { hidden: ["offline-readiness"] },
@@ -90,6 +95,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
     const pendingSave = repository.save({
       version: 1,
       hidden: ["workspace-switcher"],
+      autoHideWhileDrawing: false,
     });
     const pendingLoad = repository.load();
 
@@ -119,7 +125,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       async set() { throw new Error("denied"); },
       async delete() {},
     });
-    await expect(failed.save({ version: 1, hidden: ["collaboration"] }))
+    await expect(failed.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false }))
       .resolves.toMatchObject({
         status: "memory-only",
         failure: "write-failed",
@@ -130,7 +136,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       async set() {},
       async delete() {},
     });
-    await expect(ignored.save({ version: 1, hidden: ["collaboration"] }))
+    await expect(ignored.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false }))
       .resolves.toMatchObject({
         status: "memory-only",
         failure: "verification-failed",

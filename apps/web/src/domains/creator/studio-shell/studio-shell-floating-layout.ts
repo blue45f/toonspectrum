@@ -43,6 +43,8 @@ export type StudioShellFloatingPresetId =
 export interface StudioShellFloatingVisibilityState {
   readonly version: typeof STUDIO_SHELL_FLOATING_VISIBILITY_VERSION;
   readonly hidden: readonly StudioShellFloatingVisibilityId[];
+  /** Temporarily hides non-critical floating chrome while a pen stroke is active. */
+  readonly autoHideWhileDrawing: boolean;
 }
 
 export interface StudioShellFloatingSurfaceDefinition {
@@ -64,6 +66,8 @@ export interface StudioShellFloatingSurfaceDefinition {
   readonly zIndexFloor: number;
   readonly resizable: boolean;
   readonly applySize: boolean;
+  /** False only for controls that must remain reachable while layout editing is active. */
+  readonly hideWhileDrawing?: boolean;
   readonly safetyBehavior?: string;
 }
 
@@ -300,6 +304,7 @@ export const STUDIO_SHELL_FLOATING_SURFACES: readonly StudioShellFloatingSurface
       zIndexFloor: 69,
       resizable: false,
       applySize: false,
+      hideWhileDrawing: false,
       safetyBehavior: "기존 배치 도구에서 편집 중일 때는 완료·취소 동선을 위해 자동 표시됩니다.",
     },
   ] satisfies readonly StudioShellFloatingSurfaceDefinition[]);
@@ -308,6 +313,7 @@ export const DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY: StudioShellFloatingVisibi
   Object.freeze({
     version: STUDIO_SHELL_FLOATING_VISIBILITY_VERSION,
     hidden: Object.freeze([]),
+    autoHideWhileDrawing: false,
   });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -316,10 +322,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function freezeVisibility(
   hidden: readonly StudioShellFloatingVisibilityId[],
+  autoHideWhileDrawing = false,
 ): StudioShellFloatingVisibilityState {
   return Object.freeze({
     version: STUDIO_SHELL_FLOATING_VISIBILITY_VERSION,
     hidden: Object.freeze([...hidden]),
+    autoHideWhileDrawing,
   });
 }
 
@@ -328,7 +336,7 @@ export function normalizeStudioShellFloatingVisibility(
   fallback: StudioShellFloatingVisibilityState = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
 ): StudioShellFloatingVisibilityState {
   if (!isRecord(raw) || raw.version !== STUDIO_SHELL_FLOATING_VISIBILITY_VERSION) {
-    return freezeVisibility(fallback.hidden);
+    return freezeVisibility(fallback.hidden, fallback.autoHideWhileDrawing);
   }
   const rawHidden = Array.isArray(raw.hidden) ? raw.hidden : [];
   const hidden = new Set<StudioShellFloatingVisibilityId>();
@@ -339,6 +347,9 @@ export function normalizeStudioShellFloatingVisibility(
   }
   return freezeVisibility(
     STUDIO_SHELL_FLOATING_VISIBILITY_IDS.filter((id) => hidden.has(id)),
+    typeof raw.autoHideWhileDrawing === "boolean"
+      ? raw.autoHideWhileDrawing
+      : fallback.autoHideWhileDrawing,
   );
 }
 
@@ -354,7 +365,8 @@ export function studioShellFloatingVisibilityEqual(
 ): boolean {
   const a = normalizeStudioShellFloatingVisibility(left);
   const b = normalizeStudioShellFloatingVisibility(right);
-  return a.hidden.length === b.hidden.length
+  return a.autoHideWhileDrawing === b.autoHideWhileDrawing
+    && a.hidden.length === b.hidden.length
     && a.hidden.every((id, index) => id === b.hidden[index]);
 }
 
@@ -376,12 +388,23 @@ export function setStudioShellFloatingSurfaceVisible(
   else hidden.add(id);
   return freezeVisibility(
     STUDIO_SHELL_FLOATING_VISIBILITY_IDS.filter((candidate) => hidden.has(candidate)),
+    normalized.autoHideWhileDrawing,
   );
+}
+
+export function setStudioShellFloatingAutoHideWhileDrawing(
+  state: StudioShellFloatingVisibilityState,
+  enabled: boolean,
+): StudioShellFloatingVisibilityState {
+  const normalized = normalizeStudioShellFloatingVisibility(state);
+  return freezeVisibility(normalized.hidden, enabled);
 }
 
 export function applyStudioShellFloatingPreset(
   preset: StudioShellFloatingPresetId,
+  state: StudioShellFloatingVisibilityState = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
 ): StudioShellFloatingVisibilityState {
+  const autoHideWhileDrawing = normalizeStudioShellFloatingVisibility(state).autoHideWhileDrawing;
   switch (preset) {
     case "canvas-focus":
       return freezeVisibility([
@@ -392,23 +415,30 @@ export function applyStudioShellFloatingPreset(
         "offline-readiness",
         "collaboration",
         "workspace-arrangement",
-      ]);
+      ], autoHideWhileDrawing);
     case "production":
-      return freezeVisibility(["collaboration"]);
+      return freezeVisibility(["collaboration"], autoHideWhileDrawing);
     case "collaboration":
       return freezeVisibility([
         "drawing-options",
         "drawing-input",
         "offline-readiness",
-      ]);
+      ], autoHideWhileDrawing);
     case "all":
     default:
-      return DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY;
+      return autoHideWhileDrawing
+        ? freezeVisibility([], true)
+        : DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY;
   }
 }
 
-export function hideAllStudioShellFloatingSurfaces(): StudioShellFloatingVisibilityState {
-  return freezeVisibility(STUDIO_SHELL_FLOATING_VISIBILITY_IDS);
+export function hideAllStudioShellFloatingSurfaces(
+  state: StudioShellFloatingVisibilityState = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+): StudioShellFloatingVisibilityState {
+  return freezeVisibility(
+    STUDIO_SHELL_FLOATING_VISIBILITY_IDS,
+    normalizeStudioShellFloatingVisibility(state).autoHideWhileDrawing,
+  );
 }
 
 export function studioShellFloatingSurfaceById(

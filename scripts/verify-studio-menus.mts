@@ -1075,6 +1075,18 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       await dialog.getByRole("switch", { name: "그리기 옵션 표시하기" }).click();
       await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
 
+      if (await dialog.locator('[data-studio-shell-mounted-state="available"]').count() === 0) {
+        failures.push("현재 화면에서 사용 가능한 플로팅 요소 상태가 표시되지 않음");
+      }
+      await dialog.getByRole("button", { name: /캔버스 집중/ }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      await dialog.locator('[data-studio-shell-focus-mode="true"]').waitFor({
+        state: "visible",
+        timeout: 3000,
+      });
+      await dialog.getByRole("button", { name: "원래 보기", exact: true }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+
       await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
       const handle = page.locator('[data-studio-shell-floating-handle="drawing-options"]');
       await handle.waitFor({ state: "visible", timeout: 3000 });
@@ -1083,8 +1095,40 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
         failures.push("그리기 옵션 위치 잠금 미적용");
       }
       await handle.getByRole("button", { name: "그리기 옵션 위치 잠금 해제" }).click();
+      const dockSelect = handle.getByRole("combobox", { name: "그리기 옵션 도킹 위치" });
+      await dockSelect.selectOption("top");
+      if (await dockSelect.inputValue() !== "top") {
+        failures.push("그리기 옵션 직접 도킹 선택 미적용");
+      }
+      await dockSelect.selectOption("bottom");
       await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
 
+      const autoHide = dialog.getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/ });
+      if (await autoHide.getAttribute("aria-checked") !== "true") await autoHide.click();
+      const canvas = page.locator('[data-studio-canvas-viewport] canvas').first();
+      if (await canvas.count() === 0) {
+        failures.push("펜 자동 숨김을 검증할 캔버스를 찾지 못함");
+      } else {
+        await canvas.dispatchEvent("pointerdown", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "true"
+        );
+        await canvas.dispatchEvent("pointerup", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "false"
+        , undefined, { timeout: 2500 });
+      }
+
+      if (!(await dialog.isVisible().catch(() => false))) {
+        await launcher.click();
+        await dialog.waitFor({ state: "visible", timeout: 3000 });
+      }
       await dialog.getByRole("button", { name: "모두 숨김" }).click();
       await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
       if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");
