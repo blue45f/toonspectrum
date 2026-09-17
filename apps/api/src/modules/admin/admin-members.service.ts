@@ -235,7 +235,7 @@ export class AdminMembersService {
     const rows = await db
       .update(users)
       .set({ role })
-      .where(eq(users.id, targetUserId))
+      .where(and(eq(users.id, targetUserId), sql`${users.status} <> 'merged'`))
       .returning({ id: users.id });
     if (!rows.length) {
       throw new BadRequestException({ error: "대상 사용자를 찾을 수 없어요." });
@@ -257,7 +257,7 @@ export class AdminMembersService {
     const admin = await requireAdminUser(userId);
     requireMemberMutationAdmin(admin);
     const status = parseMemberStatus(statusValue);
-    if (!status || status === "deleted") {
+    if (!status || status === "deleted" || status === "merged") {
       throw new BadRequestException({
         error: "지원하지 않는 회원 상태예요.",
       });
@@ -405,7 +405,7 @@ export class AdminMembersService {
     const admin = await requireAdminUser(userId);
     requireMemberMutationAdmin(admin);
     const status = parseMemberStatus(statusValue);
-    if (!status || status === "deleted") {
+    if (!status || status === "deleted" || status === "merged") {
       throw new BadRequestException("지원하지 않는 일괄 상태 변경입니다.");
     }
     if (!Array.isArray(userIds) || !userIds.length) {
