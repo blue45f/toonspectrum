@@ -7,6 +7,7 @@ import { CreatorHomeNavigation, CreatorSectionLink } from "./CreatorHomeNavigati
 import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import "./creator-home.css";
 import "./creator-film.css";
+import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
 import Link from "@/compat/router-link";
