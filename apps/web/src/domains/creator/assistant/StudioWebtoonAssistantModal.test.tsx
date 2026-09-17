@@ -166,12 +166,22 @@ describe("StudioWebtoonAssistantModal — tab accessibility", () => {
     expect(screen.getByText("페이싱 건강도 점수")).toBeTruthy();
   });
 
-  it("labels fixture-derived analyses as sample data", () => {
-    render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
-    expect(screen.getByText(/샘플 보호 영역 3곳 기준 예시/)).toBeTruthy();
+  it("uses live document geometry when panels are provided and teaches the empty state otherwise", () => {
+    const props = {
+      protectedRegions: [{ top: 100, bottom: 700, label: "원고 컷 1" }],
+      panels: [{ id: "frame-1", topY: 100, bottomY: 700, heightPx: 600, dialogueCount: 2 }],
+    } as const;
+    const { rerender } = render(<StudioWebtoonAssistantModal open onClose={() => {}} {...props} />);
+    expect(screen.getByText(/실제 원고 컷 1곳 분석/)).toBeTruthy();
+    expect(screen.getByText(/현재 페이지의 컷 경계를 보호 영역으로 사용/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("tab")[1]);
-    expect(screen.getByText(/샘플 컷 5개 기준 예시/)).toBeTruthy();
+    expect(screen.getByText(/실제 원고 컷 1개 분석/)).toBeTruthy();
+    expect(screen.getByText(/실제 컷 위치와 컷 안의 대사 요소/)).toBeTruthy();
+
+    rerender(<StudioWebtoonAssistantModal open onClose={() => {}} />);
+    fireEvent.click(screen.getAllByRole("tab")[0]);
+    expect(screen.getByText(/현재 원고에서 컷을 찾지 못함/)).toBeTruthy();
   });
 });
 

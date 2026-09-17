@@ -418,6 +418,7 @@ import {
 } from "./lettering/studio-dialogue-translate";
 import { studioAiSuperSuiteModalLoader } from "./ai/studio-ai-super-suite-loader";
 import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
+import { buildStudioWebtoonAssistantDocumentAnalysis } from "./assistant/studio-webtoon-assistant-document";
 import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
@@ -2004,6 +2005,10 @@ export function StudioCuttoonEditor({
         canvasH: 1080,
       },
     [pages, activePageIndex, currentPageId]
+  );
+  const webtoonAssistantDocumentAnalysis = useMemo(
+    () => buildStudioWebtoonAssistantDocumentAnalysis(activePage.elements),
+    [activePage.elements],
   );
   const {
     cancelPaperVectorRefinement,
@@ -15328,19 +15333,21 @@ const puppetWarpArmed =
       setError("생성한 에셋을 라이브러리에 저장하려면 로그인이 필요해요.");
       return;
     }
-    if (!isStudioAiConfigured(aiSettings)) {
-      setError("통합 AI 설정에서 사용자 이미지 API 키와 모델을 연결해 주세요.");
-      return;
-    }
+    // BYOK가 설정되어 있으면 기존 직접 호출 경로를 유지하고, 그렇지 않으면 서버 관리형
+    // creator/assets/generate 경로를 사용한다. 서버 경로가 비활성화된 배포에서는 API가
+    // 명시적인 오류를 반환하므로 사용자가 설정 화면으로 이동할 수 있다.
     runWithAiNotice(() => void executeGenerateAsset(prompt));
   }
   async function executeGenerateAsset(prompt: string) {
     if (collaborationAccessRef.current.locked) return;
     const mutationTicket = captureStudioMutationTicket();
     const insertionPlacement = nextAssetInsertionPlacement();
-    const provider = studioImageAiProviderContext(aiSettings);
+    const useByok = isStudioAiConfigured(aiSettings);
+    const provider = useByok
+      ? studioImageAiProviderContext(aiSettings)
+      : { provider: "openai", model: "gpt-image-2", transport: "server" as const };
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-    const size: StudioAiImageSize = assetPromptSize === "1536x1024"
+    const byokSize: StudioAiImageSize = assetPromptSize === "1536x1024"
       ? "1792x1024"
       : assetPromptSize === "1024x1536" ? "1024x1792" : "1024x1024";
     const qualityDirection = assetPromptQuality === "low"
@@ -15354,6 +15361,9 @@ const puppetWarpArmed =
 
 ${qualityDirection}
 No text, logo, watermark, or copyrighted character.`;
+    const generatedName = assetPromptName.trim()
+      || prompt.split("\n")[0]?.trim().slice(0, 80)
+      || "AI 에셋";
     setAssetGenerating(true);
     setError(null);
     let operationId: string | null = null;
@@ -15367,27 +15377,45 @@ No text, logo, watermark, or copyrighted character.`;
         promptVersion: 1,
         prompt: providerPrompt,
         target: { pageId: activePage.id },
-        requestedSize: parseStudioAiRequestedSize(size),
+        requestedSize: parseStudioAiRequestedSize(useByok ? byokSize : assetPromptSize),
         references: [],
       });
-      const result = await generateBackgroundImage(aiSettings, providerPrompt, { size });
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      settleTrackedStudioAiOperation(operationId, result);
-      operationId = null;
-      if (!result.ok) throw new Error(result.error);
-      const generatedName = assetPromptName.trim()
-        || prompt.split("\n")[0]?.trim().slice(0, 80)
-        || "AI 에셋";
+
+      let generated: { dataUrl: string; width: number; height: number; model: string };
+      if (useByok) {
+        const result = await generateBackgroundImage(aiSettings, providerPrompt, { size: byokSize });
+        if (!canApplyStudioMutation(mutationTicket)) return;
+        settleTrackedStudioAiOperation(operationId, result);
+        operationId = null;
+        if (!result.ok) throw new Error(result.error);
+        generated = result.data;
+      } else {
+        const { generateAsset } = await import("@/infrastructure/creator-client");
+        const result = await generateAsset({
+          prompt: providerPrompt,
+          name: generatedName,
+          size: assetPromptSize,
+          quality: assetPromptQuality,
+        });
+        if (!canApplyStudioMutation(mutationTicket)) return;
+        settleTrackedStudioAiOperation(operationId, { ok: true }, {
+          provider: "openai",
+          model: result.model,
+        });
+        operationId = null;
+        generated = result;
+      }
+
       const saved = await saveStudioAssetMutation({
         name: generatedName,
-        dataUrl: result.data.dataUrl,
-        width: result.data.width,
-        height: result.data.height,
+        dataUrl: generated.dataUrl,
+        width: generated.width,
+        height: generated.height,
         kind: "ai",
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
-        model: result.data.model,
+        model: generated.model,
       });
       if (!addRenderedImage(
         saved.dataUrl,
@@ -20207,7 +20235,7 @@ No text, logo, watermark, or copyrighted character.`;
     const targetMasterEditMode = masterEditMode;
     const insertionPlacement = nextAssetInsertionPlacement();
     try {
-      const { src, width, height, isAnimatedGif } = await loadStudioCanvasImageFile(file);
+      const { src, width, height, isAnimatedGif, frames, frameFps, frameLoop } = await loadStudioCanvasImageFile(file);
       if (!isStudioPasteScopeCurrent({
         mutationAllowed: canApplyStudioMutation(mutationTicket),
         reviewLocked: activeSurfaceReviewLockedRef.current,
@@ -20228,6 +20256,12 @@ No text, logo, watermark, or copyrighted character.`;
           placement: insertionPlacement,
         }),
         ...(isAnimatedGif ? { isAnimatedGif: true } : {}), // studio-skew.ts와 동일한 관례: 항등값(false)은 저장하지 않는다.
+        ...(frames && frames.length > 1 ? {
+          frames,
+          frameFps,
+          frameLoop,
+          activeFrameId: frames[0]!.id,
+        } : {}),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지 추가 실패");
@@ -26299,6 +26333,28 @@ function clearSelectionForEdit() {
     return result;
   }
 
+  async function exportCurrentPageToVectorPdf(): Promise<import("./export/studio-vector-pdf-product").StudioVectorPdfExportResult> {
+    if (!ensureSharedDocumentAvailableForExport()) {
+      throw new Error("공동 문서를 불러온 뒤 벡터 PDF로 내보낼 수 있어요.");
+    }
+    const captured = await handleCapturePagesForPreset("current");
+    const canvas = captured[0];
+    if (!canvas) throw new Error("벡터 PDF용 현재 페이지 캡처를 만들지 못했습니다.");
+    const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
+    const drawElements = activePage.elements.filter(
+      (element): element is DrawEl =>
+        element.type === "draw" && !isEffectivelyHidden(element, pageGroups),
+    );
+    const { exportStudioCurrentPageVectorPdf } = await import("./export/studio-vector-pdf-product");
+    return exportStudioCurrentPageVectorPdf({
+      canvas,
+      logicalWidth: CANVAS_W,
+      logicalHeight: activePage.canvasH,
+      title,
+      drawElements,
+    });
+  }
+
   async function exportCurrentPageToInkMl(): Promise<StudioInkMlExportResult> {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 InkML로 내보낼 수 있어요.");
@@ -27559,6 +27615,7 @@ function clearSelectionForEdit() {
     exportCurrentPageToInkMl,
     exportCurrentPageToWillV1,
     exportCurrentPageToSvg,
+    exportCurrentPageToVectorPdf,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
     // 검수·미리보기 7종: 툴벨트가 전 뷰포트에서 display:none이라 프로젝트 시트가 정본 진입점이다.
@@ -29671,6 +29728,8 @@ function clearSelectionForEdit() {
           onClose={() => setWebtoonAssistantOpen(false)}
           canvasWidth={CANVAS_W}
           canvasHeight={canvasH}
+          protectedRegions={webtoonAssistantDocumentAnalysis.protectedRegions}
+          panels={webtoonAssistantDocumentAnalysis.panels}
         />
         {aiSuperSuiteOpen !== null ? (
           <Suspense fallback={aiSuperSuiteOpen ? (
