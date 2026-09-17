@@ -571,16 +571,18 @@ describe("procedural brush pack runtime", () => {
     expect(visualPlans).toEqual([
       // Area-R8 v1 integrates 2x2 texels for the original procedural tips; dab locations remain fixed.
       // Values intentionally pin both custom tip rasterization and the dynamic dab planner.
+      // The 2026-09 receipts include artist-facing start-size normalization; tip identities stay
+      // fixed while affected carrier cadence and dab sizes follow the selected catalogue width.
       // Update only after a deliberate visual QA pass.
-      { id: "bristle-fan-dry", tip: "208effa4", dabs: "62a0855b", count: 18 },
-      { id: "palette-knife-edge", tip: "574618f3", dabs: "ae46755f", count: 70 },
-      { id: "watercolor-salt-bloom", tip: "aa9dca76", dabs: "c11da11a", count: 7 },
+      { id: "bristle-fan-dry", tip: "208effa4", dabs: "728bf9f7", count: 20 },
+      { id: "palette-knife-edge", tip: "574618f3", dabs: "d0a14901", count: 72 },
+      { id: "watercolor-salt-bloom", tip: "aa9dca76", dabs: "1393ce48", count: 8 },
       { id: "ribbon-satin-fold", tip: "81404148", dabs: "ac5ec2b4", count: 17 },
       // Denser soft wash carriers (continuous-carrier-quality-v3) add stations on layered smoke.
-      { id: "smoke-wisp-layered", tip: "ad04b04c", dabs: "b9897050", count: 26 },
+      { id: "smoke-wisp-layered", tip: "ad04b04c", dabs: "3d531277", count: 36 },
       { id: "flower-petal-scatter", tip: "fd53c39f", dabs: "616763b3", count: 9 },
-      { id: "halftone-gradient-dot", tip: "b5bbae69", dabs: "96b49af2", count: 13 },
-      { id: "focus-ray-streak", tip: "5d42b6dd", dabs: "9d9ff412", count: 27 },
+      { id: "halftone-gradient-dot", tip: "b5bbae69", dabs: "af579acf", count: 15 },
+      { id: "focus-ray-streak", tip: "5d42b6dd", dabs: "c121fde6", count: 28 },
     ]);
   });
 });
