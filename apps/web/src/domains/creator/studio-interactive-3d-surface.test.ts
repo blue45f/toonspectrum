@@ -10,6 +10,7 @@ describe("Studio interactive 3D surface admission", () => {
       dccRouteRequested: true,
       mannequinPoserOpen: true,
       poserVrmOpen: true,
+      routedSurface: "bg3d",
     })).toEqual({
       bg3dOpen: false,
       characterShaperOpen: false,
@@ -25,6 +26,7 @@ describe("Studio interactive 3D surface admission", () => {
       dccRouteRequested: false,
       mannequinPoserOpen: false,
       poserVrmOpen: false,
+      routedSurface: "canvas",
     })).toEqual({
       bg3dOpen: true,
       characterShaperOpen: false,
@@ -33,16 +35,49 @@ describe("Studio interactive 3D surface admission", () => {
     });
   });
 
-  it("lets the Character Shaper win over the legacy poser so one VRM runtime owns the document", () => {
+  it("lets the Character Shaper win over the legacy poser before a routed owner commits", () => {
     expect(resolveStudioInteractiveThreeDSurfaceAdmission({
       bg3dOpen: false,
       characterShaperOpen: true,
       dccRouteRequested: false,
       mannequinPoserOpen: false,
       poserVrmOpen: true,
+      routedSurface: "canvas",
     })).toEqual({
       bg3dOpen: false,
       characterShaperOpen: true,
+      mannequinPoserOpen: false,
+      poserVrmOpen: false,
+    });
+  });
+
+  it("lets the poser route take renderer ownership while stale Character Shaper state retires", () => {
+    expect(resolveStudioInteractiveThreeDSurfaceAdmission({
+      bg3dOpen: false,
+      characterShaperOpen: true,
+      dccRouteRequested: false,
+      mannequinPoserOpen: true,
+      poserVrmOpen: true,
+      routedSurface: "poser",
+    })).toEqual({
+      bg3dOpen: false,
+      characterShaperOpen: false,
+      mannequinPoserOpen: false,
+      poserVrmOpen: true,
+    });
+  });
+
+  it("lets the BG3D route own the only renderer during a 3D-to-3D transition", () => {
+    expect(resolveStudioInteractiveThreeDSurfaceAdmission({
+      bg3dOpen: true,
+      characterShaperOpen: false,
+      dccRouteRequested: false,
+      mannequinPoserOpen: true,
+      poserVrmOpen: true,
+      routedSurface: "bg3d",
+    })).toEqual({
+      bg3dOpen: true,
+      characterShaperOpen: false,
       mannequinPoserOpen: false,
       poserVrmOpen: false,
     });
