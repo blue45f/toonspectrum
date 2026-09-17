@@ -1,9 +1,15 @@
+import { CreatorFeatureReels } from "../marketing/CreatorFeatureReels";
 import { CreatorHomeExperience } from "../marketing/CreatorHomeExperience";
 import "../marketing/creator-home-experience-interactions.css";
 import "../marketing/creator-home-visual-upgrade.css";
 import "../marketing/creator-prism.css";
 
-/** One root experience: recent work and goal navigation are part of the page, not a second hero. */
+/** One creator journey: task-first home followed by a visual feature walkthrough. */
 export function CreatorHomePage() {
-  return <CreatorHomeExperience />;
+  return (
+    <>
+      <CreatorHomeExperience />
+      <CreatorFeatureReels />
+    </>
+  );
 }
