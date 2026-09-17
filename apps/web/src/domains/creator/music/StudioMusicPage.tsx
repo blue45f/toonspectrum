@@ -54,6 +54,7 @@ import {
 } from "@toonspectrum/core/studio-music";
 import { useSession } from "@/compat/auth-session-store";
 import { getApiErrorMessage } from "@/infrastructure/api";
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { completeAutomaticFreeText } from "@/domains/creator/studio-server-ai-client";
 import { cn } from "@/shared/lib/utils";
 
@@ -684,7 +685,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             ) : null}
             {notice ? <p className="mt-3 rounded-xl border border-line bg-panel/40 p-4 text-sm leading-relaxed">{notice}</p> : null}
           </div>
-          {error ? <p role="alert" className="rounded-xl border border-bad/30 bg-bad/5 p-4 text-sm text-bad">{error}</p> : null}
+          {error ? <AiRecoveryNotice message={error} /> : null}
           {libraryLoading ? <p role="status" className="p-5 text-sm text-fg-3">기기 보관함을 여는 중…</p> : null}
 
           {visibleTracks.map((track) => (

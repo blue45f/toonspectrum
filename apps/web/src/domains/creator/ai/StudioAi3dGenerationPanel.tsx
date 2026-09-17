@@ -304,7 +304,13 @@ export function StudioAi3dGenerationPanel({
         ) : null}
       </div>
 
-      <div aria-live="polite" role="status" className="text-xs text-fg-2">
+      <div
+        aria-label="현재 3D 생성 상태"
+        aria-live="polite"
+        aria-busy={Boolean(job && !TERMINAL.has(job.state))}
+        role="status"
+        className="rounded-lg border border-line/70 bg-panel/45 px-2.5 py-2 text-xs text-fg-2"
+      >
         {job ? `${STATE_LABELS[job.state]} · ${job.request.tier} · 예상 ${job.estimatedCredits} credit` : statusMessage}
       </div>
       {error ? <p role="alert" className="rounded-lg border border-bad/30 bg-bad/10 p-2 text-xs text-bad">{error}</p> : null}

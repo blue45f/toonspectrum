@@ -8,6 +8,7 @@ import { resolveSignupAvatarImage } from "@/shared/lib/avatar";
 import { useT } from "@/shared/lib/i18n";
 import { cn, keepInlineText } from "@/shared/lib/utils";
 import { useSession, signOut } from "@/compat/auth-session-store";
+import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
 import Link from "@/compat/router-link";
 import { adminFetch, type AdminMe } from "@/domains/admin/components/admin-client";
 import { messagingClient } from "@/infrastructure/messaging-client";
@@ -51,6 +52,12 @@ export function AuthMenu({
   useEffect(() => {
     if (defaultOpen) setModal(true);
   }, [defaultOpen]);
+
+  useEffect(() => subscribeAuthModalRequests(() => {
+    if (status === "authenticated") return;
+    setMenuOpen(false);
+    setModal(true);
+  }), [status]);
 
   // 관리자 콘솔 링크 노출 — 세션 role(화이트리스트 승격 반영) + /api/admin/me 프로브.
   // 프로브는 세션 role 이 stale 한 탭/캐시에서도 링크가 보이도록 하는 2차 게이트.
