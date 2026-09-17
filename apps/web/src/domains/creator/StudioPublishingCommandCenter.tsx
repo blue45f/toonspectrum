@@ -957,7 +957,8 @@ export function StudioPublishingCommandCenter({
   const cover = pages[0]?.src ?? null;
 
   return (
-    <Container size="wide" className={STUDIO_UPLOAD_CONTAINER_CLASS}>
+    <div data-route-ready="studio-publish">
+      <Container size="wide" className={STUDIO_UPLOAD_CONTAINER_CLASS}>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Link
           href="/create"
@@ -1294,6 +1295,7 @@ export function StudioPublishingCommandCenter({
           </button>
         )}
       </div>
-    </Container>
+      </Container>
+    </div>
   );
 }

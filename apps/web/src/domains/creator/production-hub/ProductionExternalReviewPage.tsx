@@ -220,28 +220,28 @@ export function ProductionExternalReviewPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
+      <div data-route-pending="external-review" className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
         <div className="flex items-center gap-3 rounded-2xl border border-line bg-card px-5 py-4 text-sm font-semibold">
           <LoaderCircle className="size-5 animate-spin text-accent" aria-hidden="true" /> 검수 자료를 확인하는 중…
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!view) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
+      <div data-route-error="external-review" className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
         <div role="alert" className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7 text-center">
           <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
           <h1 className="mt-4 text-xl font-black">검수 링크를 열 수 없습니다</h1>
           <p className="mt-2 text-sm leading-6 text-fg-2">{error ?? "링크가 만료되었거나 접근 권한이 회수되었습니다."}</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-canvas text-fg">
+    <div data-route-ready="external-review" className="min-h-dvh bg-canvas text-fg">
       <header className="border-b border-line bg-card">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -321,6 +321,6 @@ export function ProductionExternalReviewPage() {
           </form>
         </aside>
       </div>
-    </main>
+    </div>
   );
 }

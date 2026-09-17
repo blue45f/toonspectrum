@@ -110,7 +110,7 @@ export function StudioAssetHubPage() {
     : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit" && candidate !== "safety");
 
   return (
-    <div data-studio-asset-hub={view}>
+    <div data-route-ready="studio-assets" data-studio-asset-hub={view}>
       <div className="border-b border-line bg-panel/75 backdrop-blur">
         <Container size="wide" className="py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
