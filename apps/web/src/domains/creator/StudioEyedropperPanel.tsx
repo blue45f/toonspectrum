@@ -28,6 +28,7 @@ import type {
 import type { LucideIcon } from "lucide-react";
 import type { KeyboardEvent, MutableRefObject, ReactElement } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 type ReferencePresentation = Readonly<{
@@ -153,22 +154,7 @@ function ToggleRow({
           </span>
         ) : null}
       </span>
-      <span
-        aria-hidden
-        className={cn(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-150",
-          checked
-            ? "border-accent bg-accent"
-            : "border-line-strong bg-canvas",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 size-3.5 rounded-full bg-fg shadow-sm transition-transform duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
-            checked ? "translate-x-[1.05rem]" : "translate-x-0.5",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={checked} />
     </button>
   );
 }

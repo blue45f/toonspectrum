@@ -10,6 +10,41 @@ type SwitchProps = Omit<
   readonly onCheckedChange: (checked: boolean) => void;
 };
 
+type SwitchIndicatorProps = {
+  readonly checked: boolean;
+  readonly className?: string;
+};
+
+/** Non-interactive visual authority for row-level switches whose whole row is the hit target. */
+export function SwitchIndicator({ checked, className }: SwitchIndicatorProps): ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      data-ui-switch-track="true"
+      data-state={checked ? "on" : "off"}
+      className={cn(
+        "relative block h-6 w-11 shrink-0 rounded-full border transition-colors duration-150",
+        "motion-reduce:transition-none",
+        checked
+          ? "border-accent bg-accent"
+          : "border-line-strong bg-raised",
+        className,
+      )}
+    >
+      <span
+        data-ui-switch-thumb="true"
+        className={cn(
+          "absolute left-0.5 top-0.5 size-5 rounded-full shadow-sm",
+          "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+          checked
+            ? "translate-x-5 bg-on-accent"
+            : "translate-x-0 bg-fg-2",
+        )}
+      />
+    </span>
+  );
+}
+
 /**
  * Canonical binary switch for ToonSpectrum UI.
  *
@@ -50,28 +85,7 @@ export function Switch({
         if (!event.defaultPrevented && !disabled) onCheckedChange(!checked);
       }}
     >
-      <span
-        aria-hidden="true"
-        data-ui-switch-track="true"
-        className={cn(
-          "relative block h-6 w-11 shrink-0 rounded-full border transition-colors duration-150",
-          "motion-reduce:transition-none",
-          checked
-            ? "border-accent bg-accent"
-            : "border-line-strong bg-raised",
-        )}
-      >
-        <span
-          data-ui-switch-thumb="true"
-          className={cn(
-            "absolute left-0.5 top-0.5 size-5 rounded-full shadow-sm",
-            "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
-            checked
-              ? "translate-x-5 bg-on-accent"
-              : "translate-x-0 bg-fg-2",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={checked} />
     </button>
   );
 }

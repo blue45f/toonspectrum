@@ -18,6 +18,7 @@ import type {
   StudioBrushDynamicsSource,
 } from "./studio-brush-dynamics";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 interface StudioBrushDynamicsControlsProps {
@@ -223,20 +224,7 @@ function SourceControl({
           <span className="block text-[0.7rem] font-bold text-fg-2">{sourceLabel}</span>
           <span className="block truncate text-[0.61rem] text-fg-3">{sourceHint}</span>
         </span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-            active ? "border-accent bg-accent" : "border-line-strong bg-raised"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-3.5 rounded-full bg-fg transition-transform",
-              active ? "translate-x-[17px] bg-on-accent" : "translate-x-0.5"
-            )}
-          />
-        </span>
+        <SwitchIndicator checked={active} />
       </button>
 
       {active && random && jitter ? (

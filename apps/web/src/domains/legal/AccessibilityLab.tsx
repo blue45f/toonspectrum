@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 import { useI18n } from "@/shared/lib/i18n";
 
@@ -172,20 +173,7 @@ function PreferenceToggle({
       className="flex min-h-11 w-full items-center justify-between rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
     >
       {label}
-      <span
-        aria-hidden="true"
-        className={cn(
-          "h-6 w-11 rounded-full border p-0.5 transition",
-          pressed ? "border-accent bg-accent" : "border-line-strong bg-canvas",
-        )}
-      >
-        <span
-          className={cn(
-            "block size-4 rounded-full bg-fg transition-transform",
-            pressed && "translate-x-5 bg-on-accent",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={pressed} />
     </button>
   );
 }
