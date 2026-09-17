@@ -33,6 +33,23 @@
       ]
     },
     {
+      "id": "drawing-engine-integrity",
+      "title": "Shared professional drawing engine quality",
+      "outcome": "Integrated Studio and ToonStudio Draw share bounded input prediction, stabilizer endpoint completion, pressure dynamics, device input profiles, live stylus feedback, large-canvas brush coverage, selection refinement and compositing semantics without creating a second editor authority.",
+      "tests": [
+        "apps/web/src/domains/creator/brush/studio-drawing-input-deck-model.test.ts",
+        "apps/web/src/domains/creator/brush/studio-drawing-input-profile-library.test.ts",
+        "apps/web/src/domains/creator/brush/studio-brush-cursor-sensor.test.ts",
+        "apps/web/src/domains/creator/brush/studio-brush-velocity-pressure.test.ts",
+        "apps/web/src/domains/creator/brush/studio-stroke-stabilizer.test.ts",
+        "apps/web/src/domains/creator/studio-predicted-ink-tail.test.ts",
+        "apps/web/src/domains/creator/studio-dynamic-brush-coverage-renderer.test.ts",
+        "apps/web/src/domains/creator/studio-selection-refinement.test.ts",
+        "apps/web/src/domains/creator/studio-live-adjustment.test.ts"
+      ],
+      "artifacts": []
+    },
+    {
       "id": "file-roundtrip-integrity",
       "title": "Loss-visible PSD and CLIP round-trip contracts",
       "outcome": "PSD import/export, editable text, adjustment graphs, saved CLIP selections and workspace interchange preserve supported editable data and reject silent coercion.",
@@ -81,6 +98,7 @@
   ],
   "externalReleaseGates": [
     "Current-commit eight-hour soak on the release build",
+    "Physical pen-display and tablet sessions covering pressure, tilt, hover, barrel rotation, stylus buttons and palm rejection",
     "Physical WebGPU device-loss and real browser worker termination matrix",
     "Browser process crash and OPFS recovery on Safari, Chromium and Firefox release devices",
     "Real network, Socket.IO and PostgreSQL partition recovery with multiple clients",
