@@ -1,79 +1,106 @@
 # Audio assets
 
-## Licensed anime opening reference
+## Site soundtrack policy
 
-- Web path: `/audio/toonspectrum-anime-vocal-opening.mp3`
-- Source title: `anime`
-- Creator: `PuyoPuyoMegaFan1234`
-- Source: https://pixabay.com/music/upbeat-anime-239882/
-- License: Pixabay Content License — https://pixabay.com/service/license-summary/
-- Source metadata: AI-generated, J-pop/anime, female vocal; licensed 15-second site excerpt, delivered as 256 kbps MP3
-- Downloaded: 2026-06-29
-- SHA-256: `2c2bf9665778d507f2cf93d1bc6d19901ef91cb0e41d2c31f3a0e593450ba2fd`
+The site-wide soundtrack accepts **ToonSpectrum original productions only**. The previous Pixabay
+reference tracks were removed on 2026-09-18 and the player no longer falls back to licensed demo
+songs or the browser-procedural soundtrack when an original file is unavailable.
 
-The track is embedded as part of ToonSpectrum's interactive product experience. It is not
-offered as a standalone audio product. Attribution is not required by the license, but source
-and provenance are retained here for maintenance and release review.
+A missing or unapproved soundtrack is intentionally silent. This is a product-quality boundary:
+low-fidelity placeholders must not be mistaken for the brand's final sound.
 
-Audio files are served from the deployed web origin instead of being duplicated in JavaScript
-bundles (see "Playlist manifest" below). The procedural Web Audio soundtrack remains the runtime
-fallback.
+## Original OST production pipeline
 
-## Boom! Goes My Heart (Kpop Version)
+The production source of truth is `config/site-original-ost.production.json`. It defines the
+ToonSpectrum sonic identity, nine launch themes, original Korean lyrics, BPM, duration, adaptive
+profiles, intensity, and role metadata. `scripts/generate-site-original-ost.mjs` turns those
+briefs into long-form Eleven Music v2.5 requests.
 
-- Web path: `/audio/boom-goes-my-heart-kpop.mp3`
-- Source title: `Boom! Goes My Heart (Kpop Version)`
-- Creator: `Sekuora`
-- Source: https://pixabay.com/music/pop-boom-goes-my-heart-kpop-version-242507/
-- License: Pixabay Content License — https://pixabay.com/service/license-summary/
-- Source metadata: K-pop, vocal
-- Downloaded: 2026-07-02
-- SHA-256: `8b7f645bd3d40260d0e569cdae02adf04c4fd903e79618f509d826d387c885dd`
+Generation is deliberately separated from publication:
 
-## 설레나요
+1. `--dry-run` is the default and prints provider requests without spending credits.
+2. `--generate` requires `ELEVENLABS_API_KEY` and writes the MP3 plus a provenance JSON sidecar.
+3. Every generated file records SHA-256, provider song id when available, model, generation time,
+   config hash, requested C2PA provenance, and review flags.
+4. Human creative, clipping, lyric and rights review must be completed in the sidecar. Set
+   `review.approvedForSite` to `true` only after those checks pass.
+5. `--publish` verifies the MP3 hash and provenance metadata and rebuilds
+   `apps/web/public/audio/playlist.json` using **approved** files only.
 
-- Web path: `/audio/seollenayo.mp3`
-- Source title: `설레나요`
-- Creator: `옴택`
-- Source: https://pixabay.com/music/pop-설레나요-227248/
-- License: Pixabay Content License — https://pixabay.com/service/license-summary/
-- Source metadata: K-pop/Korean pop, vocal
-- Downloaded: 2026-07-02
-- SHA-256: `fcf7edd5692eba95820b662234d465a9276df3be9d385d600191e9dedfbaf15c`
+Example single-track flow:
 
-## Playlist manifest
+```bash
+node scripts/generate-site-original-ost.mjs --track draw-your-world --dry-run
+ELEVENLABS_API_KEY=... node scripts/generate-site-original-ost.mjs --track draw-your-world --generate
+# listen/review, then update review flags in the generated sidecar
+node scripts/generate-site-original-ost.mjs --track draw-your-world --dry-run --publish
+```
 
-The site-wide player reads `public/audio/playlist.json` with role-aware metadata:
-`id`, `src`, `title`, `artist`, `role`, `origin`, `vocalMode`, `language`, `summary`, `license`, and
-`creditUrl`. New listeners enter the **Original anime OST** source by default, but playback still
-requires an explicit user gesture. The route resolver chooses an opening, creator, story, action,
-romance/character, or ending role and always prefers a reviewed `origin: "original"` track.
+Batch paid generation has an additional `--confirm-batch` guard. Existing audio is never replaced
+without `--force`.
 
-The three checked-in tracks documented above are `origin: "licensed-reference"` fallbacks. They
-are intentionally presented as **REFERENCE DEMO**, never as ToonSpectrum-authored songs. Until a
-reviewed original is published for a role, the player may use the matching reference track; users
-can switch to the procedural **Focus instrumental** source at any time.
+## Launch album
 
-Manifest entries are restricted to reviewed same-origin `/audio/*` files with HTTPS credit
-links. `/audio/*` response headers are generated from `config/http-response-headers.json`. If the
-manifest fails, the player returns to the procedural instrumental engine. Audio creation, animatic,
-game, message, and live-call routes temporarily suspend the site soundtrack without clearing the
-listener's saved opt-in.
-## Site-wide soundscape runtime
+The initial suite is built around one recurring four-note "creation motif" instead of unrelated
+page jingles. The motif should be recognizable without copying any existing work.
 
-The floating player is lazy-loaded from the global application shell. Music is off by default;
-a listener must press play before the browser audio context is resumed. The player remembers
-its OST/instrumental source, role-following preference, expanded state, opt-in, mute state, and
-an OST-only volume that does not change notification or interface effects. Legacy `page-theme`
-preferences migrate to `focus-instrumental`; legacy `vocal-ost` preferences migrate to the new
-`original-ost` experience.
+| ID | Role | Primary form | Runtime | Purpose |
+| --- | --- | --- | ---: | --- |
+| `draw-your-world` | opening | Korean vocal | 3:30 | flagship animation-style opening |
+| `after-the-last-panel` | ending | Korean vocal | 3:45 | emotional closing theme |
+| `lines-become-worlds` | creator | Korean vocal | 3:25 | creator anthem |
+| `ink-and-starlight` | story | instrumental | 4:00 | worldbuilding main score |
+| `beyond-the-panel` | action | instrumental | 3:15 | production/action climax |
+| `between-two-speech-bubbles` | romance | Korean vocal | 3:20 | character/romance song |
+| `midnight-storyboard` | creator | instrumental | 5:00 | long-form drawing focus |
+| `neon-scroll` | story | instrumental | 3:50 | discovery/community city-pop |
+| `publish-the-sky` | ending | instrumental | 2:00 | publish/completion victory theme |
 
-Public and project pages resolve into route themes such as creator focus, worldbuilding,
-production drive, catalog discovery, city pop, creator café, asset market, study ambience,
-royal fantasy, mystery, and healing. Page transitions crossfade instead of restarting the global
-audio graph. A listener can disable automatic page following and choose any procedural theme.
+Vocal titles declare an instrumental variant so the same composition family can serve focused work
+without lyrics. The production script generates only primary variants by default; `--with-variants`
+is explicit because every provider request may incur cost.
 
-Admin, account, login, game, message, live-call, audio creation, promo/animatic, spatial-reader,
-and immersive editor routes suspend the soundtrack while preserving the opt-in. Returning to a
-compatible page resumes it only when the listener had previously enabled music. Hidden tabs also
-pause playback for battery and attention safety.
+## Manifest contract
+
+`apps/web/public/audio/playlist.json` is intentionally empty until reviewed originals are present.
+Published entries must point to `/audio/original/*` and include:
+
+- role, vocal mode, adaptive profile and intensity
+- duration and BPM
+- `origin: "original"`
+- provider `elevenlabs` and model `music_v2_5`
+- SHA-256 and generation timestamp
+- `c2paRequested: true`
+- `status: "published"`
+- HTTPS terms/provenance URL
+
+The web parser rejects legacy `licensed-reference` entries, external audio URLs, missing integrity
+metadata, unreviewed/draft status, unsupported providers/models, and files outside
+`/audio/original/`.
+
+## Runtime behavior
+
+The global player stays silent until at least one valid published original is available. Browser
+autoplay policy still applies: music requires a user gesture before the audio context resumes.
+
+Once originals are published, route roles select opening, creator, story, action, romance, or ending
+tracks. The listener can keep automatic routing or choose an adaptive style (`Animation`, `Webtoon`,
+`Lo-fi`, `Cinematic`, `Fantasy`, `City Pop`), intensity (`Chill`, `Normal`, `Epic`), and vocal mode
+(`Auto`, `Vocal`, `Instrumental`). Creator/learning/story workspaces prefer instrumental tracks in
+Auto mode. Existing crossfades remain in the core audio engine.
+
+Audio creation, animatic, live-call, game, message, admin, login/account and other audio-conflicting
+routes suspend the global soundtrack without erasing the listener's saved preferences.
+
+## Quality and rights release gate
+
+The production target is a high-fidelity, cinematic animation/webtoon soundtrack, not a synthetic
+browser loop. Provider prompts explicitly prohibit named-artist, franchise, copyrighted-melody and
+celebrity-voice imitation.
+
+Eleven Music availability and commercial rights vary by subscription and its current Music Terms.
+Do not interpret a generated file or a successful API response as automatic clearance for every
+use. Before public release, verify the ToonSpectrum subscription covers the intended web,
+advertising, film/TV, offline or other distribution use at that time and retain the review record.
+
+Provider terms: https://elevenlabs.io/eleven-music-model-specific-terms
