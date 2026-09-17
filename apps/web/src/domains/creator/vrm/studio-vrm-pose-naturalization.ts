@@ -41,10 +41,22 @@ const WRIST_CHAINS = [
   ["rightLowerArm", "rightHand"],
 ] as const satisfies readonly (readonly [VRMHumanBoneName, VRMHumanBoneName])[];
 
+const KNEE_CHAINS = [
+  ["leftUpperLeg", "leftLowerLeg"],
+  ["rightUpperLeg", "rightLowerLeg"],
+] as const satisfies readonly (readonly [VRMHumanBoneName, VRMHumanBoneName])[];
+
+const ANKLE_CHAINS = [
+  ["leftLowerLeg", "leftFoot"],
+  ["rightLowerLeg", "rightFoot"],
+] as const satisfies readonly (readonly [VRMHumanBoneName, VRMHumanBoneName])[];
+
 const NATURALIZED_BONES = new Set<VRMHumanBoneName>([
   ...TORSO_CHAIN,
   ...SHOULDER_PAIRS.flat(),
   ...WRIST_CHAINS.flat(),
+  ...KNEE_CHAINS.flat(),
+  ...ANKLE_CHAINS.flat(),
 ]);
 
 function radians(degrees: number): number {
@@ -220,6 +232,52 @@ export function naturalizeStudioVrmPose(
       );
       hand[axis] -= removed;
       if (lowerArm && lowerArmEditable) lowerArm[axis] += removed * 0.45;
+    }
+  }
+
+  // Knees are hinge-dominant. Camera/IK noise often appears as sideways lower-leg twist, which
+  // reads as a dislocated knee even when the intended bend is correct. Preserve the primary X bend
+  // and only bleed excessive Y/Z twist back into the thigh by a few degrees.
+  const kneeTwistComfort = [radians(14), radians(11)] as const;
+  for (const [upperLegName, lowerLegName] of KNEE_CHAINS) {
+    const lowerLeg = rotations.get(lowerLegName);
+    if (!lowerLeg || !editable(lowerLegName)) continue;
+    const upperLeg = rotations.get(upperLegName);
+    const upperLegEditable = upperLeg ? editable(upperLegName) : false;
+    const removalLimit = radians(3.5) * intensity;
+    for (const [offset, axis] of ([1, 2] as const).entries()) {
+      const magnitude = Math.abs(lowerLeg[axis]);
+      const excess = magnitude - kneeTwistComfort[offset]!;
+      if (excess <= 0) continue;
+      const removed = Math.sign(lowerLeg[axis]) * Math.min(
+        excess * 0.42 * intensity,
+        removalLimit,
+      );
+      lowerLeg[axis] -= removed;
+      if (upperLeg && upperLegEditable) upperLeg[axis] += removed * 0.32;
+    }
+  }
+
+  // Feet keep authored pointing/planting but reject the last few degrees of ankle roll that make a
+  // standing foot visibly skate onto its edge. A small share moves to the shin so silhouettes stay
+  // continuous instead of snapping at the ankle.
+  const ankleComfort = [radians(44), radians(25), radians(23)] as const;
+  for (const [lowerLegName, footName] of ANKLE_CHAINS) {
+    const foot = rotations.get(footName);
+    if (!foot || !editable(footName)) continue;
+    const lowerLeg = rotations.get(lowerLegName);
+    const lowerLegEditable = lowerLeg ? editable(lowerLegName) : false;
+    const removalLimit = radians(4) * intensity;
+    for (let axis = 0; axis < 3; axis += 1) {
+      const magnitude = Math.abs(foot[axis]);
+      const excess = magnitude - ankleComfort[axis]!;
+      if (excess <= 0) continue;
+      const removed = Math.sign(foot[axis]) * Math.min(
+        excess * 0.34 * intensity,
+        removalLimit,
+      );
+      foot[axis] -= removed;
+      if (lowerLeg && lowerLegEditable) lowerLeg[axis] += removed * 0.2;
     }
   }
 
