@@ -23,6 +23,19 @@ describe("sitemap static routes", () => {
     expect(staticRoutes).toContain('"/market"');
     expect(staticRoutes).toContain('"/market/browse"');
   });
+
+  it("keeps the engineering story hub and reusable formats indexable", () => {
+    for (const route of [
+      '"/about/technology"',
+      '"/about/technology/story"',
+      '"/about/technology/guides"',
+      '"/about/technology/deck"',
+      '"/about/technology/videos"',
+      '"/about/technology/licenses"',
+    ]) {
+      expect(staticRoutes).toContain(route);
+    }
+  });
 });
 
 describe("home creator funnel", () => {

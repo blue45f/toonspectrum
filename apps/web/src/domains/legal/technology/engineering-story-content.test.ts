@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -27,6 +29,15 @@ describe("engineering story content", () => {
       expect(chapter.title.en.trim(), chapter.id).not.toBe("");
       expect(ENGINEERING_STATUS_META[chapter.status].label.ko).toBeTruthy();
       expect(ENGINEERING_STATUS_META[chapter.status].label.en).toBeTruthy();
+    }
+  });
+
+  it("keeps every published evidence reference attached to a repository path", () => {
+    for (const chapter of ENGINEERING_CHAPTERS) {
+      for (const item of chapter.evidence) {
+        const [repositoryPath] = item.path.split("#", 1);
+        expect(existsSync(repositoryPath), `${chapter.id}: missing evidence ${item.path}`).toBe(true);
+      }
     }
   });
 
