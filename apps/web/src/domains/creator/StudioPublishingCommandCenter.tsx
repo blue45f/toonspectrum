@@ -90,6 +90,7 @@ import {
   StudioPublishContextBanner,
   type PublishContext,
 } from "./StudioPublishContextBanner";
+import { StudioPublishVisualJourney } from "./StudioPublishVisualJourney";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -1005,6 +1006,12 @@ export function StudioPublishingCommandCenter({
           </div>
         </div>
       </header>
+
+      <StudioPublishVisualJourney
+        activeStep={step}
+        disabled={workspaceLocked}
+        onSelect={(nextStep) => setStep(nextStep)}
+      />
 
       <StudioPublishContextBanner context={publishContext} />
 
