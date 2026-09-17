@@ -100,3 +100,59 @@ test("section navigation keeps readable focus and browser history semantics", as
   await expect(page.locator("#creator-process-title")).toBeFocused();
   await expect(page.locator("#creator-process-title")).toContainText("모든 단계가 다음 작업으로");
 });
+
+for (const width of [320, 390]) {
+  test(`Studio task-first entry stays readable and unclipped at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/studio", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { name: "지금 무엇을 가지고 있나요?", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /아이디어만 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /대본이나 콘티가 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /그리던 파일이 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /팀 프로젝트를 시작해요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /샘플로 먼저 둘러볼게요/u })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "웹툰 제작 전체 흐름" })).toBeVisible();
+    await expect(page.getByText("클라우드와 동기화됨", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("이 기기에 저장됨", { exact: true })).toBeVisible();
+
+    const hasNoHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    );
+    expect(hasNoHorizontalOverflow).toBe(true);
+
+    await capturePageEvidence(page, testInfo, `studio-task-first-${width}`);
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+test("new project flow explains a disabled start action and preserves the chosen setup", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 1000 });
+  await page.goto("/studio/new?kind=webtoon&template=webtoon-vertical", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeVisible();
+  await expect(page.getByText("만들 작업 선택", { exact: true })).toBeVisible();
+  await expect(page.getByText("이름과 시작 형식", { exact: true })).toBeVisible();
+  await expect(page.getByText("자동 저장하며 시작", { exact: true })).toBeVisible();
+
+  const projectName = page.getByLabel("프로젝트 이름");
+  await projectName.fill("");
+  const startButton = page.locator('button[aria-describedby*="studio-create-disabled-reason"]');
+  await expect(startButton).toBeDisabled();
+  await expect(page.getByText("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", { exact: true })).toBeVisible();
+
+  await projectName.fill("별빛 식당 1화");
+  await expect(startButton).toHaveCount(0);
+  await expect(page.getByText(/별빛 식당 1화/u)).toBeVisible();
+  await expect(page.getByText("이 기기에 저장됨", { exact: true })).toBeVisible();
+
+  const hasNoHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  );
+  expect(hasNoHorizontalOverflow).toBe(true);
+  await capturePageEvidence(page, testInfo, "studio-new-guided-320");
+});
