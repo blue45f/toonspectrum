@@ -357,7 +357,7 @@ export function StudioTemplateVisualPreview({
           <p className="truncate text-xs font-black text-fg">{pageLabel(activePage, bt)}</p>
           <p className="text-[0.65rem] text-fg-3">
             {activePage.panelCount > 0
-              ? (locale === "ko" ? `${activePage.panelCount}개 컷·영역` : `${activePage.panelCount} panels`)
+              ? bt(`${activePage.panelCount}개 컷·영역`, `${activePage.panelCount} panels`)
               : bt("레이아웃", "Layout")}
           </p>
         </div>
