@@ -9,10 +9,11 @@ const ABOUT_ROUTE_FAMILY = [
   { id: "legal-about", path: "/about" },
   { id: "legal-about-workflow", path: "/about/workflow" },
   { id: "legal-about-technology", path: "/about/technology" },
+  { id: "legal-about-principles", path: "/about/principles" },
 ] as const;
 
 describe("ToonStudio introduction route family", () => {
-  it("registers the service, workflow and technology pages as explicit routes", () => {
+  it("registers the service, workflow, technology and product-principles pages as explicit routes", () => {
     for (const expectedRoute of ABOUT_ROUTE_FAMILY) {
       expect(legalRoutes).toContainEqual(expect.objectContaining(expectedRoute));
     }

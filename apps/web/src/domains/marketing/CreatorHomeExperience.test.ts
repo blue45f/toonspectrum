@@ -32,6 +32,9 @@ describe("creator home experience contracts", () => {
     const identity = readFileSync(PRODUCT_IDENTITY_SOURCE, "utf8");
     expect(source).toContain('id="creator-start"');
     expect(source).toContain('id="creator-flow"');
+    expect(source).toContain('id="creator-principles"');
+    expect(source).toContain('href="/about/principles"');
+    expect(source).toContain("AI는 보조 도구로");
     expect(source).toContain('id="creator-toolkit-title"');
     expect(source).toContain('id="creator-process-title"');
     expect(source).toContain('data-creator-home="production-first"');
@@ -140,6 +143,7 @@ describe("creator home experience contracts", () => {
     expect(flagship).toContain(".cf-start-grid");
     expect(flagship).toContain(".cf-bridge");
     expect(flagship).toContain(".cf-flow-grid");
+    expect(flagship).toContain(".cf-principles-grid");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(themeArt).toContain('data-theme-art="aurora"');
     expect(themeArt).toContain('data-theme-art="blossom"');

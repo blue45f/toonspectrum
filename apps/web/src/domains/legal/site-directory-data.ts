@@ -272,6 +272,13 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "웹·2D·3D·저장·협업 기술과 신뢰 원칙",
         "See the web, 2D, 3D, storage, collaboration and trust foundations",
       ),
+      destination(
+        "/about/principles",
+        "제품 원칙",
+        "Product principles",
+        "창작 흐름·권리·AI·협업·접근성 의사결정 기준",
+        "Product standards for creative flow, rights, AI, collaboration and accessibility",
+      ),
       destination("/about/data", "데이터 출처", "Data sources", "공급자별 연결·이용 준비 상태", "Provider connections and readiness"),
       destination("/about/crawler", "공개 데이터 수집 정책", "Public data policy", "자동수집 원칙·제외·중지 요청", "Collection rules, exclusions and opt-out"),
       destination("/guide", "랭킹 산정 방식", "Ranking guide", "데이터와 산식 설명", "Understand ranking data and formulas"),

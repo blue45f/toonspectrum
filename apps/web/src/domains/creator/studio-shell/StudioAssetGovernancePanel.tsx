@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BadgeCheck,
   CircleAlert,
   Cloud,
@@ -28,6 +29,7 @@ import {
   STUDIO_PLUGIN_PERMISSIONS,
   type StudioPluginPermission,
 } from "../studio-plugin-registry";
+import Link from "@/compat/router-link";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = "ko" | "en";
@@ -443,6 +445,24 @@ export function StudioAssetGovernancePanel({
               </p>
             </div>
           ) : null}
+
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-accent/25 bg-accent-soft/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+              <p className="text-xs leading-5 text-fg-2">
+                {locale === "ko"
+                  ? "이 확인은 프로젝트의 사용 목적과 권리 조건을 정리하는 도구입니다. 작품·원고·원본 파일의 권리를 서비스로 이전하지 않습니다."
+                  : "This review organises project usage and rights conditions. It does not transfer ownership of artwork, manuscripts or source files to the service."}
+              </p>
+            </div>
+            <Link
+              href="/about/principles"
+              className="inline-flex min-h-10 shrink-0 items-center gap-2 text-xs font-black text-accent hover:text-accent-2"
+            >
+              {locale === "ko" ? "제품 원칙 보기" : "View product principles"}
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </div>
     </section>
