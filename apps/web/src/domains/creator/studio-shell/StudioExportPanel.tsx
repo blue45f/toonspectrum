@@ -26,6 +26,17 @@ import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
 type Locale = "ko" | "en";
 
+const EXPORT_TARGET_VISUALS: Readonly<Record<StudioExportTargetId, string>> = {
+  "webtoon-platform": "/brand/theme-scenes/ink-studio.svg",
+  social: "/brand/theme-scenes/blossom-studio.svg",
+  print: "/brand/theme-scenes/paper-studio.svg",
+  "image-pdf": "/brand/theme-scenes/sepia-studio.svg",
+  editable: "/brand/theme-scenes/graphite-studio.svg",
+  ebook: "/brand/theme-scenes/aurora-studio.svg",
+  video: "/brand/theme-scenes/starlight-studio.svg",
+  archive: "/brand/theme-scenes/midnight-studio.svg",
+};
+
 function numberValue(value: string, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -155,7 +166,7 @@ export function StudioExportPanel({
         </p>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap gap-2" aria-label={locale === "ko" ? "내보내기 목적" : "Export destinations"}>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label={locale === "ko" ? "내보내기 목적" : "Export destinations"}>
         {STUDIO_EXPORT_TARGETS.map((candidate) => {
           const candidateProfile = STUDIO_EXPORT_TARGET_PROFILES[candidate];
           const active = candidate === target;
@@ -166,14 +177,27 @@ export function StudioExportPanel({
               aria-pressed={active}
               onClick={() => selectTarget(candidate)}
               className={cn(
-                "min-h-11 rounded-xl border px-3 text-xs font-bold transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+                "group min-w-0 overflow-hidden rounded-xl border text-left text-xs font-bold transition-all",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none",
                 active
-                  ? "border-accent bg-accent text-on-accent"
-                  : "border-line bg-panel text-fg-2 hover:border-accent/40 hover:text-fg",
+                  ? "border-accent bg-accent-soft/50 shadow-sm"
+                  : "border-line bg-panel text-fg-2 hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised hover:text-fg",
               )}
             >
-              {locale === "ko" ? candidateProfile.labelKo : candidateProfile.labelEn}
+              <span className="relative block h-20 overflow-hidden bg-canvas">
+                <img
+                  src={EXPORT_TARGET_VISUALS[candidate]}
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transform-none"
+                />
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-white/[0.04]" aria-hidden="true" />
+              </span>
+              <span className={cn("flex min-h-11 items-center px-3", active ? "text-accent" : "text-fg-2")}>
+                {locale === "ko" ? candidateProfile.labelKo : candidateProfile.labelEn}
+              </span>
             </button>
           );
         })}

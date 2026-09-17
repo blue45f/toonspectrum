@@ -3,6 +3,7 @@ import { useI18n } from "@/shared/lib/i18n";
 
 import { StudioImportPage } from "./StudioFrontDoorPages";
 import { StudioImportIntake } from "./StudioImportIntake";
+import { StudioImportVisualGuide } from "./StudioImportVisualGuide";
 
 function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
@@ -16,6 +17,7 @@ export function StudioImportIntegratedPage() {
     <>
       <StudioImportPage />
       <Container size="wide" className="pb-10 lg:pb-12">
+        <StudioImportVisualGuide locale={locale} />
         <StudioImportIntake locale={locale} />
       </Container>
     </>
