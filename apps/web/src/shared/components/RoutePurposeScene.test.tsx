@@ -82,8 +82,11 @@ describe("route purpose scene", () => {
     const result = scene("/studio/new");
     const video = result.container.querySelector<HTMLVideoElement>("video")!;
     expect(video.dataset.ready).toBe("false");
-    fireEvent.canPlay(video);
+    expect(video.querySelector("source")?.getAttribute("src")).toBe("/brand/toonstudio-route-header.mp4");
+    expect(video.querySelectorAll("source")).toHaveLength(1);
+    fireEvent.playing(video);
     expect(video.dataset.ready).toBe("true");
+    expect(result.container.querySelector<HTMLElement>("[data-route-visual-kind]")?.dataset.routeVisualVideoReady).toBe("true");
   });
 
   it("loops only the route-specific film chapter", () => {
