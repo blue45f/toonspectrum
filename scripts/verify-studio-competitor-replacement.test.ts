@@ -7,7 +7,7 @@ describe("Studio competitor replacement program", () => {
     await expect(verifyReplacementProgram()).resolves.toEqual({
       manifestPath: "docs/benchmarks/studio-competitor-replacement-program.json",
       workstreams: 57,
-      evidencePaths: 101,
+      evidencePaths: 107,
       implemented: 52,
       validationHarnesses: 4,
       externalValidationRequired: 1,
