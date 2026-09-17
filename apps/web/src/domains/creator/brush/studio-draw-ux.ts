@@ -16,7 +16,6 @@ import {
   studioBrushEngineLaneRowById,
 } from "./studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
-import { studioBrushProductProfileSearchTerms } from "./studio-brush-product-profile";
 import { isStudioV6BrushCatalogId } from "./studio-brush-v6-id";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
@@ -102,7 +101,6 @@ export function filterStudioBrushLibraryItems(options: {
       engineLane?.family ?? "",
       engineLaneLabel ?? "",
       ...(item.searchAliases ?? []),
-      ...studioBrushProductProfileSearchTerms(item),
     ]);
   });
 }
