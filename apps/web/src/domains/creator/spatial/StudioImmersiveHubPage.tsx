@@ -72,7 +72,7 @@ const KIT_TONE = Object.freeze({
 });
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return language;
 }
 
 function supportTone(state: StudioImmersiveSupport): string {
@@ -119,6 +119,7 @@ function CapabilityCard({
   );
 }
 function ImmersiveHeroVisual({ locale }: { readonly locale: Locale }) {
+  const bt = useBilingual("StudioImmersiveHubPage.hero");
   return (
     <div className="relative min-h-72 overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_top_left,oklch(0.72_0.18_285/0.26),transparent_42%),radial-gradient(circle_at_bottom_right,oklch(0.76_0.14_190/0.2),transparent_44%),var(--color-panel)] p-5 shadow-xl">
       <div className="absolute inset-x-10 top-8 h-36 rounded-[50%] border border-accent/25" aria-hidden />
@@ -301,8 +302,8 @@ export function StudioImmersiveHubPage() {
                     {stageIndex + 1}
                   </span>
                   <div className="lg:mt-3">
-                    <h3 id={`immersive-stage-${stage.id}`} className="text-sm font-black text-fg">{locale === "ko" ? stage.labelKo : stage.labelEn}</h3>
-                    <p className="mt-1 text-xs leading-5 text-fg-3">{locale === "ko" ? stage.descriptionKo : stage.descriptionEn}</p>
+                    <h3 id={`immersive-stage-${stage.id}`} className="text-sm font-black text-fg">{bt(stage.labelKo, stage.labelEn)}</h3>
+                    <p className="mt-1 text-xs leading-5 text-fg-3">{bt(stage.descriptionKo, stage.descriptionEn)}</p>
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -320,8 +321,8 @@ export function StudioImmersiveHubPage() {
                           </span>
                           <ArrowRight size={16} className="text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent" aria-hidden />
                         </div>
-                        <h4 className="mt-4 text-sm font-black text-fg">{locale === "ko" ? workflow.titleKo : workflow.titleEn}</h4>
-                        <p className="mt-2 flex-1 text-xs leading-5 text-fg-3">{locale === "ko" ? workflow.descriptionKo : workflow.descriptionEn}</p>
+                        <h4 className="mt-4 text-sm font-black text-fg">{bt(workflow.titleKo, workflow.titleEn)}</h4>
+                        <p className="mt-2 flex-1 text-xs leading-5 text-fg-3">{bt(workflow.descriptionKo, workflow.descriptionEn)}</p>
                         <p className="mt-3 text-[0.68rem] font-bold text-accent">
                           {bt(`결과 · ${workflow.outputKo}`, `Output · ${workflow.outputEn}`)}
                         </p>
@@ -357,21 +358,25 @@ export function StudioImmersiveHubPage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className={cn("rounded-full border px-2.5 py-1 text-[0.65rem] font-black", STAGE_TONE[kit.stage])}>
-                    {locale === "ko"
-                      ? STUDIO_IMMERSIVE_STAGES.find((stage) => stage.id === kit.stage)?.labelKo
-                      : STUDIO_IMMERSIVE_STAGES.find((stage) => stage.id === kit.stage)?.labelEn}
+                    {(() => {
+                      const stage = STUDIO_IMMERSIVE_STAGES.find((candidate) => candidate.id === kit.stage);
+                      return stage ? bt(stage.labelKo, stage.labelEn) : kit.stage;
+                    })()}
                   </span>
                   <ArrowRight size={16} className="text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent" aria-hidden />
                 </div>
-                <h3 className="mt-5 text-lg font-black text-fg">{locale === "ko" ? kit.titleKo : kit.titleEn}</h3>
-                <p className="mt-2 text-sm leading-6 text-fg-2">{locale === "ko" ? kit.descriptionKo : kit.descriptionEn}</p>
+                <h3 className="mt-5 text-lg font-black text-fg">{bt(kit.titleKo, kit.titleEn)}</h3>
+                <p className="mt-2 text-sm leading-6 text-fg-2">{bt(kit.descriptionKo, kit.descriptionEn)}</p>
                 <ul className="mt-4 space-y-2 text-xs font-semibold text-fg-3">
-                  {(locale === "ko" ? kit.deliverablesKo : kit.deliverablesEn).map((deliverable) => (
+                  {kit.deliverablesKo.map((deliverableKo, index) => {
+                  const deliverable = bt(deliverableKo, kit.deliverablesEn[index] ?? deliverableKo);
+                  return (
                     <li key={deliverable} className="flex items-start gap-2">
                       <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
                       <span>{deliverable}</span>
                     </li>
-                  ))}
+                  );
+                })}
                 </ul>
               </Link>
             ))}
