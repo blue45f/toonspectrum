@@ -1,5 +1,6 @@
 import {
   PRODUCTION_ROLE_LABELS,
+  eligibleAssignmentsForTask,
   inferProductionTaskDepartment,
   productionDepartment,
   type ProductionDepartmentKey,
@@ -86,6 +87,20 @@ export interface AssignmentWorkload {
   readonly health: "available" | "busy" | "overloaded";
 }
 
+export interface AssignmentRecommendation {
+  readonly task: ProductionTask;
+  readonly departmentKey: ProductionDepartmentKey;
+  readonly departmentLabel: string;
+  readonly candidate: RoleAssignment;
+  readonly candidateName: string;
+  readonly roleLabel: string;
+  readonly currentLoadPercent: number;
+  readonly projectedLoadPercent: number;
+  readonly addedHours: number;
+  readonly eligibleCandidateCount: number;
+  readonly reasons: readonly string[];
+}
+
 export interface EpisodePhaseCell {
   readonly key: string;
   readonly label: string;
@@ -112,6 +127,8 @@ export interface ProductionManagementOverview {
   readonly actions: readonly ManagementAction[];
   readonly episodeRows: readonly ManagementEpisodeRow[];
   readonly workload: readonly AssignmentWorkload[];
+  readonly assignmentRecommendations: readonly AssignmentRecommendation[];
+  readonly uncoveredUnassignedTaskCount: number;
   readonly blockedTaskCount: number;
   readonly overdueTaskCount: number;
   readonly reviewTaskCount: number;
@@ -263,6 +280,124 @@ export function deriveAssignmentWorkload(
     });
 }
 
+function assignmentCapabilityMatches(
+  assignment: RoleAssignment,
+  task: ProductionTask,
+  departmentKey: ProductionDepartmentKey,
+): boolean {
+  const processKey = normalizeProcessKey(task.processKey);
+  const departmentToken = normalizeProcessKey(departmentKey);
+  return assignment.capabilities.some((capability) => {
+    const normalized = normalizeProcessKey(capability);
+    return normalized.includes(processKey)
+      || normalized.includes(departmentToken)
+      || processKey.includes(normalized);
+  });
+}
+
+function assignmentRecommendationUrgency(task: ProductionTask, nowMs: number): number {
+  const dueAt = task.dueAt ? Date.parse(task.dueAt) : Number.NaN;
+  if (Number.isFinite(dueAt) && dueAt < nowMs) return 0;
+  if (ATTENTION_STATUSES.has(task.status)) return 1;
+  if (Number.isFinite(dueAt) && dueAt <= nowMs + 3 * DAY_MS) return 2;
+  return 3;
+}
+
+export function deriveAssignmentRecommendations(
+  aggregate: ProductionProjectAggregate,
+  now = new Date(),
+  workload: readonly AssignmentWorkload[] = deriveAssignmentWorkload(aggregate, now),
+): readonly AssignmentRecommendation[] {
+  const workloadByAssignmentId = new Map(workload.map((entry) => [entry.assignment.id, entry]));
+  const nowIso = now.toISOString();
+  const nowMs = now.getTime();
+
+  return aggregate.tasks
+    .filter((task) => !isClosed(task) && task.assignmentIds.length === 0)
+    .flatMap((task): AssignmentRecommendation[] => {
+      const departmentKey = inferProductionTaskDepartment(task, aggregate.assignments);
+      if (!departmentKey) return [];
+      const department = productionDepartment(departmentKey);
+      const eligible = eligibleAssignmentsForTask({
+        task,
+        assignments: aggregate.assignments,
+        departmentKey,
+        kind: "owner",
+        at: nowIso,
+      });
+      if (eligible.length === 0) return [];
+      const addedHours = round(task.estimateHours?.likely ?? task.estimateHours?.optimistic ?? 0);
+      const candidates = eligible.map((candidate) => {
+        const current = workloadByAssignmentId.get(candidate.id);
+        const capacityHours = current?.capacityHours ?? assignmentCapacityHours(
+          candidate,
+          now,
+          new Date(nowMs + PLANNING_WINDOW_DAYS * DAY_MS),
+        );
+        const remainingHours = current?.remainingHours ?? 0;
+        const currentLoadPercent = capacityHours > 0
+          ? Math.round((remainingHours / capacityHours) * 100)
+          : 999;
+        const projectedLoadPercent = capacityHours > 0
+          ? Math.round(((remainingHours + addedHours) / capacityHours) * 100)
+          : 999;
+        return {
+          candidate,
+          candidateName: assignmentName(aggregate, candidate),
+          currentLoadPercent,
+          projectedLoadPercent,
+          capabilityMatch: assignmentCapabilityMatches(candidate, task, departmentKey),
+        };
+      }).sort((left, right) => {
+        const overload = Number(left.projectedLoadPercent > 100) - Number(right.projectedLoadPercent > 100);
+        if (overload !== 0) return overload;
+        const capability = Number(right.capabilityMatch) - Number(left.capabilityMatch);
+        if (capability !== 0) return capability;
+        if (left.projectedLoadPercent !== right.projectedLoadPercent) {
+          return left.projectedLoadPercent - right.projectedLoadPercent;
+        }
+        const lead = Number(right.candidate.lead) - Number(left.candidate.lead);
+        if (lead !== 0) return lead;
+        return left.candidateName.localeCompare(right.candidateName, "ko-KR");
+      });
+      const selected = candidates[0];
+      if (!selected) return [];
+      const reasons = [
+        `${department.label} 담당 역할과 작업 범위가 일치합니다.`,
+        selected.capabilityMatch
+          ? `${task.processKey} 공정 역량 태그가 연결되어 있습니다.`
+          : "프로젝트 역할 규칙을 충족하는 후보입니다.",
+        `예상 ${addedHours}h 반영 시 작업량 ${selected.currentLoadPercent}% → ${selected.projectedLoadPercent}%입니다.`,
+      ];
+      if (eligible.length > 1) reasons.push(`후보 ${eligible.length}명 중 예상 부하가 가장 낮습니다.`);
+      if (selected.projectedLoadPercent > 100) {
+        reasons.push("배정 후 예상 부하가 100%를 넘어 일정 조정 또는 작업 분할이 필요합니다.");
+      }
+      return [{
+        task,
+        departmentKey,
+        departmentLabel: department.label,
+        candidate: selected.candidate,
+        candidateName: selected.candidateName,
+        roleLabel: selected.candidate.publicCreditRole ?? PRODUCTION_ROLE_LABELS[selected.candidate.roleType],
+        currentLoadPercent: selected.currentLoadPercent,
+        projectedLoadPercent: selected.projectedLoadPercent,
+        addedHours,
+        eligibleCandidateCount: eligible.length,
+        reasons,
+      }];
+    })
+    .sort((left, right) => {
+      const urgency = assignmentRecommendationUrgency(left.task, nowMs)
+        - assignmentRecommendationUrgency(right.task, nowMs);
+      if (urgency !== 0) return urgency;
+      const leftDue = left.task.dueAt ? Date.parse(left.task.dueAt) : Number.MAX_SAFE_INTEGER;
+      const rightDue = right.task.dueAt ? Date.parse(right.task.dueAt) : Number.MAX_SAFE_INTEGER;
+      if (leftDue !== rightDue) return leftDue - rightDue;
+      return left.task.title.localeCompare(right.task.title, "ko-KR");
+    });
+}
+
 function normalizeProcessKey(value: string): string {
   return value.trim().toLocaleLowerCase("en-US").replace(/[\s_]+/gu, "-");
 }
@@ -370,11 +505,15 @@ function buildActions(input: {
   readonly now: Date;
   readonly episodeRows: readonly ManagementEpisodeRow[];
   readonly workload: readonly AssignmentWorkload[];
+  readonly assignmentRecommendations: readonly AssignmentRecommendation[];
 }): readonly ManagementAction[] {
-  const { aggregate, lens, now, episodeRows, workload } = input;
+  const { aggregate, lens, now, episodeRows, workload, assignmentRecommendations } = input;
   const nowMs = now.getTime();
   const projectBase = `/production/projects/${encodeURIComponent(aggregate.projectId)}`;
   const actions: ManagementAction[] = [];
+  const recommendationByTaskId = new Map(
+    assignmentRecommendations.map((recommendation) => [recommendation.task.id, recommendation]),
+  );
 
   for (const thread of aggregate.clarifications.filter((entry) => entry.blocking && (entry.status === "open" || entry.status === "answered"))) {
     const episodeId = thread.scope.kind === "episode"
@@ -449,14 +588,17 @@ function buildActions(input: {
     }
 
     if (task.assignmentIds.length === 0) {
+      const recommendation = recommendationByTaskId.get(task.id);
       actions.push({
         id: `unassigned-task:${task.id}`,
         kind: "assignment",
         severity: "warning",
         title: task.title,
-        detail: `${productionDepartment(departmentKey).label} · 책임자 미배정`,
-        actionLabel: "담당 배정",
-        href: `${projectBase}/production`,
+        detail: recommendation
+          ? `${productionDepartment(departmentKey).label} · ${recommendation.candidateName} 추천 · 예상 ${recommendation.projectedLoadPercent}%`
+          : `${productionDepartment(departmentKey).label} · 책임자 미배정 · 적합 후보 없음`,
+        actionLabel: recommendation ? "추천 배정 확인" : "팀 역할 보강",
+        href: recommendation ? `${projectBase}/overview#assignment-recommendations` : `${projectBase}/settings`,
         dueAt: task.dueAt,
         sourceId: task.id,
         episodeId,
@@ -567,8 +709,12 @@ export function deriveProductionManagementOverview(
   const operations = deriveProductionOperationsOverview(aggregate, now);
   const episodeRows = deriveManagementEpisodeRows(operations.rows);
   const workload = deriveAssignmentWorkload(aggregate, now);
+  const assignmentRecommendations = deriveAssignmentRecommendations(aggregate, now, workload);
   const nowMs = now.getTime();
   const openTasks = aggregate.tasks.filter((task) => !isClosed(task));
+  const recommendedTaskIds = new Set(assignmentRecommendations.map((entry) => entry.task.id));
+  const uncoveredUnassignedTaskCount = openTasks.filter((task) =>
+    task.assignmentIds.length === 0 && !recommendedTaskIds.has(task.id)).length;
   const blockedTaskCount = openTasks.filter((task) => task.status === "blocked" || task.status === "needs-input").length;
   const overdueTaskCount = openTasks.filter((task) => Boolean(task.dueAt && Date.parse(task.dueAt) < nowMs)).length;
   const reviewTaskCount = openTasks.filter((task) => REVIEW_STATUSES.has(task.status)).length;
@@ -598,6 +744,7 @@ export function deriveProductionManagementOverview(
   if (blockedTaskCount > 0) healthReasons.push(`차단·입력 대기 업무 ${blockedTaskCount}개`);
   if (blockingQuestionCount > 0) healthReasons.push(`제작 차단 질문 ${blockingQuestionCount}개`);
   if (overloadedAssignmentCount > 0) healthReasons.push(`기본 가용량 초과 ${overloadedAssignmentCount}명`);
+  if (uncoveredUnassignedTaskCount > 0) healthReasons.push(`배정 가능 인력 없음 ${uncoveredUnassignedTaskCount}개`);
   if (reviewTaskCount > 0) healthReasons.push(`검수·수정 대기 ${reviewTaskCount}개`);
   if (operations.unplannedCount > 0) healthReasons.push(`게시 마감 미설정 ${operations.unplannedCount}개`);
   if (healthReasons.length === 0) healthReasons.push("현재 기준으로 차단·지연·과부하가 없습니다.");
@@ -608,9 +755,18 @@ export function deriveProductionManagementOverview(
     healthLabel: health.label,
     healthReasons,
     operations,
-    actions: buildActions({ aggregate, lens: roleLens, now, episodeRows, workload }),
+    actions: buildActions({
+      aggregate,
+      lens: roleLens,
+      now,
+      episodeRows,
+      workload,
+      assignmentRecommendations,
+    }),
     episodeRows,
     workload,
+    assignmentRecommendations,
+    uncoveredUnassignedTaskCount,
     blockedTaskCount,
     overdueTaskCount,
     reviewTaskCount,

@@ -93,9 +93,41 @@ describe("production management overview", () => {
     const overview = deriveProductionManagementOverview(next, { now: NOW, roleLens: "producer" });
 
     expect(overview.unassignedTaskCount).toBe(1);
+    expect(overview.uncoveredUnassignedTaskCount).toBe(0);
+    expect(overview.assignmentRecommendations).toHaveLength(1);
+    expect(overview.assignmentRecommendations[0]).toMatchObject({
+      task: { id: task.id },
+      candidate: { id: "assignment-lettering" },
+      candidateName: "정태오",
+      departmentKey: "lettering",
+    });
+    expect(overview.assignmentRecommendations[0]?.projectedLoadPercent)
+      .toBeGreaterThan(overview.assignmentRecommendations[0]?.currentLoadPercent ?? 0);
     expect(overview.actions.some((action) =>
       action.id === `unassigned-task:${task.id}`
-      && action.actionLabel === "담당 배정"))
+      && action.actionLabel === "추천 배정 확인"))
+      .toBe(true);
+  });
+
+  it("marks unassigned work as a coverage gap when no eligible role is active", () => {
+    const aggregate = createProductionDemoProject();
+    const task = aggregate.tasks.find((entry) => entry.id === "task-episode-12-lettering");
+    if (!task) throw new Error("demo lettering task missing");
+    const next: ProductionProjectAggregate = {
+      ...aggregate,
+      tasks: aggregate.tasks.map((entry) =>
+        entry.id === task.id ? { ...entry, assignmentIds: [] } : entry),
+      assignments: aggregate.assignments.map((assignment) =>
+        assignment.id === "assignment-lettering" ? { ...assignment, status: "ended" as const } : assignment),
+    };
+    const overview = deriveProductionManagementOverview(next, { now: NOW });
+
+    expect(overview.assignmentRecommendations).toHaveLength(0);
+    expect(overview.uncoveredUnassignedTaskCount).toBe(1);
+    expect(overview.healthReasons).toContain("배정 가능 인력 없음 1개");
+    expect(overview.actions.some((action) =>
+      action.id === `unassigned-task:${task.id}`
+      && action.actionLabel === "팀 역할 보강"))
       .toBe(true);
   });
 

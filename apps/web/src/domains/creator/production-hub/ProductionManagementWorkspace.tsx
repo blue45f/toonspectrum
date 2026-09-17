@@ -10,9 +10,11 @@ import {
   Gauge,
   GitBranch,
   ListChecks,
+  LoaderCircle,
   PanelTopOpen,
   ShieldAlert,
   Sparkles,
+  UserPlus,
   UserRoundCheck,
   Users,
   Workflow,
@@ -26,12 +28,14 @@ import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
 import {
   deriveProductionManagementOverview,
   episodeHealthLabel,
+  type AssignmentRecommendation,
   type ManagementAction,
   type ManagementHealth,
   type ManagementPhaseStatus,
   type ManagementSeverity,
   type ProductionManagementLens,
 } from "./production-management-overview";
+import type { ProductionClientCommand } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -39,6 +43,8 @@ import { cn } from "@/shared/lib/utils";
 interface ProductionManagementWorkspaceProps {
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: ProductionManagementLens;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
   readonly now?: Date;
 }
 
@@ -183,12 +189,14 @@ function MetricCard({
 }
 
 function Section({
+  id,
   title,
   description,
   action,
   children,
   className,
 }: {
+  readonly id?: string;
   readonly title: string;
   readonly description?: string;
   readonly action?: ReactNode;
@@ -196,7 +204,7 @@ function Section({
   readonly className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-line bg-card p-4 sm:p-5", className)}>
+    <section id={id} className={cn("scroll-mt-4 rounded-2xl border border-line bg-card p-4 sm:p-5", className)}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-black text-fg">{title}</h2>
@@ -277,6 +285,8 @@ function PhaseCell({
 export function ProductionManagementWorkspace({
   aggregate,
   roleLens,
+  execute,
+  canEdit,
   now,
 }: ProductionManagementWorkspaceProps) {
   const overview = useMemo(
@@ -284,11 +294,28 @@ export function ProductionManagementWorkspace({
     [aggregate, now, roleLens],
   );
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
   const visibleActions = overview.actions.filter((action) => actionMatchesFilter(action, actionFilter));
   const roleCopy = ROLE_COPY[roleLens];
   const nextRelease = overview.operations.nextRelease;
   const projectBase = `/production/projects/${encodeURIComponent(aggregate.projectId)}`;
   const reviewOrChangeCount = overview.actions.filter((action) => action.kind === "review" || action.kind === "change").length;
+
+  const applyRecommendedAssignment = async (recommendation: AssignmentRecommendation) => {
+    if (!canEdit || assigningTaskId) return;
+    setAssigningTaskId(recommendation.task.id);
+    try {
+      await execute({
+        type: "upsert-task",
+        task: {
+          ...recommendation.task,
+          assignmentIds: [recommendation.candidate.id],
+        },
+      }, `${recommendation.task.title} 담당자를 ${recommendation.candidateName}에게 배정했습니다.`);
+    } finally {
+      setAssigningTaskId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -384,7 +411,9 @@ export function ProductionManagementWorkspace({
         <MetricCard
           label="미배정·과부하"
           value={`${overview.unassignedTaskCount} · ${overview.overloadedAssignmentCount}`}
-          detail="책임자 미배정 · 기본 가용량 초과"
+          detail={overview.uncoveredUnassignedTaskCount > 0
+            ? `후보 없음 ${overview.uncoveredUnassignedTaskCount} · 과부하 ${overview.overloadedAssignmentCount}`
+            : "책임자 미배정 · 기본 가용량 초과"}
           icon={Users}
           tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? "warning" : "success"}
         />
@@ -484,6 +513,107 @@ export function ProductionManagementWorkspace({
           </div>
         </Section>
       </div>
+
+      <Section
+        id="assignment-recommendations"
+        title="추천 업무 배정"
+        description="개인 생산성 순위가 아니라 역할·범위·활성 기간·향후 14일 예상 부하만 사용합니다. 사용자 확인 전에는 담당자를 변경하지 않습니다."
+        action={(
+          <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/settings`}>
+            팀 역할 확인 <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        )}
+      >
+        {overview.assignmentRecommendations.length > 0 ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {overview.assignmentRecommendations.slice(0, 6).map((recommendation) => {
+              const projectedTone: Tone = recommendation.projectedLoadPercent > 100
+                ? "danger"
+                : recommendation.projectedLoadPercent >= 80 ? "warning" : "success";
+              const assigning = assigningTaskId === recommendation.task.id;
+              return (
+                <article key={recommendation.task.id} className="rounded-2xl border border-line bg-panel p-4">
+                  <header className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Pill tone="accent">{recommendation.departmentLabel}</Pill>
+                        <Pill tone={projectedTone}>
+                          {recommendation.currentLoadPercent}% → {recommendation.projectedLoadPercent}%
+                        </Pill>
+                      </div>
+                      <h3 className="mt-2 text-sm font-black leading-5 text-fg">{recommendation.task.title}</h3>
+                      <p className="mt-1 text-xs text-fg-2">
+                        추천 {recommendation.candidateName} · {recommendation.roleLabel}
+                      </p>
+                    </div>
+                    <span className="text-right text-[0.6875rem] text-fg-3">
+                      {formatDate(recommendation.task.dueAt)} 마감<br />예상 +{recommendation.addedHours}h
+                    </span>
+                  </header>
+
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between gap-2 text-[0.6875rem]">
+                      <span className="text-fg-3">배정 후 예상 작업량</span>
+                      <span className="font-black text-fg">{recommendation.projectedLoadPercent}%</span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised" aria-label={`${recommendation.candidateName} 배정 후 예상 작업량 ${recommendation.projectedLoadPercent}%`}>
+                      <div
+                        className={cn("h-full rounded-full", recommendation.projectedLoadPercent > 100 ? "bg-bad" : recommendation.projectedLoadPercent >= 80 ? "bg-warn" : "bg-good")}
+                        style={{ width: `${Math.min(100, recommendation.projectedLoadPercent)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <ul className="mt-3 space-y-1 text-[0.6875rem] leading-5 text-fg-2">
+                    {recommendation.reasons.slice(0, 4).map((reason) => (
+                      <li key={reason} className="flex gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" />
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    className={cn(buttonClass({ size: "sm" }), "mt-4 w-full")}
+                    aria-label={`업무 ${recommendation.task.title} 담당자를 ${recommendation.candidateName}에게 배정`}
+                    disabled={!canEdit || assigningTaskId !== null}
+                    onClick={() => void applyRecommendedAssignment(recommendation)}
+                  >
+                    {assigning ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <UserPlus className="size-4" aria-hidden="true" />}
+                    {assigning ? "배정 중…" : canEdit ? "추천 담당자 배정" : "편집 권한 필요"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line p-8 text-center">
+            {overview.unassignedTaskCount === 0
+              ? <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
+              : <Users className="mx-auto size-8 text-warn" aria-hidden="true" />}
+            <p className="mt-3 text-sm font-black text-fg">
+              {overview.unassignedTaskCount === 0 ? "모든 열린 업무에 책임자가 있습니다" : "현재 규칙으로 추천할 담당자가 없습니다"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-fg-2">
+              {overview.unassignedTaskCount === 0
+                ? "새 업무가 생성되면 역할과 작업량을 다시 계산합니다."
+                : "해당 공정의 역할 범위, 활성 기간 또는 프로젝트 참여자를 확인해 주세요."}
+            </p>
+          </div>
+        )}
+        {overview.assignmentRecommendations.length > 0 && overview.uncoveredUnassignedTaskCount > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/35 bg-warn/10 p-3">
+            <div>
+              <p className="text-xs font-black text-fg">적합 후보가 없는 업무 {overview.uncoveredUnassignedTaskCount}개</p>
+              <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">역할 범위 또는 참여 기간을 보강해야 배정 추천을 만들 수 있습니다.</p>
+            </div>
+            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/settings`}>
+              팀 설정 열기
+            </Link>
+          </div>
+        ) : null}
+      </Section>
 
       <Section
         title="회차 공정 매트릭스"

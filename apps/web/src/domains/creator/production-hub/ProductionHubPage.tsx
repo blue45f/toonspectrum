@@ -566,8 +566,18 @@ function ProjectNav({ projectId, surface }: { readonly projectId: string; readon
   );
 }
 
-function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: ProductionProjectAggregate; readonly roleLens: RoleLens }) {
-  return <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} />;
+function OverviewSurface({
+  aggregate,
+  roleLens,
+  execute,
+  canEdit,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly roleLens: RoleLens;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+}) {
+  return <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
 }
 
 function PlanningSurface({
@@ -1015,7 +1025,7 @@ function SurfaceContent({
   readonly canEdit: boolean;
 }) {
   switch (surface) {
-    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
+    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
