@@ -4,7 +4,16 @@ import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  SystemDesktopCredentialVault,
+} from "./credential-vault.js";
 import { loadSyncJournal } from "./journal.js";
+import {
+  DEFAULT_DESKTOP_OAUTH_PROFILE,
+  DESKTOP_OAUTH_CLIENT_ID_ENVIRONMENT,
+  DesktopOAuthCredentialManager,
+  desktopOAuthProviderConfig,
+} from "./oauth.js";
 import { buildDesktopSyncPlan, countSyncPlanActions } from "./planner.js";
 import {
   DEFAULT_CLOUD_ACCESS_TOKEN_ENVIRONMENT,
@@ -67,12 +76,20 @@ export const DESKTOP_SYNC_CLI_HELP = `ToonStudio folder sync
 Usage:
   toonstudio-sync --local <folder> --remote-folder <folder> [options]
   toonstudio-sync --local <folder> --cloud-provider <provider> [options]
+  toonstudio-sync login --cloud-provider <provider> [options]
+  toonstudio-sync auth-status --cloud-provider <provider> [options]
+  toonstudio-sync logout --cloud-provider <provider> [options]
 
 Remote targets:
   --remote-folder <path>       Local disk, external disk, NAS or mounted folder
   --cloud-provider <provider>  google-drive, dropbox or onedrive
   --cloud-root <path>          Provider root path (default: Sync)
-  --access-token-env <name>    Environment variable that contains the OAuth token
+  --access-token-env <name>    Optional legacy access-token environment variable
+  --credential-profile <name>  OS credential-vault profile (default: default)
+
+OAuth account commands:
+  --oauth-client-id-env <name> Environment variable containing the public OAuth client id
+  --onedrive-tenant <tenant>   common, consumers, organizations or tenant UUID
 
 Modes:
   --once                 Run one conflict-safe sync cycle (default)
@@ -86,7 +103,7 @@ Options:
   --json                 Emit machine-readable summaries
   --help                 Show this help
 
-Default token variables:
+Legacy access-token fallback variables:
   Google Drive  TOONSTUDIO_GOOGLE_DRIVE_ACCESS_TOKEN
   Dropbox       TOONSTUDIO_DROPBOX_ACCESS_TOKEN
   OneDrive      TOONSTUDIO_ONEDRIVE_ACCESS_TOKEN
@@ -131,6 +148,8 @@ export function parseDesktopSyncCliArguments(
   let cloudProviderValue = "";
   let cloudRoot = "Sync";
   let accessTokenEnvironmentVariable = "";
+  let credentialProfile = DEFAULT_DESKTOP_OAUTH_PROFILE;
+  let credentialProfileExplicit = false;
   let selectedMode: DesktopSyncCliMode | null = null;
   let intervalMs = DEFAULT_INTERVAL_MS;
   let includeUnknownFiles = false;
@@ -155,6 +174,11 @@ export function parseDesktopSyncCliArguments(
         break;
       case "--cloud-root":
         cloudRoot = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--credential-profile":
+        credentialProfile = requiredValue(arguments_, index, argument);
+        credentialProfileExplicit = true;
         index += 1;
         break;
       case "--access-token-env":
@@ -212,9 +236,13 @@ export function parseDesktopSyncCliArguments(
       "choose exactly one of --remote-folder or --cloud-provider",
     );
   }
-  if (remoteFolder && (accessTokenEnvironmentVariable || cloudRoot !== "Sync")) {
+  if (remoteFolder && (
+    accessTokenEnvironmentVariable
+    || cloudRoot !== "Sync"
+    || credentialProfileExplicit
+  )) {
     throw new TypeError(
-      "--cloud-root and --access-token-env require --cloud-provider",
+      "--cloud-root, --access-token-env and --credential-profile require --cloud-provider",
     );
   }
   const mode: DesktopSyncCliMode = selectedMode ?? "once";
@@ -229,6 +257,7 @@ export function parseDesktopSyncCliArguments(
       kind: "cloud",
       provider,
       rootPath: cloudRoot,
+      credentialProfile,
       accessTokenEnvironmentVariable:
         accessTokenEnvironmentVariable
         || DEFAULT_CLOUD_ACCESS_TOKEN_ENVIRONMENT[provider],
@@ -251,6 +280,156 @@ export function parseDesktopSyncCliArguments(
     json,
     help,
   };
+}
+
+export type DesktopSyncAuthCommand =
+  | "login"
+  | "logout"
+  | "auth-status";
+
+interface DesktopSyncAuthCliOptions {
+  readonly command: DesktopSyncAuthCommand;
+  readonly provider: ReturnType<typeof parseDesktopCloudProviderId>;
+  readonly credentialProfile: string;
+  readonly oauthClientIdEnvironmentVariable: string;
+  readonly oneDriveTenant: string;
+  readonly json: boolean;
+  readonly help: boolean;
+}
+
+function parseDesktopSyncAuthArguments(
+  command: DesktopSyncAuthCommand,
+  arguments_: readonly string[],
+): DesktopSyncAuthCliOptions {
+  let providerValue = "";
+  let credentialProfile = DEFAULT_DESKTOP_OAUTH_PROFILE;
+  let oauthClientIdEnvironmentVariable = "";
+  let oneDriveTenant = "";
+  let json = false;
+  let help = false;
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const argument = arguments_[index];
+    switch (argument) {
+      case "--cloud-provider":
+        providerValue = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--credential-profile":
+        credentialProfile = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--oauth-client-id-env":
+        oauthClientIdEnvironmentVariable = requiredValue(
+          arguments_,
+          index,
+          argument,
+        );
+        index += 1;
+        break;
+      case "--onedrive-tenant":
+        oneDriveTenant = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--json":
+        json = true;
+        break;
+      case "--help":
+      case "-h":
+        help = true;
+        break;
+      default:
+        throw new TypeError(`unknown ${command} option: ${argument}`);
+    }
+  }
+  if (!help && !providerValue) {
+    throw new TypeError(`${command} requires --cloud-provider`);
+  }
+  const provider = providerValue
+    ? parseDesktopCloudProviderId(providerValue)
+    : "google-drive";
+  if (provider !== "onedrive" && oneDriveTenant) {
+    throw new TypeError("--onedrive-tenant requires --cloud-provider onedrive");
+  }
+  return {
+    command,
+    provider,
+    credentialProfile,
+    oauthClientIdEnvironmentVariable:
+      oauthClientIdEnvironmentVariable
+      || DESKTOP_OAUTH_CLIENT_ID_ENVIRONMENT[provider],
+    oneDriveTenant,
+    json,
+    help,
+  };
+}
+
+function authHumanSummary(
+  command: DesktopSyncAuthCommand,
+  status: Awaited<ReturnType<DesktopOAuthCredentialManager["status"]>>,
+): string {
+  if (command === "logout") {
+    return `${status.provider} profile ${status.profile} disconnected.`;
+  }
+  if (!status.connected) {
+    return `${status.provider} profile ${status.profile} is not connected.`;
+  }
+  return `${status.provider} profile ${status.profile} connected as ${status.accountLabel ?? "unknown account"}; expires ${status.expiresAt ?? "unknown"}.`;
+}
+
+async function runDesktopSyncAuthCommand(
+  options: DesktopSyncAuthCliOptions,
+  io: DesktopSyncCliIo,
+  dependencies: DesktopSyncRemoteDependencies,
+): Promise<number> {
+  if (options.help) {
+    io.stdout.write(DESKTOP_SYNC_CLI_HELP);
+    return 0;
+  }
+  const environment = dependencies.environment ?? process.env;
+  const vault = dependencies.credentialVault
+    ?? new SystemDesktopCredentialVault();
+  const manager = dependencies.oauthManager
+    ?? new DesktopOAuthCredentialManager(vault, {
+      fetchImpl: dependencies.fetchImpl,
+    });
+  if (options.command === "login") {
+    const clientId = environment[
+      options.oauthClientIdEnvironmentVariable
+    ]?.trim();
+    if (!clientId) {
+      throw new TypeError(
+        `OAuth client id is missing from ${options.oauthClientIdEnvironmentVariable}`,
+      );
+    }
+    const tenant = options.oneDriveTenant
+      || environment.TOONSTUDIO_ONEDRIVE_OAUTH_TENANT;
+    const config = desktopOAuthProviderConfig(
+      options.provider,
+      clientId,
+      tenant,
+    );
+    const status = await manager.login(config, {
+      profile: options.credentialProfile,
+    });
+    io.stdout.write(options.json
+      ? `${JSON.stringify(status)}\n`
+      : `${authHumanSummary(options.command, status)}\n`);
+    return 0;
+  }
+  if (options.command === "logout") {
+    await manager.logout(
+      options.provider,
+      options.credentialProfile,
+    );
+  }
+  const status = await manager.status(
+    options.provider,
+    options.credentialProfile,
+  );
+  io.stdout.write(options.json
+    ? `${JSON.stringify(status)}\n`
+    : `${authHumanSummary(options.command, status)}\n`);
+  return 0;
 }
 
 async function assertLocalRoot(localRoot: string): Promise<void> {
@@ -374,6 +553,16 @@ export async function runDesktopSyncCli(
   io: DesktopSyncCliIo = process,
   dependencies: DesktopSyncRemoteDependencies = {},
 ): Promise<number> {
+  const command = arguments_[0];
+  if (command === "login"
+    || command === "logout"
+    || command === "auth-status") {
+    return runDesktopSyncAuthCommand(
+      parseDesktopSyncAuthArguments(command, arguments_.slice(1)),
+      io,
+      dependencies,
+    );
+  }
   const options = parseDesktopSyncCliArguments(arguments_);
   if (options.help) {
     io.stdout.write(DESKTOP_SYNC_CLI_HELP);

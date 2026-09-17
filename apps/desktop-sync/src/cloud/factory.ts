@@ -3,6 +3,8 @@ import { GoogleDriveDesktopCloudProvider } from "./google-drive.js";
 import { IndexedCloudDesktopSyncRemote } from "./indexed-remote.js";
 import { OneDriveDesktopCloudProvider } from "./onedrive.js";
 
+import type { DesktopCloudAccessTokenSource } from "../oauth.js";
+import type { DesktopUploadSessionStore } from "../upload-session-store.js";
 import type {
   DesktopCloudProvider,
   DesktopCloudProviderId,
@@ -10,9 +12,11 @@ import type {
 
 export interface CreateDesktopCloudRemoteOptions {
   readonly provider: DesktopCloudProviderId;
-  readonly accessToken: string;
+  readonly accessToken: string | DesktopCloudAccessTokenSource;
   readonly rootPath?: string;
   readonly fetchImpl?: typeof fetch;
+  readonly credentialProfile?: string;
+  readonly uploadSessionStore?: DesktopUploadSessionStore;
 }
 
 export function createDesktopCloudProvider(

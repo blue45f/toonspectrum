@@ -4,6 +4,7 @@ import {
   jsonObject,
   normalizeCloudRelativePath,
   numberField,
+  sha256Bytes,
   stringField,
 } from "./http.js";
 import {
@@ -12,10 +13,19 @@ import {
   type DesktopCloudProvider,
 } from "./types.js";
 
+import type { DesktopCloudAccessTokenSource } from "../oauth.js";
+import type {
+  DesktopUploadSessionIdentity,
+  DesktopUploadSessionRecord,
+  DesktopUploadSessionStore,
+} from "../upload-session-store.js";
+
 export interface OneDriveDesktopCloudProviderOptions {
-  readonly accessToken: string;
+  readonly accessToken: string | DesktopCloudAccessTokenSource;
   readonly rootPath?: string;
   readonly fetchImpl?: typeof fetch;
+  readonly credentialProfile?: string;
+  readonly uploadSessionStore?: DesktopUploadSessionStore;
 }
 
 const GRAPH_API = "https://graph.microsoft.com/v1.0/me/drive";
@@ -76,12 +86,16 @@ export class OneDriveDesktopCloudProvider implements DesktopCloudProvider {
   readonly rootLabel: string;
   private readonly rootSegments: readonly string[];
   private readonly http: DesktopCloudHttpClient;
+  private readonly credentialProfile: string;
+  private readonly uploadSessionStore?: DesktopUploadSessionStore;
   private rootFolderId: string | null = null;
 
   constructor(options: OneDriveDesktopCloudProviderOptions) {
     const root = normalizeCloudRelativePath(options.rootPath ?? "Sync");
     this.rootLabel = `AppRoot/${root}`;
     this.rootSegments = cloudPathSegments(root);
+    this.credentialProfile = options.credentialProfile?.trim() || "default";
+    this.uploadSessionStore = options.uploadSessionStore;
     this.http = new DesktopCloudHttpClient({
       provider: this.id,
       accessToken: options.accessToken,
@@ -328,11 +342,37 @@ export class OneDriveDesktopCloudProvider implements DesktopCloudProvider {
     );
     return new Uint8Array(await response.arrayBuffer());
   }
+  private uploadIdentity(input: {
+    readonly relativePath: string;
+    readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
+    readonly expected: DesktopCloudObject | null;
+  }): DesktopUploadSessionIdentity {
+    const sourceSha256 = input.sourceSha256 ?? sha256Bytes(input.bytes);
+    if (!/^[a-f0-9]{64}$/u.test(sourceSha256)) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        `OneDrive upload hash is invalid: ${input.relativePath}`,
+      );
+    }
+    return {
+      provider: this.id,
+      remoteRoot: this.rootLabel,
+      credentialProfile: this.credentialProfile,
+      relativePath: normalizeCloudRelativePath(input.relativePath),
+      sourceSha256,
+      size: input.bytes.byteLength,
+      expectedObjectId: input.expected?.id ?? null,
+      expectedVersion: input.expected?.version ?? null,
+    };
+  }
+
   private async createUploadSession(input: {
     readonly relativePath: string;
     readonly expected: DesktopCloudObject | null;
     readonly signal?: AbortSignal;
-  }): Promise<string> {
+  }): Promise<{ readonly handle: string; readonly expiresAt: string | null }> {
     const { parentId, name } = await this.ensureParent(
       input.relativePath,
       input.signal,
@@ -368,43 +408,144 @@ export class OneDriveDesktopCloudProvider implements DesktopCloudProvider {
         deferCommit: false,
       }),
     }, { signal: input.signal });
-    const uploadUrl = stringField(body?.uploadUrl);
-    if (!uploadUrl.startsWith("https://")) {
+    const handle = stringField(body?.uploadUrl);
+    const expiresAt = stringField(body?.expirationDateTime) || null;
+    if (!handle.startsWith("https://")) {
       throw new DesktopCloudError(
         this.id,
         "invalid-response",
         "OneDrive upload session URL is missing",
       );
     }
-    return uploadUrl;
+    if (expiresAt !== null && !Number.isFinite(Date.parse(expiresAt))) {
+      throw new DesktopCloudError(
+        this.id,
+        "invalid-response",
+        "OneDrive upload session expiration is invalid",
+      );
+    }
+    return { handle, expiresAt };
   }
+
+  private async saveUploadSession(
+    identity: DesktopUploadSessionIdentity,
+    handle: string,
+    offset: number,
+    expiresAt: string | null,
+    signal?: AbortSignal,
+  ): Promise<DesktopUploadSessionRecord> {
+    const record: DesktopUploadSessionRecord = {
+      ...identity,
+      schemaVersion: 1,
+      kind: "onedrive-upload-url",
+      handle,
+      offset,
+      expiresAt,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.uploadSessionStore?.save(record, signal);
+    return record;
+  }
+
+  private nextExpectedOffset(
+    body: Record<string, unknown>,
+    fallback: number,
+  ): number {
+    const ranges = Array.isArray(body.nextExpectedRanges)
+      ? body.nextExpectedRanges
+      : [];
+    const nextRange = typeof ranges[0] === "string" ? ranges[0] : "";
+    const match = /^(\d+)-/u.exec(nextRange);
+    const offset = match ? Number(match[1]) : fallback;
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        "OneDrive upload session returned an invalid offset",
+      );
+    }
+    return offset;
+  }
+
+  private async queryUploadSession(
+    record: DesktopUploadSessionRecord,
+    bytes: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly record: DesktopUploadSessionRecord;
+    readonly metadata: OneDriveMetadata | null;
+  }> {
+    const response = await this.http.request(
+      record.handle,
+      { method: "GET", headers: { Accept: "application/json" } },
+      { anonymous: true, signal },
+    );
+    const body = await jsonObject(response, this.id);
+    const metadata = oneDriveMetadata(body);
+    if (metadata && !metadata.isFolder) return { record, metadata };
+    const offset = this.nextExpectedOffset(body, record.offset);
+    if (offset > bytes.byteLength) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        "OneDrive upload offset exceeds the source file",
+      );
+    }
+    const expiresAt = stringField(body.expirationDateTime)
+      || record.expiresAt;
+    return {
+      record: await this.saveUploadSession(
+        record,
+        record.handle,
+        offset,
+        expiresAt,
+        signal,
+      ),
+      metadata: null,
+    };
+  }
+
   private async uploadChunks(
-    uploadUrl: string,
+    recordValue: DesktopUploadSessionRecord,
     bytes: Uint8Array,
     signal?: AbortSignal,
   ): Promise<OneDriveMetadata> {
-    let offset = 0;
-    while (offset < bytes.byteLength) {
+    let record = recordValue;
+    if (record.offset > 0) {
+      const status = await this.queryUploadSession(record, bytes, signal);
+      if (status.metadata) return status.metadata;
+      record = status.record;
+    }
+    while (record.offset < bytes.byteLength) {
       const endExclusive = Math.min(
         bytes.byteLength,
-        offset + ONEDRIVE_CHUNK_BYTES,
+        record.offset + ONEDRIVE_CHUNK_BYTES,
       );
-      const response = await this.http.request(uploadUrl, {
+      const response = await this.http.request(record.handle, {
         method: "PUT",
         headers: {
           "Content-Type": "application/octet-stream",
-          "Content-Range": `bytes ${offset}-${endExclusive - 1}/${bytes.byteLength}`,
+          "Content-Range": `bytes ${record.offset}-${endExclusive - 1}/${bytes.byteLength}`,
         },
-        body: bytes.slice(offset, endExclusive),
+        body: bytes.slice(record.offset, endExclusive),
       }, { allow: [202], anonymous: true, signal });
       if (response.status === 202) {
         const progress = await jsonObject(response, this.id);
-        const ranges = Array.isArray(progress.nextExpectedRanges)
-          ? progress.nextExpectedRanges
-          : [];
-        const nextRange = typeof ranges[0] === "string" ? ranges[0] : "";
-        const match = /^(\d+)-/u.exec(nextRange);
-        offset = match ? Number(match[1]) : endExclusive;
+        const offset = this.nextExpectedOffset(progress, endExclusive);
+        if (offset <= record.offset || offset > bytes.byteLength) {
+          throw new DesktopCloudError(
+            this.id,
+            "integrity",
+            "OneDrive upload session did not advance safely",
+          );
+        }
+        record = await this.saveUploadSession(
+          record,
+          record.handle,
+          offset,
+          stringField(progress.expirationDateTime) || record.expiresAt,
+          signal,
+        );
         continue;
       }
       const metadata = oneDriveMetadata(await jsonObject(response, this.id));
@@ -417,16 +558,19 @@ export class OneDriveDesktopCloudProvider implements DesktopCloudProvider {
       }
       return metadata;
     }
+    const status = await this.queryUploadSession(record, bytes, signal);
+    if (status.metadata) return status.metadata;
     throw new DesktopCloudError(
       this.id,
-      "unsupported",
-      "OneDrive cannot upload an empty file",
+      "invalid-response",
+      "OneDrive upload session is incomplete",
     );
   }
 
   async uploadFile(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
     readonly expected: DesktopCloudObject | null;
     readonly signal?: AbortSignal;
   }): Promise<DesktopCloudObject> {
@@ -437,14 +581,51 @@ export class OneDriveDesktopCloudProvider implements DesktopCloudProvider {
         "empty OneDrive uploads are not supported",
       );
     }
-    const uploadUrl = await this.createUploadSession(input);
-    const metadata = await this.uploadChunks(
-      uploadUrl,
-      input.bytes,
+    const identity = this.uploadIdentity(input);
+    let record = await this.uploadSessionStore?.load(
+      identity,
       input.signal,
-    );
-    return cloudObject(input.relativePath, metadata);
+    ) ?? null;
+    if (record && record.kind !== "onedrive-upload-url") {
+      await this.uploadSessionStore?.delete(identity, input.signal);
+      record = null;
+    }
+    let restarted = false;
+    while (true) {
+      if (!record) {
+        const session = await this.createUploadSession(input);
+        record = await this.saveUploadSession(
+          identity,
+          session.handle,
+          0,
+          session.expiresAt,
+          input.signal,
+        );
+      }
+      try {
+        const metadata = await this.uploadChunks(
+          record,
+          input.bytes,
+          input.signal,
+        );
+        await this.uploadSessionStore?.delete(identity, input.signal);
+        return cloudObject(input.relativePath, metadata);
+      } catch (error) {
+        if (
+          !restarted
+          && error instanceof DesktopCloudError
+          && error.code === "not-found"
+        ) {
+          await this.uploadSessionStore?.delete(identity, input.signal);
+          record = null;
+          restarted = true;
+          continue;
+        }
+        throw error;
+      }
+    }
   }
+
   async deleteFile(input: {
     readonly file: DesktopCloudObject;
     readonly expectedVersion: string;
