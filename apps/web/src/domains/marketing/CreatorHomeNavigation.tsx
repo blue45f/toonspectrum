@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode } from "react";
 
-import { CREATOR_HOME_SECTIONS, bindCreatorSectionNavigation, focusCreatorSection, isPlainCreatorJump, type CreatorHomeSectionId } from "./creator-home-navigation";
+import { CREATOR_HOME_SECTIONS, focusCreatorSection, isPlainCreatorJump, type CreatorHomeSectionId } from "./creator-home-navigation";
+import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 import "./creator-home-navigation.css";
 
 export function CreatorSectionLink({ sectionId, className, children }: {
@@ -21,21 +22,9 @@ export function CreatorSectionLink({ sectionId, className, children }: {
   );
 }
 
-export function useCreatorHomeNavigation(): void {
-  useEffect(() => bindCreatorSectionNavigation({
-    getHash: () => window.location.hash,
-    findTarget: (id) => document.getElementById(id),
-    requestFrame: (callback) => window.requestAnimationFrame(callback),
-    cancelFrame: (handle) => window.cancelAnimationFrame(handle),
-    subscribe: (callback) => {
-      window.addEventListener("hashchange", callback);
-      return () => window.removeEventListener("hashchange", callback);
-    },
-  }), []);
-}
-
 export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
-  useCreatorHomeNavigation();
+  useCreatorHomeSectionNavigation();
+
   const label = locale === "ko" ? "툰스튜디오 소개 바로가기" : "Explore the ToonStudio introduction";
   return (
     <nav className="ch-jump-nav" aria-label={label}>

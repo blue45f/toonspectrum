@@ -10,7 +10,16 @@ import {
   Clock3,
   Bookmark,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   SORTS,
@@ -19,25 +28,55 @@ import {
   AGE_LABEL_KEY,
 } from "./search-explorer-constants";
 import { SearchFacetPanel } from "./search-explorer-facets";
-import { compactNumber, relativeTime, platformName, platformColor } from "./search-explorer-utils";
+import {
+  compactNumber,
+  relativeTime,
+  platformName,
+  platformColor,
+} from "./search-explorer-utils";
 import { TitleCard, TitleRow } from "./title-card";
 import { buttonClass } from "./ui/button-utils";
 import { Segmented } from "./ui/segmented";
 import { Select } from "./ui/select";
 
 import type { SortKey } from "@/shared/lib/search";
-import type { WorkType, SerialStatus, AgeRating, PlatformId } from "@/shared/lib/types";
+import type {
+  WorkType,
+  SerialStatus,
+  AgeRating,
+  PlatformId,
+} from "@/shared/lib/types";
 
+import {
+  hasCatalogDiscoveryFilters,
+  parseCatalogDiscoveryState,
+  writeCatalogDiscoveryState,
+  type CatalogDiscoveryState,
+} from "@/shared/lib/catalog-discovery-state";
 import { useT } from "@/shared/lib/i18n";
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { normalizeQuery } from "@/shared/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/shared/lib/store";
+import {
+  EMPTY_TITLE_FILTERS,
+  titleFiltersToParams,
+  type TitleFilterState,
+} from "@/shared/lib/title-filters";
 import { cn } from "@/shared/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePaginatedSearch } from "@/infrastructure/use-paginated-search";
 
-
 type FilterToken = { key: string; label: string; category: string };
+
+type FilterSetter<K extends keyof TitleFilterState> = Dispatch<
+  SetStateAction<TitleFilterState[K]>
+>;
+
+function resolveAction<T>(action: SetStateAction<T>, current: T): T {
+  return typeof action === "function"
+    ? (action as (value: T) => T)(current)
+    : action;
+}
 
 export function SearchExplorer({
   initialQuery = "",
@@ -48,24 +87,174 @@ export function SearchExplorer({
   initialFree?: boolean;
   initialPlatforms?: PlatformId[];
 }) {
-  const [q, setQ] = useState(initialQuery);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const explicitFilters = hasCatalogDiscoveryFilters(searchParams);
+  const parsed = useMemo(() => {
+    const current = parseCatalogDiscoveryState(searchParams, {
+      fallbackQuery: initialQuery,
+    });
+    if (explicitFilters) return current;
+    return {
+      ...current,
+      filters: {
+        ...current.filters,
+        platforms: initialPlatforms,
+        pricing: initialFree ? ["free", "wait-free"] : current.filters.pricing,
+      },
+    } satisfies CatalogDiscoveryState;
+  }, [
+    explicitFilters,
+    initialFree,
+    initialPlatforms,
+    initialQuery,
+    searchParams,
+  ]);
+  const [q, setQ] = useState(parsed.query);
   const debouncedQ = useDebouncedValue(q, 180);
-  const [types, setTypes] = useState<WorkType[]>([]);
-  const [genres, setGenres] = useState<string[]>([]);
-  const [status, setStatus] = useState<SerialStatus[]>([]);
-  const [platforms, setPlatforms] = useState<PlatformId[]>(initialPlatforms);
-  const [ages, setAges] = useState<AgeRating[]>([]);
-  const [minRating, setMinRating] = useState(0);
-  const [tags, setTags] = useState<string[]>([]);
-  const [yearRange, setYearRange] = useState<[number, number] | null>(null);
-  const [freeOnly, setFreeOnly] = useState(initialFree);
-  const [adaptedOnly, setAdaptedOnly] = useState(false);
-  const [sort, setSort] = useState<SortKey>(initialQuery ? "relevance" : "popular");
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [savedOnly, setSavedOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const filterSheetRef = useRef<HTMLElement>(null);
   const [retryKey, setRetryKey] = useState(0);
   const t = useT();
+
+  const updateState = useCallback(
+    (update: (current: CatalogDiscoveryState) => CatalogDiscoveryState) => {
+      const next = update(parsed);
+      setSearchParams(writeCatalogDiscoveryState(searchParams, next), {
+        replace: true,
+        preventScrollReset: true,
+      });
+    },
+    [parsed, searchParams, setSearchParams],
+  );
+
+  const updateFilters = useCallback(
+    (action: SetStateAction<TitleFilterState>) => {
+      updateState((current) => ({
+        ...current,
+        filters: resolveAction(action, current.filters),
+      }));
+    },
+    [updateState],
+  );
+
+  const filterSetter = useCallback(
+    <K extends keyof TitleFilterState>(key: K): FilterSetter<K> =>
+      (action) => {
+        updateFilters((current) => ({
+          ...current,
+          [key]: resolveAction(action, current[key]),
+        }));
+      },
+    [updateFilters],
+  );
+
+  const { filters, sort, view } = parsed;
+  const {
+    types,
+    genres,
+    status,
+    platforms,
+    ages,
+    minRating,
+    tags,
+    yearRange,
+    adaptedOnly,
+  } = filters;
+  const savedOnly = filters.savedOnly;
+  const freeOnly =
+    filters.pricing.length > 0 &&
+    filters.pricing.every(
+      (pricing) => pricing === "free" || pricing === "wait-free",
+    );
+  const setTypes = filterSetter("types");
+  const setGenres = filterSetter("genres");
+  const setStatus = filterSetter("status");
+  const setPlatforms = filterSetter("platforms");
+  const setAges = filterSetter("ages");
+  const setMinRating = filterSetter("minRating");
+  const setTags = filterSetter("tags");
+  const setYearRange = filterSetter("yearRange");
+  const setAdaptedOnly = filterSetter("adaptedOnly");
+  const setSavedOnly: Dispatch<SetStateAction<boolean>> = (action) => {
+    updateFilters((current) => ({
+      ...current,
+      savedOnly: resolveAction(action, current.savedOnly),
+    }));
+  };
+  const setFreeOnly: Dispatch<SetStateAction<boolean>> = (action) => {
+    const next = resolveAction(action, freeOnly);
+    updateFilters((current) => ({
+      ...current,
+      pricing: next ? ["free", "wait-free"] : [],
+    }));
+  };
+  const setSort = (next: SortKey) =>
+    updateState((current) => ({ ...current, sort: next }));
+  const setView = (next: "grid" | "list") =>
+    updateState((current) => ({ ...current, view: next }));
+
+  useEffect(() => {
+    setQ((current) => (current === parsed.query ? current : parsed.query));
+  }, [parsed.query]);
+  useEffect(() => {
+    if (!showFilters) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const sheet = filterSheetRef.current;
+    const focusReturnTarget = filterButtonRef.current;
+    const focusableSelector = [
+      "button:not([disabled])",
+      "a[href]",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowFilters(false);
+        return;
+      }
+      if (event.key !== "Tab" || !sheet) return;
+      const focusable = [
+        ...sheet.querySelectorAll<HTMLElement>(focusableSelector),
+      ];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        sheet.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => sheet?.focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      focusReturnTarget?.focus();
+    };
+  }, [showFilters]);
+  useEffect(() => {
+    if (debouncedQ.trim() === parsed.query.trim()) return;
+    updateState((current) => ({
+      ...current,
+      query: debouncedQ,
+      sort:
+        debouncedQ.trim() && current.sort === "popular"
+          ? "relevance"
+          : current.sort,
+    }));
+  }, [debouncedQ, parsed.query, updateState]);
 
   const recentSearches = useApp((s) => s.recentSearches);
   const recordRecentSearch = useApp((s) => s.addRecentSearch);
@@ -75,24 +264,11 @@ export function SearchExplorer({
   const savedIds = useSavedTitleIds();
 
   const query = useMemo(() => {
-    const params = new URLSearchParams({ sort });
+    const params = new URLSearchParams(titleFiltersToParams(filters, { sort }));
     if (debouncedQ) params.set("q", debouncedQ);
-    if (types.length) params.set("types", types.join(","));
-    if (genres.length) params.set("genres", genres.join(","));
-    if (tags.length) params.set("tags", tags.join(","));
-    if (status.length) params.set("status", status.join(","));
-    if (platforms.length) params.set("platforms", platforms.join(","));
-    if (ages.length) params.set("ages", ages.join(","));
-    if (minRating) params.set("minRating", String(minRating));
-    if (yearRange) {
-      params.set("yearMin", String(yearRange[0]));
-      params.set("yearMax", String(yearRange[1]));
-    }
-    if (freeOnly) params.set("freeOnly", "true");
-    if (adaptedOnly) params.set("adaptedOnly", "true");
     if (savedOnly) params.set("ids", [...savedIds].sort().join(","));
     return params.toString();
-  }, [adaptedOnly, ages, debouncedQ, freeOnly, genres, minRating, platforms, sort, status, tags, types, yearRange, savedOnly, savedIds]);
+  }, [debouncedQ, filters, savedIds, savedOnly, sort]);
 
   const search = usePaginatedSearch(query, !textSettling, retryKey);
   const results = search.items;
@@ -102,21 +278,31 @@ export function SearchExplorer({
   const topTags = search.data?.topTags ?? [];
   const catalog = search.data?.catalog ?? null;
   useEffect(() => {
-    if (!loading && normalizeQuery(debouncedQ) && results.length > 0) recordRecentSearch(debouncedQ);
+    if (!loading && normalizeQuery(debouncedQ) && results.length > 0)
+      recordRecentSearch(debouncedQ);
   }, [debouncedQ, loading, results.length, recordRecentSearch]);
 
   const shown = results;
   const hasResult = Boolean(shown.length);
-  const resultText = search.total > 0
-    ? t("search.explorer.resultCount").replace("{count}", compactNumber(search.total))
-    : t("search.explorer.noResult");
+  const resultText =
+    search.total > 0
+      ? t("search.explorer.resultCount").replace(
+          "{count}",
+          compactNumber(search.total),
+        )
+      : t("search.explorer.noResult");
   const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
   const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
   // 플랫폼 필터는 카탈로그에 실제로 존재하는 플랫폼만 노출(빈 슬롯 방지). 커버리지 정보가
   // 아직 없으면 전체를 보여주고, 이미 선택된 플랫폼은 사라지지 않게 유지한다.
-  const presentPlatformIds = new Set((catalog?.platformCoverage ?? []).map((entry) => entry.id));
+  const presentPlatformIds = new Set(
+    (catalog?.platformCoverage ?? []).map((entry) => entry.id),
+  );
   const platformOptions = presentPlatformIds.size
-    ? PLATFORM_LIST.filter((entry) => presentPlatformIds.has(entry.id) || platforms.includes(entry.id))
+    ? PLATFORM_LIST.filter(
+        (entry) =>
+          presentPlatformIds.has(entry.id) || platforms.includes(entry.id),
+      )
     : PLATFORM_LIST;
 
   const activeCount =
@@ -131,7 +317,7 @@ export function SearchExplorer({
     (freeOnly ? 1 : 0) +
     (adaptedOnly ? 1 : 0);
 
-  const selectedTokens = useMemo<FilterToken[]>(() => {
+  const selectedTokens: FilterToken[] = (() => {
     const entries: FilterToken[] = [];
 
     types.forEach((entry) => {
@@ -151,54 +337,72 @@ export function SearchExplorer({
     });
 
     status.forEach((entry) => {
-      entries.push({ key: `status:${entry}`, category: "status", label: t(STATUS_LABEL_KEY[entry]) });
+      entries.push({
+        key: `status:${entry}`,
+        category: "status",
+        label: t(STATUS_LABEL_KEY[entry]),
+      });
     });
 
     platforms.forEach((entry) => {
       const matched = PLATFORM_LIST.find((platform) => platform.id === entry);
       if (matched) {
-        entries.push({ key: `platform:${entry}`, category: "platform", label: matched.name });
+        entries.push({
+          key: `platform:${entry}`,
+          category: "platform",
+          label: matched.name,
+        });
       }
     });
 
     ages.forEach((entry) => {
-      entries.push({ key: `age:${entry}`, category: "age", label: t(AGE_LABEL_KEY[entry]) });
+      entries.push({
+        key: `age:${entry}`,
+        category: "age",
+        label: t(AGE_LABEL_KEY[entry]),
+      });
     });
 
     if (minRating > 0) {
-      entries.push({ key: "minRating", category: "rating", label: `${minRating}★+` });
+      entries.push({
+        key: "minRating",
+        category: "rating",
+        label: `${minRating}★+`,
+      });
     }
 
     if (yearRange) {
       entries.push({
         key: "year",
         category: "year",
-        label: yearRange[0] === 0 ? t("search.explorer.year.upto2013") : `${yearRange[0]}-${yearRange[1]}`,
+        label:
+          yearRange[0] === 0
+            ? t("search.explorer.year.upto2013")
+            : `${yearRange[0]}-${yearRange[1]}`,
       });
     }
 
     if (freeOnly) {
-      entries.push({ key: "freeOnly", category: "option", label: t("search.explorer.option.freeOnly") });
+      entries.push({
+        key: "freeOnly",
+        category: "option",
+        label: t("search.explorer.option.freeOnly"),
+      });
     }
 
     if (adaptedOnly) {
-      entries.push({ key: "adaptedOnly", category: "option", label: t("search.explorer.option.adapted") });
+      entries.push({
+        key: "adaptedOnly",
+        category: "option",
+        label: t("search.explorer.option.adapted"),
+      });
     }
 
     return entries;
-  }, [adaptedOnly, ages, freeOnly, genres, minRating, platforms, status, t, tags, types, yearRange]);
+  })();
 
   const reset = () => {
-    setTypes([]);
-    setGenres([]);
-    setTags([]);
-    setYearRange(null);
-    setStatus([]);
-    setPlatforms([]);
-    setAges([]);
-    setMinRating(0);
-    setFreeOnly(false);
-    setAdaptedOnly(false);
+    updateFilters(EMPTY_TITLE_FILTERS);
   };
 
   const removeToken = (token: FilterToken) => {
@@ -209,27 +413,42 @@ export function SearchExplorer({
     }
 
     if (token.key.startsWith("genre:")) {
-      setGenres((prev) => prev.filter((entry) => entry !== token.key.replace("genre:", "")));
+      setGenres((prev) =>
+        prev.filter((entry) => entry !== token.key.replace("genre:", "")),
+      );
       return;
     }
 
     if (token.key.startsWith("tag:")) {
-      setTags((prev) => prev.filter((entry) => entry !== token.key.replace("tag:", "")));
+      setTags((prev) =>
+        prev.filter((entry) => entry !== token.key.replace("tag:", "")),
+      );
       return;
     }
 
     if (token.key.startsWith("status:")) {
-      setStatus((prev) => prev.filter((entry) => entry !== token.key.replace("status:", "") as SerialStatus));
+      setStatus((prev) =>
+        prev.filter(
+          (entry) =>
+            entry !== (token.key.replace("status:", "") as SerialStatus),
+        ),
+      );
       return;
     }
 
     if (token.key.startsWith("platform:")) {
-      setPlatforms((prev) => prev.filter((entry) => entry !== token.key.replace("platform:", "")));
+      setPlatforms((prev) =>
+        prev.filter((entry) => entry !== token.key.replace("platform:", "")),
+      );
       return;
     }
 
     if (token.key.startsWith("age:")) {
-      setAges((prev) => prev.filter((entry) => entry !== token.key.replace("age:", "") as AgeRating));
+      setAges((prev) =>
+        prev.filter(
+          (entry) => entry !== (token.key.replace("age:", "") as AgeRating),
+        ),
+      );
       return;
     }
 
@@ -260,8 +479,12 @@ export function SearchExplorer({
     typeCount.webtoon === 0 && typeCount.webnovel === 0
       ? t("search.explorer.typeSummary.empty")
       : [
-          typeCount.webtoon ? `${t("search.explorer.type.webtoon")} ${compactNumber(typeCount.webtoon)}` : "",
-          typeCount.webnovel ? `${t("search.explorer.type.webnovel")} ${compactNumber(typeCount.webnovel)}` : "",
+          typeCount.webtoon
+            ? `${t("search.explorer.type.webtoon")} ${compactNumber(typeCount.webtoon)}`
+            : "",
+          typeCount.webnovel
+            ? `${t("search.explorer.type.webnovel")} ${compactNumber(typeCount.webnovel)}`
+            : "",
         ]
           .filter(Boolean)
           .join(t("search.explorer.separator"));
@@ -305,11 +528,17 @@ export function SearchExplorer({
               <SlidersHorizontal size={15} />
               {t("search.explorer.filter")}
               {activeCount > 0 && (
-                <span className="numeral rounded-full bg-accent px-1.5 text-[0.7rem] text-on-accent">{activeCount}</span>
+                <span className="numeral rounded-full bg-accent px-1.5 text-[0.7rem] text-on-accent">
+                  {activeCount}
+                </span>
               )}
             </h2>
             {activeCount > 0 && (
-              <button type="button" onClick={reset} className="text-xs text-fg-3 hover:text-accent">
+              <button
+                type="button"
+                onClick={reset}
+                className="text-xs text-fg-3 hover:text-accent"
+              >
                 {t("search.explorer.filterReset")}
               </button>
             )}
@@ -360,14 +589,22 @@ export function SearchExplorer({
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
+              ref={filterButtonRef}
               type="button"
-              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 lg:hidden" })}
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-11 gap-1.5 lg:hidden",
+              })}
               onClick={() => setShowFilters((value) => !value)}
               aria-expanded={showFilters}
+              aria-controls="search-mobile-filter-sheet"
             >
               <SlidersHorizontal size={14} />
               {t("search.explorer.filter")}
-              {activeCount > 0 && <span className="ml-0.5 text-accent">{mobileCount}</span>}
+              {activeCount > 0 && (
+                <span className="ml-0.5 text-accent">{mobileCount}</span>
+              )}
             </button>
 
             <Select
@@ -375,7 +612,10 @@ export function SearchExplorer({
               onValueChange={(value) => setSort(value as SortKey)}
               ariaLabel={t("search.explorer.sort.label")}
               triggerClassName="h-8 rounded-lg border border-line bg-card px-2.5 text-[0.8125rem] text-fg-2"
-              options={SORTS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
+              options={SORTS.map((entry) => ({
+                value: entry.value,
+                label: t(entry.labelKey),
+              }))}
             />
 
             <button
@@ -386,7 +626,7 @@ export function SearchExplorer({
                 "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[0.8125rem] font-medium transition-colors",
                 savedOnly
                   ? "border-accent/55 bg-accent-soft text-accent"
-                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
               )}
             >
               <Bookmark size={14} className={savedOnly ? "fill-current" : ""} />
@@ -398,8 +638,16 @@ export function SearchExplorer({
               value={view}
               onChange={(value) => setView(value)}
               items={[
-                { value: "grid", label: <LayoutGrid size={14} />, hint: t("search.explorer.view.grid") },
-                { value: "list", label: <List size={14} />, hint: t("search.explorer.view.list") },
+                {
+                  value: "grid",
+                  label: <LayoutGrid size={14} />,
+                  hint: t("search.explorer.view.grid"),
+                },
+                {
+                  value: "list",
+                  label: <List size={14} />,
+                  hint: t("search.explorer.view.list"),
+                },
               ]}
               className="ml-auto"
             />
@@ -409,22 +657,33 @@ export function SearchExplorer({
               onClick={() => {
                 setRetryKey((value) => value + 1);
               }}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "gap-1.5",
+              })}
             >
               <RefreshCw size={14} />
               {t("search.explorer.refresh")}
             </button>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-fg-3" role="status" aria-live="polite">
+          <div
+            className="mt-3 flex flex-wrap items-center gap-2 text-xs text-fg-3"
+            role="status"
+            aria-live="polite"
+          >
             <span className="truncate">
-              {t("search.explorer.search.label")}: <strong>{q ? `"${q}"` : t("search.queryAll")}</strong>
+              {t("search.explorer.search.label")}:{" "}
+              <strong>{q ? `"${q}"` : t("search.queryAll")}</strong>
             </span>
             <span className="h-1 w-1 rounded-full bg-line-strong" />
             <span className="truncate">{resultText}</span>
             <span className="h-1 w-1 rounded-full bg-line-strong" />
             <span className="truncate">
-              {loading || textSettling ? t("search.explorer.loading") : typeSummary}
+              {loading || textSettling
+                ? t("search.explorer.loading")
+                : typeSummary}
             </span>
           </div>
 
@@ -453,7 +712,10 @@ export function SearchExplorer({
                   <button
                     type="button"
                     onClick={() => removeRecentSearch(entry)}
-                    aria-label={t("search.explorer.recent.delete").replace("{query}", `"${entry}"`)}
+                    aria-label={t("search.explorer.recent.delete").replace(
+                      "{query}",
+                      `"${entry}"`,
+                    )}
                     className="grid h-full place-items-center py-1 pl-0.5 pr-2 text-fg-3 transition-colors hover:text-bad"
                   >
                     <X size={12} />
@@ -475,7 +737,10 @@ export function SearchExplorer({
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
                 <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
                   <Database size={13} className="text-accent" />
-                  {t("search.explorer.catalog.label")} <strong className="numeral text-fg">{compactNumber(catalog.titleCount)}</strong>
+                  {t("search.explorer.catalog.label")}{" "}
+                  <strong className="numeral text-fg">
+                    {compactNumber(catalog.titleCount)}
+                  </strong>
                   {t("search.explorer.unit.itemSuffix")}
                 </span>
                 <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
@@ -489,15 +754,23 @@ export function SearchExplorer({
                 )}
               </div>
               <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[0.72rem] text-fg-3 sm:justify-end">
-                {(filteredCoverage.length ? filteredCoverage : catalogCoverage).map((entry) => (
+                {(filteredCoverage.length
+                  ? filteredCoverage
+                  : catalogCoverage
+                ).map((entry) => (
                   <span
                     key={entry.id}
                     className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5"
                     title={`${platformName(entry.id)} ${compactNumber(entry.count)}${t("search.explorer.unit.itemSuffix")}`}
                   >
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: platformColor(entry.id) }} />
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: platformColor(entry.id) }}
+                    />
                     {platformName(entry.id)}
-                    <span className="numeral text-fg">{compactNumber(entry.count)}</span>
+                    <span className="numeral text-fg">
+                      {compactNumber(entry.count)}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -506,14 +779,19 @@ export function SearchExplorer({
 
           {selectedTokens.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-xs uppercase tracking-[0.06em] text-fg-3">{t("search.explorer.currentFilter")}</span>
+              <span className="text-xs uppercase tracking-[0.06em] text-fg-3">
+                {t("search.explorer.currentFilter")}
+              </span>
               {selectedTokens.map((token) => (
                 <button
                   type="button"
                   key={`${token.key}:${token.category}`}
                   onClick={() => removeToken(token)}
                   className="inline-flex items-center gap-1 rounded-full border border-line bg-panel/45 px-2.5 py-1 text-[0.7rem] text-fg-2 transition-all duration-150 hover:border-accent/50 hover:text-fg"
-                  aria-label={t("search.explorer.token.remove").replace("{label}", token.label)}
+                  aria-label={t("search.explorer.token.remove").replace(
+                    "{label}",
+                    token.label,
+                  )}
                 >
                   <span>{token.label}</span>
                   <span aria-hidden>×</span>
@@ -531,19 +809,72 @@ export function SearchExplorer({
           )}
         </div>
 
-        {showFilters && (
-          <div className="mt-3 rounded-2xl border border-line bg-panel/40 lg:hidden">
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <p className="text-sm font-semibold">{t("search.explorer.filter")}</p>
-              {activeCount > 0 && (
-                <button type="button" onClick={reset} className="text-xs text-accent">
+        {showFilters ? (
+          <div className="lg:hidden">
+            <button
+              type="button"
+              aria-label="필터 닫기"
+              className="fixed inset-0 z-[70] bg-canvas/75 backdrop-blur-sm"
+              onClick={() => setShowFilters(false)}
+            />
+            <section
+              ref={filterSheetRef}
+              tabIndex={-1}
+              id="search-mobile-filter-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="search-mobile-filter-title"
+              className="fixed inset-x-0 bottom-0 z-[71] flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[1.75rem] border border-line bg-panel shadow-2xl"
+            >
+              <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                <div>
+                  <h2
+                    id="search-mobile-filter-title"
+                    className="text-base font-bold text-fg"
+                  >
+                    {t("search.explorer.filter")}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-fg-3">
+                    {activeCount > 0
+                      ? `${activeCount}개 조건 적용 중`
+                      : "원하는 조건을 골라 결과를 좁히세요."}
+                  </p>
+                </div>
+                {activeCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="min-h-11 rounded-xl px-3 text-xs font-semibold text-accent"
+                  >
+                    {t("search.explorer.filterReset")}
+                  </button>
+                ) : null}
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2">
+                {facets}
+              </div>
+              <footer className="grid grid-cols-[auto_1fr] gap-2 border-t border-line bg-panel p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  onClick={reset}
+                  disabled={activeCount === 0}
+                  className="min-h-12 rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 disabled:opacity-40"
+                >
                   {t("search.explorer.filterReset")}
                 </button>
-              )}
-            </div>
-            <div className="px-4 py-3">{facets}</div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(false)}
+                  className="min-h-12 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent"
+                >
+                  {search.total > 0
+                    ? `${compactNumber(search.total)}개 결과 보기`
+                    : "결과 보기"}
+                </button>
+              </footer>
+            </section>
           </div>
-        )}
+        ) : null}
 
         {loading ? (
           <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4">
@@ -558,28 +889,42 @@ export function SearchExplorer({
         ) : error ? (
           <div className="mt-10 rounded-xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
             <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-            <p className="text-sm font-medium text-fg">{t("search.explorer.error.title")}</p>
+            <p className="text-sm font-medium text-fg">
+              {t("search.explorer.error.title")}
+            </p>
             <p className="mt-1 text-sm text-fg-3">{error}</p>
             <button
               type="button"
               onClick={() => setRetryKey((value) => value + 1)}
-              className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
+              className={buttonClass({
+                size: "sm",
+                variant: "outline",
+                className: "mt-4",
+              })}
             >
               {t("search.explorer.retry")}
             </button>
           </div>
         ) : !hasResult ? (
           <div className="mt-10 rounded-xl border border-dashed border-line bg-card/40 px-5 py-12 text-center">
-            <p className="text-sm font-medium text-fg">{t("search.explorer.noResults")}</p>
+            <p className="text-sm font-medium text-fg">
+              {t("search.explorer.noResults")}
+            </p>
             <p className="mt-1 text-sm text-fg-2">
-              {q ? t("search.explorer.hint.search") : t("search.explorer.hint.filter")}
+              {q
+                ? t("search.explorer.hint.search")
+                : t("search.explorer.hint.filter")}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               {q && (
                 <button
                   type="button"
                   onClick={() => setQ("")}
-                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                  className={buttonClass({
+                    size: "sm",
+                    variant: "outline",
+                    className: "gap-1.5",
+                  })}
                 >
                   <X size={14} />
                   {t("search.explorer.search.clear")}
@@ -649,12 +994,14 @@ export function SearchExplorer({
                   aria-busy={search.loadingMore}
                   className={buttonClass({ size: "sm", className: "gap-1.5" })}
                 >
-                  {search.loadingMore ? t("search.explorer.loading") : search.moreFailed ? t("search.explorer.retry") : t("search.explorer.loadMore")}
+                  {search.loadingMore
+                    ? t("search.explorer.loading")
+                    : search.moreFailed
+                      ? t("search.explorer.retry")
+                      : t("search.explorer.loadMore")}
                   <span className="text-fg-3">
-                    (
-                    {compactNumber(Math.max(0, search.total - shown.length))}
-                    {t("search.explorer.unit.itemSuffix")}
-                    )
+                    ({compactNumber(Math.max(0, search.total - shown.length))}
+                    {t("search.explorer.unit.itemSuffix")})
                   </span>
                 </button>
               </div>

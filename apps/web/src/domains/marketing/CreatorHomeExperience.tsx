@@ -19,8 +19,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { CreatorSectionLink, useCreatorHomeNavigation } from "./CreatorHomeNavigation";
-
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import {
@@ -39,6 +37,9 @@ import "./creator-flagship.css";
 import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
+
+import { focusCreatorSection, isPlainCreatorJump } from "./creator-home-navigation";
+import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
 interface LocalizedText {
   readonly ko: string;
@@ -222,12 +223,12 @@ function localeText(copy: LocalizedText, locale: ProductLocale) {
 }
 
 export function CreatorHomeExperience() {
+  useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
   const identity = PRODUCT_IDENTITY[locale];
   const copy = COPY[locale];
-  useCreatorHomeNavigation();
 
   return (
     <div
@@ -265,10 +266,18 @@ export function CreatorHomeExperience() {
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
-          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
-          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
-          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
+          {([
+            ["creator-start", copy.jumpStart],
+            ["creator-flow", copy.jumpFlow],
+            ["creator-principles", copy.jumpPrinciples],
+            ["creator-support", copy.jumpSupport],
+          ] as const).map(([sectionId, label]) => {
+            const href = `#${sectionId}`;
+            return <a key={sectionId} href={href} onClick={(event) => {
+              if (!isPlainCreatorJump(event) || window.location.hash !== href) return;
+              if (focusCreatorSection(href, (id) => document.getElementById(id), true)) event.preventDefault();
+            }}>{label}</a>;
+          })}
         </nav>
       </div>
 
