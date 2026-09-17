@@ -162,6 +162,29 @@ async function fetchStudioNamespace(
   }
 }
 
+async function loadStudioNamespaceBatch(
+  assetLocale: string,
+  namespaces: readonly StudioI18nNamespace[],
+  options: StudioI18nPriorityLoaderOptions,
+): Promise<readonly { readonly namespace: StudioI18nNamespace; readonly result: NamespaceLoadResult }[]> {
+  return Promise.all(
+    namespaces.map(async (namespace) => ({
+      namespace,
+      result: await fetchStudioNamespace(assetLocale, namespace, options),
+    })),
+  );
+}
+
+function mergeLoadedStudioDictionaries(
+  results: readonly { readonly result: NamespaceLoadResult }[],
+): Record<string, string> {
+  const merged: Record<string, string> = {};
+  for (const { result } of results) {
+    if (result.status === "loaded") Object.assign(merged, result.dictionary);
+  }
+  return merged;
+}
+
 export async function loadStudioI18nNamespaces(
   namespaces: readonly StudioI18nNamespace[],
   options: StudioI18nPriorityLoaderOptions = {},
@@ -174,14 +197,17 @@ export async function loadStudioI18nNamespaces(
   registerManagedStudioI18nLocale(requestedLocale, assetLocale);
 
   const uniqueNamespaces = [...new Set(namespaces)];
-  const results = await Promise.all(
-    uniqueNamespaces.map(async (namespace) => ({
-      namespace,
-      result: await fetchStudioNamespace(assetLocale, namespace, options),
-    })),
-  );
+  const [results, englishSourceResults] = await Promise.all([
+    loadStudioNamespaceBatch(assetLocale, uniqueNamespaces, options),
+    assetLocale === "en"
+      ? Promise.resolve([])
+      : loadStudioNamespaceBatch("en", uniqueNamespaces, options),
+  ]);
 
-  const merged: Record<string, string> = {};
+  const merged = mergeLoadedStudioDictionaries(results);
+  const englishMerged = assetLocale === "en"
+    ? merged
+    : mergeLoadedStudioDictionaries(englishSourceResults);
   const loadedNamespaces: StudioI18nNamespace[] = [];
   const failedNamespaces: StudioI18nNamespace[] = [];
 
@@ -191,9 +217,13 @@ export async function loadStudioI18nNamespaces(
       continue;
     }
     loadedNamespaces.push(namespace);
-    if (result.status === "loaded") {
-      Object.assign(merged, result.dictionary);
-    }
+  }
+
+  // Always keep the English source for the same namespaces in DICT. This guarantees the explicit
+  // requested → en → ko fallback chain can resolve a Studio key even when a locale namespace is
+  // missing/failed, and gives the runtime translator a canonical source for English-valued gaps.
+  if (Object.keys(englishMerged).length > 0) {
+    registerI18nLocaleEntries("en", englishMerged);
   }
 
   if (Object.keys(merged).length > 0) {
@@ -205,6 +235,9 @@ export async function loadStudioI18nNamespaces(
     ) {
       registerI18nLocaleEntries(normalizedRequestedLocale, merged);
     }
+  }
+
+  if (Object.keys(englishMerged).length > 0 || Object.keys(merged).length > 0) {
     triggerTranslationBundleUpdate();
   }
 
