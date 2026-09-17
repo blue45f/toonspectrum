@@ -76,16 +76,18 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
 
 const CREATE_DISABLED_REASON_ID = "studio-create-disabled-reason";
 
-function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+function localized(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.titleKo, option.titleEn);
 }
 
-function localized(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.titleKo : option.titleEn;
-}
-
-function defaultTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.defaultTitleKo : option.defaultTitleEn;
+function defaultTitle(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.defaultTitleKo, option.defaultTitleEn);
 }
 
 function requestedKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
@@ -97,10 +99,14 @@ function requestedKind(kind: string | null, templateId: string | null): StudioPr
   )?.id ?? null;
 }
 
-function documentTitle(kind: StudioProjectKind, title: string): string {
-  if (kind === "webtoon") return "EP01 원고";
-  if (kind === "slides") return "발표 자료";
-  return `${title} 작업 문서`;
+function documentTitle(
+  kind: StudioProjectKind,
+  title: string,
+  bt: (ko: string, en: string) => string,
+): string {
+  if (kind === "webtoon") return bt("EP01 원고", "EP01 manuscript");
+  if (kind === "slides") return bt("발표 자료", "Presentation");
+  return bt(`${title} 작업 문서`, `${title} working document`);
 }
 
 function OnboardingSelect<T extends string>({
@@ -118,6 +124,7 @@ function OnboardingSelect<T extends string>({
   readonly locale: Locale;
   readonly onChange: (next: T) => void;
 }) {
+  const bt = useBilingual("StudioModeProjectCreatePage.onboardingSelect");
   return (
     <label className="text-xs font-bold text-fg-2" htmlFor={id}>
       {label}
@@ -129,7 +136,7 @@ function OnboardingSelect<T extends string>({
       >
         {choices.map((choice) => (
           <option key={choice.id} value={choice.id}>
-            {locale === "ko" ? choice.labelKo : choice.labelEn}
+            {bt(choice.labelKo, choice.labelEn)}
           </option>
         ))}
       </select>
@@ -141,7 +148,7 @@ export function StudioModeProjectCreatePage() {
   const bt = useBilingual("StudioModeProjectCreatePage");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const locale = localeFromLanguage(useI18n((state) => state.lang));
+  const locale = useI18n((state) => state.lang);
   const requestedTemplateId = searchParams.get("template");
   const requestedSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
   const requestedKindId = requestedKind(searchParams.get("kind"), requestedTemplateId);
@@ -154,7 +161,7 @@ export function StudioModeProjectCreatePage() {
 
   const [kind, setKind] = useState<StudioProjectKind>(initialKind.id);
   const [templateId, setTemplateId] = useState(initialTemplateId);
-  const [title, setTitle] = useState(() => defaultTitle(initialKind, locale));
+  const [title, setTitle] = useState(() => defaultTitle(initialKind, bt));
   const [titleEdited, setTitleEdited] = useState(false);
   const [showMoreKinds, setShowMoreKinds] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(Boolean(requestedSelection));
@@ -166,7 +173,7 @@ export function StudioModeProjectCreatePage() {
 
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((template) => template.id === templateId) ?? templates[0]!;
-  const selectedTemplateLabel = locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn;
+  const selectedTemplateLabel = bt(selectedTemplate.labelKo, selectedTemplate.labelEn);
   const modePlan = useMemo(
     () => resolveStudioModeCreationPlan(kind, selectedTemplate.id),
     [kind, selectedTemplate.id],
@@ -195,7 +202,7 @@ export function StudioModeProjectCreatePage() {
     ...(structuredWebtoon ? [{
       id: "production-track",
       label: bt("제작 트랙 확인", "Confirm production track"),
-      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      description: bt(onboardingPlan.titleKo, onboardingPlan.titleEn),
       state: "complete" as const,
     }] : []),
     {
@@ -209,7 +216,7 @@ export function StudioModeProjectCreatePage() {
   function chooseKind(option: StudioProjectCreateKindOption) {
     setKind(option.id);
     setTemplateId(STUDIO_PROJECT_CREATE_TEMPLATES[option.id][0]?.id ?? `${option.id}-blank`);
-    if (!titleEdited) setTitle(defaultTitle(option, locale));
+    if (!titleEdited) setTitle(defaultTitle(option, bt));
     if (option.id !== "webtoon") setOnboardingEnabled(false);
     setError(null);
   }
@@ -224,9 +231,9 @@ export function StudioModeProjectCreatePage() {
         title: normalizedTitle,
         kind,
         templateId: selectedTemplate.id,
-        primaryLocale: bt("ko-KR", "en-US"),
+        primaryLocale: locale,
         document: {
-          title: documentTitle(kind, normalizedTitle),
+          title: documentTitle(kind, normalizedTitle, bt),
           kind: modePlan.document.kind,
           defaultWorkspace: modePlan.document.workspace,
           width: modePlan.document.width,
@@ -312,9 +319,9 @@ export function StudioModeProjectCreatePage() {
                     <span className={cn("grid size-10 place-items-center rounded-xl", active ? "bg-accent text-on-accent" : "bg-panel text-fg-2")}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block text-sm text-fg">{localized(option, locale)}</b>
+                    <b className="mt-3 block text-sm text-fg">{localized(option, bt)}</b>
                     <span className="mt-1 block text-xs leading-5 text-fg-3">
-                      {locale === "ko" ? option.descriptionKo : option.descriptionEn}
+                      {bt(option.descriptionKo, option.descriptionEn)}
                     </span>
                   </button>
                 );
@@ -357,10 +364,10 @@ export function StudioModeProjectCreatePage() {
                   {onboardingEnabled ? (
                     <div className="mt-4">
                       <h3 className="text-base font-black text-fg">
-                        {locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn}
+                        {bt(onboardingPlan.titleKo, onboardingPlan.titleEn)}
                       </h3>
                       <p className="mt-1 text-xs leading-5 text-fg-3">
-                        {locale === "ko" ? onboardingPlan.summaryKo : onboardingPlan.summaryEn}
+                        {bt(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}
                       </p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         <OnboardingSelect<WebtoonStartingPointId>
@@ -428,7 +435,7 @@ export function StudioModeProjectCreatePage() {
                 >
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>
-                      {locale === "ko" ? template.labelKo : template.labelEn}
+                      {bt(template.labelKo, template.labelEn)}
                     </option>
                   ))}
                 </select>
