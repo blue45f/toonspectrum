@@ -395,7 +395,7 @@ const ExternalReviewAccessSchema = z.object({
   createdByAssignmentId: IdentitySchema,
   createdAt: IsoDateTimeSchema,
   lastAccessedAt: NullableIsoDateTimeSchema,
-  responses: z.array(ExternalReviewResponseSchema).max(100_000),
+  responses: z.array(ExternalReviewResponseSchema).max(1_000),
 }).strict();
 const ProductionAutomationConditionSchema = z.object({
   field: z.enum([
@@ -1012,6 +1012,7 @@ const UpsertTaskCommandSchema = z.object({ type: z.literal("upsert-task"), task:
 const UpsertTaskBatchCommandSchema = z.object({
   type: z.literal("upsert-task-batch"),
   tasks: z.array(ProductionTaskSchema).min(1).max(10_000),
+  expectedTasks: z.array(ProductionTaskSchema).max(10_000).default([]),
 }).strict();
 const UpsertEpisodeOperationsCommandSchema = z.object({
   type: z.literal("upsert-episode-operations"),
@@ -1023,6 +1024,12 @@ const UpsertEpisodeOperationsCommandSchema = z.object({
 const UpsertOperationsRecordCommandSchema = z.object({
   type: z.literal("upsert-operations-record"),
   record: ProductionOperationsRecordSchema,
+}).strict();
+const ApplyAutomationExecutionCommandSchema = z.object({
+  type: z.literal("apply-automation-execution"),
+  tasks: z.array(ProductionTaskSchema).max(10_000).default([]),
+  notifications: z.array(ProductionNotificationSchema).max(10_000).default([]),
+  evaluatedRules: z.array(ProductionAutomationRuleSchema).max(1_000).default([]),
 }).strict();
 const ApplyScheduleScenarioCommandSchema = z.object({
   type: z.literal("apply-schedule-scenario"),
@@ -1097,6 +1104,7 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertTaskBatchCommandSchema,
   UpsertEpisodeOperationsCommandSchema,
   UpsertOperationsRecordCommandSchema,
+  ApplyAutomationExecutionCommandSchema,
   ApplyScheduleScenarioCommandSchema,
   UpsertChangeRequestCommandSchema,
   PublishScopePackageCommandSchema,

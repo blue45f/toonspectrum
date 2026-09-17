@@ -55,6 +55,10 @@ describe("ProductionRecoveryScenarioPanel", () => {
         id: "task-episode-12-background",
         dueAt: expect.not.stringMatching(original?.dueAt ?? ""),
       })]),
+      expectedTasks: expect.arrayContaining([expect.objectContaining({
+        id: "task-episode-12-background",
+        dueAt: original?.dueAt,
+      })]),
     }, expect.stringContaining("원자적으로 적용했습니다"));
 
     const undo = await screen.findByRole("button", {
@@ -67,6 +71,10 @@ describe("ProductionRecoveryScenarioPanel", () => {
       tasks: expect.arrayContaining([expect.objectContaining({
         id: "task-episode-12-background",
         dueAt: original?.dueAt,
+      })]),
+      expectedTasks: expect.arrayContaining([expect.objectContaining({
+        id: "task-episode-12-background",
+        dueAt: expect.not.stringMatching(original?.dueAt ?? ""),
       })]),
     }, expect.stringContaining("원자적으로 되돌렸습니다"));
   });
@@ -84,4 +92,77 @@ describe("ProductionRecoveryScenarioPanel", () => {
     fireEvent.click(apply);
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it("does not expose undo state when the guarded apply fails", async () => {
+    const aggregate = createProductionDemoProject();
+    const overview = deriveProductionManagementOverview(aggregate, { now: NOW });
+    const execute = vi.fn().mockRejectedValue(new Error("다른 변경이 감지되었습니다."));
+    render(
+      <MemoryRouter>
+        <ProductionRecoveryScenarioPanel
+          aggregate={aggregate}
+          intelligence={overview.riskIntelligence}
+          execute={execute}
+          canEdit
+          now={NOW}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("시나리오를 비교할 위험"), {
+      target: { value: "blocker:task-episode-12-background" },
+    });
+    fireEvent.click(await screen.findByRole("button", {
+      name: "마감 2일 재조정 복구 시나리오 적용",
+    }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("다른 변경이 감지되었습니다.");
+    expect(screen.queryByRole("button", {
+      name: "마감 2일 재조정 복구 시나리오 되돌리기",
+    })).toBeNull();
+  });
+
+  it("locks undo after a later collaborator change is observed", async () => {
+    const aggregate = createProductionDemoProject();
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const renderPanel = (value: typeof aggregate) => (
+      <MemoryRouter>
+        <ProductionRecoveryScenarioPanel
+          aggregate={value}
+          intelligence={deriveProductionManagementOverview(value, { now: NOW }).riskIntelligence}
+          execute={execute}
+          canEdit
+          now={NOW}
+        />
+      </MemoryRouter>
+    );
+    const view = render(renderPanel(aggregate));
+
+    fireEvent.change(screen.getByLabelText("시나리오를 비교할 위험"), {
+      target: { value: "blocker:task-episode-12-background" },
+    });
+    fireEvent.click(await screen.findByRole("button", {
+      name: "마감 2일 재조정 복구 시나리오 적용",
+    }));
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+
+    const command = execute.mock.calls[0]?.[0] as Extract<ProductionClientCommand, { type: "upsert-task-batch" }>;
+    const applied = command.tasks[0]!;
+    const externallyChanged = {
+      ...aggregate,
+      revision: aggregate.revision + 2,
+      tasks: aggregate.tasks.map((task) => task.id === applied.id
+        ? { ...applied, status: "paused" as const }
+        : task),
+    };
+    view.rerender(renderPanel(externallyChanged));
+
+    const undo = screen.getByRole("button", {
+      name: "마감 2일 재조정 복구 시나리오 되돌리기",
+    });
+    expect((undo as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("추가 변경으로 잠김")).toBeTruthy();
+    expect(screen.getByText(/같은 업무 1개가 이후 변경되어/u)).toBeTruthy();
+  });
+
 });

@@ -92,8 +92,10 @@ jobs:
           apps/web/src/domains/creator/production-hub/production-automation-execution.test.ts
           apps/web/src/domains/creator/production-hub/production-management-overview.test.ts
           apps/web/src/domains/creator/production-hub/ProductionRecoveryScenarioPanel.test.tsx
+          apps/web/src/domains/creator/production-hub/ProductionOperationsControlWorkspace.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionExternalReviewPage.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionManagementWorkspace.test.tsx
+          apps/api/src/modules/production-collaboration/production-collaboration.service.test.ts
           apps/web/src/domains/creator/production-hub/ProductionScheduleWorkspace.test.tsx
       - name: Production bundle
         run: pnpm run build:bundle

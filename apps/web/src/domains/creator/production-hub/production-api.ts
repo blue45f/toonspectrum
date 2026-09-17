@@ -22,6 +22,8 @@ import type {
   ProductionAgreement,
   ProductionDispute,
   ProductionInvoice,
+  ProductionAutomationRule,
+  ProductionNotification,
   ProductionOperationsRecord,
   ProductionProjectAggregate,
   ProductionRisk,
@@ -147,8 +149,18 @@ export type ProductionClientCommand =
   | { readonly type: "upsert-review-policy"; readonly policy: ReviewPolicy }
   | { readonly type: "record-review-decision"; readonly policyId: string; readonly decision: ReviewDecision }
   | { readonly type: "upsert-task"; readonly task: ProductionTask }
-  | { readonly type: "upsert-task-batch"; readonly tasks: readonly ProductionTask[] }
+  | {
+      readonly type: "upsert-task-batch";
+      readonly tasks: readonly ProductionTask[];
+      readonly expectedTasks?: readonly ProductionTask[];
+    }
   | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord }
+  | {
+      readonly type: "apply-automation-execution";
+      readonly tasks: readonly ProductionTask[];
+      readonly notifications: readonly ProductionNotification[];
+      readonly evaluatedRules: readonly ProductionAutomationRule[];
+    }
   | { readonly type: "apply-schedule-scenario"; readonly baseline: ScheduleBaseline; readonly tasks: readonly ProductionTask[] }
   | {
       readonly type: "upsert-episode-operations";
@@ -272,6 +284,7 @@ export interface ProductionExternalReviewView {
       readonly createdAt: string;
     };
     readonly evidenceRefs: readonly string[];
+    readonly protectedEvidenceCount: number;
     readonly deliverable: {
       readonly id: string;
       readonly type: string;

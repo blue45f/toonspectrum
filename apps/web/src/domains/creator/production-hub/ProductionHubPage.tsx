@@ -75,7 +75,7 @@ import {
 } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage, httpStatus } from "@/infrastructure/api";
 import { getMyProfile } from "@/infrastructure/me-client";
 
 export type ProductionProjectSurface =
@@ -355,6 +355,12 @@ function reduceDemoCommand(
     case "upsert-task":
       return { ...base, tasks: replaceById(aggregate.tasks, command.task) };
     case "upsert-task-batch": {
+      for (const expected of command.expectedTasks ?? []) {
+        const current = aggregate.tasks.find((task) => task.id === expected.id);
+        if (!current || JSON.stringify(current) !== JSON.stringify(expected)) {
+          throw new Error("다른 변경이 감지되어 작업 묶음을 안전하게 적용하지 않았습니다.");
+        }
+      }
       const tasks = command.tasks.reduce<readonly ProductionTask[]>(
         (current, task) => replaceById(current, task),
         aggregate.tasks,
@@ -373,6 +379,21 @@ function reduceDemoCommand(
         aggregate.tasks,
       );
       return { ...base, episodes, episodePlans, tasks };
+    }
+    case "apply-automation-execution": {
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      const notifications = command.notifications.reduce(
+        (current, notification) => replaceById(current, notification),
+        aggregate.notifications ?? [],
+      );
+      const automationRules = command.evaluatedRules.reduce(
+        (current, rule) => replaceById(current, rule),
+        aggregate.automationRules ?? [],
+      );
+      return { ...base, tasks, notifications, automationRules };
     }
     case "upsert-operations-record": {
       const record = command.record;
@@ -484,10 +505,17 @@ function useProductionProject(projectId: string | undefined) {
     return () => { active = false; };
   }, [isDemo, projectId]);
 
-  const execute = useCallback((command: ProductionClientCommand, successMessage: string): Promise<void> => {
+  const queueCommand = useCallback((
+    command: ProductionClientCommand,
+    successMessage: string,
+    propagateFailure: boolean,
+  ): Promise<void> => {
     const run = async () => {
       const current = aggregateRef.current;
-      if (!current) return;
+      if (!current) {
+        if (propagateFailure) throw new Error("저장할 제작 프로젝트가 없습니다.");
+        return;
+      }
       setSaveState("saving");
       setNotice(null);
       try {
@@ -499,8 +527,21 @@ function useProductionProject(projectId: string | undefined) {
         setSaveState("saved");
         setNotice(successMessage);
       } catch (cause) {
+        let message = await getApiErrorMessage(cause, "변경 내용을 저장하지 못했습니다.");
+        if (!isDemo && httpStatus(cause) === 409) {
+          try {
+            const refreshed = await getProductionProject(current.projectId);
+            aggregateRef.current = refreshed.aggregate;
+            setAggregate(refreshed.aggregate);
+            setAccess(refreshed.access);
+            message = `${message} 최신 프로젝트 상태를 다시 불러왔습니다.`;
+          } catch {
+            message = `${message} 최신 상태 자동 갱신에도 실패해 페이지 새로고침이 필요합니다.`;
+          }
+        }
         setSaveState("error");
-        setNotice(await getApiErrorMessage(cause, "변경 내용을 저장하지 못했습니다."));
+        setNotice(message);
+        if (propagateFailure) throw new Error(message, { cause });
       }
     };
     const pending = commandQueueRef.current.then(run, run);
@@ -508,7 +549,16 @@ function useProductionProject(projectId: string | undefined) {
     return pending;
   }, [isDemo]);
 
-  return { aggregate, access, loading, error, saveState, notice, execute, isDemo };
+  const execute = useCallback(
+    (command: ProductionClientCommand, successMessage: string) => queueCommand(command, successMessage, false),
+    [queueCommand],
+  );
+  const executeStrict = useCallback(
+    (command: ProductionClientCommand, successMessage: string) => queueCommand(command, successMessage, true),
+    [queueCommand],
+  );
+
+  return { aggregate, access, loading, error, saveState, notice, execute, executeStrict, isDemo };
 }
 
 export function ProductionLandingPage() {
@@ -781,18 +831,20 @@ function OverviewSurface({
   aggregate,
   roleLens,
   execute,
+  executeStrict,
   canEdit,
   isDemo,
 }: {
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly executeStrict: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly isDemo: boolean;
 }) {
   return (
     <div className="space-y-4">
-      <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />
+      <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} executeRecovery={executeStrict} canEdit={canEdit} />
       <ProductionStudioRevisionBridgePanel
         aggregate={aggregate}
         execute={execute}
@@ -1239,6 +1291,7 @@ function SurfaceContent({
   aggregate,
   roleLens,
   execute,
+  executeStrict,
   canEdit,
   canManage,
   isDemo,
@@ -1247,17 +1300,18 @@ function SurfaceContent({
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly executeStrict: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly canManage: boolean;
   readonly isDemo: boolean;
 }) {
   switch (surface) {
-    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} isDemo={isDemo} />;
+    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} executeStrict={executeStrict} canEdit={canEdit} isDemo={isDemo} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
-    case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
+    case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;
@@ -1288,6 +1342,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
             aggregate={project.aggregate}
             roleLens={roleLens}
             execute={project.execute}
+            executeStrict={project.executeStrict}
             canEdit={project.access.edit}
             canManage={project.access.manage}
             isDemo={project.isDemo}
