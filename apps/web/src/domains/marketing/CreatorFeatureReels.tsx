@@ -141,11 +141,12 @@ const COPY = {
     choose: "기능 미리보기",
     visualAlt: "ToonStudio 기능을 설명하는 오리지널 제품 비주얼",
     filmEyebrow: "REMOTION PRODUCT FILM",
-    filmTitle: "24초면 전체 제작 흐름을 이해할 수 있어요.",
-    filmBody: "기획 → 드로잉 → 장면 구성 → 완성까지의 흐름을 Remotion으로 만든 짧은 영상으로 먼저 확인하세요.",
+    filmTitle: "24초로 감을 잡고, 8분 투어로 전체를 이해하세요.",
+    filmBody: "짧은 브랜드 필름으로 방향을 먼저 보고, 실제 제품 화면이 필요한 경우 8분 24초 상세 투어에서 9개 제작 챕터를 이어서 확인하세요.",
     filmPlay: "24초 영상 재생",
     filmPause: "영상 일시정지",
-    filmOpen: "큰 화면에서 보기",
+    filmOpen: "24초 큰 화면",
+    tourOpen: "8분 24초 전체 투어",
     finalTitle: "설명서를 읽기 전에, 만들어보세요.",
     finalBody: "처음에는 가장 쉬운 선택만 보여주고, 전문 기능은 필요한 순간에 나타납니다.",
     finalAction: "새 작품 시작하기",
@@ -157,11 +158,12 @@ const COPY = {
     choose: "Feature preview",
     visualAlt: "Original ToonStudio product visual explaining a creative capability",
     filmEyebrow: "REMOTION PRODUCT FILM",
-    filmTitle: "Understand the complete creation flow in 24 seconds.",
-    filmBody: "Watch planning, drawing, scene building and finishing in a short Remotion film before reading the details.",
+    filmTitle: "Get the idea in 24 seconds, then understand the whole product in 8 minutes.",
+    filmBody: "Use the short brand film for orientation, then continue into the 8m24s tour when you want nine chapters built from real product screens.",
     filmPlay: "Play 24-second film",
     filmPause: "Pause film",
-    filmOpen: "Open full film",
+    filmOpen: "Open 24-second film",
+    tourOpen: "Open 8m24s full tour",
     finalTitle: "Create before you read a manual.",
     finalBody: "The easiest choices appear first. Professional depth arrives only when the task needs it.",
     finalAction: "Start a new work",
@@ -181,7 +183,7 @@ function ReelPicture({ reel, alt }: { reel: ReelVisual; alt: string }) {
   return <img src={reel.image} alt={alt} loading="lazy" decoding="async" />;
 }
 
-export function CreatorFeatureReels() {
+export function CreatorFeatureReels({ showFilm = true, embedded = false }: { readonly showFilm?: boolean; readonly embedded?: boolean } = {}) {
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
   const copy = COPY[locale];
@@ -192,15 +194,17 @@ export function CreatorFeatureReels() {
   const ActiveIcon = active.icon;
 
   return (
-    <section className="creator-feature-reels" aria-labelledby="creator-feature-reels-title" lang={locale}>
+    <section className={`creator-feature-reels${embedded ? " creator-feature-reels--embedded" : ""}`} aria-labelledby={embedded ? undefined : "creator-feature-reels-title"} lang={locale}>
       <div className="creator-feature-reels__shell">
-        <header className="creator-feature-reels__heading">
-          <div>
-            <p className="creator-feature-reels__eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
-            <h2 id="creator-feature-reels-title">{copy.title}</h2>
-          </div>
-          <p>{copy.intro}</p>
-        </header>
+        {!embedded ? (
+          <header className="creator-feature-reels__heading">
+            <div>
+              <p className="creator-feature-reels__eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
+              <h2 id="creator-feature-reels-title">{copy.title}</h2>
+            </div>
+            <p>{copy.intro}</p>
+          </header>
+        ) : null}
 
         <div className="creator-feature-reels__stage">
           <div className="creator-feature-reels__tabs" role="tablist" aria-label={copy.choose}>
@@ -285,7 +289,8 @@ export function CreatorFeatureReels() {
           })}
         </div>
 
-        <section className="creator-feature-reels__film" aria-labelledby="creator-feature-film-title">
+        {showFilm ? (
+          <section className="creator-feature-reels__film" aria-labelledby="creator-feature-film-title">
           <div className="creator-feature-reels__film-copy">
             <p className="creator-feature-reels__eyebrow"><Play size={14} aria-hidden="true" />{copy.filmEyebrow}</p>
             <h3 id="creator-feature-film-title">{copy.filmTitle}</h3>
@@ -296,6 +301,7 @@ export function CreatorFeatureReels() {
                 {filmMounted ? copy.filmPause : copy.filmPlay}
               </button>
               <Link href="/brand-film">{copy.filmOpen}<ArrowRight size={15} aria-hidden="true" /></Link>
+              <Link href="/product-tour">{copy.tourOpen}<ArrowRight size={15} aria-hidden="true" /></Link>
             </div>
           </div>
           <div className="creator-feature-reels__film-media">
@@ -322,11 +328,14 @@ export function CreatorFeatureReels() {
             )}
           </div>
         </section>
+        ) : null}
 
-        <footer className="creator-feature-reels__closing">
-          <div><h3>{copy.finalTitle}</h3><p>{copy.finalBody}</p></div>
-          <Link href="/studio/new">{copy.finalAction}<ArrowRight size={18} aria-hidden="true" /></Link>
-        </footer>
+        {!embedded ? (
+          <footer className="creator-feature-reels__closing">
+            <div><h3>{copy.finalTitle}</h3><p>{copy.finalBody}</p></div>
+            <Link href="/studio/new">{copy.finalAction}<ArrowRight size={18} aria-hidden="true" /></Link>
+          </footer>
+        ) : null}
       </div>
     </section>
   );
