@@ -63,7 +63,7 @@ try {
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
     const intent = page.locator(".cf-intent");
     await intent.waitFor({ state: "visible", timeout: 60_000 });
-    await expect(intent.locator("nav a")).toHaveCount(7);
+    await expect(intent.locator("nav a")).toHaveCount(6);
 
     const recent = intent.locator(".cf-recent-card");
     await expect(recent).toBeVisible();
