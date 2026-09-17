@@ -456,7 +456,10 @@
       "state": "implemented",
       "evidence": [
         "apps/desktop-sync/src/runtime.ts",
-        "apps/desktop-sync/src/agent.ts"
+        "apps/desktop-sync/src/agent.ts",
+        "apps/desktop-sync/src/cli.ts",
+        "apps/desktop-sync/src/remote-target.ts",
+        "apps/desktop-sync/src/cloud/indexed-remote.ts"
       ]
     },
     {
@@ -466,7 +469,8 @@
       "state": "implemented",
       "evidence": [
         "apps/desktop-sync/src/path-policy.ts",
-        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts",
+        "apps/desktop-sync/src/filesystem-remote.ts"
       ]
     },
     {
@@ -476,17 +480,22 @@
       "state": "implemented",
       "evidence": [
         "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts",
-        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts",
+        "apps/desktop-sync/src/cloud/google-drive.ts",
+        "apps/desktop-sync/src/cloud/indexed-remote.test.ts"
       ]
     },
     {
       "id": "PR-052",
-      "title": "Dropbox Adapter",
+      "title": "Dropbox and OneDrive Adapters",
       "track": "sync",
       "state": "implemented",
       "evidence": [
         "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts",
-        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts"
+        "apps/api/src/modules/studio-project-graph/studio-external-file-binding.repository.ts",
+        "apps/desktop-sync/src/cloud/dropbox.ts",
+        "apps/desktop-sync/src/cloud/onedrive.ts",
+        "apps/desktop-sync/src/cloud/providers.test.ts"
       ]
     },
     {

@@ -4,16 +4,23 @@ import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { FileSystemDesktopSyncRemote } from "./filesystem-remote.js";
 import { loadSyncJournal } from "./journal.js";
 import { buildDesktopSyncPlan, countSyncPlanActions } from "./planner.js";
+import {
+  DEFAULT_CLOUD_ACCESS_TOKEN_ENVIRONMENT,
+  createDesktopSyncRemoteForTarget,
+  desktopSyncRemoteLabel,
+  parseDesktopCloudProviderId,
+  type DesktopSyncRemoteDependencies,
+  type DesktopSyncRemoteTarget,
+} from "./remote-target.js";
 import {
   runDesktopSyncCycle,
   startDesktopSyncAgent,
 } from "./runtime.js";
 import { scanSyncFolder } from "./scanner.js";
 
-import type { DesktopSyncCycleResult } from "./runtime.js";
+import type { DesktopSyncCycleResult, DesktopSyncRemote } from "./runtime.js";
 import type { ScanSyncFolderOptions } from "./scanner.js";
 
 export type DesktopSyncCliMode = "once" | "watch" | "dry-run";
@@ -21,6 +28,7 @@ export type DesktopSyncCliMode = "once" | "watch" | "dry-run";
 export interface DesktopSyncCliOptions extends ScanSyncFolderOptions {
   readonly localRoot: string;
   readonly remoteRoot: string;
+  readonly remoteTarget: DesktopSyncRemoteTarget;
   readonly mode: DesktopSyncCliMode;
   readonly intervalMs: number;
   readonly json: boolean;
@@ -58,10 +66,17 @@ export const DESKTOP_SYNC_CLI_HELP = `ToonStudio folder sync
 
 Usage:
   toonstudio-sync --local <folder> --remote-folder <folder> [options]
+  toonstudio-sync --local <folder> --cloud-provider <provider> [options]
+
+Remote targets:
+  --remote-folder <path>       Local disk, external disk, NAS or mounted folder
+  --cloud-provider <provider>  google-drive, dropbox or onedrive
+  --cloud-root <path>          Provider root path (default: Sync)
+  --access-token-env <name>    Environment variable that contains the OAuth token
 
 Modes:
   --once                 Run one conflict-safe sync cycle (default)
-  --dry-run              Print the plan without changing either folder
+  --dry-run              Print the plan without changing either side
   --watch                 Keep polling and sync after each completed cycle
 
 Options:
@@ -71,8 +86,14 @@ Options:
   --json                 Emit machine-readable summaries
   --help                 Show this help
 
+Default token variables:
+  Google Drive  TOONSTUDIO_GOOGLE_DRIVE_ACCESS_TOKEN
+  Dropbox       TOONSTUDIO_DROPBOX_ACCESS_TOKEN
+  OneDrive      TOONSTUDIO_ONEDRIVE_ACCESS_TOKEN
+
 Exit codes:
   0  completed or watching
+  1  configuration, authentication, network or integrity error
   2  conflicts require manual review
 `;
 
@@ -106,7 +127,10 @@ export function parseDesktopSyncCliArguments(
   arguments_: readonly string[],
 ): DesktopSyncCliOptions {
   let localRoot = "";
-  let remoteRoot = "";
+  let remoteFolder = "";
+  let cloudProviderValue = "";
+  let cloudRoot = "Sync";
+  let accessTokenEnvironmentVariable = "";
   let selectedMode: DesktopSyncCliMode | null = null;
   let intervalMs = DEFAULT_INTERVAL_MS;
   let includeUnknownFiles = false;
@@ -122,7 +146,19 @@ export function parseDesktopSyncCliArguments(
         index += 1;
         break;
       case "--remote-folder":
-        remoteRoot = requiredValue(arguments_, index, argument);
+        remoteFolder = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--cloud-provider":
+        cloudProviderValue = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--cloud-root":
+        cloudRoot = requiredValue(arguments_, index, argument);
+        index += 1;
+        break;
+      case "--access-token-env":
+        accessTokenEnvironmentVariable = requiredValue(arguments_, index, argument);
         index += 1;
         break;
       case "--once":
@@ -168,17 +204,46 @@ export function parseDesktopSyncCliArguments(
     }
   }
 
-  if (!help && (!localRoot || !remoteRoot)) {
-    throw new TypeError("--local and --remote-folder are required");
+  if (!help && !localRoot) {
+    throw new TypeError("--local is required");
+  }
+  if (!help && Boolean(remoteFolder) === Boolean(cloudProviderValue)) {
+    throw new TypeError(
+      "choose exactly one of --remote-folder or --cloud-provider",
+    );
+  }
+  if (remoteFolder && (accessTokenEnvironmentVariable || cloudRoot !== "Sync")) {
+    throw new TypeError(
+      "--cloud-root and --access-token-env require --cloud-provider",
+    );
   }
   const mode: DesktopSyncCliMode = selectedMode ?? "once";
   if (mode === "watch" && intervalMs < 1_000) {
     throw new TypeError("--interval must be at least 1000ms in watch mode");
   }
 
+  let remoteTarget: DesktopSyncRemoteTarget;
+  if (cloudProviderValue) {
+    const provider = parseDesktopCloudProviderId(cloudProviderValue);
+    remoteTarget = {
+      kind: "cloud",
+      provider,
+      rootPath: cloudRoot,
+      accessTokenEnvironmentVariable:
+        accessTokenEnvironmentVariable
+        || DEFAULT_CLOUD_ACCESS_TOKEN_ENVIRONMENT[provider],
+    };
+  } else {
+    remoteTarget = {
+      kind: "filesystem",
+      root: remoteFolder ? resolve(remoteFolder) : "",
+    };
+  }
+
   return {
     localRoot: localRoot ? resolve(localRoot) : "",
-    remoteRoot: remoteRoot ? resolve(remoteRoot) : "",
+    remoteRoot: desktopSyncRemoteLabel(remoteTarget),
+    remoteTarget,
     mode,
     intervalMs,
     includeUnknownFiles,
@@ -248,7 +313,7 @@ function writeSummary(
 
 async function planDryRun(
   options: DesktopSyncCliOptions,
-  remote: FileSystemDesktopSyncRemote,
+  remote: DesktopSyncRemote,
 ): Promise<DesktopSyncCycleResult> {
   const [journal, localFiles, remoteFiles] = await Promise.all([
     loadSyncJournal(options.localRoot),
@@ -263,12 +328,27 @@ async function planDryRun(
   };
 }
 
+async function createRemote(
+  options: DesktopSyncCliOptions,
+  dependencies: DesktopSyncRemoteDependencies = {},
+): Promise<DesktopSyncRemote> {
+  return createDesktopSyncRemoteForTarget(
+    options.remoteTarget,
+    options.localRoot,
+    {
+      includeUnknownFiles: options.includeUnknownFiles,
+      maximumFileBytes: options.maximumFileBytes,
+    },
+    dependencies,
+  );
+}
+
 export async function executeDesktopSyncCli(
   options: DesktopSyncCliOptions,
+  dependencies: DesktopSyncRemoteDependencies = {},
 ): Promise<DesktopSyncCliRunResult> {
   await assertLocalRoot(options.localRoot);
-  const remote = await FileSystemDesktopSyncRemote.create(options.remoteRoot, options);
-  await remote.assertDistinctFrom(options.localRoot);
+  const remote = await createRemote(options, dependencies);
   const result = options.mode === "dry-run"
     ? await planDryRun(options, remote)
     : await runDesktopSyncCycle(options.localRoot, remote, options);
@@ -292,6 +372,7 @@ function waitForShutdown(): Promise<NodeJS.Signals> {
 export async function runDesktopSyncCli(
   arguments_: readonly string[],
   io: DesktopSyncCliIo = process,
+  dependencies: DesktopSyncRemoteDependencies = {},
 ): Promise<number> {
   const options = parseDesktopSyncCliArguments(arguments_);
   if (options.help) {
@@ -299,14 +380,13 @@ export async function runDesktopSyncCli(
     return 0;
   }
   if (options.mode !== "watch") {
-    const result = await executeDesktopSyncCli(options);
+    const result = await executeDesktopSyncCli(options, dependencies);
     writeSummary(io, result.summary, options.json);
     return result.exitCode;
   }
 
   await assertLocalRoot(options.localRoot);
-  const remote = await FileSystemDesktopSyncRemote.create(options.remoteRoot, options);
-  await remote.assertDistinctFrom(options.localRoot);
+  const remote = await createRemote(options, dependencies);
   let conflictSeen = false;
   const agent = startDesktopSyncAgent(options.localRoot, remote, {
     intervalMs: options.intervalMs,

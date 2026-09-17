@@ -121,11 +121,18 @@
 - 원격 쓰기·삭제는 마지막으로 확인한 version을 compare-and-swap 조건으로 사용해 스캔 뒤 변경된 파일을 덮어쓰지 않는다.
 - upload·download는 임시 파일, digest 재검증과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
 - 로컬 삭제는 `.toonstudio/trash`로 이동하며 감시 모드는 중복 trigger를 병합하고 SIGINT·SIGTERM에서 안전하게 중지한다.
+- Google Drive·Dropbox·OneDrive를 access token으로 직접 연결하는 cloud transport를 제공한다.
+- Google Drive version+ETag, Dropbox revision, OneDrive eTag를 공급자 compare-and-swap 조건으로 사용한다.
+- 공급자에 SHA-256이 없거나 알고리즘이 다른 경우 `.toonstudio-sync-index.json` sidecar를 저장하고 object version과 연결한다.
+- sidecar가 없거나 오래됐으면 원격 파일을 다시 내려받아 SHA-256을 복구하고, conflict 없는 실행 뒤 index를 compare-and-swap으로 갱신한다.
+- `--dry-run`과 충돌 cycle은 원격 폴더나 sidecar index를 생성·수정하지 않는다.
+- Google Drive와 OneDrive는 resumable upload session, Dropbox는 revision-guarded upload session을 사용한다.
+- access token은 환경 변수에서만 읽고 CLI 출력·journal·sidecar에 기록하지 않는다.
 - 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
 - 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
 - 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
 
-이 증분의 완료 범위는 파일시스템·마운트 폴더 transport와 CLI다. 실제 Google Drive·Dropbox·OneDrive OAuth transport, OS 서명 설치 패키지, 네트워크 multipart 재개 전송과 충돌 GUI는 별도 release gate로 유지한다.
+이 증분의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport다. 브라우저 OAuth 로그인·refresh token·OS Keychain, 프로세스 재시작 이후 upload session 재개, OS 서명 설치 패키지와 충돌 GUI는 별도 release gate로 유지한다.
 
 ## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
 
