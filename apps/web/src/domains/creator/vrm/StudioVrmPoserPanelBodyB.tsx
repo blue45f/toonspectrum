@@ -53,6 +53,11 @@ import {
   VrmColorControl,
 } from "./StudioVrmColorControl";
 import { DEFAULT_VRM_CUSTOM_COLORS } from "./StudioVrmPoserTypes";
+import {
+  StudioVrmCostumePresetVisual,
+  StudioVrmWardrobeItemVisual,
+  StudioVrmWardrobeSetVisual,
+} from "./StudioVrmCatalogVisual";
 
 import type { FingerRotationMap, PoseBoneMap } from "./studio-vrm-poser-utils";
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
@@ -325,7 +330,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                         onClick={() => equipWardrobeSetById(set.id)}
                         className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-[0.68rem] font-medium text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <span className="text-xs" aria-hidden>{set.emoji}</span>
+                        <StudioVrmWardrobeSetVisual set={set} className="size-7" />
                         <span className="truncate">{set.label}</span>
                       </button>
                     ))}
@@ -397,7 +402,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                                   active ? "border-accent bg-accent/15 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
                                 }`}
                               >
-                                <span className="text-sm" aria-hidden>{item.emoji}</span>
+                                <StudioVrmWardrobeItemVisual item={item} className="size-9" />
                                 <span className="w-full truncate text-center">{item.label}</span>
                               </button>
                             );
@@ -594,7 +599,7 @@ export function StudioVrmPoserPanelBodyB({ h }: { h: StudioVrmPoserHost }) {
                         }}
                         className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-[0.68rem] font-medium text-fg hover:bg-raised disabled:opacity-40 transition-colors cursor-pointer"
                       >
-                        <span className="text-xs">{p.emoji}</span>
+                        <StudioVrmCostumePresetVisual preset={p} className="size-7" />
                         <span className="truncate">{p.name}</span>
                       </button>
                     ))}
