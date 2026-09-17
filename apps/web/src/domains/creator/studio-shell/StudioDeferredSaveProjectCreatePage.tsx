@@ -258,7 +258,7 @@ export function StudioDeferredSaveProjectCreatePage() {
       : `Start ${selected.titleEn}`;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
+    <div data-route-ready="studio-new" className="min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
       <Container size="wide" className="min-w-0 py-7 sm:py-12">
         <div className="mx-auto min-w-0 max-w-6xl">
           <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

@@ -214,7 +214,7 @@ export function brushStudioV6ProviderManifestById(id: string): BrushStudioV6Prov
 export function brushStudioV6ProviderManifestForNode(
   nodeId: string,
 ): BrushStudioV6ProviderManifestEntry | null {
-  if (nodeId.startsWith("carrier-cpu-")) {
+  if (nodeId.startsWith("carrier-cpu-") || nodeId.startsWith("surface-v7-")) {
     return PROVIDER_BY_ID.get("toonspectrum-cpu-contact-v2") ?? null;
   }
   return PROVIDER_BY_NODE.get(nodeId) ?? null;

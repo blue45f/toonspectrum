@@ -232,7 +232,7 @@ describe("StudioQuickStartPanel", () => {
       ["브러시 골라 그리기", handlers.onBrushKit],
       ["컷 나누기", handlers.onOpenTemplate],
       ["캐릭터·포즈", handlers.onOpenCharacter],
-      ["3D 배경 열기", handlers.onOpenBackground3d],
+      ["3D로 장면 잡기", handlers.onOpenBackground3d],
       ["캔버스 넓게 보기", handlers.onCollabFocus],
     ] as const;
 

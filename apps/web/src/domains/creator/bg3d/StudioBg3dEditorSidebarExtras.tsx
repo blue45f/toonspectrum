@@ -6,6 +6,13 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { Studio3dAssetQualityPanel } from "../Studio3dAssetQualityPanel";
 
+import { useMemo } from "react";
+
+import {
+  deriveStudioBg3dProfessionalDeviceCapabilities,
+  resolveStudioBg3dProfessionalRuntimeReadiness,
+} from "./studio-bg3d-professional-runtime-readiness";
+
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { StudioBg3dSceneOutliner } from "./StudioBg3dSceneOutliner";
 
@@ -322,6 +329,75 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
     LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, engineFrameTimeMs, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
+  const professionalRuntimeReadiness = useMemo(() => {
+    const viewportWidth = viewportBoxSize?.width ?? documentCanvasSize?.width ?? 0;
+    const viewportHeight = viewportBoxSize?.height ?? documentCanvasSize?.height ?? 0;
+    const viewportAspectRatio = viewportWidth > 0 && viewportHeight > 0
+      ? viewportWidth / viewportHeight
+      : sceneBaseDocument.output.exportAspectRatio;
+    const groundingReceipts = new Map(sharedCharacters.flatMap((character) => {
+      const receipt = sharedCharacterGroundings[character.runtimeKey]
+        ?? sharedCharacterGroundings[character.modelRuntimeKey];
+      return receipt ? [[character.elementId, receipt]] : [];
+    }));
+    const capabilities = deriveStudioBg3dProfessionalDeviceCapabilities({
+      enginePlan: engineRuntime.plan,
+      webGpuProbe: engineRuntime.probe,
+      deviceSignals,
+      maxTextureDimension2d: deviceSignals.deviceMemoryGb && deviceSignals.deviceMemoryGb >= 8
+        ? 8192
+        : 4096,
+      float16Shaders: engineRuntime.probe.supported,
+    });
+    const runtimeFailure = engineRuntime.deviceLostMessage
+      ? {
+          kind: "webgpu-device-lost" as const,
+          attempt: 1,
+          recoverable: false,
+        }
+      : engineRuntime.plan.status === "failed"
+        ? {
+            kind: engineRuntime.plan.backend === "webgpu"
+              ? "webgpu-initialization" as const
+              : "webgl-context-lost" as const,
+            attempt: 1,
+            recoverable: false,
+          }
+        : undefined;
+    return resolveStudioBg3dProfessionalRuntimeReadiness({
+      authorityId: `bg3d:${sharedStageSessionScopeKey ?? "editor-session"}`,
+      primitives,
+      customModels,
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      baseDocument: sceneBaseDocument,
+      sharedSceneSession,
+      viewportAspectRatio,
+      revision: canonicalRevision,
+      capabilities,
+      groundingReceipts,
+      babylonSpecialistAvailable: babylonDiagnosticState.status === "success",
+      runtimeFailure,
+    });
+  }, [
+    attachmentByStorageModelIdRef,
+    babylonDiagnosticState.status,
+    canonicalRevision,
+    customModels,
+    deviceSignals,
+    documentCanvasSize?.height,
+    documentCanvasSize?.width,
+    engineRuntime.deviceLostMessage,
+    engineRuntime.plan,
+    engineRuntime.probe,
+    primitives,
+    sceneBaseDocument,
+    sharedCharacterGroundings,
+    sharedCharacters,
+    sharedSceneSession,
+    sharedStageSessionScopeKey,
+    viewportBoxSize?.height,
+    viewportBoxSize?.width,
+  ]);
   return (
     <>
               <Studio3dAssetQualityPanel
@@ -392,6 +468,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineProbing={engineRuntime.phase === "probing"}
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
                 engineFrameTimeMs={engineFrameTimeMs}
+                professionalReadiness={professionalRuntimeReadiness}
                 onEnginePreferenceChange={engineRuntime.setPreference}
                 onOpenPrecisionModeler={handleOpenPrecisionModeler}
                 aiReferenceBusy={isCapturing}

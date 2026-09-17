@@ -64,11 +64,21 @@ function host(
 describe("BG3D modal compositor boundary", () => {
   it("uses a dense readable scrim rather than sampling the underlying full-screen GPU canvas", () => {
     render(createElement(StudioBg3dEditorModal, { h: host() }));
-    const dialog = screen.getByRole("dialog", { name: "3D 장면 스튜디오" });
+    const dialog = screen.getByRole("dialog", { name: "3D 장면 연출" });
     expect(dialog.className).toContain("bg-[oklch(0.08_0.01_70/0.94)]");
     expect(dialog.className).not.toContain("backdrop-blur");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("opens in simple mode and keeps the professional workspace one click away", () => {
+    render(createElement(StudioBg3dEditorModal, { h: host() }));
+    const dialog = screen.getByRole("dialog", { name: "3D 장면 연출" });
+    expect(dialog.getAttribute("data-studio-bg3d-experience")).toBe("simple");
+    expect(screen.getByRole("button", { name: /간편/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /전문/ }));
+    expect(dialog.getAttribute("data-studio-bg3d-experience")).toBe("pro");
+    expect(screen.getByRole("button", { name: /전문/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("keeps the keyboard-focusable close action and its original dismissal handler", () => {

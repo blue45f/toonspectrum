@@ -128,6 +128,7 @@ apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx
+apps/web/src/domains/creator/studio-shell/StudioVisualGuidance.test.tsx
 apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts
 apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts
 apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts

@@ -65,11 +65,13 @@ function intentActions(locale: StudioFrontDoorLocale): readonly StudioIntentActi
         ? "작품 이름과 첫 회차부터 시작하고, 기획·콘티·작화 순서로 이어갑니다."
         : "Start with a title and first episode, then move through planning, storyboard and art.",
       badge: locale === "ko" ? "처음 시작 추천" : "Recommended first start",
+      visual: "/brand/theme-scenes/ink-studio.svg",
     },
     {
       href: "/story-lab",
       icon: FileText,
       title: locale === "ko" ? "대본이나 콘티가 있어요" : "I have a script or storyboard",
+      visual: "/brand/theme-scenes/graphite-studio.svg",
       description: locale === "ko"
         ? "기존 대본·캐릭터·장면을 정리하고 바로 회차 제작으로 연결합니다."
         : "Organize existing scripts, characters and scenes, then connect them to production.",
@@ -78,6 +80,7 @@ function intentActions(locale: StudioFrontDoorLocale): readonly StudioIntentActi
       href: "/studio/import",
       icon: FileUp,
       title: locale === "ko" ? "그리던 파일이 있어요" : "I have work-in-progress files",
+      visual: "/brand/atelier-process-640.webp",
       description: locale === "ko"
         ? "PSD·ORA·이미지·브러시·3D 파일을 분석하고 원본을 보존한 채 가져옵니다."
         : "Analyze PSD, ORA, image, brush and 3D files while preserving the originals.",
@@ -86,6 +89,7 @@ function intentActions(locale: StudioFrontDoorLocale): readonly StudioIntentActi
       href: "/production",
       icon: UsersRound,
       title: locale === "ko" ? "팀 프로젝트를 시작해요" : "I am starting a team project",
+      visual: "/brand/production-os-journey.svg",
       description: locale === "ko"
         ? "역할·마감·작업 넘기기·검수 기준을 먼저 정하고 함께 제작합니다."
         : "Set roles, deadlines, handoffs and review rules before producing together.",
@@ -98,6 +102,7 @@ function intentActions(locale: StudioFrontDoorLocale): readonly StudioIntentActi
         ? "기획부터 검토·연재 준비까지 연결된 샘플 프로젝트를 안전하게 체험합니다."
         : "Explore a safe sample project connected from planning through review and publishing.",
       badge: locale === "ko" ? "원본 유지" : "Original stays intact",
+      visual: "/brand/production-os-hero.svg",
     },
   ];
 }
@@ -278,8 +283,8 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
     href: "/studio/bg3d",
     icon: Boxes,
-    title: { ko: "3D 배경·소품", en: "3D backgrounds & props" },
-    description: { ko: "카메라·조명·선화 출력까지 웹툰 배경 작업을 연결합니다.", en: "Connect cameras, lighting and line-art output for webtoon backgrounds." },
+    title: { ko: "3D 장면 연출", en: "3D scene direction" },
+    description: { ko: "배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 적용합니다.", en: "Block backgrounds, poses and composition, then apply line and tone guides to artwork." },
   },
   {
     href: "/studio/assets/audio",

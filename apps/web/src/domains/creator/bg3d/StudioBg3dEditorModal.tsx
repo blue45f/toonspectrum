@@ -1,7 +1,8 @@
 "use no memo";
 // The legacy editor still reuses one mutable host object. Keep this shell out of React Compiler
 // memoization until the remaining document/session controllers stop mutating that identity.
-import { Boxes, X } from "lucide-react";
+import { SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { useState } from "react";
 
 import type { RefObject } from "react";
 
@@ -17,6 +18,7 @@ import {
 } from "./studio-bg3d-editor-ui";
 
 import type { StudioBg3dSceneOutlinerController } from "./studio-bg3d-scene-outliner-controller";
+import type { StudioBg3dExperienceMode } from "./StudioBackground3DTypes";
 
 interface StudioBg3dShotBatchProgress {
   readonly stage: "render" | "contact" | "archive";
@@ -36,6 +38,7 @@ export interface StudioBg3dEditorModalHost {
   readonly webXrSessionState: StudioWebXrSessionState;
   readonly requestUserClose: () => void;
   readonly outlinerController: StudioBg3dSceneOutlinerController;
+  readonly sharedStageSessionScopeKey?: string;
   readonly [key: string]: unknown;
 }
 
@@ -56,6 +59,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
     webXrSessionState,
     requestUserClose,
   } = h;
+  const [experienceMode, setExperienceMode] = useState<StudioBg3dExperienceMode>("simple");
   if (!open && !webXrRendererLifetimeRetained) return null;
 
   return (
@@ -65,7 +69,8 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       aria-modal={open ? "true" : undefined}
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
-      data-studio-bg3d-workspace="professional-v1"
+      data-studio-bg3d-workspace="professional-v2"
+      data-studio-bg3d-experience={experienceMode}
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
@@ -80,20 +85,38 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Boxes size={14} aria-hidden />
-              3D 배경
+              <Sparkles size={14} aria-hidden />
+              웹툰 제작 도우미
             </p>
             <h2
               id="studio-bg3d-dialog-title"
               className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl"
             >
-              3D 장면 스튜디오
+              3D 장면 연출
             </h2>
             <p className="mt-1 line-clamp-1 text-xs text-fg-3">
-              캐릭터·배경·소품·조명을 한 장면에서 연출하고 컬러·선화로 추출
+              배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 바로 적용하세요.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden items-center rounded-lg border border-line bg-card p-0.5 sm:flex" role="group" aria-label="3D 편집 모드">
+              <button
+                type="button"
+                aria-pressed={experienceMode === "simple"}
+                className="min-h-8 rounded-md px-2.5 text-[0.65rem] font-bold text-fg-2 hover:text-fg aria-pressed:bg-accent-soft aria-pressed:text-accent"
+                onClick={() => setExperienceMode("simple")}
+              >
+                <Sparkles size={12} className="mr-1 inline" aria-hidden />간편
+              </button>
+              <button
+                type="button"
+                aria-pressed={experienceMode === "pro"}
+                className="min-h-8 rounded-md px-2.5 text-[0.65rem] font-bold text-fg-2 hover:text-fg aria-pressed:bg-accent-soft aria-pressed:text-accent"
+                onClick={() => setExperienceMode("pro")}
+              >
+                <SlidersHorizontal size={12} className="mr-1 inline" aria-hidden />전문
+              </button>
+            </div>
             {isBatchRenderingShots ? (
               <>
                 <span className="sr-only" role="status" aria-live="polite">
@@ -138,9 +161,17 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
           className="flex min-h-0 flex-1"
         >
           <StudioBg3dProfessionalWorkspace
+            scopeKey={h.sharedStageSessionScopeKey ?? null}
+            experienceMode={experienceMode}
             outliner={<StudioBg3dSceneOutliner controller={h.outlinerController} variant="dock" />}
             viewport={<StudioBg3dEditorViewport h={h} />}
-            inspector={<StudioBg3dEditorSidebar h={h} />}
+            inspector={(
+              <StudioBg3dEditorSidebar
+                h={h}
+                experienceMode={experienceMode}
+                onOpenPro={() => setExperienceMode("pro")}
+              />
+            )}
           />
         </div>
       </div>

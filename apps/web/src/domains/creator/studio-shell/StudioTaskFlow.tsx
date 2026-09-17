@@ -194,6 +194,7 @@ export interface StudioIntentAction {
   readonly title: string;
   readonly description: string;
   readonly badge?: string;
+  readonly visual?: string;
 }
 
 /** Intent-first launcher used by entry pages and onboarding surfaces. */
@@ -219,6 +220,19 @@ export function StudioIntentLauncher({
                 href={action.href}
                 className="group flex h-full min-h-36 min-w-0 flex-col rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/45 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none"
               >
+                {action.visual ? (
+                  <span className="relative -mx-1 -mt-1 mb-3 block h-24 overflow-hidden rounded-xl border border-line bg-panel">
+                    <img
+                      src={action.visual}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transform-none"
+                    />
+                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/[0.035]" aria-hidden="true" />
+                  </span>
+                ) : null}
                 <span className="flex min-w-0 items-start justify-between gap-3">
                   <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover:border-accent/35 group-hover:text-accent">
                     <Icon size={18} aria-hidden="true" />

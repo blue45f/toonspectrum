@@ -114,7 +114,9 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    await waitFor(() => expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull());
+    await waitFor(() => {
+      expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
+    });
     expect(document.documentElement.dataset.routeVisualKind).toBe("assets");
     expect(document.documentElement.dataset.routeVisualMotion).toBe("stack");
     expect(document.documentElement.dataset.routePurposeScene).toBe("true");
@@ -159,6 +161,8 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    await waitFor(() => expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull());
+    await waitFor(() => {
+      expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
+    });
   });
 });

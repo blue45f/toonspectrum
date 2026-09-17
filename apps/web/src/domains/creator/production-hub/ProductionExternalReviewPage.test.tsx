@@ -93,6 +93,8 @@ describe("ProductionExternalReviewPage", () => {
 
     const secret = renderPage();
     expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
+    expect(document.querySelector('[data-route-ready="external-review"]')).not.toBeNull();
+    expect(document.querySelector("main")).toBeNull();
     expect(getProductionExternalReview).toHaveBeenCalledWith("project-1", "review-1", secret);
     await waitFor(() => expect(screen.getByTestId("review-location").textContent).toBe(
       "/production/review/project-1/review-1",
@@ -137,6 +139,8 @@ describe("ProductionExternalReviewPage", () => {
     getProductionExternalReview.mockRejectedValue(new Error("not found"));
     renderPage();
     expect(await screen.findByRole("heading", { name: "검수 링크를 열 수 없습니다" })).toBeTruthy();
+    expect(document.querySelector('[data-route-error="external-review"]')).not.toBeNull();
+    expect(document.querySelector("main")).toBeNull();
     expect(screen.queryByText("밤의 우편배달부")).toBeNull();
   });
 });

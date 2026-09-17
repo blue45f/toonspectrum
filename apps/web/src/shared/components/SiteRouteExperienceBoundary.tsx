@@ -10,9 +10,10 @@ import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 import { useI18n } from "@/shared/lib/i18n";
 
-const RoutePurposeScene = lazy(() => import("./RoutePurposeScene").then((module) => ({
-  default: module.RoutePurposeScene,
-})));
+const RoutePurposeScene = lazy(async () => {
+  const module = await import("./RoutePurposeScene");
+  return { default: module.RoutePurposeScene };
+});
 
 function useNarrowViewport() {
   const [narrow, setNarrow] = useState(false);

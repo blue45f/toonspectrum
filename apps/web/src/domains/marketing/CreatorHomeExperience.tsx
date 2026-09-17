@@ -38,7 +38,7 @@ import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 
-import { focusCreatorSection, isPlainCreatorJump } from "./creator-home-navigation";
+import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
 interface LocalizedText {
@@ -266,18 +266,10 @@ export function CreatorHomeExperience() {
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          {([
-            ["creator-start", copy.jumpStart],
-            ["creator-flow", copy.jumpFlow],
-            ["creator-principles", copy.jumpPrinciples],
-            ["creator-support", copy.jumpSupport],
-          ] as const).map(([sectionId, label]) => {
-            const href = `#${sectionId}`;
-            return <a key={sectionId} href={href} onClick={(event) => {
-              if (!isPlainCreatorJump(event) || window.location.hash !== href) return;
-              if (focusCreatorSection(href, (id) => document.getElementById(id), true)) event.preventDefault();
-            }}>{label}</a>;
-          })}
+          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
 
