@@ -6,6 +6,12 @@ export const CREATOR_HOME_SECTIONS = [
   { id: "creator-closing-title", headingId: "creator-closing-title", ko: "작품 시작", en: "Start creating" },
 ] as const;
 
+const EXPERIENCE_SECTIONS = [
+  { id: "creator-start", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
+  { id: "creator-flow", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
+  { id: "creator-support", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },
+] as const;
+
 const LEGACY_SECTIONS = [
   { id: "creator-film", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
   { id: "creator-faq-title", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },
@@ -15,6 +21,7 @@ const LEGACY_SECTIONS = [
 
 export type CreatorHomeSectionId =
   | (typeof CREATOR_HOME_SECTIONS)[number]["id"]
+  | (typeof EXPERIENCE_SECTIONS)[number]["id"]
   | (typeof LEGACY_SECTIONS)[number]["id"];
 
 export function creatorSectionFromHash(hash: string) {
@@ -22,6 +29,7 @@ export function creatorSectionFromHash(hash: string) {
   try {
     const id = decodeURIComponent(hash.slice(1));
     return CREATOR_HOME_SECTIONS.find((section) => section.id === id)
+      ?? EXPERIENCE_SECTIONS.find((section) => section.id === id)
       ?? LEGACY_SECTIONS.find((section) => section.id === id);
   } catch {
     return undefined;
