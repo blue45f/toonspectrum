@@ -137,6 +137,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ),
     ],
     extras: [
+      ours("view/floating-layout", "플로팅 UI 표시·배치 편집."),
       ours("view/fullscreen", "전체화면."),
       ours("view/save-current-view", "현재 보기 저장."),
       ours("view/restore-view", "보기 복원."),
