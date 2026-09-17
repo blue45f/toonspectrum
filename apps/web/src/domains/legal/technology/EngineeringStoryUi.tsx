@@ -43,6 +43,12 @@ const NAV_ITEMS = [
     en: "References",
   },
   {
+    href: "/about/technology/field-notes",
+    icon: FlaskConical,
+    ko: "기술 심화",
+    en: "Field notes",
+  },
+  {
     href: "/about/technology/deck",
     icon: Presentation,
     ko: "발표 모드",
@@ -121,7 +127,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
         className,
       )}
     >
-      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

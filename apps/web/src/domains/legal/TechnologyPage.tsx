@@ -7,6 +7,7 @@ import {
   Gauge,
   Layers3,
   LibraryBig,
+  NotebookTabs,
   Presentation,
   Scale,
   ShieldCheck,
@@ -100,6 +101,15 @@ const HUB_LINKS = [
     body: {
       ko: "실제 사용·평가·제품 참고를 구분하고 PWA, Worker, 3D, AI와 Open API 장애 해결 과정을 확인합니다.",
       en: "Separate used, evaluated and product-reference material and inspect PWA, Worker, 3D, AI and Open API incident records.",
+    },
+  },
+  {
+    href: "/about/technology/field-notes",
+    icon: NotebookTabs,
+    title: { ko: "기술 심화 노트", en: "Engineering field notes" },
+    body: {
+      ko: "Worker·PWA·무료 AI·인프라·Blender MCP·3D·Open API와 장애 해결 사례를 살펴봅니다.",
+      en: "Study workers, PWA, free-first AI and infrastructure, Blender MCP, 3D, Open APIs and troubleshooting.",
     },
   },
   {

@@ -1,5 +1,10 @@
 import { getTitle } from "../../../../../packages/core/src/server";
 
+import {
+  resolvePublicOgPage,
+  type PublicOgReaders,
+} from "./og-public-pages";
+
 const DEFAULT_CANONICAL_HOST = "www.toonstudio.cloud";
 const CANONICAL_HOST_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/iu;
 const CRAWLER_USER_AGENT_PATTERN =
@@ -46,7 +51,7 @@ type MarketplaceMetadata = Readonly<{
   updatedAt?: string;
 }>;
 
-type OgReaders = Readonly<{
+type OgReaders = PublicOgReaders & Readonly<{
   readTitle?: (identifier: string) => TitleMetadata | null | Promise<TitleMetadata | null>;
   readMarketResource?: (identifier: string) => unknown | Promise<unknown>;
 }>;
@@ -54,7 +59,7 @@ type OgReaders = Readonly<{
 export type OgPageResult = Readonly<{
   html: string;
   cacheControl: string;
-  source: "site" | "title" | "market" | "market-resource" | "fallback";
+  source: "site" | "title" | "market" | "market-resource" | "public" | "fallback";
 }>;
 
 type OgPageInput = Readonly<{
@@ -412,6 +417,25 @@ export async function renderOgPage(input: OgPageInput = {}): Promise<OgPageResul
       safeDecode(query.marketResourceId),
       input.readers?.readMarketResource,
     );
+  }
+
+  if (Object.hasOwn(query, "publicPath")) {
+    const publicPage = await resolvePublicOgPage(
+      origin,
+      queryValue(query.publicPath),
+      input.readers ?? {},
+    );
+    return publicPage
+      ? {
+          html: renderHtml(publicPage.metadata, publicPage.structuredData),
+          cacheControl: publicPage.cacheControl,
+          source: "public",
+        }
+      : {
+          html: renderHtml(siteMetadata(origin)),
+          cacheControl: "no-store",
+          source: "fallback",
+        };
   }
 
   const slug = safeDecode(query.slug);

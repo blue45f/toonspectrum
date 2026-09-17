@@ -81,3 +81,31 @@ test("reference search and troubleshooting remain usable on mobile", async ({ pa
   await expect(page.getByRole("heading", { name: "Blender MCP" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
 });
+
+test("field notes expose workers, PWA, free-first AI, Blender, Open APIs and troubleshooting on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/about/technology/field-notes");
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("실제 구현에서 남은 기술 판단");
+  await expect(page.locator("[data-engineering-field-note]")).toHaveCount(12);
+  await expect(page.getByRole("heading", { name: /Open API마다/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /실패를 숨기지 않고/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /참고한 제품/u })).toBeVisible();
+
+  const blenderFilter = page.getByRole("button", { name: "Blender · 3D", exact: true });
+  await blenderFilter.click();
+  await expect(blenderFilter).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-engineering-field-note="three-d-dcc"]')).toHaveCount(2);
+  await expect(page.locator("[data-engineering-field-note]")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "전체", exact: true }).click();
+  await page.getByRole("searchbox", { name: "기술 노트 검색" }).fill("MediaPipe");
+  await expect(page.locator('[data-engineering-field-note-id="browser-local-ai"]')).toHaveCount(1);
+  await expect(page.locator("[data-engineering-field-note]")).toHaveCount(1);
+  await expect(page.getByText("1개 / 전체 12개 노트", { exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "기술 노트 검색" }).fill("");
+
+  const officialLinks = page.getByRole("link", { name: /공식 API 문서|공식 사이트/u });
+  expect(await officialLinks.count()).toBeGreaterThanOrEqual(20);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
+});

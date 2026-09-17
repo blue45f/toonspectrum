@@ -8,6 +8,9 @@ import { CreatorCollaborationRepository } from "./creator-collaboration.reposito
 import { creatorDraftCollaborationRepositoryProvider } from "./creator-draft-collaboration.repository";
 import { CreatorController } from "./creator.controller";
 import { creatorPublicationCollaborationRepositoryProvider } from "./creator-publication-collaboration.repository";
+import { CreatorRoleWorkspaceController } from "./creator-role-workspace.controller";
+import { CreatorRoleWorkspaceRepository } from "./creator-role-workspace.repository";
+import { CreatorRoleWorkspaceService } from "./creator-role-workspace.service";
 import { CreatorPublicationSchedulerService } from "./creator-publication-scheduler.service";
 import { CreatorService } from "./creator.service";
 import {
@@ -71,6 +74,7 @@ const privateObjectStorageModule =
   ],
   controllers: [
     CreatorController,
+    CreatorRoleWorkspaceController,
     StudioLiveAuthTicketController,
     StudioRasterAssetController,
     StudioRemoteReferenceImageController,
@@ -98,6 +102,8 @@ const privateObjectStorageModule =
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
     CreatorPublicationSchedulerService,
+    CreatorRoleWorkspaceRepository,
+    CreatorRoleWorkspaceService,
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getMyProfile, updateMyProfile } from "./me-client";
+import {
+  getMyProfile,
+  invalidateMyProfileCache,
+  updateMyProfile,
+} from "./me-client";
 
 import { getAuthSession, persistSession } from "@/compat/auth-session-state";
 
@@ -36,6 +40,7 @@ describe("me profile client", () => {
   beforeEach(() => {
     apiGet.mockReset();
     apiPatch.mockReset();
+    invalidateMyProfileCache({ broadcast: false });
     persistSession({
       user: { id: "profile-user", name: "이전 이름", role: "creator" },
       token: "profile-session-token",
@@ -43,6 +48,7 @@ describe("me profile client", () => {
   });
 
   afterEach(() => {
+    invalidateMyProfileCache({ broadcast: false });
     persistSession(null);
   });
 
@@ -104,5 +110,27 @@ describe("me profile client", () => {
         activeRole: null,
       },
     });
+  });
+
+  it("동일 세션 프로필 조회를 캐시하고 강제 새로고침을 지원한다", async () => {
+    const response = {
+      profile: {
+        id: "profile-user",
+        name: "캐시 사용자",
+        image: null,
+        avatar: null,
+        email: "profile@example.com",
+        bio: null,
+        creatorRoleProfile,
+      },
+    };
+    apiGet.mockResolvedValue(response);
+
+    await getMyProfile();
+    await getMyProfile();
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    await getMyProfile(undefined, true);
+    expect(apiGet).toHaveBeenCalledTimes(2);
   });
 });

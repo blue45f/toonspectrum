@@ -871,6 +871,115 @@ export const ENGINEERING_GUIDES = [
       { ko: "후보·승인·폐기 이력 보존", en: "Candidate, approval and rejection history retained" },
     ],
   },
+  {
+    id: "worker-isolation",
+    status: "live",
+    title: { ko: "Web Worker 작업 격리", en: "Web Worker task isolation" },
+    summary: {
+      ko: "무거운 연산을 옮기는 것보다 요청·취소·메모리·commit 권위를 먼저 정의합니다.",
+      en: "Define request, cancellation, memory and commit authority before moving heavy work off-thread.",
+    },
+    outcome: { ko: "UI 응답성을 지키는 작업별 Worker 프로토콜", en: "Task-specific worker protocols that protect UI responsiveness" },
+    steps: [
+      { ko: "작업 시간, payload 크기와 DOM 의존성을 기준으로 Worker 후보를 고릅니다.", en: "Choose worker candidates by duration, payload size and DOM dependency." },
+      { ko: "requestId, schema, progress, timeout, abort와 error envelope를 정의합니다.", en: "Define request IDs, schemas, progress, timeout, abort and error envelopes." },
+      { ko: "대형 binary는 transferable로 넘기고 원본 소유권 전환을 명시합니다.", en: "Transfer large binaries and make ownership changes explicit." },
+      { ko: "late response와 취소 후 응답을 generation fence로 버립니다.", en: "Discard late and post-cancel responses through generation fencing." },
+      { ko: "cleanup 실패 시 Worker를 종료하고 clean instance를 지연 생성합니다.", en: "Terminate workers after cleanup failure and lazily create clean instances." },
+    ],
+    checklist: [
+      { ko: "Worker가 문서 정본을 소유하지 않음", en: "Workers do not own canonical documents" },
+      { ko: "payload·queue·heap 상한", en: "Payload, queue and heap bounds" },
+      { ko: "timeout·abort·poisoned runtime 회귀", en: "Timeout, abort and poisoned-runtime regressions" },
+    ],
+    code: "UI intent → validate → transfer → Worker/WASM\n         → typed result → main-thread commit",
+  },
+  {
+    id: "pwa-offline-update",
+    status: "live",
+    title: { ko: "PWA 오프라인·업데이트 정책", en: "PWA offline and update policy" },
+    summary: {
+      ko: "서비스워커 캐시와 작업 데이터 저장을 분리하고 버전 불일치와 reload loop를 복구합니다.",
+      en: "Separate service-worker caches from work storage and recover version drift and reload loops.",
+    },
+    outcome: { ko: "오래된 runtime이 원고를 손상시키지 않는 설치형 웹 앱", en: "An installable web app where stale runtime code cannot damage work" },
+    steps: [
+      { ko: "API·HTML·해시 자산·편집 runtime을 요청 클래스로 나눕니다.", en: "Classify API, HTML, hashed assets and editor runtime requests." },
+      { ko: "클래스별 network/cache 전략, TTL, byte와 entry 상한을 둡니다.", en: "Assign network/cache strategy, TTL, byte and entry limits per class." },
+      { ko: "빌드 manifest에서 precache plan과 content hash를 생성합니다.", en: "Generate a precache plan and content hash from the build manifest." },
+      { ko: "controllerchange를 one-shot reload로 제한합니다.", en: "Limit controllerchange to a one-shot reload." },
+      { ko: "반복 실패 시 unregister·cache cleanup·온라인 복구 경로를 제공합니다.", en: "Provide unregister, cache cleanup and online recovery after repeated failure." },
+    ],
+    checklist: [
+      { ko: "프로젝트 원본을 Cache Storage에 저장하지 않음", en: "Project sources never live in Cache Storage" },
+      { ko: "저장 중 업데이트·오프라인 재시작 검증", en: "Updates during save and offline restart verified" },
+      { ko: "manifest·icon·shortcut·설치 접근성", en: "Manifest, icons, shortcuts and install accessibility" },
+    ],
+  },
+  {
+    id: "blender-mcp",
+    status: "configured",
+    title: { ko: "Blender MCP 안전한 제작 자동화", en: "Safe Blender MCP production automation" },
+    summary: {
+      ko: "LLM에 임의 Python을 주지 않고 결과 중심 allowlist 명령과 검증 receipt를 제공합니다.",
+      en: "Expose outcome-oriented allowlisted commands and verification receipts instead of arbitrary Python." },
+    outcome: { ko: "재현 가능한 캐릭터·3D asset authoring pipeline", en: "A reproducible character and 3D asset authoring pipeline" },
+    steps: [
+      { ko: "브라우저 문서와 DCC 출력의 권위를 분리합니다.", en: "Separate browser document authority from DCC output." },
+      { ko: "inspect, build, validate, render, export 같은 제한된 명령을 정의합니다.", en: "Define bounded commands such as inspect, build, validate, render and export." },
+      { ko: "경로·payload·operator를 allowlist하고 shell·network를 차단합니다.", en: "Allowlist paths, payloads and operators while blocking shell and network access." },
+      { ko: "headless Blender에서 같은 pipeline을 재현합니다.", en: "Reproduce the same pipeline in headless Blender." },
+      { ko: "digest·quality score·도구 버전이 포함된 package receipt를 검증합니다.", en: "Verify package receipts containing digests, quality scores and tool versions." },
+    ],
+    checklist: [
+      { ko: "eval·exec·임의 operator 없음", en: "No eval, exec or arbitrary operators" },
+      { ko: "출력은 검증 후 사용자 승인", en: "Outputs require verification and user approval" },
+      { ko: "실제 Blender CI와 package preflight", en: "Real-Blender CI and package preflight" },
+    ],
+    code: "MCP tool → typed Blender command → headless pipeline\n         → GLB/VRM + review images + SHA-256 receipt",
+  },
+  {
+    id: "multi-engine-3d",
+    status: "experimental",
+    title: { ko: "문서 권위 중심 멀티 3D 엔진", en: "Document-authority-first multi-engine 3D" },
+    summary: {
+      ko: "Three를 주 runtime으로 두고 Babylon·CAD·physics kernel은 명시적 specialist로 지연 활성화합니다.",
+      en: "Use Three as the primary runtime and activate Babylon, CAD and physics kernels as explicit specialists." },
+    outcome: { ko: "엔진을 바꿔도 저장·undo·출력이 흔들리지 않는 장면", en: "Scenes whose save, undo and output survive engine changes" },
+    steps: [
+      { ko: "제품이 소유할 engine-neutral scene schema를 먼저 정의합니다.", en: "Define an engine-neutral product-owned scene schema first." },
+      { ko: "primary renderer와 specialist별 capability·입출력·dispose를 기록합니다.", en: "Record capability, I/O and disposal for the primary renderer and each specialist." },
+      { ko: "specialist는 사용자 명시 동작에서만 동적 import합니다.", en: "Dynamically import specialists only after explicit user action." },
+      { ko: "beauty·depth·normal·stable ID를 renderer-neutral artifact로 반환합니다.", en: "Return beauty, depth, normal and stable IDs as renderer-neutral artifacts." },
+      { ko: "device loss, context loss, import 증폭과 long-session memory를 검증합니다.", en: "Verify device/context loss, import amplification and long-session memory." },
+    ],
+    checklist: [
+      { ko: "엔진 객체를 문서에 직렬화하지 않음", en: "Engine objects are never serialized into documents" },
+      { ko: "명시적 backend 선택과 실패 표시", en: "Explicit backend selection and visible failure" },
+      { ko: "GPU 자원 ref-count·dispose·soak gate", en: "GPU ref-count, disposal and soak gates" },
+    ],
+  },
+  {
+    id: "open-api-provenance",
+    status: "live",
+    title: { ko: "권리·출처 중심 Open API adapter", en: "Rights- and provenance-first Open API adapters" },
+    summary: {
+      ko: "외부 응답을 신뢰하지 않고 제공처별 schema·rights·host·rate·cache 계약 뒤에서 정규화합니다.",
+      en: "Normalize untrusted upstream responses behind provider-specific schema, rights, host, rate and cache contracts." },
+    outcome: { ko: "출처와 실패가 보이는 재사용 가능한 외부 데이터 연결", en: "Reusable external-data integration with visible provenance and failures" },
+    steps: [
+      { ko: "공식 API, exact host와 지원 endpoint를 먼저 고정합니다.", en: "Pin official APIs, exact hosts and supported endpoints first." },
+      { ko: "응답 schema와 공개 도메인·CC0 predicate를 공급자별로 정의합니다.", en: "Define response schemas and public-domain/CC0 predicates per provider." },
+      { ko: "내부 provider-neutral model에 출처·credit·license·fetchedAt을 보존합니다.", en: "Preserve source, credit, license and fetchedAt in a provider-neutral model." },
+      { ko: "429·timeout·schema drift와 부분 실패를 명시적으로 전달합니다.", en: "Expose 429, timeout, schema drift and partial failure explicitly." },
+      { ko: "원문 삭제·권리 변경 시 캐시와 카탈로그를 추적해 갱신합니다.", en: "Trace cached/catalogued items back to source for deletion or rights changes." },
+    ],
+    checklist: [
+      { ko: "공개 API와 재배포 권리를 구분", en: "Public API access separated from redistribution rights" },
+      { ko: "unsafe URL·image host·malformed payload 차단", en: "Unsafe URLs, image hosts and malformed payloads blocked" },
+      { ko: "빈 성공으로 장애를 숨기지 않음", en: "Outages never hidden as empty success" },
+    ],
+  },
 ] as const satisfies readonly EngineeringGuide[];
 
 export const ENGINEERING_LICENSE_GROUPS = [

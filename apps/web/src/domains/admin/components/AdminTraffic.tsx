@@ -43,9 +43,24 @@ import {
   TrafficRealtimeBars,
   TrafficTrendChart,
 } from "./AdminTrafficCharts";
+import { AdminTrafficSharing } from "./AdminTrafficSharing";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+
+const EMPTY_SHARING: TrafficOverview["sharing"] = {
+  attempts: 0,
+  opened: 0,
+  completed: 0,
+  failed: 0,
+  cancelled: 0,
+  uniqueSharers: 0,
+  attributedPageViews: 0,
+  attributedVisitors: 0,
+  attributedSessions: 0,
+  channels: [],
+  topContent: [],
+};
 
 function withPulse(
   overview: TrafficOverview,
@@ -198,6 +213,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
         locale,
       )}`
     : null;
+  const sharing = data.sharing ?? EMPTY_SHARING;
 
   return (
     <div className="space-y-5">
@@ -390,6 +406,8 @@ export function AdminTraffic({ uid }: { uid: string }) {
             <TrafficTopPages pages={data.topPages} t={t} />
             <TrafficSourceList sources={data.sources} t={t} />
           </div>
+
+          <AdminTrafficSharing sharing={sharing} t={t} />
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <TrafficBreakdownList

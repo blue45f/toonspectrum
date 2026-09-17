@@ -8,6 +8,7 @@ import {
   DataSourcesPage,
   DesignSystemPage,
   EngineeringDeckPage,
+  EngineeringFieldNotesPage,
   EngineeringGuidesPage,
   EngineeringLicensesPage,
   EngineeringReferencesPage,
@@ -50,6 +51,11 @@ export const legalRoutes = defineAppRoutes([
     id: "legal-about-technology-references",
     path: "/about/technology/references",
     element: <EngineeringReferencesPage />,
+  },
+  {
+    id: "legal-about-technology-field-notes",
+    path: "/about/technology/field-notes",
+    element: <EngineeringFieldNotesPage />,
   },
   {
     id: "legal-about-technology-deck",

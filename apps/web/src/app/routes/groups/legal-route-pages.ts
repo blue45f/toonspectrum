@@ -36,6 +36,12 @@ export const EngineeringReferencesPage = lazyRetry(
   })),
   "EngineeringReferencesPage",
 );
+export const EngineeringFieldNotesPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringFieldNotesPage").then((module) => ({
+    default: module.EngineeringFieldNotesPage,
+  })),
+  "EngineeringFieldNotesPage",
+);
 export const EngineeringDeckPage = lazyRetry(
   () => import("@/domains/legal/technology/EngineeringDeckPage").then((module) => ({
     default: module.EngineeringDeckPage,

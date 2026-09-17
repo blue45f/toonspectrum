@@ -50,3 +50,9 @@ test("technology film covers Worker, PWA, 3D, free AI, Open API and troubleshoot
   assert(renderer.includes("Blender QA"));
   assert(renderer.includes("중복 추론"));
 });
+
+test("overview film keeps browser execution in sync with the field notes", () => {
+  assert(film.includes('kicker: "04 · WORKER · PWA · LOCAL-FIRST · BROWSER EXECUTION"'));
+  assert(film.includes('points: ["Workers", "PWA", "ONNX", "MediaPipe"]'));
+  assert(film.includes('kicker: "11 · REUSABLE ENGINEERING"'));
+});
