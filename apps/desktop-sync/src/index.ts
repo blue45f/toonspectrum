@@ -1,4 +1,5 @@
 export * from "./agent.js";
+export * from "./filesystem-remote.js";
 export * from "./journal.js";
 export * from "./model.js";
 export * from "./path-policy.js";

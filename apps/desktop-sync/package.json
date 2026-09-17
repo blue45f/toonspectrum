@@ -15,8 +15,15 @@
     }
   },
   "scripts": {
-    "build": "pnpm run typecheck",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "cli": "pnpm run build && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
-  }
+  },
+  "bin": {
+    "toonstudio-sync": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ]
 }
