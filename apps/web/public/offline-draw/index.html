@@ -3,23 +3,17 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#171823"><meta name="robots" content="noindex">
-  <meta name="application-name" content="툰드로잉">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="툰드로잉">
-  <title>툰스튜디오 · 순수 드로잉</title>
-  <link rel="manifest" href="/offline-draw/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/brand/spectrum-ribbon-v2/apple-touch-icon.png">
+  <title>툰스튜디오 · 긴급 복구 드로잉</title>
   <link rel="stylesheet" href="/offline-draw/styles.css">
 </head>
 <body>
 <header>
-  <a class="brand" href="/studio" title="전체 툰스튜디오로 이동">TOON<span>STUDIO</span></a>
-  <span class="badge">DRAW ONLY</span>
-  <input id="title" aria-label="작업 제목" value="새 드로잉" maxlength="120">
+  <a class="brand" href="/studio" title="온라인 스튜디오로 이동">TOON<span>STUDIO</span></a>
+  <span class="badge">EMERGENCY DRAW</span>
+  <input id="title" aria-label="작업 제목" value="새 긴급 복구 드로잉" maxlength="120">
   <button id="simple" aria-pressed="true">심플 모드</button>
 </header>
-<div class="notice">로그인·협업·AI 기능 없이 그리기에 집중하는 독립 로컬 드로잉입니다. 작업은 이 브라우저에 저장되며 기존 스튜디오 프로젝트와 자동 동기화하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
+<div class="notice">스튜디오 화면을 열 수 없을 때만 사용하는 별도 긴급 복구 도구입니다. 기존 스튜디오 프로젝트는 변경하지 않습니다. <span id="offline-state">오프라인 실행 준비 확인 중…</span></div>
 <main>
   <nav class="tools" aria-label="드로잉 도구">
     <button data-tool="pen" aria-pressed="true" title="펜 (B)">펜</button>
@@ -47,7 +41,7 @@
 </main>
 <footer>
   <div><strong id="save-status" role="status" aria-live="polite">로컬 저장소 확인 중…</strong><small id="save-detail">서버를 사용하지 않습니다.</small></div>
-  <a id="portable" href="/offline-draw/portable.html" download="ToonStudio-Emergency-Drawing.html">독립 실행 HTML 보관</a>
+  <a id="portable" href="/offline-draw/portable.html" download="ToonStudio-Emergency-Drawing.html">긴급 복구 파일 보관</a>
   <button id="save">로컬 저장</button><button id="export-json">복구 파일</button><button id="export-png" class="primary">PNG 내보내기</button>
 </footer>
 <div id="error" role="alert" hidden></div>
