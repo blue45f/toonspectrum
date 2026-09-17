@@ -8,7 +8,7 @@ import {
   readdir,
   stat,
 } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -298,8 +298,22 @@ async function verifySigning(bundleRoot, manifest, requireSigned) {
   return evidence;
 }
 
+export function resolveArchiveListingInvocation(
+  archivePath,
+  pathApi = { basename, dirname },
+) {
+  return {
+    command: "tar",
+    args: ["-tzf", pathApi.basename(archivePath)],
+    cwd: pathApi.dirname(archivePath),
+  };
+}
+
 function verifyArchiveListing(archivePath, bundleName) {
-  const listing = run("tar", ["-tzf", archivePath]).split("\n").filter(Boolean);
+  const invocation = resolveArchiveListingInvocation(archivePath);
+  const listing = run(invocation.command, invocation.args, { cwd: invocation.cwd })
+    .split("\n")
+    .filter(Boolean);
   if (listing.length === 0) throw new Error("release archive is empty");
   for (const path of listing) {
     if (
