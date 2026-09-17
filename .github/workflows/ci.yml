@@ -1,7 +1,7 @@
 name: CI
 
-# Keep all main merge gates, with serial performance checks added. The broad
-# repository QA workflow remains diagnostic; a green core is not a full-suite claim.
+# Keep one protected aggregate while running independent quality gates in parallel.
+# Broad repository QA remains diagnostic; a green core is not a full-suite claim.
 on:
   workflow_dispatch:
   pull_request:
@@ -30,6 +30,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout: |
+            .github
+            scripts
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -39,11 +43,10 @@ jobs:
       - name: Verify deduplicated PR workflow policy
         run: python3 scripts/verify-pr-workflow-fanout.py
 
-  static:
-    needs: preflight
-    name: Core static and product checks
+  lint:
+    name: Core strict lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:
@@ -54,13 +57,58 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Restore ESLint result cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/eslint/full
+          key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-
       - name: Strict lint
         run: pnpm run lint:strict
+
+  typecheck:
+    name: Core application typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Restore TypeScript incremental state
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+          key: core-ts-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/**/tsconfig*.json', 'deploy/**/tsconfig*.json', 'packages/**/tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: |
+            core-ts-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/**/tsconfig*.json', 'deploy/**/tsconfig*.json', 'packages/**/tsconfig*.json') }}-
       - name: Typecheck application, API and realtime worker
         run: |
           set -euo pipefail
           pnpm run typecheck
           pnpm run typecheck:cloudflare-realtime
+
+  static:
+    name: Core product regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: P2P browser verification cache regression
         run: node --test scripts/verify-studio-p2p-huddle.test.mjs
       - name: P2P merge source-reader and recovery regressions
@@ -294,7 +342,6 @@ jobs:
         run: pnpm exec vitest run scripts/verify-studio-menus.test.ts
 
   serial:
-    needs: preflight
     name: Core serial performance regressions
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -323,7 +370,6 @@ jobs:
           if-no-files-found: error
 
   build:
-    needs: preflight
     name: Core production build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -341,12 +387,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Build API and web without relaxing the bundle ratchet
+      - name: Build API and web without repeating the required web typecheck
         run: |
           set -euo pipefail
           mkdir -p artifacts/core
           git rev-parse HEAD > artifacts/core/commit.txt
-          (pnpm --filter @webtoon-nest/api build && test -s apps/api/dist/apps/api/src/main.js && node --check apps/api/dist/apps/api/src/main.js && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+          (pnpm --filter @webtoon-nest/api build && test -s apps/api/dist/apps/api/src/main.js && node --check apps/api/dist/apps/api/src/main.js && pnpm run build:bundle && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -358,17 +404,30 @@ jobs:
   core:
     name: core
     if: ${{ always() }}
-    needs: [static, serial, build]
+    needs: [preflight, lint, typecheck, static, serial, build]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
       - name: Require actual success from every mandatory check
         env:
           CORE_RESULTS: ${{ toJSON(needs) }}
-        run: node scripts/ci-core-gate.mjs
+        run: |
+          node --input-type=module <<'NODE'
+          const required = ["preflight", "lint", "typecheck", "static", "serial", "build"];
+          const results = JSON.parse(process.env.CORE_RESULTS ?? "null");
+          if (!results || typeof results !== "object" || Array.isArray(results)) {
+            throw new Error("core requires the GitHub needs object");
+          }
+          const unexpected = Object.keys(results).filter((name) => !required.includes(name));
+          if (unexpected.length > 0) {
+            throw new Error(`core has unrecognized dependencies: ${unexpected.join(", ")}`);
+          }
+          const failed = required.filter((name) => results[name]?.result !== "success");
+          if (failed.length > 0) {
+            throw new Error(`core requires actual success from: ${failed.join(", ")}`);
+          }
+          console.log(`core: all required checks succeeded (${required.join(", ")})`);
+          NODE
 
   verify:
     name: verify
