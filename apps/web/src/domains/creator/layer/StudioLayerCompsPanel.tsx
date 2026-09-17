@@ -313,7 +313,7 @@ return (
                   <div className="mr-1 flex min-w-0 flex-1 items-center gap-1.5">
                     <input
                       type="text"
-                      aria-label={`${comp.name} 이름 수정`}
+                      aria-label={`${comp.name} 보기 이름 바꾸기`}
                       data-studio-escape-scope="true"
                       maxLength={160}
                       value={editNameText}
@@ -369,7 +369,7 @@ return (
                         {isActive ? <StudioContextPill tone="accent">사용 중</StudioContextPill> : null}
                       </span>
                       <span className="mt-0.5 text-[10px] text-fg-3">
-                        보이는 레이어 {visibleCount} / {totalCount}
+                        보이는 레이어 {visibleCount} / {totalCount}개
                       </span>
                     </span>
                   </button>
