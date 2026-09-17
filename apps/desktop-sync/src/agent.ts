@@ -52,6 +52,7 @@ export interface DesktopSyncExecutionResult {
   readonly deletedLocal: number;
   readonly deletedRemote: number;
   readonly recorded: number;
+  readonly forgotten: number;
 }
 
 function entry(
@@ -120,6 +121,7 @@ export async function executeDesktopSyncPlan(
   let deletedLocal = 0;
   let deletedRemote = 0;
   let recorded = 0;
+  let forgotten = 0;
 
   for (const item of plan) {
     if (item.action === "record") {
@@ -132,6 +134,11 @@ export async function executeDesktopSyncPlan(
         now,
       );
       recorded += 1;
+      continue;
+    }
+    if (item.action === "forget") {
+      delete entries[item.relativePath];
+      forgotten += 1;
       continue;
     }
     if (item.action === "upload") {
@@ -200,5 +207,6 @@ export async function executeDesktopSyncPlan(
     deletedLocal,
     deletedRemote,
     recorded,
+    forgotten,
   };
 }
