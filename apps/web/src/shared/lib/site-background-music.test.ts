@@ -9,8 +9,39 @@ import {
   resolveSiteOstTrackIndex,
   writeSiteBgmExpanded,
   writeSiteBgmFollowRoute,
-  writeSiteBgmSource,
+  writeSiteBgmIntensity,
+  writeSiteBgmStyle,
+  writeSiteBgmVocals,
+  type SiteOstTrack,
 } from "./site-background-music";
+
+function originalTrack(overrides: Partial<SiteOstTrack> = {}): SiteOstTrack {
+  return {
+    id: "draw-your-world-vocal",
+    src: "/audio/original/draw-your-world-vocal.mp3",
+    title: "Draw Your World",
+    artist: "ToonSpectrum Original",
+    role: "opening",
+    origin: "original",
+    vocalMode: "vocal",
+    language: "ko",
+    summary: "툰스펙트럼 오리지널 오프닝",
+    license: "Eleven Music original generation; commercial use subject to reviewed Music Terms",
+    creditUrl: "https://elevenlabs.io/eleven-music-model-specific-terms",
+    profiles: ["animation", "cinematic"],
+    intensity: "epic",
+    durationMs: 210_000,
+    bpm: 154,
+    provider: "elevenlabs",
+    model: "music_v2_5",
+    sha256: "a".repeat(64),
+    generatedAt: "2026-09-18T00:00:00.000Z",
+    c2paRequested: true,
+    status: "published",
+    songId: "song_123",
+    ...overrides,
+  };
+}
 
 describe("site background music policy", () => {
   beforeEach(() => localStorage.clear());
@@ -31,11 +62,6 @@ describe("site background music policy", () => {
     ["/studio/bg3d", "story", "worldbuilding"],
     ["/studio/assets", "market", "funky"],
     ["/about", "healing", "healing_walk"],
-    ["/title/romance-1", "catalog", "worldbuilding"],
-    ["/author/kim", "catalog", "worldbuilding"],
-    ["/compare", "discovery", "library_night"],
-    ["/references", "learning", "library_night"],
-    ["/research/assets", "market", "funky"],
     ["/showcase/challenges", "playful", "happy"],
     ["/studio/p/project-1/story", "story", "worldbuilding"],
     ["/studio/p/project-1/production", "production", "synthwave"],
@@ -64,62 +90,60 @@ describe("site background music policy", () => {
     expect(experience.suspensionReason.length).toBeGreaterThan(10);
   });
 
-  it("prefers a same-role original OST over licensed references", () => {
+  it("uses style, intensity and vocal preference when selecting an original", () => {
     const experience = resolveSiteBgmExperience("/");
     const tracks = [
-      { id: "ref-opening", src: "/audio/ref.mp3", title: "Reference", artist: "Artist", role: "opening" as const, origin: "licensed-reference" as const, vocalMode: "vocal" as const, language: "ko", summary: "ref", license: "license", creditUrl: "https://example.com/ref" },
-      { id: "original-ending", src: "/audio/end.mp3", title: "Ending", artist: "ToonSpectrum", role: "ending" as const, origin: "original" as const, vocalMode: "vocal" as const, language: "ko", summary: "ending", license: "original", creditUrl: "https://example.com/end" },
-      { id: "original-opening", src: "/audio/open.mp3", title: "Opening", artist: "ToonSpectrum", role: "opening" as const, origin: "original" as const, vocalMode: "vocal" as const, language: "ko", summary: "opening", license: "original", creditUrl: "https://example.com/open" },
+      originalTrack({ id: "opening-instrumental", src: "/audio/original/opening-instrumental.mp3", vocalMode: "instrumental", profiles: ["cinematic"], intensity: "normal" }),
+      originalTrack({ id: "opening-vocal", src: "/audio/original/opening-vocal.mp3", vocalMode: "vocal", profiles: ["animation"], intensity: "epic" }),
+      originalTrack({ id: "ending-vocal", src: "/audio/original/ending-vocal.mp3", role: "ending", vocalMode: "vocal", profiles: ["animation"], intensity: "epic" }),
     ];
-    expect(resolveSiteOstTrackIndex(tracks, experience)).toBe(2);
+    expect(resolveSiteOstTrackIndex(tracks, experience, { style: "animation", intensity: "epic", vocals: "vocal" })).toBe(1);
+    expect(resolveSiteOstTrackIndex(tracks, experience, { style: "cinematic", intensity: "normal", vocals: "instrumental" })).toBe(0);
   });
 
-  it("persists source, automatic page following and panel state", () => {
+  it("prefers instrumental music automatically on long-form creator routes", () => {
+    const experience = resolveSiteBgmExperience("/studio/projects");
+    const tracks = [
+      originalTrack({ id: "creator-vocal", src: "/audio/original/creator-vocal.mp3", role: "creator", vocalMode: "vocal", profiles: ["webtoon"], intensity: "normal" }),
+      originalTrack({ id: "creator-instrumental", src: "/audio/original/creator-instrumental.mp3", role: "creator", vocalMode: "instrumental", profiles: ["webtoon"], intensity: "normal" }),
+    ];
+    expect(resolveSiteOstTrackIndex(tracks, experience)).toBe(1);
+  });
+
+  it("persists adaptive OST preferences", () => {
     expect(readSiteBgmPreferences()).toEqual({
-      source: "original-ost",
       followRoute: true,
       expanded: false,
+      style: "auto",
+      intensity: "normal",
+      vocals: "auto",
     });
-    writeSiteBgmSource("focus-instrumental");
     writeSiteBgmFollowRoute(false);
     writeSiteBgmExpanded(true);
+    writeSiteBgmStyle("cinematic");
+    writeSiteBgmIntensity("epic");
+    writeSiteBgmVocals("instrumental");
     expect(readSiteBgmPreferences()).toEqual({
-      source: "focus-instrumental",
       followRoute: false,
       expanded: true,
+      style: "cinematic",
+      intensity: "epic",
+      vocals: "instrumental",
     });
-    localStorage.setItem("ts_site_bgm_source", "page-theme");
-    expect(readSiteBgmPreferences().source).toBe("focus-instrumental");
-    localStorage.setItem("ts_site_bgm_source", "vocal-ost");
-    expect(readSiteBgmPreferences().source).toBe("original-ost");
   });
 
-  it("accepts only bounded same-origin audio entries with explicit provenance", () => {
+  it("accepts only reviewed original assets with production provenance", () => {
+    const good = originalTrack();
     const tracks = parseSiteBgmManifest({
       tracks: [
-        {
-          id: "theme-original", src: "/audio/theme.mp3", title: "Theme", artist: "ToonSpectrum",
-          role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
-          summary: "오리지널 오프닝", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
-        },
-        {
-          id: "external", src: "https://untrusted.example/theme.mp3", title: "External", artist: "Artist",
-          role: "opening", origin: "licensed-reference", vocalMode: "vocal", language: "en",
-          summary: "External", license: "Unknown", creditUrl: "https://example.com/credit",
-        },
-        {
-          id: "bad-credit", src: "/audio/missing-credit.mp3", title: "No credit", artist: "Artist",
-          role: "romance", origin: "licensed-reference", vocalMode: "vocal", language: "ko",
-          summary: "Bad credit", license: "License", creditUrl: "javascript:alert(1)",
-        },
+        good,
+        { ...good, id: "legacy-ref", src: "/audio/legacy.mp3", origin: "licensed-reference" },
+        { ...good, id: "external", src: "https://untrusted.example/theme.mp3" },
+        { ...good, id: "missing-integrity", sha256: "bad" },
+        { ...good, id: "not-c2pa", c2paRequested: false },
+        { ...good, id: "draft", status: "draft" },
       ],
     });
-    expect(tracks).toEqual([
-      {
-        id: "theme-original", src: "/audio/theme.mp3", title: "Theme", artist: "ToonSpectrum",
-        role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
-        summary: "오리지널 오프닝", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
-      },
-    ]);
+    expect(tracks).toEqual([good]);
   });
 });

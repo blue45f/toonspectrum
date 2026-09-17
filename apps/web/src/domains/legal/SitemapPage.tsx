@@ -33,7 +33,7 @@ const PAGE_COPY = {
     description: "새 프로젝트를 시작하는 순간부터 드로잉·3D·AI·소재·학습·공유·커뮤니티·지원까지, 하고 싶은 일 기준으로 가장 가까운 화면부터 찾을 수 있게 다시 정리했습니다.",
     newProject: "새 프로젝트",
     projects: "프로젝트 목록",
-    brandFilm: "홍보영상 보기",
+    brandFilm: "전체 제품 투어 보기",
     search: "작품 검색",
     core: "목적별 빠른 시작",
     coreDescription: "제작 시작, 배우고 준비하기, 작품 발견, 함께하고 관리하기 네 흐름으로 자주 쓰는 목적지를 먼저 모았습니다.",
@@ -47,7 +47,7 @@ const PAGE_COPY = {
     description: "From starting a project to drawing, 3D, AI, assets, learning, sharing, community and support, the directory is organized around what you want to do next.",
     newProject: "New project",
     projects: "Project list",
-    brandFilm: "Watch brand film",
+    brandFilm: "Watch full product tour",
     search: "Search stories",
     core: "Start by purpose",
     coreDescription: "Frequent destinations are grouped into four flows: create, prepare, discover, and connect or manage.",
@@ -130,7 +130,7 @@ export function SitemapPage() {
               <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
             <Link
-              href="/brand-film"
+              href="/product-tour"
               className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-accent/35 bg-accent-soft/70 px-4 py-3 text-sm font-bold text-accent transition-all hover:-translate-y-0.5 hover:border-accent/60"
             >
               <Sparkles size={18} aria-hidden="true" />

@@ -14,7 +14,6 @@ import {
   Music2,
   Pause,
   Play,
-  Radio,
   SkipForward,
   Sparkles,
   Volume2,
@@ -24,25 +23,44 @@ import { Link, useLocation } from "react-router-dom";
 
 import {
   loadSiteOstManifest,
-  resolveSiteOstTrackIndex,
-  siteOstTrackToPlaylistEntry,
   readSiteBgmPreferences,
   resolveSiteBgmExperience,
-  type SiteBgmSource,
+  resolveSiteOstTrackIndex,
+  siteOstTrackToPlaylistEntry,
+  type SiteOstIntensity,
+  type SiteOstStylePreference,
   type SiteOstTrack,
+  type SiteOstVocalPreference,
   writeSiteBgmExpanded,
   writeSiteBgmFollowRoute,
-  writeSiteBgmSource,
+  writeSiteBgmIntensity,
+  writeSiteBgmStyle,
+  writeSiteBgmVocals,
 } from "@/shared/lib/site-background-music";
-import { cn } from "@/shared/lib/utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 const SITE_ROUTE_SUSPENSION = "site-route-audio-conflict";
 
-function sourceLabel(source: SiteBgmSource, korean: boolean): string {
-  if (source === "original-ost") return korean ? "오리지널 애니 OST" : "Original anime OST";
-  return korean ? "집중용 인스트" : "Focus instrumental";
-}
+const STYLE_OPTIONS: readonly { value: SiteOstStylePreference; ko: string; en: string }[] = [
+  { value: "auto", ko: "자동", en: "Auto" },
+  { value: "animation", ko: "애니메이션", en: "Animation" },
+  { value: "webtoon", ko: "웹툰", en: "Webtoon" },
+  { value: "lofi", ko: "Lo-fi", en: "Lo-fi" },
+  { value: "cinematic", ko: "시네마틱", en: "Cinematic" },
+  { value: "fantasy", ko: "판타지", en: "Fantasy" },
+  { value: "citypop", ko: "시티팝", en: "City Pop" },
+];
+const INTENSITY_OPTIONS: readonly { value: SiteOstIntensity; ko: string; en: string }[] = [
+  { value: "chill", ko: "차분", en: "Chill" },
+  { value: "normal", ko: "균형", en: "Normal" },
+  { value: "epic", ko: "웅장", en: "Epic" },
+];
+const VOCAL_OPTIONS: readonly { value: SiteOstVocalPreference; ko: string; en: string }[] = [
+  { value: "auto", ko: "자동", en: "Auto" },
+  { value: "vocal", ko: "보컬", en: "Vocal" },
+  { value: "instrumental", ko: "인스트루멘털", en: "Instrumental" },
+];
 
 function roleLabel(role: SiteOstTrack["role"], korean: boolean): string {
   const labels: Record<SiteOstTrack["role"], readonly [string, string]> = {
@@ -70,7 +88,6 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     artist: bgmArtist,
     creditUrl: bgmCreditUrl,
     volume: bgmVolume,
-    presets: bgmPresets,
     setEnabled: setBgmEnabled,
     next: nextBgm,
     setMood: setBgmMood,
@@ -79,10 +96,13 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   const audio = useAudioState();
   const [expanded, setExpanded] = useState(initial.expanded);
   const [followRoute, setFollowRoute] = useState(initial.followRoute);
-  const [source, setSource] = useState<SiteBgmSource>(initial.source);
+  const [style, setStyle] = useState<SiteOstStylePreference>(initial.style);
+  const [intensity, setIntensity] = useState<SiteOstIntensity>(initial.intensity);
+  const [vocals, setVocals] = useState<SiteOstVocalPreference>(initial.vocals);
   const [playlistTracks, setPlaylistTracks] = useState<readonly SiteOstTrack[]>([]);
   const [sourceError, setSourceError] = useState("");
   const suspended = externallySuspended || experience.suspended;
+  const hasPublishedOst = playlistTracks.length > 0;
 
   useEffect(() => {
     if (suspended) suspendBgmForContext(SITE_ROUTE_SUSPENSION);
@@ -92,43 +112,36 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   useEffect(() => () => resumeBgmForContext(SITE_ROUTE_SUSPENSION), []);
 
   useEffect(() => {
-    if (source === "focus-instrumental") {
-      registerBgmPlaylist([]);
-      setPlaylistTracks([]);
-      return;
-    }
-
     const controller = new AbortController();
     setSourceError("");
     void loadSiteOstManifest(controller.signal)
       .then((tracks) => {
         if (controller.signal.aborted) return;
-        if (tracks.length === 0) throw new Error("사용 가능한 사이트 OST가 없습니다.");
         setPlaylistTracks(tracks);
         registerBgmPlaylist(tracks.map(siteOstTrackToPlaylistEntry));
+        if (tracks.length === 0) {
+          setBgmEnabled(false);
+          setSourceError(korean ? "검수 완료된 오리지널 OST가 아직 게시되지 않았습니다." : "No reviewed original OST has been published yet.");
+        }
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
         registerBgmPlaylist([]);
         setPlaylistTracks([]);
-        setSource("focus-instrumental");
-        writeSiteBgmSource("focus-instrumental");
-        setSourceError(reason instanceof Error ? reason.message : "사이트 OST를 불러오지 못했습니다.");
+        setBgmEnabled(false);
+        setSourceError(reason instanceof Error ? reason.message : (korean ? "오리지널 OST를 불러오지 못했습니다." : "Could not load the original OST."));
       });
     return () => controller.abort();
-  }, [source]);
+  }, [korean, setBgmEnabled]);
 
   useEffect(() => {
-    if (!followRoute || suspended) return;
-    if (source === "focus-instrumental") {
-      setBgmMood(experience.moodId);
-      return;
-    }
-    if (playlistTracks.length > 0) setBgmMood(`playlist:${resolveSiteOstTrackIndex(playlistTracks, experience)}`);
-  }, [setBgmMood, experience, followRoute, playlistTracks, source, suspended]);
+    if (!followRoute || suspended || playlistTracks.length === 0) return;
+    const index = resolveSiteOstTrackIndex(playlistTracks, experience, { style, intensity, vocals });
+    setBgmMood(`playlist:${index}`);
+  }, [setBgmMood, experience, followRoute, playlistTracks, style, intensity, vocals, suspended]);
 
   useEffect(() => {
-    if (!bgmEnabled || suspended) return;
+    if (!bgmEnabled || suspended || !hasPublishedOst) return;
     const unlock = () => {
       void resumeAudio().then(() => setBgmEnabled(true));
       window.removeEventListener("pointerdown", unlock);
@@ -140,7 +153,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
     };
-  }, [bgmEnabled, setBgmEnabled, suspended]);
+  }, [bgmEnabled, hasPublishedOst, setBgmEnabled, suspended]);
 
   if (suspended) return null;
 
@@ -149,15 +162,14 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   const activePlaylistIndex = bgmMoodId.startsWith("playlist:")
     ? Number.parseInt(bgmMoodId.slice("playlist:".length), 10)
     : -1;
-  const activeOstTrack = source === "original-ost"
-    ? (Number.isInteger(activePlaylistIndex) && activePlaylistIndex >= 0 ? playlistTracks[activePlaylistIndex] : undefined)
-      ?? playlistTracks.find((track) => track.title === bgmMood)
-      ?? null
-    : null;
-  const activeLabel = activeOstTrack?.title || bgmMood || themeLabel;
-  const playing = bgmEnabled && !audio.muted;
+  const activeOstTrack = (Number.isInteger(activePlaylistIndex) && activePlaylistIndex >= 0 ? playlistTracks[activePlaylistIndex] : undefined)
+    ?? playlistTracks.find((track) => track.title === bgmMood)
+    ?? null;
+  const activeLabel = activeOstTrack?.title || (hasPublishedOst ? themeLabel : (korean ? "오리지널 OST 준비 중" : "Original OST in production"));
+  const playing = hasPublishedOst && bgmEnabled && !audio.muted;
 
   const togglePlayback = async () => {
+    if (!hasPublishedOst) return;
     if (playing) {
       setBgmEnabled(false);
       return;
@@ -167,21 +179,25 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     setBgmEnabled(true);
   };
 
-  const chooseSource = (value: SiteBgmSource) => {
-    setSourceError("");
-    setSource(value);
-    writeSiteBgmSource(value);
-  };
-
   const chooseFollowRoute = (value: boolean) => {
     setFollowRoute(value);
     writeSiteBgmFollowRoute(value);
-    if (value) {
-      if (source === "focus-instrumental") setBgmMood(experience.moodId);
-      if (source === "original-ost" && playlistTracks.length > 0) {
-        setBgmMood(`playlist:${resolveSiteOstTrackIndex(playlistTracks, experience)}`);
-      }
+    if (value && playlistTracks.length > 0) {
+      setBgmMood(`playlist:${resolveSiteOstTrackIndex(playlistTracks, experience, { style, intensity, vocals })}`);
     }
+  };
+
+  const chooseStyle = (value: SiteOstStylePreference) => {
+    setStyle(value);
+    writeSiteBgmStyle(value);
+  };
+  const chooseIntensity = (value: SiteOstIntensity) => {
+    setIntensity(value);
+    writeSiteBgmIntensity(value);
+  };
+  const chooseVocals = (value: SiteOstVocalPreference) => {
+    setVocals(value);
+    writeSiteBgmVocals(value);
   };
 
   const toggleExpanded = () => {
@@ -194,111 +210,69 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     <aside
       data-testid="site-background-music-player"
       className="fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
-      aria-label={korean ? "사이트 애니 OST" : "Site anime OST"}
+      aria-label={korean ? "툰스펙트럼 오리지널 OST" : "ToonSpectrum original OST"}
     >
       {expanded ? (
-        <div className="mb-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl">
+        <div className="mb-2 w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl">
           <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-accent">
-                <Sparkles className="size-3.5" aria-hidden="true" />
-                {korean ? "TOONSPECTRUM ORIGINAL OST" : "TOONSPECTRUM ORIGINAL OST"}
+                <Sparkles className="size-3.5" aria-hidden="true" /> TOONSPECTRUM ORIGINAL OST
               </p>
               <p className="mt-1 truncate text-sm font-black text-fg">{themeLabel}</p>
               <p className="mt-1 text-xs leading-5 text-fg-2">{themeDescription}</p>
             </div>
-            <button
-              type="button"
-              onClick={toggleExpanded}
-              className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              aria-label={korean ? "OST 플레이어 접기" : "Collapse OST player"}
-            >
+            <button type="button" onClick={toggleExpanded} className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={korean ? "OST 플레이어 접기" : "Collapse OST player"}>
               <ChevronDown className="size-4" aria-hidden="true" />
             </button>
           </div>
 
           <div className="space-y-4 p-4">
-            <div className="grid grid-cols-2 gap-2" role="group" aria-label={korean ? "음악 소스" : "Music source"}>
-              {(["original-ost", "focus-instrumental"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={source === value}
-                  onClick={() => chooseSource(value)}
-                  className={cn(
-                    "min-h-11 rounded-xl border px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                    source === value ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                  )}
-                >
-                  {value === "focus-instrumental" ? <Music2 className="mr-1.5 inline size-3.5" aria-hidden="true" /> : <Radio className="mr-1.5 inline size-3.5" aria-hidden="true" />}
-                  {sourceLabel(value, korean)}
-                </button>
-              ))}
+            <div className="rounded-xl border border-accent/25 bg-accent/5 px-3 py-2 text-xs leading-5 text-fg-2">
+              <span className="font-black text-accent">{korean ? "오리지널 전용" : "Original only"}</span>
+              <span>{korean ? " · 레퍼런스/스톡/브라우저 합성 BGM으로 자동 대체하지 않습니다." : " · No automatic fallback to reference, stock, or browser-synthesized music."}</span>
             </div>
 
             <label className="flex min-h-10 items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2 text-xs font-semibold text-fg-2">
               <span>{korean ? "페이지 역할에 맞춰 OP · 테마 · ED 자동 전환" : "Follow page role with opening, theme and ending"}</span>
-              <input
-                type="checkbox"
-                checked={followRoute}
-                onChange={(event) => chooseFollowRoute(event.target.checked)}
-                className="size-4 accent-[var(--color-accent)]"
-              />
+              <input type="checkbox" checked={followRoute} onChange={(event) => chooseFollowRoute(event.target.checked)} className="size-4 accent-[var(--color-accent)]" />
             </label>
 
-            {source === "focus-instrumental" ? (
-              <label className="block text-xs font-semibold text-fg-2">
-                {korean ? "테마 직접 선택" : "Choose a theme"}
-                <select
-                  className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/30"
-                  value={bgmMoodId.startsWith("playlist:") ? experience.moodId : bgmMoodId}
-                  onChange={(event) => {
-                    chooseFollowRoute(false);
-                    setBgmMood(event.target.value);
-                  }}
-                >
-                  {bgmPresets.map((preset) => (
-                    <option key={preset.id} value={preset.id}>{preset.emoji ? `${preset.emoji} ` : ""}{preset.name}</option>
-                  ))}
+            <div className="grid grid-cols-3 gap-2">
+              <label className="text-[0.6875rem] font-semibold text-fg-2">
+                {korean ? "스타일" : "Style"}
+                <select aria-label={korean ? "OST 스타일" : "OST style"} className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-2 text-xs text-fg outline-none focus:border-accent" value={style} onChange={(event) => chooseStyle(event.target.value as SiteOstStylePreference)}>
+                  {STYLE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{korean ? option.ko : option.en}</option>)}
                 </select>
               </label>
-            ) : null}
+              <label className="text-[0.6875rem] font-semibold text-fg-2">
+                {korean ? "강도" : "Intensity"}
+                <select aria-label={korean ? "OST 강도" : "OST intensity"} className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-2 text-xs text-fg outline-none focus:border-accent" value={intensity} onChange={(event) => chooseIntensity(event.target.value as SiteOstIntensity)}>
+                  {INTENSITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{korean ? option.ko : option.en}</option>)}
+                </select>
+              </label>
+              <label className="text-[0.6875rem] font-semibold text-fg-2">
+                {korean ? "보컬" : "Vocal"}
+                <select aria-label={korean ? "OST 보컬" : "OST vocal"} className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-2 text-xs text-fg outline-none focus:border-accent" value={vocals} onChange={(event) => chooseVocals(event.target.value as SiteOstVocalPreference)}>
+                  {VOCAL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{korean ? option.ko : option.en}</option>)}
+                </select>
+              </label>
+            </div>
 
             <label className="block text-xs font-semibold text-fg-2">
               <span className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5"><Volume2 className="size-3.5" aria-hidden="true" />{korean ? "OST 음량" : "OST volume"}</span>
                 <span className="font-black text-fg">{Math.round(bgmVolume * 100)}%</span>
               </span>
-              <input
-                aria-label={korean ? "OST 음량" : "OST volume"}
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={bgmVolume}
-                onChange={(event) => setBgmVolume(Number(event.target.value))}
-                className="mt-2 w-full accent-[var(--color-accent)]"
-              />
+              <input aria-label={korean ? "OST 음량" : "OST volume"} type="range" min={0} max={1} step={0.05} value={bgmVolume} onChange={(event) => setBgmVolume(Number(event.target.value))} className="mt-2 w-full accent-[var(--color-accent)]" disabled={!hasPublishedOst} />
             </label>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void togglePlayback()}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-on-accent hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
+              <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", hasPublishedOst ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-raised text-fg-3")}>
                 {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-                {playing ? (korean ? "잠시 멈춤" : "Pause") : (korean ? "음악 재생" : "Play music")}
+                {playing ? (korean ? "잠시 멈춤" : "Pause") : hasPublishedOst ? (korean ? "음악 재생" : "Play music") : (korean ? "OST 제작 중" : "OST in production")}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  chooseFollowRoute(false);
-                  nextBgm();
-                }}
-                className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                aria-label={korean ? "다음 OST" : "Next OST"}
-              >
+              <button type="button" disabled={!hasPublishedOst} onClick={() => { chooseFollowRoute(false); nextBgm(); }} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={korean ? "다음 OST" : "Next OST"}>
                 <SkipForward className="size-4" aria-hidden="true" />
               </button>
             </div>
@@ -307,24 +281,21 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
               {activeOstTrack ? (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-black text-accent">{roleLabel(activeOstTrack.role, korean)}</span>
-                  <span className={cn("rounded-full border px-2 py-0.5 font-black", activeOstTrack.origin === "original" ? "border-good/30 bg-good/10 text-good" : "border-warn/30 bg-warn/10 text-warn")}>
-                    {activeOstTrack.origin === "original" ? "ORIGINAL" : "REFERENCE DEMO"}
-                  </span>
-                  <span className="rounded-full border border-line px-2 py-0.5 text-fg-3">{activeOstTrack.vocalMode === "vocal" ? (korean ? "보컬" : "Vocal") : activeOstTrack.vocalMode === "instrumental" ? (korean ? "연주" : "Instrumental") : (korean ? "보컬 여부 확인 중" : "Vocal status unknown")}</span>
+                  <span className="rounded-full border border-good/30 bg-good/10 px-2 py-0.5 font-black text-good">ORIGINAL</span>
+                  <span className="rounded-full border border-line px-2 py-0.5 text-fg-3">{activeOstTrack.vocalMode === "vocal" ? (korean ? "보컬" : "Vocal") : (korean ? "인스트루멘털" : "Instrumental")}</span>
+                  <span className="rounded-full border border-line px-2 py-0.5 text-fg-3">{activeOstTrack.bpm} BPM</span>
                 </div>
               ) : null}
               <p className="truncate font-bold text-fg">{playing ? "● " : "○ "}{activeLabel}</p>
               {activeOstTrack?.summary ? <p className="mt-1 text-fg-3">{activeOstTrack.summary}</p> : null}
               {bgmArtist ? <p className="mt-1 truncate">{bgmArtist}</p> : null}
-              {activeOstTrack?.origin === "licensed-reference" ? (
-                <p className="mt-2 rounded-lg border border-warn/30 bg-warn/5 px-2 py-1.5 text-warn">{korean ? "현재는 임시 레퍼런스 음원입니다. 생성된 ToonSpectrum 오리지널 OST가 게시되면 같은 역할의 곡을 자동 우선 재생합니다." : "This is a temporary reference track. A published ToonSpectrum original will automatically take priority for the same role."}</p>
-              ) : null}
+              {activeOstTrack ? <p className="mt-1 text-fg-3">Eleven Music v2.5 · SHA {activeOstTrack.sha256.slice(0, 10)}… · C2PA requested</p> : null}
               {bgmCreditUrl ? (
                 <a href={bgmCreditUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-7 items-center gap-1 text-accent underline underline-offset-4">
-                  {korean ? "음원 출처·이용 조건" : "Track source and terms"}<ExternalLink className="size-3" aria-hidden="true" />
+                  {korean ? "생성 출처·이용 조건" : "Generation provenance and terms"}<ExternalLink className="size-3" aria-hidden="true" />
                 </a>
               ) : null}
-              {sourceError ? <p className="mt-1 text-warn">{sourceError}</p> : null}
+              {sourceError ? <p className="mt-2 text-warn">{sourceError}</p> : null}
             </div>
 
             <Link to="/studio/assets/audio" className="inline-flex min-h-9 items-center gap-1.5 text-xs font-bold text-accent underline underline-offset-4">
@@ -335,28 +306,14 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         </div>
       ) : null}
 
-      <div className="flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={() => void togglePlayback()}
-          className={cn(
-            "grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg",
-          )}
-          aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")}
-          aria-pressed={playing}
-        >
+      <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl">
+        <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", !hasPublishedOst ? "cursor-not-allowed bg-raised text-fg-3" : playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg")} aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")} aria-pressed={playing}>
           {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
         </button>
-        <button
-          type="button"
-          onClick={toggleExpanded}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          aria-expanded={expanded}
-        >
-          <span className={cn("size-2 shrink-0 rounded-full", playing ? "animate-pulse bg-good" : "bg-fg-3")} aria-hidden="true" />
+        <button type="button" onClick={toggleExpanded} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-expanded={expanded}>
+          <span className={cn("size-2 shrink-0 rounded-full", playing ? "animate-pulse bg-good" : hasPublishedOst ? "bg-fg-3" : "bg-warn")} aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[0.6875rem] font-bold text-fg-3">{sourceLabel(source, korean)}</span>
+            <span className="block truncate text-[0.6875rem] font-bold text-fg-3">{korean ? "오리지널 애니·웹툰 OST" : "Original animation · webtoon OST"}</span>
             <span className="block truncate text-xs font-black text-fg">{activeLabel}</span>
           </span>
           {expanded ? <ChevronDown className="size-4 shrink-0 text-fg-3" aria-hidden="true" /> : <ChevronUp className="size-4 shrink-0 text-fg-3" aria-hidden="true" />}
