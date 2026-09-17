@@ -28,9 +28,14 @@ import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import { useSession, signOut } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
-import { api } from "@/infrastructure/api";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/infrastructure/creator-client";
-import { deleteMyAccount, updateMyProfile } from "@/infrastructure/me-client";
+import { deleteMyAccount, getMyProfile, updateMyProfile } from "@/infrastructure/me-client";
+import {
+  EMPTY_CREATOR_ROLE_PROFILE,
+  type CreatorRoleProfile,
+} from "@/shared/lib/creator-role-contract";
+
+import { CreatorRoleProfileEditor } from "./CreatorRoleProfileEditor";
 
 type Tab = "posts" | "activity" | "profile";
 const TABS: { id: Tab; labelKey: string }[] = [
@@ -332,27 +337,46 @@ function ProfileTab() {
   const [name, setName] = useState(user?.name ?? "");
   const [bio, setBio] = useState("");
   const [image, setImage] = useState<string | null>(user?.image ?? null);
+  const [creatorRoleProfile, setCreatorRoleProfile] = useState<CreatorRoleProfile>(() => ({
+    ...EMPTY_CREATOR_ROLE_PROFILE,
+    secondaryRoles: [],
+    specialties: [],
+  }));
+  const [roleProfileLoaded, setRoleProfileLoaded] = useState(false);
+  const [roleProfileTouched, setRoleProfileTouched] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(Boolean(user?.id));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 서버 프로필(소개 포함)을 불러와 폼 초기값을 채운다(세션엔 bio가 없음).
+  // 서버 프로필(소개·직무 포함)을 불러와 폼 초기값을 채운다(세션엔 전체 프로필이 없음).
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setProfileLoading(false);
+      return;
+    }
     let alive = true;
-    // 공유 ky 클라이언트가 HttpOnly 세션 쿠키를 포함한다. 베스트에포트라 실패는 무시.
-    api
-      .get<{ profile?: { name?: string | null; bio?: string | null; image?: string | null } }>("/me")
-      .then((data) => {
-        if (!alive || !data?.profile) return;
-        setName((prev) => prev || data.profile?.name || "");
-        setBio((prev) => prev || data.profile?.bio || "");
-        setImage((prev) => prev ?? data.profile?.image ?? null);
+    const controller = new AbortController();
+    setProfileLoading(true);
+    setRoleProfileLoaded(false);
+    setRoleProfileTouched(false);
+    getMyProfile(controller.signal)
+      .then((profile) => {
+        if (!alive) return;
+        setName((prev) => prev || profile.name || "");
+        setBio((prev) => prev || profile.bio || "");
+        setImage((prev) => prev ?? profile.image ?? null);
+        setCreatorRoleProfile(profile.creatorRoleProfile);
+        setRoleProfileLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setProfileLoading(false);
+      });
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [user?.id]);
 
@@ -361,7 +385,15 @@ function ProfileTab() {
     setError(null);
     setSaved(false);
     try {
-      await updateMyProfile({ name: name.trim(), bio: bio.trim(), image });
+      const updated = await updateMyProfile({
+        name: name.trim(),
+        bio: bio.trim(),
+        image,
+        ...(roleProfileLoaded || roleProfileTouched ? { creatorRoleProfile } : {}),
+      });
+      setCreatorRoleProfile(updated.creatorRoleProfile);
+      setRoleProfileLoaded(true);
+      setRoleProfileTouched(false);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("account.profile.errorSave"));
@@ -388,7 +420,7 @@ function ProfileTab() {
   const nameInvalid = name.trim().length === 0;
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <section className="rounded-2xl border border-line bg-panel/40 p-5">
         <h2 className="mb-1 text-sm font-semibold text-fg">{t("account.profile.photoTitle")}</h2>
         <p className="mb-4 text-[0.78rem] leading-relaxed text-fg-2">{t("account.profile.photoDesc")}</p>
@@ -436,6 +468,15 @@ function ProfileTab() {
           </p>
         </div>
       </section>
+
+      <CreatorRoleProfileEditor
+        value={creatorRoleProfile}
+        onChange={(next) => {
+          setCreatorRoleProfile(next);
+          setRoleProfileTouched(true);
+        }}
+        disabled={saving || deleting || profileLoading}
+      />
 
       {error && (
         <p className="rounded-xl border border-bad/40 bg-bad/10 px-3.5 py-2.5 text-sm text-bad" role="alert">

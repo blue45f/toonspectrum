@@ -46,8 +46,12 @@ import {
   type ProductionWorkspace,
   type StudioProductionWorkspaceMode,
 } from "./studio-production-workspace";
+import { creatorProfileProductionRoleRecommendations } from "./creator-role-production-bridge";
 import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
-import { StudioProductionOperationsPanel } from "./StudioProductionOperationsPanel";
+import {
+  StudioProductionOperationsPanel,
+  type StudioProductionRoleCandidate,
+} from "./StudioProductionOperationsPanel";
 import { StudioProductionReviewBoard } from "./StudioProductionReviewBoard";
 import { StudioProductionTaskBoard } from "./StudioProductionTaskBoard";
 import {
@@ -58,7 +62,9 @@ import {
 } from "./studio-production-server-client";
 import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
+import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
+import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
@@ -314,6 +320,8 @@ function StudioProductionHubWorkspace({
   const [serverCapabilities, setServerCapabilities] = useState<
     StudioServerProductionCapabilities | null
   >(null);
+  const [teamSnapshot, setTeamSnapshot] = useState<StudioTeamSnapshot | null>(null);
+  const [myProfile, setMyProfile] = useState<MeProfile | null>(null);
   const capabilities = useMemo(() => {
     const base = studioProductionWorkspaceCapabilities(mode);
     if (mode !== "server-work" || !serverCapabilities) return base;
@@ -385,6 +393,83 @@ function StudioProductionHubWorkspace({
   useEffect(() => {
     void reloadWorkspace(true);
   }, [reloadWorkspace]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    getMyProfile(controller.signal)
+      .then((profile) => {
+        if (alive) setMyProfile(profile);
+      })
+      .catch(() => {
+        if (alive && !controller.signal.aborted) setMyProfile(null);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "server-work" || !serverWorkId) {
+      setTeamSnapshot(null);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    getStudioTeam(serverWorkId, controller.signal)
+      .then((snapshot) => {
+        if (alive) setTeamSnapshot(snapshot);
+      })
+      .catch(() => {
+        if (alive && !controller.signal.aborted) setTeamSnapshot(null);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [mode, serverWorkId]);
+
+  const roleCandidates = useMemo<readonly StudioProductionRoleCandidate[]>(() => {
+    const recommendations = creatorProfileProductionRoleRecommendations(
+      myProfile?.creatorRoleProfile,
+    );
+    if (teamSnapshot) {
+      const candidates = teamSnapshot.members
+        .filter((member) => member.status === "active")
+        .map((member): StudioProductionRoleCandidate => ({
+          memberId: member.userId,
+          displayName: member.name,
+          accessRole: member.role,
+          isCurrentUser: member.userId === myProfile?.id,
+          recommendedRoles: member.userId === myProfile?.id ? recommendations : [],
+        }));
+      if (
+        myProfile
+        && teamSnapshot.viewer.status === "active"
+        && !candidates.some((candidate) => candidate.memberId === myProfile.id)
+      ) {
+        candidates.unshift({
+          memberId: myProfile.id,
+          displayName: myProfile.name ?? myProfile.email ?? "나",
+          accessRole: teamSnapshot.viewer.role,
+          isCurrentUser: true,
+          recommendedRoles: recommendations,
+        });
+      }
+      return candidates;
+    }
+    if (mode !== "server-work" && myProfile) {
+      return [{
+        memberId: myProfile.id,
+        displayName: myProfile.name ?? myProfile.email ?? "나",
+        accessRole: "local",
+        isCurrentUser: true,
+        recommendedRoles: recommendations,
+      }];
+    }
+    return [];
+  }, [mode, myProfile, teamSnapshot]);
 
   useEffect(() => {
     if (!capabilities.canPersistLocally || typeof BroadcastChannel === "undefined") return;
@@ -808,6 +893,7 @@ function StudioProductionHubWorkspace({
               workspace={workspace}
               canEdit={capabilities.canEdit && !loadError}
               canManageRoles={capabilities.canManageRoles && !loadError}
+              roleCandidates={roleCandidates}
               onCommit={(update, message) => { void commit(update, message); }}
             />
           </div>

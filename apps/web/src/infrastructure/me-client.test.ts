@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { updateMyProfile } from "./me-client";
+import { getMyProfile, updateMyProfile } from "./me-client";
 
 import { getAuthSession, persistSession } from "@/compat/auth-session-state";
 
-const apiPatch = vi.hoisted(() => vi.fn());
+const { apiGet, apiPatch } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPatch: vi.fn(),
+}));
 
 vi.mock("@/infrastructure/api", () => ({
   api: {
+    get: apiGet,
     patch: apiPatch,
     raw: vi.fn(),
   },
@@ -17,8 +21,20 @@ vi.mock("@/infrastructure/api", () => ({
   ),
 }));
 
-describe("me profile session merge", () => {
+const creatorRoleProfile = {
+  version: 1 as const,
+  primaryRole: "line-art" as const,
+  secondaryRoles: ["assistant" as const],
+  specialties: ["line-art" as const, "inking" as const],
+  experienceLevel: "professional" as const,
+  collaborationStatus: "limited" as const,
+  roleVisibility: true,
+  activeRole: "assistant" as const,
+};
+
+describe("me profile client", () => {
   beforeEach(() => {
+    apiGet.mockReset();
     apiPatch.mockReset();
     persistSession({
       user: { id: "profile-user", name: "이전 이름", role: "creator" },
@@ -30,7 +46,7 @@ describe("me profile session merge", () => {
     persistSession(null);
   });
 
-  it("프로필 저장 응답을 현재 세션에 즉시 병합한다", async () => {
+  it("프로필 저장 응답과 직무 정보를 반환하고 현재 세션을 즉시 병합한다", async () => {
     const profile = {
       id: "profile-user",
       name: "수정한 이름",
@@ -38,11 +54,19 @@ describe("me profile session merge", () => {
       avatar: "#123456",
       email: "profile@example.com",
       bio: "새 소개",
+      creatorRoleProfile,
     };
     apiPatch.mockResolvedValue({ profile });
 
-    await expect(updateMyProfile({ name: "수정한 이름" })).resolves.toEqual(profile);
+    await expect(updateMyProfile({
+      name: "수정한 이름",
+      creatorRoleProfile,
+    })).resolves.toEqual(profile);
 
+    expect(apiPatch).toHaveBeenCalledWith("/me/profile", {
+      name: "수정한 이름",
+      creatorRoleProfile,
+    });
     expect(getAuthSession()).toEqual({
       user: {
         id: "profile-user",
@@ -52,6 +76,33 @@ describe("me profile session merge", () => {
         role: "creator",
       },
       token: null,
+    });
+  });
+
+  it("이전 서버 응답에 직무 필드가 없어도 안전한 기본 프로필로 읽는다", async () => {
+    apiGet.mockResolvedValue({
+      profile: {
+        id: "profile-user",
+        name: "기존 사용자",
+        image: null,
+        avatar: null,
+        email: "profile@example.com",
+        bio: null,
+      },
+    });
+
+    await expect(getMyProfile()).resolves.toMatchObject({
+      id: "profile-user",
+      creatorRoleProfile: {
+        version: 1,
+        primaryRole: null,
+        secondaryRoles: [],
+        specialties: [],
+        experienceLevel: null,
+        collaborationStatus: null,
+        roleVisibility: true,
+        activeRole: null,
+      },
     });
   });
 });

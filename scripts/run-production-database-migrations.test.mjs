@@ -38,10 +38,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(62);
+  expect(manifest).toHaveLength(63);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0062_auth_identity_hardening");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(62);
+  expect(manifest.at(-1).id).toBe("0063_creator_role_profile");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(63);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -72,6 +72,38 @@ test("auth identity hardening migration preserves legacy access and enforces nor
   }
   expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("creator role profile migration is additive, versioned, and structurally guarded", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0063_creator_role_profile",
+  );
+  expect(migration?.id).toBe("0063_creator_role_profile");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "creatorRoleProfile" jsonb',
+    '"version":1',
+    '"secondaryRoles":[]',
+    '"specialties":[]',
+    '"roleVisibility":true',
+    'ALTER COLUMN "creatorRoleProfile" SET NOT NULL',
+    'user_creator_role_profile_object_check',
+    '"creatorRoleProfile" ?& ARRAY[',
+    "'primaryRole'",
+    "'secondaryRoles'",
+    "'specialties'",
+    "'roleVisibility'",
+    "'activeRole'",
+    "jsonb_typeof(\"creatorRoleProfile\") = 'object'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'secondaryRoles') = 'array'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'specialties') = 'array'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'roleVisibility') = 'boolean'",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
 });
 
 test("Studio AI free pool migration supports three reviewed provider attempts", () => {
