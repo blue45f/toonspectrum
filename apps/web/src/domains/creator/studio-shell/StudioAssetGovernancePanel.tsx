@@ -249,7 +249,7 @@ export function StudioAssetGovernancePanel({
           </p>
         </div>
         <span className={cn("inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-black", tone(report.status))}>
-          {summaryCopy[report.status][locale]}
+          {bt(summaryCopy[report.status].ko, summaryCopy[report.status].en)}
         </span>
       </div>
 
@@ -270,7 +270,7 @@ export function StudioAssetGovernancePanel({
             >
               {STUDIO_ASSET_DESTINATIONS.map((destination) => (
                 <option key={destination} value={destination}>
-                  {DESTINATION_LABELS[destination][locale]}
+                  {bt(DESTINATION_LABELS[destination].ko, DESTINATION_LABELS[destination].en)}
                 </option>
               ))}
             </select>
@@ -366,7 +366,7 @@ export function StudioAssetGovernancePanel({
                   <CheckOption
                     key={permission}
                     checked={preferences.confirmedPluginPermissions.includes(permission)}
-                    label={PERMISSION_LABELS[permission][locale]}
+                    label={bt(PERMISSION_LABELS[permission].ko, PERMISSION_LABELS[permission].en)}
                     description={bt("이 프로젝트에서만 허용합니다.", "Allow only in this project.")}
                     onChange={(checked) => togglePermission(permission, checked)}
                   />
