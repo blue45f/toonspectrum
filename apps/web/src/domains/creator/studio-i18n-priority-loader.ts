@@ -162,29 +162,6 @@ async function fetchStudioNamespace(
   }
 }
 
-async function loadStudioNamespaceBatch(
-  assetLocale: string,
-  namespaces: readonly StudioI18nNamespace[],
-  options: StudioI18nPriorityLoaderOptions,
-): Promise<readonly { readonly namespace: StudioI18nNamespace; readonly result: NamespaceLoadResult }[]> {
-  return Promise.all(
-    namespaces.map(async (namespace) => ({
-      namespace,
-      result: await fetchStudioNamespace(assetLocale, namespace, options),
-    })),
-  );
-}
-
-function mergeLoadedStudioDictionaries(
-  results: readonly { readonly result: NamespaceLoadResult }[],
-): Record<string, string> {
-  const merged: Record<string, string> = {};
-  for (const { result } of results) {
-    if (result.status === "loaded") Object.assign(merged, result.dictionary);
-  }
-  return merged;
-}
-
 export async function loadStudioI18nNamespaces(
   namespaces: readonly StudioI18nNamespace[],
   options: StudioI18nPriorityLoaderOptions = {},
@@ -197,17 +174,14 @@ export async function loadStudioI18nNamespaces(
   registerManagedStudioI18nLocale(requestedLocale, assetLocale);
 
   const uniqueNamespaces = [...new Set(namespaces)];
-  const [results, englishSourceResults] = await Promise.all([
-    loadStudioNamespaceBatch(assetLocale, uniqueNamespaces, options),
-    assetLocale === "en"
-      ? Promise.resolve([])
-      : loadStudioNamespaceBatch("en", uniqueNamespaces, options),
-  ]);
+  const results = await Promise.all(
+    uniqueNamespaces.map(async (namespace) => ({
+      namespace,
+      result: await fetchStudioNamespace(assetLocale, namespace, options),
+    })),
+  );
 
-  const merged = mergeLoadedStudioDictionaries(results);
-  const englishMerged = assetLocale === "en"
-    ? merged
-    : mergeLoadedStudioDictionaries(englishSourceResults);
+  const merged: Record<string, string> = {};
   const loadedNamespaces: StudioI18nNamespace[] = [];
   const failedNamespaces: StudioI18nNamespace[] = [];
 
@@ -217,13 +191,9 @@ export async function loadStudioI18nNamespaces(
       continue;
     }
     loadedNamespaces.push(namespace);
-  }
-
-  // Always keep the English source for the same namespaces in DICT. This guarantees the explicit
-  // requested → en → ko fallback chain can resolve a Studio key even when a locale namespace is
-  // missing/failed, and gives the runtime translator a canonical source for English-valued gaps.
-  if (Object.keys(englishMerged).length > 0) {
-    registerI18nLocaleEntries("en", englishMerged);
+    if (result.status === "loaded") {
+      Object.assign(merged, result.dictionary);
+    }
   }
 
   if (Object.keys(merged).length > 0) {
@@ -235,9 +205,6 @@ export async function loadStudioI18nNamespaces(
     ) {
       registerI18nLocaleEntries(normalizedRequestedLocale, merged);
     }
-  }
-
-  if (Object.keys(englishMerged).length > 0 || Object.keys(merged).length > 0) {
     triggerTranslationBundleUpdate();
   }
 
@@ -296,6 +263,39 @@ export async function retryFailedStudioI18nNamespaces(
   return report;
 }
 
+function shouldLoadStudioEnglishTranslationSource(locale: string): boolean {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return false;
+  const root = normalized.split("-")[0];
+  if (root === "en" || root === "ko") return false;
+  return resolveStudioAssetLocale(normalized) !== "en";
+}
+
+/**
+ * Loads the canonical Studio English source only after the first route has committed. This keeps
+ * the critical-path invariant (core requests still fetch only the active locale) while giving the
+ * runtime translator an exact English reference for lazy Studio keys whose locale asset still
+ * contains English placeholder copy.
+ */
+async function loadStudioEnglishTranslationSource(
+  options: StudioI18nPriorityLoaderOptions,
+): Promise<void> {
+  const requestedLocale = options.locale ?? getLang();
+  if (!shouldLoadStudioEnglishTranslationSource(requestedLocale)) return;
+
+  const report = await loadStudioI18nNamespaces(STUDIO_I18N_NAMESPACES, {
+    ...options,
+    locale: "en",
+  });
+  if (report.failedNamespaces.length > 0) {
+    console.warn(
+      `[i18n] ${report.failedNamespaces.length} Studio English source namespace(s) failed to load; `
+        + "display fallback remains available and a later navigation can retry.",
+      report.failedNamespaces,
+    );
+  }
+}
+
 export function scheduleStudioI18nDeferredLoad(
   options: StudioI18nPriorityLoaderOptions = {},
 ): () => void {
@@ -337,6 +337,7 @@ export function scheduleStudioI18nDeferredLoad(
   const run = () => {
     idleHandle = null;
     void runAttempt(STUDIO_I18N_DEFERRED_NAMESPACES, 0);
+    void loadStudioEnglishTranslationSource(options);
   };
 
   const scheduler = globalThis as typeof globalThis & IdleScheduler;
