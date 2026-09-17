@@ -92,7 +92,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-service-worker": "tsx scripts/verify-studio-service-worker.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
-    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit",
+    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit && pnpm run test:desktop-sync-release",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",
     "verify:studio-autosave-two-tab": "tsx scripts/verify-studio-autosave-two-tab-leader.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
@@ -205,7 +205,11 @@
     "mobile:android:build": "cap sync android && cd android && ./gradlew assembleDebug",
     "mobile:android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "mobile:ios:prepare": "cap sync ios",
-    "verify:studio-competitor-capabilities": "tsx scripts/verify-studio-competitor-capabilities.mts"
+    "verify:studio-competitor-capabilities": "tsx scripts/verify-studio-competitor-capabilities.mts",
+    "desktop:sync:release:package": "pnpm --filter @toonspectrum/desktop-sync-agent build && node scripts/package-desktop-sync-release.mjs",
+    "desktop:sync:release:sign": "node scripts/sign-desktop-sync-release.mjs",
+    "desktop:sync:release:verify": "node scripts/verify-desktop-sync-release.mjs",
+    "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent build && node --test scripts/desktop-sync-release.test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

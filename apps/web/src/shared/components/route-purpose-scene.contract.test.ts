@@ -40,6 +40,18 @@ describe("site-wide visual UX contracts", () => {
     }
   });
 
+  it("keeps decorative route glyphs consolidated in the global app entry", () => {
+    const lucideImportBlock = component.match(/import \{([\s\S]*?)\} from "lucide-react";/u)?.[1] ?? "";
+    const lucideImports = lucideImportBlock
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .sort();
+    expect(lucideImports).toEqual(["Pause", "Play", "Sparkles"]);
+    expect(component).not.toContain("const ICONS");
+    expect(component).not.toContain("LucideIcon");
+  });
+
   it("treats video and 3D motion as accessible progressive enhancement", () => {
     expect(component).toContain("useAtelierMotion");
     expect(component).toContain("videoFailed");

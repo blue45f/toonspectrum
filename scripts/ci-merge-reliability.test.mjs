@@ -60,6 +60,13 @@ test("fanout guard rejects representative unsafe trigger changes", () => {
   }
 });
 
+test("superseded PR heads cancel while main and merge-group verification finish", () => {
+  const concurrency = workflow.split("\nconcurrency:\n")[1]?.split("\nenv:\n")[0] ?? "";
+  assert.match(concurrency, /group: core-v3-\$\{\{ github\.event_name \}\}-/);
+  assert.match(concurrency, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+  assert.doesNotMatch(concurrency, /cancel-in-progress: true/);
+});
+
 test("lint, typecheck and semantic regression shards are independent installed lanes", () => {
   for (const [name, command] of [
     ["lint", "pnpm run lint:strict"],

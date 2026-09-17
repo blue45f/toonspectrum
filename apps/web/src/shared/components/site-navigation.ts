@@ -2,7 +2,6 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
-  Code2,
   Compass,
   Gamepad2,
   Home,
@@ -115,7 +114,7 @@ export const SITE_NAVIGATION_ITEMS = {
   technology: item(
     "technology",
     "/about/technology",
-    Code2,
+    Workflow,
     "제작 기술",
     "Engineering",
     "제작 과정·아키텍처·오픈소스·적용 가이드",

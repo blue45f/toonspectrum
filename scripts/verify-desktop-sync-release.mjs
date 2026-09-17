@@ -74,6 +74,7 @@ function normalizeRelativePath(value) {
   if (
     !value
     || value.startsWith("/")
+    || /^[A-Za-z]:/u.test(value)
     || value.includes("\\")
     || value.split("/").some((segment) => !segment || segment === "." || segment === "..")
   ) throw new TypeError(`unsafe release path: ${value}`);
@@ -100,9 +101,28 @@ async function discoverBundleRoot(releaseDir) {
   return join(stage, directories[0].name);
 }
 
-function expectedNativePackage(platform, arch) {
-  const platformPart = platform === "windows" ? "win32" : platform;
-  return `keyring-${platformPart}-${arch}`;
+function expectedNativePackages(platform, arch) {
+  if (platform === "darwin") return [`@napi-rs/keyring-darwin-${arch}`];
+  if (platform === "windows") return [`@napi-rs/keyring-win32-${arch}-msvc`];
+  if (platform === "linux") {
+    return [
+      `@napi-rs/keyring-linux-${arch}-gnu`,
+      `@napi-rs/keyring-linux-${arch}-musl`,
+    ];
+  }
+  if (platform === "freebsd") return [`@napi-rs/keyring-freebsd-${arch}`];
+  return [];
+}
+
+function platformLabel() {
+  return process.platform === "win32" ? "windows" : process.platform;
+}
+
+function expectedSigningKind(platform) {
+  if (platform === "darwin") return "apple-codesign";
+  if (platform === "windows") return "authenticode";
+  if (platform === "linux") return "gpg";
+  throw new Error(`signed release verification is unsupported on ${platform}`);
 }
 
 function run(command, args, options = {}) {
@@ -187,8 +207,47 @@ async function verifySbom(bundleRoot, manifest) {
   ) throw new Error("CycloneDX SBOM is incomplete");
   const names = new Set(sbom.components.map((component) => component?.name));
   if (!names.has("@napi-rs/keyring")) throw new Error("SBOM omits the credential vault library");
-  const nativeName = `@napi-rs/${expectedNativePackage(manifest.platform, manifest.arch)}`;
-  if (!names.has(nativeName)) throw new Error(`SBOM omits ${nativeName}`);
+  const nativeNames = expectedNativePackages(manifest.platform, manifest.arch);
+  if (nativeNames.length < 1 || !nativeNames.some((name) => names.has(name))) {
+    throw new Error(`SBOM omits the native credential vault package (${nativeNames.join(" or ")})`);
+  }
+}
+
+function verifyNativeSigning(bundleRoot, manifest, artifact) {
+  if (platformLabel() !== manifest.platform || process.arch !== manifest.arch) {
+    throw new Error(
+      `strict signature verification requires ${manifest.platform}/${manifest.arch}, current host is ${platformLabel()}/${process.arch}`,
+    );
+  }
+  const targetPath = join(
+    bundleRoot,
+    normalizeRelativePath(assertText(artifact.targetPath, "signing target path")),
+  );
+  if (manifest.platform === "darwin") {
+    run(
+      process.env.TOONSTUDIO_CODESIGN_PATH || "codesign",
+      ["--verify", "--strict", "--verbose=2", targetPath],
+      { cwd: bundleRoot },
+    );
+    return;
+  }
+  if (manifest.platform === "windows") {
+    run(
+      process.env.TOONSTUDIO_SIGNTOOL_PATH || "signtool.exe",
+      ["verify", "/pa", "/v", targetPath],
+      { cwd: bundleRoot },
+    );
+    return;
+  }
+  const signaturePath = join(
+    bundleRoot,
+    normalizeRelativePath(assertText(artifact.path, "GPG signature path")),
+  );
+  run(
+    process.env.TOONSTUDIO_GPG_PATH || "gpg",
+    ["--batch", "--verify", signaturePath, targetPath],
+    { cwd: bundleRoot },
+  );
 }
 
 async function verifySigning(bundleRoot, manifest, requireSigned) {
@@ -202,31 +261,40 @@ async function verifySigning(bundleRoot, manifest, requireSigned) {
     || evidence.arch !== manifest.arch
     || !Array.isArray(evidence.artifacts)
   ) throw new Error("signing evidence does not match the release bundle");
+  if (!["signed", "unsigned"].includes(evidence.status)) {
+    throw new Error("signing evidence status is invalid");
+  }
+  if (evidence.status === "unsigned" && evidence.artifacts.length !== 0) {
+    throw new Error("unsigned signing evidence must not contain artifacts");
+  }
   if (requireSigned && evidence.status !== "signed") {
     throw new Error("signed release evidence is required");
   }
-  if (!requireSigned && !["signed", "unsigned"].includes(evidence.status)) {
-    throw new Error("signing evidence status is invalid");
-  }
+  const requiredKind = expectedSigningKind(manifest.platform);
+  let requiredArtifact = null;
   for (const artifactValue of evidence.artifacts) {
     const artifact = assertRecord(artifactValue, "signing artifact");
     const path = assertText(artifact.path, "signing artifact path");
+    const targetPath = assertText(artifact.targetPath, "signing target path");
     if (artifact.verified !== true) throw new Error(`unverified signing artifact: ${path}`);
     const absolutePath = join(bundleRoot, normalizeRelativePath(path));
-    await access(absolutePath);
-    if (artifact.sha256 && await sha256File(absolutePath) !== artifact.sha256) {
+    const absoluteTargetPath = join(bundleRoot, normalizeRelativePath(targetPath));
+    await Promise.all([access(absolutePath), access(absoluteTargetPath)]);
+    if (await sha256File(absolutePath) !== assertSha256(artifact.sha256, `${path}.sha256`)) {
       throw new Error(`signed artifact changed after verification: ${path}`);
     }
+    if (
+      await sha256File(absoluteTargetPath)
+      !== assertSha256(artifact.targetSha256, `${targetPath}.targetSha256`)
+    ) {
+      throw new Error(`signed target changed after verification: ${targetPath}`);
+    }
+    if (artifact.kind === requiredKind) requiredArtifact = artifact;
   }
-  if (requireSigned) {
-    const kinds = new Set(evidence.artifacts.map((artifact) => artifact.kind));
-    const requiredKind = manifest.platform === "darwin"
-      ? "apple-codesign"
-      : manifest.platform === "windows"
-        ? "authenticode"
-        : "gpg";
-    if (!kinds.has(requiredKind)) throw new Error(`missing ${requiredKind} signing evidence`);
+  if (evidence.status === "signed" && requiredArtifact === null) {
+    throw new Error(`missing ${requiredKind} signing evidence`);
   }
+  if (requireSigned) verifyNativeSigning(bundleRoot, manifest, requiredArtifact);
   return evidence;
 }
 
@@ -271,6 +339,9 @@ export async function verifyDesktopSyncRelease(input = {}) {
   if (receipt.bundleName !== manifest.bundleName) throw new Error("receipt bundle name mismatch");
   if (receipt.manifestSha256 !== manifest.manifestSha256) {
     throw new Error("receipt manifest checksum mismatch");
+  }
+  if (receipt.signingStatus !== manifest.signingStatus) {
+    throw new Error("receipt signing status mismatch");
   }
   const archivePath = join(releaseDir, normalizeRelativePath(assertText(receipt.archive, "receipt.archive")));
   if (await sha256File(archivePath) !== assertSha256(receipt.archiveSha256, "receipt.archiveSha256")) {

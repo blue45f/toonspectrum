@@ -80,6 +80,23 @@ function normalizePath(value) {
   return value.split(sep).join("/");
 }
 
+function safeBundlePath(bundleRoot, value, label) {
+  if (
+    typeof value !== "string"
+    || !value
+    || value.startsWith("/")
+    || /^[A-Za-z]:/u.test(value)
+    || value.includes("\\")
+    || value.split("/").some((segment) => !segment || segment === "." || segment === "..")
+  ) throw new TypeError(`${label} contains an unsafe bundle path`);
+  const absolutePath = resolve(bundleRoot, value.split("/").join(sep));
+  const relativePath = relative(bundleRoot, absolutePath);
+  if (!relativePath || relativePath.startsWith(`..${sep}`) || relativePath === "..") {
+    throw new TypeError(`${label} escapes the staged bundle`);
+  }
+  return absolutePath;
+}
+
 function sha256Bytes(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -284,7 +301,14 @@ async function buildSbom(bundleRoot, metadata) {
   };
 }
 
-function parseSigningEvidence(value, metadata) {
+function expectedSigningKind(platform) {
+  if (platform === "darwin") return "apple-codesign";
+  if (platform === "windows") return "authenticode";
+  if (platform === "linux") return "gpg";
+  throw new TypeError(`unsupported signing platform: ${platform}`);
+}
+
+async function parseSigningEvidence(value, metadata, bundleRoot) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError("signing evidence must be an object");
   }
@@ -297,17 +321,44 @@ function parseSigningEvidence(value, metadata) {
   ) {
     throw new TypeError("signing evidence does not match the staged platform");
   }
-  for (const artifact of value.artifacts) {
+  if (value.status === "unsigned") {
+    if (value.artifacts.length !== 0) {
+      throw new TypeError("unsigned signing evidence must not contain artifacts");
+    }
+    return value;
+  }
+  const requiredKind = expectedSigningKind(metadata.platform);
+  if (value.artifacts.length < 1) {
+    throw new TypeError("signed evidence must contain a verified artifact");
+  }
+  let requiredKindSeen = false;
+  for (const [index, artifact] of value.artifacts.entries()) {
     if (
       !artifact
       || typeof artifact !== "object"
       || typeof artifact.path !== "string"
       || typeof artifact.kind !== "string"
-      || typeof artifact.verified !== "boolean"
-    ) throw new TypeError("signing evidence artifact is invalid");
+      || artifact.verified !== true
+      || typeof artifact.sha256 !== "string"
+      || !/^[a-f0-9]{64}$/u.test(artifact.sha256)
+      || typeof artifact.targetPath !== "string"
+      || typeof artifact.targetSha256 !== "string"
+      || !/^[a-f0-9]{64}$/u.test(artifact.targetSha256)
+      || typeof artifact.identity !== "string"
+      || !artifact.identity.trim()
+    ) throw new TypeError(`signing evidence artifact ${index} is invalid`);
+    const artifactPath = safeBundlePath(bundleRoot, artifact.path, `artifact ${index}`);
+    const targetPath = safeBundlePath(bundleRoot, artifact.targetPath, `artifact ${index} target`);
+    if (await sha256File(artifactPath) !== artifact.sha256) {
+      throw new Error(`signed artifact checksum mismatch: ${artifact.path}`);
+    }
+    if (await sha256File(targetPath) !== artifact.targetSha256) {
+      throw new Error(`signed target checksum mismatch: ${artifact.targetPath}`);
+    }
+    requiredKindSeen ||= artifact.kind === requiredKind;
   }
-  if (value.status === "signed" && value.artifacts.some((artifact) => artifact.verified !== true)) {
-    throw new TypeError("signed evidence contains an unverified artifact");
+  if (!requiredKindSeen) {
+    throw new TypeError(`signed evidence is missing ${requiredKind}`);
   }
   return value;
 }
@@ -441,9 +492,10 @@ async function finalizeRelease(options) {
     artifacts: [],
   };
   if (options.signingEvidence) {
-    signingEvidence = parseSigningEvidence(
+    signingEvidence = await parseSigningEvidence(
       JSON.parse(await readFile(options.signingEvidence, "utf8")),
       metadata,
+      bundleRoot,
     );
   }
   await writeJson(join(bundleRoot, SIGNING_EVIDENCE_FILE), signingEvidence);

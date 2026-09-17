@@ -141,3 +141,4 @@ crates/**/target/
 
 # Generated visual UX audit artifacts
 .qa/visual-ux/
+/apps/desktop-sync/dist
