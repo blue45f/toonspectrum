@@ -39,8 +39,14 @@ import { WorkFxPanel } from "./WorkFxPanel";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  canShareCreatorWork,
+  compactPublicShareDescription,
+  publicShareImageUrl,
+} from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
@@ -460,6 +466,16 @@ export function CreateWorkPage() {
     () => resolveCreatorPublicationReaderPolicy(work?.doc),
     [work?.doc],
   );
+  const shareable = work ? canShareCreatorWork(work, publicationPolicy.directive) : false;
+  const sharePath = work ? `/create/${encodeURIComponent(work.id)}` : "/create";
+  const shareTitle = publicationPolicy.directive.socialTitle.trim() || work?.title || "창작 작품";
+  const shareDescription = compactPublicShareDescription(
+    publicationPolicy.directive.socialDescription || work?.description,
+    work
+      ? `${work.author.name} 창작자의 ${work.title} 작품을 감상해 보세요.`
+      : "툰스튜디오 창작 게시판의 작품을 감상해 보세요.",
+  );
+  const shareImage = publicShareImageUrl(work?.cover);
 
   useCreatorPublicationPageMeta({
     workId: work?.id ?? id ?? null,
@@ -752,6 +768,17 @@ export function CreateWorkPage() {
             <Bookmark size={14} className={cn(work.bookmarked && "fill-current")} />
             <span className="numeral">{formatCount(work.bookmarks ?? 0)}</span>
           </button>
+          {shareable && (
+            <SharePageButton
+              path={sharePath}
+              text={shareTitle}
+              description={shareDescription}
+              imageUrl={shareImage}
+              label="작품 공유"
+              actionLabel="작품 감상하기"
+              className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+            />
+          )}
           <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
             <Eye size={14} />
             <span className="numeral">{formatCount(work.views)}</span> 조회

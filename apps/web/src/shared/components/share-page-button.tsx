@@ -10,6 +10,7 @@ export interface SharePageButtonProps {
   readonly description?: string;
   readonly imageUrl?: string;
   readonly label?: string;
+  readonly actionLabel?: string;
   readonly className?: string;
 }
 
@@ -20,6 +21,7 @@ export function SharePageButton({
   description,
   imageUrl,
   label,
+  actionLabel,
   className,
 }: SharePageButtonProps) {
   const t = useT();
@@ -32,7 +34,7 @@ export function SharePageButton({
         text: description || `${text} · ${t("app.name")}`,
         url: path,
         imageUrl,
-        buttonLabel: t("share.viewContent"),
+        buttonLabel: actionLabel || t("share.viewContent"),
       }}
       trigger={
         <button

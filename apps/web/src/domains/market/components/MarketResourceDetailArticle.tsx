@@ -7,7 +7,6 @@ import {
   Heart,
   Layers,
   Lightbulb,
-  Link2,
   Shield,
   ShieldCheck,
   Sliders,
@@ -59,7 +58,9 @@ import { StaleNoticeBar } from "./StaleNoticeBar";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { compactPublicShareDescription } from "@/shared/lib/public-share-policy";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 
@@ -82,53 +83,6 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
       <dt className="shrink-0 text-xs text-fg-3">{label}</dt>
       <dd className="min-w-0 max-w-full text-right text-xs font-medium text-fg">{children}</dd>
     </div>
-  );
-}
-
-function ShareLinkButton() {
-  const [status, setStatus] = useState<"idle" | "shared" | "copied" | "failed">("idle");
-
-  async function shareCurrentLink() {
-    const url = window.location.href;
-    setStatus("idle");
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ url, title: document.title });
-        setStatus("shared");
-        return;
-      } catch (error) {
-        if ((error as { name?: unknown } | null)?.name === "AbortError") return;
-        // 공유 시트가 실패하면 클립보드 복사를 한 번 더 시도한다.
-      }
-    }
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
-      await navigator.clipboard.writeText(url);
-      setStatus("copied");
-      setTimeout(() => setStatus("idle"), 2000);
-    } catch {
-      setStatus("failed");
-    }
-  }
-
-  const label = status === "shared"
-    ? "공유했어요"
-    : status === "copied"
-      ? "링크를 복사했어요"
-      : status === "failed"
-        ? "공유할 수 없어요 · 다시 시도"
-        : "링크 공유";
-
-  return (
-    <button
-      type="button"
-      onClick={() => void shareCurrentLink()}
-      className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
-      aria-live="polite"
-    >
-      <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-      {label}
-    </button>
   );
 }
 
@@ -733,7 +687,17 @@ export function MarketResourceDetailArticle({
             >
               같은 종류의 리소스 더 보기
             </Link>
-            <ShareLinkButton />
+            <SharePageButton
+              path={`/market/resource/${encodeURIComponent(currentRecord.id)}`}
+              text={currentRecord.name}
+              description={compactPublicShareDescription(
+                currentRecord.description,
+                `${kind.label} 리소스의 구성과 사용권, Studio 적용 방법을 확인해 보세요.`,
+              )}
+              label="리소스 공유"
+              actionLabel="리소스 보기"
+              className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
+            />
             <CreatorMarketplaceReportAction record={record} />
             <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
               {studioActionSummary}

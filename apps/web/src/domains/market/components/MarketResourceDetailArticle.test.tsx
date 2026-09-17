@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,22 +23,9 @@ vi.mock("./MarketResourceReleaseHistory", () => ({
   ),
 }));
 
-const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-const originalShareDescriptor = Object.getOwnPropertyDescriptor(navigator, "share");
-
-function restoreNavigatorProperty(
-  property: "clipboard" | "share",
-  descriptor: PropertyDescriptor | undefined,
-): void {
-  if (descriptor) Object.defineProperty(navigator, property, descriptor);
-  else Reflect.deleteProperty(navigator, property);
-}
-
 afterEach(() => {
   cleanup();
   localStorage.removeItem(CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY);
-  restoreNavigatorProperty("clipboard", originalClipboardDescriptor);
-  restoreNavigatorProperty("share", originalShareDescriptor);
   vi.restoreAllMocks();
 });
 
@@ -294,18 +281,17 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
     );
   });
 
-  it("announces a recoverable error when share and clipboard APIs cannot complete", async () => {
-    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
-    });
-    renderDetail(marketRecord("asset"));
+  it("opens the unified share dialog with resource-specific metadata", async () => {
+    const record = marketRecord("asset");
+    renderDetail(record);
 
-    fireEvent.click(screen.getByRole("button", { name: "링크 공유" }));
+    fireEvent.click(screen.getByRole("button", { name: `리소스 공유: ${record.name}` }));
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "공유할 수 없어요 · 다시 시도" })).toBeTruthy();
-    });
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(record.name)).toBeTruthy();
+    expect(within(dialog).getByText(record.description)).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: /링크 복사/u })).toBeTruthy();
+    expect(within(dialog).getByRole("link", { name: /네이버/u }).getAttribute("href"))
+      .toContain(encodeURIComponent(`/market/resource/${record.id}`));
   });
 });
