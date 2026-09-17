@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Header,
   Headers,
   HttpCode,
   HttpException,
@@ -16,31 +17,39 @@ import {
 
 import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
 
+import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+
 import {
   CommitStudioRevisionDto,
   CreateCompatibilityReportDto,
   CreateStudioExternalFileBindingDto,
   CreateStudioProjectGraphDto,
+  CreateStudioArtifactDto,
+  DecideStudioReviewDto,
+  ResolveStudioReviewCommentDto,
   CreateStudioReviewCommentDto,
   CreateStudioReviewDto,
   RegisterStudioBlobDto,
+  RestoreStudioRevisionDto,
   StudioArtifactParamsDto,
   StudioExternalBindingParamsDto,
+  StudioRevisionParamsDto,
   StudioProjectParamsDto,
   StudioReportParamsDto,
   StudioReviewParamsDto,
+  StudioReviewCommentParamsDto,
   StudioWorkParamsDto,
   UpdateStudioExternalFileBindingDto,
 } from "./studio-project-graph.dto";
 import { StudioProjectGraphService } from "./studio-project-graph.service";
 
-function authenticatedStudioUserId(userId: string | undefined): string {
-  const normalized = userId?.trim() ?? "";
-  if (!normalized) throw new ForbiddenException("로그인이 필요해요.");
-  return normalized;
+export function authenticatedStudioUserId(userId: string | undefined): string {
+  const value = userId?.trim() ?? "";
+  if (value.length === 0) throw new ForbiddenException("로그인이 필요해요.");
+  return value;
 }
 
-function requireIdempotencyKey(value: string | undefined): string {
+export function requireStudioIdempotencyKey(value: string | undefined): string {
   const key = value?.trim() ?? "";
   if (key.length < 8 || key.length > 240) {
     throw new BadRequestException({
@@ -68,9 +77,14 @@ export function parseStudioIfMatch(value: string | undefined): string {
       message: "A single strong revision identifier is required.",
     });
   }
-  const unquoted = raw.startsWith('"') && raw.endsWith('"')
-    ? raw.slice(1, -1)
-    : raw;
+  const quoted = raw.startsWith('"') || raw.endsWith('"');
+  if (quoted && !(raw.startsWith('"') && raw.endsWith('"') && raw.length >= 3)) {
+    throw new BadRequestException({
+      code: "studio_if_match_invalid",
+      message: "If-Match quotes must be balanced.",
+    });
+  }
+  const unquoted = quoted ? raw.slice(1, -1) : raw;
   const parsed = studioEntityIdSchema.safeParse(unquoted);
   if (!parsed.success) {
     throw new BadRequestException({
@@ -81,99 +95,193 @@ export function parseStudioIfMatch(value: string | undefined): string {
   return parsed.data;
 }
 
-@Controller("studio-project-graph")
+@Controller("/studio-project-graph")
 export class StudioProjectGraphController {
   constructor(private readonly service: StudioProjectGraphService) {}
 
-  @Post("projects")
+  @Post("/projects")
   @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   createProject(
-    @Headers("x-user-id") userId: string | undefined,
+    @Body(new ZodValidationPipe(CreateStudioProjectGraphDto))
+    body: CreateStudioProjectGraphDto,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
-    @Body() body: CreateStudioProjectGraphDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.createProject(
       authenticatedStudioUserId(userId),
       body,
-      requireIdempotencyKey(idempotencyKey),
+      requireStudioIdempotencyKey(idempotencyKey),
     );
   }
 
-  @Get("projects/:projectId")
+  @Post("/projects/:projectId/artifacts")
+  @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  createArtifact(
+    @Param(new ZodValidationPipe(StudioProjectParamsDto))
+    params: StudioProjectParamsDto,
+    @Body(new ZodValidationPipe(CreateStudioArtifactDto))
+    body: CreateStudioArtifactDto,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.createArtifact(
+      authenticatedStudioUserId(userId),
+      params.projectId,
+      body,
+      requireStudioIdempotencyKey(idempotencyKey),
+    );
+  }
+
+  @Get("/projects/:projectId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
   getProject(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioProjectParamsDto,
+    @Param(new ZodValidationPipe(StudioProjectParamsDto))
+    params: StudioProjectParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.getProject(authenticatedStudioUserId(userId), params.projectId);
+    return this.service.getProject(
+      authenticatedStudioUserId(userId),
+      params.projectId,
+    );
   }
 
-  @Get("works/:workId/project")
+  @Get("/works/:workId/project")
+  @Header("Cache-Control", "private, no-store, max-age=0")
   getProjectByWork(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioWorkParamsDto,
+    @Param(new ZodValidationPipe(StudioWorkParamsDto))
+    params: StudioWorkParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.getProjectByWork(authenticatedStudioUserId(userId), params.workId);
+    return this.service.getProjectByWork(
+      authenticatedStudioUserId(userId),
+      params.workId,
+    );
   }
 
-  @Post("projects/:projectId/blobs")
+  @Post("/projects/:projectId/blobs")
   @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   registerBlob(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioProjectParamsDto,
-    @Body() body: RegisterStudioBlobDto,
+    @Param(new ZodValidationPipe(StudioProjectParamsDto))
+    params: StudioProjectParamsDto,
+    @Body(new ZodValidationPipe(RegisterStudioBlobDto))
+    body: RegisterStudioBlobDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.registerBlob(authenticatedStudioUserId(userId), params.projectId, body);
+    return this.service.registerBlob(
+      authenticatedStudioUserId(userId),
+      params.projectId,
+      body,
+    );
   }
 
-  @Post("projects/:projectId/compatibility-reports")
+  @Get("/projects/:projectId/compatibility-reports")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  listCompatibilityReports(
+    @Param(new ZodValidationPipe(StudioProjectParamsDto))
+    params: StudioProjectParamsDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.listCompatibilityReports(
+      authenticatedStudioUserId(userId),
+      params.projectId,
+    );
+  }
+
+  @Post("/projects/:projectId/compatibility-reports")
   @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   createCompatibilityReport(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioProjectParamsDto,
-    @Body() body: CreateCompatibilityReportDto,
+    @Param(new ZodValidationPipe(StudioProjectParamsDto))
+    params: StudioProjectParamsDto,
+    @Body(new ZodValidationPipe(CreateCompatibilityReportDto))
+    body: CreateCompatibilityReportDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.createCompatibilityReport(authenticatedStudioUserId(userId), params.projectId, body);
+    return this.service.createCompatibilityReport(
+      authenticatedStudioUserId(userId),
+      params.projectId,
+      body,
+    );
   }
 
-  @Post("compatibility-reports/:reportId/approve")
+  @Post("/compatibility-reports/:reportId/approve")
   @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   approveCompatibilityReport(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioReportParamsDto,
+    @Param(new ZodValidationPipe(StudioReportParamsDto))
+    params: StudioReportParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.approveCompatibilityReport(authenticatedStudioUserId(userId), params.reportId);
+    return this.service.approveCompatibilityReport(
+      authenticatedStudioUserId(userId),
+      params.reportId,
+    );
   }
 
-  @Get("artifacts/:artifactId/revisions")
+  @Get("/artifacts/:artifactId/revisions")
+  @Header("Cache-Control", "private, no-store, max-age=0")
   listRevisions(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioArtifactParamsDto,
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.listRevisions(authenticatedStudioUserId(userId), params.artifactId);
+    return this.service.listRevisions(
+      authenticatedStudioUserId(userId),
+      params.artifactId,
+    );
   }
 
-  @Post("artifacts/:artifactId/revisions")
+  @Post("/artifacts/:artifactId/revisions")
   @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   commitRevision(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioArtifactParamsDto,
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Body(new ZodValidationPipe(CommitStudioRevisionDto))
+    body: CommitStudioRevisionDto,
     @Headers("if-match") ifMatch: string | undefined,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
-    @Body() body: CommitStudioRevisionDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.commitRevision(
       authenticatedStudioUserId(userId),
       params.artifactId,
       parseStudioIfMatch(ifMatch),
-      requireIdempotencyKey(idempotencyKey),
+      requireStudioIdempotencyKey(idempotencyKey),
+      body,
+    );
+  }
+  @Post("/artifacts/:artifactId/revisions/:revisionId/restore")
+  @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  restoreRevision(
+    @Param(new ZodValidationPipe(StudioRevisionParamsDto))
+    params: StudioRevisionParamsDto,
+    @Body(new ZodValidationPipe(RestoreStudioRevisionDto))
+    body: RestoreStudioRevisionDto,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.restoreRevision(
+      authenticatedStudioUserId(userId),
+      params.artifactId,
+      params.revisionId,
+      parseStudioIfMatch(ifMatch),
+      requireStudioIdempotencyKey(idempotencyKey),
       body,
     );
   }
 
-  @Get("artifacts/:artifactId/external-bindings")
+  @Get("/artifacts/:artifactId/external-bindings")
+  @Header("Cache-Control", "private, no-store, max-age=0")
   listExternalFileBindings(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioArtifactParamsDto,
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.listExternalFileBindings(
       authenticatedStudioUserId(userId),
@@ -181,12 +289,15 @@ export class StudioProjectGraphController {
     );
   }
 
-  @Post("artifacts/:artifactId/external-bindings")
+  @Post("/artifacts/:artifactId/external-bindings")
   @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   createExternalFileBinding(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioArtifactParamsDto,
-    @Body() body: CreateStudioExternalFileBindingDto,
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Body(new ZodValidationPipe(CreateStudioExternalFileBindingDto))
+    body: CreateStudioExternalFileBindingDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.createExternalFileBinding(
       authenticatedStudioUserId(userId),
@@ -195,11 +306,14 @@ export class StudioProjectGraphController {
     );
   }
 
-  @Patch("external-bindings/:bindingId")
+  @Patch("/external-bindings/:bindingId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
   updateExternalFileBinding(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioExternalBindingParamsDto,
-    @Body() body: UpdateStudioExternalFileBindingDto,
+    @Param(new ZodValidationPipe(StudioExternalBindingParamsDto))
+    params: StudioExternalBindingParamsDto,
+    @Body(new ZodValidationPipe(UpdateStudioExternalFileBindingDto))
+    body: UpdateStudioExternalFileBindingDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.updateExternalFileBinding(
       authenticatedStudioUserId(userId),
@@ -208,11 +322,13 @@ export class StudioProjectGraphController {
     );
   }
 
-  @Delete("external-bindings/:bindingId")
+  @Delete("/external-bindings/:bindingId")
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   removeExternalFileBinding(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioExternalBindingParamsDto,
+    @Param(new ZodValidationPipe(StudioExternalBindingParamsDto))
+    params: StudioExternalBindingParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
     return this.service.removeExternalFileBinding(
       authenticatedStudioUserId(userId),
@@ -220,23 +336,111 @@ export class StudioProjectGraphController {
     );
   }
 
-  @Post("artifacts/:artifactId/reviews")
-  @HttpCode(HttpStatus.CREATED)
-  createReview(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioArtifactParamsDto,
-    @Body() body: CreateStudioReviewDto,
+  @Get("/artifacts/:artifactId/reviews")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  listReviews(
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.createReview(authenticatedStudioUserId(userId), params.artifactId, body);
+    return this.service.listReviews(
+      authenticatedStudioUserId(userId),
+      params.artifactId,
+    );
   }
 
-  @Post("reviews/:reviewId/comments")
-  @HttpCode(HttpStatus.CREATED)
-  createReviewComment(
-    @Headers("x-user-id") userId: string | undefined,
-    @Param() params: StudioReviewParamsDto,
-    @Body() body: CreateStudioReviewCommentDto,
+  @Get("/reviews/:reviewId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getReview(
+    @Param(new ZodValidationPipe(StudioReviewParamsDto))
+    params: StudioReviewParamsDto,
+    @Headers("x-user-id") userId?: string,
   ) {
-    return this.service.createReviewComment(authenticatedStudioUserId(userId), params.reviewId, body);
+    return this.service.getReview(
+      authenticatedStudioUserId(userId),
+      params.reviewId,
+    );
+  }
+
+  @Post("/reviews/:reviewId/decision")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  decideReview(
+    @Param(new ZodValidationPipe(StudioReviewParamsDto))
+    params: StudioReviewParamsDto,
+    @Body(new ZodValidationPipe(DecideStudioReviewDto))
+    body: DecideStudioReviewDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.decideReview(
+      authenticatedStudioUserId(userId),
+      params.reviewId,
+      body,
+    );
+  }
+
+  @Post("/review-comments/:commentId/resolve")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  resolveReviewComment(
+    @Param(new ZodValidationPipe(StudioReviewCommentParamsDto))
+    params: StudioReviewCommentParamsDto,
+    @Body(new ZodValidationPipe(ResolveStudioReviewCommentDto))
+    body: ResolveStudioReviewCommentDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.resolveReviewComment(
+      authenticatedStudioUserId(userId),
+      params.commentId,
+      body,
+    );
+  }
+
+  @Post("/review-comments/:commentId/reopen")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  reopenReviewComment(
+    @Param(new ZodValidationPipe(StudioReviewCommentParamsDto))
+    params: StudioReviewCommentParamsDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.reopenReviewComment(
+      authenticatedStudioUserId(userId),
+      params.commentId,
+    );
+  }
+
+  @Post("/artifacts/:artifactId/reviews")
+  @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  createReview(
+    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
+    params: StudioArtifactParamsDto,
+    @Body(new ZodValidationPipe(CreateStudioReviewDto))
+    body: CreateStudioReviewDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.createReview(
+      authenticatedStudioUserId(userId),
+      params.artifactId,
+      body,
+    );
+  }
+
+  @Post("/reviews/:reviewId/comments")
+  @HttpCode(HttpStatus.CREATED)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  createReviewComment(
+    @Param(new ZodValidationPipe(StudioReviewParamsDto))
+    params: StudioReviewParamsDto,
+    @Body(new ZodValidationPipe(CreateStudioReviewCommentDto))
+    body: CreateStudioReviewCommentDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.createReviewComment(
+      authenticatedStudioUserId(userId),
+      params.reviewId,
+      body,
+    );
   }
 }
