@@ -9,6 +9,7 @@ import {
   Subtitles,
 } from "lucide-react";
 
+import { BrandFilmStoryboard } from "./BrandFilmStoryboard";
 import { CreatorBrandFilm } from "./CreatorHomePage";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 
@@ -183,6 +184,8 @@ export function BrandFilmPage() {
           ))}
         </dl>
       </header>
+
+      <BrandFilmStoryboard locale={locale} />
 
       <div className="brand-film-page__film-shell">
         <CreatorBrandFilm copy={filmCopy} locale={locale} />
