@@ -5,7 +5,7 @@ import { accounts, db, dbClient, sessions, users } from "../db";
 
 import { getSessionUserCached, invalidateSessionUser } from "./session";
 
-export type UserAccountStatus = "active" | "suspended" | "deleted";
+export type UserAccountStatus = "active" | "suspended" | "deleted" | "merged";
 
 export interface UserLifecycleRow {
   id: string;
@@ -14,6 +14,7 @@ export interface UserLifecycleRow {
   suspendedAt?: Date | null;
   suspensionReason?: string | null;
   deletedAt?: Date | null;
+  mergedIntoUserId?: string | null;
 }
 
 let lifecycleSchemaReady: Promise<void> | null = null;
@@ -31,6 +32,7 @@ async function assertUserLifecycleSchema(): Promise<void> {
       "image",
       "role",
       "status",
+      "mergedIntoUserId",
       "sessionVersion",
       "suspendedAt",
       "suspensionReason",
@@ -58,7 +60,11 @@ export async function ensureUserLifecycleSchema(): Promise<void> {
 
 export function normalizeUserAccountStatus(value: unknown): UserAccountStatus {
   const normalized = String(value ?? "").trim().toLowerCase();
-  if (normalized === "suspended" || normalized === "deleted") return normalized;
+  if (
+    normalized === "suspended"
+    || normalized === "deleted"
+    || normalized === "merged"
+  ) return normalized;
   return "active";
 }
 
@@ -72,6 +78,7 @@ export function getUserAuthBlock(row: { status?: string | null } | null | undefi
   if (!row) return "사용자 정보를 확인할 수 없습니다.";
   const status = normalizeUserAccountStatus(row.status);
   if (status === "deleted") return "탈퇴한 계정입니다.";
+  if (status === "merged") return "다른 계정으로 통합된 계정입니다.";
   if (status === "suspended") return "정지된 계정입니다. 운영팀에 문의해 주세요.";
   return null;
 }
