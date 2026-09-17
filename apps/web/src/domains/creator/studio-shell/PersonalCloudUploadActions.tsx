@@ -1,5 +1,6 @@
 import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import type {
@@ -8,7 +9,7 @@ import type {
 } from "../save-first/personal-cloud-client";
 import type { PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;
@@ -46,6 +47,7 @@ export function PersonalCloudUploadActions({
   readonly onAction: (provider: PersonalCloudProviderId) => void;
   readonly disabled?: boolean;
 }) {
+  const bt = useBilingual("PersonalCloudUploadActions");
   return (
     <div>
       <div className="grid gap-2 sm:grid-cols-3">
@@ -71,16 +73,10 @@ export function PersonalCloudUploadActions({
                   : <Link2 size={14} className="shrink-0" aria-hidden="true" />}
               <span className="truncate">
                 {connected
-                  ? locale === "ko"
-                    ? `${connection.label}에 저장`
-                    : `Save to ${connection.label}`
+                  ? bt(`${connection.label}에 저장`, `Save to ${connection.label}`)
                   : connection.configured
-                    ? locale === "ko"
-                      ? `${connection.label} 연결`
-                      : `Connect ${connection.label}`
-                    : locale === "ko"
-                      ? `${connection.label} 설정 필요`
-                      : `${connection.label} needs setup`}
+                    ? bt(`${connection.label} 연결`, `Connect ${connection.label}`)
+                    : bt(`${connection.label} 설정 필요`, `${connection.label} needs setup`)}
               </span>
             </button>
           );
