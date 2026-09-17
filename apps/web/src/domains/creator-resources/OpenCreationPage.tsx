@@ -25,7 +25,7 @@ function ReferenceTile({ item, saved, disabled, toggle }: { item: OpenReference;
   const [failed, setFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !failed
-      ? <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-48 w-full bg-raised object-contain p-3" />
+      ? <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" crossOrigin="anonymous" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-48 w-full bg-raised object-contain p-3" />
       : <div className="flex h-24 items-center justify-center bg-raised px-4 text-center text-sm text-fg-2">{failed ? "이미지를 불러오지 못했습니다 · 원문에서 확인" : "원문 링크로 확인하는 자료"}</div>}
     <div className="flex flex-1 flex-col gap-3 p-4">
       <p className="text-xs font-semibold text-accent">{OPEN_PROVIDERS.find((provider) => provider.id === item.provider)?.name ?? "기존 저장 보드"} · {item.rights}</p>
