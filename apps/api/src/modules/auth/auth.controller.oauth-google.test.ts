@@ -18,7 +18,7 @@ import {
   readOAuthStateContext,
   verifyBrowserBoundState,
 } from "../../server/oauth";
-import { verifySessionToken } from "../../server/session";
+import { signSession, verifySessionToken } from "../../server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { AuthController } from "./auth.controller";
@@ -405,16 +405,101 @@ describe("AuthController Google GIS/code-flow boundary", () => {
     );
 
     expect(handleOAuthCallback).not.toHaveBeenCalled();
-    expect(res.clearCookie).toHaveBeenCalledWith(
-      oauthStateCookieName("google"),
-      expect.objectContaining({
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/api/auth/oauth/google",
-        maxAge: 0,
-      }),
+    expect(res.clearCookie).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/auth/callback#error=bad_state",
     );
+  });
+
+  it("does not let a stale callback erase a newer browser-bound Naver flow", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_ID", "naver-client-id");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_SECRET", "naver-client-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const staleState = issueState("naver");
+    const currentState = issueState("naver");
+    const res = response();
+
+    await controller().oauthCallback(
+      "naver",
+      "stale-authorization-code",
+      staleState,
+      undefined,
+      requestWithOAuthState("naver", currentState),
+      res,
+    );
+
+    expect(handleOAuthCallback).not.toHaveBeenCalled();
+    expect(res.clearCookie).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/auth/callback#error=bad_state",
+    );
+  });
+
+  it("recovers a repeated Naver callback when the first callback already issued a valid session", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_ID", "naver-client-id");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_SECRET", "naver-client-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv(
+      "AUTH_SESSION_SECRET",
+      "abcdef0123456789abcdef0123456789",
+    );
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const state = issueState("naver");
+    const session = signSession("naver-user-1", 3);
+    const res = response();
+
+    await controller().oauthCallback(
+      "naver",
+      "already-consumed-authorization-code",
+      state,
+      undefined,
+      request(`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(session)}`),
+      res,
+    );
+
+    expect(handleOAuthCallback).not.toHaveBeenCalled();
+    expect(res.clearCookie).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/auth/callback#session=1",
+    );
+  });
+
+  it("does not mask a Naver provider rejection as a recovered duplicate callback", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_ID", "naver-client-id");
+    vi.stubEnv("NAVER_OAUTH_CLIENT_SECRET", "naver-client-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv(
+      "AUTH_SESSION_SECRET",
+      "abcdef0123456789abcdef0123456789",
+    );
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const state = issueState("naver");
+    const session = signSession("naver-user-1", 3);
+    const res = response();
+
+    await controller().oauthCallback(
+      "naver",
+      undefined,
+      state,
+      "access_denied",
+      request(`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(session)}`),
+      res,
+    );
+
+    expect(handleOAuthCallback).not.toHaveBeenCalled();
     expect(res.redirect).toHaveBeenCalledWith(
       "https://www.toonstudio.cloud/auth/callback#error=bad_state",
     );

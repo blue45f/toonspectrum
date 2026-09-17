@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import {
@@ -19,8 +19,16 @@ import { useStudioDocumentRuntime } from "./studio-document-runtime-context";
 import { useStudioLocalDraftOwner } from "./useStudioLocalDraftOwner";
 
 import { useSession } from "@/compat/auth-session-store";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import type { StudioWorkspaceRoute } from "../studio-workspace-route";
+
+const StudioShellFloatingLayoutHost = lazyRetry(
+  () => import("../studio-shell/StudioShellFloatingLayoutHost").then((module) => ({
+    default: module.StudioShellFloatingLayoutHost,
+  })),
+  "StudioShellFloatingLayoutHost",
+);
 
 interface StudioDocumentLayoutProps {
   readonly children: ReactNode;
@@ -110,6 +118,9 @@ export function StudioDocumentLayout({
       <StudioDocumentWorkspaceSwitcher />
       <StudioDocumentWorkspaceDock />
       {children}
+      <Suspense fallback={null}>
+        <StudioShellFloatingLayoutHost />
+      </Suspense>
     </StudioDocumentLayoutContext>
   );
 }

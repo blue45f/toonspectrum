@@ -230,7 +230,10 @@ export function StudioDocumentWorkspaceDock() {
 
   return (
     <>
-      <div className="pointer-events-none fixed right-2 top-2 z-[119] print:hidden sm:right-3">
+      <div
+        className="pointer-events-none fixed right-2 top-2 z-[119] print:hidden sm:right-3"
+        data-studio-shell-floating-target="document-tools"
+      >
         <button
           type="button"
           aria-controls={panelId}
