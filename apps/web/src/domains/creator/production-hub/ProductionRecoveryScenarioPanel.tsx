@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowRight,
   CalendarClock,
   CheckCircle2,
@@ -35,7 +36,9 @@ import { cn } from "@/shared/lib/utils";
 interface AppliedRecoveryScenario {
   readonly scenarioId: string;
   readonly title: string;
+  readonly baseRevision: number;
   readonly originalTasks: readonly ProductionTask[];
+  readonly appliedTasks: readonly ProductionTask[];
 }
 
 interface ProductionRecoveryScenarioPanelProps {
@@ -74,6 +77,10 @@ function taskById(
   taskId: string,
 ): ProductionTask | null {
   return aggregate.tasks.find((task) => task.id === taskId) ?? null;
+}
+
+function taskMatchesSnapshot(current: ProductionTask | null, expected: ProductionTask): boolean {
+  return current !== null && JSON.stringify(current) === JSON.stringify(expected);
 }
 
 function metricTone(before: number, after: number): string {
@@ -132,9 +139,15 @@ export function ProductionRecoveryScenarioPanel({
   const [applyingScenarioId, setApplyingScenarioId] = useState<string | null>(null);
   const [undoing, setUndoing] = useState(false);
   const [lastApplied, setLastApplied] = useState<AppliedRecoveryScenario | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
   const selectedSignal = selectableSignals.find((signal) => signal.id === selectedSignalId)
     ?? selectableSignals[0]
     ?? null;
+  const undoConflictTaskIds = useMemo(() => lastApplied && aggregate.revision > lastApplied.baseRevision
+    ? lastApplied.appliedTasks
+        .filter((expected) => !taskMatchesSnapshot(taskById(aggregate, expected.id), expected))
+        .map((task) => task.id)
+    : [], [aggregate, lastApplied]);
 
   useEffect(() => {
     if (!selectedSignal && selectableSignals[0]) {
@@ -162,30 +175,46 @@ export function ProductionRecoveryScenarioPanel({
     }).filter((entry): entry is { original: ProductionTask; next: ProductionTask } => entry !== null);
     if (changes.length !== scenario.taskUpdates.length || changes.length === 0) return;
     setApplyingScenarioId(scenario.id);
+    setOperationError(null);
     try {
+      const originalTasks = changes.map((change) => change.original);
+      const appliedTasks = changes.map((change) => change.next);
       await execute({
         type: "upsert-task-batch",
-        tasks: changes.map((change) => change.next),
+        tasks: appliedTasks,
+        expectedTasks: originalTasks,
       }, `${scenario.title} 복구 시나리오를 원자적으로 적용했습니다.`);
       setLastApplied({
         scenarioId: scenario.id,
         title: scenario.title,
-        originalTasks: changes.map((change) => change.original),
+        baseRevision: aggregate.revision,
+        originalTasks,
+        appliedTasks,
       });
+    } catch (cause) {
+      setOperationError(cause instanceof Error
+        ? cause.message
+        : "복구 시나리오를 안전하게 적용하지 못했습니다.");
     } finally {
       setApplyingScenarioId(null);
     }
   };
 
   const undoLastScenario = async () => {
-    if (!canEdit || !lastApplied || applyingScenarioId || undoing) return;
+    if (!canEdit || !lastApplied || undoConflictTaskIds.length > 0 || applyingScenarioId || undoing) return;
     setUndoing(true);
+    setOperationError(null);
     try {
       await execute({
         type: "upsert-task-batch",
         tasks: lastApplied.originalTasks,
+        expectedTasks: lastApplied.appliedTasks,
       }, `${lastApplied.title} 복구 시나리오를 원자적으로 되돌렸습니다.`);
       setLastApplied(null);
+    } catch (cause) {
+      setOperationError(cause instanceof Error
+        ? cause.message
+        : "다른 변경이 있어 복구 시나리오를 안전하게 되돌리지 못했습니다.");
     } finally {
       setUndoing(false);
     }
@@ -233,21 +262,33 @@ export function ProductionRecoveryScenarioPanel({
         </div>
       </header>
 
+      {operationError ? (
+        <div className="flex items-start gap-3 border-b border-bad/25 bg-bad/10 px-4 py-3 sm:px-5" role="alert">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
+          <div>
+            <p className="text-xs font-black text-fg">안전한 변경 조건을 확인해 주세요</p>
+            <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">{operationError}</p>
+          </div>
+        </div>
+      ) : null}
+
       {lastApplied ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-good/25 bg-good/10 px-4 py-3 sm:px-5" role="status">
           <div className="min-w-0">
-            <p className="text-xs font-black text-fg">{lastApplied.title} 적용됨</p>
-            <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">원래 업무 상태를 보관했습니다. 결과를 확인한 뒤 같은 자리에서 되돌릴 수 있습니다.</p>
+            <p className="text-xs font-black text-fg">{undoConflictTaskIds.length > 0 ? `${lastApplied.title} 이후 추가 변경 감지` : `${lastApplied.title} 적용됨`}</p>
+            <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">{undoConflictTaskIds.length > 0
+              ? `같은 업무 ${undoConflictTaskIds.length}개가 이후 변경되어 자동 되돌리기를 잠갔습니다. 최신 내용을 확인한 뒤 직접 조정해 주세요.`
+              : "원래 업무 상태를 보관했습니다. 이후 같은 업무가 바뀌면 덮어쓰지 않고 되돌리기를 중단합니다."}</p>
           </div>
           <button
             type="button"
             className={buttonClass({ variant: "outline", size: "sm" })}
             aria-label={`${lastApplied.title} 복구 시나리오 되돌리기`}
-            disabled={!canEdit || applyingScenarioId !== null || undoing}
+            disabled={!canEdit || undoConflictTaskIds.length > 0 || applyingScenarioId !== null || undoing}
             onClick={() => void undoLastScenario()}
           >
             {undoing ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Undo2 className="size-4" aria-hidden="true" />}
-            {undoing ? "되돌리는 중…" : "적용 취소"}
+            {undoing ? "되돌리는 중…" : undoConflictTaskIds.length > 0 ? "추가 변경으로 잠김" : "적용 취소"}
           </button>
         </div>
       ) : null}

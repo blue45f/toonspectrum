@@ -23,7 +23,7 @@ const reviewView: ProductionExternalReviewView = {
     id: "review-1",
     label: "편집부 최종 검수",
     watermark: true,
-    permissions: ["view", "comment", "approve"],
+    permissions: ["view", "comment", "approve", "download"],
     expiresAt: "2027-09-17T00:00:00.000Z",
     responses: [],
   },
@@ -39,6 +39,7 @@ const reviewView: ProductionExternalReviewView = {
       createdAt: "2026-09-17T00:00:00.000Z",
     },
     evidenceRefs: ["https://example.test/review.png"],
+    protectedEvidenceCount: 0,
     deliverable: {
       id: "deliverable-1",
       type: "통합 웹툰 원고",
@@ -139,4 +140,25 @@ describe("ProductionExternalReviewPage", () => {
     expect(await screen.findByRole("heading", { name: "검수 링크를 열 수 없습니다" })).toBeTruthy();
     expect(screen.queryByText("밤의 우편배달부")).toBeNull();
   });
+
+  it("does not expose original evidence links without download permission", async () => {
+    getProductionExternalReview.mockResolvedValue({
+      ...reviewView,
+      review: {
+        ...reviewView.review,
+        permissions: ["view", "comment", "approve"],
+      },
+      submissions: reviewView.submissions.map((submission) => ({
+        ...submission,
+        evidenceRefs: [],
+        protectedEvidenceCount: 1,
+      })),
+    });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /자료 열기/u })).toBeNull();
+    expect(screen.getByText(/원본 검수 자료 1개는 다운로드 권한이 없어/u)).toBeTruthy();
+  });
+
 });

@@ -47,6 +47,7 @@ interface ProductionManagementWorkspaceProps {
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: ProductionManagementLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly executeRecovery?: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly now?: Date;
 }
@@ -289,6 +290,7 @@ export function ProductionManagementWorkspace({
   aggregate,
   roleLens,
   execute,
+  executeRecovery = execute,
   canEdit,
   now,
 }: ProductionManagementWorkspaceProps) {
@@ -534,7 +536,7 @@ export function ProductionManagementWorkspace({
       <ProductionRecoveryScenarioPanel
         aggregate={aggregate}
         intelligence={overview.riskIntelligence}
-        execute={execute}
+        execute={executeRecovery}
         canEdit={canEdit}
         now={now}
       />

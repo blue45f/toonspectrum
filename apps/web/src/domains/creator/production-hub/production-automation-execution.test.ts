@@ -119,4 +119,59 @@ describe("production automation execution plan", () => {
     expect(repeated.tasks).toHaveLength(0);
     expect(repeated.suppressedTaskCount).toBe(1);
   });
+
+  it("emits a new same-day occurrence when the timed source state meaningfully changes", () => {
+    const { aggregate, task } = sourceAggregate();
+    const automation = rule();
+    const first = deriveProductionAutomationExecutionPlan(aggregate, [automation], NOW);
+    const changedTask = {
+      ...task,
+      dueAt: "2026-09-15T09:00:00.000Z",
+    };
+    const changed = deriveProductionAutomationExecutionPlan({
+      ...aggregate,
+      tasks: [changedTask],
+      notifications: first.notifications,
+    }, [automation], NOW);
+
+    expect(changed.notifications).toHaveLength(1);
+    expect(changed.notifications[0]?.id).not.toBe(first.notifications[0]?.id);
+  });
+
+  it("does not suppress a semantically edited action against an older generated task", () => {
+    const { aggregate, assignmentId } = sourceAggregate();
+    const firstRule = rule({
+      id: "automation-semantic-action",
+      trigger: "task-status-changed",
+      conditions: [{ field: "task-status", operator: "equals", value: "in-progress" }],
+      actions: [{
+        type: "create-task",
+        title: "지연 원인 확인",
+        processKey: "producer-follow-up",
+        assignmentIds: [assignmentId],
+        dueInHours: 4,
+      }],
+    });
+    const first = deriveProductionAutomationExecutionPlan(aggregate, [firstRule], NOW);
+    const editedRule: ProductionAutomationRule = {
+      ...firstRule,
+      revision: 2,
+      actions: [{
+        type: "create-task",
+        title: "지연 원인과 회복 계획 확인",
+        processKey: "producer-follow-up",
+        assignmentIds: [assignmentId],
+        dueInHours: 6,
+      }],
+    };
+    const edited = deriveProductionAutomationExecutionPlan({
+      ...aggregate,
+      tasks: [...aggregate.tasks, ...first.tasks],
+    }, [editedRule], NOW);
+
+    expect(edited.tasks).toHaveLength(1);
+    expect(edited.tasks[0]).toMatchObject({ title: "지연 원인과 회복 계획 확인" });
+    expect(edited.tasks[0]?.id).not.toBe(first.tasks[0]?.id);
+  });
+
 });
