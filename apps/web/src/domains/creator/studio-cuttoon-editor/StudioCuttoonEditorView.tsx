@@ -12,9 +12,9 @@ import { lazy, Suspense } from "react";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { returnFromStudioEditorInBrowser } from "../studio-editor-return-navigation";
 import { StudioEditorReturnButton } from "../StudioEditorReturnButton";
+import { useStudioDrawingPresentation } from "../studio-drawing-presentation";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
-import { StudioWorkspaceRegion } from "../StudioWorkspaceRegion";
 import { Container } from "@/shared/components/container";
 import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorChrome } from "./StudioCuttoonEditorChrome";
@@ -22,13 +22,13 @@ import { StudioCuttoonEditorContextMenu } from "./StudioCuttoonEditorContextMenu
 import { StudioCuttoonEditorDialogs } from "./StudioCuttoonEditorDialogs";
 import { StudioCuttoonEditorHosts } from "./StudioCuttoonEditorHosts";
 import { StudioCuttoonEditorWorkspace } from "./StudioCuttoonEditorWorkspace";
+import { StudioDrawingAppBar } from "./StudioDrawingAppBar";
+import { StudioDrawingGestureBridge } from "./StudioDrawingGestureBridge";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 const StudioDraftSaveCenter = lazy(() => import("../StudioDraftSaveCenter").then((module) => ({ default: module.StudioDraftSaveCenter })));
 
 export type { StudioCuttoonEditorViewSession };
-
-const CHROME_LAYOUT = { version: 2, xRatio: 0.3, yRatio: 0.08, width: 980, height: 220, dock: "free", positionLocked: false, sizeLocked: false } as const;
 
 export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
   const {
@@ -57,6 +57,9 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
     uiDensityMode,
     watermarkPreferenceSnapshot,
   } = s;
+  const drawingPresentation = useStudioDrawingPresentation();
+  const drawingAppPresentation = drawingPresentation === "app";
+
   return (
     <StudioLiveCollaborationProvider
       workId={effectiveWorkId}
@@ -81,6 +84,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       data-studio-ui-density={uiDensityMode}
+      data-studio-drawing-presentation={drawingPresentation}
       data-studio-tool-hint-mode={appSettings.general.toolHintMode}
       data-studio-reduce-motion={appSettings.other.reduceMotion ? "true" : "false"}
       data-studio-device-kind={isMobile ? "mobile" : "desktop"}
@@ -102,14 +106,11 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         studioHistoryRetention.totalBudgetEvictedSteps
       }
       className={cn(
-        // Default draw-app shell: fill the viewport without site chrome padding.
         "flex min-h-0 flex-col bg-canvas text-fg",
-        // 전체화면도 평소와 같은 "뷰포트 높이 고정 + 내부만 스크롤" 셸을 쓴다. 예전에는
-        // min-h-screen + overflow-y-auto 였는데, 높이 상한이 없어 콘텐츠가 넘치면 셸 자체가
-        // 스크롤되면서 상단 메뉴바가 화면 밖으로 밀려났다(전체화면에서 메뉴 사라짐 버그).
         !maximized && !canvasOnlyMode && !mobileImmersive &&
           "h-[100dvh] max-h-[100dvh] overflow-hidden",
         isFullscreen && "bg-canvas",
+        drawingAppPresentation && "isolate",
         maximized && !isMobile && !mobileImmersive &&
           "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
         canvasOnlyMode && !isMobile &&
@@ -127,13 +128,17 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           : undefined
       }
     >
-      <StudioWorkspaceNavigator />
+      {drawingAppPresentation ? (
+        !canvasOnlyMode && !mobileImmersive ? <StudioDrawingAppBar session={s} /> : null
+      ) : (
+        <StudioWorkspaceNavigator />
+      )}
+      <StudioDrawingGestureBridge enabled={drawingAppPresentation} session={s} />
       <StudioCuttoonEditorHosts {...s} />
       <StudioCuttoonEditorDialogs {...s} />
       <Container
         size="wide"
         className={cn(
-          // Canvas-max draw-app shell: full-bleed, no marketing padding or max-width cap.
           "flex min-h-0 flex-1 flex-col !max-w-none !px-0 py-0",
           (isFullscreen || maximized) && "min-h-0"
         )}
@@ -194,16 +199,9 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         </button>
       </div>
     ) : null}
-    {/*
-      §15.3 Help 그룹의 다섯 표면(현재 도구·용어 사전·진단·복구·라이선스·버그
-      리포트) 호스트. 자기 상태만 들고 채널로 요청을 받으므로 prop 이 없고, 열기
-      전에는 아무것도 렌더하지 않는다. 캔버스만 모드에서도 살아 있어야 해서
-      Container 밖 최상단에 둔다.
-    */}
     <StudioHelpCenterHost />
     </div>
     </StudioToolHintPreferencesProvider>
     </StudioLiveCollaborationProvider>
-
   );
 }
