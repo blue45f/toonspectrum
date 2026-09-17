@@ -24,8 +24,8 @@ describe("site navigation information architecture", () => {
     expect(TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
       "production",
       "studio",
-      "studio-assets",
-      "publish",
+      "research",
+      "market",
     ]);
     expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
       "explore",
@@ -43,6 +43,8 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.publish.href).toBe("/studio/publish");
     expect(SITE_NAVIGATION_ITEMS.technology.href).toBe("/about/technology");
     expect(SITE_NAVIGATION_ITEMS.technology.label.ko).toBe("제작 기술");
+    expect(SITE_NAVIGATION_ITEMS.research.label.ko).toBe("리서치 데스크");
+    expect(SITE_NAVIGATION_ITEMS.market.label.ko).toBe("소재 마켓");
   });
 
   it("keeps fortune and tarot in Spectrum's research and growth directory", () => {
@@ -54,6 +56,7 @@ describe("site navigation information architecture", () => {
       "now",
       "fortune",
       "research",
+      "market",
       "opportunities",
       "insights",
       "technology",

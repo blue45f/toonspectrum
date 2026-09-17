@@ -72,11 +72,10 @@ describe("mobile site shell accessibility", () => {
       </MemoryRouter>
     );
 
-    const headerTechnologyEntry = container.querySelector<HTMLAnchorElement>(
-      'a[data-navigation-entry="technology"]',
-    );
-    expect(headerTechnologyEntry?.getAttribute("href")).toBe("/about/technology");
-    expect(headerTechnologyEntry?.textContent).toContain("제작 기술");
+    const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
+    expect(primaryNavigation?.querySelector('a[href="/about/technology"]')).toBeNull();
+    expect(primaryNavigation?.querySelector('a[data-navigation-entry="research"]')?.getAttribute("href")).toBe("/research");
+    expect(primaryNavigation?.querySelector('a[data-navigation-entry="market"]')?.getAttribute("href")).toBe("/market");
 
     const trigger = screen.getByRole("button", { name: "전체 메뉴" });
     trigger.focus();
@@ -191,8 +190,7 @@ describe("mobile site shell accessibility", () => {
     );
 
     const footer = container.querySelector("footer");
-    const technologyEntry = screen.getByRole("link", { name: "제작 기술" });
-    expect(technologyEntry.getAttribute("href")).toBe("/about/technology");
+    expect(screen.queryByRole("link", { name: "제작 기술" })).toBeNull();
     expect(footer?.className).toContain(
       "pb-[calc(3.75rem+env(safe-area-inset-bottom))]"
     );
