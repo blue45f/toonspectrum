@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   Factory,
   Layers3,
-  Route,
   ShieldCheck,
   Sparkles,
   Users,
@@ -55,7 +54,7 @@ const GUIDE_VIEWS: readonly {
   readonly summary: string;
   readonly icon: LucideIcon;
 }[] = [
-  { id: "lifecycle", label: "작품 생애주기", summary: "권리 확인부터 시즌 종료까지", icon: Route },
+  { id: "lifecycle", label: "작품 생애주기", summary: "권리 확인부터 시즌 종료까지", icon: Workflow },
   { id: "episode", label: "회차 제작", summary: "브리프부터 공개 후 회고까지", icon: Layers3 },
   { id: "rolling", label: "병렬 연재 운영", summary: "여러 회차·게이트·버퍼 관리", icon: CalendarClock },
   { id: "onboarding", label: "내 제작 트랙", summary: "현재 상태에서 프로젝트 생성", icon: Sparkles },
@@ -444,7 +443,7 @@ export function WebtoonProcessPage() {
         />
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <article className="rounded-3xl border border-line bg-panel p-5">
-            <Route className="size-7 text-accent" aria-hidden="true" />
+            <Workflow className="size-7 text-accent" aria-hidden="true" />
             <h3 className="mt-4 text-lg font-bold">작품 생애주기</h3>
             <p className="mt-2 text-sm leading-6 text-fg-2">IP·전략 → 콘셉트 → 바이블 → 파일럿·계약 → 프리프로덕션 → 론칭 → 연재 → 시즌 종료</p>
           </article>
