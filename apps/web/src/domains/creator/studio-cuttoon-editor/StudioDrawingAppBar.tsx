@@ -43,7 +43,7 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
         </span>
         <div className="hidden min-w-0 sm:block">
           <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg">ToonStudio Draw</strong>
-          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.title || "Untitled"}</span>
+          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.name || "Untitled"}</span>
         </div>
       </div>
 
