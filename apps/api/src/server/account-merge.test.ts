@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../db", () => ({ dbPool: {} }));
-
 import {
   findProviderOverlap,
   isAccountMergeToken,
   maskAccountMergeEmail,
   shouldTransferUserReference,
 } from "./account-merge";
+
+vi.mock("../db", () => ({ dbPool: {} }));
 
 describe("account merge policy", () => {
   it("accepts only bounded base64url merge codes", () => {
