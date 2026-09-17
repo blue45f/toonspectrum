@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 
 import {
   migrateProductionProjectAggregate,
+  PRODUCTION_MODEL_VERSION,
   type ProductionProjectAggregate,
 } from "@toonspectrum/core/production";
 
@@ -362,7 +363,7 @@ export class ProductionCollaborationRepository {
       if (
         aggregate.projectId !== row.id
         || aggregate.workId !== row.workId
-        || aggregate.modelVersion !== 1
+        || aggregate.modelVersion !== PRODUCTION_MODEL_VERSION
       ) {
         throw new Error("public production mutation returned an invalid aggregate identity");
       }
