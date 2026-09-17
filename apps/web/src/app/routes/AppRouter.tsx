@@ -77,12 +77,9 @@ export function AppRouter() {
   );
   const currentIsStudioEditor = isStudioWorkspaceLocation({ pathname, search });
   const routeTree = (
-    <SiteRouteExperienceBoundary>
-      <AppRouteTree pathname={pathname} search={search} title={routeTitle} />
-    </SiteRouteExperienceBoundary>
+    <SiteRouteExperienceBoundary><AppRouteTree pathname={pathname} search={search} title={routeTitle} /></SiteRouteExperienceBoundary>
   );
-  const needsIsolationGate =
-    currentIsStudioEditor
+  const needsIsolationGate = currentIsStudioEditor
     || documentWasStudioEditor
     || globalThis.crossOriginIsolated === true;
 
