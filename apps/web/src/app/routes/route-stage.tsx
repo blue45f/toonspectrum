@@ -2,7 +2,7 @@ import { AlertTriangle, Home, RefreshCw, Rows3 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { hasMeaningfulRouteContent } from "./route-stage-content";
+import { inspectRouteContent, routeStageTimeoutMs, type RouteContentSource, type RouteContentState } from "./route-stage-content";
 import { useI18n } from "@/shared/lib/i18n";
 import { allowStudioProgrammaticReload } from "@/shared/lib/programmatic-reload";
 import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
@@ -25,8 +25,8 @@ interface RouteStageProps {
 export function RouteStage({ pathname, search, accessibleTitle, children }: RouteStageProps) {
   const [settled, setSettled] = useState(false);
   const [needsHeading, setNeedsHeading] = useState(true);
-  const [ready, setReady] = useState(false);
-  const [stalled, setStalled] = useState(false);
+  const [routeState, setRouteState] = useState<RouteContentState | "stalled">("pending");
+  const [readinessSource, setReadinessSource] = useState<RouteContentSource>("none");
   const stageRef = useRef<HTMLDivElement>(null);
   const language = useI18n((state) => state.lang);
   const korean = language.toLowerCase().split(/[-_]/u)[0] === "ko";
@@ -62,20 +62,19 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
   useEffect(() => {
     const root = stageRef.current;
     if (!root) return;
-    setReady(false);
-    setStalled(false);
-    const delay = isStudioRoutePathname(pathname) ? 12_000 : 8_000;
+    setRouteState("pending");
+    setReadinessSource("none");
+    const delay = routeStageTimeoutMs(pathname);
     const inspect = () => {
-      const meaningful = hasMeaningfulRouteContent(root);
-      if (meaningful) {
-        setReady(true);
-        setStalled(false);
-      }
-      return meaningful;
+      const inspection = inspectRouteContent(root);
+      if (inspection.state === "pending" || inspection.state === "empty") return false;
+      setRouteState(inspection.state);
+      setReadinessSource(inspection.source);
+      return true;
     };
     inspect();
     const timeoutId = window.setTimeout(() => {
-      if (!inspect()) setStalled(true);
+      if (!inspect()) setRouteState("stalled");
     }, delay);
     const observer = new MutationObserver(inspect);
     observer.observe(root, { childList: true, subtree: true, characterData: true });
@@ -98,9 +97,10 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       ref={stageRef}
       key={stageKey}
       data-route-stage-key={stageKey}
-      data-route-state={stalled ? "stalled" : ready ? "ready" : "pending"}
+      data-route-state={routeState === "empty" ? "pending" : routeState}
+      data-route-readiness-source={readinessSource}
       data-route-surface-identity={surfaceIdentity}
-      aria-busy={!ready && !stalled}
+      aria-busy={routeState === "pending" || routeState === "empty"}
       className={cn(
         "route-stage",
         (settled || instantEntry) && "route-stage--settled",
@@ -118,7 +118,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
           </p>
         </>
       ) : null}
-      {stalled ? (
+      {routeState === "stalled" ? (
         <section
           data-route-recovery=""
           role="alert"
@@ -138,7 +138,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setStalled(false)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2 text-sm font-bold text-fg-2 hover:text-accent">
+            <button type="button" onClick={() => setRouteState("pending")} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2 text-sm font-bold text-fg-2 hover:text-accent">
               <RefreshCw size={16} aria-hidden="true" />{korean ? "계속 기다리기" : "Keep waiting"}
             </button>
             <button type="button" onClick={reload} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">

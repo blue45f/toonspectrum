@@ -395,7 +395,7 @@ export function StudioSaveFirstProjectLibraryPage({
   const secondaryNavigation: readonly LibraryView[] = ["storage", "exports", "publications"];
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div data-route-ready="studio-project-library-secondary" className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-7 sm:py-11">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
