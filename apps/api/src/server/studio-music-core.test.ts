@@ -43,12 +43,14 @@ describe("studio music paid request boundary", () => {
     expect(result.audio.length).toBe(23);
     expect(result.songId).toBe("song-1");
     const [url, init] = transport.mock.calls[1];
-    expect(url).toBe("https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128");
+    expect(url).toBe("https://api.elevenlabs.io/v1/music?output_format=auto");
     expect(init?.redirect).toBe("error");
     const body = JSON.parse(init?.body as string);
     expect(body.force_instrumental).toBe(true);
     expect(body.music_length_ms).toBe(30000);
     expect(body.model_id).toBe("music_v2_5");
+    expect(body.store_for_inpainting).toBe(true);
+    expect(body.sign_with_c2pa).toBe(true);
     expect(body).not.toHaveProperty("seed");
     expect(body).not.toHaveProperty("composition_plan");
     expect(body.prompt).not.toContain("test-only");
@@ -58,6 +60,8 @@ describe("studio music paid request boundary", () => {
     await composeMusic(env, "u", key, { ...brief, vocals: true, songStructure: "anime-op", lyrics: "[Verse]\n우리의 내일을 노래해\n[Chorus]\n다음 페이지를 함께 열어" }, signal(), transport);
     const body = JSON.parse(transport.mock.calls[1][1]?.body as string);
     expect(body.model_id).toBe("music_v2_5");
+    expect(body.store_for_inpainting).toBe(true);
+    expect(body.sign_with_c2pa).toBe(true);
     expect(body).toHaveProperty("composition_plan");
     expect(body).not.toHaveProperty("prompt");
     expect(body).not.toHaveProperty("force_instrumental");
