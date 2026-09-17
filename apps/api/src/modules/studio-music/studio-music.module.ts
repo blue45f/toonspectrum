@@ -32,7 +32,7 @@ export class StudioMusicController {
       const result = await composeMusic(process.env, userId, key, body, controller.signal);
       return {
         audioBase64: result.audio.toString("base64"),
-        metadata: { id: key!.toLowerCase(), createdAt: new Date().toISOString(), provider: "elevenlabs", model: "music_v1", format: "mp3_44100_128", brief: result.brief, songId: result.songId, termsUrl: MUSIC_TERMS_URL },
+        metadata: { id: key!.toLowerCase(), createdAt: new Date().toISOString(), provider: "elevenlabs", model: "music_v2_5", format: "mp3_44100_128", brief: result.brief, songId: result.songId, termsUrl: MUSIC_TERMS_URL },
       };
     } catch (error) {
       if (error instanceof MusicError) throw new HttpException(error.message, error.status);

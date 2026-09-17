@@ -147,6 +147,8 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "review-decision", id: command.decision.id };
     case "upsert-task":
       return { type: "task", id: command.task.id };
+    case "upsert-episode-operations":
+      return { type: "episode-operations", id: command.episodeId };
     case "upsert-change-request":
       return { type: "change-request", id: command.request.id };
     case "publish-scope-package":
@@ -877,6 +879,48 @@ function applyCommand(
         throw new BadRequestException({ message: "작업 의존성에 순환이 있습니다.", cycles });
       }
       return { aggregate: { ...aggregate, tasks } };
+    }
+    case "upsert-episode-operations": {
+      if (!command.episode && !command.episodePlan && command.tasks.length === 0) {
+        throw new BadRequestException("회차 운영 명령에 저장할 내용이 없습니다.");
+      }
+      if (command.episode && command.episode.episodeId !== command.episodeId) {
+        throw new BadRequestException("회차 운영 명령의 회차 식별자가 일치하지 않습니다.");
+      }
+      if (command.episodePlan && command.episodePlan.episodeId !== command.episodeId) {
+        throw new BadRequestException("회차 계획의 회차 식별자가 일치하지 않습니다.");
+      }
+      let next = aggregate;
+      if (command.episode) next = applyEpisodeCommand(next, command.episode);
+      if (!next.episodes.some((episode) => episode.episodeId === command.episodeId)) {
+        throw new BadRequestException("운영 일정을 저장할 회차가 없습니다.");
+      }
+      if (command.episodePlan) {
+        next = applyPlanningRecord(next, {
+          kind: "episode-plan",
+          value: command.episodePlan,
+        }, actorUserId);
+      }
+      let tasks = next.tasks;
+      for (const task of command.tasks) {
+        assertProjectIdentity(next, task);
+        if (task.scope.kind !== "episode" || task.scope.id !== command.episodeId) {
+          throw new BadRequestException("회차 운영 작업의 범위가 대상 회차와 일치하지 않습니다.");
+        }
+        tasks = upsertById(tasks, task);
+      }
+      const cycles = detectTaskDependencyCycles(tasks);
+      if (cycles.length > 0) {
+        throw new BadRequestException({ message: "회차 공정 의존성에 순환이 있습니다.", cycles });
+      }
+      return {
+        aggregate: { ...next, tasks },
+        derived: {
+          episodeId: command.episodeId,
+          taskCount: command.tasks.length,
+          releaseAt: command.tasks.find((task) => task.processKey === "publication")?.dueAt ?? null,
+        },
+      };
     }
     case "upsert-change-request": {
       assertProjectIdentity(aggregate, command.request);

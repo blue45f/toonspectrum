@@ -6,9 +6,7 @@ import {
   Boxes,
   BriefcaseBusiness,
   CalendarClock,
-  CheckCircle2,
   ChevronRight,
-  CircleDot,
   ClipboardCheck,
   Coins,
   FileKey2,
@@ -47,11 +45,13 @@ import {
   type ClarificationThread,
   type EpisodeCollaboration,
   type ProductionProjectAggregate,
+  type ProductionTask,
   type ReviewDecision,
   type StoryToArtHandoffPackage,
 } from "@toonspectrum/core/production";
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
+import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
@@ -317,6 +317,19 @@ function reduceDemoCommand(
       return { ...base, episodes: replaceById(aggregate.episodes, command.episode) };
     case "upsert-task":
       return { ...base, tasks: replaceById(aggregate.tasks, command.task) };
+    case "upsert-episode-operations": {
+      const episodes = command.episode
+        ? replaceById(aggregate.episodes, command.episode)
+        : aggregate.episodes;
+      const episodePlans = command.episodePlan
+        ? replaceById(aggregate.episodePlans, command.episodePlan)
+        : aggregate.episodePlans;
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      return { ...base, episodes, episodePlans, tasks };
+    }
     case "upsert-change-request":
       return { ...base, changeRequests: replaceById(aggregate.changeRequests, command.request) };
     case "upsert-contribution":
@@ -757,44 +770,6 @@ function PlanningSurface({
     </div>
   );
 }
-function EpisodesSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
-  const stages = ["스토리", "작업 넘기기", "콘티", "작화", "최종 검수", "공개 준비"] as const;
-  return (
-    <SectionCard title="회차 공정 매트릭스" description="상태 셀을 누르면 해당 회차의 공동 작업실로 이동합니다.">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[54rem] border-separate border-spacing-y-1 text-xs">
-          <thead className="text-fg-3"><tr><th className="px-3 py-2 text-left">회차</th>{stages.map((stage) => <th key={stage} className="px-3 py-2 text-center">{stage}</th>)}<th className="px-3 py-2 text-left">현재 상태</th></tr></thead>
-          <tbody>
-            {aggregate.episodes.map((episode) => {
-              const progression = [
-                episode.storyLockApproved,
-                Boolean(episode.activeHandoffId),
-                episode.thumbnailLockApproved,
-                Boolean(episode.visualRevisionRef),
-                episode.jointProofApproved,
-                episode.state === "published",
-              ];
-              return (
-                <tr key={episode.id} className="bg-panel">
-                  <td className="rounded-l-xl px-3 py-3">
-                    <Link className="font-bold text-fg hover:text-accent" to={`/production/projects/${aggregate.projectId}/episodes/${episode.episodeId}`}>{episode.episodeId}</Link>
-                  </td>
-                  {progression.map((done, index) => (
-                    <td key={stages[index]} className="px-3 py-3 text-center">
-                      {done ? <CheckCircle2 className="mx-auto size-4 text-good" aria-label="완료" /> : <CircleDot className="mx-auto size-4 text-fg-3" aria-label="대기" />}
-                    </td>
-                  ))}
-                  <td className="rounded-r-xl px-3 py-3"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
-  );
-}
-
 function ProductionSurface({
   aggregate,
   execute,
@@ -1139,7 +1114,7 @@ function SurfaceContent({
   switch (surface) {
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
-    case "episodes": return <EpisodesSurface aggregate={aggregate} />;
+    case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
