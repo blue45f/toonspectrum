@@ -6,6 +6,7 @@ import {
   Film,
   Gauge,
   Layers3,
+  LibraryBig,
   Presentation,
   Scale,
   ShieldCheck,
@@ -15,7 +16,7 @@ import {
 
 import { AboutSectionNav } from "./AboutSectionNav";
 import {
-  ENGINEERING_CHAPTERS,
+  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   ENGINEERING_STATUS_META,
   type EngineeringStatus,
 } from "./technology/engineering-story-content";
@@ -79,8 +80,8 @@ const HUB_LINKS = [
     icon: BookOpen,
     title: { ko: "전체 제작 스토리", en: "Full engineering story" },
     body: {
-      ko: "문제, 선택, 포기한 대안, 사용자 가치와 실제 근거를 15개 챕터로 확인합니다.",
-      en: "Explore problems, decisions, rejected alternatives, user value and evidence across 15 chapters.",
+      ko: "문제, 선택, 포기한 대안, 사용자 가치와 실제 근거를 25개 챕터로 확인합니다.",
+      en: "Explore problems, decisions, rejected alternatives, user value and evidence across 25 chapters.",
     },
   },
   {
@@ -90,6 +91,15 @@ const HUB_LINKS = [
     body: {
       ko: "OAuth, 클라우드 저장, 브러시, 성능, 크롤링, QA, 인프라와 AI 가이드를 제공합니다.",
       en: "Use implementation guides for OAuth, cloud storage, brushes, performance, acquisition, QA, infrastructure and AI.",
+    },
+  },
+  {
+    href: "/about/technology/references",
+    icon: LibraryBig,
+    title: { ko: "참고 자료와 장애 기록", en: "References and troubleshooting" },
+    body: {
+      ko: "실제 사용·평가·제품 참고를 구분하고 PWA, Worker, 3D, AI와 Open API 장애 해결 과정을 확인합니다.",
+      en: "Separate used, evaluated and product-reference material and inspect PWA, Worker, 3D, AI and Open API incident records.",
     },
   },
   {
@@ -128,6 +138,10 @@ const FEATURED_CHAPTER_IDS = new Set([
   "brush-engine",
   "quality",
   "ai-routing",
+  "worker-architecture",
+  "pwa-continuity",
+  "web-3d-engine",
+  "free-ai-routing",
 ]);
 
 export function TechnologyPage() {
@@ -285,9 +299,9 @@ export function TechnologyPage() {
       <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
         <p className="eyebrow text-accent">REUSE THE STORY</p>
         <h2 id="engineering-hub-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-          {ko ? "하나의 기술 원본을 다섯 가지 방식으로 사용합니다." : "Use one engineering source in five different ways."}
+          {ko ? "하나의 기술 원본을 여섯 가지 방식으로 사용합니다." : "Use one engineering source in six different ways."}
         </h2>
-        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {HUB_LINKS.map((item) => {
             const Icon = item.icon;
             return (

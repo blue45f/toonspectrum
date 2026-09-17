@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EngineeringDeckPage } from "./EngineeringDeckPage";
 import { EngineeringGuidesPage } from "./EngineeringGuidesPage";
 import { EngineeringLicensesPage } from "./EngineeringLicensesPage";
+import { EngineeringReferencesPage } from "./EngineeringReferencesPage";
 import { EngineeringStoryPage } from "./EngineeringStoryPage";
 import { EngineeringVideosPage } from "./EngineeringVideosPage";
 
@@ -27,7 +28,7 @@ describe("engineering story pages", () => {
       .toBe("location");
     expect(screen.getByRole("link", { name: /제작 스토리|Story/u }).getAttribute("aria-current"))
       .toBe("page");
-    expect(document.querySelectorAll("article[id]")).toHaveLength(15);
+    expect(document.querySelectorAll("article[id]")).toHaveLength(25);
     expect(screen.getByRole("link", { name: /적용 가이드 열기|Open implementation guides/u }).getAttribute("href"))
       .toBe("/about/technology/guides");
   });
@@ -47,6 +48,23 @@ describe("engineering story pages", () => {
     fireEvent.click(liveFilter);
     expect(liveFilter.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("heading", { name: /성능 예산|Performance budget/u })).toBeTruthy();
+  });
+
+  it("searches and filters reference products while keeping troubleshooting evidence available", () => {
+    render(
+      <MemoryRouter initialEntries={["/about/technology/references"]}>
+        <EngineeringReferencesPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: /참고·장애 기록|References/u }).getAttribute("aria-current"))
+      .toBe("page");
+    expect(document.querySelectorAll("[data-reference-card]").length).toBeGreaterThanOrEqual(10);
+    expect(screen.getByRole("heading", { name: /재현 가능한 트러블슈팅|Reproducible troubleshooting/u })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Blender MCP" } });
+    expect(screen.getByRole("heading", { name: "Blender MCP" })).toBeTruthy();
+    expect(document.querySelectorAll("[data-reference-card]")).toHaveLength(1);
   });
 
   it("supports presentation navigation and exact nested current-location semantics", () => {

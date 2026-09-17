@@ -11,7 +11,7 @@ import {
 
 import { AboutSectionNav } from "../AboutSectionNav";
 import {
-  ENGINEERING_CHAPTERS,
+  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   ENGINEERING_STATUS_META,
   type EngineeringEvidenceKind,
   type EngineeringStatus,
@@ -58,7 +58,7 @@ export function EngineeringStoryPage() {
       <EngineeringStoryNav className="mt-3" />
 
       <EngineeringPageIntro
-        eyebrow="ENGINEERING STORY · 15 CHAPTERS"
+        eyebrow={`ENGINEERING STORY · ${ENGINEERING_CHAPTERS.length} CHAPTERS`}
         title={
           ko
             ? "기술 이름이 아니라, 문제와 판단의 순서로 설명합니다."
@@ -107,7 +107,7 @@ export function EngineeringStoryPage() {
             className="rounded-3xl border border-line/70 bg-panel/70 p-3 shadow-sm"
           >
             <p className="px-3 py-2 font-display text-[0.66rem] font-black uppercase tracking-[0.16em] text-fg-3">
-              {ko ? "15개 챕터" : "15 chapters"}
+              {ko ? `${ENGINEERING_CHAPTERS.length}개 챕터` : `${ENGINEERING_CHAPTERS.length} chapters`}
             </p>
             <ol className="mt-1 max-h-[65dvh] space-y-0.5 overflow-y-auto overscroll-contain pr-1">
               {ENGINEERING_CHAPTERS.map((chapter) => (
