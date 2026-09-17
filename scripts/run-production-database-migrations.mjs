@@ -93,6 +93,7 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "verificationToken",
 ]);
 export const POST_BASELINE_RELATIONS = Object.freeze([
+  "account_merge",
   "admin_announcements",
   "admin_audit_logs",
   "admin_banned_words",
@@ -242,16 +243,25 @@ export function buildAuthRuntimeAclSql(runtimeDatabaseRole) {
   return `
 REVOKE ALL ON TABLE
   public."user",
-  public.account
+  public.account,
+  public.account_merge
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
   public."user",
-  public.account
+  public.account,
+  public.account_merge
 FROM ${quotedRole};
 
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON TABLE public."user", public.account
+  TO ${quotedRole};
+
+GRANT SELECT, INSERT
+  ON TABLE public.account_merge
+  TO ${quotedRole};
+GRANT UPDATE ("targetUserId", status, "completedAt", summary)
+  ON TABLE public.account_merge
   TO ${quotedRole};
 `;
 }
@@ -645,34 +655,90 @@ export function buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole) {
 
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
   return `(
     NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
+      ${roleLiteral},
       'public."user"',
       'SELECT, INSERT, UPDATE, DELETE'
     )
     OR NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
+      ${roleLiteral},
       'public.account',
       'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.account_merge',
+      'SELECT, INSERT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.account_merge',
+      'UPDATE, DELETE'
     )
     OR EXISTS (
       SELECT 1
       FROM unnest(ARRAY[
+        'targetUserId', 'status', 'completedAt', 'summary'
+      ]::text[]) AS mutable_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${roleLiteral},
+        'public.account_merge',
+        mutable_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'id', 'sourceUserId', 'tokenHash', 'expiresAt', 'createdAt'
+      ]::text[]) AS immutable_column
+      WHERE pg_catalog.has_column_privilege(
+        ${roleLiteral},
+        'public.account_merge',
+        immutable_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public."user"',
+        'public.account',
+        'public.account_merge'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
         'TRUNCATE',
         'REFERENCES',
         'TRIGGER'
       ]::text[]) AS elevated_privilege
       WHERE pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
+        ${roleLiteral},
+        relation_name,
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
         'public."user"',
-        elevated_privilege
-      )
-      OR pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
         'public.account',
-        elevated_privilege
+        'public.account_merge'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        relation_name,
+        public_privilege
       )
+    )
+    OR pg_catalog.has_any_column_privilege(
+      0::oid,
+      'public.account_merge',
+      'UPDATE'
     )
   )`;
 }
