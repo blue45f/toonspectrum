@@ -8,6 +8,7 @@ import {
   externalFileSyncModeSchema,
   isoTimestampSchema,
   revisionKindSchema,
+  reviewAnchorSchema,
   scopeRefSchema,
   sha256Schema,
   studioEntityIdSchema,
@@ -37,10 +38,20 @@ export const StudioArtifactParamsSchema = z
   .strict();
 export class StudioArtifactParamsDto extends createZodDto(StudioArtifactParamsSchema) {}
 
+export const StudioRevisionParamsSchema = z
+  .object({ artifactId: studioEntityIdSchema, revisionId: studioEntityIdSchema })
+  .strict();
+export class StudioRevisionParamsDto extends createZodDto(StudioRevisionParamsSchema) {}
+
 export const StudioReviewParamsSchema = z
   .object({ reviewId: studioEntityIdSchema })
   .strict();
 export class StudioReviewParamsDto extends createZodDto(StudioReviewParamsSchema) {}
+
+export const StudioReviewCommentParamsSchema = z
+  .object({ commentId: studioEntityIdSchema })
+  .strict();
+export class StudioReviewCommentParamsDto extends createZodDto(StudioReviewCommentParamsSchema) {}
 
 export const StudioReportParamsSchema = z
   .object({ reportId: studioEntityIdSchema })
@@ -100,6 +111,24 @@ export const CreateStudioProjectGraphSchema = z
   });
 export class CreateStudioProjectGraphDto extends createZodDto(
   CreateStudioProjectGraphSchema,
+) {}
+
+export const CreateStudioArtifactSchema = z
+  .object({
+    workspaceId: studioEntityIdSchema,
+    artifact: z
+      .object({
+        id: studioEntityIdSchema,
+        kind: artifactKindSchema,
+        title: z.string().trim().min(1).max(240),
+        scope: scopeRefSchema,
+      })
+      .strict(),
+    initialRevision: InitialRevisionSchema,
+  })
+  .strict();
+export class CreateStudioArtifactDto extends createZodDto(
+  CreateStudioArtifactSchema,
 ) {}
 
 export const StudioCommandCommitSchema = z
@@ -179,6 +208,19 @@ export class CommitStudioRevisionDto extends createZodDto(
   CommitStudioRevisionSchema,
 ) {}
 
+export const RestoreStudioRevisionSchema = z
+  .object({
+    revisionId: studioEntityIdSchema,
+    commandId: studioEntityIdSchema,
+    deviceId: studioEntityIdSchema,
+    createdAt: isoTimestampSchema,
+    message: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+export class RestoreStudioRevisionDto extends createZodDto(
+  RestoreStudioRevisionSchema,
+) {}
+
 export const RegisterStudioBlobSchema = z
   .object({
     hash: sha256Schema,
@@ -212,7 +254,7 @@ export class CreateStudioReviewDto extends createZodDto(CreateStudioReviewSchema
 export const CreateStudioReviewCommentSchema = z
   .object({
     id: studioEntityIdSchema,
-    anchor: z.record(z.string(), z.unknown()),
+    anchor: reviewAnchorSchema,
     body: HumanTextSchema.max(20_000),
     severity: z.enum(["required", "recommended", "note"]),
     assigneeIds: z.array(studioEntityIdSchema).max(64).default([]),
@@ -221,6 +263,23 @@ export const CreateStudioReviewCommentSchema = z
   .strict();
 export class CreateStudioReviewCommentDto extends createZodDto(
   CreateStudioReviewCommentSchema,
+) {}
+
+export const DecideStudioReviewSchema = z
+  .object({
+    status: z.enum(["changes-requested", "approved", "rejected", "cancelled"]),
+  })
+  .strict();
+export class DecideStudioReviewDto extends createZodDto(DecideStudioReviewSchema) {}
+
+export const ResolveStudioReviewCommentSchema = z
+  .object({
+    resolutionRevisionId: studioEntityIdSchema,
+    status: z.enum(["resolved", "dismissed"]).default("resolved"),
+  })
+  .strict();
+export class ResolveStudioReviewCommentDto extends createZodDto(
+  ResolveStudioReviewCommentSchema,
 ) {}
 
 export const CreateStudioExternalFileBindingSchema = z
@@ -315,9 +374,13 @@ export class CreateCompatibilityReportDto extends createZodDto(
 ) {}
 
 export type CreateStudioProjectGraph = z.infer<typeof CreateStudioProjectGraphSchema>;
+export type CreateStudioArtifact = z.infer<typeof CreateStudioArtifactSchema>;
 export type CommitStudioRevision = z.infer<typeof CommitStudioRevisionSchema>;
+export type RestoreStudioRevision = z.infer<typeof RestoreStudioRevisionSchema>;
 export type RegisterStudioBlob = z.infer<typeof RegisterStudioBlobSchema>;
 export type CreateStudioReview = z.infer<typeof CreateStudioReviewSchema>;
+export type DecideStudioReview = z.infer<typeof DecideStudioReviewSchema>;
+export type ResolveStudioReviewComment = z.infer<typeof ResolveStudioReviewCommentSchema>;
 export type CreateStudioReviewComment = z.infer<typeof CreateStudioReviewCommentSchema>;
 export type CreateCompatibilityReport = z.infer<typeof CreateCompatibilityReportSchema>;
 export type CreateStudioExternalFileBinding = z.infer<

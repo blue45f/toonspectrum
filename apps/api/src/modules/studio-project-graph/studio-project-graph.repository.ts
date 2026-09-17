@@ -2,8 +2,15 @@ import { createHash } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
 
-import { canonicalJson, reviewAnchorSchema } from "@toonspectrum/studio-project-model";
 import {
+  canonicalJson,
+  parseScopeRef,
+  reviewAnchorSchema,
+  scopeRefContains,
+  scopeRefSchema,
+} from "@toonspectrum/studio-project-model";
+import {
+  compatibilityReportSchema,
   createCompatibilityReport,
   type CompatibilityReport,
 } from "@toonspectrum/studio-format-gateway";
@@ -17,10 +24,14 @@ import {
 
 import type {
   CommitStudioRevision,
+  CreateStudioArtifact,
   CreateCompatibilityReport,
   CreateStudioProjectGraph,
   CreateStudioReview,
   CreateStudioReviewComment,
+  DecideStudioReview,
+  ResolveStudioReviewComment,
+  RestoreStudioRevision,
   RegisterStudioBlob,
 } from "./studio-project-graph.dto";
 
@@ -102,16 +113,7 @@ export interface StudioRevisionCommitResponse {
 }
 
 export class StudioProjectNotFoundError extends Error {
-  constructor(
-    readonly target:
-      | "work"
-      | "project"
-      | "artifact"
-      | "revision"
-      | "review"
-      | "report"
-      | "binding",
-  ) {
+  constructor(readonly target: "work" | "project" | "artifact" | "revision" | "review" | "comment" | "report" | "binding") {
     super(`studio_${target}_not_found`);
     this.name = "StudioProjectNotFoundError";
   }
@@ -125,14 +127,7 @@ export class StudioProjectForbiddenError extends Error {
 }
 
 export class StudioProjectIdentityConflictError extends Error {
-  constructor(
-    readonly code:
-      | "project_exists"
-      | "work_already_linked"
-      | "artifact_exists"
-      | "revision_exists"
-      | "binding_exists",
-  ) {
+  constructor(readonly code: "project_exists" | "work_already_linked" | "artifact_exists" | "revision_exists" | "binding_exists") {
     super(code);
     this.name = "StudioProjectIdentityConflictError";
   }
@@ -300,28 +295,47 @@ async function loadArtifactAccess(
   return row ? { row, access: projectAccess(actorUserId, row) } : null;
 }
 
+interface StudioBlobReadinessRow {
+  readonly hash: string;
+  readonly malwareStatus: string;
+  readonly formatStatus: string;
+}
+
+export function studioUnreadyBlobHashes(
+  blobRefs: readonly { readonly sha256: string; readonly role: string }[],
+  rows: readonly StudioBlobReadinessRow[],
+): readonly string[] {
+  const rolesByHash = new Map<string, Set<string>>();
+  for (const blob of blobRefs) {
+    const roles = rolesByHash.get(blob.sha256) ?? new Set<string>();
+    roles.add(blob.role);
+    rolesByHash.set(blob.sha256, roles);
+  }
+  const rowByHash = new Map(rows.map((row) => [row.hash, row] as const));
+  const missing: string[] = [];
+  for (const [hash, roles] of rolesByHash) {
+    const row = rowByHash.get(hash);
+    const clean = row?.malwareStatus === "clean";
+    const formatReady = row?.formatStatus === "valid"
+      || (row?.formatStatus === "unsupported" && [...roles].every((role) => role === "source"));
+    if (!clean || !formatReady) missing.push(hash);
+  }
+  return Object.freeze(missing);
+}
+
 async function verifyBlobRefsReady(
   client: PoolClient,
-  blobRefs: readonly { readonly sha256: string }[],
+  blobRefs: readonly { readonly sha256: string; readonly role: string }[],
 ): Promise<void> {
   const hashes = [...new Set(blobRefs.map((blob) => blob.sha256))];
   if (hashes.length === 0) return;
-  const result = await client.query<{
-    hash: string;
-    malwareStatus: string;
-    formatStatus: string;
-  }>(
+  const result = await client.query<StudioBlobReadinessRow>(
     `SELECT hash, "malwareStatus", "formatStatus"
      FROM studio_blob
      WHERE hash = ANY($1::text[])`,
     [hashes],
   );
-  const ready = new Set(
-    result.rows
-      .filter((row) => row.malwareStatus === "clean" && row.formatStatus === "valid")
-      .map((row) => row.hash),
-  );
-  const missing = hashes.filter((hash) => !ready.has(hash));
+  const missing = studioUnreadyBlobHashes(blobRefs, result.rows);
   if (missing.length > 0) throw new StudioBlobNotReadyError(missing);
 }
 
@@ -345,12 +359,6 @@ function mapPostgresError(error: unknown): never {
     if (constraint.includes("revision_pkey")) {
       throw new StudioProjectIdentityConflictError("revision_exists");
     }
-    if (
-      constraint.includes("external_file_binding_pkey")
-      || constraint.includes("external_file_binding_remote_unique")
-    ) {
-      throw new StudioProjectIdentityConflictError("binding_exists");
-    }
   }
   if (code === "23514" || code === "23503" || code === "55000") {
     throw new StudioRepositoryInvariantError(
@@ -368,11 +376,108 @@ export interface StudioProjectCreateResponse {
   readonly replayed: boolean;
 }
 
+export interface StudioReviewSummaryRecord {
+  readonly id: string;
+  readonly artifactId: string;
+  readonly revisionId: string;
+  readonly requestedBy: string | null;
+  readonly title: string;
+  readonly status: "open" | "changes-requested" | "approved" | "rejected" | "cancelled";
+  readonly decidedAt: string | null;
+  readonly decidedBy: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly reviewerIds: readonly string[];
+  readonly openRequiredCommentCount: number;
+}
+
+export interface StudioReviewCommentRecord {
+  readonly id: string;
+  readonly reviewId: string;
+  readonly authorUserId: string | null;
+  readonly anchor: Record<string, unknown>;
+  readonly body: string;
+  readonly severity: "required" | "recommended" | "note";
+  readonly status: "open" | "resolved" | "reopened" | "dismissed";
+  readonly dueAt: string | null;
+  readonly resolutionRevisionId: string | null;
+  readonly resolvedBy: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly assigneeIds: readonly string[];
+}
+
+export interface StudioReviewRecord extends StudioReviewSummaryRecord {
+  readonly comments: readonly StudioReviewCommentRecord[];
+}
+
 export class StudioBlobMetadataConflictError extends Error {
   constructor(readonly hash: string) {
     super("studio_blob_metadata_conflict");
     this.name = "StudioBlobMetadataConflictError";
   }
+}
+
+interface StudioReviewSummaryRow {
+  id: string;
+  artifactId: string;
+  revisionId: string;
+  requestedBy: string | null;
+  title: string;
+  status: StudioReviewSummaryRecord["status"];
+  decidedAt: Date | null;
+  decidedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  reviewerIds: string[];
+  openRequiredCommentCount: number | string;
+}
+
+function mapStudioReviewSummary(
+  row: StudioReviewSummaryRow,
+): StudioReviewSummaryRecord {
+  return Object.freeze({
+    id: row.id,
+    artifactId: row.artifactId,
+    revisionId: row.revisionId,
+    requestedBy: row.requestedBy,
+    title: row.title,
+    status: row.status,
+    decidedAt: row.decidedAt ? toIso(row.decidedAt) : null,
+    decidedBy: row.decidedBy,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+    reviewerIds: Object.freeze([...row.reviewerIds]),
+    openRequiredCommentCount: Number(row.openRequiredCommentCount),
+  });
+}
+
+interface StudioReviewCommentRow {
+  id: string;
+  reviewId: string;
+  authorUserId: string | null;
+  anchor: Record<string, unknown>;
+  body: string;
+  severity: StudioReviewCommentRecord["severity"];
+  status: StudioReviewCommentRecord["status"];
+  dueAt: Date | null;
+  resolutionRevisionId: string | null;
+  resolvedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  assigneeIds: string[];
+}
+
+function mapStudioReviewComment(
+  row: StudioReviewCommentRow,
+): StudioReviewCommentRecord {
+  return Object.freeze({
+    ...row,
+    dueAt: row.dueAt ? toIso(row.dueAt) : null,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+    assigneeIds: Object.freeze([...row.assigneeIds]),
+  });
 }
 
 @Injectable()
@@ -503,6 +608,138 @@ export class StudioProjectGraphRepository {
         || error instanceof StudioProjectForbiddenError
         || error instanceof StudioIdempotencyConflictError
         || error instanceof StudioBlobNotReadyError
+      ) {
+        throw error;
+      }
+      mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async createArtifact(
+    actorUserId: string,
+    projectId: string,
+    input: CreateStudioArtifact,
+    idempotencyKey: string,
+  ): Promise<StudioProjectCreateResponse> {
+    const client = await dbPool.connect();
+    const keyHash = studioIdempotencyKeyHash(idempotencyKey);
+    const requestHash = studioRequestHash({ projectId, input });
+    try {
+      await client.query("BEGIN");
+      const accessResult = await loadProjectAccess(
+        client,
+        actorUserId,
+        projectId,
+        true,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("project");
+      assertAccess(accessResult.access, "edit");
+      if (input.artifact.scope.projectId !== projectId) {
+        throw new StudioRepositoryInvariantError(
+          "scope_project_mismatch",
+          "artifact scope does not belong to the target project",
+        );
+      }
+
+      const receipt = await client.query<{
+        requestHash: string;
+        response: StudioProjectCreateResponse;
+      }>(
+        `SELECT "requestHash", response
+         FROM studio_mutation_receipt
+         WHERE "artifactId" = $1
+           AND "actorUserId" = $2
+           AND "idempotencyKeyHash" = $3`,
+        [input.artifact.id, actorUserId, keyHash],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].requestHash !== requestHash) {
+          throw new StudioIdempotencyConflictError();
+        }
+        await client.query("COMMIT");
+        return { ...receipt.rows[0].response, replayed: true };
+      }
+
+      await verifyBlobRefsReady(client, input.initialRevision.blobRefs);
+      await client.query(
+        `INSERT INTO studio_artifact (
+           id, "projectId", kind, title, scope, "headRevisionId",
+           "ownerWorkspaceId", "createdAt", "updatedAt"
+         ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $8)`,
+        [
+          input.artifact.id,
+          projectId,
+          input.artifact.kind,
+          input.artifact.title,
+          JSON.stringify(input.artifact.scope),
+          input.initialRevision.id,
+          input.workspaceId,
+          input.initialRevision.createdAt,
+        ],
+      );
+      await client.query(
+        `INSERT INTO studio_revision (
+           id, "artifactId", kind, "rootGraphHash", "createdBy",
+           "deviceId", "createdAt", message
+         ) VALUES ($1, $2, 'checkpoint', $3, $4, $5, $6, $7)`,
+        [
+          input.initialRevision.id,
+          input.artifact.id,
+          input.initialRevision.rootGraphHash,
+          actorUserId,
+          input.initialRevision.deviceId,
+          input.initialRevision.createdAt,
+          input.initialRevision.message ?? null,
+        ],
+      );
+      for (const blob of input.initialRevision.blobRefs) {
+        await client.query(
+          `INSERT INTO studio_revision_blob (
+             "revisionId", "blobHash", role, ordinal
+           ) VALUES ($1, $2, $3, $4)`,
+          [input.initialRevision.id, blob.sha256, blob.role, blob.ordinal],
+        );
+      }
+
+      const response: StudioProjectCreateResponse = {
+        projectId,
+        artifactId: input.artifact.id,
+        revisionId: input.initialRevision.id,
+        replayed: false,
+      };
+      await client.query(
+        `INSERT INTO studio_mutation_receipt (
+           "artifactId", "actorUserId", "idempotencyKeyHash",
+           "requestHash", "resultRevisionId", response
+         ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [
+          input.artifact.id,
+          actorUserId,
+          keyHash,
+          requestHash,
+          input.initialRevision.id,
+          JSON.stringify(response),
+        ],
+      );
+      await client.query(
+        `UPDATE studio_project_graph
+         SET "updatedAt" = now()
+         WHERE id = $1`,
+        [projectId],
+      );
+      await client.query("COMMIT");
+      return response;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (
+        error instanceof StudioProjectNotFoundError
+        || error instanceof StudioProjectForbiddenError
+        || error instanceof StudioProjectIdentityConflictError
+        || error instanceof StudioIdempotencyConflictError
+        || error instanceof StudioBlobNotReadyError
+        || error instanceof StudioRepositoryInvariantError
       ) {
         throw error;
       }
@@ -769,10 +1006,17 @@ export class StudioProjectGraphRepository {
       if (accessResult.row.headRevisionId !== expectedHeadRevisionId) {
         throw new StudioRevisionConflictError(accessResult.row.headRevisionId);
       }
-      if (input.command.scope.projectId !== accessResult.row.projectId) {
+      const artifactScope = scopeRefSchema.safeParse(accessResult.row.projectScope);
+      if (!artifactScope.success) {
         throw new StudioRepositoryInvariantError(
-          "scope_project_mismatch",
-          "command scope does not belong to the artifact project",
+          "artifact_scope_invalid",
+          "stored artifact scope is invalid",
+        );
+      }
+      if (!scopeRefContains(parseScopeRef(artifactScope.data), parseScopeRef(input.command.scope))) {
+        throw new StudioRepositoryInvariantError(
+          "scope_outside_artifact",
+          "command scope must stay inside the artifact scope",
         );
       }
       if (
@@ -967,6 +1211,339 @@ export class StudioProjectGraphRepository {
       client.release();
     }
   }
+  async restoreRevision(
+    actorUserId: string,
+    artifactId: string,
+    targetRevisionId: string,
+    expectedHeadRevisionId: string,
+    idempotencyKey: string,
+    input: RestoreStudioRevision,
+  ): Promise<StudioRevisionCommitResponse> {
+    const client = await dbPool.connect();
+    const keyHash = studioIdempotencyKeyHash(idempotencyKey);
+    const requestHash = studioRequestHash({
+      artifactId,
+      targetRevisionId,
+      expectedHeadRevisionId,
+      input,
+    });
+    try {
+      await client.query("BEGIN");
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        artifactId,
+        true,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "edit");
+
+      const receipt = await client.query<{
+        requestHash: string;
+        response: StudioRevisionCommitResponse;
+      }>(
+        `SELECT "requestHash", response
+         FROM studio_mutation_receipt
+         WHERE "artifactId" = $1
+           AND "actorUserId" = $2
+           AND "idempotencyKeyHash" = $3`,
+        [artifactId, actorUserId, keyHash],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].requestHash !== requestHash) {
+          throw new StudioIdempotencyConflictError();
+        }
+        await client.query("COMMIT");
+        return { ...receipt.rows[0].response, replayed: true };
+      }
+      if (accessResult.row.headRevisionId !== expectedHeadRevisionId) {
+        throw new StudioRevisionConflictError(accessResult.row.headRevisionId);
+      }
+      if (targetRevisionId === expectedHeadRevisionId) {
+        throw new StudioRepositoryInvariantError(
+          "restore_target_is_head",
+          "the selected revision is already the artifact head",
+        );
+      }
+
+      const targetResult = await client.query<{
+        id: string;
+        kind: string;
+        rootGraphHash: string;
+        compatibilityReportId: string | null;
+        provenanceManifestId: string | null;
+      }>(
+        `SELECT id, kind, "rootGraphHash", "compatibilityReportId",
+                "provenanceManifestId"
+         FROM studio_revision
+         WHERE id = $1 AND "artifactId" = $2`,
+        [targetRevisionId, artifactId],
+      );
+      const target = targetResult.rows[0];
+      if (!target) throw new StudioProjectNotFoundError("revision");
+      if (target.kind === "release") {
+        throw new StudioRepositoryInvariantError(
+          "release_restore_requires_source_revision",
+          "release revisions are immutable delivery records; restore their source revision instead",
+        );
+      }
+
+      const sequenceResult = await client.query<{ next: string | number }>(
+        `SELECT COALESCE(MAX(sequence), 0) + 1 AS next
+         FROM studio_operation WHERE "artifactId" = $1`,
+        [artifactId],
+      );
+      const sequence = Number(sequenceResult.rows[0]?.next ?? 1);
+      await client.query(
+        `INSERT INTO studio_revision (
+           id, "artifactId", kind, "rootGraphHash", "operationFirst", "operationLast",
+           "createdBy", "deviceId", "createdAt", message,
+           "compatibilityReportId", "provenanceManifestId"
+         ) VALUES ($1, $2, 'checkpoint', $3, $4, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          input.revisionId,
+          artifactId,
+          target.rootGraphHash,
+          sequence,
+          actorUserId,
+          input.deviceId,
+          input.createdAt,
+          input.message ?? `Restore ${targetRevisionId}`,
+          target.compatibilityReportId,
+          target.provenanceManifestId,
+        ],
+      );
+      await client.query(
+        `INSERT INTO studio_revision_parent (
+           "revisionId", "parentRevisionId", ordinal
+         ) VALUES ($1, $2, 0)`,
+        [input.revisionId, targetRevisionId],
+      );
+      await client.query(
+        `INSERT INTO studio_revision_blob (
+           "revisionId", "blobHash", role, ordinal
+         )
+         SELECT $1, "blobHash", role, ordinal
+         FROM studio_revision_blob
+         WHERE "revisionId" = $2`,
+        [input.revisionId, targetRevisionId],
+      );
+
+      const payload = { targetRevisionId };
+      const operationRecord = {
+        commandId: input.commandId,
+        type: "revision.restore",
+        idempotencyKeyHash: keyHash,
+        deterministicSeed: 0,
+        payload,
+        patches: [],
+        inversePatches: [],
+        invalidations: ["document", "viewport", "thumbnail", "export"],
+      };
+      await client.query(
+        `INSERT INTO studio_operation (
+           "artifactId", sequence, "commandId", "baseRevisionId", "resultRevisionId",
+           "actorUserId", "deviceId", "commandType", scope, "payloadHash",
+           operation, "issuedAt"
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'revision.restore', $8::jsonb,
+                   $9, $10::jsonb, $11)`,
+        [
+          artifactId,
+          sequence,
+          input.commandId,
+          expectedHeadRevisionId,
+          input.revisionId,
+          actorUserId,
+          input.deviceId,
+          JSON.stringify(accessResult.row.projectScope),
+          sha256(canonicalJson(payload)),
+          JSON.stringify(operationRecord),
+          input.createdAt,
+        ],
+      );
+      await client.query(
+        `UPDATE studio_artifact
+         SET "headRevisionId" = $2, "updatedAt" = now()
+         WHERE id = $1`,
+        [artifactId, input.revisionId],
+      );
+      await client.query(
+        `UPDATE studio_project_graph SET "updatedAt" = now() WHERE id = $1`,
+        [accessResult.row.projectId],
+      );
+
+      const response: StudioRevisionCommitResponse = {
+        artifactId,
+        revisionId: input.revisionId,
+        headRevisionId: input.revisionId,
+        approvedRevisionId: accessResult.row.approvedRevisionId,
+        sequence,
+        replayed: false,
+      };
+      await client.query(
+        `INSERT INTO studio_mutation_receipt (
+           "artifactId", "actorUserId", "idempotencyKeyHash", "requestHash",
+           "resultRevisionId", response
+         ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [
+          artifactId,
+          actorUserId,
+          keyHash,
+          requestHash,
+          input.revisionId,
+          JSON.stringify(response),
+        ],
+      );
+      await client.query("COMMIT");
+      return response;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (
+        error instanceof StudioProjectNotFoundError
+        || error instanceof StudioProjectForbiddenError
+        || error instanceof StudioRevisionConflictError
+        || error instanceof StudioIdempotencyConflictError
+        || error instanceof StudioRepositoryInvariantError
+      ) {
+        throw error;
+      }
+      mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async listReviews(
+    actorUserId: string,
+    artifactId: string,
+  ): Promise<readonly StudioReviewSummaryRecord[]> {
+    const client = await dbPool.connect();
+    try {
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        artifactId,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "view");
+      const result = await client.query<StudioReviewSummaryRow>(
+        `SELECT
+           review.id,
+           review."artifactId" AS "artifactId",
+           review."revisionId" AS "revisionId",
+           review."requestedBy" AS "requestedBy",
+           review.title,
+           review.status,
+           review."decidedAt" AS "decidedAt",
+           review."decidedBy" AS "decidedBy",
+           review."createdAt" AS "createdAt",
+           review."updatedAt" AS "updatedAt",
+           COALESCE(
+             array_agg(DISTINCT reviewer."reviewerUserId")
+               FILTER (WHERE reviewer."reviewerUserId" IS NOT NULL),
+             ARRAY[]::text[]
+           ) AS "reviewerIds",
+           COUNT(DISTINCT comment.id) FILTER (
+             WHERE comment.severity = 'required'
+               AND comment.status IN ('open', 'reopened')
+           )::integer AS "openRequiredCommentCount"
+         FROM studio_review review
+         LEFT JOIN studio_review_reviewer reviewer
+           ON reviewer."reviewId" = review.id
+         LEFT JOIN studio_review_comment comment
+           ON comment."reviewId" = review.id
+         WHERE review."artifactId" = $1
+         GROUP BY review.id
+         ORDER BY review."createdAt" DESC, review.id`,
+        [artifactId],
+      );
+      return Object.freeze(result.rows.map(mapStudioReviewSummary));
+    } finally {
+      client.release();
+    }
+  }
+
+  async getReview(
+    actorUserId: string,
+    reviewId: string,
+  ): Promise<StudioReviewRecord> {
+    const client = await dbPool.connect();
+    try {
+      const summaryResult = await client.query<StudioReviewSummaryRow>(
+        `SELECT
+           review.id,
+           review."artifactId" AS "artifactId",
+           review."revisionId" AS "revisionId",
+           review."requestedBy" AS "requestedBy",
+           review.title,
+           review.status,
+           review."decidedAt" AS "decidedAt",
+           review."decidedBy" AS "decidedBy",
+           review."createdAt" AS "createdAt",
+           review."updatedAt" AS "updatedAt",
+           COALESCE(
+             array_agg(DISTINCT reviewer."reviewerUserId")
+               FILTER (WHERE reviewer."reviewerUserId" IS NOT NULL),
+             ARRAY[]::text[]
+           ) AS "reviewerIds",
+           COUNT(DISTINCT comment.id) FILTER (
+             WHERE comment.severity = 'required'
+               AND comment.status IN ('open', 'reopened')
+           )::integer AS "openRequiredCommentCount"
+         FROM studio_review review
+         LEFT JOIN studio_review_reviewer reviewer
+           ON reviewer."reviewId" = review.id
+         LEFT JOIN studio_review_comment comment
+           ON comment."reviewId" = review.id
+         WHERE review.id = $1
+         GROUP BY review.id`,
+        [reviewId],
+      );
+      const summaryRow = summaryResult.rows[0];
+      if (!summaryRow) throw new StudioProjectNotFoundError("review");
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        summaryRow.artifactId,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "view");
+      const comments = await client.query<StudioReviewCommentRow>(
+        `SELECT
+           comment.id,
+           comment."reviewId" AS "reviewId",
+           comment."authorUserId" AS "authorUserId",
+           comment.anchor,
+           comment.body,
+           comment.severity,
+           comment.status,
+           comment."dueAt" AS "dueAt",
+           comment."resolutionRevisionId" AS "resolutionRevisionId",
+           comment."resolvedBy" AS "resolvedBy",
+           comment."createdAt" AS "createdAt",
+           comment."updatedAt" AS "updatedAt",
+           COALESCE(
+             array_agg(DISTINCT assignee."assigneeUserId")
+               FILTER (WHERE assignee."assigneeUserId" IS NOT NULL),
+             ARRAY[]::text[]
+           ) AS "assigneeIds"
+         FROM studio_review_comment comment
+         LEFT JOIN studio_review_comment_assignee assignee
+           ON assignee."commentId" = comment.id
+         WHERE comment."reviewId" = $1
+         GROUP BY comment.id
+         ORDER BY comment."createdAt", comment.id`,
+        [reviewId],
+      );
+      return Object.freeze({
+        ...mapStudioReviewSummary(summaryRow),
+        comments: Object.freeze(comments.rows.map(mapStudioReviewComment)),
+      });
+    } finally {
+      client.release();
+    }
+  }
+
   async createReview(
     actorUserId: string,
     artifactId: string,
@@ -1030,6 +1607,30 @@ export class StudioProjectGraphRepository {
         );
       }
 
+      const reviewerAccess = await client.query<{ id: string }>(
+        `SELECT candidate.id
+         FROM unnest($1::text[]) AS candidate(id)
+         WHERE candidate.id = $2
+            OR EXISTS (
+              SELECT 1
+              FROM creator_work_collaborator membership
+              WHERE membership."workId" = $3
+                AND membership."userId" = candidate.id
+                AND membership.status = 'active'
+            )`,
+        [
+          input.reviewerIds,
+          accessResult.row.ownerUserId,
+          accessResult.row.workId,
+        ],
+      );
+      if (reviewerAccess.rows.length !== input.reviewerIds.length) {
+        throw new StudioRepositoryInvariantError(
+          "reviewer_access_missing",
+          "every reviewer must have active access to the project",
+        );
+      }
+
       const inserted = await client.query<{ createdAt: Date }>(
         `INSERT INTO studio_review (
            id, "artifactId", "revisionId", "requestedBy", title, status
@@ -1074,7 +1675,7 @@ export class StudioProjectGraphRepository {
     reviewId: string,
     input: CreateStudioReviewComment,
   ) {
-    const anchor = reviewAnchorSchema.parse(input.anchor) as unknown as Record<string, unknown>;
+    const anchor = reviewAnchorSchema.parse(input.anchor);
     const client = await dbPool.connect();
     try {
       await client.query("BEGIN");
@@ -1102,6 +1703,13 @@ export class StudioProjectGraphRepository {
         throw new StudioRepositoryInvariantError(
           "review_anchor_mismatch",
           "comment anchor must target the frozen review artifact and revision",
+        );
+      }
+      const artifactScope = scopeRefSchema.safeParse(accessResult.row.projectScope);
+      if (!artifactScope.success || !scopeRefContains(parseScopeRef(artifactScope.data), parseScopeRef(anchor.scope))) {
+        throw new StudioRepositoryInvariantError(
+          "review_anchor_scope_mismatch",
+          "comment scope must stay inside the reviewed artifact scope",
         );
       }
       const existing = await client.query<{
@@ -1132,6 +1740,33 @@ export class StudioProjectGraphRepository {
           createdAt: toIso(current.createdAt),
         };
       }
+      if (input.assigneeIds.length > 0) {
+        const assigneeAccess = await client.query<{ id: string }>(
+          `SELECT candidate.id
+           FROM unnest($1::text[]) AS candidate(id)
+           WHERE candidate.id = $2
+              OR EXISTS (
+                SELECT 1
+                FROM creator_work_collaborator membership
+                WHERE membership."workId" = $3
+                  AND membership."userId" = candidate.id
+                  AND membership.status = 'active'
+                  AND membership.role IN ('admin', 'editor')
+              )`,
+          [
+            input.assigneeIds,
+            accessResult.row.ownerUserId,
+            accessResult.row.workId,
+          ],
+        );
+        if (assigneeAccess.rows.length !== input.assigneeIds.length) {
+          throw new StudioRepositoryInvariantError(
+            "assignee_edit_access_missing",
+            "every assignee must have edit access to the project",
+          );
+        }
+      }
+
       const inserted = await client.query<{ createdAt: Date }>(
         `INSERT INTO studio_review_comment (
            id, "reviewId", "authorUserId", anchor, body, severity, status, "dueAt"
@@ -1174,6 +1809,390 @@ export class StudioProjectGraphRepository {
         throw error;
       }
       mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async decideReview(
+    actorUserId: string,
+    reviewId: string,
+    input: DecideStudioReview,
+  ) {
+    const client = await dbPool.connect();
+    try {
+      await client.query("BEGIN");
+      const reviewResult = await client.query<{
+        id: string;
+        artifactId: string;
+        requestedBy: string | null;
+        status: StudioReviewSummaryRecord["status"];
+        decidedAt: Date | null;
+        decidedBy: string | null;
+        updatedAt: Date;
+      }>(
+        `SELECT id, "artifactId", "requestedBy", status,
+                "decidedAt", "decidedBy", "updatedAt"
+         FROM studio_review
+         WHERE id = $1
+         FOR UPDATE`,
+        [reviewId],
+      );
+      const review = reviewResult.rows[0];
+      if (!review) throw new StudioProjectNotFoundError("review");
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        review.artifactId,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "view");
+      const reviewer = await client.query<{ allowed: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM studio_review_reviewer
+           WHERE "reviewId" = $1 AND "reviewerUserId" = $2
+         ) AS allowed`,
+        [reviewId, actorUserId],
+      );
+      const canManage = accessResult.access.manageMembers;
+      const canCancel = canManage || review.requestedBy === actorUserId;
+      const canDecide = canManage || reviewer.rows[0]?.allowed === true;
+      if (input.status === "cancelled" ? !canCancel : !canDecide) {
+        throw new StudioProjectForbiddenError("manage");
+      }
+
+      if (["approved", "rejected", "cancelled"].includes(review.status)) {
+        if (review.status !== input.status) {
+          throw new StudioRepositoryInvariantError(
+            "review_already_decided",
+            "a terminal review decision cannot be replaced",
+          );
+        }
+        await client.query("COMMIT");
+        return {
+          id: review.id,
+          status: review.status,
+          decidedAt: review.decidedAt ? toIso(review.decidedAt) : null,
+          decidedBy: review.decidedBy,
+          updatedAt: toIso(review.updatedAt),
+        };
+      }
+      if (input.status === "approved") {
+        const blocking = await client.query<{ count: number | string }>(
+          `SELECT COUNT(*)::integer AS count
+           FROM studio_review_comment
+           WHERE "reviewId" = $1
+             AND severity = 'required'
+             AND status IN ('open', 'reopened')`,
+          [reviewId],
+        );
+        if (Number(blocking.rows[0]?.count ?? 0) > 0) {
+          throw new StudioRepositoryInvariantError(
+            "required_review_comments_open",
+            "required review comments must be resolved before approval",
+          );
+        }
+      }
+
+      const terminal = input.status !== "changes-requested";
+      const updated = await client.query<{
+        status: StudioReviewSummaryRecord["status"];
+        decidedAt: Date | null;
+        decidedBy: string | null;
+        updatedAt: Date;
+      }>(
+        `UPDATE studio_review
+         SET status = $2,
+             "decidedAt" = CASE WHEN $3 THEN now() ELSE NULL END,
+             "decidedBy" = CASE WHEN $3 THEN $4 ELSE NULL END,
+             "updatedAt" = now()
+         WHERE id = $1
+         RETURNING status, "decidedAt", "decidedBy", "updatedAt"`,
+        [reviewId, input.status, terminal, actorUserId],
+      );
+      const value = updated.rows[0]!;
+      await client.query("COMMIT");
+      return {
+        id: reviewId,
+        status: value.status,
+        decidedAt: value.decidedAt ? toIso(value.decidedAt) : null,
+        decidedBy: value.decidedBy,
+        updatedAt: toIso(value.updatedAt),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (
+        error instanceof StudioProjectNotFoundError
+        || error instanceof StudioProjectForbiddenError
+        || error instanceof StudioRepositoryInvariantError
+      ) {
+        throw error;
+      }
+      mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async resolveReviewComment(
+    actorUserId: string,
+    commentId: string,
+    input: ResolveStudioReviewComment,
+  ) {
+    const client = await dbPool.connect();
+    try {
+      await client.query("BEGIN");
+      const commentResult = await client.query<{
+        id: string;
+        artifactId: string;
+        status: StudioReviewCommentRecord["status"];
+        resolutionRevisionId: string | null;
+        resolvedBy: string | null;
+        updatedAt: Date;
+      }>(
+        `SELECT comment.id,
+                review."artifactId" AS "artifactId",
+                comment.status,
+                comment."resolutionRevisionId" AS "resolutionRevisionId",
+                comment."resolvedBy" AS "resolvedBy",
+                comment."updatedAt" AS "updatedAt"
+         FROM studio_review_comment comment
+         JOIN studio_review review ON review.id = comment."reviewId"
+         WHERE comment.id = $1
+         FOR UPDATE OF comment`,
+        [commentId],
+      );
+      const comment = commentResult.rows[0];
+      if (!comment) throw new StudioProjectNotFoundError("comment");
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        comment.artifactId,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "edit");
+      if (
+        ["resolved", "dismissed"].includes(comment.status)
+        && comment.status === input.status
+        && comment.resolutionRevisionId === input.resolutionRevisionId
+      ) {
+        await client.query("COMMIT");
+        return {
+          id: comment.id,
+          status: comment.status,
+          resolutionRevisionId: comment.resolutionRevisionId,
+          resolvedBy: comment.resolvedBy,
+          updatedAt: toIso(comment.updatedAt),
+        };
+      }
+      if (["resolved", "dismissed"].includes(comment.status)) {
+        throw new StudioRepositoryInvariantError(
+          "review_comment_already_resolved",
+          "reopen a resolved comment before changing its resolution",
+        );
+      }
+      const resolution = await client.query<{ kind: string }>(
+        `SELECT kind FROM studio_revision
+         WHERE id = $1 AND "artifactId" = $2`,
+        [input.resolutionRevisionId, comment.artifactId],
+      );
+      const resolutionKind = resolution.rows[0]?.kind;
+      if (!resolutionKind) throw new StudioProjectNotFoundError("revision");
+      if (!["autosave", "checkpoint", "submission", "approved"].includes(resolutionKind)) {
+        throw new StudioRepositoryInvariantError(
+          "review_resolution_revision_kind",
+          "a comment resolution must point to an editable or approved revision",
+        );
+      }
+      const updated = await client.query<{
+        status: StudioReviewCommentRecord["status"];
+        resolutionRevisionId: string;
+        resolvedBy: string;
+        updatedAt: Date;
+      }>(
+        `UPDATE studio_review_comment
+         SET status = $2,
+             "resolutionRevisionId" = $3,
+             "resolvedBy" = $4,
+             "updatedAt" = now()
+         WHERE id = $1
+         RETURNING status,
+                   "resolutionRevisionId" AS "resolutionRevisionId",
+                   "resolvedBy" AS "resolvedBy",
+                   "updatedAt" AS "updatedAt"`,
+        [commentId, input.status, input.resolutionRevisionId, actorUserId],
+      );
+      const value = updated.rows[0]!;
+      await client.query("COMMIT");
+      return {
+        id: commentId,
+        status: value.status,
+        resolutionRevisionId: value.resolutionRevisionId,
+        resolvedBy: value.resolvedBy,
+        updatedAt: toIso(value.updatedAt),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (
+        error instanceof StudioProjectNotFoundError
+        || error instanceof StudioProjectForbiddenError
+        || error instanceof StudioRepositoryInvariantError
+      ) {
+        throw error;
+      }
+      mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async reopenReviewComment(
+    actorUserId: string,
+    commentId: string,
+  ) {
+    const client = await dbPool.connect();
+    try {
+      await client.query("BEGIN");
+      const commentResult = await client.query<{
+        id: string;
+        artifactId: string;
+        status: StudioReviewCommentRecord["status"];
+        updatedAt: Date;
+      }>(
+        `SELECT comment.id,
+                review."artifactId" AS "artifactId",
+                comment.status,
+                comment."updatedAt" AS "updatedAt"
+         FROM studio_review_comment comment
+         JOIN studio_review review ON review.id = comment."reviewId"
+         WHERE comment.id = $1
+         FOR UPDATE OF comment`,
+        [commentId],
+      );
+      const comment = commentResult.rows[0];
+      if (!comment) throw new StudioProjectNotFoundError("comment");
+      const accessResult = await loadArtifactAccess(
+        client,
+        actorUserId,
+        comment.artifactId,
+      );
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "edit");
+      if (["open", "reopened"].includes(comment.status)) {
+        await client.query("COMMIT");
+        return {
+          id: comment.id,
+          status: comment.status,
+          resolutionRevisionId: null,
+          resolvedBy: null,
+          updatedAt: toIso(comment.updatedAt),
+        };
+      }
+      const updated = await client.query<{ updatedAt: Date }>(
+        `UPDATE studio_review_comment
+         SET status = 'reopened',
+             "resolutionRevisionId" = NULL,
+             "resolvedBy" = NULL,
+             "updatedAt" = now()
+         WHERE id = $1
+         RETURNING "updatedAt"`,
+        [commentId],
+      );
+      await client.query("COMMIT");
+      return {
+        id: commentId,
+        status: "reopened" as const,
+        resolutionRevisionId: null,
+        resolvedBy: null,
+        updatedAt: toIso(updated.rows[0]!.updatedAt),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (
+        error instanceof StudioProjectNotFoundError
+        || error instanceof StudioProjectForbiddenError
+        || error instanceof StudioRepositoryInvariantError
+      ) {
+        throw error;
+      }
+      mapPostgresError(error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async listCompatibilityReports(
+    actorUserId: string,
+    projectId: string,
+  ): Promise<readonly CompatibilityReport[]> {
+    const client = await dbPool.connect();
+    try {
+      const accessResult = await loadProjectAccess(client, actorUserId, projectId);
+      if (!accessResult) throw new StudioProjectNotFoundError("project");
+      assertAccess(accessResult.access, "view");
+      const result = await client.query<{
+        id: string;
+        artifactId: string | null;
+        sourceFormat: CompatibilityReport["source"]["sourceFormat"];
+        sourceFileName: string;
+        sourceHash: string;
+        sourceSize: string | number;
+        sourceMediaType: string;
+        grade: CompatibilityReport["grade"];
+        summary: CompatibilityReport["summary"];
+        items: CompatibilityReport["items"];
+        requiresApproval: boolean;
+        approvedBy: string | null;
+        approvedAt: Date | null;
+        createdAt: Date;
+      }>(
+        `SELECT report.id,
+                report."artifactId" AS "artifactId",
+                report."sourceFormat" AS "sourceFormat",
+                report."sourceFileName" AS "sourceFileName",
+                report."sourceHash" AS "sourceHash",
+                report."sourceSize" AS "sourceSize",
+                blob."mediaType" AS "sourceMediaType",
+                report.grade,
+                report.summary,
+                report.items,
+                report."requiresApproval" AS "requiresApproval",
+                report."approvedBy" AS "approvedBy",
+                report."approvedAt" AS "approvedAt",
+                report."createdAt" AS "createdAt"
+         FROM studio_compatibility_report report
+         JOIN studio_blob blob ON blob.hash = report."sourceHash"
+         WHERE report."projectId" = $1
+         ORDER BY report."createdAt" DESC, report.id`,
+        [projectId],
+      );
+      return Object.freeze(result.rows.map((row) => compatibilityReportSchema.parse({
+        id: row.id,
+        ...(row.artifactId ? { artifactId: row.artifactId } : {}),
+        source: {
+          sourceFileName: row.sourceFileName,
+          sourceFormat: row.sourceFormat,
+          sourceHash: row.sourceHash,
+          sourceSize: Number(row.sourceSize),
+          sourceBlob: {
+            id: `source-${row.sourceHash.slice(0, 32)}`,
+            sha256: row.sourceHash,
+            size: Number(row.sourceSize),
+            mediaType: row.sourceMediaType,
+            role: "source",
+          },
+          immutable: true,
+          importedAt: toIso(row.createdAt),
+        },
+        grade: row.grade,
+        summary: row.summary,
+        items: row.items,
+        requiresApproval: row.requiresApproval,
+        ...(row.approvedBy && row.approvedAt
+          ? { approvedBy: row.approvedBy, approvedAt: toIso(row.approvedAt) }
+          : {}),
+        createdAt: toIso(row.createdAt),
+      }) as unknown as CompatibilityReport));
     } finally {
       client.release();
     }

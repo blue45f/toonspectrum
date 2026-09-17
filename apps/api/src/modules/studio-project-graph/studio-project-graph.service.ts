@@ -11,9 +11,13 @@ import type {
   CommitStudioRevision,
   CreateCompatibilityReport,
   CreateStudioExternalFileBinding,
+  CreateStudioArtifact,
   CreateStudioProjectGraph,
   CreateStudioReview,
   CreateStudioReviewComment,
+  DecideStudioReview,
+  ResolveStudioReviewComment,
+  RestoreStudioRevision,
   RegisterStudioBlob,
   UpdateStudioExternalFileBinding,
 } from "./studio-project-graph.dto";
@@ -110,6 +114,21 @@ export class StudioProjectGraphService {
       this.repository.createProject(actorUserId, input, idempotencyKey));
   }
 
+  createArtifact(
+    actorUserId: string,
+    projectId: string,
+    input: CreateStudioArtifact,
+    idempotencyKey: string,
+  ) {
+    return this.execute(() =>
+      this.repository.createArtifact(
+        actorUserId,
+        projectId,
+        input,
+        idempotencyKey,
+      ));
+  }
+
   getProject(actorUserId: string, projectId: string) {
     return this.execute(() => this.repository.getProject(actorUserId, projectId));
   }
@@ -147,6 +166,25 @@ export class StudioProjectGraphService {
       ));
   }
 
+  restoreRevision(
+    actorUserId: string,
+    artifactId: string,
+    targetRevisionId: string,
+    expectedHeadRevisionId: string,
+    idempotencyKey: string,
+    input: RestoreStudioRevision,
+  ) {
+    return this.execute(() =>
+      this.repository.restoreRevision(
+        actorUserId,
+        artifactId,
+        targetRevisionId,
+        expectedHeadRevisionId,
+        idempotencyKey,
+        input,
+      ));
+  }
+
   createReview(
     actorUserId: string,
     artifactId: string,
@@ -161,6 +199,44 @@ export class StudioProjectGraphService {
     input: CreateStudioReviewComment,
   ) {
     return this.execute(() => this.repository.createReviewComment(actorUserId, reviewId, input));
+  }
+
+  listReviews(actorUserId: string, artifactId: string) {
+    return this.execute(() =>
+      this.repository.listReviews(actorUserId, artifactId));
+  }
+
+  getReview(actorUserId: string, reviewId: string) {
+    return this.execute(() =>
+      this.repository.getReview(actorUserId, reviewId));
+  }
+
+  decideReview(
+    actorUserId: string,
+    reviewId: string,
+    input: DecideStudioReview,
+  ) {
+    return this.execute(() =>
+      this.repository.decideReview(actorUserId, reviewId, input));
+  }
+
+  resolveReviewComment(
+    actorUserId: string,
+    commentId: string,
+    input: ResolveStudioReviewComment,
+  ) {
+    return this.execute(() =>
+      this.repository.resolveReviewComment(actorUserId, commentId, input));
+  }
+
+  reopenReviewComment(actorUserId: string, commentId: string) {
+    return this.execute(() =>
+      this.repository.reopenReviewComment(actorUserId, commentId));
+  }
+
+  listCompatibilityReports(actorUserId: string, projectId: string) {
+    return this.execute(() =>
+      this.repository.listCompatibilityReports(actorUserId, projectId));
   }
 
   createCompatibilityReport(
