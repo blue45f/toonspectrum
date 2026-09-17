@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import test from "node:test";
 
 import {
@@ -9,7 +9,10 @@ import {
   resolveReleaseCommand,
 } from "./package-desktop-sync-release.mjs";
 import { signDesktopSyncReleaseStage } from "./sign-desktop-sync-release.mjs";
-import { verifyDesktopSyncRelease } from "./verify-desktop-sync-release.mjs";
+import {
+  resolveArchiveListingInvocation,
+  verifyDesktopSyncRelease,
+} from "./verify-desktop-sync-release.mjs";
 
 function packageOptions(outputDir, version, overrides = {}) {
   return {
@@ -46,6 +49,21 @@ test("wraps Windows command shims through cmd.exe", () => {
     { command: "npm", args: ["install"] },
   );
 });
+
+test("lists Windows archives from their directory without a drive-letter argument", () => {
+  assert.deepEqual(
+    resolveArchiveListingInvocation(
+      "D:\\a\\toonspectrum\\release\\toonstudio-sync-windows-x64.tar.gz",
+      win32,
+    ),
+    {
+      command: "tar",
+      args: ["-tzf", "toonstudio-sync-windows-x64.tar.gz"],
+      cwd: "D:\\a\\toonspectrum\\release",
+    },
+  );
+});
+
 test("packages a reproducible, self-contained desktop sync release", {
   timeout: 180_000,
 }, async (context) => {
