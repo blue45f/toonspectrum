@@ -907,7 +907,7 @@ export function StudioHudPill({
       className={cn(
         // 밝은 원고 위에서도 읽히도록 프로스트 글라스(blur+saturate) 위에 얹는다 — 반투명
         // 캔버스색 단독으로는 흰 배경에서 대비가 무너졌다.
-        "inline-flex min-w-max shrink-0 items-center gap-1 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] rounded-lg border border-line/50 bg-panel/70 px-2 py-0.5",
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] rounded-lg border border-line/50 bg-panel/70 px-2 py-0.5",
         "backdrop-blur-md backdrop-saturate-150 shadow-[0_1px_2px_oklch(0.08_0.01_70/0.35),inset_0_1px_0_oklch(0.95_0.02_85/0.06)]",
         "text-[0.65rem] font-semibold tabular-nums tracking-tight text-fg-2",
         accent && "border-accent/40 bg-accent-soft/60 text-accent",
