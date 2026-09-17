@@ -14,11 +14,15 @@ import {
   STUDIO_I18N_MANAGED_SENTINEL_KEY,
 } from "./studio-i18n-priority-loader";
 
-function namespaceFromUrl(input: string | URL | Request): string {
+function studioAssetFromUrl(input: string | URL | Request): { namespace: string; locale: string } {
   const pathname = new URL(String(input), "https://toonstudio.test").pathname;
   const match = pathname.match(/\/i18n\/studio\/([^/]+)\/([^/]+)\.json$/);
   if (!match) throw new Error(`unexpected Studio i18n URL: ${pathname}`);
-  return match[1]!;
+  return { namespace: match[1]!, locale: match[2]! };
+}
+
+function namespaceFromUrl(input: string | URL | Request): string {
+  return studioAssetFromUrl(input).namespace;
 }
 
 function dictionaryResponse(namespace: string): Response {
@@ -141,16 +145,17 @@ describe("Studio priority i18n loader", () => {
     }
   });
 
-  it("retries only deferred namespaces that fail transiently", async () => {
+  it("retries only deferred active-locale namespaces and loads English source off the critical path", async () => {
     vi.useFakeTimers();
     try {
       const transientNamespace = STUDIO_I18N_DEFERRED_NAMESPACES[0]!;
       const attempts = new Map<string, number>();
       const fetchMock = vi.fn(async (input: string | URL | Request) => {
-        const namespace = namespaceFromUrl(input);
-        const nextAttempt = (attempts.get(namespace) ?? 0) + 1;
-        attempts.set(namespace, nextAttempt);
-        if (namespace === transientNamespace && nextAttempt === 1) {
+        const { namespace, locale } = studioAssetFromUrl(input);
+        const key = `${locale}/${namespace}`;
+        const nextAttempt = (attempts.get(key) ?? 0) + 1;
+        attempts.set(key, nextAttempt);
+        if (locale === "is" && namespace === transientNamespace && nextAttempt === 1) {
           return new Response("temporary", { status: 503 });
         }
         return dictionaryResponse(namespace);
@@ -163,12 +168,19 @@ describe("Studio priority i18n loader", () => {
         deferredRetryDelaysMs: [10],
       });
 
+      // Nothing beyond the active-locale core preload is added to the critical path; the scheduler
+      // starts both deferred locale strings and the canonical English translation source later.
+      expect(fetchMock).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(250);
-      expect(attempts.get(transientNamespace)).toBe(1);
+      expect(attempts.get(`is/${transientNamespace}`)).toBe(1);
+      for (const namespace of STUDIO_I18N_NAMESPACES) {
+        expect(attempts.get(`en/${namespace}`)).toBe(1);
+      }
+
       await vi.advanceTimersByTimeAsync(10);
-      expect(attempts.get(transientNamespace)).toBe(2);
+      expect(attempts.get(`is/${transientNamespace}`)).toBe(2);
       for (const namespace of STUDIO_I18N_DEFERRED_NAMESPACES) {
-        expect(attempts.get(namespace)).toBe(namespace === transientNamespace ? 2 : 1);
+        expect(attempts.get(`is/${namespace}`)).toBe(namespace === transientNamespace ? 2 : 1);
       }
       cancel();
     } finally {
