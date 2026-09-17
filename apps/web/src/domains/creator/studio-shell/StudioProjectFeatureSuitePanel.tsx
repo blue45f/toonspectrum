@@ -59,7 +59,7 @@ function safeResult<T>(factory: () => T): T | null {
   }
 }
 
-function statusLabel(status: ResultStatus, locale: Locale): string {
+function statusLabel(status: ResultStatus, bt: (ko: string, en: string) => string): string {
   const labels: Record<ResultStatus, Record<Locale, string>> = {
     ready: { ko: "준비됨", en: "Ready" },
     review: { ko: "확인 필요", en: "Review" },
@@ -67,10 +67,12 @@ function statusLabel(status: ResultStatus, locale: Locale): string {
     pass: { ko: "문제 없음", en: "Pass" },
     warning: { ko: "확인 필요", en: "Warning" },
   };
-  return labels[status][locale];
+  const label = labels[status];
+  return bt(label.ko, label.en);
 }
 
-function StatusBadge({ status, locale }: { readonly status: ResultStatus; readonly locale: Locale }) {
+function StatusBadge({ status, locale: _locale }: { readonly status: ResultStatus; readonly locale: Locale }) {
+  const bt = useBilingual("StudioProjectFeatureSuitePanel.status");
   return (
     <span className={cn(
       "inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-bold",
@@ -80,7 +82,7 @@ function StatusBadge({ status, locale }: { readonly status: ResultStatus; readon
           ? "border-danger/30 bg-danger-soft/20 text-danger"
           : "border-warning/35 bg-warning-soft/20 text-warning",
     )}>
-      {statusLabel(status, locale)}
+      {statusLabel(status, bt)}
     </span>
   );
 }
