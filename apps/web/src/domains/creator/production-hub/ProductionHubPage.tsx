@@ -55,11 +55,16 @@ import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWor
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
+import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
 import {
   executeProductionCommand,
+  getProductionPersonalInbox,
   getProductionProject,
+  listProductionProjects,
   type ProductionClientCommand,
+  type ProductionPersonalInboxItem,
   type ProductionProjectAccess,
+  type ProductionProjectSummary,
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -73,6 +78,7 @@ export type ProductionProjectSurface =
   | "episodes"
   | "production"
   | "schedule"
+  | "control"
   | "handoff"
   | "review"
   | "procurement"
@@ -96,6 +102,7 @@ const SURFACES: readonly {
   { id: "episodes", label: "회차", description: "회차별 상태와 원고", icon: PanelTopOpen },
   { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
   { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
+  { id: "control", label: "운영 제어", description: "임계경로·연재·자동화", icon: GitBranch },
   { id: "handoff", label: "작업 넘기기", description: "꼭 지킬 내용과 질문", icon: Handshake },
   { id: "review", label: "검수·수정", description: "수정 요청과 승인", icon: ClipboardCheck },
   { id: "procurement", label: "외주·발주", description: "의뢰 범위와 납품", icon: BriefcaseBusiness },
@@ -307,6 +314,13 @@ function reduceDemoCommand(
       return { ...base, episodes: replaceById(aggregate.episodes, command.episode) };
     case "upsert-task":
       return { ...base, tasks: replaceById(aggregate.tasks, command.task) };
+    case "upsert-task-batch": {
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      return { ...base, tasks };
+    }
     case "upsert-episode-operations": {
       const episodes = command.episode
         ? replaceById(aggregate.episodes, command.episode)
@@ -319,6 +333,43 @@ function reduceDemoCommand(
         aggregate.tasks,
       );
       return { ...base, episodes, episodePlans, tasks };
+    }
+    case "upsert-operations-record": {
+      const record = command.record;
+      switch (record.kind) {
+        case "resource-calendar":
+          return { ...base, resourceCalendars: replaceById(aggregate.resourceCalendars ?? [], record.value) };
+        case "schedule-baseline":
+          return { ...base, scheduleBaselines: replaceById(aggregate.scheduleBaselines ?? [], record.value) };
+        case "release-plan":
+          return { ...base, releasePlans: replaceById(aggregate.releasePlans ?? [], record.value) };
+        case "external-review-access":
+          return { ...base, externalReviewAccesses: replaceById(aggregate.externalReviewAccesses ?? [], record.value) };
+        case "automation-rule":
+          return { ...base, automationRules: replaceById(aggregate.automationRules ?? [], record.value) };
+        case "notification-policy":
+          return { ...base, notificationPolicies: replaceById(aggregate.notificationPolicies ?? [], record.value) };
+        case "notification":
+          return { ...base, notifications: replaceById(aggregate.notifications ?? [], record.value) };
+        case "saved-view":
+          return { ...base, savedViews: replaceById(aggregate.savedViews ?? [], record.value) };
+      }
+      return aggregate;
+    }
+    case "apply-schedule-scenario": {
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      const baselines = (aggregate.scheduleBaselines ?? []).map((baseline) => ({
+        ...baseline,
+        active: command.baseline.active ? false : baseline.active,
+      }));
+      return {
+        ...base,
+        tasks,
+        scheduleBaselines: replaceById(baselines, command.baseline),
+      };
     }
     case "upsert-change-request":
       return { ...base, changeRequests: replaceById(aggregate.changeRequests, command.request) };
@@ -422,6 +473,40 @@ function useProductionProject(projectId: string | undefined) {
 
 export function ProductionLandingPage() {
   const demo = useMemo(() => createProductionDemoProject(), []);
+  const userId = useApp((state) => state.userId);
+  const [projects, setProjects] = useState<readonly ProductionProjectSummary[]>([]);
+  const [inboxItems, setInboxItems] = useState<readonly ProductionPersonalInboxItem[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(Boolean(userId));
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setProjects([]);
+      setInboxItems([]);
+      setProjectsLoading(false);
+      setProjectsError(null);
+      return;
+    }
+    let active = true;
+    setProjectsLoading(true);
+    setProjectsError(null);
+    void Promise.all([listProductionProjects(), getProductionPersonalInbox()])
+      .then(([projectResult, inboxResult]) => {
+        if (!active) return;
+        setProjects(projectResult.projects);
+        setInboxItems(inboxResult.items);
+      })
+      .catch(async (cause: unknown) => {
+        if (active) setProjectsError(await getApiErrorMessage(cause, "제작 포트폴리오를 불러오지 못했습니다."));
+      })
+      .finally(() => {
+        if (active) setProjectsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
   return (
     <div className="min-h-dvh bg-canvas text-fg">
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -454,6 +539,92 @@ export function ProductionLandingPage() {
             </div>
           </div>
         </header>
+
+        {userId ? (
+          <SectionCard
+            className="mt-6"
+            title="내 제작 포트폴리오"
+            description="여러 작품의 다음 연재, 일정 안정도, 차단·검수·인력 공백을 같은 기준으로 비교합니다. 위험한 작품을 먼저 표시합니다."
+            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/projects">프로젝트 만들기</Link>}
+          >
+            {projectsLoading ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록 불러오는 중">
+                {[0, 1, 2].map((index) => <div key={index} className="h-44 animate-pulse rounded-2xl bg-raised" />)}
+              </div>
+            ) : projectsError ? (
+              <div role="alert" className="rounded-xl border border-bad/35 bg-bad/10 p-4 text-sm text-fg">{projectsError}</div>
+            ) : projects.length > 0 ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Metric label="운영 작품" value={String(projects.length)} detail={`진행 회차 ${projects.reduce((sum, project) => sum + project.activeEpisodeCount, 0)}개`} icon={LayoutDashboard} tone="accent" />
+                  <Metric label="위험 작품" value={String(projects.filter((project) => project.healthScore < 64).length)} detail={`기한 초과 ${projects.reduce((sum, project) => sum + project.overdueTaskCount, 0)}건`} icon={AlertTriangle} tone={projects.some((project) => project.healthScore < 64) ? "danger" : "success"} />
+                  <Metric label="완성 비축" value={`${projects.reduce((sum, project) => sum + project.readyBufferCount, 0)}회`} detail="게시 준비가 끝난 미공개 회차" icon={BadgeCheck} tone="success" />
+                  <Metric label="검수 대기" value={String(projects.reduce((sum, project) => sum + project.reviewTaskCount, 0))} detail={`미배정 ${projects.reduce((sum, project) => sum + project.unassignedTaskCount, 0)}건`} icon={ClipboardCheck} tone="warning" />
+                </div>
+                <div className="rounded-2xl border border-line bg-card p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><h3 className="text-sm font-black text-fg">내 통합 작업함</h3><p className="mt-1 text-xs text-fg-2">모든 작품에서 오늘 제출·진행·검수·입력 대기 업무를 우선순위 순으로 모았습니다.</p></div>
+                    <span className="rounded-full border border-accent/35 bg-accent-soft px-2.5 py-1 text-xs font-black text-accent">조치 {inboxItems.length}건</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    {inboxItems.slice(0, 8).map((item) => {
+                      const bucketLabel = {
+                        dueToday: "오늘 제출",
+                        inProgress: "진행 중",
+                        review: "내 검수",
+                        ready: "시작 가능",
+                        waitingInput: "입력 대기",
+                        blockingOthers: "다른 작업 차단",
+                      }[item.bucket];
+                      const tone = item.bucket === "dueToday" || item.bucket === "blockingOthers"
+                        ? "danger"
+                        : item.bucket === "waitingInput" || item.bucket === "review"
+                          ? "warning"
+                          : item.bucket === "ready" ? "success" : "accent";
+                      return (
+                        <Link
+                          key={`${item.bucket}:${item.projectId}:${item.taskId}`}
+                          to={`/production/projects/${encodeURIComponent(item.projectId)}/production?task=${encodeURIComponent(item.taskId)}`}
+                          className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/40 hover:bg-raised"
+                        >
+                          <div className="flex items-center justify-between gap-2"><Pill tone={tone}>{bucketLabel}</Pill><span className="text-[0.625rem] text-fg-3">{formatDay(item.dueAt)}</span></div>
+                          <p className="mt-2 line-clamp-2 text-xs font-black leading-5 text-fg">{item.taskTitle}</p>
+                          <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{item.projectTitle} · {item.processKey} · {item.estimateHours}h</p>
+                        </Link>
+                      );
+                    })}
+                    {inboxItems.length === 0 ? <div className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3 md:col-span-2 xl:col-span-4">현재 사용자에게 배정된 조치 업무가 없습니다.</div> : null}
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {projects.map((project) => {
+                    const healthTone = project.healthScore >= 82 ? "success" : project.healthScore >= 64 ? "warning" : "danger";
+                    return (
+                      <Link
+                        key={project.projectId}
+                        to={`/production/projects/${encodeURIComponent(project.projectId)}/overview`}
+                        className="group rounded-2xl border border-line bg-panel p-4 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0"><p className="truncate text-base font-black text-fg">{project.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{project.collaborationModel} · r{project.revision}</p></div>
+                          <Pill tone={healthTone}>안정도 {project.healthScore}</Pill>
+                        </div>
+                        <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[0.6875rem]">
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">진행 회차</p><p className="mt-1 font-black text-fg">{project.activeEpisodeCount}</p></div>
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">차단·지연</p><p className={cn("mt-1 font-black", project.blockedTaskCount + project.overdueTaskCount > 0 ? "text-bad" : "text-fg")}>{project.blockedTaskCount + project.overdueTaskCount}</p></div>
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">비축</p><p className="mt-1 font-black text-fg">{project.readyBufferCount}회</p></div>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-fg-2"><span>다음 공개 {formatDay(project.nextReleaseAt)}</span><span className="flex items-center gap-1 font-bold text-accent">운영 열기 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-line p-8 text-center"><LayoutDashboard className="mx-auto size-8 text-fg-3" aria-hidden="true" /><p className="mt-3 text-sm font-black text-fg">운영 중인 제작 프로젝트가 없습니다</p><p className="mt-1 text-xs text-fg-2">Studio 프로젝트에서 제작 관리 프로젝트를 연결해 주세요.</p></div>
+            )}
+          </SectionCard>
+        ) : null}
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
@@ -1017,12 +1188,14 @@ function SurfaceContent({
   roleLens,
   execute,
   canEdit,
+  canManage,
 }: {
   readonly surface: ProductionProjectSurface;
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
+  readonly canManage: boolean;
 }) {
   switch (surface) {
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
@@ -1030,6 +1203,7 @@ function SurfaceContent({
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
+    case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;
@@ -1055,7 +1229,14 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
-          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} />
+          <SurfaceContent
+            surface={surface}
+            aggregate={project.aggregate}
+            roleLens={roleLens}
+            execute={project.execute}
+            canEdit={project.access.edit}
+            canManage={project.access.manage}
+          />
         </div>
       </div>
     </div>
