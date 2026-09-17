@@ -397,7 +397,7 @@ describe("StudioLayerCompsPanel", () => {
     expect(input.value).toBe("삭제하지 못한 초안");
     await act(async () => { reject(new Error("lease denied")); });
     expect(input.value).toBe("삭제하지 못한 초안");
-    expect(screen.getByRole("alert").textContent).toBe("콤프를 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    expect(screen.getByRole("alert").textContent).toBe("저장한 보기를 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
     fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     await waitFor(() => { expect(screen.queryByRole("textbox")).toBeNull(); });
   });
@@ -420,7 +420,7 @@ describe("StudioLayerCompsPanel", () => {
     expect(panel.disabled).toBe(true);
     await act(async () => { reject(new Error("lease failed")); });
     expect(panel.disabled).toBe(false);
-    expect(screen.getByRole("alert").textContent).toBe("콤프를 업데이트하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    expect(screen.getByRole("alert").textContent).toBe("저장한 보기를 현재 상태로 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.");
     fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
     await waitFor(() => { expect(panel.disabled).toBe(false); });
     expect(onCaptureComp).toHaveBeenCalledTimes(2);
