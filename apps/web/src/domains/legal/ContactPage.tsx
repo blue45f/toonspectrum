@@ -1,6 +1,7 @@
 import {
   Bug,
   Database,
+  HandCoins,
   Handshake,
   MessagesSquare,
   Palette,
@@ -23,6 +24,12 @@ const SUPPORT_LINKS = [
     title: "투자·제휴·후원 문의",
     body: "투자·IR, 콘텐츠/IP, 광고·스폰서십 제안을 비공개로 접수합니다.",
     href: "/business",
+  },
+  {
+    icon: HandCoins,
+    title: "ToonSpectrum 응원하기",
+    body: "개인 서포터 결제 준비 상태, 기업 스폰서십, 공익 기부의 서로 다른 경로를 확인합니다.",
+    href: "/support-us",
   },
   {
     icon: Bug,
@@ -62,7 +69,7 @@ export function ContactPage() {
       <PublicStoryHero
         eyebrow="CONTACT · CREATE SOMETHING TOGETHER"
         title="웹툰을 만드는 더 나은 환경, 함께."
-        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서 해결 경로를 찾고, 투자·제휴·후원처럼 연락처가 필요한 제안은 비공개 비즈니스 센터에서 접수할 수 있습니다."
+        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서, 투자·제휴·스폰서십은 비공개 비즈니스 센터에서, 개인 서포터와 후원 경계는 응원 센터에서 확인할 수 있습니다."
         image="materials"
         imageAlt="브러시와 재료가 놓인 웹툰 작업실 콘셉트 아트"
         caption="LET’S MAKE ROOM FOR IDEAS · 드로잉 재료 콘셉트 아트"
@@ -103,7 +110,7 @@ export function ContactPage() {
           <h2 className="mb-3 mt-8 text-lg font-bold text-fg">
             문의 성격에 맞는 전용 경로
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {SUPPORT_LINKS.map((link) => (
               <Link
                 key={link.title}
