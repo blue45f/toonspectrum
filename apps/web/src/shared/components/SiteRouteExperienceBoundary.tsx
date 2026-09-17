@@ -1,8 +1,7 @@
 import { MonitorUp, WifiOff } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { RoutePurposeScene } from "./RoutePurposeScene";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
@@ -10,6 +9,10 @@ import { resolveProductLocale } from "@/shared/lib/product-identity";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 import { useI18n } from "@/shared/lib/i18n";
+
+const RoutePurposeScene = lazy(() => import("./RoutePurposeScene").then((module) => ({
+  default: module.RoutePurposeScene,
+})));
 
 function useNarrowViewport() {
   const [narrow, setNarrow] = useState(false);
@@ -97,12 +100,14 @@ export function SiteRouteExperienceBoundary({
       </p>
 
       {routePurposeSceneSupported ? (
-        <RoutePurposeScene
-          title={routeTitle}
-          locale={locale}
-          experience={experience}
-          profile={visual}
-        />
+        <Suspense fallback={null}>
+          <RoutePurposeScene
+            title={routeTitle}
+            locale={locale}
+            experience={experience}
+            profile={visual}
+          />
+        </Suspense>
       ) : null}
 
       {desktopRequired ? (
