@@ -48,6 +48,7 @@ const DOC_ROUTES = [
 ] as const;
 
 const STUDIO_PUBLIC_ROUTES = [
+  "/",
   "/brand-film",
   "/collaborate",
   "/learn",
@@ -136,6 +137,8 @@ const DESKTOP_FIRST_ROUTES = [
   "/studio/poser",
 ] as const;
 
+const STUDIO_NAVIGATION_DOC_ROUTES = ["/about/technology", "/help"] as const;
+
 export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
   const canonicalPath = canonicalSitePath(input);
   const authority = resolveSiteRouteAuthority(canonicalPath);
@@ -190,6 +193,16 @@ export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
     device: pathMatchesAny(canonicalPath, DESKTOP_FIRST_ROUTES) ? "desktop-first" : "responsive",
     projectContext,
   };
+}
+
+
+/** Resolve the product navigation shell from canonical route metadata instead of duplicating route prefixes. */
+export function resolveSiteRouteNavigationContext(input: string): "studio" | "spectrum" {
+  const canonicalPath = canonicalSitePath(input);
+  const metadata = resolveSiteRouteMetadata(canonicalPath);
+  return metadata.product === "studio" || pathMatchesAny(canonicalPath, STUDIO_NAVIGATION_DOC_ROUTES)
+    ? "studio"
+    : "spectrum";
 }
 
 export function siteRouteMetadataSearchText(metadata: SiteRouteMetadata): string {
