@@ -7,6 +7,7 @@
 import { Studio3dAssetQualityPanel } from "../Studio3dAssetQualityPanel";
 
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { StudioBg3dSceneOutliner } from "./StudioBg3dSceneOutliner";
 
 export function StudioBg3dEditorSidebarExtras({ h }) {
   const {
@@ -370,193 +371,14 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                   </Suspense>
                 ) : null}
                 <div className={cx(
-                  "mb-2 flex items-center justify-between gap-3",
-                  includeSharedCharactersInCapture
-                    && sharedCharacters.length > 0
-                    && "mt-4",
+                  includeSharedCharactersInCapture && sharedCharacters.length > 0 && "mt-4",
+                  "xl:hidden",
                 )}>
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <Layers size={15} className="text-accent" aria-hidden />
-                    레이어
-                  </h3>
-                  <span className="text-[0.68rem] text-fg-3">
-                    {filteredLayerItems.length}/{layerListItems.length}개
-                  </span>
+                  <StudioBg3dSceneOutliner controller={h.outlinerController} variant="panel" />
                 </div>
-                {layerListItems.length === 0 ? (
-                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·에셋이 없습니다. &ldquo;도형&rdquo;/&ldquo;에셋&rdquo; 탭에서 먼저 추가해 주세요.</p>
-                ) : (
-                  <>
-                    <label className="mb-2 block">
-                      <span className="sr-only">레이어 검색</span>
-                      <input
-                        type="search"
-                        value={layerQuery}
-                        onChange={(e) => setLayerQuery(e.target.value)}
-                        placeholder="이름 검색…"
-                        className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-medium text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                      />
-                    </label>
-                    {filteredLayerItems.length === 0 ? (
-                      <p className="text-xs leading-relaxed text-fg-3">검색 결과가 없습니다.</p>
-                    ) : (
-                                            <ul className="space-y-1">
-                        {(() => {
-                          const filteredById = new Map(
-                            filteredLayerItems.map((entry) => [entry.id, entry] as const),
-                          );
-                          const searchActive = layerQuery.trim().length > 0;
-                          const renderSidebarNode = (item: typeof filteredLayerItems[0], depth: number = 0) => {
-                            const isActive = selectedIds.has(item.id);
-                            const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
-                            const children = searchActive
-                              ? []
-                              : (sceneHierarchy.childrenByParent.get(item.id) ?? [])
-                                .map((id) => filteredById.get(id))
-                                .filter((entry): entry is typeof item => entry !== undefined);
-                            
-                            return (
-                              <Fragment key={item.id}>
-                                <li>
-                                  <div
-                                    style={{ marginLeft: `${depth * 16}px` }}
-                                    className={cx(
-                                      "flex min-h-11 items-center gap-1 rounded-lg border px-1.5 py-1.5 text-xs transition-colors sm:min-h-0",
-                                      isActive
-                                        ? "border-accent/55 bg-accent-soft text-accent"
-                                        : "border-line bg-card text-fg-2 hover:bg-raised",
-                                      !item.visible && "opacity-60"
-                                    )}
-                                  >
-                                    <button
-                                      type="button"
-                                      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
-                                      onClick={(e) => {
-                                        setSelectedIds((prev) => {
-                                          const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
-                                          if (isMulti) {
-                                            const next = new Set(prev);
-                                            if (next.has(item.id)) next.delete(item.id);
-                                            else next.add(item.id);
-                                            return next;
-                                          }
-                                          return new Set([item.id]);
-                                        });
-                                      }}
-                                    >
-                                      {prim ? (
-                                        <span
-                                          className="inline-block size-2.5 shrink-0 rounded-sm"
-                                          style={{ backgroundColor: prim.color }}
-                                          aria-hidden
-                                        />
-                                      ) : (
-                                        <Hexagon size={13} className="shrink-0 text-fg-3" aria-hidden />
-                                      )}
-                                      <span className="truncate font-semibold">{item.label}</span>
-                                      {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 이름 변경`}
-                                      title="이름 변경"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => renameBgObject(item.id, item.kind)}
-                                    >
-                                      <PencilLine size={12} aria-hidden />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
-                                      title={item.visible ? "숨기기" : "보이기"}
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "visible");
-                                        else toggleCustomModelFlag(item.id, "visible");
-                                      }}
-                                    >
-                                      {item.visible ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
-                                      title={item.locked ? "잠금 해제" : "잠금"}
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "locked");
-                                        else toggleCustomModelFlag(item.id, "locked");
-                                      }}
-                                    >
-                                      {item.locked ? <Lock size={12} aria-hidden /> : <Unlock size={12} aria-hidden />}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 복제`}
-                                      title="복제"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (!canAdmitSceneNodes(1)) return;
-                                        const live = physicsRuntimeSourceRef.current;
-                                        if (item.kind === "primitive") {
-                                          const source = live.primitives.find((p) => p.id === item.id);
-                                          if (!source) return;
-                                          const clone = duplicatePrimitive(source);
-                                          const nextPrimitives = [...live.primitives, clone];
-                                          physicsRuntimeSourceRef.current = {
-                                            ...live,
-                                            primitives: nextPrimitives,
-                                          };
-                                          setPrimitives(nextPrimitives);
-                                          setSelectedIds(new Set([clone.id]));
-                                          return;
-                                        }
-                                        const source = live.customModels.find((m) => m.id === item.id);
-                                        if (!source) return;
-                                        const clone = duplicateBgCustomModelInstance(source);
-                                        const nextCustomModels = [...live.customModels, clone];
-                                        physicsRuntimeSourceRef.current = {
-                                          ...live,
-                                          customModels: nextCustomModels,
-                                        };
-                                        setCustomModels(nextCustomModels);
-                                        setSelectedIds(new Set([clone.id]));
-                                      }}
-                                    >
-                                      <Copy size={12} aria-hidden />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 삭제`}
-                                      title="삭제"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        removeSceneEntities(new Set([item.id]));
-                                        setSelectedIds((prev) => {
-                                          const next = new Set(prev);
-                                          next.delete(item.id);
-                                          return next;
-                                        });
-                                      }}
-                                    >
-                                      <Trash2 size={12} aria-hidden />
-                                    </button>
-                                  </div>
-                                </li>
-                                {children.map(child => renderSidebarNode(child, depth + 1))}
-                              </Fragment>
-                            );
-                          };
-                          const roots = searchActive
-                            ? filteredLayerItems
-                            : sceneHierarchy.roots
-                              .map((id) => filteredById.get(id))
-                              .filter((entry): entry is typeof filteredLayerItems[0] => entry !== undefined);
-                          return roots.map(root => renderSidebarNode(root, 0));
-                        })()}
-                      </ul>
-                    )}
-                  </>
-                )}
+                <p className="hidden rounded-lg border border-line bg-raised/60 px-3 py-2.5 text-xs leading-relaxed text-fg-3 xl:block">
+                  장면 계층은 왼쪽 패널에서 관리할 수 있습니다. 선택한 객체의 상세 설정은 이 패널에서 이어서 편집하세요.
+                </p>
               </section>
 
               <div inert={immersiveSceneActive || undefined}>
