@@ -1,4 +1,4 @@
-import { EyeOff, GripHorizontal, RotateCcw, Scaling } from "lucide-react";
+import { EyeOff, GripHorizontal, Pin, RotateCcw, Scaling } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -18,6 +18,7 @@ import {
   resizeStudioFloatingSurfaceRectFromEdge,
   resolveStudioFloatingSurfaceDock,
   resolveStudioFloatingSurfaceRect,
+  setStudioFloatingSurfaceLock,
   type StudioFloatingSurfaceConstraints,
   type StudioFloatingSurfaceRect,
   type StudioFloatingSurfaceViewport,
@@ -60,6 +61,7 @@ const MANAGED_STYLE_PROPERTIES = [
   "width",
   "height",
   "transform",
+  "translate",
   "z-index",
   "will-change",
 ] as const;
@@ -89,19 +91,36 @@ function restoreStyle(node: HTMLElement, snapshot: StyleSnapshot): void {
   }
 }
 
+function numericDatasetValue(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function readViewport(
   definition: ReturnType<typeof studioShellFloatingSurfaceById>,
+  node: HTMLElement | null = null,
 ): StudioFloatingSurfaceViewport {
   const visual = typeof window === "undefined" ? null : window.visualViewport;
   const offsetLeft = visual?.offsetLeft ?? 0;
   const offsetTop = visual?.offsetTop ?? 0;
+  const authoredDockLeft = definition.id === "drawing-options"
+    ? numericDatasetValue(node?.dataset.studioDrawOptionsDockLeft)
+    : null;
+  const authoredDockRight = definition.id === "drawing-options"
+    ? numericDatasetValue(node?.dataset.studioDrawOptionsDockRight)
+    : null;
   return {
     width: offsetLeft + (visual?.width ?? globalThis.innerWidth ?? 1),
     height: offsetTop + (visual?.height ?? globalThis.innerHeight ?? 1),
     insetTop: offsetTop + definition.insetTop,
-    insetRight: definition.insetRight,
+    insetRight: authoredDockRight === null
+      ? definition.insetRight
+      : authoredDockRight + definition.insetRight,
     insetBottom: definition.insetBottom,
-    insetLeft: offsetLeft + definition.insetLeft,
+    insetLeft: offsetLeft + (authoredDockLeft === null
+      ? definition.insetLeft
+      : authoredDockLeft + definition.insetLeft),
   };
 }
 
@@ -155,12 +174,10 @@ function styleRect(node: HTMLElement, rect: StudioFloatingSurfaceRect, applySize
   node.style.setProperty("right", "auto");
   node.style.setProperty("bottom", "auto");
   node.style.setProperty("transform", "none");
+  node.style.setProperty("translate", "none");
   if (applySize) {
     node.style.setProperty("width", `${Math.round(rect.width)}px`);
     node.style.setProperty("height", `${Math.round(rect.height)}px`);
-  } else {
-    node.style.removeProperty("width");
-    node.style.removeProperty("height");
   }
 }
 
@@ -284,6 +301,7 @@ export function StudioShellFloatingTarget({
   useLayoutEffect(() => {
     if (!node) return undefined;
     const update = (): void => {
+      setViewport(readViewport(definition, node));
       const next = measuredSize(node, definition.defaultLayout);
       setSize((current) =>
         Math.abs(current.width - next.width) < 0.5
@@ -295,13 +313,14 @@ export function StudioShellFloatingTarget({
       setScreenRect(rect.width > 0 && rect.height > 0 ? rect : null);
     };
     update();
+    if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [definition.defaultLayout, node]);
+  }, [definition, node]);
 
   useEffect(() => {
-    const update = (): void => setViewport(readViewport(definition));
+    const update = (): void => setViewport(readViewport(definition, node));
     globalThis.addEventListener("resize", update);
     window.visualViewport?.addEventListener("resize", update);
     window.visualViewport?.addEventListener("scroll", update);
@@ -310,7 +329,7 @@ export function StudioShellFloatingTarget({
       window.visualViewport?.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("scroll", update);
     };
-  }, [definition]);
+  }, [definition, node]);
 
   useLayoutEffect(() => {
     if (!node || !actualVisible || !positionEnabled) {
@@ -372,6 +391,13 @@ export function StudioShellFloatingTarget({
         sizeLocked: layout.sizeLocked,
       },
     ));
+  };
+
+  const toggleLock = (kind: "position" | "size"): void => {
+    const locked = kind === "position"
+      ? layout.positionLocked
+      : layout.sizeLocked;
+    setLayout(setStudioFloatingSurfaceLock(layout, kind, !locked));
   };
 
   const begin = (
@@ -552,16 +578,16 @@ export function StudioShellFloatingTarget({
   const toolbarStyle: CSSProperties = {
     left: toolbarLeft,
     top: toolbarTop,
-    zIndex: 205,
+    zIndex: 119,
   };
   const resizeStyle: CSSProperties = {
     left: Math.max(0, screenRect.right - 22),
     top: Math.max(0, screenRect.bottom - 22),
-    zIndex: 206,
+    zIndex: 119,
   };
   const actionClass = cn(
     "inline-flex min-h-8 items-center justify-center gap-1 rounded-md px-2",
-    "text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg",
+    "text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
     STUDIO_FOCUS_RING,
   );
 
@@ -578,6 +604,8 @@ export function StudioShellFloatingTarget({
           type="button"
           aria-label={`${definition.label} 이동`}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Home"
+          disabled={layout.positionLocked}
+          title={layout.positionLocked ? "위치 잠금을 해제한 뒤 이동할 수 있어요." : "끌어서 이동 · 방향키로 미세 조정"}
           className={cn(
             actionClass,
             "min-w-0 flex-1 cursor-grab touch-none justify-start active:cursor-grabbing",
@@ -590,6 +618,36 @@ export function StudioShellFloatingTarget({
           <GripHorizontal size={14} aria-hidden className="shrink-0" />
           <span className="truncate">{definition.label}</span>
         </button>
+        <button
+          type="button"
+          aria-pressed={layout.positionLocked}
+          aria-label={`${definition.label} 위치 ${layout.positionLocked ? "잠금 해제" : "잠금"}`}
+          title={layout.positionLocked ? "위치 잠금 해제" : "위치 잠금"}
+          className={cn(
+            actionClass,
+            "size-8 px-0",
+            layout.positionLocked && "bg-accent-soft text-accent",
+          )}
+          onClick={() => toggleLock("position")}
+        >
+          <Pin size={14} aria-hidden />
+        </button>
+        {definition.resizable ? (
+          <button
+            type="button"
+            aria-pressed={layout.sizeLocked}
+            aria-label={`${definition.label} 크기 ${layout.sizeLocked ? "잠금 해제" : "잠금"}`}
+            title={layout.sizeLocked ? "크기 잠금 해제" : "크기 잠금"}
+            className={cn(
+              actionClass,
+              "size-8 px-0",
+              layout.sizeLocked && "bg-accent-soft text-accent",
+            )}
+            onClick={() => toggleLock("size")}
+          >
+            <Scaling size={14} aria-hidden />
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label={`${definition.label} 기본 위치로 복원`}
@@ -614,6 +672,8 @@ export function StudioShellFloatingTarget({
           type="button"
           aria-label={`${definition.label} 크기 조절`}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight"
+          disabled={layout.sizeLocked}
+          title={layout.sizeLocked ? "크기 잠금을 해제한 뒤 조절할 수 있어요." : "끌어서 크기 조절 · 방향키로 미세 조정"}
           data-studio-shell-floating-resize={surfaceId}
           className={cn(
             "pointer-events-auto fixed grid size-11 touch-none cursor-se-resize place-items-center rounded-lg border border-accent/50 bg-panel/95 text-accent shadow-xl",

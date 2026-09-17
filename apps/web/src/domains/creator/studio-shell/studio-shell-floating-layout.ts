@@ -9,9 +9,11 @@ export const STUDIO_SHELL_FLOATING_VISIBILITY_IDS = [
   "workspace-switcher",
   "document-tools",
   "draft-save-status",
+  "drawing-options",
   "drawing-input",
   "offline-readiness",
   "collaboration",
+  "workspace-arrangement",
 ] as const;
 
 export const STUDIO_SHELL_FLOATING_SURFACE_IDS = [
@@ -19,10 +21,12 @@ export const STUDIO_SHELL_FLOATING_SURFACE_IDS = [
   "document-tools",
   "document-tools-panel",
   "draft-save-status",
+  "drawing-options",
   "drawing-input",
   "drawing-input-panel",
   "offline-readiness",
   "collaboration",
+  "workspace-arrangement",
 ] as const;
 
 export type StudioShellFloatingVisibilityId =
@@ -176,6 +180,26 @@ export const STUDIO_SHELL_FLOATING_SURFACES: readonly StudioShellFloatingSurface
       safetyBehavior: "저장 실패나 복구 경고가 있으면 숨김 설정과 관계없이 자동으로 표시됩니다.",
     },
     {
+      id: "drawing-options",
+      visibilityId: "drawing-options",
+      label: "그리기 옵션",
+      description: "브러시·지우개·도형·크기·불투명도를 조절하는 하단 옵션 바",
+      selector: '[data-studio-draw-options-dock="true"]',
+      defaultLayout: layout(0.5, 1, 900, 64, "bottom"),
+      positionMinWidth: 1_024,
+      insetTop: 64,
+      insetRight: 12,
+      insetBottom: 12,
+      insetLeft: 12,
+      minWidth: 320,
+      minHeight: 60,
+      maxWidth: 1_536,
+      maxHeight: 120,
+      zIndexFloor: 40,
+      resizable: false,
+      applySize: true,
+    },
+    {
       id: "drawing-input",
       visibilityId: "drawing-input",
       label: "펜 입력 센터",
@@ -256,6 +280,27 @@ export const STUDIO_SHELL_FLOATING_SURFACES: readonly StudioShellFloatingSurface
       resizable: false,
       applySize: false,
       safetyBehavior: "통화에 참여한 동안에는 종료·음소거 제어를 잃지 않도록 자동으로 표시됩니다.",
+    },
+    {
+      id: "workspace-arrangement",
+      visibilityId: "workspace-arrangement",
+      label: "배치 편집 도구",
+      description: "열린 패널을 정렬하고 현재 배치를 저장·복원하는 데스크톱 도구",
+      selector: '[data-studio-shell-floating-target="workspace-arrangement"]',
+      defaultLayout: layout(1, 1, 240, 52, "bottom"),
+      positionMinWidth: 1_024,
+      insetTop: 64,
+      insetRight: 12,
+      insetBottom: 12,
+      insetLeft: 12,
+      minWidth: 120,
+      minHeight: 44,
+      maxWidth: 720,
+      maxHeight: 120,
+      zIndexFloor: 69,
+      resizable: false,
+      applySize: false,
+      safetyBehavior: "기존 배치 도구에서 편집 중일 때는 완료·취소 동선을 위해 자동 표시됩니다.",
     },
   ] satisfies readonly StudioShellFloatingSurfaceDefinition[]);
 
@@ -342,14 +387,20 @@ export function applyStudioShellFloatingPreset(
       return freezeVisibility([
         "document-tools",
         "draft-save-status",
+        "drawing-options",
         "drawing-input",
         "offline-readiness",
         "collaboration",
+        "workspace-arrangement",
       ]);
     case "production":
       return freezeVisibility(["collaboration"]);
     case "collaboration":
-      return freezeVisibility(["drawing-input", "offline-readiness"]);
+      return freezeVisibility([
+        "drawing-options",
+        "drawing-input",
+        "offline-readiness",
+      ]);
     case "all":
     default:
       return DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY;

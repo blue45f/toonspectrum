@@ -37,22 +37,22 @@ export function StudioNewIntegratedPage() {
   return (
     <>
       {template ? (
-        <div className="border-b border-accent/25 bg-accent-soft/35">
-          <Container size="wide" className="py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 border-b border-accent/25 bg-accent-soft/35">
+          <Container size="wide" className="min-w-0 py-3">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-accent shadow-sm">
                   <LayoutTemplate size={18} aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-xs font-black text-accent">
-                    <CheckCircle2 size={14} aria-hidden="true" />
-                    {locale === "ko" ? "템플릿 선택됨" : "Template selected"}
+                  <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-black text-accent">
+                    <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="break-words">{locale === "ko" ? "템플릿 선택됨" : "Template selected"}</span>
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-fg">
+                  <p className="mt-1 break-words text-sm font-black text-fg">
                     {locale === "ko" ? template.titleKo : template.titleEn}
                   </p>
-                  <p className="mt-0.5 text-xs text-fg-2">
+                  <p className="mt-0.5 break-words text-xs leading-5 text-fg-2">
                     {locale === "ko"
                       ? `권장 작업공간: ${template.recommendedWorkspace} · 새 문서가 열리면 기본 구조를 적용합니다.`
                       : `Recommended workspace: ${template.recommendedWorkspace} · Defaults apply when the new document opens.`}
@@ -61,10 +61,10 @@ export function StudioNewIntegratedPage() {
               </div>
               <Link
                 href="/studio/new"
-                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 hover:text-fg"
+                className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 hover:text-fg sm:w-auto sm:shrink-0"
               >
-                <X size={14} aria-hidden="true" />
-                {locale === "ko" ? "템플릿 없이 시작" : "Start without template"}
+                <X size={14} className="shrink-0" aria-hidden="true" />
+                <span className="break-words">{locale === "ko" ? "템플릿 없이 시작" : "Start without template"}</span>
               </Link>
             </div>
           </Container>

@@ -8,10 +8,19 @@ import { CollabField, CollabLogin, CollabNotice, CollaborationSafety, PortfolioL
 import type { CollaborationDetail } from "../../../../../packages/core/src/collaboration";
 import type { CollaborationAction } from "./collaboration-application-panel";
 import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { collaborationClient } from "@/infrastructure/collaboration-client";
 import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
+import {
+  canShareCollaborationPost,
+  compactPublicShareDescription,
+} from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 
 export function CollaborationPostPage() {
@@ -26,7 +35,28 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
-  useDocumentTitle(data ? `${data.post.title} · 구인·의뢰` : "구인·의뢰 공고");
+  const post = data?.post;
+  const shareable = post ? canShareCollaborationPost(post) : false;
+  const sharePath = id ? `/collaborate/${encodeURIComponent(id)}` : "/collaborate";
+  const shareDescription = compactPublicShareDescription(
+    post
+      ? `${COLLABORATION_ROLES[post.role]} · ${collaborationBudget(post)} · ${post.details.description}`
+      : null,
+    "웹툰 제작을 함께할 창작자와 작업 의뢰를 찾아보세요.",
+  );
+  const publicMetaTitle = shareable ? post?.title ?? "구인·의뢰 공고" : "구인·의뢰 공고";
+  const publicMetaDescription = shareable
+    ? shareDescription
+    : "웹툰 제작을 함께할 창작자와 작업 의뢰를 찾는 공간입니다.";
+
+  useDocumentTitle(post ? `${post.title} · 구인·의뢰` : "구인·의뢰 공고");
+  useMetaDescription(post ? publicMetaDescription : null);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: publicMetaTitle,
+    description: publicMetaDescription,
+    type: "article",
+  });
   useEffect(() => {
     const controller = new AbortController();
     void collaborationClient.detail(id, controller.signal).then((result) => {
@@ -47,7 +77,6 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
     try { await collaborationClient.remove(id); navigate("/collaborate?view=mine"); }
     catch (reason) { setError(await getApiErrorMessage(reason, "공고를 삭제하지 못했어요.")); setBusy(false); }
   }
-  const post = data?.post;
   return <Container size="wide" className="py-8 sm:py-12">
     <Link href="/collaborate" className="inline-flex min-h-11 items-center gap-2 text-sm text-fg-3"><ArrowLeft size={16} aria-hidden="true" />구인·의뢰 목록</Link>
     {error && <div className="my-5"><CollabNotice error>{error}<button type="button" className={`${collabButton} ml-3`} onClick={() => setReload((value) => value + 1)}>다시 불러오기</button></CollabNotice></div>}
@@ -76,6 +105,16 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
             {post.details.tools.length > 0 && <div><dt className="text-fg-3">사용 도구</dt><dd className="mt-2 flex flex-wrap gap-2">{post.details.tools.map((tool) => <span key={tool} className="rounded-lg bg-raised px-2 py-1 text-xs text-fg-2">{tool}</span>)}</dd></div>}
           </dl>
           <PortfolioLink url={post.details.portfolioUrl} />
+          {shareable && (
+            <SharePageButton
+              path={sharePath}
+              text={post.title}
+              description={shareDescription}
+              label="공고 공유"
+              actionLabel="공고 보기"
+              className={`${collabButton} mt-4 w-full`}
+            />
+          )}
           {userId ? <button type="button" disabled={busy} aria-pressed={post.saved} className={`${collabButton} mt-4 w-full`} onClick={() => { void act(() => collaborationClient.save(id, !post.saved), post.saved ? "저장을 취소했어요." : "공고를 저장했어요."); }}><Bookmark size={16} aria-hidden="true" fill={post.saved ? "currentColor" : "none"} />{post.saved ? "저장 취소" : "공고 저장"}</button> : <div className="mt-4"><CollabLogin /></div>}
         </section>
         {data.canManage && <section className="space-y-3 rounded-2xl border border-line bg-panel p-5">

@@ -67,15 +67,6 @@ function saveSessionVisibility(state: StudioShellFloatingVisibilityState): boole
   }
 }
 
-function productRepositoryAvailable(): boolean {
-  try {
-    return typeof navigator !== "undefined"
-      && typeof navigator.storage?.getDirectory === "function";
-  } catch {
-    return false;
-  }
-}
-
 async function acquireRepositoryDeferred(): Promise<StudioShellFloatingVisibilityRepository> {
   const { acquireProductStudioShellFloatingVisibilityRepository } = await import(
     "./studio-shell-floating-visibility-sqlite"
@@ -100,17 +91,15 @@ export function StudioShellFloatingLayoutProvider({
     useRef<Promise<StudioShellFloatingVisibilityRepository> | null>(null);
   liveVisibility.current = visibility;
 
-  const sqliteAvailable = productRepositoryAvailable();
   const repository = useCallback(() => {
-    repositoryRef.current ??= acquireRepositoryDeferred();
+    repositoryRef.current ??= acquireRepositoryDeferred().catch((cause: unknown) => {
+      repositoryRef.current = null;
+      throw cause;
+    });
     return repositoryRef.current;
   }, []);
 
   useEffect(() => {
-    if (!sqliteAvailable) {
-      setAuthority("session-only");
-      return;
-    }
     let disposed = false;
     const generationAtStart = localGeneration.current;
     void repository()
@@ -132,7 +121,7 @@ export function StudioShellFloatingLayoutProvider({
     return () => {
       disposed = true;
     };
-  }, [repository, sqliteAvailable]);
+  }, [repository]);
 
   const commit = useCallback((next: StudioShellFloatingVisibilityState) => {
     const normalized = normalizeStudioShellFloatingVisibility(next);
@@ -144,7 +133,6 @@ export function StudioShellFloatingLayoutProvider({
       setAuthority("session-only");
       setFailure("storage-unavailable");
     }
-    if (!sqliteAvailable) return;
     void repository()
       .then((target) => target.save(normalized))
       .then((result) => {
@@ -155,7 +143,7 @@ export function StudioShellFloatingLayoutProvider({
         setAuthority("session-only");
         setFailure("storage-unavailable");
       });
-  }, [repository, sqliteAvailable]);
+  }, [repository]);
 
   const setVisible = useCallback((
     id: StudioShellFloatingVisibilityId,

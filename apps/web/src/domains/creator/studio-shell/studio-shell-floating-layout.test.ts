@@ -87,14 +87,16 @@ describe("studio shell floating layout registry", () => {
     expect(applyStudioShellFloatingPreset("canvas-focus").hidden).toEqual([
       "document-tools",
       "draft-save-status",
+      "drawing-options",
       "drawing-input",
       "offline-readiness",
       "collaboration",
+      "workspace-arrangement",
     ]);
     expect(applyStudioShellFloatingPreset("production").hidden)
       .toEqual(["collaboration"]);
     expect(applyStudioShellFloatingPreset("collaboration").hidden)
-      .toEqual(["drawing-input", "offline-readiness"]);
+      .toEqual(["drawing-options", "drawing-input", "offline-readiness"]);
     expect(hideAllStudioShellFloatingSurfaces().hidden)
       .toEqual(STUDIO_SHELL_FLOATING_VISIBILITY_IDS);
     expect(applyStudioShellFloatingPreset("all"))
@@ -106,6 +108,10 @@ describe("studio shell floating layout registry", () => {
       .toMatch(/자동으로 표시/);
     expect(studioShellFloatingSurfaceById("draft-save-status").safetyBehavior)
       .toMatch(/저장 실패/);
+    expect(studioShellFloatingSurfaceById("workspace-arrangement").safetyBehavior)
+      .toMatch(/자동 표시/);
+    expect(studioShellFloatingSurfaceById("drawing-options").positionMinWidth)
+      .toBe(1_024);
     expect(() => studioShellFloatingSurfaceById("missing" as never))
       .toThrowError(/Unknown Studio shell floating surface/);
   });

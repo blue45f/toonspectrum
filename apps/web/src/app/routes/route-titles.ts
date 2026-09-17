@@ -4,11 +4,12 @@ import "./reference-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { decodePathSegment } from "@/shared/lib/decode-path-segment";
 import { resolveSiteRouteAuthority } from "@/shared/lib/site-route-authority";
 import { canonicalSitePath } from "@/shared/lib/site-route-metadata";
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
+import { PRODUCT_IDENTITY, resolveProductLocale, type ProductLocale } from "@/shared/lib/product-identity";
 
 // Static route browser titles. Detail pages that own richer content titles remain responsible for
 // updating the document, while this table still provides an accessible route-level fallback.
@@ -63,9 +64,9 @@ export const STATIC_TITLES: Record<string, string> = {
 
 type Translator = ReturnType<typeof useT>;
 
-export function resolveRouteTitle(pathname: string, t: Translator): string {
+export function resolveRouteTitle(pathname: string, t: Translator, productLocale?: ProductLocale): string {
   const canonicalPath = canonicalSitePath(pathname);
-  if (canonicalPath === "/") return `${t("app.name")} · ${t("home.creatorTitle")}`;
+  if (canonicalPath === "/") return productLocale ? PRODUCT_IDENTITY[productLocale].seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
   if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
   const authority = resolveSiteRouteAuthority(canonicalPath);
   if (authority) return t(authority.titleKey);
@@ -85,7 +86,8 @@ export function resolveRouteTitle(pathname: string, t: Translator): string {
 
 export function useRouteTitle(pathname: string, search: string): string {
   const t = useT();
-  const title = resolveRouteTitle(pathname, t);
+  const language = useI18n((state) => state.lang);
+  const title = resolveRouteTitle(pathname, t, resolveProductLocale(language));
   useEffect(() => {
     if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
     if (pathname === "/") {
