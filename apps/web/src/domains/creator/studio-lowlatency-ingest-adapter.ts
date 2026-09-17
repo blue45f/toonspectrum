@@ -30,6 +30,8 @@ import {
   type StudioLowLatencySampleMerger,
 } from "./studio-lowlatency-sample-merge";
 
+export const STUDIO_LOW_LATENCY_NATIVE_PREDICTION_SAMPLE_LIMIT = 24;
+
 export interface StudioLowLatencyPointerEventLike extends StudioLowLatencySampleLike {
   readonly getCoalescedEvents?: unknown;
   readonly getPredictedEvents?: unknown;
@@ -158,7 +160,13 @@ export class StudioLowLatencyPointerIngest<T extends StudioLowLatencyPointerEven
       { channel: "coalesced", samples: hardware, arrivalTimeStamp },
     ];
     if (this.acceptPredicted) {
-      const predicted = safeRelatedSamples(event, "getPredictedEvents");
+      const predictedSource = safeRelatedSamples(event, "getPredictedEvents");
+      // Predictions are disposable UI latency hints, never authority. A broken webview/polyfill can
+      // return an arbitrarily large future list; keep the nearest horizon and bound transient merge
+      // work without dropping a single coalesced/raw hardware sample.
+      const predicted = predictedSource.length > STUDIO_LOW_LATENCY_NATIVE_PREDICTION_SAMPLE_LIMIT
+        ? predictedSource.slice(0, STUDIO_LOW_LATENCY_NATIVE_PREDICTION_SAMPLE_LIMIT)
+        : predictedSource;
       if (predicted.length > 0) {
         deliveries.push({ channel: "predicted", samples: predicted, arrivalTimeStamp });
       }
