@@ -538,7 +538,11 @@
         "docs/validation/studio-professional-creator-validation-plan.md",
         "docs/benchmarks/studio-reference-project-certification.json",
         "scripts/verify-studio-reference-projects.mjs",
-        "scripts/verify-studio-reference-projects.test.mjs"
+        "scripts/verify-studio-reference-projects.test.mjs",
+        "docs/validation/studio-professional-creator-validation-protocol.json",
+        "docs/validation/studio-professional-creator-validation-template.json",
+        "scripts/verify-studio-professional-validation.mjs",
+        "scripts/verify-studio-professional-validation.test.mjs"
       ]
     }
   ],

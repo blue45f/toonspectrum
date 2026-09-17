@@ -90,7 +90,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-service-worker": "tsx scripts/verify-studio-service-worker.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
-    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck",
+    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",
     "verify:studio-autosave-two-tab": "tsx scripts/verify-studio-autosave-two-tab-leader.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
@@ -189,7 +189,8 @@
     "test:toonbridge": "node --test tools/toonbridge/test/*.test.mjs",
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
     "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
-    "verify:studio-reference-projects": "node scripts/verify-studio-reference-projects.mjs --run && node --test scripts/verify-studio-reference-projects.test.mjs",
+    "verify:studio-reference-projects": "node scripts/verify-studio-reference-projects.mjs --run --receipt qa-results/studio-reference-projects/receipt.json && node --test scripts/verify-studio-reference-projects.test.mjs",
+    "verify:studio-professional-validation-kit": "node scripts/verify-studio-professional-validation.mjs --check && node --test scripts/verify-studio-professional-validation.test.mjs",
     "desktop:sync": "pnpm --filter @toonspectrum/desktop-sync-agent run cli"
   },
   "dependencies": {

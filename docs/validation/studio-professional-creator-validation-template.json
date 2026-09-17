@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "studio-professional-creator-v1",
+  "status": "draft-template",
+  "studyId": "replace-with-study-id",
+  "participantSlots": [
+    { "participantId": "P-001", "role": "solo-author" },
+    { "participantId": "P-002", "role": "solo-author" },
+    { "participantId": "P-003", "role": "solo-author" },
+    { "participantId": "P-004", "role": "solo-author" },
+    { "participantId": "P-005", "role": "line-artist" },
+    { "participantId": "P-006", "role": "line-artist" },
+    { "participantId": "P-007", "role": "color-artist" },
+    { "participantId": "P-008", "role": "color-artist" },
+    { "participantId": "P-009", "role": "background-artist" },
+    { "participantId": "P-010", "role": "background-artist" },
+    { "participantId": "P-011", "role": "pd-reviewer" },
+    { "participantId": "P-012", "role": "pd-reviewer" }
+  ],
+  "coordinatorAttestation": null,
+  "sessions": []
+}
