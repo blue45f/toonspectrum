@@ -200,10 +200,12 @@ export interface StudioIntentAction {
 export function StudioIntentLauncher({
   actions,
   ariaLabel,
+  actionLabel,
   className,
 }: {
   readonly actions: readonly StudioIntentAction[];
   readonly ariaLabel: string;
+  readonly actionLabel: string;
   readonly className?: string;
 }) {
   return (
@@ -230,7 +232,7 @@ export function StudioIntentLauncher({
                 <strong className="mt-4 break-words text-sm text-fg">{action.title}</strong>
                 <span className="mt-1.5 flex-1 break-words text-xs leading-5 text-fg-3">{action.description}</span>
                 <span className="mt-3 inline-flex min-w-0 items-center gap-1 text-xs font-bold text-accent">
-                  <span className="break-words">열기</span>
+                  <span className="break-words">{actionLabel}</span>
                   <ChevronRight size={13} className="shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </span>
               </Link>
