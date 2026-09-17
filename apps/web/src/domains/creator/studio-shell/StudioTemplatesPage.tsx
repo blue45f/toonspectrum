@@ -43,16 +43,18 @@ const CATEGORY_LABELS: Readonly<
   storyboard: { ko: "콘티", en: "Storyboard" },
 };
 
-function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+function templateTitle(
+  template: StudioTemplateCatalogItem,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(template.titleKo, template.titleEn);
 }
 
-function templateTitle(template: StudioTemplateCatalogItem, locale: Locale): string {
-  return locale === "ko" ? template.titleKo : template.titleEn;
-}
-
-function templateDescription(template: StudioTemplateCatalogItem, locale: Locale): string {
-  return locale === "ko" ? template.descriptionKo : template.descriptionEn;
+function templateDescription(
+  template: StudioTemplateCatalogItem,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(template.descriptionKo, template.descriptionEn);
 }
 
 function TemplatePreview({
@@ -66,6 +68,7 @@ function TemplatePreview({
   readonly favorite: boolean;
   readonly onToggleFavorite: () => void;
 }) {
+  const bt = useBilingual("StudioTemplatesPage.preview");
   const plan = useMemo(
     () => planStudioTemplateApplication(
       template.definition,
@@ -73,7 +76,7 @@ function TemplatePreview({
     ),
     [template],
   );
-  const title = templateTitle(template, locale);
+  const title = templateTitle(template, bt);
   const composition = template.definition.composition;
   const pageCount = composition?.pages.length ?? 0;
   const panelCount = composition?.pages.reduce(
@@ -120,11 +123,11 @@ function TemplatePreview({
         className="mt-4"
       />
       <p className="mt-5 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-        {CATEGORY_LABELS[template.category][locale]}
+        {bt(CATEGORY_LABELS[template.category].ko, CATEGORY_LABELS[template.category].en)}
       </p>
       <h2 className="mt-2 text-2xl font-black tracking-tight text-fg">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-fg-2">
-        {templateDescription(template, locale)}
+        {templateDescription(template, bt)}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -168,7 +171,7 @@ function TemplatePreview({
             {bt("출력·구조", "Output & structure")}
           </p>
           <p className="mt-1 text-sm font-black text-fg">
-            {locale === "ko" ? composition.canvasLabelKo : composition.canvasLabelEn}
+            {bt(composition.canvasLabelKo, composition.canvasLabelEn)}
           </p>
           <p className="mt-1 text-xs text-fg-3">
             {bt(`새 프로젝트 · 포함 에셋 ${composition.includedAssetCount}개`, `New project · ${composition.includedAssetCount} included assets`)}
@@ -224,7 +227,7 @@ function TemplatePreview({
 export function StudioTemplatesPage() {
   const bt = useBilingual("StudioTemplatesPage");
   const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  const locale = language;
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<StudioTemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -302,7 +305,7 @@ export function StudioTemplatesPage() {
                     : "border-line bg-panel text-fg-2 hover:border-accent/40 hover:text-fg",
                 )}
               >
-                {CATEGORY_LABELS[candidate][locale]}
+                {bt(CATEGORY_LABELS[candidate].ko, CATEGORY_LABELS[candidate].en)}
               </button>
             ))}
             <button
@@ -343,7 +346,7 @@ export function StudioTemplatesPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedId(template.id)}
-                        aria-label={`${templateTitle(template, locale)} ${bt("시각 미리보기", "visual preview")}`}
+                        aria-label={`${templateTitle(template, bt)} ${bt("시각 미리보기", "visual preview")}`}
                         className="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                       >
                         <StudioTemplateVisualPreview
@@ -359,10 +362,10 @@ export function StudioTemplatesPage() {
                           className="min-w-0 flex-1 text-left focus-visible:outline-none"
                         >
                           <span className="inline-flex rounded-full bg-accent-soft px-2 py-1 text-[0.6rem] font-black text-accent">
-                            {CATEGORY_LABELS[template.category][locale]}
+                            {bt(CATEGORY_LABELS[template.category].ko, CATEGORY_LABELS[template.category].en)}
                           </span>
                           <h2 className="mt-3 text-base font-black leading-6 text-fg">
-                            {templateTitle(template, locale)}
+                            {templateTitle(template, bt)}
                           </h2>
                         </button>
                         <button
@@ -376,7 +379,7 @@ export function StudioTemplatesPage() {
                         </button>
                       </div>
                       <p className="mt-2 line-clamp-3 text-xs leading-5 text-fg-2">
-                        {templateDescription(template, locale)}
+                        {templateDescription(template, bt)}
                       </p>
                       {template.definition.composition ? (
                         <p className="mt-3 text-[0.68rem] font-semibold text-fg-3">
