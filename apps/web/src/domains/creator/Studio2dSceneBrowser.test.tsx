@@ -156,6 +156,9 @@ describe("2D scene browser", () => {
     const dialog = screen.getByRole("dialog", { name: title });
     loadImage(within(dialog).getByAltText(title), rooftop, 200);
     expect(within(dialog).getByRole("alert").textContent).toContain("재검수 전 삽입할 수 없습니다");
+    expect(within(dialog).getByRole("alert").querySelector("img")?.getAttribute("src")).toBe(
+      "/brand/theme-scenes/contrast-studio.svg",
+    );
     fireEvent.click(within(dialog).getByRole("button", { name: "이 배경 삽입" }));
     expect(onPick).not.toHaveBeenCalled();
   });
