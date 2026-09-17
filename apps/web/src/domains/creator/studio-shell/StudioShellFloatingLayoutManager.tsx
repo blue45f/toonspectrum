@@ -31,6 +31,11 @@ import {
   studioWorkspaceArrangingSnapshot,
   subscribeStudioWorkspaceArranging,
 } from "../studio-workspace-arrangement";
+import {
+  STUDIO_STROKE_FOCUS_SETTLE_MS,
+  studioStrokeFocusActivitySnapshot,
+  subscribeStudioStrokeFocusActivity,
+} from "../studio-stroke-focus-activity";
 import { useStudioShellFloatingLayout } from "./studio-shell-floating-layout-context";
 import { StudioShellFloatingTarget } from "./StudioShellFloatingTarget";
 import {
@@ -79,6 +84,11 @@ export function StudioShellFloatingLayoutManager() {
     subscribeStudioWorkspaceArranging,
     studioWorkspaceArrangingSnapshot,
     () => false,
+  );
+  const strokeFocusPhase = useSyncExternalStore(
+    subscribeStudioStrokeFocusActivity,
+    studioStrokeFocusActivitySnapshot,
+    () => "idle",
   );
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -416,46 +426,65 @@ export function StudioShellFloatingLayoutManager() {
                 </div>
               </section>
 
-              <section aria-labelledby="studio-shell-floating-auto-hide-heading">
-                <h3 id="studio-shell-floating-auto-hide-heading" className="text-xs font-black">
-                  드로잉 방해 최소화
-                </h3>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={shell.autoHideWhileDrawing}
-                  className={cn(
-                    "mt-2 flex w-full items-start gap-3 rounded-xl border p-3 text-left",
-                    shell.autoHideWhileDrawing
-                      ? "border-accent/60 bg-accent-soft/35"
-                      : "border-line bg-card",
-                    STUDIO_FOCUS_RING,
-                  )}
-                  onClick={() => {
-                    shell.setAutoHideWhileDrawing(!shell.autoHideWhileDrawing);
-                    setNotice(shell.autoHideWhileDrawing
-                      ? "펜 드로잉 자동 숨김을 껐어요."
-                      : "펜으로 그리는 동안 플로팅 UI를 자동으로 숨깁니다.");
-                  }}
-                >
+              <section
+                aria-labelledby="studio-shell-floating-auto-hide-heading"
+                className="rounded-xl border border-line bg-card p-3"
+              >
+                <div className="flex items-start gap-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-raised text-accent">
                     <PenTool size={16} aria-hidden />
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-black text-fg">
-                      펜으로 그리는 동안 자동 숨김
-                    </span>
-                    <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">
-                      캔버스에서 펜 스트로크가 시작되면 상시 플로팅 UI와 보기 버튼을 잠시 숨기고, 마지막 스트로크가 끝난 뒤 자동으로 복원합니다.
-                    </span>
-                    <span className="mt-1 block text-[0.65rem] leading-5 text-accent">
-                      저장 오류·오프라인 경고·참여 중인 통화처럼 안전상 필요한 제어는 계속 표시됩니다.
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-raised px-2 py-1 text-[0.65rem] font-black text-fg-2">
-                    {shell.autoHideWhileDrawing ? "켜짐" : "꺼짐"}
-                  </span>
-                </button>
+                  <div className="min-w-0 flex-1">
+                    <h3 id="studio-shell-floating-auto-hide-heading" className="text-xs font-black">
+                      드로잉 중 자동 집중
+                    </h3>
+                    <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
+                      실제 획이 시작되면 비필수 플로팅 UI를 숨기고, 마지막 획이 끝난 뒤 {STUDIO_STROKE_FOCUS_SETTLE_MS}ms 동안 연속 입력을 기다린 다음 복원합니다.
+                    </p>
+                    <p className="mt-1 text-[0.65rem] leading-5 text-accent">
+                      저장 오류·오프라인 경고·참여 중인 통화·배치 편집처럼 안전상 필요한 제어는 계속 표시됩니다.
+                    </p>
+                    <p className="mt-1 text-[0.65rem] font-bold text-accent" aria-live="polite">
+                      {!shell.autoHideWhileDrawing
+                        ? "자동 집중 꺼짐"
+                        : strokeFocusPhase === "drawing"
+                          ? "현재 획 입력 중 · 비필수 UI 숨김"
+                          : strokeFocusPhase === "settling"
+                            ? "연속 획 대기 · UI 복원 보류"
+                            : "자동 집중 대기 중"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={shell.autoHideWhileDrawing}
+                    aria-label={shell.autoHideWhileDrawing
+                      ? "드로잉 중 자동 집중 끄기"
+                      : "드로잉 중 자동 집중 켜기"}
+                    className={cn(
+                      "relative mt-0.5 h-7 w-12 shrink-0 rounded-full border transition-colors",
+                      shell.autoHideWhileDrawing
+                        ? "border-accent bg-accent"
+                        : "border-line-strong bg-raised",
+                      STUDIO_FOCUS_RING,
+                    )}
+                    onClick={() => {
+                      const enabled = !shell.autoHideWhileDrawing;
+                      shell.setAutoHideWhileDrawing(enabled);
+                      setNotice(enabled
+                        ? "드로잉 중 자동 집중을 켰어요."
+                        : "드로잉 중 자동 집중을 껐어요.");
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute top-1 size-5 rounded-full bg-white shadow transition-transform",
+                        shell.autoHideWhileDrawing ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                  </button>
+                </div>
               </section>
 
               <section aria-labelledby="studio-shell-floating-arrangement-heading">

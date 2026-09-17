@@ -70,6 +70,8 @@ describe("studio shell floating integration", () => {
     expect(provider).toContain("focusModeActive");
     expect(provider).toContain("setSurfaceMounted");
     expect(provider).toContain("visibility.autoHideWhileDrawing || arranging");
+    expect(provider).toContain("subscribeStudioStrokeFocusActivity");
+    expect(provider).toContain("data-studio-shell-stroke-auto-hide");
     const drawingAutoHide = source("studio-shell/studio-shell-drawing-auto-hide.ts");
     expect(drawingAutoHide).toContain('[data-studio-canvas-viewport]');
 
@@ -77,7 +79,8 @@ describe("studio shell floating integration", () => {
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
     expect(manager).toContain("플랫폼 규격");
-    expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
+    expect(manager).toContain("드로잉 중 자동 집중");
+    expect(manager).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");
     expect(manager).toContain("data-studio-shell-mounted-state");
     expect(manager).toContain("data-studio-shell-focus-mode");
