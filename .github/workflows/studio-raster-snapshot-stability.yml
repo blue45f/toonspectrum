@@ -35,7 +35,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     env:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
