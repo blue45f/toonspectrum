@@ -4,6 +4,7 @@ import { Navigate, useParams } from "react-router-dom";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   studioExternalJoinHref,
@@ -12,15 +13,12 @@ import {
   validateStudioExternalToken,
 } from "../studio-route-registry";
 
-type Locale = "ko" | "en";
 type EntryKind = "join" | "present" | "review";
 
-function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-}
 
-function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; readonly locale: Locale }) {
-  const title = locale === "ko" ? "이 링크를 열 수 없어요" : "This link cannot be opened";
+function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  const bt = useBilingual("StudioExternalEntryRoutes");
+  const title = bt("이 링크를 열 수 없어요", "This link cannot be opened");
   const descriptions: Readonly<Record<EntryKind, Readonly<Record<Locale, string>>>> = {
     review: {
       ko: "검토 링크가 잘렸거나 만료됐을 수 있습니다. 링크를 보낸 사람에게 새 링크를 요청해 주세요.",
@@ -44,11 +42,11 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
           </span>
           <h1 className="mt-4 text-2xl font-black text-fg">{title}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {descriptions[kind][locale]}
+            {bt(descriptions[kind].ko, descriptions[kind].en)}
           </p>
           <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
             <ExternalLink size={16} aria-hidden="true" />
-            {locale === "ko" ? "ToonStudio로 이동" : "Open ToonStudio"}
+            {bt("ToonStudio로 이동", "Open ToonStudio")}
           </Link>
         </section>
       </Container>
@@ -62,15 +60,14 @@ function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
     presentationToken?: string;
     shareToken?: string;
   }>();
-  const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  useI18n((state) => state.lang);
   const token = kind === "review"
     ? params.shareToken
     : kind === "present"
       ? params.presentationToken
       : params.inviteToken;
   if (!validateStudioExternalToken(token)) {
-    return <InvalidExternalEntry kind={kind} locale={locale} />;
+    return <InvalidExternalEntry kind={kind} />;
   }
   const href = kind === "review"
     ? studioExternalReviewHref(token)
