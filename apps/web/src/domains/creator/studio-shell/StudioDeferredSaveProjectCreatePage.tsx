@@ -71,16 +71,18 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   animation: Images,
 };
 
-function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+function projectTitle(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.titleKo, option.titleEn);
 }
 
-function projectTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.titleKo : option.titleEn;
-}
-
-function defaultTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.defaultTitleKo : option.defaultTitleEn;
+function defaultTitle(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.defaultTitleKo, option.defaultTitleEn);
 }
 
 function requestedProjectKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
@@ -115,6 +117,7 @@ function WebtoonOnboardingSelect<T extends string>({
   readonly locale: Locale;
   readonly onChange: (value: T) => void;
 }) {
+  const bt = useBilingual("StudioDeferredSaveProjectCreatePage.onboardingSelect");
   return (
     <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor={id}>
       {label}
@@ -126,7 +129,7 @@ function WebtoonOnboardingSelect<T extends string>({
       >
         {options.map((option) => (
           <option key={option.id} value={option.id}>
-            {locale === "ko" ? option.labelKo : option.labelEn}
+            {bt(option.labelKo, option.labelEn)}
           </option>
         ))}
       </select>
@@ -139,7 +142,7 @@ export function StudioDeferredSaveProjectCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  const locale = language;
   const requestedTemplateId = searchParams.get("template");
   const requestedWebtoonSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
   const requestedKindId = requestedProjectKind(searchParams.get("kind"), requestedTemplateId);
@@ -151,7 +154,7 @@ export function StudioDeferredSaveProjectCreatePage() {
     ?? "webtoon-vertical";
 
   const [kind, setKind] = useState<StudioProjectKind>(initialKind.id);
-  const [title, setTitle] = useState(() => defaultTitle(initialKind, locale));
+  const [title, setTitle] = useState(() => defaultTitle(initialKind, bt));
   const [titleEdited, setTitleEdited] = useState(false);
   const [templateId, setTemplateId] = useState(initialTemplateId);
   const [showMoreKinds, setShowMoreKinds] = useState(false);
@@ -166,7 +169,7 @@ export function StudioDeferredSaveProjectCreatePage() {
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((option) => option.id === templateId) ?? templates[0];
   const selectedTemplateLabel = selectedTemplate
-    ? (locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn)
+    ? bt(selectedTemplate.labelKo, selectedTemplate.labelEn)
     : templateId;
   const visibleKinds = useMemo(
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
@@ -183,7 +186,7 @@ export function StudioDeferredSaveProjectCreatePage() {
     {
       id: "kind",
       label: bt("만들 작업 선택", "Choose work type"),
-      description: projectTitle(selected, locale),
+      description: projectTitle(selected, bt),
       state: "complete",
     },
     {
@@ -195,7 +198,7 @@ export function StudioDeferredSaveProjectCreatePage() {
     ...(structuredWebtoonFlow ? [{
       id: "production-track",
       label: bt("제작 트랙 확인", "Confirm production track"),
-      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      description: bt(onboardingPlan.titleKo, onboardingPlan.titleEn),
       state: "complete" as const,
     }] : []),
     {
@@ -211,7 +214,7 @@ export function StudioDeferredSaveProjectCreatePage() {
   const selectKind = (option: StudioProjectCreateKindOption) => {
     setKind(option.id);
     setTemplateId(STUDIO_PROJECT_CREATE_TEMPLATES[option.id][0]?.id ?? `${option.id}-blank`);
-    if (!titleEdited) setTitle(defaultTitle(option, locale));
+    if (!titleEdited) setTitle(defaultTitle(option, bt));
     setError(null);
   };
 
@@ -224,7 +227,7 @@ export function StudioDeferredSaveProjectCreatePage() {
         title,
         kind,
         templateId,
-        primaryLocale: bt("ko-KR", "en-US"),
+        primaryLocale: locale,
       }, window);
       ensureStudioSaveProfile(window.localStorage, result.project.id, {
         provider: "browser",
@@ -313,7 +316,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     </span>
                     <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, locale)}</b>
                     <span id={descriptionId} className="mt-1 block break-words text-xs leading-5 text-fg-3">
-                      {locale === "ko" ? option.descriptionKo : option.descriptionEn}
+                      {bt(option.descriptionKo ?? "", option.descriptionEn ?? "")}
                     </span>
                   </button>
                 );
@@ -380,7 +383,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                 >
                   {templates.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {locale === "ko" ? option.labelKo : option.labelEn}
+                      {bt(option.labelKo, option.labelEn)}
                     </option>
                   ))}
                 </select>
@@ -460,12 +463,12 @@ export function StudioDeferredSaveProjectCreatePage() {
                   <div className="mt-5 grid gap-4 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,.8fr)]">
                     <div>
                       <p className="text-xs font-black text-accent">{bt("추천 제작 트랙", "Recommended production track")}</p>
-                      <h3 className="mt-1 text-lg font-black text-fg">{locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn}</h3>
-                      <p className="mt-2 text-xs leading-5 text-fg-2">{locale === "ko" ? onboardingPlan.summaryKo : onboardingPlan.summaryEn}</p>
+                      <h3 className="mt-1 text-lg font-black text-fg">{bt(onboardingPlan.titleKo, onboardingPlan.titleEn)}</h3>
+                      <p className="mt-2 text-xs leading-5 text-fg-2">{bt(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}</p>
                     </div>
                     <div className="rounded-xl bg-panel p-3">
                       <p className="text-[0.65rem] font-bold text-fg-3">{bt("첫 승인 마일스톤", "First approval milestone")}</p>
-                      <p className="mt-1 text-sm font-bold text-fg">{locale === "ko" ? onboardingPlan.milestoneKo : onboardingPlan.milestoneEn}</p>
+                      <p className="mt-1 text-sm font-bold text-fg">{bt(onboardingPlan.milestoneKo, onboardingPlan.milestoneEn)}</p>
                     </div>
                   </div>
                   <Link href="/learn/process#production-onboarding" className={buttonClass({ variant: "quiet", size: "sm", className: "mt-3 w-full min-w-0 sm:w-auto" })}>
