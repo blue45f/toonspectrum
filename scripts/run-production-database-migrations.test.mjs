@@ -12,6 +12,9 @@ import {
   buildAuthRuntimeAclSql,
   buildCommunityCommentRuntimeAclSql,
   buildTrafficAnalyticsRuntimeAclSql,
+  buildTrafficAnalyticsRuntimeAclViolationSql,
+  buildCreatorRoleWorkspaceRuntimeAclSql,
+  buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCommunityCommentRuntimeAclViolationSql,
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
@@ -778,6 +781,9 @@ test("auth runtime ACL is normalized to the exact DML contract", () => {
 
 test("traffic analytics runtime ACL is private and least-privilege", () => {
   const sql = buildTrafficAnalyticsRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildTrafficAnalyticsRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
 
   for (const relation of [
     "public.traffic_page_view",
@@ -795,6 +801,43 @@ test("traffic analytics runtime ACL is private and least-privilege", () => {
     "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.traffic_session",
   );
   expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
+  for (const relation of [
+    "public.traffic_page_view",
+    "public.traffic_session",
+    "public.traffic_share_event",
+  ]) {
+    expect(violation).toContain(`'${relation}'`);
+  }
+  expect(violation).toContain("'SELECT, INSERT, UPDATE, DELETE'");
+  expect(violation).toContain("'TRUNCATE', 'REFERENCES', 'TRIGGER'");
+});
+
+test("creator role workspace runtime ACL is revision-bounded and private", () => {
+  const sql = buildCreatorRoleWorkspaceRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildCreatorRoleWorkspaceRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain("DO $creator_role_workspace_acl$");
+  expect(sql).toContain(
+    "REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM PUBLIC;",
+  );
+  expect(sql).toContain(
+    'REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM "toonspectrum_runtime";',
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_role_workspace_preference",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("revision", "document", "updatedAt")',
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE|REFERENCES|TRIGGER)/u);
+  for (const mutableColumn of ["revision", "document", "updatedAt"]) {
+    expect(violation).toContain(`'${mutableColumn}'`);
+  }
+  expect(sql).not.toContain('GRANT UPDATE ("userId"');
+  expect(sql).not.toContain('GRANT UPDATE ("projectKey"');
+  expect(sql).not.toContain('GRANT UPDATE ("createdAt"');
 });
 
 test("creator object storage runtime ACL is least-privilege and preserves immutable identity", () => {
@@ -890,6 +933,9 @@ test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () 
   expect(sql).not.toMatch(/GRANT UPDATE \([^)]*rootGraphHash/u);
   expect(sql).not.toMatch(/GRANT UPDATE \([^)]*operation/u);
   expect(sql).not.toMatch(/GRANT INSERT[^;]*studio_capability_ledger/u);
+  expect(sql).not.toContain(
+    'GRANT UPDATE ("decision", "decidedAt")\n  ON TABLE public.studio_review_reviewer',
+  );
 
   for (const relation of [
     "studio_project_graph",
@@ -899,6 +945,7 @@ test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () 
     "studio_compatibility_report",
     "studio_external_file_binding",
     "studio_review",
+    "studio_review_reviewer",
     "studio_capability_ledger",
   ]) {
     expect(violation).toContain(`'${relation}'`);
@@ -1243,6 +1290,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_promotion_comment_like",
     "creator_promotion_post",
     "creator_promotion_report",
+    "creator_role_workspace_preference",
     "creator_work_asset_storage_reference",
     "creator_work_bookmark",
     "creator_work_comment_like",
@@ -1284,6 +1332,9 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_revision",
     "studio_revision_blob",
     "studio_revision_parent",
+    "traffic_page_view",
+    "traffic_session",
+    "traffic_share_event",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",
