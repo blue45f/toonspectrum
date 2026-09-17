@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -106,7 +106,7 @@ describe("route purpose scene", () => {
 });
 
 describe("route visual boundary", () => {
-  it("mounts public route guidance and exposes route metadata", () => {
+  it("mounts public route guidance and exposes route metadata", async () => {
     const result = render(
       <MemoryRouter initialEntries={["/market/browse"]}>
         <SiteRouteExperienceBoundary routeTitle="소재 마켓">
@@ -114,7 +114,9 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
+    });
     expect(document.documentElement.dataset.routeVisualKind).toBe("assets");
     expect(document.documentElement.dataset.routeVisualMotion).toBe("stack");
     expect(document.documentElement.dataset.routePurposeScene).toBe("true");
@@ -151,7 +153,7 @@ describe("route visual boundary", () => {
     ["/studio/new", "create"],
     ["/studio/p/demo/production", "production"],
     ["/studio/manual/getting-started", "learn"],
-  ] as const)("explains non-editor Studio route %s", (path, kind) => {
+  ] as const)("explains non-editor Studio route %s", async (path, kind) => {
     const result = render(
       <MemoryRouter initialEntries={[path]}>
         <SiteRouteExperienceBoundary routeTitle="스튜디오 안내">
@@ -159,6 +161,8 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
+    await waitFor(() => {
+      expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
+    });
   });
 });
