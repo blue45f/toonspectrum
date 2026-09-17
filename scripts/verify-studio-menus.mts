@@ -1092,8 +1092,58 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
     }
 
+    const strokeFocusSwitch = dialog.getByRole("switch", {
+      name: "드로잉 중 자동 집중 끄기",
+    });
+    if (!(await strokeFocusSwitch.isVisible().catch(() => false))) {
+      failures.push("드로잉 중 자동 집중 설정 미노출");
+    }
+
     await dialog.getByRole("button", { name: "보기 설정 닫기" }).click();
-    if (failures.length === 0) log("  floating visibility + WYSIWYG layout ok");
+    const viewport = await page.locator('[data-studio-canvas-viewport="true"]').first().boundingBox();
+    if (!viewport) {
+      failures.push("자동 집중 검증용 캔버스를 찾지 못함");
+    } else {
+      const x = viewport.x + viewport.width * 0.48;
+      const y = viewport.y + viewport.height * 0.45;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      try {
+        await page.mouse.move(x + 28, y + 12, { steps: 4 });
+        await page.waitForFunction(() =>
+          document.documentElement.dataset.studioStrokeFocusPhase === "drawing",
+        );
+        const drawingState = await drawingOptions.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            opacity: style.opacity,
+            visibility: style.visibility,
+            pointerEvents: style.pointerEvents,
+          };
+        });
+        if (
+          drawingState.opacity !== "0"
+          || drawingState.visibility !== "hidden"
+          || drawingState.pointerEvents !== "none"
+        ) {
+          failures.push(`획 입력 중 플로팅 UI가 남음: ${JSON.stringify(drawingState)}`);
+        }
+        if (await launcher.isVisible()) failures.push("획 입력 중 보기 런처가 남음");
+      } finally {
+        await page.mouse.up();
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.dataset.studioStrokeFocusPhase === "settling",
+      );
+      if (await drawingOptions.isVisible()) failures.push("연속 획 대기 중 UI가 너무 일찍 복원됨");
+      await page.waitForFunction(() =>
+        !document.documentElement.hasAttribute("data-studio-stroke-focus-phase"),
+      );
+      await drawingOptions.waitFor({ state: "visible", timeout: 3_000 });
+      await launcher.waitFor({ state: "visible", timeout: 3_000 });
+    }
+
+    if (failures.length === 0) log("  floating visibility + WYSIWYG layout + stroke focus ok");
   } catch (err) {
     failures.push(`플로팅 보기·배치: ${err instanceof Error ? err.message : String(err)}`);
     await page.keyboard.press("Escape").catch(() => undefined);

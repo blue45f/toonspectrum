@@ -1,13 +1,19 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
 import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
 import { StudioP2pMediaTile as MediaTile, P2P_CONTROL_CLASS as controlClass } from "./StudioP2pMediaTile";
 import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
+import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 
 export default function StudioP2pHuddleLauncher() {
   const live = useStudioLiveCollaboration();
+  const strokeFocusPhase = useSyncExternalStore(
+    subscribeStudioStrokeFocusActivity,
+    studioStrokeFocusActivitySnapshot,
+    () => "idle",
+  );
   const controller = useRef<StudioP2pHuddleController | null>(null);
   const cleanup = useRef<(() => void) | null>(null);
   const [open, setOpen] = useState(false);
@@ -26,6 +32,9 @@ export default function StudioP2pHuddleLauncher() {
       controller.current?.close(); controller.current = null;
     };
   }, [room, live.availability, live.canChat]);
+  useEffect(() => {
+    if (strokeFocusPhase === "drawing") setOpen(false);
+  }, [strokeFocusPhase]);
   useEffect(() => {
     const element = log.current;
     if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160)

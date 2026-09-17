@@ -29,6 +29,7 @@ export interface StudioShellFloatingLayoutRuntime {
   readonly isVisible: (id: StudioShellFloatingVisibilityId) => boolean;
   readonly setVisible: (id: StudioShellFloatingVisibilityId, visible: boolean) => void;
   readonly toggleVisible: (id: StudioShellFloatingVisibilityId) => void;
+  readonly setAutoHideDuringStroke: (enabled: boolean) => void;
   readonly applyPreset: (preset: StudioShellFloatingPresetId) => void;
   readonly showAll: () => void;
   readonly hideAll: () => void;
@@ -51,6 +52,7 @@ const FALLBACK_RUNTIME: StudioShellFloatingLayoutRuntime = Object.freeze({
   isVisible: () => true,
   setVisible: () => undefined,
   toggleVisible: () => undefined,
+  setAutoHideDuringStroke: () => undefined,
   applyPreset: () => undefined,
   showAll: () => undefined,
   hideAll: () => undefined,

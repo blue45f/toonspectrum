@@ -438,6 +438,7 @@ import {
   labelStudioCollaborationRole,
 } from "./studio-collaboration-lock-copy";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
+import { setStudioStrokeFocusActivity } from "./studio-stroke-focus-activity";
 import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
 import {
   markAllStudioTeamCommentThreadsRead,
@@ -22552,6 +22553,7 @@ No text, logo, watermark, or copyrighted character.`;
   }
 
   function releaseDrawingPointerSession() {
+    setStudioStrokeFocusActivity("canvas-stroke", false);
     stopFixedRateStrokePump();
     hideStrokeGuide();
     stagePointerFrameMapperCacheRef.current?.invalidate();

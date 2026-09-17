@@ -24,6 +24,11 @@ import {
   arrangeStudioFloatingSurfaces,
   requestStudioFloatingSurfaceLayoutReset,
 } from "../studio-floating-surface-stack";
+import {
+  STUDIO_STROKE_FOCUS_SETTLE_MS,
+  studioStrokeFocusActivitySnapshot,
+  subscribeStudioStrokeFocusActivity,
+} from "../studio-stroke-focus-activity";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import {
   setStudioWorkspaceArranging,
@@ -84,6 +89,11 @@ export function StudioShellFloatingLayoutManager() {
     studioWorkspaceArrangingSnapshot,
     () => false,
   );
+  const strokeFocusPhase = useSyncExternalStore(
+    subscribeStudioStrokeFocusActivity,
+    studioStrokeFocusActivitySnapshot,
+    () => "idle",
+  );
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -113,6 +123,16 @@ export function StudioShellFloatingLayoutManager() {
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
   }, []);
+
+  useEffect(() => {
+    if (strokeFocusPhase !== "drawing") return;
+    setOpen(false);
+    if (typeof document === "undefined") return;
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused.closest('[data-studio-shell-layout-managed="true"], [data-studio-shell-view-options="true"]')) {
+      focused.blur();
+    }
+  }, [strokeFocusPhase]);
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +172,11 @@ export function StudioShellFloatingLayoutManager() {
 
   return (
     <>
-      <style>{`[data-studio-shell-layout-hidden="true"]{display:none!important}`}</style>
+      <style>{`
+[data-studio-shell-layout-hidden="true"]{display:none!important}
+html[data-studio-shell-stroke-auto-hide="true"]:is([data-studio-stroke-focus-phase="drawing"],[data-studio-stroke-focus-phase="settling"]) [data-studio-shell-layout-managed="true"]:not([data-studio-shell-force-visible="true"]),
+html[data-studio-shell-stroke-auto-hide="true"]:is([data-studio-stroke-focus-phase="drawing"],[data-studio-stroke-focus-phase="settling"]) [data-studio-shell-view-options="true"]:not([data-studio-shell-force-visible="true"]){opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+      `}</style>
       {STUDIO_SHELL_FLOATING_SURFACES.map((definition) => (
         <StudioShellFloatingTarget
           key={definition.id}
@@ -162,6 +186,7 @@ export function StudioShellFloatingLayoutManager() {
 
       <div
         data-studio-shell-view-options="true"
+        data-studio-shell-force-visible={arranging ? "true" : undefined}
         className="pointer-events-auto fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden"
       >
         {open ? (
@@ -314,6 +339,63 @@ export function StudioShellFloatingLayoutManager() {
                       </span>
                     </button>
                   ))}
+                </div>
+              </section>
+
+              <section
+                aria-labelledby="studio-shell-stroke-focus-heading"
+                className="rounded-xl border border-line bg-card p-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 id="studio-shell-stroke-focus-heading" className="text-xs font-black">
+                      획을 그리는 동안 화면 비우기
+                    </h3>
+                    <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
+                      실제 획이 시작되면 비필수 플로팅 UI를 즉시 숨기고, 마지막 획이 끝난 뒤 {STUDIO_STROKE_FOCUS_SETTLE_MS}ms 후 복원합니다. 저장 경고·오프라인 위험·참여 중인 통화·배치 편집은 계속 표시됩니다.
+                    </p>
+                    <p className="mt-1 text-[0.65rem] font-bold text-accent" aria-live="polite">
+                      {!shell.visibility.autoHideDuringStroke
+                        ? "자동 집중 꺼짐"
+                        : strokeFocusPhase === "drawing"
+                          ? "현재 획 입력 중 · 비필수 UI 숨김"
+                          : strokeFocusPhase === "settling"
+                            ? "연속 획 대기 · UI 복원 보류"
+                            : "자동 집중 대기 중"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={shell.visibility.autoHideDuringStroke}
+                    className={cn(
+                      "relative mt-0.5 h-7 w-12 shrink-0 rounded-full border transition-colors",
+                      shell.visibility.autoHideDuringStroke
+                        ? "border-accent bg-accent"
+                        : "border-line-strong bg-raised",
+                      STUDIO_FOCUS_RING,
+                    )}
+                    onClick={() => {
+                      const enabled = !shell.visibility.autoHideDuringStroke;
+                      shell.setAutoHideDuringStroke(enabled);
+                      setNotice(enabled
+                        ? "드로잉 중 자동 집중을 켰어요."
+                        : "드로잉 중 자동 집중을 껐어요.");
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute top-1 size-5 rounded-full bg-white shadow transition-transform",
+                        shell.visibility.autoHideDuringStroke ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                    <span className="sr-only">
+                      {shell.visibility.autoHideDuringStroke
+                        ? "드로잉 중 자동 집중 끄기"
+                        : "드로잉 중 자동 집중 켜기"}
+                    </span>
+                  </button>
                 </div>
               </section>
 

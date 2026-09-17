@@ -15,7 +15,9 @@ import {
   hideAllStudioShellFloatingSurfaces,
   isStudioShellFloatingSurfaceVisible,
   normalizeStudioShellFloatingVisibility,
+  setStudioShellFloatingAutoHideDuringStroke,
   setStudioShellFloatingSurfaceVisible,
+  showAllStudioShellFloatingSurfaces,
   studioShellFloatingVisibilityEqual,
   type StudioShellFloatingPresetId,
   type StudioShellFloatingSurfaceId,
@@ -123,6 +125,16 @@ export function StudioShellFloatingLayoutProvider({
     };
   }, [repository]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const root = document.documentElement;
+    root.setAttribute(
+      "data-studio-shell-stroke-auto-hide",
+      visibility.autoHideDuringStroke ? "true" : "false",
+    );
+    return () => root.removeAttribute("data-studio-shell-stroke-auto-hide");
+  }, [visibility.autoHideDuringStroke]);
+
   const commit = useCallback((next: StudioShellFloatingVisibilityState) => {
     const normalized = normalizeStudioShellFloatingVisibility(next);
     if (studioShellFloatingVisibilityEqual(liveVisibility.current, normalized)) return;
@@ -156,16 +168,20 @@ export function StudioShellFloatingLayoutProvider({
     setVisible(id, !isStudioShellFloatingSurfaceVisible(liveVisibility.current, id));
   }, [setVisible]);
 
+  const setAutoHideDuringStroke = useCallback((enabled: boolean) => {
+    commit(setStudioShellFloatingAutoHideDuringStroke(liveVisibility.current, enabled));
+  }, [commit]);
+
   const applyPreset = useCallback((preset: StudioShellFloatingPresetId) => {
-    commit(applyStudioShellFloatingPreset(preset));
+    commit(applyStudioShellFloatingPreset(preset, liveVisibility.current));
   }, [commit]);
 
   const showAll = useCallback(() => {
-    commit(DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY);
+    commit(showAllStudioShellFloatingSurfaces(liveVisibility.current));
   }, [commit]);
 
   const hideAll = useCallback(() => {
-    commit(hideAllStudioShellFloatingSurfaces());
+    commit(hideAllStudioShellFloatingSurfaces(liveVisibility.current));
   }, [commit]);
 
   const resetSurface = useCallback((id: StudioShellFloatingSurfaceId) => {
@@ -189,6 +205,7 @@ export function StudioShellFloatingLayoutProvider({
     isVisible: (id) => isStudioShellFloatingSurfaceVisible(visibility, id),
     setVisible,
     toggleVisible,
+    setAutoHideDuringStroke,
     applyPreset,
     showAll,
     hideAll,
@@ -202,6 +219,7 @@ export function StudioShellFloatingLayoutProvider({
     resetAllSurfaces,
     resetRevisions,
     resetSurface,
+    setAutoHideDuringStroke,
     setVisible,
     showAll,
     toggleVisible,
