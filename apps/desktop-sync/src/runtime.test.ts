@@ -119,3 +119,22 @@ describe("desktop sync cycle metadata boundary", () => {
       .rejects.toMatchObject({ code: "ENOENT" });
   });
 });
+
+it("forgets a journal tombstone after both sides delete the same file", async () => {
+  const root = await temporaryRoot();
+  await writeFile(join(root, "page.psd"), "base");
+  const target = remote();
+  await runDesktopSyncCycle(root, target, {
+    now: "2026-09-17T00:03:00.000Z",
+  });
+  await rm(join(root, "page.psd"));
+  target.listRemoteFiles = vi.fn(async () => []);
+
+  const result = await runDesktopSyncCycle(root, target, {
+    now: "2026-09-17T00:04:00.000Z",
+  });
+  expect(result.counts.forget).toBe(1);
+  expect(result.execution).toMatchObject({ forgotten: 1 });
+  await expect(readFile(desktopSyncJournalPath(root), "utf8"))
+    .resolves.not.toContain("page.psd");
+});

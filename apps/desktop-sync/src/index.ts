@@ -1,3 +1,5 @@
+export * from "./conflict-server.js";
+export * from "./conflict-resolution.js";
 export * from "./upload-session-store.js";
 export * from "./oauth.js";
 export * from "./credential-vault.js";
