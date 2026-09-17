@@ -303,7 +303,7 @@ export function StudioReviewPanel({
           "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-bold",
           statusTone(session.status),
         )}>
-          {STATUS_LABELS[session.status][locale]}
+          {bt(STATUS_LABELS[session.status].ko, STATUS_LABELS[session.status].en)}
         </span>
       </div>
 
