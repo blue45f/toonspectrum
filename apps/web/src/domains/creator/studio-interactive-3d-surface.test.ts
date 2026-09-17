@@ -67,6 +67,22 @@ describe("Studio interactive 3D surface admission", () => {
     });
   });
 
+  it("gives the route-less mannequin exclusive ownership while its canvas transition commits", () => {
+    expect(resolveStudioInteractiveThreeDSurfaceAdmission({
+      bg3dOpen: true,
+      characterShaperOpen: true,
+      dccRouteRequested: false,
+      mannequinPoserOpen: true,
+      poserVrmOpen: true,
+      routedSurface: "canvas",
+    })).toEqual({
+      bg3dOpen: false,
+      characterShaperOpen: false,
+      mannequinPoserOpen: true,
+      poserVrmOpen: false,
+    });
+  });
+
   it("lets the BG3D route own the only renderer during a 3D-to-3D transition", () => {
     expect(resolveStudioInteractiveThreeDSurfaceAdmission({
       bg3dOpen: true,
