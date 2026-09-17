@@ -1,5 +1,5 @@
 import { ArrowLeft, MessageCircle, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import type { FanCafePost } from "@/shared/lib/types";
@@ -7,7 +7,6 @@ import type { FanCafePost } from "@/shared/lib/types";
 import { FanPostImages, FanPostReplySection } from "@/shared/components/fan-cafe-panel";
 import { KIND_LABEL } from "@/shared/components/fan-cafe-utils";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { COMMUNITY_SCOPE_LABEL, getCommunityScopeTargetLink } from "@/shared/lib/community-ui";
 import {
   canShareCommunityPost,
@@ -27,6 +26,11 @@ import { useApiResource } from "@/infrastructure/use-api-resource";
 
 // 토론 스레드 상세 — 목록 카드에서 진입하는 분할 라우트(/community/post/:id).
 // 글 전문 + 첨부 + 답글 트리를 한 화면에 모으고, 보드(작품/작가/펜카페/카페)로 돌아가는 길을 연다.
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
+
 export function CommunityPostPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -166,14 +170,16 @@ export function CommunityPostPage() {
           {(shareable || isOwner) && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {shareable && (
-                <SharePageButton
-                  path={sharePath}
-                  text={post.title}
-                  description={shareDescription}
-                  label="글 공유"
-                  actionLabel="토론 보기"
-                  className="rounded-lg px-2.5"
-                />
+                <Suspense fallback={null}>
+                  <SharePageButton
+                    path={sharePath}
+                    text={post.title}
+                    description={shareDescription}
+                    label="글 공유"
+                    actionLabel="토론 보기"
+                    className="rounded-lg px-2.5"
+                  />
+                </Suspense>
               )}
               {isOwner && (
                 <button

@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import {
@@ -22,7 +22,6 @@ import type { CommunityCafe } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import {
   canShareCommunityCafe,
@@ -37,6 +36,11 @@ import {
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
 import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 export function CafeDetailPage() {
   const { slug: rawSlug } = useParams();
@@ -223,14 +227,16 @@ export function CafeDetailPage() {
 
           <div className="w-full max-w-xs space-y-2 sm:w-auto">
             {shareable && (
-              <SharePageButton
-                path={sharePath}
-                text={cafe.name}
-                description={shareDescription}
-                label="커뮤니티 공유"
-                actionLabel="커뮤니티 보기"
-                className="w-full justify-center rounded-lg"
-              />
+              <Suspense fallback={null}>
+                <SharePageButton
+                  path={sharePath}
+                  text={cafe.name}
+                  description={shareDescription}
+                  label="커뮤니티 공유"
+                  actionLabel="커뮤니티 보기"
+                  className="w-full justify-center rounded-lg"
+                />
+              </Suspense>
             )}
             {canManage && (
               <Link href={`/community/cafes/${encodeURIComponent(cafe.slug)}/manage`} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-semibold text-accent"><Settings size={14} />운영 관리</Link>

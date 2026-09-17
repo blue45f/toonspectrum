@@ -1,5 +1,5 @@
 import { ArrowLeft, Bookmark, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { COLLABORATION_MODES, COLLABORATION_PAY, COLLABORATION_ROLES, COLLABORATION_STATUS, COLLABORATION_TYPES, collaborationBudget } from "../../../../../packages/core/src/collaboration";
 import { ApplicationPanel, ApplicationsPanel } from "./collaboration-application-panel";
@@ -16,12 +16,16 @@ import {
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { collaborationClient } from "@/infrastructure/collaboration-client";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import {
   canShareCollaborationPost,
   compactPublicShareDescription,
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 export function CollaborationPostPage() {
   const { id = "" } = useParams();
@@ -106,14 +110,16 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
           </dl>
           <PortfolioLink url={post.details.portfolioUrl} />
           {shareable && (
-            <SharePageButton
-              path={sharePath}
-              text={post.title}
-              description={shareDescription}
-              label="공고 공유"
-              actionLabel="공고 보기"
-              className={`${collabButton} mt-4 w-full`}
-            />
+            <Suspense fallback={null}>
+              <SharePageButton
+                path={sharePath}
+                text={post.title}
+                description={shareDescription}
+                label="공고 공유"
+                actionLabel="공고 보기"
+                className={`${collabButton} mt-4 w-full`}
+              />
+            </Suspense>
           )}
           {userId ? <button type="button" disabled={busy} aria-pressed={post.saved} className={`${collabButton} mt-4 w-full`} onClick={() => { void act(() => collaborationClient.save(id, !post.saved), post.saved ? "저장을 취소했어요." : "공고를 저장했어요."); }}><Bookmark size={16} aria-hidden="true" fill={post.saved ? "currentColor" : "none"} />{post.saved ? "저장 취소" : "공고 저장"}</button> : <div className="mt-4"><CollabLogin /></div>}
         </section>
