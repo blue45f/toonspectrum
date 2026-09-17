@@ -19,6 +19,8 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/learn/process": "웹툰 제작 과정",
   "/learn/careers": "웹툰 진로·직무 안내",
   "/learn/education": "웹툰 교육기관 찾기",
+  "/learn/resources": "웹툰 교육 자료 허브",
+  "/learn/classroom": "웹툰 교육기관 활용",
   "/learn/recipes": "웹툰 제작 레시피",
   "/story-lab": "스토리 연구실",
   "/discover/works": "만화·작법서 탐색",

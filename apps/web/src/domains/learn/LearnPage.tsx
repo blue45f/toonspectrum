@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { EducationDirectoryPage } from "./EducationDirectoryPage";
 import { LearnPage as LearnContent } from "./LearnContent";
 import { LearningHome, LearningPathPage } from "./LearningHome";
+import { LearningClassroomPage } from "./LearningClassroomPage";
+import { LearningResourceHub } from "./LearningResourceHub";
 import { LearningRecordsPage } from "./LearningRecordsPage";
 import { WebtoonCareerPage } from "./WebtoonCareerPage";
 import { WebtoonProcessPage } from "./WebtoonProcessPage";
@@ -13,6 +15,8 @@ const REFERENCE_LINKS = [
   { path: "/learn/process", label: "웹툰 제작 과정" },
   { path: "/learn/careers", label: "진로·직무 안내" },
   { path: "/learn/education", label: "교육기관 찾기" },
+  { path: "/learn/resources", label: "교육 자료 허브" },
+  { path: "/learn/classroom", label: "교육기관 활용" },
 ] as const;
 
 function LearningReferenceNavigation({ pathname }: { readonly pathname: string }) {
@@ -50,6 +54,8 @@ export function LearnPage() {
   }
 
   const isHome = normalizedPath === "/learn";
+  const resourceHub = normalizedPath === "/learn/resources" ? <LearningResourceHub /> : null;
+  const classroomPage = normalizedPath === "/learn/classroom" ? <LearningClassroomPage /> : null;
   const pathMatch = normalizedPath.match(/^\/learn\/paths\/([^/]+)$/u);
   const referencePage = normalizedPath === "/learn/process"
     ? <WebtoonProcessPage />
@@ -63,7 +69,7 @@ export function LearnPage() {
     <>
       <LearningReferenceNavigation pathname={normalizedPath} />
       <LearningRecordShortcut />
-      {referencePage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
+      {referencePage ?? resourceHub ?? classroomPage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
     </>
   );
 }
