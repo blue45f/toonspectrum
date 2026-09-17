@@ -76,7 +76,7 @@ const DEFINITIONS: Readonly<Record<StudioVrmHandPoseType, HandPoseDefinition>> =
   },
   relaxed: {
     fingers: [[8, 14, 6], [12, 20, 10], [18, 26, 14], [24, 32, 18]], spread: [4, 1, -2, -5],
-    thumb: [[7, 10, 6], [4, 13, 13], [0, 2, 8]],
+    thumb: [[7, 10, 5], [4, 13, 9], [0, 2, 6]],
   },
 };
 

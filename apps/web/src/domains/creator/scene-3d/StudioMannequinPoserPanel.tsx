@@ -19,11 +19,15 @@ import {
   Download,
   FlipHorizontal2,
   ImageIcon,
+  Hand,
   Loader2,
+  Lock,
   PersonStanding,
   RotateCcw,
+  ScanFace,
   Share2,
   Sliders,
+  Unlock,
   Upload,
   UserRound,
   Video,
@@ -641,7 +645,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {poseFrozen ? "🔒 포즈 고정됨" : "🔓 포즈 고정"}
+              {poseFrozen ? <Lock size={13} aria-hidden /> : <Unlock size={13} aria-hidden />}
+              {poseFrozen ? "포즈 고정됨" : "포즈 고정"}
             </button>
             <button
               type="button"
@@ -652,7 +657,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {mirrorMode ? "↔️ 좌우 반전 ON" : "↔️ 좌우 반전"}
+              <FlipHorizontal2 size={13} aria-hidden />
+              {mirrorMode ? "좌우 반전 ON" : "좌우 반전"}
             </button>
             <button
               type="button"
@@ -663,7 +669,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {fingerTracking ? "🖐️ 손가락 솔버 ON" : "🖐️ 손가락 솔버"}
+              <Hand size={13} aria-hidden />
+              {fingerTracking ? "손가락 솔버 ON" : "손가락 솔버"}
             </button>
             <button
               type="button"
@@ -674,7 +681,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {facialTracking ? "😀 표정 맵핑 ON" : "😀 표정 맵핑"}
+              <ScanFace size={13} aria-hidden />
+              {facialTracking ? "표정 맵핑 ON" : "표정 맵핑"}
             </button>
           </div>
         )}
