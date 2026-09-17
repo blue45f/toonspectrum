@@ -9,7 +9,8 @@ import {
 
 function roundTrip() {
   const page = createStudioLinked3dRenderPageFixture();
-  const bundleId = page.elements[0]?.bg3dLtBundleId;
+  const element = page.elements[0];
+  const bundleId = element?.type === "image" ? element.bg3dLtBundleId : undefined;
   if (!bundleId || !page.shared3dStage || !page.linked3dRender) {
     throw new Error("Linked 3D fixture is incomplete.");
   }
@@ -75,7 +76,13 @@ describe("Studio Scene3D linked layer bridge", () => {
   it("fails closed when the Canvas pass receipt and active shot diverge", () => {
     const page = createStudioLinked3dRenderPageFixture("page-diverged");
     const element = page.elements[0];
-    if (!element?.bg3dLtBundleId || !element.bg3dScene || !page.shared3dStage) {
+    if (
+      !element
+      || element.type !== "image"
+      || !element.bg3dLtBundleId
+      || !element.bg3dScene
+      || !page.shared3dStage
+    ) {
       throw new Error("Linked 3D fixture is incomplete.");
     }
     const divergedScene = captureStudioBg3dShot(element.bg3dScene, {

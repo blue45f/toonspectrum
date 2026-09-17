@@ -633,6 +633,7 @@ import {
   removeStudioLinked3dRenderLinks,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
+import { resolveStudioScene3dLinkedLayerRoundTrip } from "./scene3d/studio-scene3d-linked-layer-bridge";
 import type { StudioLiquifyMode } from "./studio-liquify-contract";
 import { mapLiquifyRoiToDocumentFrame, planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
 import {
@@ -14502,8 +14503,17 @@ const puppetWarpArmed =
       readonly legacyDataUrl?: string;
     } | null => {
       if (!element || element.type !== "image") return null;
-      if (element.bg3dScene) return { scene: element.bg3dScene };
       if (element.bg3dLtBundleId) {
+        if (activePage.linked3dRender && activePage.shared3dStage) {
+          const linkedRoundTrip = resolveStudioScene3dLinkedLayerRoundTrip({
+            bundleId: element.bg3dLtBundleId,
+            linked3dRender: activePage.linked3dRender,
+            shared3dStage: activePage.shared3dStage,
+            elements,
+          });
+          if (!linkedRoundTrip.ok) return null;
+          return { scene: linkedRoundTrip.authority.bg3d };
+        }
         const anchor = elements.find(
           (candidate): candidate is ImageEl =>
             candidate.type === "image" &&
@@ -14512,9 +14522,10 @@ const puppetWarpArmed =
         );
         if (anchor?.bg3dScene) return { scene: anchor.bg3dScene };
       }
+      if (element.bg3dScene) return { scene: element.bg3dScene };
       return parseStudio3dTool(element.src) === "bg3d" ? { legacyDataUrl: element.src } : null;
     },
-    [elements]
+    [activePage.linked3dRender, activePage.shared3dStage, elements]
   );
   // Referentially stable so the memoized inspector child doesn't re-render on unrelated commits.
   const selectedBg3dEditSource = useMemo(
