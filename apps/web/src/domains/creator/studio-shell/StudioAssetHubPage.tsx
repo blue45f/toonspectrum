@@ -11,6 +11,7 @@ import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
+import { StudioAssetVisualIntro } from "./StudioAssetVisualIntro";
 import { StudioAssetsPage } from "./StudioFrontDoorPages";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 import {
@@ -157,6 +158,7 @@ export function StudioAssetHubPage() {
         </Container>
       </div>
 
+      {view === "overview" ? <StudioAssetVisualIntro locale={locale} /> : null}
       {view === "overview" ? <StudioAssetsPage /> : null}
       {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{locale === "ko" ? "제작 소재 준비 중…" : "Loading creator essentials…"}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
