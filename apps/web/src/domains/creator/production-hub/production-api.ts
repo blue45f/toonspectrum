@@ -281,13 +281,19 @@ export interface ProductionExternalReviewView {
   }[];
 }
 
+function externalReviewAuthorization(token: string): { readonly headers: Readonly<Record<string, string>> } {
+  return { headers: { Authorization: `Bearer ${token}` } };
+}
+
 export function getProductionExternalReview(
   projectId: string,
   reviewId: string,
   token: string,
 ): Promise<ProductionExternalReviewView> {
-  const query = new URLSearchParams({ token });
-  return api.get(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}?${query.toString()}`);
+  return api.get(
+    `/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}`,
+    externalReviewAuthorization(token),
+  );
 }
 
 export function submitProductionExternalReview(
@@ -300,10 +306,11 @@ export function submitProductionExternalReview(
     readonly note: string;
   },
 ): Promise<ProductionExternalReviewView> {
+  const { token, ...review } = input;
   return api.post(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}/responses`, {
     responseId: mutationId(),
-    ...input,
-  });
+    ...review,
+  }, externalReviewAuthorization(token));
 }
 
 export type ProductionGoogleDriveArtifact =

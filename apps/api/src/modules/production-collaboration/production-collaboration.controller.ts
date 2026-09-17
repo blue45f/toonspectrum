@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   Headers,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -26,6 +27,17 @@ import { ProductionCollaborationService } from "./production-collaboration.servi
 function authenticatedProductionUserId(userId: string | undefined): string {
   if (!userId) throw new ForbiddenException("로그인이 필요해요.");
   return userId;
+}
+
+const EXTERNAL_REVIEW_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
+
+function externalReviewToken(authorization: string | undefined, fallback: string | undefined): string {
+  const bearer = /^Bearer\s+(.+)$/iu.exec(authorization ?? "")?.[1]?.trim();
+  const token = bearer || fallback?.trim() || "";
+  if (!EXTERNAL_REVIEW_TOKEN_PATTERN.test(token)) {
+    throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
+  }
+  return token;
 }
 
 @Controller("/production")
@@ -82,24 +94,39 @@ export class ProductionCollaborationController {
 
   @Get("/public-reviews/:projectId/:reviewId")
   @Header("Cache-Control", "private, no-store, max-age=0")
+  @Header("Referrer-Policy", "no-referrer")
+  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   getExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Query(new ZodValidationPipe(ProductionExternalReviewQueryDto))
     query: ProductionExternalReviewQueryDto,
+    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.getExternalReview(params.projectId, params.reviewId, query.token);
+    return this.service.getExternalReview(
+      params.projectId,
+      params.reviewId,
+      externalReviewToken(authorization, query.token),
+    );
   }
 
   @Post("/public-reviews/:projectId/:reviewId/responses")
   @Header("Cache-Control", "private, no-store, max-age=0")
+  @Header("Referrer-Policy", "no-referrer")
+  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   submitExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Body(new ZodValidationPipe(SubmitProductionExternalReviewDto))
     body: SubmitProductionExternalReviewDto,
+    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.submitExternalReview(params.projectId, params.reviewId, body);
+    return this.service.submitExternalReview(
+      params.projectId,
+      params.reviewId,
+      externalReviewToken(authorization, body.token),
+      body,
+    );
   }
 
   @Post("/projects/:projectId/commands")

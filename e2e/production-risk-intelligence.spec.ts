@@ -99,11 +99,11 @@ test("recovery scenarios compare outcomes and apply only an explicit reversible 
   const apply = page.getByRole("button", { name: "마감 2일 재조정 복구 시나리오 적용" });
   await expect(apply).toBeEnabled();
   await apply.click();
-  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 적용했습니다" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 원자적으로 적용했습니다" })).toBeVisible();
   const undo = page.getByRole("button", { name: "마감 2일 재조정 복구 시나리오 되돌리기" });
   await expect(undo).toBeEnabled();
   await undo.click();
-  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 되돌렸습니다" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "복구 시나리오를 원자적으로 되돌렸습니다" })).toBeVisible();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await capturePageEvidence(page, testInfo, "production-recovery-scenario-mobile");

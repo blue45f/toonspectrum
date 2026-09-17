@@ -942,9 +942,9 @@ describe("ProductionCollaborationService", () => {
     const result = await service().submitExternalReview(
       current.projectId,
       "external-review-1",
+      externalReviewToken,
       {
         responseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        token: externalReviewToken,
         reviewerName: "외부 편집자",
         decision: "request-changes",
         note: "마지막 컷 식자를 수정해 주세요.",
@@ -984,9 +984,9 @@ describe("ProductionCollaborationService", () => {
     const result = await service().submitExternalReview(
       current.projectId,
       "external-review-1",
+      externalReviewToken,
       {
         responseId: existing.id,
-        token: externalReviewToken,
         reviewerName: existing.reviewerName,
         decision: existing.decision,
         note: existing.note,
