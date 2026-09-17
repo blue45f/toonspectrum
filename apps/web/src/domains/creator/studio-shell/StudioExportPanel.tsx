@@ -196,7 +196,7 @@ export function StudioExportPanel({
                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-white/[0.04]" aria-hidden="true" />
               </span>
               <span className={cn("flex min-h-11 items-center px-3", active ? "text-accent" : "text-fg-2")}>
-                {locale === "ko" ? candidateProfile.labelKo : candidateProfile.labelEn}
+                {bt(candidateProfile.labelKo, candidateProfile.labelEn)}
               </span>
             </button>
           );
@@ -289,8 +289,8 @@ export function StudioExportPanel({
           <ul className="mt-4 space-y-2">
             {displayedResult.findings.map((finding) => (
               <li key={finding.code} className="rounded-xl border border-line bg-card/70 p-3 text-xs leading-5 text-fg-2">
-                <b className={finding.severity === "error" ? "text-danger" : finding.severity === "warning" ? "text-warning" : "text-fg"}>{locale === "ko" ? finding.messageKo : finding.messageEn}</b>
-                <span className="mt-1 block text-fg-3">{locale === "ko" ? finding.suggestedActionKo : finding.suggestedActionEn}</span>
+                <b className={finding.severity === "error" ? "text-danger" : finding.severity === "warning" ? "text-warning" : "text-fg"}>{bt(finding.messageKo, finding.messageEn)}</b>
+                <span className="mt-1 block text-fg-3">{bt(finding.suggestedActionKo, finding.suggestedActionEn)}</span>
               </li>
             ))}
           </ul>
